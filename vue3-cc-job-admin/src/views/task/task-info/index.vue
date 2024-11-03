@@ -167,7 +167,9 @@
                   <el-dropdown-item>注册节点</el-dropdown-item>
                   <el-dropdown-item disabled>下次执行时间</el-dropdown-item>
                   <el-dropdown-item divided>启动</el-dropdown-item>
-                  <el-dropdown-item>编辑</el-dropdown-item>
+                  <el-dropdown-item @click="editTask(scope.row.id)"
+                    >编辑</el-dropdown-item
+                  >
                   <el-dropdown-item>删除</el-dropdown-item>
                   <el-dropdown-item>复制</el-dropdown-item>
                 </el-dropdown-menu>
@@ -191,6 +193,12 @@
       :taskId="taskId"
       @close="closeExecuteOne"
     ></ExecuteOne>
+
+    <EditTaskInfo
+      :editTaskInfoVal="editTaskInfoVal"
+      :taskId="taskId"
+      @close="closeEditTaskInfo"
+    ></EditTaskInfo>
   </div>
 </template>
 
@@ -206,6 +214,7 @@ import TaskInfoAPI, {
   TaskInfoPageQuery,
 } from "@/api/task/task-info";
 import ExecuteOne from "./operation/executeone.vue";
+import EditTaskInfo from "./operation/edit-task-info.vue";
 
 const queryFormRef = ref(ElForm);
 
@@ -231,6 +240,7 @@ const dialog = reactive({
 const formData = reactive<TaskInfoForm>({});
 const executeOneVal = ref(false);
 const taskId = ref(0);
+const editTaskInfoVal = ref(false);
 
 const executeOne = (id: number) => {
   console.log(id);
@@ -241,6 +251,16 @@ const executeOne = (id: number) => {
 const closeExecuteOne = () => {
   taskId.value = 0;
   executeOneVal.value = false;
+};
+
+const closeEditTaskInfo = () => {
+  taskId.value = 0;
+  editTaskInfoVal.value = false;
+};
+
+const editTask = (id: number) => {
+  taskId.value = id;
+  editTaskInfoVal.value = true;
 };
 
 /** 查询task_info */
