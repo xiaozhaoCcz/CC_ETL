@@ -1,5 +1,7 @@
 package com.cc.job.task.model.entity;
 
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
 import com.cc.job.common.base.BaseEntity;
 import lombok.Getter;
 import lombok.Setter;
@@ -16,9 +18,12 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @TableName("task_log")
-public class TaskLog extends BaseEntity {
+public class TaskLog{
 
     private static final long serialVersionUID = 1L;
+
+    @TableId(type = IdType.AUTO)
+    private Long id;
 
     /**
      * 执行器主键ID

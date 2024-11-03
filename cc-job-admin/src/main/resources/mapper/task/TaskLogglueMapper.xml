@@ -10,7 +10,7 @@
                 glue_type,
                 glue_source,
                 glue_remark,
-                add_time,
+                create_time,
                 update_time
         FROM
             task_logglue

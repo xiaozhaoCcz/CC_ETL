@@ -25,7 +25,6 @@ public class TaskInfo extends BaseEntity {
      */
     private Long jobGroup;
     private String jobDesc;
-    private LocalDateTime addTime;
     /**
      * 作者
      */

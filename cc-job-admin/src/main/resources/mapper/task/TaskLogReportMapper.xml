@@ -10,6 +10,7 @@
                 running_count,
                 suc_count,
                 fail_count,
+                create_time,
                 update_time
         FROM
             task_log_report

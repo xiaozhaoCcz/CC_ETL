@@ -14,7 +14,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 @Getter
 @Setter
 @TableName("task_lock")
-public class TaskLock extends BaseEntity {
+public class TaskLock {
 
     private static final long serialVersionUID = 1L;
 

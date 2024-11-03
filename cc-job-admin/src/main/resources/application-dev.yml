@@ -93,6 +93,7 @@ security:
     - /swagger-ui.html
     - /api/v1/auth/captcha
     - /ws/**
+    - /xxl-job-admin/api/**
 
 # 文件存储配置
 oss:

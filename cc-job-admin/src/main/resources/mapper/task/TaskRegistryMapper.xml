@@ -7,6 +7,7 @@
 		t.registry_group,
 		t.registry_key,
 		t.registry_value,
+        t.create_time,
 		t.update_time
     </sql>
 
@@ -17,6 +18,7 @@
                 registry_group,
                 registry_key,
                 registry_value,
+                create_time,
                 update_time
         FROM
             task_registry

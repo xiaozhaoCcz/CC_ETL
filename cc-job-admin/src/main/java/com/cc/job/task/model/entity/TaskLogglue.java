@@ -36,5 +36,5 @@ public class TaskLogglue extends BaseEntity {
      * GLUE备注
      */
     private String glueRemark;
-    private LocalDateTime addTime;
+
 }

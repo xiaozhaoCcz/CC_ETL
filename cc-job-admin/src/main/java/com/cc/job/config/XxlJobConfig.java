@@ -12,8 +12,8 @@ import org.springframework.context.annotation.Configuration;
  *
  * @author xuxueli 2017-04-28
  */
-@Configuration
-@ConditionalOnProperty(name = "xxl.job.enabled") // xxl.job.enabled = true 才会自动装配
+//@Configuration
+//@ConditionalOnProperty(name = "xxl.job.enabled") // xxl.job.enabled = true 才会自动装配
 @Slf4j
 public class XxlJobConfig {
 

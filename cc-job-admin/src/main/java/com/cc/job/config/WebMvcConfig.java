@@ -42,20 +42,20 @@ public class WebMvcConfig implements WebMvcConfigurer {
      */
     @Override
     public void configureMessageConverters(List<HttpMessageConverter<?>> converters) {
-        MappingJackson2HttpMessageConverter jackson2HttpMessageConverter = new MappingJackson2HttpMessageConverter();
-        ObjectMapper objectMapper = jackson2HttpMessageConverter.getObjectMapper();
-        objectMapper.registerModule(new JavaTimeModule());
-        objectMapper.configure(JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES, true);
-        objectMapper.configure(SerializationFeature.WRITE_ENUMS_USING_TO_STRING, true);
+//        MappingJackson2HttpMessageConverter jackson2HttpMessageConverter = new MappingJackson2HttpMessageConverter();
+//        ObjectMapper objectMapper = jackson2HttpMessageConverter.getObjectMapper();
+//        objectMapper.registerModule(new JavaTimeModule());
+//        objectMapper.configure(JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES, true);
+//        objectMapper.configure(SerializationFeature.WRITE_ENUMS_USING_TO_STRING, true);
+//
+//        // 处理 Long 和 BigInteger 类型，避免前端精度丢失问题
+//        SimpleModule simpleModule = new SimpleModule();
+//        simpleModule.addSerializer(Long.class, ToStringSerializer.instance);
+//        simpleModule.addSerializer(BigInteger.class, ToStringSerializer.instance);
+//        objectMapper.registerModule(simpleModule);
 
-        // 处理 Long 和 BigInteger 类型，避免前端精度丢失问题
-        SimpleModule simpleModule = new SimpleModule();
-        simpleModule.addSerializer(Long.class, ToStringSerializer.instance);
-        simpleModule.addSerializer(BigInteger.class, ToStringSerializer.instance);
-        objectMapper.registerModule(simpleModule);
-
-        jackson2HttpMessageConverter.setObjectMapper(objectMapper);
-        converters.add(1, jackson2HttpMessageConverter);
+//        jackson2HttpMessageConverter.setObjectMapper(objectMapper);
+//        converters.add(1, jackson2HttpMessageConverter);
     }
 
     /**

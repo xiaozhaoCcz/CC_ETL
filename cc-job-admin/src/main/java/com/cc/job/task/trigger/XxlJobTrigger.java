@@ -123,6 +123,8 @@ public class XxlJobTrigger {
         jobLog.setJobGroup(jobInfo.getJobGroup());
         jobLog.setJobId(jobInfo.getId());
         jobLog.setTriggerTime(LocalDateTime.now());
+        jobLog.setTriggerCode(0);
+        jobLog.setHandleCode(0);
         XxlJobAdminConfig.getAdminConfig().getTaskLogMapper().insert(jobLog);
         logger.debug(">>>>>>>>>>> xxl-job trigger start, jobId:{}", jobLog.getId());
 

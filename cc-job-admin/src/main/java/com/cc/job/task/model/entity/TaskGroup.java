@@ -1,5 +1,6 @@
 package com.cc.job.task.model.entity;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.cc.job.common.base.BaseEntity;
 import lombok.Getter;
 import lombok.Setter;
@@ -39,6 +40,7 @@ public class TaskGroup extends BaseEntity {
      */
     private String addressList;
 
+    @TableField(exist = false)
     private List<String> registryList;  // 执行器地址列表(系统注册)
     public List<String> getRegistryList() {
         if (addressList!=null && addressList.trim().length()>0) {

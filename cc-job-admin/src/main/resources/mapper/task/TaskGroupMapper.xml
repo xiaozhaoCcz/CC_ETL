@@ -10,6 +10,7 @@
                 title,
                 address_type,
                 address_list,
+                create_time,
                 update_time
         FROM
             task_group
