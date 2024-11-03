@@ -107,6 +107,7 @@ watch(
   () => menuMode.value,
   () => {
     if (menuMode.value === "horizontal") {
+
       expandedMenuIndexes.value.forEach((item) => menuRef.value!.close(item));
     }
   }

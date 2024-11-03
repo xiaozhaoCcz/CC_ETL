@@ -1,0 +1,81 @@
+package com.cc.job.task.controller;
+
+import com.cc.job.task.service.TaskGroupService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import com.cc.job.task.model.form.TaskGroupForm;
+import com.cc.job.task.model.query.TaskGroupQuery;
+import com.cc.job.task.model.vo.TaskGroupVO;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.cc.job.common.result.PageResult;
+import com.cc.job.common.result.Result;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
+
+/**
+ * task_group前端控制层
+ *
+ * @author ccjob
+ * @since 2024-11-03 08:21
+ */
+@Tag(name = "task_group接口")
+@RestController
+@RequestMapping("/api/v1/taskGroups")
+@RequiredArgsConstructor
+public class TaskGroupController  {
+
+    private final TaskGroupService taskGroupService;
+
+    @Operation(summary = "task_group分页列表")
+    @GetMapping("/page")
+    //@PreAuthorize("@ss.hasPerm('task:taskGroup:query')")
+    public PageResult<TaskGroupVO> getTaskGroupPage(TaskGroupQuery queryParams ) {
+        IPage<TaskGroupVO> result = taskGroupService.getTaskGroupPage(queryParams);
+        return PageResult.success(result);
+    }
+
+    @Operation(summary = "新增task_group")
+    @PostMapping
+    //@PreAuthorize("@ss.hasPerm('task:taskGroup:add')")
+    public Result<Void> saveTaskGroup(@RequestBody @Valid TaskGroupForm formData ) {
+        boolean result = taskGroupService.saveTaskGroup(formData);
+        return Result.judge(result);
+    }
+
+    @Operation(summary = "获取task_group表单数据")
+    @GetMapping("/{id}/form")
+    //@PreAuthorize("@ss.hasPerm('task:taskGroup:edit')")
+    public Result<TaskGroupForm> getTaskGroupForm(
+        @Parameter(description = "task_groupID") @PathVariable Long id
+    ) {
+        TaskGroupForm formData = taskGroupService.getTaskGroupFormData(id);
+        return Result.success(formData);
+    }
+
+    @Operation(summary = "修改task_group")
+    @PutMapping(value = "/{id}")
+    //@PreAuthorize("@ss.hasPerm('task:taskGroup:edit')")
+    public Result<Void> updateTaskGroup(
+            @Parameter(description = "task_groupID") @PathVariable Long id,
+            @RequestBody @Validated TaskGroupForm formData
+    ) {
+        boolean result = taskGroupService.updateTaskGroup(id, formData);
+        return Result.judge(result);
+    }
+
+    @Operation(summary = "删除task_group")
+    @DeleteMapping("/{ids}")
+    //@PreAuthorize("@ss.hasPerm('task:taskGroup:delete')")
+    public Result<Void> deleteTaskGroups(
+        @Parameter(description = "task_groupID，多个以英文逗号(,)分割") @PathVariable String ids
+    ) {
+        boolean result = taskGroupService.deleteTaskGroups(ids);
+        return Result.judge(result);
+    }
+}

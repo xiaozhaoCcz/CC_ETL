@@ -98,10 +98,7 @@ const onlyOneChild = ref();
  * @param parent 父级路由
  * @returns 是否仅有一个可见子节点
  */
-function hasOneShowingChild(
-  children: RouteRecordRaw[] = [],
-  parent: RouteRecordRaw
-) {
+function hasOneShowingChild(children: RouteRecordRaw[] = [], parent: RouteRecordRaw) {
   // 过滤出可见子节点
   const showingChildren = children.filter((route: RouteRecordRaw) => {
     if (!route.meta?.hidden) {

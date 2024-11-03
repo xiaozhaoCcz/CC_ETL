@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cc.job.task.mapper.TaskLogMapper">
+
+    <!-- 获取task_log分页列表 -->
+    <select id="getTaskLogPage" resultType="com.cc.job.task.model.vo.TaskLogVO">
+        SELECT
+                id,
+                job_group,
+                job_id,
+                executor_address,
+                executor_handler,
+                executor_param,
+                executor_sharding_param,
+                executor_fail_retry_count,
+                trigger_time,
+                trigger_code,
+                trigger_msg,
+                handle_time,
+                handle_code,
+                handle_msg,
+                alarm_status
+        FROM
+            task_log
+        <where>
+        </where>
+    </select>
+
+</mapper>

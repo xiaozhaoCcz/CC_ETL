@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cc.job.task.mapper.TaskInfoMapper">
+
+    <!-- 获取task_info分页列表 -->
+    <select id="getTaskInfoPage" resultType="com.cc.job.task.model.vo.TaskInfoVO">
+        SELECT
+                id,
+                job_group,
+                job_desc,
+                add_time,
+                update_time,
+                author,
+                alarm_email,
+                schedule_type,
+                schedule_conf,
+                misfire_strategy,
+                executor_route_strategy,
+                executor_handler,
+                executor_param,
+                executor_block_strategy,
+                executor_timeout,
+                executor_fail_retry_count,
+                glue_type,
+                glue_source,
+                glue_remark,
+                glue_updatetime,
+                child_jobid,
+                trigger_status,
+                trigger_last_time,
+                trigger_next_time
+        FROM
+            task_info
+        <where>
+        </where>
+    </select>
+
+</mapper>

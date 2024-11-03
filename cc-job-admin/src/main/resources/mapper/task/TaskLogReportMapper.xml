@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cc.job.task.mapper.TaskLogReportMapper">
+
+    <!-- 获取task_log_report分页列表 -->
+    <select id="getTaskLogReportPage" resultType="com.cc.job.task.model.vo.TaskLogReportVO">
+        SELECT
+                id,
+                trigger_day,
+                running_count,
+                suc_count,
+                fail_count,
+                update_time
+        FROM
+            task_log_report
+        <where>
+        </where>
+    </select>
+
+</mapper>

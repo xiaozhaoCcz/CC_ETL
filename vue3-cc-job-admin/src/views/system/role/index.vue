@@ -30,11 +30,7 @@
           <template #icon><Plus /></template>
           新增
         </el-button>
-        <el-button
-          type="danger"
-          :disabled="ids.length === 0"
-          @click="handleDelete()"
-        >
+        <el-button type="danger" :disabled="ids.length === 0" @click="handleDelete()">
           <template #icon><Delete /></template>
           删除
         </el-button>
@@ -110,12 +106,7 @@
       width="500px"
       @close="handleCloseDialog"
     >
-      <el-form
-        ref="roleFormRef"
-        :model="formData"
-        :rules="rules"
-        label-width="100px"
-      >
+      <el-form ref="roleFormRef" :model="formData" :rules="rules" label-width="100px">
         <el-form-item label="角色名称" prop="name">
           <el-input v-model="formData.name" placeholder="请输入角色名称" />
         </el-form-item>
@@ -195,9 +186,7 @@
             <template #content>
               如果只需勾选菜单权限，不需要勾选子菜单或者按钮权限，请关闭父子联动
             </template>
-            <el-icon
-              class="ml-1 color-[--el-color-primary] inline-block cursor-pointer"
-            >
+            <el-icon class="ml-1 color-[--el-color-primary] inline-block cursor-pointer">
               <QuestionFilled />
             </el-icon>
           </el-tooltip>
@@ -221,9 +210,7 @@
 
       <template #footer>
         <div class="dialog-footer">
-          <el-button type="primary" @click="handleAssignPermSubmit">
-            确 定
-          </el-button>
+          <el-button type="primary" @click="handleAssignPermSubmit"> 确 定 </el-button>
           <el-button @click="assignPermDialogVisible = false">取 消</el-button>
         </div>
       </template>
@@ -237,11 +224,7 @@ defineOptions({
   inheritAttrs: false,
 });
 
-import RoleAPI, {
-  RolePageVO,
-  RoleForm,
-  RolePageQuery,
-} from "@/api/system/role";
+import RoleAPI, { RolePageVO, RoleForm, RolePageQuery } from "@/api/system/role";
 import MenuAPI from "@/api/system/menu";
 
 const queryFormRef = ref(ElForm);
