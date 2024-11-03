@@ -6,6 +6,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cc.job.task.model.query.TaskInfoQuery;
 import com.cc.job.task.model.vo.TaskInfoVO;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
 
 /**
  * task_infoMapper接口
@@ -24,5 +27,7 @@ public interface TaskInfoMapper extends BaseMapper<TaskInfo> {
      * @return
      */
     Page<TaskInfoVO> getTaskInfoPage(Page<TaskInfoVO> page, TaskInfoQuery queryParams);
+
+    List<TaskInfo> scheduleJobQuery(@Param("maxNextTime") long maxNextTime, @Param("pagesize") int pagesize );
 
 }

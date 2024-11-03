@@ -1,5 +1,6 @@
 package com.cc.job.task.controller;
 
+import com.cc.job.task.model.dto.TaskInfoTriggerDto;
 import com.cc.job.task.service.TaskInfoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -71,6 +72,13 @@ public class TaskInfoController  {
         @Parameter(description = "task_infoID，多个以英文逗号(,)分割") @PathVariable String ids
     ) {
         boolean result = taskInfoService.deleteTaskInfos(ids);
+        return Result.judge(result);
+    }
+
+    @Operation(summary = "执行任务一次")
+    @PostMapping("/trigger")
+    public Result<Void> triggerJob(@RequestBody TaskInfoTriggerDto taskInfoTriggerDto){
+        boolean result = taskInfoService.triggerJob(taskInfoTriggerDto);
         return Result.judge(result);
     }
 }

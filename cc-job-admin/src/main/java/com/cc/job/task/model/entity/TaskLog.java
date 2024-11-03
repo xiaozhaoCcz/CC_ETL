@@ -23,11 +23,11 @@ public class TaskLog extends BaseEntity {
     /**
      * 执行器主键ID
      */
-    private Integer jobGroup;
+    private Long jobGroup;
     /**
      * 任务，主键ID
      */
-    private Integer jobId;
+    private Long jobId;
     /**
      * 执行器地址，本次执行的地址
      */

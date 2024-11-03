@@ -23,7 +23,7 @@ public class TaskLogglue extends BaseEntity {
     /**
      * 任务，主键ID
      */
-    private Integer jobId;
+    private Long jobId;
     /**
      * GLUE类型
      */

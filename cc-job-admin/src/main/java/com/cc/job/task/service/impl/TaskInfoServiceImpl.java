@@ -1,5 +1,9 @@
 package com.cc.job.task.service.impl;
 
+import com.cc.job.task.enums.TriggerTypeEnum;
+import com.cc.job.task.model.dto.TaskInfoTriggerDto;
+import com.cc.job.task.thread.JobTriggerPoolHelper;
+import com.xxl.job.core.biz.model.ReturnT;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -98,6 +102,22 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
                 .map(Long::parseLong)
                 .toList();
         return this.removeByIds(idList);
+    }
+
+    @Override
+    public boolean triggerJob(TaskInfoTriggerDto taskInfoTriggerDto) {
+
+//        XxlJobInfo xxlJobInfo = xxlJobInfoDao.loadById(jobId);
+//        if (xxlJobInfo == null) {
+//            return new ReturnT<String>(ReturnT.FAIL.getCode(), I18nUtil.getString("jobinfo_glue_jobid_unvalid"));
+//        }
+        // force cover job param
+        if (taskInfoTriggerDto.getExecutorParam() == null) {
+            taskInfoTriggerDto.setExecutorParam("");
+        }
+
+        //JobTriggerPoolHelper.trigger(jobId, TriggerTypeEnum.MANUAL, -1, null, taskInfoTriggerDto.getExecutorParam(), taskInfoTriggerDto.getAddressList());
+        return true;
     }
 
 }

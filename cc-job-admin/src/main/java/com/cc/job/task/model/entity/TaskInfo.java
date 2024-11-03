@@ -23,7 +23,7 @@ public class TaskInfo extends BaseEntity {
     /**
      * 执行器主键ID
      */
-    private Integer jobGroup;
+    private Long jobGroup;
     private String jobDesc;
     private LocalDateTime addTime;
     /**

@@ -1,5 +1,6 @@
 package com.cc.job.task.service;
 
+import com.cc.job.task.model.dto.TaskInfoTriggerDto;
 import com.cc.job.task.model.entity.TaskInfo;
 import com.cc.job.task.model.form.TaskInfoForm;
 import com.cc.job.task.model.query.TaskInfoQuery;
@@ -55,4 +56,5 @@ public interface TaskInfoService extends IService<TaskInfo> {
      */
     boolean deleteTaskInfos(String ids);
 
+    boolean triggerJob(TaskInfoTriggerDto taskInfoTriggerDto);
 }
