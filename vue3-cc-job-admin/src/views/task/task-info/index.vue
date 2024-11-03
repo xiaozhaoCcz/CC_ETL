@@ -160,7 +160,9 @@
               </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item>执行一次</el-dropdown-item>
+                  <el-dropdown-item @click="executeOne(scope.row.id)"
+                    >执行一次</el-dropdown-item
+                  >
                   <el-dropdown-item>查询日志</el-dropdown-item>
                   <el-dropdown-item>注册节点</el-dropdown-item>
                   <el-dropdown-item disabled>下次执行时间</el-dropdown-item>
@@ -184,124 +186,11 @@
       />
     </el-card>
 
-    <!-- task_info表单弹窗 -->
-    <el-dialog
-      v-model="dialog.visible"
-      :title="dialog.title"
-      width="500px"
-      @close="handleCloseDialog"
-    >
-      <el-form ref="dataFormRef" :model="formData" :rules="rules" label-width="100px">
-        <el-form-item label="" prop="id">
-          <el-input v-model="formData.id" placeholder="" />
-        </el-form-item>
-        <el-form-item label="执行器主键ID" prop="jobGroup">
-          <el-input v-model="formData.jobGroup" placeholder="执行器主键ID" />
-        </el-form-item>
-        <el-form-item label="" prop="jobDesc">
-          <el-input v-model="formData.jobDesc" placeholder="" />
-        </el-form-item>
-        <el-form-item label="" prop="addTime">
-          <el-date-picker
-            v-model="formData.addTime"
-            type="datetime"
-            placeholder=""
-            value-format="YYYY-MM-DD HH:mm:ss"
-          />
-        </el-form-item>
-        <el-form-item label="" prop="updateTime">
-          <el-date-picker
-            v-model="formData.updateTime"
-            type="datetime"
-            placeholder=""
-            value-format="YYYY-MM-DD HH:mm:ss"
-          />
-        </el-form-item>
-        <el-form-item label="作者" prop="author">
-          <el-input v-model="formData.author" placeholder="作者" />
-        </el-form-item>
-        <el-form-item label="报警邮件" prop="alarmEmail">
-          <el-input v-model="formData.alarmEmail" placeholder="报警邮件" />
-        </el-form-item>
-        <el-form-item label="调度类型" prop="scheduleType">
-          <el-input v-model="formData.scheduleType" placeholder="调度类型" />
-        </el-form-item>
-        <el-form-item label="调度配置，值含义取决于调度类型" prop="scheduleConf">
-          <el-input
-            v-model="formData.scheduleConf"
-            placeholder="调度配置，值含义取决于调度类型"
-          />
-        </el-form-item>
-        <el-form-item label="调度过期策略" prop="misfireStrategy">
-          <el-input v-model="formData.misfireStrategy" placeholder="调度过期策略" />
-        </el-form-item>
-        <el-form-item label="执行器路由策略" prop="executorRouteStrategy">
-          <el-input
-            v-model="formData.executorRouteStrategy"
-            placeholder="执行器路由策略"
-          />
-        </el-form-item>
-        <el-form-item label="执行器任务handler" prop="executorHandler">
-          <el-input v-model="formData.executorHandler" placeholder="执行器任务handler" />
-        </el-form-item>
-        <el-form-item label="执行器任务参数" prop="executorParam">
-          <el-input v-model="formData.executorParam" placeholder="执行器任务参数" />
-        </el-form-item>
-        <el-form-item label="阻塞处理策略" prop="executorBlockStrategy">
-          <el-input v-model="formData.executorBlockStrategy" placeholder="阻塞处理策略" />
-        </el-form-item>
-        <el-form-item label="任务执行超时时间，单位秒" prop="executorTimeout">
-          <el-input
-            v-model="formData.executorTimeout"
-            placeholder="任务执行超时时间，单位秒"
-          />
-        </el-form-item>
-        <el-form-item label="失败重试次数" prop="executorFailRetryCount">
-          <el-input
-            v-model="formData.executorFailRetryCount"
-            placeholder="失败重试次数"
-          />
-        </el-form-item>
-        <el-form-item label="GLUE类型" prop="glueType">
-          <el-input v-model="formData.glueType" placeholder="GLUE类型" />
-        </el-form-item>
-        <el-form-item label="GLUE源代码" prop="glueSource">
-          <el-input v-model="formData.glueSource" placeholder="GLUE源代码" />
-        </el-form-item>
-        <el-form-item label="GLUE备注" prop="glueRemark">
-          <el-input v-model="formData.glueRemark" placeholder="GLUE备注" />
-        </el-form-item>
-        <el-form-item label="GLUE更新时间" prop="glueUpdatetime">
-          <el-date-picker
-            v-model="formData.glueUpdatetime"
-            type="datetime"
-            placeholder="GLUE更新时间"
-            value-format="YYYY-MM-DD HH:mm:ss"
-          />
-        </el-form-item>
-        <el-form-item label="子任务ID，多个逗号分隔" prop="childJobid">
-          <el-input v-model="formData.childJobid" placeholder="子任务ID，多个逗号分隔" />
-        </el-form-item>
-        <el-form-item label="调度状态：0-停止，1-运行" prop="triggerStatus">
-          <el-input
-            v-model="formData.triggerStatus"
-            placeholder="调度状态：0-停止，1-运行"
-          />
-        </el-form-item>
-        <el-form-item label="上次调度时间" prop="triggerLastTime">
-          <el-input v-model="formData.triggerLastTime" placeholder="上次调度时间" />
-        </el-form-item>
-        <el-form-item label="下次调度时间" prop="triggerNextTime">
-          <el-input v-model="formData.triggerNextTime" placeholder="下次调度时间" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button type="primary" @click="handleSubmit()">确定</el-button>
-          <el-button @click="handleCloseDialog()">取消</el-button>
-        </div>
-      </template>
-    </el-dialog>
+    <ExecuteOne
+      :executeOneVal="executeOneVal"
+      :taskId="taskId"
+      @close="closeExecuteOne"
+    ></ExecuteOne>
   </div>
 </template>
 
@@ -316,9 +205,9 @@ import TaskInfoAPI, {
   TaskInfoForm,
   TaskInfoPageQuery,
 } from "@/api/task/task-info";
+import ExecuteOne from "./operation/executeone.vue";
 
 const queryFormRef = ref(ElForm);
-const dataFormRef = ref(ElForm);
 
 const loading = ref(false);
 const removeIds = ref<number[]>([]);
@@ -340,33 +229,19 @@ const dialog = reactive({
 
 // task_info表单数据
 const formData = reactive<TaskInfoForm>({});
+const executeOneVal = ref(false);
+const taskId = ref(0);
 
-// task_info表单校验规则
-const rules = reactive({
-  addTime: [{ required: true, message: "请输入", trigger: "blur" }],
-  updateTime: [{ required: true, message: "请输入", trigger: "blur" }],
-  author: [{ required: true, message: "请输入作者", trigger: "blur" }],
-  alarmEmail: [{ required: true, message: "请输入报警邮件", trigger: "blur" }],
-  scheduleConf: [
-    { required: true, message: "请输入调度配置，值含义取决于调度类型", trigger: "blur" },
-  ],
-  executorRouteStrategy: [
-    { required: true, message: "请输入执行器路由策略", trigger: "blur" },
-  ],
-  executorHandler: [
-    { required: true, message: "请输入执行器任务handler", trigger: "blur" },
-  ],
-  executorParam: [{ required: true, message: "请输入执行器任务参数", trigger: "blur" }],
-  executorBlockStrategy: [
-    { required: true, message: "请输入阻塞处理策略", trigger: "blur" },
-  ],
-  glueSource: [{ required: true, message: "请输入GLUE源代码", trigger: "blur" }],
-  glueRemark: [{ required: true, message: "请输入GLUE备注", trigger: "blur" }],
-  glueUpdatetime: [{ required: true, message: "请输入GLUE更新时间", trigger: "blur" }],
-  childJobid: [
-    { required: true, message: "请输入子任务ID，多个逗号分隔", trigger: "blur" },
-  ],
-});
+const executeOne = (id: number) => {
+  console.log(id);
+  executeOneVal.value = true;
+  taskId.value = id;
+};
+
+const closeExecuteOne = () => {
+  taskId.value = 0;
+  executeOneVal.value = false;
+};
 
 /** 查询task_info */
 function handleQuery() {
@@ -404,41 +279,6 @@ function handleOpenDialog(id?: number) {
   } else {
     dialog.title = "新增task_info";
   }
-}
-
-/** 提交task_info表单 */
-function handleSubmit() {
-  dataFormRef.value.validate((valid: any) => {
-    if (valid) {
-      loading.value = true;
-      const id = formData.id;
-      if (id) {
-        TaskInfoAPI.update(id, formData)
-          .then(() => {
-            ElMessage.success("修改成功");
-            handleCloseDialog();
-            handleResetQuery();
-          })
-          .finally(() => (loading.value = false));
-      } else {
-        TaskInfoAPI.add(formData)
-          .then(() => {
-            ElMessage.success("新增成功");
-            handleCloseDialog();
-            handleResetQuery();
-          })
-          .finally(() => (loading.value = false));
-      }
-    }
-  });
-}
-
-/** 关闭task_info弹窗 */
-function handleCloseDialog() {
-  dialog.visible = false;
-  dataFormRef.value.resetFields();
-  dataFormRef.value.clearValidate();
-  formData.id = undefined;
 }
 
 /** 删除task_info */

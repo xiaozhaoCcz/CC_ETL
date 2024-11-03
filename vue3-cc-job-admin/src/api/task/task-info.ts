@@ -57,6 +57,14 @@ const TaskInfoAPI = {
       url: `${TASKINFO_BASE_URL}/${ids}`,
       method: "delete",
     });
+  },
+
+  triggerJob(data: any) {
+    return request({
+      url: `${TASKINFO_BASE_URL}/trigger`,
+      method: "post",
+      data: data,
+    });
   }
 }
 
