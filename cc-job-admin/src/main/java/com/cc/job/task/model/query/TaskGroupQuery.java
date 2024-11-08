@@ -18,4 +18,7 @@ import java.util.List;
 @Setter
 public class TaskGroupQuery extends BasePageQuery {
 
+    private String appName;
+
+    private String title;
 }

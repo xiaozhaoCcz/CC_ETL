@@ -7,6 +7,8 @@ import com.cc.job.task.model.vo.TaskGroupVO;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 
+import java.util.List;
+
 /**
  * task_group服务类
  *
@@ -55,4 +57,5 @@ public interface TaskGroupService extends IService<TaskGroup> {
      */
     boolean deleteTaskGroups(String ids);
 
+    List<String> findAddressList(Long id);
 }

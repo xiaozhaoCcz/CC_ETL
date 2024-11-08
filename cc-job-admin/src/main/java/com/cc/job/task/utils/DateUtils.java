@@ -8,6 +8,8 @@ import java.util.Date;
 
 public class DateUtils {
 
+    public static final String DATE_FORMAT1  = "yyyy-MM-dd HH:mm:ss";
+
     public static Date asDate(LocalDate localDate) {
         return Date.from(localDate.atStartOfDay().atZone(ZoneId.systemDefault()).toInstant());
     }

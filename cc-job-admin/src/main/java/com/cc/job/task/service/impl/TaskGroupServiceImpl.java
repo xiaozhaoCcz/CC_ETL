@@ -1,6 +1,8 @@
 package com.cc.job.task.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -13,6 +15,7 @@ import com.cc.job.task.model.query.TaskGroupQuery;
 import com.cc.job.task.model.vo.TaskGroupVO;
 import com.cc.job.task.converter.TaskGroupConverter;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -40,10 +43,19 @@ public class TaskGroupServiceImpl extends ServiceImpl<TaskGroupMapper, TaskGroup
     */
     @Override
     public IPage<TaskGroupVO> getTaskGroupPage(TaskGroupQuery queryParams) {
-        Page<TaskGroupVO> pageVO = this.baseMapper.getTaskGroupPage(
-                new Page<>(queryParams.getPageNum(), queryParams.getPageSize()),
-                queryParams
-        );
+        Page<TaskGroupVO> pageVO = new Page<>();
+        LambdaQueryWrapper<TaskGroup> wrapper= new LambdaQueryWrapper<>();
+        if(StringUtils.isNotBlank(queryParams.getAppName())){
+            wrapper.like(TaskGroup::getAppName,queryParams.getAppName());
+        }
+        if(StringUtils.isNotBlank(queryParams.getTitle())){
+            wrapper.like(TaskGroup::getTitle,queryParams.getTitle());
+        }
+        Page<TaskGroup> page = this.page(new Page<>(queryParams.getPageNum(), queryParams.getPageSize()), wrapper);
+        List<TaskGroup> records = page.getRecords();
+        List<TaskGroupVO> voList = records.stream().map(taskGroupConverter::toVo).toList();
+        pageVO.setRecords(voList);
+        pageVO.setTotal(page.getTotal());
         return pageVO;
     }
     
@@ -98,6 +110,17 @@ public class TaskGroupServiceImpl extends ServiceImpl<TaskGroupMapper, TaskGroup
                 .map(Long::parseLong)
                 .toList();
         return this.removeByIds(idList);
+    }
+
+    @Override
+    public List<String> findAddressList(Long id) {
+        TaskGroup taskGroup = this.getById(id);
+        if (taskGroup!= null && StrUtil.isNotBlank(taskGroup.getAddressList())) {
+            return Arrays.stream(taskGroup.getAddressList().split(","))
+                   .map(String::trim)
+                   .collect(Collectors.toList());
+        }
+        return new ArrayList<>();
     }
 
 }

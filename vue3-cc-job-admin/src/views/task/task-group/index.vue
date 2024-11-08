@@ -2,6 +2,22 @@
   <div class="app-container">
     <div class="search-container">
       <el-form ref="queryFormRef" :model="queryParams" :inline="true">
+        <el-form-item label="AppName" prop="appName">
+          <el-input
+            v-model="queryParams.appName"
+            placeholder="请输入AppName"
+            clearable
+            @keyup.enter="handleQuery"
+          />
+        </el-form-item>
+        <el-form-item label="执行器名称" prop="title">
+          <el-input
+            v-model="queryParams.title"
+            placeholder="请输入执行器名称"
+            clearable
+            @keyup.enter="handleQuery"
+          />
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleQuery">
             <template #icon><Search /></template>
@@ -17,16 +33,11 @@
 
     <el-card shadow="never" class="table-container">
       <template #header>
-        <el-button
-          v-hasPerm="['task:taskGroup:add']"
-          type="success"
-          @click="handleOpenDialog()"
-        >
+        <el-button type="success" @click="handleOpenDialog()">
           <template #icon><Plus /></template>
           新增
         </el-button>
         <el-button
-          v-hasPerm="['task:taskGroup:delete']"
           type="danger"
           :disabled="removeIds.length === 0"
           @click="handleDelete()"
@@ -45,7 +56,7 @@
         @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection" width="55" align="center" />
-        <el-table-column key="id" label="" prop="id" min-width="150" align="center" />
+        <el-table-column type="index" width="120" label="序号" align="center" />
         <el-table-column
           key="appName"
           label="执行器AppName"
@@ -62,29 +73,35 @@
         />
         <el-table-column
           key="addressType"
-          label="执行器地址类型：0=自动注册、1=手动录入"
+          label="执行器类型"
           prop="addressType"
           min-width="150"
           align="center"
-        />
+        >
+          <template #default="{ row }">
+            {{ row.addressType === 0 ? "自动注册" : "手动录入" }}
+          </template>
+        </el-table-column>
         <el-table-column
           key="addressList"
-          label="执行器地址列表，多地址逗号分隔"
+          label="OnLine机器地址"
           prop="addressList"
           min-width="150"
           align="center"
-        />
-        <el-table-column
-          key="updateTime"
-          label=""
-          prop="updateTime"
-          min-width="150"
-          align="center"
-        />
+        >
+          <template #default="{ row }">
+            <span v-if="row.addressList === null || row.addressList === ''"> 无 </span>
+            <span v-else>
+              <el-link type="primary" @click="findAddressList(row.id)"
+                >查看</el-link
+              ></span
+            >
+          </template>
+        </el-table-column>
+
         <el-table-column fixed="right" label="操作" width="220">
           <template #default="scope">
             <el-button
-              v-hasPerm="['task:taskGroup:edit']"
               type="primary"
               size="small"
               link
@@ -94,7 +111,6 @@
               编辑
             </el-button>
             <el-button
-              v-hasPerm="['task:taskGroup:delete']"
               type="danger"
               size="small"
               link
@@ -116,51 +132,25 @@
       />
     </el-card>
 
-    <!-- task_group表单弹窗 -->
     <el-dialog
-      v-model="dialog.visible"
-      :title="dialog.title"
-      width="500px"
-      @close="handleCloseDialog"
+      v-model="addressVisible"
+      title="注册节点"
+      width="300px"
+      @close="handleCloseAddress"
     >
-      <el-form ref="dataFormRef" :model="formData" :rules="rules" label-width="100px">
-        <el-form-item label="" prop="id">
-          <el-input v-model="formData.id" placeholder="" />
-        </el-form-item>
-        <el-form-item label="执行器AppName" prop="appName">
-          <el-input v-model="formData.appName" placeholder="执行器AppName" />
-        </el-form-item>
-        <el-form-item label="执行器名称" prop="title">
-          <el-input v-model="formData.title" placeholder="执行器名称" />
-        </el-form-item>
-        <el-form-item label="执行器地址类型：0=自动注册、1=手动录入" prop="addressType">
-          <el-input
-            v-model="formData.addressType"
-            placeholder="执行器地址类型：0=自动注册、1=手动录入"
-          />
-        </el-form-item>
-        <el-form-item label="执行器地址列表，多地址逗号分隔" prop="addressList">
-          <el-input
-            v-model="formData.addressList"
-            placeholder="执行器地址列表，多地址逗号分隔"
-          />
-        </el-form-item>
-        <el-form-item label="" prop="updateTime">
-          <el-date-picker
-            v-model="formData.updateTime"
-            type="datetime"
-            placeholder=""
-            value-format="YYYY-MM-DD HH:mm:ss"
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button type="primary" @click="handleSubmit()">确定</el-button>
-          <el-button @click="handleCloseDialog()">取消</el-button>
-        </div>
-      </template>
+      <ul>
+        <li v-for="item in addressList">
+          {{ item }}
+        </li>
+      </ul>
     </el-dialog>
+
+    <EditTaskGroup
+      :taskGroupVisible="taskGroupVisible"
+      :formData="formData"
+      @close="handleCloseDialog"
+      @handleResetQuery="handleResetQuery"
+    ></EditTaskGroup>
   </div>
 </template>
 
@@ -175,13 +165,15 @@ import TaskGroupAPI, {
   TaskGroupForm,
   TaskGroupPageQuery,
 } from "@/api/task/task-group";
+import EditTaskGroup from "./operation/edit-task-group.vue";
 
 const queryFormRef = ref(ElForm);
-const dataFormRef = ref(ElForm);
 
 const loading = ref(false);
 const removeIds = ref<number[]>([]);
 const total = ref(0);
+const addressList = ref([]);
+const addressVisible = ref(false);
 
 const queryParams = reactive<TaskGroupPageQuery>({
   pageNum: 1,
@@ -192,21 +184,41 @@ const queryParams = reactive<TaskGroupPageQuery>({
 const pageData = ref<TaskGroupPageVO[]>([]);
 
 // 弹窗
-const dialog = reactive({
+const taskGroupVisible = reactive({
   title: "",
   visible: false,
 });
 
 // task_group表单数据
-const formData = reactive<TaskGroupForm>({});
-
-// task_group表单校验规则
-const rules = reactive({
-  addressList: [
-    { required: true, message: "请输入执行器地址列表，多地址逗号分隔", trigger: "blur" },
-  ],
-  updateTime: [{ required: true, message: "请输入", trigger: "blur" }],
+const formData = reactive<TaskGroupForm>({
+  addressType: 0,
 });
+
+function findAddressList(id: number) {
+  console.log(id);
+  addressVisible.value = true;
+  TaskGroupAPI.findAddressList(id).then((data: any) => {
+    addressList.value = data;
+  });
+}
+
+const handleCloseAddress = () => {
+  addressVisible.value = false;
+  addressList.value = [];
+};
+
+/** 打开task_group弹窗 */
+function handleOpenDialog(id?: number) {
+  taskGroupVisible.visible = true;
+  if (id) {
+    taskGroupVisible.title = "修改taskGroup";
+    TaskGroupAPI.getFormData(id).then((data) => {
+      Object.assign(formData, data);
+    });
+  } else {
+    taskGroupVisible.title = "新增taskGroup";
+  }
+}
 
 /** 查询task_group */
 function handleQuery() {
@@ -221,6 +233,11 @@ function handleQuery() {
     });
 }
 
+function handleCloseDialog() {
+  formData.id = undefined;
+  taskGroupVisible.visible = false;
+}
+
 /** 重置task_group查询 */
 function handleResetQuery() {
   queryFormRef.value!.resetFields();
@@ -231,54 +248,6 @@ function handleResetQuery() {
 /** 行复选框选中记录选中ID集合 */
 function handleSelectionChange(selection: any) {
   removeIds.value = selection.map((item: any) => item.id);
-}
-
-/** 打开task_group弹窗 */
-function handleOpenDialog(id?: number) {
-  dialog.visible = true;
-  if (id) {
-    dialog.title = "修改task_group";
-    TaskGroupAPI.getFormData(id).then((data) => {
-      Object.assign(formData, data);
-    });
-  } else {
-    dialog.title = "新增task_group";
-  }
-}
-
-/** 提交task_group表单 */
-function handleSubmit() {
-  dataFormRef.value.validate((valid: any) => {
-    if (valid) {
-      loading.value = true;
-      const id = formData.id;
-      if (id) {
-        TaskGroupAPI.update(id, formData)
-          .then(() => {
-            ElMessage.success("修改成功");
-            handleCloseDialog();
-            handleResetQuery();
-          })
-          .finally(() => (loading.value = false));
-      } else {
-        TaskGroupAPI.add(formData)
-          .then(() => {
-            ElMessage.success("新增成功");
-            handleCloseDialog();
-            handleResetQuery();
-          })
-          .finally(() => (loading.value = false));
-      }
-    }
-  });
-}
-
-/** 关闭task_group弹窗 */
-function handleCloseDialog() {
-  dialog.visible = false;
-  dataFormRef.value.resetFields();
-  dataFormRef.value.clearValidate();
-  formData.id = undefined;
 }
 
 /** 删除task_group */

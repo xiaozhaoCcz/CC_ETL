@@ -22,7 +22,7 @@ public class TaskGroupVO implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    private Integer id;
+    private Long id;
     @Schema(description = "执行器AppName")
     private String appName;
     @Schema(description = "执行器名称")
@@ -31,5 +31,8 @@ public class TaskGroupVO implements Serializable {
     private Integer addressType;
     @Schema(description = "执行器地址列表，多地址逗号分隔")
     private String addressList;
-    private LocalDateTime updateTime;
+
+    private String createTime;
+
+    private String updateTime;
 }

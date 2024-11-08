@@ -87,13 +87,7 @@
         @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection" width="55" align="center" />
-        <el-table-column
-          key="id"
-          label="任务id"
-          prop="id"
-          min-width="150"
-          align="center"
-        />
+        <el-table-column type="index" width="50" label="序号" />
         <el-table-column
           key="jobDesc"
           label="任务描述"

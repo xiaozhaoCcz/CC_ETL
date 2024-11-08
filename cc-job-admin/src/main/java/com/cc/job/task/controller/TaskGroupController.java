@@ -18,6 +18,8 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 
+import java.util.List;
+
 /**
  * task_group前端控制层
  *
@@ -77,5 +79,13 @@ public class TaskGroupController  {
     ) {
         boolean result = taskGroupService.deleteTaskGroups(ids);
         return Result.judge(result);
+    }
+
+
+    @Operation(summary = "查看地址")
+    @GetMapping("/findAddressList/{id}")
+    public Result<List<String>> findAddressList(@PathVariable Long id){
+        List<String> list = taskGroupService.findAddressList(id);
+        return Result.success(list);
     }
 }
