@@ -16,13 +16,5 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface TaskGroupMapper extends BaseMapper<TaskGroup> {
 
-    /**
-     * 获取task_group分页数据
-     *
-     * @param page 分页对象
-     * @param queryParams 查询参数
-     * @return
-     */
-    Page<TaskGroupVO> getTaskGroupPage(Page<TaskGroupVO> page, TaskGroupQuery queryParams);
 
 }

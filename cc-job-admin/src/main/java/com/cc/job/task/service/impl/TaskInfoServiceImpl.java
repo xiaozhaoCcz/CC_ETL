@@ -1,5 +1,6 @@
 package com.cc.job.task.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.common.exception.BusinessException;
 import com.cc.job.core.cron.CronExpression;
 import com.cc.job.task.enums.ExecutorRouteStrategyEnum;
@@ -8,6 +9,7 @@ import com.cc.job.task.enums.ScheduleTypeEnum;
 import com.cc.job.task.enums.TriggerTypeEnum;
 import com.cc.job.task.model.dto.TaskInfoTriggerDto;
 import com.cc.job.task.model.entity.TaskGroup;
+import com.cc.job.task.model.vo.TaskGroupVO;
 import com.cc.job.task.service.TaskGroupService;
 import com.cc.job.task.thread.JobScheduleHelper;
 import com.cc.job.task.thread.JobTriggerPoolHelper;
@@ -15,7 +17,11 @@ import com.cc.job.task.utils.I18nUtil;
 import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
 import com.xxl.job.core.glue.GlueTypeEnum;
+import com.xxl.job.core.util.DateUtil;
+import jodd.util.Task;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.security.core.parameters.P;
 import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -30,6 +36,7 @@ import com.cc.job.task.converter.TaskInfoConverter;
 
 import java.text.MessageFormat;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
@@ -60,10 +67,35 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
     */
     @Override
     public IPage<TaskInfoVO> getTaskInfoPage(TaskInfoQuery queryParams) {
-        Page<TaskInfoVO> pageVO = this.baseMapper.getTaskInfoPage(
-                new Page<>(queryParams.getPageNum(), queryParams.getPageSize()),
-                queryParams
-        );
+//        Page<TaskInfoVO> pageVO = this.baseMapper.getTaskInfoPage(
+//                new Page<>(queryParams.getPageNum(), queryParams.getPageSize()),
+//                queryParams
+//        );
+        Page<TaskInfoVO> pageVO = new Page<>();
+        LambdaQueryWrapper<TaskInfo> wrapper = new LambdaQueryWrapper<>();
+        if(queryParams.getJobGroup()!=null){
+            wrapper.eq(TaskInfo::getJobGroup, queryParams.getJobGroup());
+        }
+        if(queryParams.getTriggerStatus()!=null){
+            wrapper.eq(TaskInfo::getTriggerStatus, queryParams.getTriggerStatus());
+        }
+        if(StringUtils.isNotBlank(queryParams.getAuthor())){
+            wrapper.like(TaskInfo::getAuthor, queryParams.getAuthor());
+        }
+        if(StringUtils.isNotBlank(queryParams.getJobDesc())){
+            wrapper.like(TaskInfo::getJobDesc, queryParams.getJobDesc());
+        }
+        if(StringUtils.isNotBlank(queryParams.getExecutorHandler())){
+            wrapper.eq(TaskInfo::getExecutorHandler,queryParams.getExecutorHandler());
+        }
+
+
+
+        Page<TaskInfo> page = this.page(new Page<>(queryParams.getPageNum(), queryParams.getPageSize()), wrapper);
+        List<TaskInfo> records = page.getRecords();
+        List<TaskInfoVO> voList = records.stream().map(taskInfoConverter::toVo).toList();
+        pageVO.setRecords(voList);
+        pageVO.setTotal(page.getTotal());
         return pageVO;
     }
     
@@ -360,6 +392,29 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         xxlJobInfo.setTriggerLastTime(0L);
         xxlJobInfo.setTriggerNextTime(0L);
         return this.updateById(xxlJobInfo);
+    }
+
+    @Override
+    public List<String> nextTriggerTime(String scheduleType, String scheduleConf) {
+        TaskInfo paramXxlJobInfo = new TaskInfo();
+        paramXxlJobInfo.setScheduleType(scheduleType);
+        paramXxlJobInfo.setScheduleConf(scheduleConf);
+
+        List<String> result = new ArrayList<>();
+        try {
+            Date lastTime = new Date();
+            for (int i = 0; i < 5; i++) {
+                lastTime = JobScheduleHelper.generateNextValidTime(paramXxlJobInfo, lastTime);
+                if (lastTime != null) {
+                    result.add(DateUtil.formatDateTime(lastTime));
+                } else {
+                    break;
+                }
+            }
+        } catch (Exception e) {
+            throw new BusinessException(I18nUtil.getString("schedule_type")+I18nUtil.getString("system_unvalid")+ e.getMessage());
+        }
+        return result;
     }
 
 }

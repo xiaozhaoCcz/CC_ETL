@@ -40,42 +40,13 @@ public class TaskLogController  {
         return PageResult.success(result);
     }
 
-    @Operation(summary = "新增task_log")
-    @PostMapping
-    //@PreAuthorize("@ss.hasPerm('task:taskLog:add')")
-    public Result<Void> saveTaskLog(@RequestBody @Valid TaskLogForm formData ) {
-        boolean result = taskLogService.saveTaskLog(formData);
-        return Result.judge(result);
-    }
-
-    @Operation(summary = "获取task_log表单数据")
-    @GetMapping("/{id}/form")
-    //@PreAuthorize("@ss.hasPerm('task:taskLog:edit')")
-    public Result<TaskLogForm> getTaskLogForm(
-        @Parameter(description = "task_logID") @PathVariable Long id
-    ) {
-        TaskLogForm formData = taskLogService.getTaskLogFormData(id);
-        return Result.success(formData);
-    }
-
-    @Operation(summary = "修改task_log")
-    @PutMapping(value = "/{id}")
-    //@PreAuthorize("@ss.hasPerm('task:taskLog:edit')")
-    public Result<Void> updateTaskLog(
-            @Parameter(description = "task_logID") @PathVariable Long id,
-            @RequestBody @Validated TaskLogForm formData
-    ) {
-        boolean result = taskLogService.updateTaskLog(id, formData);
-        return Result.judge(result);
-    }
-
     @Operation(summary = "删除task_log")
-    @DeleteMapping("/{ids}")
+    @DeleteMapping()
     //@PreAuthorize("@ss.hasPerm('task:taskLog:delete')")
     public Result<Void> deleteTaskLogs(
-        @Parameter(description = "task_logID，多个以英文逗号(,)分割") @PathVariable String ids
+            TaskLogQuery queryParams
     ) {
-        boolean result = taskLogService.deleteTaskLogs(ids);
+        boolean result = taskLogService.deleteTaskLogs(queryParams);
         return Result.judge(result);
     }
 }

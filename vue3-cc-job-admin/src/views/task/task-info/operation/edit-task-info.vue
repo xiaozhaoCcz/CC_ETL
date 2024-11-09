@@ -338,13 +338,24 @@ function changeCron(cron: string) {
 function submitForm() {
   const id = props.formData.id;
   if (id) {
-    TaskInfoAPI.update(id, props.formData)
-      .then(() => {
-        ElMessage.success("修改成功");
-        handleCloseDialog();
-        emit("handleResetQuery");
-      })
-      .finally(() => {});
+    if (props.taskInfoVisible.isCopy) {
+      props.formData.id = undefined;
+      TaskInfoAPI.add(props.formData)
+        .then(() => {
+          ElMessage.success("新增成功");
+          handleCloseDialog();
+          emit("handleResetQuery");
+        })
+        .finally(() => {});
+    } else {
+      TaskInfoAPI.update(id, props.formData)
+        .then(() => {
+          ElMessage.success("修改成功");
+          handleCloseDialog();
+          emit("handleResetQuery");
+        })
+        .finally(() => {});
+    }
   } else {
     TaskInfoAPI.add(props.formData)
       .then(() => {

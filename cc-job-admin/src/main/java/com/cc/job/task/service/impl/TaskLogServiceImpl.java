@@ -1,6 +1,12 @@
 package com.cc.job.task.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cc.job.common.result.ResultCode;
+import com.cc.job.task.model.entity.TaskInfo;
+import com.cc.job.task.model.vo.TaskGroupVO;
+import com.cc.job.task.utils.DateUtils;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -40,49 +46,24 @@ public class TaskLogServiceImpl extends ServiceImpl<TaskLogMapper, TaskLog> impl
     */
     @Override
     public IPage<TaskLogVO> getTaskLogPage(TaskLogQuery queryParams) {
-        Page<TaskLogVO> pageVO = this.baseMapper.getTaskLogPage(
-                new Page<>(queryParams.getPageNum(), queryParams.getPageSize()),
-                queryParams
-        );
+        IPage<TaskLogVO> pageVO = new Page<>();
+        LambdaQueryWrapper<TaskLog> wrapper = new LambdaQueryWrapper<>();
+
+        if(queryParams.getJobId()!=null){
+            wrapper.eq(TaskLog::getJobId,queryParams.getJobId());
+        }
+
+        baseWrapper(queryParams, wrapper);
+
+        wrapper.orderByDesc(TaskLog::getTriggerTime);
+
+        Page<TaskLog> page = this.page(new Page<>(queryParams.getPageNum(), queryParams.getPageSize()), wrapper);
+        List<TaskLogVO> voList = page.getRecords().stream().map(taskLogConverter::toVo).toList();
+        pageVO.setRecords(voList);
+        pageVO.setTotal(page.getTotal());
         return pageVO;
     }
-    
-    /**
-     * 获取task_log表单数据
-     *
-     * @param id task_logID
-     * @return
-     */
-    @Override
-    public TaskLogForm getTaskLogFormData(Long id) {
-        TaskLog entity = this.getById(id);
-        return taskLogConverter.toForm(entity);
-    }
-    
-    /**
-     * 新增task_log
-     *
-     * @param formData task_log表单对象
-     * @return
-     */
-    @Override
-    public boolean saveTaskLog(TaskLogForm formData) {
-        TaskLog entity = taskLogConverter.toEntity(formData);
-        return this.save(entity);
-    }
-    
-    /**
-     * 更新task_log
-     *
-     * @param id   task_logID
-     * @param formData task_log表单对象
-     * @return
-     */
-    @Override
-    public boolean updateTaskLog(Long id,TaskLogForm formData) {
-        TaskLog entity = taskLogConverter.toEntity(formData);
-        return this.updateById(entity);
-    }
+
     
     /**
      * 删除task_log
@@ -91,13 +72,33 @@ public class TaskLogServiceImpl extends ServiceImpl<TaskLogMapper, TaskLog> impl
      * @return
      */
     @Override
-    public boolean deleteTaskLogs(String ids) {
-        Assert.isTrue(StrUtil.isNotBlank(ids), "删除的task_log数据为空");
+    public boolean deleteTaskLogs(TaskLogQuery queryParams) {
+        LambdaQueryWrapper<TaskLog> wrapper = new LambdaQueryWrapper<>();
         // 逻辑删除
-        List<Long> idList = Arrays.stream(ids.split(","))
-                .map(Long::parseLong)
-                .toList();
-        return this.removeByIds(idList);
+        baseWrapper(queryParams, wrapper);
+        return  this.remove(wrapper);
+    }
+
+    private void baseWrapper(TaskLogQuery queryParams, LambdaQueryWrapper<TaskLog> wrapper) {
+        if(queryParams.getJobGroup()!=null){
+            wrapper.eq(TaskLog::getJobGroup, queryParams.getJobGroup());
+        }
+
+        if(queryParams.getLogStatus()!=null){
+            if(queryParams.getLogStatus()==1){
+                wrapper.eq(TaskLog::getHandleCode, 200);
+            }else if(queryParams.getLogStatus()==2){
+                wrapper.and(
+                        e -> e.notIn(TaskLog::getTriggerCode, 0, 200).or()
+                                .notIn(TaskLog::getHandleCode,0, 200));
+            }else if(queryParams.getLogStatus()==3){
+                wrapper.eq(TaskLog::getTriggerCode,200).eq(TaskLog::getHandleCode,0);
+            }
+        }
+
+        if(queryParams.getFilterTime()!=null&&queryParams.getFilterTime().length>0){
+            wrapper.between(TaskLog::getTriggerTime, DateUtils.formatDate(queryParams.getFilterTime()[0]),  DateUtils.formatDate(queryParams.getFilterTime()[1]));
+        }
     }
 
 }

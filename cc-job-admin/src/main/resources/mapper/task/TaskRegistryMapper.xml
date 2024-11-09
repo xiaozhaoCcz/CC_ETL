@@ -11,20 +11,6 @@
 		t.update_time
     </sql>
 
-    <!-- 获取执行器分页列表 -->
-    <select id="getTaskRegistryPage" resultType="com.cc.job.task.model.vo.TaskRegistryVO">
-        SELECT
-                id,
-                registry_group,
-                registry_key,
-                registry_value,
-                create_time,
-                update_time
-        FROM
-            task_registry
-        <where>
-        </where>
-    </select>
 
     <select id="findDead" resultType="java.lang.Long">
         SELECT t.id

@@ -18,4 +18,11 @@ import java.util.List;
 @Setter
 public class TaskLogQuery extends BasePageQuery {
 
+    private Long jobId;
+
+    private Long jobGroup;
+
+    private Integer logStatus;
+
+    private String[] filterTime;
 }

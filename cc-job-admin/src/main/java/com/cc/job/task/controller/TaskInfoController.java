@@ -19,6 +19,8 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 
+import java.util.List;
+
 /**
  * task_info前端控制层
  *
@@ -94,5 +96,12 @@ public class TaskInfoController {
     public Result<Void> stopTask(@PathVariable Long id) {
         boolean result = taskInfoService.stopTask(id);
         return Result.judge(result);
+    }
+
+    @Operation(summary = "下一次的运行时间")
+    @GetMapping("/nextTriggerTime")
+    public Result<List<String>> nextTriggerTime(String scheduleType, String scheduleConf){
+      List<String> list = taskInfoService.nextTriggerTime(scheduleType, scheduleConf);
+      return Result.success(list);
     }
 }

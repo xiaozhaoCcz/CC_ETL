@@ -22,9 +22,9 @@ public class TaskInfoVO implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    private Integer id;
+    private Long id;
     @Schema(description = "执行器主键ID")
-    private Integer jobGroup;
+    private Long jobGroup;
     private String jobDesc;
     private LocalDateTime addTime;
     private LocalDateTime updateTime;

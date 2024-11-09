@@ -22,30 +22,6 @@ public interface TaskLogService extends IService<TaskLog> {
      */
     IPage<TaskLogVO> getTaskLogPage(TaskLogQuery queryParams);
 
-    /**
-     * 获取task_log表单数据
-     *
-     * @param id task_logID
-     * @return
-     */
-     TaskLogForm getTaskLogFormData(Long id);
-
-    /**
-     * 新增task_log
-     *
-     * @param formData task_log表单对象
-     * @return
-     */
-    boolean saveTaskLog(TaskLogForm formData);
-
-    /**
-     * 修改task_log
-     *
-     * @param id   task_logID
-     * @param formData task_log表单对象
-     * @return
-     */
-    boolean updateTaskLog(Long id, TaskLogForm formData);
 
     /**
      * 删除task_log
@@ -53,6 +29,6 @@ public interface TaskLogService extends IService<TaskLog> {
      * @param ids task_logID，多个以英文逗号(,)分割
      * @return
      */
-    boolean deleteTaskLogs(String ids);
+    boolean deleteTaskLogs(TaskLogQuery queryParams);
 
 }

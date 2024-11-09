@@ -1,9 +1,7 @@
 package com.cc.job.task.utils;
 
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
 import java.util.Date;
 
 public class DateUtils {
@@ -24,5 +22,16 @@ public class DateUtils {
 
     public static LocalDateTime asLocalDateTime(Date date) {
         return Instant.ofEpochMilli(date.getTime()).atZone(ZoneId.systemDefault()).toLocalDateTime();
+    }
+
+    public static String formatDate(String isoDateString){
+        // 解析字符串为ZonedDateTime对象
+        ZonedDateTime zonedDateTime = ZonedDateTime.parse(isoDateString);
+
+        // 定义目标格式
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(DATE_FORMAT1);
+
+        // 格式化日期时间
+        return zonedDateTime.format(formatter);
     }
 }

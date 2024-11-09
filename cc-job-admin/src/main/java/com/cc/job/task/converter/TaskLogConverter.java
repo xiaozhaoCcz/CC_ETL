@@ -1,5 +1,6 @@
 package com.cc.job.task.converter;
 
+import com.cc.job.task.model.vo.TaskLogVO;
 import org.mapstruct.Mapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cc.job.task.model.entity.TaskLog;
@@ -17,4 +18,6 @@ public interface TaskLogConverter{
     TaskLogForm toForm(TaskLog entity);
 
     TaskLog toEntity(TaskLogForm formData);
+
+    TaskLogVO toVo(TaskLog taskLog);
 }

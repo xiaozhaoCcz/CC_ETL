@@ -80,6 +80,15 @@ const TaskInfoAPI = {
       method: "get",
     });
   },
+
+
+  nextTriggerTime(scheduleType: string, scheduleConf: string) {
+    return request({
+      url: `${TASKINFO_BASE_URL}/nextTriggerTime`,
+      method: "get",
+      params: { scheduleType, scheduleConf },
+    });
+  },
 };
 
 export default TaskInfoAPI;

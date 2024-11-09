@@ -16,13 +16,6 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface TaskLogReportMapper extends BaseMapper<TaskLogReport> {
 
-    /**
-     * 获取task_log_report分页数据
-     *
-     * @param page 分页对象
-     * @param queryParams 查询参数
-     * @return
-     */
-    Page<TaskLogReportVO> getTaskLogReportPage(Page<TaskLogReportVO> page, TaskLogReportQuery queryParams);
+
 
 }

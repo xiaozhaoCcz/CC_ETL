@@ -2,14 +2,4 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.cc.job.task.mapper.TaskLockMapper">
 
-    <!-- 获取task_lock分页列表 -->
-    <select id="getTaskLockPage" resultType="com.cc.job.task.model.vo.TaskLockVO">
-        SELECT
-                lock_name
-        FROM
-            task_lock
-        <where>
-        </where>
-    </select>
-
 </mapper>

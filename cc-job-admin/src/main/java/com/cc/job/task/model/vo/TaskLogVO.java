@@ -38,13 +38,13 @@ public class TaskLogVO implements Serializable {
     @Schema(description = "失败重试次数")
     private Integer executorFailRetryCount;
     @Schema(description = "调度-时间")
-    private LocalDateTime triggerTime;
+    private String triggerTime;
     @Schema(description = "调度-结果")
     private Integer triggerCode;
     @Schema(description = "调度-日志")
     private String triggerMsg;
     @Schema(description = "执行-时间")
-    private LocalDateTime handleTime;
+    private String handleTime;
     @Schema(description = "执行-状态")
     private Integer handleCode;
     @Schema(description = "执行-日志")

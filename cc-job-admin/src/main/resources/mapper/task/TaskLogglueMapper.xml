@@ -2,20 +2,4 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.cc.job.task.mapper.TaskLogglueMapper">
 
-    <!-- 获取task_logglue分页列表 -->
-    <select id="getTaskLoggluePage" resultType="com.cc.job.task.model.vo.TaskLogglueVO">
-        SELECT
-                id,
-                job_id,
-                glue_type,
-                glue_source,
-                glue_remark,
-                create_time,
-                update_time
-        FROM
-            task_logglue
-        <where>
-        </where>
-    </select>
-
 </mapper>

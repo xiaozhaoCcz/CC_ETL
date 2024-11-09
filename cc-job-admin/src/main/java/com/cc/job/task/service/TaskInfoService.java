@@ -8,6 +8,8 @@ import com.cc.job.task.model.vo.TaskInfoVO;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 
+import java.util.List;
+
 /**
  * task_info服务类
  *
@@ -61,4 +63,6 @@ public interface TaskInfoService extends IService<TaskInfo> {
     boolean startTask(Long id);
 
     boolean stopTask(Long id);
+
+    List<String> nextTriggerTime(String scheduleType, String scheduleConf);
 }

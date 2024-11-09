@@ -4,29 +4,32 @@
       <el-form ref="queryFormRef" :model="queryParams" :inline="true">
         <el-form-item label="执行器" prop="status">
           <el-select
-            v-model="queryParams.status"
+            v-model="queryParams.jobGroup"
             placeholder="全部"
             clearable
             class="!w-[200px]"
           >
-            <el-option label="正常" :value="1" />
-            <el-option label="禁用" :value="0" />
+            <el-option
+              :label="item.title"
+              :value="item.id"
+              v-for="item in taskGroupList"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="任务状态" prop="status">
           <el-select
-            v-model="queryParams.status"
+            v-model="queryParams.triggerStatus"
             placeholder="全部"
             clearable
             class="!w-[100px]"
           >
-            <el-option label="正常" :value="1" />
-            <el-option label="禁用" :value="0" />
+            <el-option label="启动" :value="1" />
+            <el-option label="停止" :value="0" />
           </el-select>
         </el-form-item>
         <el-form-item label="任务描述" prop="keywords">
           <el-input
-            v-model="queryParams.keywords"
+            v-model="queryParams.jobDesc"
             placeholder="请输入任务描述"
             clearable
             @keyup.enter="handleQuery"
@@ -34,7 +37,7 @@
         </el-form-item>
         <el-form-item label="JobHandler" prop="keywords">
           <el-input
-            v-model="queryParams.keywords"
+            v-model="queryParams.executorHandler"
             placeholder="请输入JobHandler"
             clearable
             @keyup.enter="handleQuery"
@@ -42,7 +45,7 @@
         </el-form-item>
         <el-form-item label="责任人" prop="keywords" style="width: 200px">
           <el-input
-            v-model="queryParams.keywords"
+            v-model="queryParams.author"
             placeholder="请输入责任人"
             clearable
             @keyup.enter="handleQuery"
@@ -157,9 +160,16 @@
                   <el-dropdown-item @click="executeOne(scope.row.id)"
                     >执行一次</el-dropdown-item
                   >
-                  <el-dropdown-item>查询日志</el-dropdown-item>
+                  <el-dropdown-item @click="getTaskTriggerLog(scope.row.id)"
+                    >查询日志</el-dropdown-item
+                  >
                   <el-dropdown-item>注册节点</el-dropdown-item>
-                  <el-dropdown-item disabled>下次执行时间</el-dropdown-item>
+                  <el-dropdown-item
+                    @click="
+                      nextTriggerTime(scope.row.scheduleType, scope.row.scheduleConf)
+                    "
+                    >下次执行时间</el-dropdown-item
+                  >
                   <el-dropdown-item
                     divided
                     @click="startTask(scope.row.id)"
@@ -173,8 +183,12 @@
                   <el-dropdown-item @click="handleOpenDialog(scope.row.id)"
                     >编辑</el-dropdown-item
                   >
-                  <el-dropdown-item>删除</el-dropdown-item>
-                  <el-dropdown-item>复制</el-dropdown-item>
+                  <el-dropdown-item @click="handleDelete(scope.row.id)"
+                    >删除</el-dropdown-item
+                  >
+                  <el-dropdown-item @click="handleCopy(scope.row.id)"
+                    >复制</el-dropdown-item
+                  >
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
@@ -203,6 +217,19 @@
       @close="handleCloseDialog"
       @handleResetQuery="handleResetQuery"
     ></EditTaskInfo>
+
+    <el-dialog
+      v-model="nextTriggerTimeVisible"
+      title="下一次的执行时间"
+      width="300px"
+      @close="closeNextTriggerTimeDialog"
+    >
+      <ul>
+        <li v-for="item in nextTriggerTimeList">
+          {{ item }}
+        </li>
+      </ul>
+    </el-dialog>
   </div>
 </template>
 
@@ -219,6 +246,8 @@ import TaskInfoAPI, {
 } from "@/api/task/task-info";
 import ExecuteOne from "./operation/executeone.vue";
 import EditTaskInfo from "./operation/edit-task-info.vue";
+import TaskGroupAPI from "@/api/task/task-group";
+import router from "@/router";
 
 const queryFormRef = ref(ElForm);
 
@@ -237,12 +266,28 @@ const pageData = ref<TaskInfoPageVO[]>([]);
 const taskInfoVisible = reactive({
   title: "",
   visible: false,
+  isCopy: false,
 });
 
 // task_info表单数据
 const formData = reactive<TaskInfoForm>({});
 const executeOneVal = ref(false);
 const taskId = ref();
+const nextTriggerTimeVisible = ref(false);
+const nextTriggerTimeList = ref([]);
+const taskGroupList = ref([]);
+
+function getTaskTriggerLog(id: number) {
+  router.push({
+    path: "/task/task-log",
+    query: { id },
+  });
+}
+
+function closeNextTriggerTimeDialog() {
+  nextTriggerTimeVisible.value = false;
+  nextTriggerTimeList.value = [];
+}
 
 function executeOne(id?: number) {
   executeOneVal.value = true;
@@ -265,6 +310,13 @@ function stopTask(id: number) {
   const taskObj = pageData.value.filter((v) => v.id == id)[0];
   TaskInfoAPI.stopTask(id).then(() => {
     taskObj.triggerStatus = 0;
+  });
+}
+
+function nextTriggerTime(scheduleType: string, scheduleConf: string) {
+  nextTriggerTimeVisible.value = true;
+  TaskInfoAPI.nextTriggerTime(scheduleType, scheduleConf).then((data: any) => {
+    nextTriggerTimeList.value = data;
   });
 }
 
@@ -316,6 +368,15 @@ function handleOpenDialog(id?: number) {
   }
 }
 
+function handleCopy(id: number) {
+  taskInfoVisible.visible = true;
+  TaskInfoAPI.getFormData(id).then((data) => {
+    Object.assign(formData, data);
+  });
+  taskInfoVisible.title = "复制taskInfo";
+  taskInfoVisible.isCopy = true;
+}
+
 /** 删除task_info */
 function handleDelete(id?: number) {
   const ids = [id || removeIds.value].join(",");
@@ -344,8 +405,14 @@ function handleDelete(id?: number) {
   );
 }
 
+async function fetchTaskGroupList() {
+  const data = await TaskGroupAPI.getAllTaskGroupList();
+  taskGroupList.value = data as any;
+}
+
 onMounted(() => {
   handleQuery();
+  fetchTaskGroupList();
 });
 </script>
 <style lang="scss" scoped>

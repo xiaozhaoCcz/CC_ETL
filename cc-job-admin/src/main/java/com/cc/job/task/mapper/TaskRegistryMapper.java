@@ -20,14 +20,6 @@ import java.util.List;
 @Mapper
 public interface TaskRegistryMapper extends BaseMapper<TaskRegistry> {
 
-    /**
-     * 获取执行器分页数据
-     *
-     * @param page 分页对象
-     * @param queryParams 查询参数
-     * @return
-     */
-    Page<TaskRegistryVO> getTaskRegistryPage(Page<TaskRegistryVO> page, TaskRegistryQuery queryParams);
 
     List<Long> findDead(@Param("timeout") int timeout,
                                   @Param("nowTime") Date nowTime);

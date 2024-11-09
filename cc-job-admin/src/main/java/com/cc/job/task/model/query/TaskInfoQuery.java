@@ -18,4 +18,13 @@ import java.util.List;
 @Setter
 public class TaskInfoQuery extends BasePageQuery {
 
+    private Long jobGroup;
+
+    private Integer triggerStatus;
+
+    private String jobDesc;
+
+    private String executorHandler;
+
+    private String author;
 }

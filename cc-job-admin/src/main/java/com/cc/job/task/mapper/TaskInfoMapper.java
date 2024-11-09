@@ -19,15 +19,6 @@ import java.util.List;
 @Mapper
 public interface TaskInfoMapper extends BaseMapper<TaskInfo> {
 
-    /**
-     * 获取task_info分页数据
-     *
-     * @param page 分页对象
-     * @param queryParams 查询参数
-     * @return
-     */
-    Page<TaskInfoVO> getTaskInfoPage(Page<TaskInfoVO> page, TaskInfoQuery queryParams);
-
     List<TaskInfo> scheduleJobQuery(@Param("maxNextTime") long maxNextTime, @Param("pagesize") int pagesize );
 
 }

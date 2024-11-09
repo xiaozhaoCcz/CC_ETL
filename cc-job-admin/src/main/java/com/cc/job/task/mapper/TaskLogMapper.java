@@ -21,14 +21,6 @@ import java.util.Map;
 @Mapper
 public interface TaskLogMapper extends BaseMapper<TaskLog> {
 
-    /**
-     * 获取task_log分页数据
-     *
-     * @param page 分页对象
-     * @param queryParams 查询参数
-     * @return
-     */
-    Page<TaskLogVO> getTaskLogPage(Page<TaskLogVO> page, TaskLogQuery queryParams);
 
     List<Long> findLostJobIds(@Param("losedTime") Date losedTime);
 
