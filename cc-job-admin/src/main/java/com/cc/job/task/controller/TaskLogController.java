@@ -52,6 +52,7 @@ public class TaskLogController  {
         return Result.judge(result);
     }
 
+    @Operation(summary = "查看log日志")
     @GetMapping("/logDetailCat")
     public Result<ReturnT<LogResult>> getLogDetailCat(@RequestParam("logId") Long logId, int fromLineNum){
         ReturnT<LogResult> result = taskLogService.getLogDetailCat(logId,fromLineNum);
