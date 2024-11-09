@@ -6,6 +6,8 @@ import com.cc.job.task.model.query.TaskLogQuery;
 import com.cc.job.task.model.vo.TaskLogVO;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.xxl.job.core.biz.model.LogResult;
+import com.xxl.job.core.biz.model.ReturnT;
 
 /**
  * task_log服务类
@@ -31,4 +33,5 @@ public interface TaskLogService extends IService<TaskLog> {
      */
     boolean deleteTaskLogs(TaskLogQuery queryParams);
 
+    ReturnT<LogResult> getLogDetailCat(Long logId, int fromLineNum);
 }

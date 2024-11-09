@@ -139,7 +139,14 @@
           prop="handleMsg"
           min-width="150"
           align="center"
-        />
+        >
+          <template #default="{ row }">
+            <span v-if="row.handleMsg == null || row.handleMsg == ''">无</span>
+            <el-link v-else type="primary" @click="lookHandleMsg(row.handleMsg)"
+              >查看</el-link
+            >
+          </template>
+        </el-table-column>
 
         <el-table-column fixed="right" label="操作" width="220">
           <template #default="scope">
@@ -170,6 +177,16 @@
       :triggerMsg="triggerMsg"
       @close="closeTriggerMsg"
     ></TaskTriggerLog>
+
+    <TaskExecuteLog
+      :taskLogId="taskLogId"
+      :executeLogVisable="executeLogVisable"
+      @close="closeExecuteLog"
+    ></TaskExecuteLog>
+
+    <el-dialog v-model="handleMsgVisable" title="调度备注" width="500">
+      {{ handleMsg }}
+    </el-dialog>
   </div>
 </template>
 
@@ -179,8 +196,9 @@ defineOptions({
   inheritAttrs: false,
 });
 
-import TaskLogAPI, { TaskLogPageVO, TaskLogForm } from "@/api/task/task-log";
+import TaskLogAPI, { TaskLogPageVO } from "@/api/task/task-log";
 import TaskTriggerLog from "./operstion/task-trigger-log.vue";
+import TaskExecuteLog from "./operstion/task-execute-log.vue";
 import TaskGroupAPI from "@/api/task/task-group";
 import dayjs from "dayjs";
 import { useRoute } from "vue-router";
@@ -201,17 +219,13 @@ const queryParams = reactive<any>({
 // task_log表格数据
 const pageData = ref<TaskLogPageVO[]>([]);
 
-// 弹窗
-const dialog = reactive({
-  title: "",
-  visible: false,
-});
-
-// task_log表单数据
-const formData = reactive<TaskLogForm>({});
 const triggerLogVisable = ref(false);
 const triggerMsg = ref("");
 const taskGroupList = ref([]);
+const taskLogId = ref();
+const executeLogVisable = ref(false);
+const handleMsgVisable = ref(false);
+const handleMsg = ref("");
 
 function lookTriggerLog(o: any) {
   triggerLogVisable.value = true;
@@ -221,6 +235,16 @@ function lookTriggerLog(o: any) {
 function closeTriggerMsg() {
   triggerLogVisable.value = false;
   triggerMsg.value = "";
+}
+
+function closeExecuteLog() {
+  taskLogId.value = undefined;
+  executeLogVisable.value = false;
+}
+
+function lookHandleMsg(msg: string) {
+  handleMsgVisable.value = true;
+  handleMsg.value = msg;
 }
 
 const shortcuts = [
@@ -289,15 +313,8 @@ function handleSelectionChange(selection: any) {
 
 /** 打开task_log弹窗 */
 function handleOpenDialog(id?: number) {
-  dialog.visible = true;
-  if (id) {
-    dialog.title = "修改task_log";
-    TaskLogAPI.getFormData(id).then((data) => {
-      Object.assign(formData, data);
-    });
-  } else {
-    dialog.title = "新增task_log";
-  }
+  taskLogId.value = id;
+  executeLogVisable.value = true;
 }
 
 /** 删除task_log */

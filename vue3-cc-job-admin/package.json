@@ -50,6 +50,7 @@
     "@wangeditor/editor": "^5.1.23",
     "@wangeditor/editor-for-vue": "5.1.10",
     "animate.css": "^4.1.1",
+    "ansi_up": "^6.0.2",
     "axios": "^1.7.7",
     "codemirror": "^5.65.18",
     "codemirror-editor-vue3": "^2.8.0",

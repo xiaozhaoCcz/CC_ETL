@@ -1,6 +1,8 @@
 package com.cc.job.task.controller;
 
 import com.cc.job.task.service.TaskLogService;
+import com.xxl.job.core.biz.model.LogResult;
+import com.xxl.job.core.biz.model.ReturnT;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -41,12 +43,18 @@ public class TaskLogController  {
     }
 
     @Operation(summary = "删除task_log")
-    @DeleteMapping()
+    @DeleteMapping
     //@PreAuthorize("@ss.hasPerm('task:taskLog:delete')")
     public Result<Void> deleteTaskLogs(
             TaskLogQuery queryParams
     ) {
         boolean result = taskLogService.deleteTaskLogs(queryParams);
         return Result.judge(result);
+    }
+
+    @GetMapping("/logDetailCat")
+    public Result<ReturnT<LogResult>> getLogDetailCat(@RequestParam("logId") Long logId, int fromLineNum){
+        ReturnT<LogResult> result = taskLogService.getLogDetailCat(logId,fromLineNum);
+        return Result.success(result);
     }
 }

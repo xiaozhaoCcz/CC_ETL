@@ -30,6 +30,14 @@ const TaskLogAPI = {
       method: "delete",
       params: queryParams,
     });
+  },
+
+  logDetailCat(logId: number, fromLineNum: number) {
+    return request({
+      url: `${TASKLOG_BASE_URL}/logDetailCat`,
+      method: "get",
+      params: { logId, fromLineNum },
+    });
   }
 }
 
