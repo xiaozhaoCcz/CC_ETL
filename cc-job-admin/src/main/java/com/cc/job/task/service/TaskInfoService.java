@@ -57,4 +57,8 @@ public interface TaskInfoService extends IService<TaskInfo> {
     boolean deleteTaskInfos(String ids);
 
     boolean triggerJob(TaskInfoTriggerDto taskInfoTriggerDto);
+
+    boolean startTask(Long id);
+
+    boolean stopTask(Long id);
 }

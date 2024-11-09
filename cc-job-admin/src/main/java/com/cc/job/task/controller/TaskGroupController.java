@@ -1,5 +1,6 @@
 package com.cc.job.task.controller;
 
+import com.cc.job.task.model.entity.TaskGroup;
 import com.cc.job.task.service.TaskGroupService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -86,6 +87,13 @@ public class TaskGroupController  {
     @GetMapping("/findAddressList/{id}")
     public Result<List<String>> findAddressList(@PathVariable Long id){
         List<String> list = taskGroupService.findAddressList(id);
+        return Result.success(list);
+    }
+
+    @Operation(summary = "获取所有taskGroup")
+    @GetMapping("/getAllTaskGroupList")
+    public Result<List<TaskGroup>> getAllTaskGroupList(){
+        List<TaskGroup> list = taskGroupService.list();
         return Result.success(list);
     }
 }

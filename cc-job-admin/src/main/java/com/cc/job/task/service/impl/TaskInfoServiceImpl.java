@@ -1,9 +1,20 @@
 package com.cc.job.task.service.impl;
 
+import com.cc.job.common.exception.BusinessException;
+import com.cc.job.core.cron.CronExpression;
+import com.cc.job.task.enums.ExecutorRouteStrategyEnum;
+import com.cc.job.task.enums.MisfireStrategyEnum;
+import com.cc.job.task.enums.ScheduleTypeEnum;
 import com.cc.job.task.enums.TriggerTypeEnum;
 import com.cc.job.task.model.dto.TaskInfoTriggerDto;
+import com.cc.job.task.model.entity.TaskGroup;
+import com.cc.job.task.service.TaskGroupService;
+import com.cc.job.task.thread.JobScheduleHelper;
 import com.cc.job.task.thread.JobTriggerPoolHelper;
+import com.cc.job.task.utils.I18nUtil;
 import com.xxl.job.core.biz.model.ReturnT;
+import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
+import com.xxl.job.core.glue.GlueTypeEnum;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -17,7 +28,10 @@ import com.cc.job.task.model.query.TaskInfoQuery;
 import com.cc.job.task.model.vo.TaskInfoVO;
 import com.cc.job.task.converter.TaskInfoConverter;
 
+import java.text.MessageFormat;
+import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -35,6 +49,8 @@ import cn.hutool.core.util.StrUtil;
 public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> implements TaskInfoService {
 
     private final TaskInfoConverter taskInfoConverter;
+
+    private final TaskGroupService taskGroupService;
 
     /**
     * 获取task_info分页列表
@@ -71,8 +87,93 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
      */
     @Override
     public boolean saveTaskInfo(TaskInfoForm formData) {
-        TaskInfo entity = taskInfoConverter.toEntity(formData);
-        return this.save(entity);
+        TaskGroup taskGroup = taskGroupService.getById(formData.getJobGroup());
+        if (taskGroup == null) {
+            throw new BusinessException(I18nUtil.getString("system_please_choose")+I18nUtil.getString("jobinfo_field_jobgroup"));
+        }
+
+        ScheduleTypeEnum scheduleTypeEnum = ScheduleTypeEnum.match(formData.getScheduleType(), null);
+        if (scheduleTypeEnum == null) {
+            throw new BusinessException(I18nUtil.getString("schedule_type")+I18nUtil.getString("system_unvalid"));
+        }
+        if (scheduleTypeEnum == ScheduleTypeEnum.CRON) {
+            if (formData.getScheduleConf()==null || !CronExpression.isValidExpression(formData.getScheduleConf())) {
+                throw new BusinessException("Cron"+I18nUtil.getString("system_unvalid"));
+            }
+        }else if(scheduleTypeEnum == ScheduleTypeEnum.FIX_RATE){
+            if (formData.getScheduleConf() == null) {
+                throw new BusinessException(I18nUtil.getString("schedule_type"));
+            }
+            try {
+                int fixSecond = Integer.parseInt(formData.getScheduleConf());
+                if (fixSecond < 1) {
+                    throw new BusinessException(I18nUtil.getString("schedule_type")+I18nUtil.getString("system_unvalid"));
+                }
+            } catch (Exception e) {
+                throw new BusinessException(I18nUtil.getString("schedule_type")+I18nUtil.getString("system_unvalid"));
+            }
+        }
+
+        // valid job
+        if (GlueTypeEnum.match(formData.getGlueType()) == null) {
+            throw new BusinessException(I18nUtil.getString("jobinfo_field_gluetype")+I18nUtil.getString("system_unvalid"));
+        }
+        if (GlueTypeEnum.BEAN==GlueTypeEnum.match(formData.getGlueType()) && (formData.getExecutorHandler()==null || formData.getExecutorHandler().trim().length()==0) ) {
+            throw new BusinessException(I18nUtil.getString("system_please_input")+"JobHandler");
+        }
+        // 》fix "\r" in shell
+        if (GlueTypeEnum.GLUE_SHELL==GlueTypeEnum.match(formData.getGlueType()) && formData.getGlueSource()!=null) {
+            formData.setGlueSource(formData.getGlueSource().replaceAll("\r", ""));
+        }
+
+        if (ExecutorRouteStrategyEnum.match(formData.getExecutorRouteStrategy(), null) == null) {
+            throw new BusinessException(I18nUtil.getString("jobinfo_field_executorRouteStrategy")+I18nUtil.getString("system_unvalid"));
+
+        }
+        if (MisfireStrategyEnum.match(formData.getMisfireStrategy(), null) == null) {
+            throw new BusinessException(I18nUtil.getString("misfire_strategy")+I18nUtil.getString("system_unvalid"));
+
+        }
+        if (ExecutorBlockStrategyEnum.match(formData.getExecutorBlockStrategy(), null) == null) {
+            throw new BusinessException(I18nUtil.getString("jobinfo_field_executorBlockStrategy")+I18nUtil.getString("system_unvalid"));
+        }
+
+        if (formData.getChildJobid()!=null && formData.getChildJobid().trim().length()>0) {
+            String[] childJobIds = formData.getChildJobid().split(",");
+            for (String childJobIdItem: childJobIds) {
+                if (childJobIdItem!=null && childJobIdItem.trim().length()>0 && isNumeric(childJobIdItem)) {
+                    TaskInfo childJobInfo = this.getById(Integer.parseInt(childJobIdItem));
+                    if (childJobInfo==null) {
+                        throw new BusinessException( MessageFormat.format((I18nUtil.getString("jobinfo_field_childJobId")+"({0})"+I18nUtil.getString("system_not_found")), childJobIdItem));
+
+                    }
+                } else {
+                    throw   new BusinessException(
+                            MessageFormat.format((I18nUtil.getString("jobinfo_field_childJobId")+"({0})"+I18nUtil.getString("system_unvalid")), childJobIdItem));
+                }
+            }
+
+            // join , avoid "xxx,,"
+            String temp = "";
+            for (String item:childJobIds) {
+                temp += item + ",";
+            }
+            temp = temp.substring(0, temp.length()-1);
+
+            formData.setChildJobid(temp);
+        }
+        formData.setGlueUpdatetime(LocalDateTime.now());
+        TaskInfo taskInfo = taskInfoConverter.toEntity(formData);
+        return   this.save(taskInfo);
+    }
+
+    private boolean isNumeric(String str){
+        try {
+            int result = Integer.parseInt(str);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
     
     /**
@@ -84,8 +185,110 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
      */
     @Override
     public boolean updateTaskInfo(Long id,TaskInfoForm formData) {
-        TaskInfo entity = taskInfoConverter.toEntity(formData);
-        return this.updateById(entity);
+        // valid trigger
+        ScheduleTypeEnum scheduleTypeEnum = ScheduleTypeEnum.match(formData.getScheduleType(), null);
+        if (scheduleTypeEnum == null) {
+            throw new BusinessException (I18nUtil.getString("schedule_type")+I18nUtil.getString("system_unvalid"));
+        }
+        if (scheduleTypeEnum == ScheduleTypeEnum.CRON) {
+            if (formData.getScheduleConf()==null || !CronExpression.isValidExpression(formData.getScheduleConf())) {
+                throw new  BusinessException("Cron"+I18nUtil.getString("system_unvalid") );
+            }
+        } else if (scheduleTypeEnum == ScheduleTypeEnum.FIX_RATE /*|| scheduleTypeEnum == ScheduleTypeEnum.FIX_DELAY*/) {
+            if (formData.getScheduleConf() == null) {
+                throw new BusinessException (I18nUtil.getString("schedule_type")+I18nUtil.getString("system_unvalid"));
+            }
+            try {
+                int fixSecond = Integer.parseInt(formData.getScheduleConf());
+                if (fixSecond < 1) {
+                    throw new  BusinessException(I18nUtil.getString("schedule_type")+I18nUtil.getString("system_unvalid"));
+                }
+            } catch (Exception e) {
+                throw new BusinessException (I18nUtil.getString("schedule_type")+I18nUtil.getString("system_unvalid"));
+            }
+        }
+
+        // valid advanced
+        if (ExecutorRouteStrategyEnum.match(formData.getExecutorRouteStrategy(), null) == null) {
+            throw new  BusinessException(I18nUtil.getString("jobinfo_field_executorRouteStrategy")+I18nUtil.getString("system_unvalid")) ;
+        }
+        if (MisfireStrategyEnum.match(formData.getMisfireStrategy(), null) == null) {
+            throw new  BusinessException(I18nUtil.getString("misfire_strategy")+I18nUtil.getString("system_unvalid")) ;
+        }
+        if (ExecutorBlockStrategyEnum.match(formData.getExecutorBlockStrategy(), null) == null) {
+            throw new BusinessException (I18nUtil.getString("jobinfo_field_executorBlockStrategy")+I18nUtil.getString("system_unvalid")) ;
+        }
+
+        // 》ChildJobId valid
+        if (formData.getChildJobid()!=null && formData.getChildJobid().trim().length()>0) {
+            String[] childJobIds = formData.getChildJobid().split(",");
+            for (String childJobIdItem: childJobIds) {
+                if (childJobIdItem!=null && childJobIdItem.trim().length()>0 && isNumeric(childJobIdItem)) {
+                    TaskInfo childJobInfo = this.getById(Integer.parseInt(childJobIdItem));
+                    if (childJobInfo==null) {
+                        throw new BusinessException(
+                                MessageFormat.format((I18nUtil.getString("jobinfo_field_childJobId")+"({0})"+I18nUtil.getString("system_not_found")), childJobIdItem));
+                    }
+                } else {
+                    throw new BusinessException(
+                            MessageFormat.format((I18nUtil.getString("jobinfo_field_childJobId")+"({0})"+I18nUtil.getString("system_unvalid")), childJobIdItem));
+                }
+            }
+
+            // join , avoid "xxx,,"
+            String temp = "";
+            for (String item:childJobIds) {
+                temp += item + ",";
+            }
+            temp = temp.substring(0, temp.length()-1);
+
+            formData.setChildJobid(temp);
+        }
+
+        // group valid
+        TaskGroup jobGroup = taskGroupService.getById(formData.getJobGroup());
+        if (jobGroup == null) {
+            throw new BusinessException (I18nUtil.getString("jobinfo_field_jobgroup")+I18nUtil.getString("system_unvalid")) ;
+        }
+
+        // stage job info
+        TaskInfo existsJobInfo = this.getById(id);
+        if (existsJobInfo == null) {
+            throw new BusinessException (I18nUtil.getString("jobinfo_field_id")+I18nUtil.getString("system_not_found")) ;
+        }
+
+        // next trigger time (5s后生效，避开预读周期)
+        long nextTriggerTime = existsJobInfo.getTriggerNextTime();
+        boolean scheduleDataNotChanged = formData.getScheduleType().equals(existsJobInfo.getScheduleType()) && formData.getScheduleConf().equals(existsJobInfo.getScheduleConf());
+        if (existsJobInfo.getTriggerStatus() == 1 && !scheduleDataNotChanged) {
+            try {
+                existsJobInfo.setScheduleConf(formData.getScheduleConf());
+                Date nextValidTime = JobScheduleHelper.generateNextValidTime(existsJobInfo, new Date(System.currentTimeMillis() + JobScheduleHelper.PRE_READ_MS));
+                if (nextValidTime == null) {
+                    throw new  BusinessException(I18nUtil.getString("schedule_type")+I18nUtil.getString("system_unvalid"));
+                }
+                nextTriggerTime = nextValidTime.getTime();
+            } catch (Exception e) {
+                log.error(e.getMessage(), e);
+                throw new  BusinessException(I18nUtil.getString("schedule_type")+I18nUtil.getString("system_unvalid"));
+            }
+        }
+        existsJobInfo.setJobGroup(formData.getJobGroup());
+        existsJobInfo.setJobDesc(formData.getJobDesc());
+        existsJobInfo.setAuthor(formData.getAuthor());
+        existsJobInfo.setAlarmEmail(formData.getAlarmEmail());
+        existsJobInfo.setScheduleType(formData.getScheduleType());
+        existsJobInfo.setScheduleConf(formData.getScheduleConf());
+        existsJobInfo.setMisfireStrategy(formData.getMisfireStrategy());
+        existsJobInfo.setExecutorRouteStrategy(formData.getExecutorRouteStrategy());
+        existsJobInfo.setExecutorHandler(formData.getExecutorHandler());
+        existsJobInfo.setExecutorParam(formData.getExecutorParam());
+        existsJobInfo.setExecutorBlockStrategy(formData.getExecutorBlockStrategy());
+        existsJobInfo.setExecutorTimeout(formData.getExecutorTimeout());
+        existsJobInfo.setExecutorFailRetryCount(formData.getExecutorFailRetryCount());
+        existsJobInfo.setChildJobid(formData.getChildJobid());
+        existsJobInfo.setTriggerNextTime(nextTriggerTime);
+        return this.updateById(existsJobInfo);
     }
     
     /**
@@ -118,6 +321,45 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
 
         JobTriggerPoolHelper.trigger(taskInfoTriggerDto.getId().intValue(), TriggerTypeEnum.MANUAL, -1, null, taskInfoTriggerDto.getExecutorParam(), taskInfoTriggerDto.getAddressList());
         return true;
+    }
+
+    @Override
+    public boolean startTask(Long id) {
+        TaskInfo xxlJobInfo = this.getById(id);
+
+        // valid
+        ScheduleTypeEnum scheduleTypeEnum = ScheduleTypeEnum.match(xxlJobInfo.getScheduleType(), ScheduleTypeEnum.NONE);
+        if (ScheduleTypeEnum.NONE == scheduleTypeEnum) {
+           throw new BusinessException (I18nUtil.getString("schedule_type_none_limit_start"));
+        }
+
+        // next trigger time (5s后生效，避开预读周期)
+        long nextTriggerTime = 0;
+        try {
+            Date nextValidTime = JobScheduleHelper.generateNextValidTime(xxlJobInfo, new Date(System.currentTimeMillis() + JobScheduleHelper.PRE_READ_MS));
+            if (nextValidTime == null) {
+                throw new BusinessException(I18nUtil.getString("schedule_type")+I18nUtil.getString("system_unvalid"));
+            }
+            nextTriggerTime = nextValidTime.getTime();
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+            throw new BusinessException(I18nUtil.getString("schedule_type")+I18nUtil.getString("system_unvalid"));
+        }
+
+        xxlJobInfo.setTriggerStatus(1);
+        xxlJobInfo.setTriggerLastTime(0L);
+        xxlJobInfo.setTriggerNextTime(nextTriggerTime);
+        return  this.updateById(xxlJobInfo);
+    }
+
+    @Override
+    public boolean stopTask(Long id) {
+        TaskInfo xxlJobInfo = this.getById(id);
+
+        xxlJobInfo.setTriggerStatus(0);
+        xxlJobInfo.setTriggerLastTime(0L);
+        xxlJobInfo.setTriggerNextTime(0L);
+        return this.updateById(xxlJobInfo);
     }
 
 }

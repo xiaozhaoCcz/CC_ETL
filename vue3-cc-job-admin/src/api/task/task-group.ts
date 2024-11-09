@@ -65,6 +65,13 @@ const TaskGroupAPI = {
       method: "get",
     });
   },
+
+  getAllTaskGroupList() {
+    return request({
+      url: `${TASKGROUP_BASE_URL}/getAllTaskGroupList`,
+      method: "get",
+    });
+  },
 };
 
 export default TaskGroupAPI;

@@ -29,20 +29,20 @@ import jakarta.validation.Valid;
 @RestController
 @RequestMapping("/api/v1/taskInfos")
 @RequiredArgsConstructor
-public class TaskInfoController  {
+public class TaskInfoController {
 
     private final TaskInfoService taskInfoService;
 
     @Operation(summary = "task_info分页列表")
     @GetMapping("/page")
-    public PageResult<TaskInfoVO> getTaskInfoPage(TaskInfoQuery queryParams ) {
+    public PageResult<TaskInfoVO> getTaskInfoPage(TaskInfoQuery queryParams) {
         IPage<TaskInfoVO> result = taskInfoService.getTaskInfoPage(queryParams);
         return PageResult.success(result);
     }
 
     @Operation(summary = "新增task_info")
     @PostMapping
-    public Result<Void> saveTaskInfo(@RequestBody @Valid TaskInfoForm formData ) {
+    public Result<Void> saveTaskInfo(@RequestBody @Valid TaskInfoForm formData) {
         boolean result = taskInfoService.saveTaskInfo(formData);
         return Result.judge(result);
     }
@@ -50,7 +50,7 @@ public class TaskInfoController  {
     @Operation(summary = "获取task_info表单数据")
     @GetMapping("/{id}/form")
     public Result<TaskInfoForm> getTaskInfoForm(
-        @Parameter(description = "task_infoID") @PathVariable Long id
+            @Parameter(description = "task_infoID") @PathVariable Long id
     ) {
         TaskInfoForm formData = taskInfoService.getTaskInfoFormData(id);
         return Result.success(formData);
@@ -69,7 +69,7 @@ public class TaskInfoController  {
     @Operation(summary = "删除task_info")
     @DeleteMapping("/{ids}")
     public Result<Void> deleteTaskInfos(
-        @Parameter(description = "task_infoID，多个以英文逗号(,)分割") @PathVariable String ids
+            @Parameter(description = "task_infoID，多个以英文逗号(,)分割") @PathVariable String ids
     ) {
         boolean result = taskInfoService.deleteTaskInfos(ids);
         return Result.judge(result);
@@ -77,8 +77,22 @@ public class TaskInfoController  {
 
     @Operation(summary = "执行任务一次")
     @PostMapping("/trigger")
-    public Result<Void> triggerJob(@RequestBody TaskInfoTriggerDto taskInfoTriggerDto){
+    public Result<Void> triggerJob(@RequestBody TaskInfoTriggerDto taskInfoTriggerDto) {
         boolean result = taskInfoService.triggerJob(taskInfoTriggerDto);
+        return Result.judge(result);
+    }
+
+    @Operation(summary = "启动")
+    @GetMapping("/startTask/{id}")
+    public Result<Void> startTask(@PathVariable Long id) {
+        boolean result = taskInfoService.startTask(id);
+        return Result.judge(result);
+    }
+
+    @Operation(summary = "停止")
+    @GetMapping("/stopTask/{id}")
+    public Result<Void> stopTask(@PathVariable Long id) {
+        boolean result = taskInfoService.stopTask(id);
         return Result.judge(result);
     }
 }

@@ -65,14 +65,27 @@ const TaskInfoAPI = {
       method: "post",
       data: data,
     });
-  }
-}
+  },
+
+  startTask(id: number) {
+    return request({
+      url: `${TASKINFO_BASE_URL}/startTask/${id}`,
+      method: "get",
+    });
+  },
+
+  stopTask(id: number) {
+    return request({
+      url: `${TASKINFO_BASE_URL}/stopTask/${id}`,
+      method: "get",
+    });
+  },
+};
 
 export default TaskInfoAPI;
 
 /** task_info分页查询参数 */
-export interface TaskInfoPageQuery extends PageQuery {
-}
+export interface TaskInfoPageQuery extends PageQuery { }
 
 /** task_info表单对象 */
 export interface TaskInfoForm {

@@ -19,10 +19,12 @@ import jakarta.validation.constraints.*;
 @Getter
 @Setter
 @Schema(description = "task_group表单对象")
-public class TaskGroupForm extends BaseEntity {
+public class TaskGroupForm implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;
+
+    private Long id;
 
     @Schema(description = "执行器AppName")
     @Size(max=64, message="执行器AppName长度不能超过64个字符")

@@ -160,8 +160,17 @@
                   <el-dropdown-item>查询日志</el-dropdown-item>
                   <el-dropdown-item>注册节点</el-dropdown-item>
                   <el-dropdown-item disabled>下次执行时间</el-dropdown-item>
-                  <el-dropdown-item divided>启动</el-dropdown-item>
-                  <el-dropdown-item @click="editTask(scope.row.id)"
+                  <el-dropdown-item
+                    divided
+                    @click="startTask(scope.row.id)"
+                    v-if="scope.row.triggerStatus === 0"
+                    >启动</el-dropdown-item
+                  >
+                  <el-dropdown-item divided @click="stopTask(scope.row.id)" v-else
+                    >停止</el-dropdown-item
+                  >
+
+                  <el-dropdown-item @click="handleOpenDialog(scope.row.id)"
                     >编辑</el-dropdown-item
                   >
                   <el-dropdown-item>删除</el-dropdown-item>
@@ -189,9 +198,10 @@
     ></ExecuteOne>
 
     <EditTaskInfo
-      :editTaskInfoVal="editTaskInfoVal"
-      :taskId="taskId"
-      @close="closeEditTaskInfo"
+      :taskInfoVisible="taskInfoVisible"
+      :formData="formData"
+      @close="handleCloseDialog"
+      @handleResetQuery="handleResetQuery"
     ></EditTaskInfo>
   </div>
 </template>
@@ -224,8 +234,7 @@ const queryParams = reactive<TaskInfoPageQuery>({
 // task_info表格数据
 const pageData = ref<TaskInfoPageVO[]>([]);
 
-// 弹窗
-const dialog = reactive({
+const taskInfoVisible = reactive({
   title: "",
   visible: false,
 });
@@ -233,29 +242,31 @@ const dialog = reactive({
 // task_info表单数据
 const formData = reactive<TaskInfoForm>({});
 const executeOneVal = ref(false);
-const taskId = ref(0);
-const editTaskInfoVal = ref(false);
+const taskId = ref();
 
-const executeOne = (id: number) => {
-  console.log(id);
+function executeOne(id?: number) {
   executeOneVal.value = true;
   taskId.value = id;
-};
+}
 
-const closeExecuteOne = () => {
-  taskId.value = 0;
+function closeExecuteOne() {
+  taskId.value = undefined;
   executeOneVal.value = false;
-};
+}
 
-const closeEditTaskInfo = () => {
-  taskId.value = 0;
-  editTaskInfoVal.value = false;
-};
+function startTask(id: number) {
+  const taskObj = pageData.value.filter((v) => v.id == id)[0];
+  TaskInfoAPI.startTask(id).then(() => {
+    taskObj.triggerStatus = 1;
+  });
+}
 
-const editTask = (id: number) => {
-  taskId.value = id;
-  editTaskInfoVal.value = true;
-};
+function stopTask(id: number) {
+  const taskObj = pageData.value.filter((v) => v.id == id)[0];
+  TaskInfoAPI.stopTask(id).then(() => {
+    taskObj.triggerStatus = 0;
+  });
+}
 
 /** 查询task_info */
 function handleQuery() {
@@ -268,6 +279,16 @@ function handleQuery() {
     .finally(() => {
       loading.value = false;
     });
+}
+
+function handleCloseDialog() {
+  const keys = Object.keys(formData);
+  let obj: { [name: string]: string } = {};
+  keys.forEach((item) => {
+    obj[item] = "";
+  });
+  Object.assign(formData, obj);
+  taskInfoVisible.visible = false;
 }
 
 /** 重置task_info查询 */
@@ -284,14 +305,14 @@ function handleSelectionChange(selection: any) {
 
 /** 打开task_info弹窗 */
 function handleOpenDialog(id?: number) {
-  dialog.visible = true;
+  taskInfoVisible.visible = true;
   if (id) {
-    dialog.title = "修改task_info";
+    taskInfoVisible.title = "修改taskInfo";
     TaskInfoAPI.getFormData(id).then((data) => {
       Object.assign(formData, data);
     });
   } else {
-    dialog.title = "新增task_info";
+    taskInfoVisible.title = "新增taskInfo";
   }
 }
 

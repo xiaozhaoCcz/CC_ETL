@@ -24,6 +24,7 @@ public class TaskInfo extends BaseEntity {
      * 执行器主键ID
      */
     private Long jobGroup;
+
     private String jobDesc;
     /**
      * 作者
