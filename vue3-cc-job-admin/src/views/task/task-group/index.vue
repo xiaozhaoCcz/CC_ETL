@@ -20,11 +20,15 @@
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleQuery">
-            <template #icon><Search /></template>
+            <template #icon>
+              <Search />
+            </template>
             搜索
           </el-button>
           <el-button @click="handleResetQuery">
-            <template #icon><Refresh /></template>
+            <template #icon>
+              <Refresh />
+            </template>
             重置
           </el-button>
         </el-form-item>
@@ -34,7 +38,9 @@
     <el-card shadow="never" class="table-container">
       <template #header>
         <el-button type="success" @click="handleOpenDialog()">
-          <template #icon><Plus /></template>
+          <template #icon>
+            <Plus />
+          </template>
           新增
         </el-button>
         <el-button
@@ -42,7 +48,9 @@
           :disabled="removeIds.length === 0"
           @click="handleDelete()"
         >
-          <template #icon><Delete /></template>
+          <template #icon>
+            <Delete />
+          </template>
           删除
         </el-button>
       </template>
@@ -90,12 +98,14 @@
           align="center"
         >
           <template #default="{ row }">
-            <span v-if="row.addressList === null || row.addressList === ''"> 无 </span>
+            <span v-if="row.addressList === null || row.addressList === ''">
+              无
+            </span>
             <span v-else>
-              <el-link type="primary" @click="findAddressList(row.id)"
-                >查看</el-link
-              ></span
-            >
+              <el-link type="primary" @click="findAddressList(row.id)">
+                查看
+              </el-link>
+            </span>
           </template>
         </el-table-column>
 
@@ -107,7 +117,9 @@
               link
               @click="handleOpenDialog(scope.row.id)"
             >
-              <template #icon><Edit /></template>
+              <template #icon>
+                <Edit />
+              </template>
               编辑
             </el-button>
             <el-button
@@ -116,7 +128,9 @@
               link
               @click="handleDelete(scope.row.id)"
             >
-              <template #icon><Delete /></template>
+              <template #icon>
+                <Delete />
+              </template>
               删除
             </el-button>
           </template>
@@ -150,20 +164,20 @@
       :formData="formData"
       @close="handleCloseDialog"
       @handleResetQuery="handleResetQuery"
-    ></EditTaskGroup>
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 defineOptions({
   name: "TaskGroup",
-  inheritAttrs: false,
+  inheritAttrs: false
 });
 
 import TaskGroupAPI, {
   TaskGroupPageVO,
   TaskGroupForm,
-  TaskGroupPageQuery,
+  TaskGroupPageQuery
 } from "@/api/task/task-group";
 import EditTaskGroup from "./operation/edit-task-group.vue";
 
@@ -177,7 +191,7 @@ const addressVisible = ref(false);
 
 const queryParams = reactive<TaskGroupPageQuery>({
   pageNum: 1,
-  pageSize: 10,
+  pageSize: 10
 });
 
 // task_group表格数据
@@ -186,12 +200,12 @@ const pageData = ref<TaskGroupPageVO[]>([]);
 // 弹窗
 const taskGroupVisible = reactive({
   title: "",
-  visible: false,
+  visible: false
 });
 
 // task_group表单数据
 const formData = reactive<TaskGroupForm>({
-  addressType: 0,
+  addressType: 0
 });
 
 function findAddressList(id: number) {
@@ -261,7 +275,7 @@ function handleDelete(id?: number) {
   ElMessageBox.confirm("确认删除已选中的数据项?", "警告", {
     confirmButtonText: "确定",
     cancelButtonText: "取消",
-    type: "warning",
+    type: "warning"
   }).then(
     () => {
       loading.value = true;

@@ -1,6 +1,7 @@
 package com.cc.job.task.scheduler;
 
 import com.cc.job.task.config.XxlJobAdminConfig;
+import com.cc.job.task.executorbiz.CcJobExecutorBiz;
 import com.cc.job.task.thread.*;
 import com.cc.job.task.utils.I18nUtil;
 import com.xxl.job.core.biz.ExecutorBiz;
@@ -95,6 +96,21 @@ public class XxlJobScheduler  {
         executorBiz = new ExecutorBizClient(address, XxlJobAdminConfig.getAdminConfig().getAccessToken());
 
         executorBizRepository.put(address, executorBiz);
+        return executorBiz;
+    }
+
+    private static ThreadLocal<ExecutorBiz> bizThreadLocal = new ThreadLocal<>();
+    public static ExecutorBiz getExecutorBiz() throws Exception {
+
+        ExecutorBiz executorBiz = bizThreadLocal.get();
+        if (executorBiz != null) {
+            return executorBiz;
+        }
+
+        // set-cache
+        executorBiz = new CcJobExecutorBiz();
+
+        bizThreadLocal.set(executorBiz);
         return executorBiz;
     }
 

@@ -59,8 +59,6 @@ public class TaskInfoForm implements Serializable {
     private String executorRouteStrategy;
 
     @Schema(description = "执行器任务handler")
-    @NotBlank(message = "执行器任务handler不能为空")
-    @Size(max=255, message="执行器任务handler长度不能超过255个字符")
     private String executorHandler;
 
     @Schema(description = "执行器任务参数")

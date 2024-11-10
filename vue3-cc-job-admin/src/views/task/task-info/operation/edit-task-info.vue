@@ -14,7 +14,11 @@
             <div class="m_left">
               <div class="c_cont">
                 <span>执行器*</span>
-                <el-select v-model="formData.jobGroup" filterable placeholder="Select">
+                <el-select
+                  v-model="formData.jobGroup"
+                  filterable
+                  placeholder="Select"
+                >
                   <el-option
                     v-for="item in taskGroupList"
                     :key="item.id"
@@ -25,17 +29,29 @@
               </div>
               <div class="c_cont">
                 <span>负责人*</span>
-                <el-input v-model="formData.author" type="text" autocomplete="off" />
+                <el-input
+                  v-model="formData.author"
+                  type="text"
+                  autocomplete="off"
+                />
               </div>
             </div>
             <div class="m_right">
               <div class="c_cont">
                 <span>任务描述*</span>
-                <el-input v-model="formData.jobDesc" type="text" autocomplete="off" />
+                <el-input
+                  v-model="formData.jobDesc"
+                  type="text"
+                  autocomplete="off"
+                />
               </div>
               <div class="c_cont">
                 <span>报警邮件</span>
-                <el-input v-model="formData.alarmEmail" type="text" autocomplete="off" />
+                <el-input
+                  v-model="formData.alarmEmail"
+                  type="text"
+                  autocomplete="off"
+                />
               </div>
             </div>
           </div>
@@ -65,18 +81,23 @@
             <div class="m_right">
               <div class="c_cont">
                 <span>CRON*</span>
-                <el-input v-model="formData.scheduleConf" placeholder="cron表达式...">
+                <el-input
+                  v-model="formData.scheduleConf"
+                  placeholder="cron表达式..."
+                >
                   <template #append>
-                    <el-button @click="cronPopover = !cronPopover">设置</el-button>
+                    <el-button @click="cronPopover = !cronPopover">
+                      设置
+                    </el-button>
                   </template>
                 </el-input>
-                <div class="cronPopover" v-show="cronPopover">
+                <div v-show="cronPopover" class="cronPopover">
                   <noVue3Cron
                     :cron-value="formData.scheduleConf"
+                    i18n="cn"
                     @change="changeCron"
                     @close="cronPopover = false"
-                    i18n="cn"
-                  ></noVue3Cron>
+                  />
                 </div>
               </div>
             </div>
@@ -177,7 +198,11 @@
             <div class="m_right">
               <div class="c_cont">
                 <span>子任务id</span>
-                <el-input v-model="formData.childJobid" type="text" autocomplete="off" />
+                <el-input
+                  v-model="formData.childJobid"
+                  type="text"
+                  autocomplete="off"
+                />
               </div>
               <div class="c_cont">
                 <span>阻塞处理策略</span>
@@ -208,7 +233,7 @@
         </div>
       </div>
       <template #footer>
-        <el-button type="primary" @click="submitForm()"> 保存 </el-button>
+        <el-button type="primary" @click="submitForm()">保存</el-button>
         <el-button @click="handleCloseDialog()">取消</el-button>
       </template>
     </el-dialog>
@@ -225,12 +250,12 @@ const emit = defineEmits(["close", "handleResetQuery"]);
 const props = defineProps({
   taskInfoVisible: {
     type: Object,
-    default: null,
+    default: null
   },
   formData: {
     type: Object,
-    default: null,
-  },
+    default: null
+  }
 });
 
 const taskGroupList = ref([]);
@@ -238,92 +263,97 @@ const taskGroupList = ref([]);
 const scheduleTypeList = [
   {
     type: "CRON",
-    title: "CRON",
+    title: "CRON"
   },
   { type: "NONE", title: "无" },
-  { type: "FIX_RATE", title: "固定速度" },
+  { type: "FIX_RATE", title: "固定速度" }
 ];
 const glueTypeList = [
   {
     type: "BEAN",
-    title: "BEAN",
+    title: "BEAN"
   },
+  {
+    type: "API",
+    title: "API"
+  }
 ];
 
 const routeStrategyList = [
   {
     type: "FIRST",
-    title: "第一个",
+    title: "第一个"
   },
   {
     type: "LAST",
-    title: "最后一个",
+    title: "最后一个"
   },
   {
     type: "ROUND",
-    title: "轮询",
+    title: "轮询"
   },
   {
     type: "RANDOM",
-    title: "随机",
+    title: "随机"
   },
   {
     type: "CONSISTENT_HASH",
-    title: "一致性哈希",
+    title: "一致性哈希"
   },
   {
     type: "LEASTY_FREQUENTY_USED",
-    title: "最不经常使用",
+    title: "最不经常使用"
   },
   {
     type: "LEASTY_RECENTLY_USED",
-    title: "最近最久未使用",
+    title: "最近最久未使用"
   },
   {
     type: "FAILOVER",
-    title: "故障转移",
+    title: "故障转移"
   },
   {
     type: "BUSYOVER",
-    title: "忙碌转移",
+    title: "忙碌转移"
   },
   {
     type: "SHARDING_BORADCAST",
-    title: "分片广播",
-  },
+    title: "分片广播"
+  }
 ];
 
 const misfireStrategyList = [
   {
     type: "DO_NOTHING",
-    title: "忽略",
+    title: "忽略"
   },
   {
     type: "FIRE_ONCE_NOW",
-    title: "立即执行一次",
-  },
+    title: "立即执行一次"
+  }
 ];
 
 const blockStrategyList = [
   {
     type: "SERIAL_EXECUTION",
-    title: "单机串行",
+    title: "单机串行"
   },
   {
     type: "DISCARD_LATER",
-    title: "丢弃后续调度",
+    title: "丢弃后续调度"
   },
   {
     type: "COVER_EARLY",
-    title: "覆盖之前调度",
-  },
+    title: "覆盖之前调度"
+  }
 ];
 
 const cronPopover = ref(false);
 
 watch(
   () => props.taskInfoVisible,
-  () => {}
+  () => {
+  }
 );
 
 async function fetchTaskGroupList() {
@@ -346,7 +376,8 @@ function submitForm() {
           handleCloseDialog();
           emit("handleResetQuery");
         })
-        .finally(() => {});
+        .finally(() => {
+        });
     } else {
       TaskInfoAPI.update(id, props.formData)
         .then(() => {
@@ -354,7 +385,8 @@ function submitForm() {
           handleCloseDialog();
           emit("handleResetQuery");
         })
-        .finally(() => {});
+        .finally(() => {
+        });
     }
   } else {
     TaskInfoAPI.add(props.formData)
@@ -363,7 +395,8 @@ function submitForm() {
         handleCloseDialog();
         emit("handleResetQuery");
       })
-      .finally(() => {});
+      .finally(() => {
+      });
   }
 }
 
@@ -380,8 +413,10 @@ onMounted(() => {
 <style lang="scss" scoped>
 .info_form {
   width: 100%;
+
   .child_form {
     width: 100%;
+
     .child_main {
       display: flex;
       justify-content: space-between;
@@ -393,6 +428,7 @@ onMounted(() => {
         justify-content: space-between;
         align-items: center;
         margin-bottom: 10px;
+
         span {
           display: inline-block;
           width: 140px;
@@ -401,11 +437,13 @@ onMounted(() => {
           margin-right: 10px;
         }
       }
+
       .c_cont_param {
         display: flex;
         align-items: center;
         width: 710px;
         margin-left: 10px;
+
         span {
           display: inline-block;
           width: 100px;

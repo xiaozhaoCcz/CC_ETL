@@ -3,10 +3,7 @@ package com.cc.job.task.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.common.exception.BusinessException;
 import com.cc.job.core.cron.CronExpression;
-import com.cc.job.task.enums.ExecutorRouteStrategyEnum;
-import com.cc.job.task.enums.MisfireStrategyEnum;
-import com.cc.job.task.enums.ScheduleTypeEnum;
-import com.cc.job.task.enums.TriggerTypeEnum;
+import com.cc.job.task.enums.*;
 import com.cc.job.task.model.dto.TaskInfoTriggerDto;
 import com.cc.job.task.model.entity.TaskGroup;
 import com.cc.job.task.model.vo.TaskGroupVO;
@@ -147,7 +144,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         }
 
         // valid job
-        if (GlueTypeEnum.match(formData.getGlueType()) == null) {
+        if (GlueTypeEnum.match(formData.getGlueType()) == null&& CcJobGlueTypeEnum.match(formData.getGlueType())==null) {
             throw new BusinessException(I18nUtil.getString("jobinfo_field_gluetype")+I18nUtil.getString("system_unvalid"));
         }
         if (GlueTypeEnum.BEAN==GlueTypeEnum.match(formData.getGlueType()) && (formData.getExecutorHandler()==null || formData.getExecutorHandler().trim().length()==0) ) {

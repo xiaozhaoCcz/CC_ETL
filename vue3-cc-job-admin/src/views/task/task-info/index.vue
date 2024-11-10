@@ -53,11 +53,15 @@
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleQuery">
-            <template #icon><Search /></template>
+            <template #icon>
+              <Search />
+            </template>
             搜索
           </el-button>
           <el-button @click="handleResetQuery">
-            <template #icon><Refresh /></template>
+            <template #icon>
+              <Refresh />
+            </template>
             重置
           </el-button>
         </el-form-item>
@@ -68,7 +72,9 @@
       <template #header>
         <!-- v-hasPerm="['task:taskInfo:add']" -->
         <el-button type="success" @click="handleOpenDialog()">
-          <template #icon><Plus /></template>
+          <template #icon>
+            <Plus />
+          </template>
           新增
         </el-button>
         <el-button
@@ -76,7 +82,9 @@
           :disabled="removeIds.length === 0"
           @click="handleDelete()"
         >
-          <template #icon><Delete /></template>
+          <template #icon>
+            <Delete />
+          </template>
           删除
         </el-button>
       </template>
@@ -153,41 +161,52 @@
           <template #default="scope">
             <el-dropdown>
               <el-button type="primary">
-                操作<el-icon class="el-icon--right"><arrow-down /></el-icon>
+                操作
+                <el-icon class="el-icon--right">
+                  <arrow-down/>
+                </el-icon>
               </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item @click="executeOne(scope.row.id)"
-                    >执行一次</el-dropdown-item
+                  >执行一次
+                  </el-dropdown-item
                   >
                   <el-dropdown-item @click="getTaskTriggerLog(scope.row.id)"
-                    >查询日志</el-dropdown-item
+                  >查询日志
+                  </el-dropdown-item
                   >
                   <el-dropdown-item>注册节点</el-dropdown-item>
                   <el-dropdown-item
                     @click="
                       nextTriggerTime(scope.row.scheduleType, scope.row.scheduleConf)
                     "
-                    >下次执行时间</el-dropdown-item
+                  >下次执行时间
+                  </el-dropdown-item
                   >
                   <el-dropdown-item
                     divided
                     @click="startTask(scope.row.id)"
                     v-if="scope.row.triggerStatus === 0"
-                    >启动</el-dropdown-item
+                  >启动
+                  </el-dropdown-item
                   >
                   <el-dropdown-item divided @click="stopTask(scope.row.id)" v-else
-                    >停止</el-dropdown-item
+                  >停止
+                  </el-dropdown-item
                   >
 
-                  <el-dropdown-item @click="handleOpenDialog(scope.row.id)"
-                    >编辑</el-dropdown-item
+                  <el-dropdown-item @click="handleOpenDialog(scope.row.id)">
+                    编辑
+                  </el-dropdown-item
                   >
                   <el-dropdown-item @click="handleDelete(scope.row.id)"
-                    >删除</el-dropdown-item
+                  >删除
+                  </el-dropdown-item
                   >
                   <el-dropdown-item @click="handleCopy(scope.row.id)"
-                    >复制</el-dropdown-item
+                  >复制
+                  </el-dropdown-item
                   >
                 </el-dropdown-menu>
               </template>
@@ -236,13 +255,13 @@
 <script setup lang="ts">
 defineOptions({
   name: "TaskInfo",
-  inheritAttrs: false,
+  inheritAttrs: false
 });
 
 import TaskInfoAPI, {
   TaskInfoPageVO,
   TaskInfoForm,
-  TaskInfoPageQuery,
+  TaskInfoPageQuery
 } from "@/api/task/task-info";
 import ExecuteOne from "./operation/executeone.vue";
 import EditTaskInfo from "./operation/edit-task-info.vue";
@@ -257,7 +276,7 @@ const total = ref(0);
 
 const queryParams = reactive<TaskInfoPageQuery>({
   pageNum: 1,
-  pageSize: 10,
+  pageSize: 10
 });
 
 // task_info表格数据
@@ -266,7 +285,7 @@ const pageData = ref<TaskInfoPageVO[]>([]);
 const taskInfoVisible = reactive({
   title: "",
   visible: false,
-  isCopy: false,
+  isCopy: false
 });
 
 // task_info表单数据
@@ -280,7 +299,7 @@ const taskGroupList = ref([]);
 function getTaskTriggerLog(id: number) {
   router.push({
     path: "/task/task-log",
-    query: { id },
+    query: { id }
   });
 }
 
@@ -388,7 +407,7 @@ function handleDelete(id?: number) {
   ElMessageBox.confirm("确认删除已选中的数据项?", "警告", {
     confirmButtonText: "确定",
     cancelButtonText: "取消",
-    type: "warning",
+    type: "warning"
   }).then(
     () => {
       loading.value = true;
