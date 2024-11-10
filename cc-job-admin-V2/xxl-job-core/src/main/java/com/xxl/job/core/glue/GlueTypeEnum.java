@@ -5,6 +5,7 @@ package com.xxl.job.core.glue;
  */
 public enum GlueTypeEnum {
 
+    API("API",false,null,null),
     BEAN("BEAN", false, null, null),
     GLUE_GROOVY("GLUE(Java)", false, null, null),
     GLUE_SHELL("GLUE(Shell)", true, "bash", ".sh"),

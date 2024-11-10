@@ -1,9 +1,20 @@
-package com.cc.job.task.jobhandler;
+package com.xxl.job.core.handler.impl;
 
 
+import cn.hutool.http.HttpUtil;
+import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.handler.IJobHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
+/**
+ * @author zhaowenpeng
+ */
 public class ApiJobHandler extends IJobHandler {
     private static Logger logger = LoggerFactory.getLogger(ApiJobHandler.class);
     private final String api;
@@ -14,7 +25,10 @@ public class ApiJobHandler extends IJobHandler {
     @Override
     public void execute() throws Exception {
         System.out.println("ApiJobHandler 任务运行"+api);
-        System.out.println("返回结果1111");
+        // TODO 需要修改参数传递
+        String s = HttpUtil.get("http://175.178.249.190/yanhuo/platform/category/getCategoryTreeData");
+        System.out.println("返回结果"+s);
+        XxlJobHelper.log(s);
     }
 
     @Override

@@ -144,7 +144,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         }
 
         // valid job
-        if (GlueTypeEnum.match(formData.getGlueType()) == null&& CcJobGlueTypeEnum.match(formData.getGlueType())==null) {
+        if (GlueTypeEnum.match(formData.getGlueType()) == null) {
             throw new BusinessException(I18nUtil.getString("jobinfo_field_gluetype")+I18nUtil.getString("system_unvalid"));
         }
         if (GlueTypeEnum.BEAN==GlueTypeEnum.match(formData.getGlueType()) && (formData.getExecutorHandler()==null || formData.getExecutorHandler().trim().length()==0) ) {

@@ -65,6 +65,15 @@ watch(
   }
 );
 
+function convertContent(str: string) {
+  return str.replace( /&amp;/g,'&')
+    .replace(/&lt;/g,'<')
+    .replace( /&gt;/g,'>')
+    .replace( /&quot;/g,"'")
+    .replace(/&#39;/g,"'")
+    .replace(/&quot;/g, '"')
+}
+
 function run(id: number) {
   logRun = setInterval(() => {
     getExecuteTaskLog(id);
@@ -75,7 +84,7 @@ function logRunStop(content: string) {
   if (logRun != null) {
     window.clearInterval(logRun);
     logRun = null;
-    execLog.value += content;
+    execLog.value += convertContent(content);
   }
 }
 
@@ -109,7 +118,7 @@ function getExecuteTaskLog(id: number) {
       // append content
       fromLineNum.value = data.content.toLineNum + 1;
 
-      execLog.value += data.content.logContent;
+      execLog.value += convertContent(data.content.logContent);
 
       pullFailCount.value = 0;
     } else {

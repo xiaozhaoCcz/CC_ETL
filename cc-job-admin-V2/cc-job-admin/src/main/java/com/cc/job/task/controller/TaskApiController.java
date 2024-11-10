@@ -51,7 +51,6 @@ public class TaskApiController {
 
         // services mapping
         if ("callback".equals(uri)) {
-            System.out.println(111+data);
             List<HandleCallbackParam> callbackParamList = GsonTool.fromJson(data, List.class, HandleCallbackParam.class);
             return adminBiz.callback(callbackParamList);
         } else if ("registry".equals(uri)) {

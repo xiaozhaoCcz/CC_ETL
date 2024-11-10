@@ -1,11 +1,11 @@
 package com.cc.job.task.scheduler;
 
 import com.cc.job.task.config.XxlJobAdminConfig;
-import com.cc.job.task.executorbiz.CcJobExecutorBiz;
 import com.cc.job.task.thread.*;
 import com.cc.job.task.utils.I18nUtil;
 import com.xxl.job.core.biz.ExecutorBiz;
 import com.xxl.job.core.biz.client.ExecutorBizClient;
+import com.xxl.job.core.biz.impl.ExecutorBizImpl;
 import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -110,7 +110,7 @@ public class XxlJobScheduler  {
         }
 
         // set-cache
-        executorBiz = new CcJobExecutorBiz();
+        executorBiz = new ExecutorBizImpl();
 
         bizThreadLocal.set(executorBiz);
         return executorBiz;

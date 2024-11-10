@@ -1,7 +1,6 @@
 package com.cc.job.task.trigger;
 
 import com.cc.job.task.config.XxlJobAdminConfig;
-import com.cc.job.task.enums.CcJobGlueTypeEnum;
 import com.cc.job.task.enums.ExecutorRouteStrategyEnum;
 import com.cc.job.task.enums.TriggerTypeEnum;
 import com.cc.job.task.model.entity.TaskGroup;
@@ -16,12 +15,12 @@ import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
 import com.xxl.job.core.glue.GlueTypeEnum;
 import com.xxl.job.core.util.IpUtil;
 import com.xxl.job.core.util.ThrowableUtil;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.Date;
 
 /**
  * xxl-job trigger
@@ -217,13 +216,9 @@ public class XxlJobTrigger {
             ExecutorBiz executorBiz = null;
             // 新增api调度任务
             GlueTypeEnum glueTypeEnum = GlueTypeEnum.match(triggerParam.getGlueType());
-            if(glueTypeEnum==null){
-                CcJobGlueTypeEnum ccJobGlueTypeEnum = CcJobGlueTypeEnum.match(triggerParam.getGlueType());
-                if(ccJobGlueTypeEnum==null){
-                    throw new Exception("ccJobGlueTypeEnum 不存在");
-                }
+            if(GlueTypeEnum.API==glueTypeEnum){
                 executorBiz = XxlJobScheduler.getExecutorBiz();
-            }else{
+            }else {
                 executorBiz = XxlJobScheduler.getExecutorBiz(address);
             }
             runResult = executorBiz.run(triggerParam);
