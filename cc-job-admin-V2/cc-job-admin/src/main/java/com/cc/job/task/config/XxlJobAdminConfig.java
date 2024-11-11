@@ -162,13 +162,11 @@ public class XxlJobAdminConfig implements InitializingBean, DisposableBean {
     @Value("${xxl.job.logpath}")
     private String logPath;
 
-    @Value("${xxl.job.address}")
-    private String address;
     @Bean
     public XxlJobSpringExecutor xxlJobExecutor() {
         XxlJobSpringExecutor xxlJobSpringExecutor = new XxlJobSpringExecutor();
         xxlJobSpringExecutor.setLogPath(logPath);
-        xxlJobSpringExecutor.setAdminAddresses(address);
+        xxlJobSpringExecutor.setAdminAddresses("http://127.0.0.1:8989/xxl-job-admin");
         return xxlJobSpringExecutor;
     }
 

@@ -178,7 +178,6 @@ xxl:
         max: 200
     logretentiondays: 30
     logpath: /Users/zhaowenpeng/logs
-    address: http://127.0.0.1:8989/xxl-job-admin
 
 
 
