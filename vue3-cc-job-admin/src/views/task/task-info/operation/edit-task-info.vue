@@ -126,7 +126,7 @@
               </div>
             </div>
             <div class="m_right">
-              <div class="c_cont">
+              <div class="c_cont" v-if="formData.glueType!='API'">
                 <span>JobHandler*</span>
                 <el-input
                   v-model="formData.executorHandler"
@@ -134,13 +134,53 @@
                   autocomplete="off"
                 />
               </div>
+              <div class="c_cont" v-else>
+                <span>请求类型*</span>
+                <el-select
+                  v-model="formData.reqType"
+                  filterable
+                  placeholder="Select"
+                  style="width: 210px"
+                >
+                  <el-option
+                    key="GET"
+                    label="GET"
+                    value="GET"
+                  />
+                  <el-option
+                    key="POST"
+                    label="POST"
+                    value="POST"
+                  />
+                </el-select>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="child_form" v-if="formData.glueType==='API'" style="margin-bottom: 10px">
+          <div class="child_main">
+            <div class="m_left">
+              <div class="c_cont_param">
+                <span>请求头</span>
+                <!-- 可编辑表格 -->
+                <EditTable style="width: 720px"/>
+              </div>
             </div>
           </div>
         </div>
         <div class="child_form">
           <div class="child_main">
             <div class="m_left">
-              <div class="c_cont_param">
+              <div class="c_cont_param" v-if="formData.glueType==='API'&&formData.reqType==='POST'">
+                <span>body</span>
+                <el-input
+                  v-model="formData.executorParam"
+                  type="textarea"
+                  autocomplete="off"
+                />
+              </div>
+
+              <div class="c_cont_param" v-if="formData.glueType!=='API'">
                 <span>任务参数</span>
                 <el-input
                   v-model="formData.executorParam"
@@ -151,6 +191,7 @@
             </div>
           </div>
         </div>
+
         <div class="child_form">
           <div style="color: #8e8e8e; font-size: 14px">高级配置</div>
           <el-divider style="margin: 8px" />
@@ -244,6 +285,7 @@ import TaskGroupAPI from "@/api/task/task-group";
 import TaskInfoAPI from "@/api/task/task-info";
 //当前使用的页面引入
 import NoVue3Cron from "@/components/NoVue3Cron/index.vue";
+import EditTable from "@/components/EditTable/EditTable.vue"
 
 const emit = defineEmits(["close", "handleResetQuery"]);
 
@@ -349,6 +391,9 @@ const blockStrategyList = [
 ];
 
 const cronPopover = ref(false);
+
+const columnList = ref([{props:"columnKey",label:"参数名"},{props:"columnValue",label:"参数值"}]);
+const tableList = ref([{"columnKey":"11","columnValue":22}]);
 
 watch(
   () => props.taskInfoVisible,
