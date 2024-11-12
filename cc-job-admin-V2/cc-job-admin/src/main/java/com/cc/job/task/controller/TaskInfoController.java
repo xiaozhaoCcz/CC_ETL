@@ -104,4 +104,11 @@ public class TaskInfoController {
       List<String> list = taskInfoService.nextTriggerTime(scheduleType, scheduleConf);
       return Result.success(list);
     }
+
+    @Operation(summary = "运行任务集")
+    @GetMapping("/runTaskSet/{id}")
+    public Result<Void> runTaskSet(@PathVariable Long id){
+        boolean result = taskInfoService.runTaskSet(id);
+        return Result.judge(result);
+    }
 }

@@ -5,20 +5,19 @@ import com.cc.job.common.exception.BusinessException;
 import com.cc.job.core.cron.CronExpression;
 import com.cc.job.task.enums.*;
 import com.cc.job.task.model.dto.TaskInfoTriggerDto;
+import com.cc.job.task.model.entity.TaskEdge;
 import com.cc.job.task.model.entity.TaskGroup;
-import com.cc.job.task.model.vo.TaskGroupVO;
+import com.cc.job.task.model.entity.TaskNode;
 import com.cc.job.task.service.TaskGroupService;
+import com.xxl.job.core.thread.JobCallBackThread;
 import com.cc.job.task.thread.JobScheduleHelper;
 import com.cc.job.task.thread.JobTriggerPoolHelper;
 import com.cc.job.task.utils.I18nUtil;
-import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
 import com.xxl.job.core.glue.GlueTypeEnum;
 import com.xxl.job.core.util.DateUtil;
-import jodd.util.Task;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.security.core.parameters.P;
 import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -33,10 +32,8 @@ import com.cc.job.task.converter.TaskInfoConverter;
 
 import java.text.MessageFormat;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 import cn.hutool.core.lang.Assert;
@@ -57,11 +54,11 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
     private final TaskGroupService taskGroupService;
 
     /**
-    * 获取task_info分页列表
-    *
-    * @param queryParams 查询参数
-    * @return {@link IPage<TaskInfoVO>} task_info分页列表
-    */
+     * 获取task_info分页列表
+     *
+     * @param queryParams 查询参数
+     * @return {@link IPage<TaskInfoVO>} task_info分页列表
+     */
     @Override
     public IPage<TaskInfoVO> getTaskInfoPage(TaskInfoQuery queryParams) {
 //        Page<TaskInfoVO> pageVO = this.baseMapper.getTaskInfoPage(
@@ -70,22 +67,21 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
 //        );
         Page<TaskInfoVO> pageVO = new Page<>();
         LambdaQueryWrapper<TaskInfo> wrapper = new LambdaQueryWrapper<>();
-        if(queryParams.getJobGroup()!=null){
+        if (queryParams.getJobGroup() != null) {
             wrapper.eq(TaskInfo::getJobGroup, queryParams.getJobGroup());
         }
-        if(queryParams.getTriggerStatus()!=null){
+        if (queryParams.getTriggerStatus() != null) {
             wrapper.eq(TaskInfo::getTriggerStatus, queryParams.getTriggerStatus());
         }
-        if(StringUtils.isNotBlank(queryParams.getAuthor())){
+        if (StringUtils.isNotBlank(queryParams.getAuthor())) {
             wrapper.like(TaskInfo::getAuthor, queryParams.getAuthor());
         }
-        if(StringUtils.isNotBlank(queryParams.getJobDesc())){
+        if (StringUtils.isNotBlank(queryParams.getJobDesc())) {
             wrapper.like(TaskInfo::getJobDesc, queryParams.getJobDesc());
         }
-        if(StringUtils.isNotBlank(queryParams.getExecutorHandler())){
-            wrapper.eq(TaskInfo::getExecutorHandler,queryParams.getExecutorHandler());
+        if (StringUtils.isNotBlank(queryParams.getExecutorHandler())) {
+            wrapper.eq(TaskInfo::getExecutorHandler, queryParams.getExecutorHandler());
         }
-
 
 
         Page<TaskInfo> page = this.page(new Page<>(queryParams.getPageNum(), queryParams.getPageSize()), wrapper);
@@ -95,7 +91,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         pageVO.setTotal(page.getTotal());
         return pageVO;
     }
-    
+
     /**
      * 获取task_info表单数据
      *
@@ -107,7 +103,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         TaskInfo entity = this.getById(id);
         return taskInfoConverter.toForm(entity);
     }
-    
+
     /**
      * 新增task_info
      *
@@ -118,85 +114,85 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
     public boolean saveTaskInfo(TaskInfoForm formData) {
         TaskGroup taskGroup = taskGroupService.getById(formData.getJobGroup());
         if (taskGroup == null) {
-            throw new BusinessException(I18nUtil.getString("system_please_choose")+I18nUtil.getString("jobinfo_field_jobgroup"));
+            throw new BusinessException(I18nUtil.getString("system_please_choose") + I18nUtil.getString("jobinfo_field_jobgroup"));
         }
 
         ScheduleTypeEnum scheduleTypeEnum = ScheduleTypeEnum.match(formData.getScheduleType(), null);
         if (scheduleTypeEnum == null) {
-            throw new BusinessException(I18nUtil.getString("schedule_type")+I18nUtil.getString("system_unvalid"));
+            throw new BusinessException(I18nUtil.getString("schedule_type") + I18nUtil.getString("system_unvalid"));
         }
         if (scheduleTypeEnum == ScheduleTypeEnum.CRON) {
-            if (formData.getScheduleConf()==null || !CronExpression.isValidExpression(formData.getScheduleConf())) {
-                throw new BusinessException("Cron"+I18nUtil.getString("system_unvalid"));
+            if (formData.getScheduleConf() == null || !CronExpression.isValidExpression(formData.getScheduleConf())) {
+                throw new BusinessException("Cron" + I18nUtil.getString("system_unvalid"));
             }
-        }else if(scheduleTypeEnum == ScheduleTypeEnum.FIX_RATE){
+        } else if (scheduleTypeEnum == ScheduleTypeEnum.FIX_RATE) {
             if (formData.getScheduleConf() == null) {
                 throw new BusinessException(I18nUtil.getString("schedule_type"));
             }
             try {
                 int fixSecond = Integer.parseInt(formData.getScheduleConf());
                 if (fixSecond < 1) {
-                    throw new BusinessException(I18nUtil.getString("schedule_type")+I18nUtil.getString("system_unvalid"));
+                    throw new BusinessException(I18nUtil.getString("schedule_type") + I18nUtil.getString("system_unvalid"));
                 }
             } catch (Exception e) {
-                throw new BusinessException(I18nUtil.getString("schedule_type")+I18nUtil.getString("system_unvalid"));
+                throw new BusinessException(I18nUtil.getString("schedule_type") + I18nUtil.getString("system_unvalid"));
             }
         }
 
         // valid job
         if (GlueTypeEnum.match(formData.getGlueType()) == null) {
-            throw new BusinessException(I18nUtil.getString("jobinfo_field_gluetype")+I18nUtil.getString("system_unvalid"));
+            throw new BusinessException(I18nUtil.getString("jobinfo_field_gluetype") + I18nUtil.getString("system_unvalid"));
         }
-        if (GlueTypeEnum.BEAN==GlueTypeEnum.match(formData.getGlueType()) && (formData.getExecutorHandler()==null || formData.getExecutorHandler().trim().length()==0) ) {
-            throw new BusinessException(I18nUtil.getString("system_please_input")+"JobHandler");
+        if (GlueTypeEnum.BEAN == GlueTypeEnum.match(formData.getGlueType()) && (formData.getExecutorHandler() == null || formData.getExecutorHandler().trim().length() == 0)) {
+            throw new BusinessException(I18nUtil.getString("system_please_input") + "JobHandler");
         }
         // 》fix "\r" in shell
-        if (GlueTypeEnum.GLUE_SHELL==GlueTypeEnum.match(formData.getGlueType()) && formData.getGlueSource()!=null) {
+        if (GlueTypeEnum.GLUE_SHELL == GlueTypeEnum.match(formData.getGlueType()) && formData.getGlueSource() != null) {
             formData.setGlueSource(formData.getGlueSource().replaceAll("\r", ""));
         }
 
         if (ExecutorRouteStrategyEnum.match(formData.getExecutorRouteStrategy(), null) == null) {
-            throw new BusinessException(I18nUtil.getString("jobinfo_field_executorRouteStrategy")+I18nUtil.getString("system_unvalid"));
+            throw new BusinessException(I18nUtil.getString("jobinfo_field_executorRouteStrategy") + I18nUtil.getString("system_unvalid"));
 
         }
         if (MisfireStrategyEnum.match(formData.getMisfireStrategy(), null) == null) {
-            throw new BusinessException(I18nUtil.getString("misfire_strategy")+I18nUtil.getString("system_unvalid"));
+            throw new BusinessException(I18nUtil.getString("misfire_strategy") + I18nUtil.getString("system_unvalid"));
 
         }
         if (ExecutorBlockStrategyEnum.match(formData.getExecutorBlockStrategy(), null) == null) {
-            throw new BusinessException(I18nUtil.getString("jobinfo_field_executorBlockStrategy")+I18nUtil.getString("system_unvalid"));
+            throw new BusinessException(I18nUtil.getString("jobinfo_field_executorBlockStrategy") + I18nUtil.getString("system_unvalid"));
         }
 
-        if (formData.getChildJobid()!=null && formData.getChildJobid().trim().length()>0) {
+        if (formData.getChildJobid() != null && formData.getChildJobid().trim().length() > 0) {
             String[] childJobIds = formData.getChildJobid().split(",");
-            for (String childJobIdItem: childJobIds) {
-                if (childJobIdItem!=null && childJobIdItem.trim().length()>0 && isNumeric(childJobIdItem)) {
+            for (String childJobIdItem : childJobIds) {
+                if (childJobIdItem != null && childJobIdItem.trim().length() > 0 && isNumeric(childJobIdItem)) {
                     TaskInfo childJobInfo = this.getById(Integer.parseInt(childJobIdItem));
-                    if (childJobInfo==null) {
-                        throw new BusinessException( MessageFormat.format((I18nUtil.getString("jobinfo_field_childJobId")+"({0})"+I18nUtil.getString("system_not_found")), childJobIdItem));
+                    if (childJobInfo == null) {
+                        throw new BusinessException(MessageFormat.format((I18nUtil.getString("jobinfo_field_childJobId") + "({0})" + I18nUtil.getString("system_not_found")), childJobIdItem));
 
                     }
                 } else {
-                    throw   new BusinessException(
-                            MessageFormat.format((I18nUtil.getString("jobinfo_field_childJobId")+"({0})"+I18nUtil.getString("system_unvalid")), childJobIdItem));
+                    throw new BusinessException(
+                            MessageFormat.format((I18nUtil.getString("jobinfo_field_childJobId") + "({0})" + I18nUtil.getString("system_unvalid")), childJobIdItem));
                 }
             }
 
             // join , avoid "xxx,,"
             String temp = "";
-            for (String item:childJobIds) {
+            for (String item : childJobIds) {
                 temp += item + ",";
             }
-            temp = temp.substring(0, temp.length()-1);
+            temp = temp.substring(0, temp.length() - 1);
 
             formData.setChildJobid(temp);
         }
         formData.setGlueUpdatetime(LocalDateTime.now());
         TaskInfo taskInfo = taskInfoConverter.toEntity(formData);
-        return   this.save(taskInfo);
+        return this.save(taskInfo);
     }
 
-    private boolean isNumeric(String str){
+    private boolean isNumeric(String str) {
         try {
             int result = Integer.parseInt(str);
             return true;
@@ -204,72 +200,72 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             return false;
         }
     }
-    
+
     /**
      * 更新task_info
      *
-     * @param id   task_infoID
+     * @param id       task_infoID
      * @param formData task_info表单对象
      * @return
      */
     @Override
-    public boolean updateTaskInfo(Long id,TaskInfoForm formData) {
+    public boolean updateTaskInfo(Long id, TaskInfoForm formData) {
         // valid trigger
         ScheduleTypeEnum scheduleTypeEnum = ScheduleTypeEnum.match(formData.getScheduleType(), null);
         if (scheduleTypeEnum == null) {
-            throw new BusinessException (I18nUtil.getString("schedule_type")+I18nUtil.getString("system_unvalid"));
+            throw new BusinessException(I18nUtil.getString("schedule_type") + I18nUtil.getString("system_unvalid"));
         }
         if (scheduleTypeEnum == ScheduleTypeEnum.CRON) {
-            if (formData.getScheduleConf()==null || !CronExpression.isValidExpression(formData.getScheduleConf())) {
-                throw new  BusinessException("Cron"+I18nUtil.getString("system_unvalid") );
+            if (formData.getScheduleConf() == null || !CronExpression.isValidExpression(formData.getScheduleConf())) {
+                throw new BusinessException("Cron" + I18nUtil.getString("system_unvalid"));
             }
         } else if (scheduleTypeEnum == ScheduleTypeEnum.FIX_RATE /*|| scheduleTypeEnum == ScheduleTypeEnum.FIX_DELAY*/) {
             if (formData.getScheduleConf() == null) {
-                throw new BusinessException (I18nUtil.getString("schedule_type")+I18nUtil.getString("system_unvalid"));
+                throw new BusinessException(I18nUtil.getString("schedule_type") + I18nUtil.getString("system_unvalid"));
             }
             try {
                 int fixSecond = Integer.parseInt(formData.getScheduleConf());
                 if (fixSecond < 1) {
-                    throw new  BusinessException(I18nUtil.getString("schedule_type")+I18nUtil.getString("system_unvalid"));
+                    throw new BusinessException(I18nUtil.getString("schedule_type") + I18nUtil.getString("system_unvalid"));
                 }
             } catch (Exception e) {
-                throw new BusinessException (I18nUtil.getString("schedule_type")+I18nUtil.getString("system_unvalid"));
+                throw new BusinessException(I18nUtil.getString("schedule_type") + I18nUtil.getString("system_unvalid"));
             }
         }
 
         // valid advanced
         if (ExecutorRouteStrategyEnum.match(formData.getExecutorRouteStrategy(), null) == null) {
-            throw new  BusinessException(I18nUtil.getString("jobinfo_field_executorRouteStrategy")+I18nUtil.getString("system_unvalid")) ;
+            throw new BusinessException(I18nUtil.getString("jobinfo_field_executorRouteStrategy") + I18nUtil.getString("system_unvalid"));
         }
         if (MisfireStrategyEnum.match(formData.getMisfireStrategy(), null) == null) {
-            throw new  BusinessException(I18nUtil.getString("misfire_strategy")+I18nUtil.getString("system_unvalid")) ;
+            throw new BusinessException(I18nUtil.getString("misfire_strategy") + I18nUtil.getString("system_unvalid"));
         }
         if (ExecutorBlockStrategyEnum.match(formData.getExecutorBlockStrategy(), null) == null) {
-            throw new BusinessException (I18nUtil.getString("jobinfo_field_executorBlockStrategy")+I18nUtil.getString("system_unvalid")) ;
+            throw new BusinessException(I18nUtil.getString("jobinfo_field_executorBlockStrategy") + I18nUtil.getString("system_unvalid"));
         }
 
         // 》ChildJobId valid
-        if (formData.getChildJobid()!=null && formData.getChildJobid().trim().length()>0) {
+        if (formData.getChildJobid() != null && formData.getChildJobid().trim().length() > 0) {
             String[] childJobIds = formData.getChildJobid().split(",");
-            for (String childJobIdItem: childJobIds) {
-                if (childJobIdItem!=null && childJobIdItem.trim().length()>0 && isNumeric(childJobIdItem)) {
+            for (String childJobIdItem : childJobIds) {
+                if (childJobIdItem != null && childJobIdItem.trim().length() > 0 && isNumeric(childJobIdItem)) {
                     TaskInfo childJobInfo = this.getById(Integer.parseInt(childJobIdItem));
-                    if (childJobInfo==null) {
+                    if (childJobInfo == null) {
                         throw new BusinessException(
-                                MessageFormat.format((I18nUtil.getString("jobinfo_field_childJobId")+"({0})"+I18nUtil.getString("system_not_found")), childJobIdItem));
+                                MessageFormat.format((I18nUtil.getString("jobinfo_field_childJobId") + "({0})" + I18nUtil.getString("system_not_found")), childJobIdItem));
                     }
                 } else {
                     throw new BusinessException(
-                            MessageFormat.format((I18nUtil.getString("jobinfo_field_childJobId")+"({0})"+I18nUtil.getString("system_unvalid")), childJobIdItem));
+                            MessageFormat.format((I18nUtil.getString("jobinfo_field_childJobId") + "({0})" + I18nUtil.getString("system_unvalid")), childJobIdItem));
                 }
             }
 
             // join , avoid "xxx,,"
             String temp = "";
-            for (String item:childJobIds) {
+            for (String item : childJobIds) {
                 temp += item + ",";
             }
-            temp = temp.substring(0, temp.length()-1);
+            temp = temp.substring(0, temp.length() - 1);
 
             formData.setChildJobid(temp);
         }
@@ -277,13 +273,13 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         // group valid
         TaskGroup jobGroup = taskGroupService.getById(formData.getJobGroup());
         if (jobGroup == null) {
-            throw new BusinessException (I18nUtil.getString("jobinfo_field_jobgroup")+I18nUtil.getString("system_unvalid")) ;
+            throw new BusinessException(I18nUtil.getString("jobinfo_field_jobgroup") + I18nUtil.getString("system_unvalid"));
         }
 
         // stage job info
         TaskInfo existsJobInfo = this.getById(id);
         if (existsJobInfo == null) {
-            throw new BusinessException (I18nUtil.getString("jobinfo_field_id")+I18nUtil.getString("system_not_found")) ;
+            throw new BusinessException(I18nUtil.getString("jobinfo_field_id") + I18nUtil.getString("system_not_found"));
         }
 
         // next trigger time (5s后生效，避开预读周期)
@@ -294,12 +290,12 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
                 existsJobInfo.setScheduleConf(formData.getScheduleConf());
                 Date nextValidTime = JobScheduleHelper.generateNextValidTime(existsJobInfo, new Date(System.currentTimeMillis() + JobScheduleHelper.PRE_READ_MS));
                 if (nextValidTime == null) {
-                    throw new  BusinessException(I18nUtil.getString("schedule_type")+I18nUtil.getString("system_unvalid"));
+                    throw new BusinessException(I18nUtil.getString("schedule_type") + I18nUtil.getString("system_unvalid"));
                 }
                 nextTriggerTime = nextValidTime.getTime();
             } catch (Exception e) {
                 log.error(e.getMessage(), e);
-                throw new  BusinessException(I18nUtil.getString("schedule_type")+I18nUtil.getString("system_unvalid"));
+                throw new BusinessException(I18nUtil.getString("schedule_type") + I18nUtil.getString("system_unvalid"));
             }
         }
         existsJobInfo.setJobGroup(formData.getJobGroup());
@@ -319,7 +315,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         existsJobInfo.setTriggerNextTime(nextTriggerTime);
         return this.updateById(existsJobInfo);
     }
-    
+
     /**
      * 删除task_info
      *
@@ -359,7 +355,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         // valid
         ScheduleTypeEnum scheduleTypeEnum = ScheduleTypeEnum.match(xxlJobInfo.getScheduleType(), ScheduleTypeEnum.NONE);
         if (ScheduleTypeEnum.NONE == scheduleTypeEnum) {
-           throw new BusinessException (I18nUtil.getString("schedule_type_none_limit_start"));
+            throw new BusinessException(I18nUtil.getString("schedule_type_none_limit_start"));
         }
 
         // next trigger time (5s后生效，避开预读周期)
@@ -367,18 +363,18 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         try {
             Date nextValidTime = JobScheduleHelper.generateNextValidTime(xxlJobInfo, new Date(System.currentTimeMillis() + JobScheduleHelper.PRE_READ_MS));
             if (nextValidTime == null) {
-                throw new BusinessException(I18nUtil.getString("schedule_type")+I18nUtil.getString("system_unvalid"));
+                throw new BusinessException(I18nUtil.getString("schedule_type") + I18nUtil.getString("system_unvalid"));
             }
             nextTriggerTime = nextValidTime.getTime();
         } catch (Exception e) {
             log.error(e.getMessage(), e);
-            throw new BusinessException(I18nUtil.getString("schedule_type")+I18nUtil.getString("system_unvalid"));
+            throw new BusinessException(I18nUtil.getString("schedule_type") + I18nUtil.getString("system_unvalid"));
         }
 
         xxlJobInfo.setTriggerStatus(1);
         xxlJobInfo.setTriggerLastTime(0L);
         xxlJobInfo.setTriggerNextTime(nextTriggerTime);
-        return  this.updateById(xxlJobInfo);
+        return this.updateById(xxlJobInfo);
     }
 
     @Override
@@ -409,9 +405,205 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
                 }
             }
         } catch (Exception e) {
-            throw new BusinessException(I18nUtil.getString("schedule_type")+I18nUtil.getString("system_unvalid")+ e.getMessage());
+            throw new BusinessException(I18nUtil.getString("schedule_type") + I18nUtil.getString("system_unvalid") + e.getMessage());
         }
         return result;
+    }
+
+    @Override
+    public boolean runTaskSet(Long id) {
+        List<TaskNode> nodes = new ArrayList<>();
+        List<TaskEdge> edges = new ArrayList<>();
+
+        TaskNode node1 = new TaskNode(1L, 1.0,1.0, 0, 0,0);
+
+        TaskNode node2 = new TaskNode(2L, 1.0,1.0, 0, 0,0);
+        TaskNode node3 = new TaskNode(3L, 1.0,1.0, 0, 0,0);
+        TaskNode node4 = new TaskNode(4L, 1.0,1.0, 0, 0,0);
+        TaskNode node5 = new TaskNode(5L, 1.0,1.0, 0, 0,0);
+        TaskNode node6 = new TaskNode(6L, 1.0,1.0, 0, 0,0);
+        TaskNode node7 = new TaskNode(7L, 1.0,1.0, 0, 0,0);
+        TaskNode node8 = new TaskNode(8L, 1.0,1.0, 0, 0,0);
+        TaskNode node9 = new TaskNode(9L, 1.0,1.0, 0, 0,0);
+        TaskNode node10 = new TaskNode(10L, 1.0,1.0, 0, 0,0);
+
+        node1.setId(1L);
+        node2.setId(2L);
+        node3.setId(3L);
+        node4.setId(4L);
+        node5.setId(5L);
+        node6.setId(6L);
+        node7.setId(7L);
+        node8.setId(8L);
+        node9.setId(9L);
+        node10.setId(10L);
+
+
+        nodes.add(node1);
+        nodes.add(node2);
+        nodes.add(node3);
+        nodes.add(node4);
+        nodes.add(node5);
+        nodes.add(node6);
+        nodes.add(node7);
+        nodes.add(node8);
+        nodes.add(node9);
+        nodes.add(node10);
+
+        TaskEdge edge1 = new TaskEdge(1L,1L, 2L,LocalDateTime.now());
+        TaskEdge edge2 = new TaskEdge(2L,1L, 3L,LocalDateTime.now());
+        TaskEdge edge3 = new TaskEdge(3L,1L, 4L,LocalDateTime.now());
+        TaskEdge edge4 = new TaskEdge(4L,1L, 5L,LocalDateTime.now());
+        TaskEdge edge5 = new TaskEdge(5L,1L, 6L,LocalDateTime.now());
+        TaskEdge edge6 = new TaskEdge(6L,2L, 7L,LocalDateTime.now());
+        TaskEdge edge7 = new TaskEdge(7L,3L, 7L,LocalDateTime.now());
+        TaskEdge edge8 = new TaskEdge(8L,4L, 8L,LocalDateTime.now());
+        TaskEdge edge9 = new TaskEdge(9L,5L, 8L,LocalDateTime.now());
+        TaskEdge edge10 = new TaskEdge(10L,6L, 9L,LocalDateTime.now());
+        TaskEdge edge11 = new TaskEdge(11L,7L, 10L,LocalDateTime.now());
+        TaskEdge edge12 = new TaskEdge(12L,8L, 10L,LocalDateTime.now());
+        TaskEdge edge13 = new TaskEdge(13L,9L, 10L,LocalDateTime.now());
+        edges.add(edge1);
+        edges.add(edge2);
+        edges.add(edge3);
+        edges.add(edge4);
+        edges.add(edge5);
+        edges.add(edge6);
+        edges.add(edge7);
+        edges.add(edge8);
+        edges.add(edge9);
+        edges.add(edge10);
+        edges.add(edge11);
+        edges.add(edge12);
+        edges.add(edge13);
+
+
+        // 计算节点的出度和入度
+        for (TaskNode node : nodes) {
+            long inCount = edges.stream().filter(v -> Objects.equals(v.getEndNodeId(), node.getId())).count();
+            long outCount = edges.stream().filter(v -> Objects.equals(v.getFromNodeId(), node.getId())).count();
+            node.setNodeInDegree((int) inCount);
+            node.setNodeOutDegree((int) outCount);
+        }
+
+        List<TaskNode> startNodes = nodes.stream().filter(v -> v.getNodeInDegree() == 0).toList();
+
+        List<Long> visited = new CopyOnWriteArrayList<>();
+        Queue<Long> queue = new ConcurrentLinkedQueue<>();
+
+        Map<Long, List<Long>> nodeMap = new HashMap<>();
+
+        Map<Long, CompletableFuture<TaskNode>> futureMap = new HashMap<>();
+
+        startNodes.forEach(item -> {
+            queue.add(item.getId());
+            visited.add(item.getId());
+        });
+
+//        Map<Integer, Integer> distances = new ConcurrentHashMap<>();
+//        distances.put(1, 0);
+//        Queue<Integer> queue = new ConcurrentLinkedQueue<>();
+//        queue.add(1);
+
+        ExecutorService executor = Executors.newFixedThreadPool(4);
+        List<Future<?>> futures = new ArrayList<>();
+
+        while (!queue.isEmpty()) {
+            List<Long> currentLevelNodes = new ArrayList<>();
+            while (!queue.isEmpty()) {
+                Long poll = queue.poll();
+                List<Long> collect = edges.stream().filter(v -> v.getEndNodeId().equals(poll)).map(TaskEdge::getFromNodeId).toList();
+                nodeMap.put(poll, collect);
+                currentLevelNodes.add(poll);
+            }
+
+            for (Long node : currentLevelNodes) {
+                futures.add(executor.submit(() -> {
+                    for (long neighbor : getNeighbors(node, edges)) {
+                        if (!visited.contains(neighbor)) {
+                            visited.add(neighbor);
+                            queue.add(neighbor);
+                        }
+                    }
+                }));
+            }
+
+            for (Future<?> future : futures) {
+                try {
+                    future.get();
+                } catch (ExecutionException | InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            futures.clear();
+        }
+
+        System.out.println(visited);
+        System.out.println(nodeMap);
+
+        nodeMap.forEach((k, v) -> {
+            TaskNode currentNode = nodes.stream().filter(item -> item.getId().equals(k)).findFirst().orElse(null);
+            CompletableFuture<TaskNode> future = CompletableFuture.supplyAsync(() -> {
+                for (long d : v) {
+                    //阻塞等待
+                    try {
+                        futureMap.get(d).get();
+                    } catch (InterruptedException | ExecutionException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+
+                //执行任务
+                runT(k);
+
+                return currentNode;
+            });
+            futureMap.put(k, future);
+        });
+        CompletableFuture<Void> voidCompletableFuture = CompletableFuture.allOf(futureMap.values().toArray(new CompletableFuture[0]));
+        try {
+            voidCompletableFuture.get();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
+        return true;
+    }
+
+
+    // 使用线程的方式模拟
+    private void runT(Long k) {
+        System.out.println("start node" + k);
+
+        TaskInfoTriggerDto taskInfoTriggerDto = new TaskInfoTriggerDto();
+        taskInfoTriggerDto.setId(k);
+        triggerJob(taskInfoTriggerDto);
+
+        try {
+            Thread futureThread = null;
+            FutureTask<Boolean> futureTask = new FutureTask<Boolean>(() -> {
+
+                while (true){
+                    Vector<Long> vector = JobCallBackThread.vector;
+                    if(vector.contains(k)){
+                        System.out.println("end node" + k);
+                        vector.remove(k);
+                        break;
+                    }
+                }
+                return true;
+            });
+            futureThread = new Thread(futureTask);
+            futureThread.start();
+
+            Boolean tempResult = futureTask.get(10, TimeUnit.SECONDS);
+        }catch (Exception e){
+
+        }
+    }
+
+
+    private List<Long> getNeighbors(Long node, List<TaskEdge> edges) {
+        return  edges.stream().filter(v -> v.getFromNodeId().equals(node)).map(TaskEdge::getEndNodeId).collect(Collectors.toList());
     }
 
 }

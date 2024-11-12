@@ -166,6 +166,10 @@ public class JobThread extends Thread{
 						handler.execute();
 					}
 
+					// TODO 执行完的任务
+					logger.info(">>>>>>>>>> 执行完成的任务{}",triggerParam.getJobId());
+					JobCallBackThread.pushCallBack((long) triggerParam.getJobId());
+
 					// valid execute handle data
 					if (XxlJobContext.getXxlJobContext().getHandleCode() <= 0) {
 						XxlJobHelper.handleFail("job handle result lost.");

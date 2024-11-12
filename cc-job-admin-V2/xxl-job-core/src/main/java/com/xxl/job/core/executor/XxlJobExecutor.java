@@ -7,6 +7,7 @@ import com.xxl.job.core.handler.annotation.XxlJob;
 import com.xxl.job.core.handler.impl.MethodJobHandler;
 import com.xxl.job.core.log.XxlJobFileAppender;
 import com.xxl.job.core.server.EmbedServer;
+import com.xxl.job.core.thread.JobCallBackThread;
 import com.xxl.job.core.thread.JobLogFileCleanThread;
 import com.xxl.job.core.thread.JobThread;
 import com.xxl.job.core.thread.TriggerCallbackThread;
@@ -82,6 +83,9 @@ public class XxlJobExecutor  {
 
         // init executor-server
         initEmbedServer(address, ip, port, appname, accessToken);
+
+        //init JobCallbackThread
+        JobCallBackThread.getInstance().start();
     }
 
     public void destroy(){

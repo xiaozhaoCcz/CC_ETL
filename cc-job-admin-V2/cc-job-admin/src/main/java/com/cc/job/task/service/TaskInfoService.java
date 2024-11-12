@@ -65,4 +65,6 @@ public interface TaskInfoService extends IService<TaskInfo> {
     boolean stopTask(Long id);
 
     List<String> nextTriggerTime(String scheduleType, String scheduleConf);
+
+    boolean runTaskSet(Long id);
 }
