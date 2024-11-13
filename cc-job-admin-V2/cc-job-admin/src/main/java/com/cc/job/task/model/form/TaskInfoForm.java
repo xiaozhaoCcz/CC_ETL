@@ -86,4 +86,16 @@ public class TaskInfoForm implements Serializable {
     @Schema(description = "子任务ID，多个逗号分隔")
     private String childJobid;
 
+    private Integer jobType;
+
+    private Long parentId;
+
+    private String reqType;
+
+    private String reqHeader;
+
+    private String reqBody;
+
+    private String reqUrl;
+
 }

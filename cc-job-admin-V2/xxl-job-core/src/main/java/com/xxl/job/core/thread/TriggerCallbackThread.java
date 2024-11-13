@@ -17,6 +17,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Vector;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -35,6 +36,9 @@ public class TriggerCallbackThread {
      * job results callback queue
      */
     private LinkedBlockingQueue<HandleCallbackParam> callBackQueue = new LinkedBlockingQueue<HandleCallbackParam>();
+
+    public  static Vector<Long> vector = new Vector<Long>();
+
     public static void pushCallBack(HandleCallbackParam callback){
         getInstance().callBackQueue.add(callback);
         logger.debug(">>>>>>>>>>> xxl-job, push callback request, logId:{}", callback.getLogId());
@@ -187,6 +191,7 @@ public class TriggerCallbackThread {
      */
     private void callbackLog(List<HandleCallbackParam> callbackParamList, String logContent){
         for (HandleCallbackParam callbackParam: callbackParamList) {
+            vector.add(callbackParam.getJobId());
             String logFileName = XxlJobFileAppender.makeLogFileName(new Date(callbackParam.getLogDateTim()), callbackParam.getLogId());
             XxlJobContext.setXxlJobContext(new XxlJobContext(
                     -1,

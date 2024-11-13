@@ -142,6 +142,13 @@ export interface TaskInfoForm {
   triggerLastTime?: number;
   /** 下次调度时间 */
   triggerNextTime?: number;
+  jobType?:number;
+  parentId?: number;
+  reqType?:string;
+  reqHeader?:string;
+  reqBody?:string;
+  reqUrl?:string;
+
 }
 
 /** task_info分页对象 */

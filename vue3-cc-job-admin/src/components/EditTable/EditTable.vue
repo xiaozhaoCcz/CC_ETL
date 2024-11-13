@@ -37,7 +37,7 @@
       </el-table-column>
       <el-table-column label="操作">
         <template #default="{ row }">
-          <el-button type="danger" link @click="handleDelete(row)">Delete</el-button>
+          <el-button type="primary" link @click="handleDelete(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -46,9 +46,40 @@
 
 <script setup>
 import { ref } from 'vue'
+const props = defineProps({
+  list: {
+    type: Array,
+    default: []
+  },
+});
+const emit = defineEmits(["handleTableData"]);
+
+const tableData = ref([
+])
+
+watch(()=>props.list,async (val)=>{
+  if (!val || val.length === 0) return;
+  // 使用 nextTick 确保 DOM 更新后进行操作，防止 offsetHeight 报错
+  await nextTick();
+  tableData.value = val;
+}, {
+  deep: true,
+  immediate: true
+})
+
+watch(()=>tableData.value,async (val)=>{
+  console.log(val)
+  emit("handleTableData", val);
+} ,{
+  deep: true,
+    immediate: true
+})
+
+
 
 let tableRowEditId = ref(null) // 控制可编辑的每一行
 let tableColumnEditIndex = ref(null) //控制可编辑的每一列
+const seenIds = new Set();
 
 const showUnitInput = (row, column) => {
   //赋值给定义的变量
@@ -59,14 +90,12 @@ const blurValueInput = (row, column) => {
   // tableRowEditId.value = null
   // tableColumnEditIndex.value = null
   //在此处调接口传数据
+  console.log(row,column);
+
 }
-const tableData = ref([
-  {
-    id:1,
-    columnKey: "11",
-    columnValue: "22",
-  },
-])
+
+
+
 
 const handleDelete = (row) => {
   const index = tableData.value.indexOf(row)
@@ -78,10 +107,8 @@ const handleDelete = (row) => {
 const handleAdd = () => {
   tableData.value.unshift({
     id:tableData.value.length+1,
-    date: '2016-05-05',
-    name: 'Tom',
-    address: 'No. 189, Grove St, Los Angeles',
-    value: tableData.value.length+1
+    columnKey:"",
+    columnValue:"",
   });
 
 }

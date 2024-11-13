@@ -102,4 +102,16 @@ public class TaskInfo extends BaseEntity {
      * 下次调度时间
      */
     private Long triggerNextTime;
+
+    private Integer jobType;
+
+    private Long parentId;
+
+    private String reqType;
+
+    private String reqHeader;
+
+    private String reqBody;
+
+    private String reqUrl;
 }

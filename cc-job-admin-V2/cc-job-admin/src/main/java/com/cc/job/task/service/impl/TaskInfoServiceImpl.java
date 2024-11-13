@@ -1,5 +1,6 @@
 package com.cc.job.task.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.common.exception.BusinessException;
 import com.cc.job.core.cron.CronExpression;
@@ -9,12 +10,12 @@ import com.cc.job.task.model.entity.TaskEdge;
 import com.cc.job.task.model.entity.TaskGroup;
 import com.cc.job.task.model.entity.TaskNode;
 import com.cc.job.task.service.TaskGroupService;
-import com.xxl.job.core.thread.JobCallBackThread;
 import com.cc.job.task.thread.JobScheduleHelper;
 import com.cc.job.task.thread.JobTriggerPoolHelper;
 import com.cc.job.task.utils.I18nUtil;
 import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
 import com.xxl.job.core.glue.GlueTypeEnum;
+import com.xxl.job.core.thread.TriggerCallbackThread;
 import com.xxl.job.core.util.DateUtil;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
@@ -86,7 +87,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
 
         Page<TaskInfo> page = this.page(new Page<>(queryParams.getPageNum(), queryParams.getPageSize()), wrapper);
         List<TaskInfo> records = page.getRecords();
-        List<TaskInfoVO> voList = records.stream().map(taskInfoConverter::toVo).toList();
+        List<TaskInfoVO> voList = records.stream().map(v->BeanUtil.copyProperties(v,TaskInfoVO.class)).toList();
         pageVO.setRecords(voList);
         pageVO.setTotal(page.getTotal());
         return pageVO;
@@ -101,7 +102,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
     @Override
     public TaskInfoForm getTaskInfoFormData(Long id) {
         TaskInfo entity = this.getById(id);
-        return taskInfoConverter.toForm(entity);
+        return BeanUtil.copyProperties(entity,TaskInfoForm.class);
     }
 
     /**
@@ -188,7 +189,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             formData.setChildJobid(temp);
         }
         formData.setGlueUpdatetime(LocalDateTime.now());
-        TaskInfo taskInfo = taskInfoConverter.toEntity(formData);
+        TaskInfo taskInfo = BeanUtil.copyProperties(formData,TaskInfo.class);
         return this.save(taskInfo);
     }
 
@@ -313,6 +314,12 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         existsJobInfo.setExecutorFailRetryCount(formData.getExecutorFailRetryCount());
         existsJobInfo.setChildJobid(formData.getChildJobid());
         existsJobInfo.setTriggerNextTime(nextTriggerTime);
+        existsJobInfo.setJobType(formData.getJobType());
+        existsJobInfo.setReqType(formData.getReqType());
+        existsJobInfo.setParentId(formData.getParentId());
+        existsJobInfo.setReqHeader(formData.getReqHeader());
+        existsJobInfo.setReqBody(formData.getReqBody());
+        existsJobInfo.setReqUrl(formData.getReqUrl());
         return this.updateById(existsJobInfo);
     }
 
@@ -583,7 +590,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             FutureTask<Boolean> futureTask = new FutureTask<Boolean>(() -> {
 
                 while (true){
-                    Vector<Long> vector = JobCallBackThread.vector;
+                    Vector<Long> vector = TriggerCallbackThread.vector;
                     if(vector.contains(k)){
                         System.out.println("end node" + k);
                         vector.remove(k);

@@ -157,13 +157,28 @@
             </div>
           </div>
         </div>
+        <div class="child_form">
+          <div class="child_main">
+            <div class="m_left">
+
+              <div class="c_cont_param" v-if="formData.glueType==='API'">
+                <span>请求地址</span>
+                <el-input
+                  v-model="formData.reqUrl"
+                  type="textarea"
+                  autocomplete="off"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
         <div class="child_form" v-if="formData.glueType==='API'" style="margin-bottom: 10px">
           <div class="child_main">
             <div class="m_left">
               <div class="c_cont_param">
                 <span>请求头</span>
                 <!-- 可编辑表格 -->
-                <EditTable style="width: 720px"/>
+                <EditTable :list="formData.reqHeader==null?[]:JSON.parse(formData.reqHeader)" @handleTableData="handleTableData"  style="width: 720px"/>
               </div>
             </div>
           </div>
@@ -174,7 +189,7 @@
               <div class="c_cont_param" v-if="formData.glueType==='API'&&formData.reqType==='POST'">
                 <span>body</span>
                 <el-input
-                  v-model="formData.executorParam"
+                  v-model="formData.reqBody"
                   type="textarea"
                   autocomplete="off"
                 />
@@ -392,9 +407,9 @@ const blockStrategyList = [
 
 const cronPopover = ref(false);
 
-const columnList = ref([{props:"columnKey",label:"参数名"},{props:"columnValue",label:"参数值"}]);
-const tableList = ref([{"columnKey":"11","columnValue":22}]);
-
+function handleTableData(val){
+   props.formData.reqHeader = JSON.stringify(val);
+}
 watch(
   () => props.taskInfoVisible,
   () => {
@@ -422,6 +437,7 @@ function submitForm() {
           emit("handleResetQuery");
         })
         .finally(() => {
+
         });
     } else {
       TaskInfoAPI.update(id, props.formData)

@@ -66,4 +66,16 @@ public class TaskInfoVO implements Serializable {
     private Long triggerLastTime;
     @Schema(description = "下次调度时间")
     private Long triggerNextTime;
+
+    private Integer jobType;
+
+    private Long parentId;
+
+    private String reqType;
+
+    private String reqHeader;
+
+    private String reqBody;
+
+    private String reqUrl;
 }

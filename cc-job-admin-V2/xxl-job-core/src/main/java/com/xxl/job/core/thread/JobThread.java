@@ -30,13 +30,13 @@ public class JobThread extends Thread{
 	private int jobId;
 	private IJobHandler handler;
 	private LinkedBlockingQueue<TriggerParam> triggerQueue;
-	private Set<Long> triggerLogIdSet;		// avoid repeat trigger for the same TRIGGER_LOG_ID
+	private Set<Long> triggerLogIdSet;        // avoid repeat trigger for the same TRIGGER_LOG_ID
 
 	private volatile boolean toStop = false;
 	private String stopReason;
 
     private boolean running = false;    // if running job
-	private int idleTimes = 0;			// idel times
+	private int idleTimes = 0;            // idel times
 
 
 	public JobThread(int jobId, IJobHandler handler) {
@@ -48,6 +48,7 @@ public class JobThread extends Thread{
 		// assign job thread name
 		this.setName("xxl-job, JobThread-"+jobId+"-"+System.currentTimeMillis());
 	}
+
 	public IJobHandler getHandler() {
 		return handler;
 	}
@@ -96,11 +97,11 @@ public class JobThread extends Thread{
     @Override
 	public void run() {
 
-    	// init
-    	try {
+		// init
+		try {
 			handler.init();
 		} catch (Throwable e) {
-    		logger.error(e.getMessage(), e);
+			logger.error(e.getMessage(), e);
 		}
 
 		// execute
@@ -166,10 +167,6 @@ public class JobThread extends Thread{
 						handler.execute();
 					}
 
-					// TODO 执行完的任务
-					logger.info(">>>>>>>>>> 执行完成的任务{}",triggerParam.getJobId());
-					JobCallBackThread.pushCallBack((long) triggerParam.getJobId());
-
 					// valid execute handle data
 					if (XxlJobContext.getXxlJobContext().getHandleCode() <= 0) {
 						XxlJobHelper.handleFail("job handle result lost.");
@@ -188,7 +185,7 @@ public class JobThread extends Thread{
 
 				} else {
 					if (idleTimes > 30) {
-						if(triggerQueue.size() == 0) {	// avoid concurrent trigger causes jobId-lost
+						if(triggerQueue.size() == 0) {    // avoid concurrent trigger causes jobId-lost
 							XxlJobExecutor.removeJobThread(jobId, "excutor idel times over limit.");
 						}
 					}
@@ -211,8 +208,10 @@ public class JobThread extends Thread{
                     // callback handler info
                     if (!toStop) {
                         // commonm
+						System.out.println(">>>>>>> 添加回滚任务"+triggerParam.getJobId());
                         TriggerCallbackThread.pushCallBack(new HandleCallbackParam(
-                        		triggerParam.getLogId(),
+								triggerParam.getJobId(),
+								triggerParam.getLogId(),
 								triggerParam.getLogDateTime(),
 								XxlJobContext.getXxlJobContext().getHandleCode(),
 								XxlJobContext.getXxlJobContext().getHandleMsg() )
@@ -220,7 +219,8 @@ public class JobThread extends Thread{
                     } else {
                         // is killed
                         TriggerCallbackThread.pushCallBack(new HandleCallbackParam(
-                        		triggerParam.getLogId(),
+								triggerParam.getJobId(),
+								triggerParam.getLogId(),
 								triggerParam.getLogDateTime(),
 								XxlJobContext.HANDLE_CODE_FAIL,
 								stopReason + " [job running, killed]" )

@@ -4,14 +4,8 @@ package com.xxl.job.core.handler.impl;
 import cn.hutool.http.HttpUtil;
 import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.handler.IJobHandler;
-import com.xxl.job.core.thread.JobCallBackThread;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 
 /**
  * @author zhaowenpeng
