@@ -143,6 +143,12 @@ public class XxlJobTrigger {
         triggerParam.setGlueUpdatetime(jobInfo.getGlueUpdatetime().toInstant(ZoneOffset.of("+8")).toEpochMilli());
         triggerParam.setBroadcastIndex(index);
         triggerParam.setBroadcastTotal(total);
+        //设置请求信息
+        triggerParam.setReqBody(jobInfo.getReqBody());
+        triggerParam.setReqHeader(jobInfo.getReqHeader());
+        triggerParam.setReqType(jobInfo.getReqType());
+        triggerParam.setReqUrl(jobInfo.getReqUrl());
+
 
         // 3、init address
         String address = null;

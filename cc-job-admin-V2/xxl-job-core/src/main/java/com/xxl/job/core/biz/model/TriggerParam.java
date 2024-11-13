@@ -25,6 +25,45 @@ public class TriggerParam implements Serializable{
     private int broadcastIndex;
     private int broadcastTotal;
 
+    private String reqType;
+
+    private String reqUrl;
+
+    private String reqHeader;
+
+    private String reqBody;
+
+    public String getReqType() {
+        return reqType;
+    }
+
+    public void setReqType(String reqType) {
+        this.reqType = reqType;
+    }
+
+    public String getReqUrl() {
+        return reqUrl;
+    }
+
+    public void setReqUrl(String reqUrl) {
+        this.reqUrl = reqUrl;
+    }
+
+    public String getReqHeader() {
+        return reqHeader;
+    }
+
+    public void setReqHeader(String reqHeader) {
+        this.reqHeader = reqHeader;
+    }
+
+    public String getReqBody() {
+        return reqBody;
+    }
+
+    public void setReqBody(String reqBody) {
+        this.reqBody = reqBody;
+    }
 
     public int getJobId() {
         return jobId;

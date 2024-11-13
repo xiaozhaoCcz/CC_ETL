@@ -98,7 +98,7 @@ public class ExecutorBizImpl implements ExecutorBiz {
                 }
             }
         }else if(GlueTypeEnum.API==glueTypeEnum){
-            IJobHandler newJobHandler = new ApiJobHandler(triggerParam.getExecutorParams());
+            IJobHandler newJobHandler = new ApiJobHandler(triggerParam.getReqUrl(),triggerParam.getReqType(),triggerParam.getReqHeader(),triggerParam.getReqBody());
             if (jobThread!=null && jobHandler != newJobHandler) {
                 // change handler, need kill old thread
                 removeOldReason = "change jobhandler or glue type, and terminate the old job thread.";
