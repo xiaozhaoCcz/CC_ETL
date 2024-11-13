@@ -13,6 +13,7 @@ import com.cc.job.task.service.TaskGroupService;
 import com.cc.job.task.thread.JobScheduleHelper;
 import com.cc.job.task.thread.JobTriggerPoolHelper;
 import com.cc.job.task.utils.I18nUtil;
+import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
 import com.xxl.job.core.glue.GlueTypeEnum;
 import com.xxl.job.core.thread.TriggerCallbackThread;
@@ -588,13 +589,16 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         try {
             Thread futureThread = null;
             FutureTask<Boolean> futureTask = new FutureTask<Boolean>(() -> {
-
+                Label:
                 while (true){
-                    Vector<Long> vector = TriggerCallbackThread.vector;
-                    if(vector.contains(k)){
-                        System.out.println("end node" + k);
-                        vector.remove(k);
-                        break;
+                    Vector<ReturnT<Long>> vector = TriggerCallbackThread.vector;
+                    List<ReturnT<Long>> list = new ArrayList<>(vector);
+                    for (ReturnT<Long> res : list) {
+                        if(res.getContent().equals(k)){
+                            System.out.println("end node" + k);
+                            TriggerCallbackThread.vector.remove(res);
+                            break Label;
+                        }
                     }
                 }
                 return true;

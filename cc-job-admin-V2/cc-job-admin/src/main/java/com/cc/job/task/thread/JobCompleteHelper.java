@@ -1,11 +1,13 @@
 package com.cc.job.task.thread;
 
+import com.cc.job.common.result.Result;
 import com.cc.job.task.complete.XxlJobCompleter;
 import com.cc.job.task.config.XxlJobAdminConfig;
 import com.cc.job.task.model.entity.TaskLog;
 import com.cc.job.task.utils.I18nUtil;
 import com.xxl.job.core.biz.model.HandleCallbackParam;
 import com.xxl.job.core.biz.model.ReturnT;
+import com.xxl.job.core.thread.TriggerCallbackThread;
 import com.xxl.job.core.util.DateUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,8 +24,9 @@ import java.util.concurrent.*;
  */
 public class JobCompleteHelper {
 	private static Logger logger = LoggerFactory.getLogger(JobCompleteHelper.class);
-	
+
 	private static JobCompleteHelper instance = new JobCompleteHelper();
+
 	public static JobCompleteHelper getInstance(){
 		return instance;
 	}
@@ -33,6 +36,7 @@ public class JobCompleteHelper {
 	private ThreadPoolExecutor callbackThreadPool = null;
 	private Thread monitorThread;
 	private volatile boolean toStop = false;
+
 	public void start(){
 
 		// for callback
@@ -143,6 +147,16 @@ public class JobCompleteHelper {
 			public void run() {
 				for (HandleCallbackParam handleCallbackParam: callbackParamList) {
 					ReturnT<String> callbackResult = callback(handleCallbackParam);
+					// 处理结果
+					ReturnT<Long> result = new ReturnT<Long>();
+					if(handleCallbackParam.getHandleCode()==ReturnT.SUCCESS_CODE){
+						result.setCode(ReturnT.SUCCESS_CODE);
+					}else if(handleCallbackParam.getHandleCode()==ReturnT.FAIL_CODE){
+						result.setCode(ReturnT.FAIL_CODE);
+						result.setMsg(handleCallbackParam.getHandleMsg());
+					}
+					result.setContent(handleCallbackParam.getJobId());
+					TriggerCallbackThread.vector.add(result);
 					logger.debug(">>>>>>>>> JobApiController.callback {}, handleCallbackParam={}, callbackResult={}",
 							(callbackResult.getCode()== ReturnT.SUCCESS_CODE?"success":"fail"), handleCallbackParam, callbackResult);
 				}

@@ -36,11 +36,6 @@ public class ApiJobHandler extends IJobHandler {
 
     @Override
     public void execute() throws Exception {
-//        System.out.println("ApiJobHandler 任务运行"+reqUrl);
-//        // TODO 需要修改参数传递
-//        String s = HttpUtil.get("http://175.178.249.190/yanhuo/platform/category/getCategoryTreeData");
-//        System.out.println("返回结果"+s);
-//        XxlJobHelper.log(s);
         JSONArray jsonArray = JSONUtil.parseArray(reqHeader);
         List<Map> headerList = jsonArray.toList(Map.class);
         Map<String,String> headers = new HashMap<>();

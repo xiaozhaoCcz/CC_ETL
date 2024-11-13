@@ -37,7 +37,7 @@ public class TriggerCallbackThread {
      */
     private LinkedBlockingQueue<HandleCallbackParam> callBackQueue = new LinkedBlockingQueue<HandleCallbackParam>();
 
-    public  static Vector<Long> vector = new Vector<Long>();
+    public  static Vector<ReturnT<Long>> vector = new Vector<>();
 
     public static void pushCallBack(HandleCallbackParam callback){
         getInstance().callBackQueue.add(callback);
@@ -191,7 +191,6 @@ public class TriggerCallbackThread {
      */
     private void callbackLog(List<HandleCallbackParam> callbackParamList, String logContent){
         for (HandleCallbackParam callbackParam: callbackParamList) {
-            vector.add(callbackParam.getJobId());
             String logFileName = XxlJobFileAppender.makeLogFileName(new Date(callbackParam.getLogDateTim()), callbackParam.getLogId());
             XxlJobContext.setXxlJobContext(new XxlJobContext(
                     -1,
