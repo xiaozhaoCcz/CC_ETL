@@ -11,6 +11,13 @@ const TaskInfoAPI = {
       params: queryParams,
     });
   },
+
+  getList() {
+    return request({
+      url: `${TASKINFO_BASE_URL}/list`,
+      method: "get",
+    });
+  },
   /**
    * 获取task_info表单数据
    *

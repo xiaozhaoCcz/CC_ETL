@@ -15,40 +15,48 @@
     <div class="task_rank">
       <div class="task_set_tree">
         <el-input
-          v-model="filterText"
+          v-model="filterTaskSetText"
           placeholder="Filter keyword"
         />
 
         <el-tree
-          ref="treeRef"
+          ref="treeTaskSetRef"
           class="filter-tree"
-          :data="data"
+          :data="taskSetList"
           :props="defaultProps"
           default-expand-all
-          :filter-node-method="filterNode"
+          :filter-node-method="filterTaskSetNode"
         />
       </div>
       <div class="task_info_tree" v-if="showTaskVisible">
         <el-input
-          v-model="filterText"
+          v-model="filterTaskInfoText"
           placeholder="Filter keyword"
         />
 
         <el-tree
-          ref="treeRef"
+          ref="taskInfoTreeRef"
           class="filter-tree"
-          :data="data"
+          :data="taskInfoList"
           :props="defaultProps"
           default-expand-all
-          :filter-node-method="filterNode"
-        />
+          :filter-node-method="filterTaskInfoNode"
+        >
+          <template #default="{ node, data }">
+            <span @dblclick="handleDblClick(node)">
+            {{ node.label }}
+          </span>
+          </template>
+        </el-tree>
 
       </div>
       <div class="vue_flow_platform">
-        <VueFlow :nodes="nodes" :edges="edges" >
-          <Panel>
-            <button type="button" @click="addNode">Add a node</button>
-          </Panel>
+        <VueFlow :nodes="nodes"
+                 :edges="edges"
+                 @connect="onConnect"
+                 @edge-update="onEdgeUpdate"
+                 @edge-update-start="onEdgeUpdateStart"
+                 @edge-update-end="onEdgeUpdateEnd">
         </VueFlow>
       </div>
     </div>
@@ -61,7 +69,7 @@ import '@vue-flow/core/dist/style.css';
 /* this contains the default theme, these are optional styles */
 import '@vue-flow/core/dist/theme-default.css';
 import { ref, onMounted } from 'vue'
-import { VueFlow, Panel, Position } from "@vue-flow/core";
+import { VueFlow, Panel, Position,useVueFlow, MarkerType } from "@vue-flow/core";
 import { Background } from '@vue-flow/background'
 import {
   Check,
@@ -71,108 +79,164 @@ import {
   Search,
   Star,
 } from '@element-plus/icons-vue'
+import TaskInfoAPI from "@/api/task/task-info";
+const {
+  updateEdge,
+  onNodesChange,
+  onNodeDragStop,
+  onEdgesChange,
+  removeEdges,
+  onNodeDoubleClick,
+} = useVueFlow();
 
-const showTaskVisible = ref(false);
-
-const nodes = ref([
+const showTaskVisible = ref(true);
+const taskSetList =ref([
   {
-    id: '1',
-    position: { x: 50, y: 50 },
-    data: { label: 'Node 1', },
-    style:{color:'red',border:'1px solid red'},
+    id: 1,
+    label: '默认分组',
+    children: []
   },
+])
+const taskInfoList = ref([
   {
-    id: '2',
-    position: { x: 50, y: 250 },
-    data: { label: 'Node 2', },
-  }
-]);
+    id: 1,
+    label: '默认分组',
+    children: []
+  },
+])
 
-const edges = ref([
-  {
-    id: 'e1->2',
-    source: '1',
-    target: '2',
-  }
-]);
+const nodes = ref([]);
 
-function addNode() {
-  const id = Date.now().toString()
+const edges = ref([]);
 
-  nodes.value.push({
-    id,
-    position: { x: 150, y: 50 },
-    data: { label: `Node ${id}`, },
-  })
+
+function generateNode(val: any) {
+  console.log(val);
+  return {
+    id:  "node:"+Date.now().toString(),
+    data: {
+      taskId: val.id,
+      label: val.label,
+    },
+    position: { x: 150, y: 150 },
+  };
 }
 
-const filterText = ref('')
-const treeRef = ref<InstanceType<typeof ElTree>>()
+function generateEdge(val: any) {
+  return {
+    id: val.source + "-" + val.target,
+    source: val.source,
+    target: val.target,
+    updatable: true,
+    // animated: true,
+    // style: { stroke: "#10b981" },
+    markerEnd: MarkerType.ArrowClosed,
+  };
+}
+
+const handleDblClick = (node) => {
+  // 在这里处理双击事件
+  if (node.data != undefined && node.data) {
+    console.log("双击了节点:", node.data);
+    // 往nodes添加节点
+    nodes.value.push(generateNode(node.data));
+  }
+};
+
+function onConnect(params) {
+  edges.value.push(generateEdge(params));
+  console.log("edge updated", params, edges);
+}
+
+function onEdgeUpdate({ edge, connection }) {
+  updateEdge(edge, connection);
+  console.log("end update", edge, connection);
+}
+
+function onEdgeUpdateStart(edge) {
+  console.log("start update", edge);
+}
+
+function onEdgeUpdateEnd(edge) {
+  console.log("end update", edge);
+}
+
+onNodesChange(async (changes) => {
+  for (const change of changes) {
+    if (change.type === "remove") {
+      //removeNodes(change.id);
+      removeNode(change.id);
+      removeEdge(change.id);
+      console.log("nodes", nodes, "edges", edges);
+    }
+  }
+});
+
+onNodeDragStop((event) => {
+  console.log("Node drag stopped", event);
+  const { id, position } = event.node;
+  const node = nodes.value.find((node) => node.id === id);
+  if (node) {
+    node.position = position;
+  }
+});
+
+onEdgesChange(async (changes) => {
+  for (const change of changes) {
+    if (change.type === "remove") {
+      edges.value = edges.value.filter((edge) => edge.id !== change.id);
+      console.log("Removed " + change.id, edges.value);
+    }
+  }
+});
+
+function removeNode(id) {
+  nodes.value = nodes.value.filter((node) => node.id !== id);
+}
+
+function removeEdge(id) {
+  edges.value = edges.value.filter((edge) => edge.target !== id);
+}
+
+
+
+const filterTaskSetText = ref('')
+
+const filterTaskInfoText = ref('')
+const taskInfoTreeRef = ref<InstanceType<typeof ElTree>>()
 
 const defaultProps = {
   children: 'children',
   label: 'label',
 }
 
-watch(filterText, (val) => {
-  treeRef.value!.filter(val)
+watch(filterTaskInfoText, (val) => {
+  taskInfoTreeRef.value!.filter(val)
 })
 
-const filterNode = (value: string, data: Tree) => {
+const filterTaskInfoNode = (value: string, data: Tree) => {
   if (!value) return true
   return data.label.includes(value)
 }
 
-const data: Tree[] = [
-  {
-    id: 1,
-    label: 'Level one 1',
-    children: [
-      {
-        id: 4,
-        label: 'Level two 1-1',
-        children: [
-          {
-            id: 9,
-            label: 'Level three 1-1-1',
-          },
-          {
-            id: 10,
-            label: 'Level three 1-1-2',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: 2,
-    label: 'Level one 2',
-    children: [
-      {
-        id: 5,
-        label: 'Level two 2-1',
-      },
-      {
-        id: 6,
-        label: 'Level two 2-2',
-      },
-    ],
-  },
-  {
-    id: 3,
-    label: 'Level one 3',
-    children: [
-      {
-        id: 7,
-        label: 'Level two 3-1',
-      },
-      {
-        id: 8,
-        label: 'Level two 3-2',
-      },
-    ],
-  },
-]
+
+
+function getTaskInfoList(){
+  TaskInfoAPI.getList().then(data=>{
+    data.forEach((item)=>{
+        const obj = {};
+        obj.id = item.id;
+        obj.label = item.jobDesc;
+
+      taskInfoList.value[0].children.push(obj)
+    })
+  })
+}
+
+
+onMounted(()=>{
+  getTaskInfoList();
+})
 </script>
 
 <style lang="scss" scoped>

@@ -1,6 +1,7 @@
 package com.cc.job.task.controller;
 
 import com.cc.job.task.model.dto.TaskInfoTriggerDto;
+import com.cc.job.task.model.entity.TaskInfo;
 import com.cc.job.task.service.TaskInfoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -40,6 +41,13 @@ public class TaskInfoController {
     public PageResult<TaskInfoVO> getTaskInfoPage(TaskInfoQuery queryParams) {
         IPage<TaskInfoVO> result = taskInfoService.getTaskInfoPage(queryParams);
         return PageResult.success(result);
+    }
+
+    @Operation(summary = "task_info分页列表")
+    @GetMapping("/list")
+    public Result<List<TaskInfo>> getTaskInfoList() {
+        List<TaskInfo> list = taskInfoService.list();
+        return Result.success(list);
     }
 
     @Operation(summary = "新增task_info")
