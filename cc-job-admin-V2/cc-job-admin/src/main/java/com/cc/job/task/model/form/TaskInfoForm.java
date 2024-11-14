@@ -98,4 +98,7 @@ public class TaskInfoForm implements Serializable {
 
     private String reqUrl;
 
+    private String nodes;
+
+    private String edges;
 }

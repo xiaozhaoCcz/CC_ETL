@@ -119,4 +119,12 @@ public class TaskInfoController {
         boolean result = taskInfoService.runTaskSet(id);
         return Result.judge(result);
     }
+
+    @Operation(summary = "保存任务运行集")
+    @PostMapping("saveTaskSet")
+    public Result<Void>  saveTaskSet(@RequestBody @Valid TaskInfoForm formData){
+        // 实现任务运行集的保存
+        boolean result = taskInfoService.saveTaskSet(formData);
+        return Result.judge(result);
+    }
 }

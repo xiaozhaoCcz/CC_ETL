@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.io.Serializable;
@@ -13,11 +14,12 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @TableName("task_edge")
-@AllArgsConstructor
 public class TaskEdge implements Serializable {
 
     @TableId(type = IdType.AUTO)
     private Long id;
+
+    private Long taskParentId;
 
     private Long fromNodeId;
 
