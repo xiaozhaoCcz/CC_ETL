@@ -4,13 +4,15 @@ import com.cc.job.task.service.TaskInfoService;
 import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.handler.annotation.XxlJob;
 import jakarta.annotation.Resource;
+import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
+@AllArgsConstructor
 public class TaskRankXxlJob {
 
-    @Resource
-    TaskInfoService taskInfoService;
+
+    final TaskInfoService taskInfoService;
 
     @XxlJob("runTaskRankXxlJob")
     public void runTaskRankXxlJob(){

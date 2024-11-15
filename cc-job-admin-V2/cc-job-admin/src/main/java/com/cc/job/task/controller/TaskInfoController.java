@@ -113,12 +113,6 @@ public class TaskInfoController {
       return Result.success(list);
     }
 
-    @Operation(summary = "运行任务集")
-    @GetMapping("/runTaskSet/{id}")
-    public Result<Void> runTaskSet(@PathVariable Long id){
-        boolean result = taskInfoService.runTaskSet(id);
-        return Result.judge(result);
-    }
 
     @Operation(summary = "保存任务运行集")
     @PostMapping("saveTaskSet")

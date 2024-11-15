@@ -581,7 +581,10 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         }
         formData.setGlueUpdatetime(LocalDateTime.now());
         TaskInfo taskInfo = BeanUtil.copyProperties(formData,TaskInfo.class);
+        taskInfo.setJobType(2);
         this.save(taskInfo);
+        taskInfo.setExecutorParam(String.valueOf(taskInfo.getId()));
+        this.updateById(taskInfo);
 
         List<Map> nodeList = JSONUtil.parseArray(formData.getNodes()).toList(Map.class);
         List<Map> edgeList = JSONUtil.parseArray(formData.getEdges()).toList(Map.class);
