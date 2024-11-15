@@ -96,6 +96,23 @@ const TaskInfoAPI = {
       params: { scheduleType, scheduleConf },
     });
   },
+
+  /** 添加task_info*/
+  saveTaskSet(data: TaskInfoForm) {
+    return request({
+      url: `${TASKINFO_BASE_URL}/saveTaskSet`,
+      method: "post",
+      data: data,
+    });
+  },
+
+  updateTaskSet(id: number, data: TaskInfoForm) {
+    return request({
+      url: `${TASKINFO_BASE_URL}/updateTaskSet/${id}`,
+      method: "put",
+      data: data,
+    });
+  },
 };
 
 export default TaskInfoAPI;
@@ -155,6 +172,8 @@ export interface TaskInfoForm {
   reqHeader?:string;
   reqBody?:string;
   reqUrl?:string;
+  nodes?:string;
+  edges?:string;
 
 }
 

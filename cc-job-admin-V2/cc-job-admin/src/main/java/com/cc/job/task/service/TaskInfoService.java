@@ -69,4 +69,6 @@ public interface TaskInfoService extends IService<TaskInfo> {
     boolean runTaskSet(Long id);
 
     boolean saveTaskSet(TaskInfoForm formData);
+
+    boolean updateTaskSet( Long id,TaskInfoForm formData);
 }

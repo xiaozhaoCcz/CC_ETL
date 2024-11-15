@@ -127,4 +127,13 @@ public class TaskInfoController {
         boolean result = taskInfoService.saveTaskSet(formData);
         return Result.judge(result);
     }
+
+    @Operation(summary = "修改任务运行集")
+    @PutMapping("updateTaskSet/{id}")
+    public Result<Void>  updateTaskSet(@Parameter(description = "task_infoID") @PathVariable Long id,
+                                       @RequestBody @Validated TaskInfoForm formData){
+        // 实现任务运行集的保存
+        boolean result = taskInfoService.updateTaskSet(id,formData);
+        return Result.judge(result);
+    }
 }

@@ -9,7 +9,7 @@
       <div class="btn_right_list">
         <el-button type="primary" :icon="Edit" circle />
         <el-button type="success" :icon="Check" circle />
-        <el-button type="info" :icon="Message" circle />
+        <el-button type="info" :icon="Message" circle  @click="handleOpenDialog" />
       </div>
     </div>
     <div class="task_rank">
@@ -60,6 +60,10 @@
         </VueFlow>
       </div>
     </div>
+
+    <EditTaskRank :taskRankVisible="taskRankVisible"   :formData="formData"
+                  @close="handleCloseDialog"
+                 ></EditTaskRank>
   </div>
 
 </template>
@@ -79,7 +83,7 @@ import {
   Search,
   Star,
 } from '@element-plus/icons-vue'
-import TaskInfoAPI from "@/api/task/task-info";
+import TaskInfoAPI, { TaskInfoForm } from "@/api/task/task-info";
 const {
   updateEdge,
   onNodesChange,
@@ -88,8 +92,17 @@ const {
   removeEdges,
   onNodeDoubleClick,
 } = useVueFlow();
+import EditTaskRank from "./operation/edit-task-rank.vue";
+import EditTaskInfo from "@/views/task/task-info/operation/edit-task-info.vue";
 
 const showTaskVisible = ref(true);
+const taskRankVisible = reactive({
+  title: "",
+  visible: false,
+});
+const taskRankId = ref(null);
+const formData = reactive<TaskInfoForm>({});
+
 const taskSetList =ref([
   {
     id: 1,
@@ -108,6 +121,32 @@ const taskInfoList = ref([
 const nodes = ref([]);
 
 const edges = ref([]);
+
+/** 打开task_info弹窗 */
+function handleOpenDialog() {
+  taskRankVisible.visible = true;
+  if (taskRankId.value) {
+    taskRankVisible.title = "修改taskRank";
+    TaskInfoAPI.getFormData(taskRankId.value).then((data) => {
+      Object.assign(formData, data);
+    });
+  } else {
+    formData.nodes = JSON.stringify(nodes.value);
+    formData.edges = JSON.stringify(edges.value);
+    taskRankVisible.title = "新增taskRank";
+  }
+}
+
+function handleCloseDialog() {
+  const keys = Object.keys(formData);
+  let obj: { [name: string]: string } = {};
+  keys.forEach((item) => {
+    obj[item] = "";
+  });
+  Object.assign(formData, obj);
+  taskRankVisible.visible = false;
+}
+
 
 
 function generateNode(val: any) {

@@ -9,6 +9,7 @@ import com.xxl.job.core.glue.GlueTypeEnum;
 import com.xxl.job.core.handler.IJobHandler;
 import com.xxl.job.core.handler.impl.ApiJobHandler;
 import com.xxl.job.core.handler.impl.GlueJobHandler;
+import com.xxl.job.core.handler.impl.JobSetHandler;
 import com.xxl.job.core.handler.impl.ScriptJobHandler;
 import com.xxl.job.core.log.XxlJobFileAppender;
 import com.xxl.job.core.thread.JobThread;
@@ -99,6 +100,22 @@ public class ExecutorBizImpl implements ExecutorBiz {
             }
         }else if(GlueTypeEnum.API==glueTypeEnum){
             IJobHandler newJobHandler = new ApiJobHandler(triggerParam.getReqUrl(),triggerParam.getReqType(),triggerParam.getReqHeader(),triggerParam.getReqBody());
+            if (jobThread!=null && jobHandler != newJobHandler) {
+                // change handler, need kill old thread
+                removeOldReason = "change jobhandler or glue type, and terminate the old job thread.";
+
+                jobThread = null;
+                jobHandler = null;
+            }
+            // valid handler
+            if (jobHandler == null) {
+                jobHandler = newJobHandler;
+                if (jobHandler == null) {
+                    return new ReturnT<String>(ReturnT.FAIL_CODE, "job handler [" + triggerParam.getExecutorHandler() + "] not found.");
+                }
+            }
+        } else if(GlueTypeEnum.RANK==glueTypeEnum){
+            IJobHandler newJobHandler = new JobSetHandler(triggerParam.getJobId());
             if (jobThread!=null && jobHandler != newJobHandler) {
                 // change handler, need kill old thread
                 removeOldReason = "change jobhandler or glue type, and terminate the old job thread.";

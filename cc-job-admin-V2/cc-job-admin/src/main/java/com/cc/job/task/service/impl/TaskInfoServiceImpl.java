@@ -1,6 +1,7 @@
 package com.cc.job.task.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.lang.Pair;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.common.exception.BusinessException;
@@ -45,6 +46,7 @@ import java.util.stream.Collectors;
 
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * task_info服务实现类
@@ -429,106 +431,13 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
 
     @Override
     public boolean runTaskSet(Long id) {
-        List<TaskNode> nodes = new ArrayList<>();
-        List<TaskEdge> edges = new ArrayList<>();
-//
-//        TaskNode node1 = new TaskNode(1L, 1.0,1.0, 0, 0,0);
-//
-//        TaskNode node2 = new TaskNode(2L, 1.0,1.0, 0, 0,0);
-//        TaskNode node3 = new TaskNode(3L, 1.0,1.0, 0, 0,0);
-//        TaskNode node4 = new TaskNode(4L, 1.0,1.0, 0, 0,0);
-//        TaskNode node5 = new TaskNode(5L, 1.0,1.0, 0, 0,0);
-//        TaskNode node6 = new TaskNode(6L, 1.0,1.0, 0, 0,0);
-//        TaskNode node7 = new TaskNode(7L, 1.0,1.0, 0, 0,0);
-//        TaskNode node8 = new TaskNode(8L, 1.0,1.0, 0, 0,0);
-//        TaskNode node9 = new TaskNode(9L, 1.0,1.0, 0, 0,0);
-//        TaskNode node10 = new TaskNode(10L, 1.0,1.0, 0, 0,0);
 
-        TaskNode node1 = new TaskNode();
-
-        TaskNode node2 = new TaskNode();
-        TaskNode node3 = new TaskNode();
-        TaskNode node4 = new TaskNode();
-        TaskNode node5 = new TaskNode();
-        TaskNode node6 = new TaskNode();
-        TaskNode node7 = new TaskNode();
-        TaskNode node8 = new TaskNode();
-        TaskNode node9 = new TaskNode();
-        TaskNode node10 = new TaskNode();
-
-        node1.setId(1L);
-        node2.setId(2L);
-        node3.setId(3L);
-        node4.setId(4L);
-        node5.setId(5L);
-        node6.setId(6L);
-        node7.setId(7L);
-        node8.setId(8L);
-        node9.setId(9L);
-        node10.setId(10L);
+        System.out.println("runTask"+id);
+        List<TaskNode> nodes = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId,id));
+        List<TaskEdge> edges = taskEdgeService.list(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId,id));
 
 
-        nodes.add(node1);
-        nodes.add(node2);
-        nodes.add(node3);
-        nodes.add(node4);
-        nodes.add(node5);
-        nodes.add(node6);
-        nodes.add(node7);
-        nodes.add(node8);
-        nodes.add(node9);
-        nodes.add(node10);
-
-//        TaskEdge edge1 = new TaskEdge(1L,1L, 2L,LocalDateTime.now());
-//        TaskEdge edge2 = new TaskEdge(2L,1L, 3L,LocalDateTime.now());
-//        TaskEdge edge3 = new TaskEdge(3L,1L, 4L,LocalDateTime.now());
-//        TaskEdge edge4 = new TaskEdge(4L,1L, 5L,LocalDateTime.now());
-//        TaskEdge edge5 = new TaskEdge(5L,1L, 6L,LocalDateTime.now());
-//        TaskEdge edge6 = new TaskEdge(6L,2L, 7L,LocalDateTime.now());
-//        TaskEdge edge7 = new TaskEdge(7L,3L, 7L,LocalDateTime.now());
-//        TaskEdge edge8 = new TaskEdge(8L,4L, 8L,LocalDateTime.now());
-//        TaskEdge edge9 = new TaskEdge(9L,5L, 8L,LocalDateTime.now());
-//        TaskEdge edge10 = new TaskEdge(10L,6L, 9L,LocalDateTime.now());
-//        TaskEdge edge11 = new TaskEdge(11L,7L, 10L,LocalDateTime.now());
-//        TaskEdge edge12 = new TaskEdge(12L,8L, 10L,LocalDateTime.now());
-//        TaskEdge edge13 = new TaskEdge(13L,9L, 10L,LocalDateTime.now());
-        TaskEdge edge1 = new TaskEdge();
-        TaskEdge edge2 = new TaskEdge();
-        TaskEdge edge3 = new TaskEdge();
-        TaskEdge edge4 = new TaskEdge();
-        TaskEdge edge5 = new TaskEdge();
-        TaskEdge edge6 = new TaskEdge();
-        TaskEdge edge7 = new TaskEdge();
-        TaskEdge edge8 = new TaskEdge();
-        TaskEdge edge9 = new TaskEdge();
-        TaskEdge edge10 = new TaskEdge();
-        TaskEdge edge11 = new TaskEdge();
-        TaskEdge edge12 = new TaskEdge();
-        TaskEdge edge13 = new TaskEdge();
-        edges.add(edge1);
-        edges.add(edge2);
-        edges.add(edge3);
-        edges.add(edge4);
-        edges.add(edge5);
-        edges.add(edge6);
-        edges.add(edge7);
-        edges.add(edge8);
-        edges.add(edge9);
-        edges.add(edge10);
-        edges.add(edge11);
-        edges.add(edge12);
-        edges.add(edge13);
-
-
-        // 计算节点的出度和入度
-        for (TaskNode node : nodes) {
-            long inCount = edges.stream().filter(v -> Objects.equals(v.getEndNodeId(), node.getId())).count();
-            long outCount = edges.stream().filter(v -> Objects.equals(v.getFromNodeId(), node.getId())).count();
-            node.setNodeInDegree( inCount);
-            node.setNodeOutDegree(outCount);
-        }
-
-        List<TaskNode> startNodes = nodes.stream().filter(v -> v.getNodeInDegree() == 0).toList();
+        List<TaskNode> startNodes = nodes.stream().filter(v -> v.getNodeInDegree().equals(0L)).toList();
 
         List<Long> visited = new CopyOnWriteArrayList<>();
         Queue<Long> queue = new ConcurrentLinkedQueue<>();
@@ -541,11 +450,6 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             queue.add(item.getId());
             visited.add(item.getId());
         });
-
-//        Map<Integer, Integer> distances = new ConcurrentHashMap<>();
-//        distances.put(1, 0);
-//        Queue<Integer> queue = new ConcurrentLinkedQueue<>();
-//        queue.add(1);
 
         ExecutorService executor = Executors.newFixedThreadPool(4);
         List<Future<?>> futures = new ArrayList<>();
@@ -594,10 +498,8 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
                         throw new RuntimeException(e);
                     }
                 }
-
                 //执行任务
                 runT(k);
-
                 return currentNode;
             });
             futureMap.put(k, future);
@@ -612,6 +514,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public boolean saveTaskSet(TaskInfoForm formData) {
         TaskGroup taskGroup = taskGroupService.getById(formData.getJobGroup());
         if (taskGroup == null) {
@@ -680,39 +583,234 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         TaskInfo taskInfo = BeanUtil.copyProperties(formData,TaskInfo.class);
         this.save(taskInfo);
 
-        List<Map<String, Object>> nodeList = JSONUtil.toBean(formData.getNodes(), List.class);
-        List<Map<String, Object>> edgeList = JSONUtil.toBean(formData.getEdges(), List.class);
+        List<Map> nodeList = JSONUtil.parseArray(formData.getNodes()).toList(Map.class);
+        List<Map> edgeList = JSONUtil.parseArray(formData.getEdges()).toList(Map.class);
 
-        List<TaskNode> taskNodeList = new ArrayList<>();
+
         List<TaskEdge> taskEdgeList = new ArrayList<>();
+
+        Map<String,Long> nodeMap = new HashMap<>();
 
         nodeList.forEach(item -> {
             TaskNode node = new TaskNode();
+            String nodeId = (String) item.get("id");
             node.setTaskParentId(taskInfo.getId());
             Map<String, Object> data = (Map<String, Object>) item.get("data");
             Map<String, Object> position = (Map<String, Object>) item.get("position");
-            node.setTaskId(Long.parseLong((String) data.get("taskId")));
+            node.setTaskId(Long.parseLong(String.valueOf(data.get("taskId"))));
             node.setNodePositionX(Double.valueOf(String.valueOf(position.get("x"))));
             node.setNodePositionY(Double.valueOf(String.valueOf(position.get("y"))));
-            taskNodeList.add(node);
+            if(nodeId.startsWith("node:")){
+                taskNodeService.save(node);
+                nodeMap.put(nodeId,node.getId());
+            }
         });
 
         edgeList.forEach(item -> {
-            TaskEdge edge= new TaskEdge();
+            TaskEdge edge = new TaskEdge();
             edge.setTaskParentId(taskInfo.getId());
-            edge.setFromNodeId(Long.parseLong((String) item.get("source")));
-            edge.setEndNodeId(Long.parseLong((String) item.get("target")));
+            String sourceId = (String) item.get("source");
+            if(sourceId.startsWith("node:")){
+                edge.setFromNodeId(nodeMap.get(sourceId));
+            }
+            String targetId = (String) item.get("target");
+            if(targetId.startsWith("node:")){
+                edge.setEndNodeId(nodeMap.get(targetId));
+            }
             taskEdgeList.add(edge);
         });
+        taskEdgeService.saveBatch(taskEdgeList);
 
-        taskNodeList.forEach(item -> {
+        List<TaskNode> nodeFromDbList = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, taskInfo.getId()));
+        nodeFromDbList.forEach(item -> {
             item.setNodeInDegree(taskEdgeList.stream().filter(v -> v.getEndNodeId().equals(item.getId())).count());
             item.setNodeOutDegree(taskEdgeList.stream().filter(v -> v.getFromNodeId().equals(item.getId())).count());
         });
+        return taskNodeService.updateBatchById(nodeFromDbList);
+    }
 
-        taskNodeService.saveBatch(taskNodeList);
-        taskEdgeService.saveBatch(taskEdgeList);
-        return true;
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean updateTaskSet( Long id,TaskInfoForm formData) {
+        // valid trigger
+        ScheduleTypeEnum scheduleTypeEnum = ScheduleTypeEnum.match(formData.getScheduleType(), null);
+        if (scheduleTypeEnum == null) {
+            throw new BusinessException(I18nUtil.getString("schedule_type") + I18nUtil.getString("system_unvalid"));
+        }
+        if (scheduleTypeEnum == ScheduleTypeEnum.CRON) {
+            if (formData.getScheduleConf() == null || !CronExpression.isValidExpression(formData.getScheduleConf())) {
+                throw new BusinessException("Cron" + I18nUtil.getString("system_unvalid"));
+            }
+        } else if (scheduleTypeEnum == ScheduleTypeEnum.FIX_RATE /*|| scheduleTypeEnum == ScheduleTypeEnum.FIX_DELAY*/) {
+            if (formData.getScheduleConf() == null) {
+                throw new BusinessException(I18nUtil.getString("schedule_type") + I18nUtil.getString("system_unvalid"));
+            }
+            try {
+                int fixSecond = Integer.parseInt(formData.getScheduleConf());
+                if (fixSecond < 1) {
+                    throw new BusinessException(I18nUtil.getString("schedule_type") + I18nUtil.getString("system_unvalid"));
+                }
+            } catch (Exception e) {
+                throw new BusinessException(I18nUtil.getString("schedule_type") + I18nUtil.getString("system_unvalid"));
+            }
+        }
+
+        // valid advanced
+        if (ExecutorRouteStrategyEnum.match(formData.getExecutorRouteStrategy(), null) == null) {
+            throw new BusinessException(I18nUtil.getString("jobinfo_field_executorRouteStrategy") + I18nUtil.getString("system_unvalid"));
+        }
+        if (MisfireStrategyEnum.match(formData.getMisfireStrategy(), null) == null) {
+            throw new BusinessException(I18nUtil.getString("misfire_strategy") + I18nUtil.getString("system_unvalid"));
+        }
+        if (ExecutorBlockStrategyEnum.match(formData.getExecutorBlockStrategy(), null) == null) {
+            throw new BusinessException(I18nUtil.getString("jobinfo_field_executorBlockStrategy") + I18nUtil.getString("system_unvalid"));
+        }
+
+        // 》ChildJobId valid
+        if (formData.getChildJobid() != null && formData.getChildJobid().trim().length() > 0) {
+            String[] childJobIds = formData.getChildJobid().split(",");
+            for (String childJobIdItem : childJobIds) {
+                if (childJobIdItem != null && childJobIdItem.trim().length() > 0 && isNumeric(childJobIdItem)) {
+                    TaskInfo childJobInfo = this.getById(Integer.parseInt(childJobIdItem));
+                    if (childJobInfo == null) {
+                        throw new BusinessException(
+                                MessageFormat.format((I18nUtil.getString("jobinfo_field_childJobId") + "({0})" + I18nUtil.getString("system_not_found")), childJobIdItem));
+                    }
+                } else {
+                    throw new BusinessException(
+                            MessageFormat.format((I18nUtil.getString("jobinfo_field_childJobId") + "({0})" + I18nUtil.getString("system_unvalid")), childJobIdItem));
+                }
+            }
+
+            // join , avoid "xxx,,"
+            String temp = "";
+            for (String item : childJobIds) {
+                temp += item + ",";
+            }
+            temp = temp.substring(0, temp.length() - 1);
+
+            formData.setChildJobid(temp);
+        }
+
+        // group valid
+        TaskGroup jobGroup = taskGroupService.getById(formData.getJobGroup());
+        if (jobGroup == null) {
+            throw new BusinessException(I18nUtil.getString("jobinfo_field_jobgroup") + I18nUtil.getString("system_unvalid"));
+        }
+
+        // stage job info
+        TaskInfo existsJobInfo = this.getById(id);
+        if (existsJobInfo == null) {
+            throw new BusinessException(I18nUtil.getString("jobinfo_field_id") + I18nUtil.getString("system_not_found"));
+        }
+
+        // next trigger time (5s后生效，避开预读周期)
+        long nextTriggerTime = existsJobInfo.getTriggerNextTime();
+        boolean scheduleDataNotChanged = formData.getScheduleType().equals(existsJobInfo.getScheduleType()) && formData.getScheduleConf().equals(existsJobInfo.getScheduleConf());
+        if (existsJobInfo.getTriggerStatus() == 1 && !scheduleDataNotChanged) {
+            try {
+                existsJobInfo.setScheduleConf(formData.getScheduleConf());
+                Date nextValidTime = JobScheduleHelper.generateNextValidTime(existsJobInfo, new Date(System.currentTimeMillis() + JobScheduleHelper.PRE_READ_MS));
+                if (nextValidTime == null) {
+                    throw new BusinessException(I18nUtil.getString("schedule_type") + I18nUtil.getString("system_unvalid"));
+                }
+                nextTriggerTime = nextValidTime.getTime();
+            } catch (Exception e) {
+                log.error(e.getMessage(), e);
+                throw new BusinessException(I18nUtil.getString("schedule_type") + I18nUtil.getString("system_unvalid"));
+            }
+        }
+        existsJobInfo.setJobGroup(formData.getJobGroup());
+        existsJobInfo.setJobDesc(formData.getJobDesc());
+        existsJobInfo.setAuthor(formData.getAuthor());
+        existsJobInfo.setAlarmEmail(formData.getAlarmEmail());
+        existsJobInfo.setScheduleType(formData.getScheduleType());
+        existsJobInfo.setScheduleConf(formData.getScheduleConf());
+        existsJobInfo.setMisfireStrategy(formData.getMisfireStrategy());
+        existsJobInfo.setExecutorRouteStrategy(formData.getExecutorRouteStrategy());
+        existsJobInfo.setExecutorHandler(formData.getExecutorHandler());
+        existsJobInfo.setExecutorParam(formData.getExecutorParam());
+        existsJobInfo.setExecutorBlockStrategy(formData.getExecutorBlockStrategy());
+        existsJobInfo.setExecutorTimeout(formData.getExecutorTimeout());
+        existsJobInfo.setExecutorFailRetryCount(formData.getExecutorFailRetryCount());
+        existsJobInfo.setChildJobid(formData.getChildJobid());
+        existsJobInfo.setTriggerNextTime(nextTriggerTime);
+        existsJobInfo.setJobType(formData.getJobType());
+        existsJobInfo.setReqType(formData.getReqType());
+        existsJobInfo.setParentId(formData.getParentId());
+        existsJobInfo.setReqHeader(formData.getReqHeader());
+        existsJobInfo.setReqBody(formData.getReqBody());
+        existsJobInfo.setReqUrl(formData.getReqUrl());
+        this.updateById(existsJobInfo);
+
+        // 更新节点
+        List<Map<String, Object>> nodeList = JSONUtil.toBean(formData.getNodes(), List.class);
+        List<Map<String, Object>> edgeList = JSONUtil.toBean(formData.getEdges(), List.class);
+
+        // 得到数据库中的节点
+        List<TaskNode> nodeFromDbList = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, id));
+
+        List<TaskNode> taskUpdateNodeList = new ArrayList<>();
+        List<TaskEdge> taskAddEdgeList = new ArrayList<>();
+
+
+        Map<String,Long> nodeMap = new HashMap<>();
+
+        nodeList.forEach(item -> {
+            TaskNode node = new TaskNode();
+            String nodeId = (String) item.get("id");
+            node.setTaskParentId(id);
+            Map<String, Object> position = (Map<String, Object>) item.get("position");
+            node.setNodePositionX(Double.valueOf(String.valueOf(position.get("x"))));
+            node.setNodePositionY(Double.valueOf(String.valueOf(position.get("y"))));
+            Map<String, Object> data = (Map<String, Object>) item.get("data");
+            node.setTaskId(Long.parseLong((String) data.get("taskId")));
+            if(nodeId.startsWith("node:")){
+                taskNodeService.save(node);
+                nodeMap.put(nodeId,node.getId());
+            }else {
+                node.setId(Long.parseLong(nodeId));
+                taskUpdateNodeList.add(node);
+            }
+        });
+
+        edgeList.forEach(item -> {
+            TaskEdge edge = new TaskEdge();
+            edge.setTaskParentId(id);
+            String sourceId = (String) item.get("source");
+            if(sourceId.startsWith("node:")){
+                edge.setFromNodeId(nodeMap.get(sourceId));
+            }else{
+                edge.setFromNodeId(Long.parseLong(sourceId));
+            }
+            String targetId = (String) item.get("target");
+            if(targetId.startsWith("node:")){
+                edge.setEndNodeId(nodeMap.get(targetId));
+            }else{
+                edge.setEndNodeId(Long.parseLong(targetId));
+            }
+            taskAddEdgeList.add(edge);
+        });
+
+        // 得到数据库中的边
+        taskEdgeService.remove(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId,id));
+        taskEdgeService.saveBatch(taskAddEdgeList);
+
+
+        List<Long> nodeIds = taskUpdateNodeList.stream().map(TaskNode::getId).toList();
+        List<TaskNode> delNodeDbs = nodeFromDbList.stream().filter(v -> !nodeIds.contains(v.getId())).toList();
+        if(!delNodeDbs.isEmpty()){
+            taskNodeService.removeBatchByIds(delNodeDbs.stream().map(TaskNode::getId).toList());
+        }
+        taskNodeService.updateBatchById(taskUpdateNodeList);
+
+        // 处理边
+        List<TaskNode> nodeFromDbList2 = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, id));
+        nodeFromDbList2.forEach(item -> {
+            item.setNodeInDegree(taskAddEdgeList.stream().filter(v -> v.getEndNodeId().equals(item.getId())).count());
+            item.setNodeOutDegree(taskAddEdgeList.stream().filter(v -> v.getFromNodeId().equals(item.getId())).count());
+        });
+        return taskNodeService.updateBatchById(nodeFromDbList2);
     }
 
 
@@ -744,7 +842,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             futureThread = new Thread(futureTask);
             futureThread.start();
 
-            Boolean tempResult = futureTask.get(10, TimeUnit.SECONDS);
+            Boolean tempResult = futureTask.get();
         }catch (Exception e){
 
         }
