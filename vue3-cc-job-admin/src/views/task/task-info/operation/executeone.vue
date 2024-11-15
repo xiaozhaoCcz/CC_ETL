@@ -53,11 +53,11 @@ const props = defineProps({
 
 const emit = defineEmits(["close"]);
 
-const taskInfoTriggerDto = {
+const taskInfoTriggerDto = reactive({
   id: 0,
   executorParam: "",
   addressList: "",
-};
+})
 
 watch(
   () => props.executeOneVal,

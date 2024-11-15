@@ -144,6 +144,18 @@
           min-width="150"
           align="center"
         />
+        <el-table-column
+          key="jobType"
+          label="任务类型"
+          prop="jobType"
+          min-width="150"
+          align="center"
+        >
+          <template #default="{ row }">
+            <el-tag type="warning" v-if="row.jobType==2">任务组</el-tag>
+            <el-tag type="success" v-if="row.jobType==0">任务</el-tag>
+          </template>
+        </el-table-column>
 
         <el-table-column
           key="triggerStatus"
@@ -168,7 +180,7 @@
               </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item @click="executeOne(scope.row.id)"
+                  <el-dropdown-item @click="executeOne(scope.row)"
                   >执行一次
                   </el-dropdown-item
                   >
@@ -308,9 +320,24 @@ function closeNextTriggerTimeDialog() {
   nextTriggerTimeList.value = [];
 }
 
-function executeOne(id?: number) {
-  executeOneVal.value = true;
-  taskId.value = id;
+function executeOne(obj: any) {
+  console.log(obj);
+  if(obj.jobType==2){
+    const taskInfoTriggerDto = {};
+    taskInfoTriggerDto.id = obj.id;
+    taskInfoTriggerDto.executorParam = obj.id;
+    TaskInfoAPI.triggerJob(taskInfoTriggerDto)
+      .then((data) => {
+        ElMessage.success("执行任务成功");
+      })
+      .catch((e) => {
+        ElMessage.error(e);
+      })
+      .finally(() => {});
+  }else{
+    executeOneVal.value = true;
+    taskId.value = obj.id;
+  }
 }
 
 function closeExecuteOne() {

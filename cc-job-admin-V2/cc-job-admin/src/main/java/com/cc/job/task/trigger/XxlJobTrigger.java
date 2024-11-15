@@ -222,7 +222,7 @@ public class XxlJobTrigger {
             ExecutorBiz executorBiz = null;
             // 新增api调度任务
             GlueTypeEnum glueTypeEnum = GlueTypeEnum.match(triggerParam.getGlueType());
-            if(GlueTypeEnum.API==glueTypeEnum||GlueTypeEnum.RANK==glueTypeEnum){
+            if(GlueTypeEnum.API==glueTypeEnum){
                 executorBiz = XxlJobScheduler.getExecutorBiz();
             }else {
                 executorBiz = XxlJobScheduler.getExecutorBiz(address);
