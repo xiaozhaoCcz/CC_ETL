@@ -68,6 +68,8 @@
     <EditTaskRank :taskRankVisible="taskRankVisible"   :formData="formData"
                   @close="handleCloseDialog"
                  ></EditTaskRank>
+
+    <EditTaskNode :taskNodeVisible = "taskNodeVisible" :nodeTaskId = "nodeTaskId" :nowDate="nowDate" @close="closeDraw"></EditTaskNode>
   </div>
 
 </template>
@@ -94,6 +96,7 @@ const {
   onNodeDoubleClick,
 } = useVueFlow();
 import EditTaskRank from "./operation/edit-task-rank.vue";
+import EditTaskNode from "./operation/edit-task-node.vue";
 
 const showTaskVisible = ref(true);
 const taskRankVisible = reactive({
@@ -235,6 +238,21 @@ onEdgesChange(async (changes) => {
     }
   }
 });
+
+const nodeTaskId = ref(null);
+const taskNodeVisible =ref(false)
+const nowDate = ref(null);
+
+onNodeDoubleClick(async (changes) => {
+  taskNodeVisible.value = true;
+  nodeTaskId.value = changes.node.data.taskId;
+  nowDate.value = new Date();
+});
+
+function closeDraw(){
+  nodeTaskId.value = null;
+  taskNodeVisible.value = false;
+}
 
 function removeNode(id) {
   nodes.value = nodes.value.filter((node) => node.id !== id);
