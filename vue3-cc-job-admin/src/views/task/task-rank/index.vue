@@ -47,6 +47,9 @@
             <span @dblclick="handleDblClick(node)">
             {{ node.label }}
           </span>
+            <div style="margin-left: 5px">
+              <el-tag  type="primary" round  size="small" v-if="data.jobType==2">任务组</el-tag>
+            </div>
           </template>
         </el-tree>
 
@@ -91,7 +94,6 @@ const {
   onNodeDoubleClick,
 } = useVueFlow();
 import EditTaskRank from "./operation/edit-task-rank.vue";
-import EditTaskInfo from "@/views/task/task-info/operation/edit-task-info.vue";
 
 const showTaskVisible = ref(true);
 const taskRankVisible = reactive({
@@ -101,6 +103,7 @@ const taskRankVisible = reactive({
 const triggerOneVisible = ref(false);
 const taskRankId = ref(null);
 const formData = reactive<TaskInfoForm>({});
+const g_position = ref([140,140])
 
 const taskSetList =ref([
   {
@@ -113,6 +116,7 @@ const taskInfoList = ref([
   {
     id: 1,
     label: '默认分组',
+    jobType:-1,
     children: []
   },
 ])
@@ -150,13 +154,15 @@ function handleCloseDialog() {
 
 function generateNode(val: any) {
   console.log(val);
+  g_position.value[0] = g_position.value[0]+10
+  g_position.value[1] = g_position.value[1]+10
   return {
     id:  "node:"+Date.now().toString(),
     data: {
       taskId: val.id,
       label: val.label,
     },
-    position: { x: 150, y: 150 },
+    position: { x: g_position.value[0], y: g_position.value[0] },
   };
 }
 
@@ -299,6 +305,7 @@ function filterTaskSetNode(value: string, data: any){
 
 function selectTaskSetNode (node){
   console.log(node);
+  g_position.value = [140,140]
   nodes.value = [];
   edges.value= [];
   taskRankId.value = node.id;
@@ -344,6 +351,7 @@ function getTaskInfoList(){
         const obj = {};
         obj.id = item.id;
         obj.label = item.jobDesc;
+        obj.jobType = item.jobType;
 
       taskInfoList.value[0].children.push(obj)
     })

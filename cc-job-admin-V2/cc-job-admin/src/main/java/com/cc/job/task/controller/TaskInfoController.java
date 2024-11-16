@@ -50,6 +50,8 @@ public class TaskInfoController {
         LambdaQueryWrapper<TaskInfo> wrapper = new LambdaQueryWrapper<>();
         if(jobType!=null){
             wrapper.eq(TaskInfo::getJobType, jobType);
+        }else{
+            wrapper.in(TaskInfo::getJobType,0,2);
         }
         List<TaskInfo> list = taskInfoService.list(wrapper);
         return Result.success(list);

@@ -146,17 +146,8 @@ public class JobCompleteHelper {
 			@Override
 			public void run() {
 				for (HandleCallbackParam handleCallbackParam: callbackParamList) {
+					System.out.println("callbackParam: " + handleCallbackParam);
 					ReturnT<String> callbackResult = callback(handleCallbackParam);
-					// 处理结果
-					ReturnT<Long> result = new ReturnT<Long>();
-					if(handleCallbackParam.getHandleCode()==ReturnT.SUCCESS_CODE){
-						result.setCode(ReturnT.SUCCESS_CODE);
-					}else if(handleCallbackParam.getHandleCode()==ReturnT.FAIL_CODE){
-						result.setCode(ReturnT.FAIL_CODE);
-						result.setMsg(handleCallbackParam.getHandleMsg());
-					}
-					result.setContent(handleCallbackParam.getJobId());
-					TriggerCallbackThread.vector.add(result);
 					logger.debug(">>>>>>>>> JobApiController.callback {}, handleCallbackParam={}, callbackResult={}",
 							(callbackResult.getCode()== ReturnT.SUCCESS_CODE?"success":"fail"), handleCallbackParam, callbackResult);
 				}
@@ -173,12 +164,26 @@ public class JobCompleteHelper {
 			return new ReturnT<String>(ReturnT.FAIL_CODE, "log item not found.");
 		}
 		if (log.getHandleCode() > 0) {
-			return new ReturnT<String>(ReturnT.FAIL_CODE, "log repeate callback.");     // avoid repeat callback, trigger child job etc
+			ReturnT<Long> returnT = new ReturnT<>(ReturnT.FAIL_CODE, "log repeate callback.");// avoid repeat callback, trigger child job etc
+			returnT.setContent(log.getJobId());
+			TriggerCallbackThread.vector.add(returnT);
+			return new ReturnT<>(ReturnT.FAIL_CODE, "log repeate callback.");
 		}
+
+		// 处理结果
+		ReturnT<Long> result = new ReturnT<Long>();
+
+		result.setCode(handleCallbackParam.getHandleCode());
+		result.setMsg(handleCallbackParam.getHandleMsg());
+
+		System.out.println("result: " + result);
+
+		result.setContent(log.getJobId());
+		TriggerCallbackThread.vector.add(result);
 
 		// handle msg
 		StringBuffer handleMsg = new StringBuffer();
-		if (log.getHandleMsg()!=null) {
+		if (log.getHandleMsg() != null) {
 			handleMsg.append(log.getHandleMsg()).append("<br>");
 		}
 		if (handleCallbackParam.getHandleMsg() != null) {

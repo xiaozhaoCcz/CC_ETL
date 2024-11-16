@@ -177,12 +177,21 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
      * @return
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public boolean deleteTaskInfos(String ids) {
         Assert.isTrue(StrUtil.isNotBlank(ids), "删除的task_info数据为空");
         // 逻辑删除
         List<Long> idList = Arrays.stream(ids.split(","))
                 .map(Long::parseLong)
                 .toList();
+        List<TaskInfo> taskInfos = this.listByIds(idList);
+        for (TaskInfo taskInfo : taskInfos) {
+            if(taskInfo.getJobType()==2){
+                taskNodeService.remove(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId,taskInfo.getId()));
+                taskEdgeService.remove(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId, taskInfo.getId()));
+                this.remove(new LambdaQueryWrapper<TaskInfo>().eq(TaskInfo::getParentId,taskInfo.getId()));
+            }
+        }
         return this.removeByIds(idList);
     }
 
@@ -288,9 +297,44 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             node.setTaskParentId(taskInfo.getId());
             Map<String, Object> data = (Map<String, Object>) item.get("data");
             Map<String, Object> position = (Map<String, Object>) item.get("position");
-            node.setTaskId(Long.parseLong(String.valueOf(data.get("taskId"))));
             node.setNodePositionX(Double.valueOf(String.valueOf(position.get("x"))));
             node.setNodePositionY(Double.valueOf(String.valueOf(position.get("y"))));
+            long taskId = Long.parseLong(String.valueOf(data.get("taskId")));
+            //得到当前节点
+            TaskInfo copyTaskInfo = this.getById(taskId);
+            copyTaskInfo.setId(null);
+            copyTaskInfo.setJobType(1);
+            this.save(copyTaskInfo);
+            node.setTaskId(copyTaskInfo.getId());
+
+            if(copyTaskInfo.getJobType()==2){
+                //TODO 还需要复制节点和边
+                // 获取节点和边
+                List<TaskNode> nodeFromDbList = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, taskInfo.getId()));
+                List<TaskEdge> edgeFromDbList = taskEdgeService.list(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId, taskInfo.getId()));
+
+                Map<Long, TaskNode> taskNodeMap = nodeFromDbList.stream().collect(Collectors.toMap(TaskNode::getId, m -> m));
+
+                for (TaskEdge edge : edgeFromDbList) {
+                    Long fromNodeId = edge.getFromNodeId();
+                    Long endNodeId = edge.getEndNodeId();
+                    TaskNode node1 = taskNodeMap.get(fromNodeId);
+                    TaskNode node2 = taskNodeMap.get(endNodeId);
+                    if (node1!= null && node2!= null) {
+                        node1.setId(null);
+                        node2.setId(null);
+                        node1.setTaskParentId(copyTaskInfo.getId());
+                        node2.setTaskParentId(copyTaskInfo.getId());
+                        taskNodeService.save(node1);
+                        taskNodeService.save(node2);
+                    }
+                    TaskEdge copyEdge = new TaskEdge();
+                    copyEdge.setFromNodeId(node1.getId());
+                    copyEdge.setEndNodeId(node2.getId());
+                    taskEdgeService.save(copyEdge);
+                }
+            }
+
             if(nodeId.startsWith("node:")){
                 taskNodeService.save(node);
                 nodeMap.put(nodeId,node.getId());
