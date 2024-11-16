@@ -22,7 +22,9 @@ import com.cc.job.task.thread.JobTriggerPoolHelper;
 import com.cc.job.task.utils.I18nUtil;
 import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
+import com.xxl.job.core.executor.XxlJobExecutor;
 import com.xxl.job.core.glue.GlueTypeEnum;
+import com.xxl.job.core.thread.JobThread;
 import com.xxl.job.core.thread.TriggerCallbackThread;
 import com.xxl.job.core.util.DateUtil;
 import lombok.RequiredArgsConstructor;
@@ -474,11 +476,48 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             node.setNodePositionX(Double.valueOf(String.valueOf(position.get("x"))));
             node.setNodePositionY(Double.valueOf(String.valueOf(position.get("y"))));
             Map<String, Object> data = (Map<String, Object>) item.get("data");
-            node.setTaskId(Long.parseLong(String.valueOf(data.get("taskId"))));
+            //node.setTaskId(Long.parseLong(String.valueOf(data.get("taskId"))));
+            long taskId = Long.parseLong(String.valueOf(data.get("taskId")));
             if(nodeId.startsWith("node:")){
+                TaskInfo copyTaskInfo = this.getById(taskId);
+                copyTaskInfo.setId(null);
+                copyTaskInfo.setJobType(1);
+                copyTaskInfo.setParentId(id);
+                this.save(copyTaskInfo);
+                node.setTaskId(copyTaskInfo.getId());
+
+                if(copyTaskInfo.getJobType()==2){
+                    //TODO 还需要复制节点和边
+                    // 获取节点和边
+                    List<TaskNode> nodeFromDbList1 = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, taskId));
+                    List<TaskEdge> edgeFromDbList = taskEdgeService.list(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId, taskId));
+
+                    Map<Long, TaskNode> taskNodeMap = nodeFromDbList1.stream().collect(Collectors.toMap(TaskNode::getId, m -> m));
+
+                    for (TaskEdge edge : edgeFromDbList) {
+                        Long fromNodeId = edge.getFromNodeId();
+                        Long endNodeId = edge.getEndNodeId();
+                        TaskNode node1 = taskNodeMap.get(fromNodeId);
+                        TaskNode node2 = taskNodeMap.get(endNodeId);
+                        if (node1!= null && node2!= null) {
+                            node1.setId(null);
+                            node2.setId(null);
+                            node1.setTaskParentId(copyTaskInfo.getId());
+                            node2.setTaskParentId(copyTaskInfo.getId());
+                            taskNodeService.save(node1);
+                            taskNodeService.save(node2);
+                        }
+                        TaskEdge copyEdge = new TaskEdge();
+                        copyEdge.setFromNodeId(node1.getId());
+                        copyEdge.setEndNodeId(node2.getId());
+                        taskEdgeService.save(copyEdge);
+                    }
+                }
+
                 taskNodeService.save(node);
                 nodeMap.put(nodeId,node.getId());
             }else {
+                node.setTaskId(taskId);
                 node.setId(Long.parseLong(nodeId));
                 taskUpdateNodeList.add(node);
             }
@@ -525,7 +564,13 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
 
     @Override
     public boolean stopTaskSet(Long id) {
-        return true;
+        XxlJobExecutor.removeJobThread(id.intValue(),"stop task"+id);
+        // 得到当前任务的所有子任务
+        List<TaskNode> taskNodeList = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, id));
+//        for (TaskNode node : taskNodeList) {
+//            XxlJobExecutor.removeJobThread(node.getTaskId().intValue(),"stop task"+node.getTaskId());
+//        }
+       return true;
     }
 
     @NotNull

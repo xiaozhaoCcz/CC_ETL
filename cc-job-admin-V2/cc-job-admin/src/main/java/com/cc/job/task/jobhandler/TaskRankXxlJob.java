@@ -115,7 +115,7 @@ public class TaskRankXxlJob {
 
     private void runT(TaskNode node,List<Long> taskIds) {
         TaskInfo taskInfo = taskInfoService.getById(node.getTaskId());
-        System.out.println("start node " + node.getTaskId()+"task:"+taskInfo.getJobDesc());
+        System.out.println("start node " + node.getTaskId()+">>>>>>>>>>> task:"+taskInfo.getJobDesc());
 
         TaskInfoTriggerDto taskInfoTriggerDto = new TaskInfoTriggerDto();
         taskInfoTriggerDto.setId(node.getTaskId());
@@ -130,7 +130,7 @@ public class TaskRankXxlJob {
                     List<ReturnT<Long>> list = new ArrayList<>(vector);
                     for (ReturnT<Long> res : list) {
                         if(res.getContent().equals(node.getTaskId())){
-                            System.out.println(res+"end node" + node.getTaskId()+"task:"+taskInfo.getJobDesc());
+                            System.out.println(res+"end node" + node.getTaskId()+">>>>>>>>>>> task:"+taskInfo.getJobDesc());
                             if(res.getCode()==ReturnT.SUCCESS_CODE){
                                 TriggerCallbackThread.vector.remove(res);
                                 break Label;
