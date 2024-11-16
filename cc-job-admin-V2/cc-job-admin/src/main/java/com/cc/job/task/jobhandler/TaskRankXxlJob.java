@@ -10,7 +10,9 @@ import com.cc.job.task.service.TaskInfoService;
 import com.cc.job.task.service.TaskNodeService;
 import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.context.XxlJobHelper;
+import com.xxl.job.core.executor.XxlJobExecutor;
 import com.xxl.job.core.handler.annotation.XxlJob;
+import com.xxl.job.core.thread.JobThread;
 import com.xxl.job.core.thread.TriggerCallbackThread;
 import jakarta.annotation.Resource;
 import lombok.AllArgsConstructor;
@@ -32,11 +34,11 @@ public class TaskRankXxlJob {
     final TaskEdgeService taskEdgeService;
 
     @XxlJob("runTaskRankXxlJob")
-    public void runTaskRankXxlJob(){
+    public void runTaskRankXxlJob() {
         String jobId = XxlJobHelper.getJobParam();
-        System.out.println(">>>>>>>runTaskRankXxlJob"+jobId);
-        List<TaskNode> nodes = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId,jobId));
-        List<TaskEdge> edges = taskEdgeService.list(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId,jobId));
+        System.out.println(">>>>>>>runTaskRankXxlJob" + jobId);
+        List<TaskNode> nodes = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, jobId));
+        List<TaskEdge> edges = taskEdgeService.list(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId, jobId));
 
 
         List<TaskNode> startNodes = nodes.stream().filter(v -> v.getNodeInDegree().equals(0L)).toList();
@@ -99,7 +101,7 @@ public class TaskRankXxlJob {
                     }
                 }
                 //执行任务
-                runT(currentNode,taskIds);
+                runT(currentNode, taskIds);
                 return currentNode;
             });
             futureMap.put(k, future);
@@ -113,55 +115,55 @@ public class TaskRankXxlJob {
     }
 
 
-    private void runT(TaskNode node,List<Long> taskIds) {
+    private void runT(TaskNode node, List<Long> taskIds) {
         TaskInfo taskInfo = taskInfoService.getById(node.getTaskId());
-        System.out.println("start node " + node.getTaskId()+">>>>>>>>>>> task:"+taskInfo.getJobDesc());
+        System.out.println("start node " + node.getTaskId() + ">>>>>>>>>>> task:" + taskInfo.getJobDesc());
 
         TaskInfoTriggerDto taskInfoTriggerDto = new TaskInfoTriggerDto();
         taskInfoTriggerDto.setId(node.getTaskId());
         taskInfoService.triggerJob(taskInfoTriggerDto);
 
-        try {
-            Thread futureThread = null;
-            FutureTask<Boolean> futureTask = new FutureTask<Boolean>(() -> {
-                Label:
-                while (true){
-                    Vector<ReturnT<Long>> vector = TriggerCallbackThread.vector;
-                    List<ReturnT<Long>> list = new ArrayList<>(vector);
-                    for (ReturnT<Long> res : list) {
-                        if(res.getContent().equals(node.getTaskId())){
-                            System.out.println(res+"end node" + node.getTaskId()+">>>>>>>>>>> task:"+taskInfo.getJobDesc());
-                            if(res.getCode()==ReturnT.SUCCESS_CODE){
+        Thread futureThread = null;
+        FutureTask<Boolean> futureTask = new FutureTask<Boolean>(() -> {
+            Label:
+            while (true) {
+                Vector<ReturnT<Long>> vector = TriggerCallbackThread.vector;
+                List<ReturnT<Long>> list = new ArrayList<>(vector);
+                for (ReturnT<Long> res : list) {
+                    if (res.getContent().equals(node.getTaskId())) {
+                        System.out.println(res + "end node" + node.getTaskId() + ">>>>>>>>>>> task:" + taskInfo.getJobDesc());
+                        if (res.getCode() == ReturnT.SUCCESS_CODE) {
+                            TriggerCallbackThread.vector.remove(res);
+                            break Label;
+                        } else {
+                            if ("DO_NOTHING".equalsIgnoreCase(taskInfo.getExecutorBlockStrategy())) {
                                 TriggerCallbackThread.vector.remove(res);
                                 break Label;
-                            }else{
-                                if("DO_NOTHING".equalsIgnoreCase(taskInfo.getExecutorBlockStrategy())){
-                                    TriggerCallbackThread.vector.remove(res);
-                                    break Label;
-                                }else{
-                                    // 立即停止当前任务
-                                    throw new RuntimeException(res.getMsg());
-                                }
+                            } else {
+                                // TODO 立即停止当前任务
+                                taskInfoService.stopTaskSet(taskInfo.getParentId());
                             }
                         }
                     }
                 }
-                return true;
-            });
-            futureThread = new Thread(futureTask);
-            futureThread.start();
+            }
+            return true;
+        });
+        futureThread = new Thread(futureTask);
+        futureThread.start();
 
+        try {
             Boolean tempResult = futureTask.get();
-        }catch (Exception e){
-             // 节点清空
-             Vector<ReturnT<Long>> vector = TriggerCallbackThread.vector;
-             vector.removeIf(res -> taskIds.contains(res.getContent()));
-             throw new RuntimeException(e.getMessage());
+        } catch (Exception e) {
+            // 节点清空
+            Vector<ReturnT<Long>> vector = TriggerCallbackThread.vector;
+            vector.removeIf(res -> taskIds.contains(res.getContent()));
+            throw new RuntimeException(e.getMessage());
         }
     }
 
     private List<Long> getNeighbors(Long node, List<TaskEdge> edges) {
-        return  edges.stream().filter(v -> v.getFromNodeId().equals(node)).map(TaskEdge::getEndNodeId).collect(Collectors.toList());
+        return edges.stream().filter(v -> v.getFromNodeId().equals(node)).map(TaskEdge::getEndNodeId).collect(Collectors.toList());
     }
 
 }

@@ -52,6 +52,7 @@ import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
 import org.springframework.transaction.annotation.Transactional;
 
+
 /**
  * task_info服务实现类
  *
@@ -570,7 +571,13 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
 //        for (TaskNode node : taskNodeList) {
 //            XxlJobExecutor.removeJobThread(node.getTaskId().intValue(),"stop task"+node.getTaskId());
 //        }
-       return true;
+//        while (true){
+//            ConcurrentMap<Integer, JobThread> jobThreadRepository = XxlJobExecutor.jobThreadRepository;
+//            if(!jobThreadRepository.isEmpty()){
+//                System.out.println(jobThreadRepository);
+//            }
+//        }
+        return true;
     }
 
     @NotNull
@@ -604,7 +611,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         if (MisfireStrategyEnum.match(formData.getMisfireStrategy(), null) == null) {
             throw new BusinessException(I18nUtil.getString("misfire_strategy") + I18nUtil.getString("system_unvalid"));
         }
-        if (ExecutorBlockStrategyEnum.match(formData.getExecutorBlockStrategy(), null) == null) {
+        if (ExecutorBlockStrategyEnum.match(formData.getExecutorBlockStrategy(), null) == null&&!"DO_NOTHING".equalsIgnoreCase(formData.getExecutorBlockStrategy())) {
             throw new BusinessException(I18nUtil.getString("jobinfo_field_executorBlockStrategy") + I18nUtil.getString("system_unvalid"));
         }
 
