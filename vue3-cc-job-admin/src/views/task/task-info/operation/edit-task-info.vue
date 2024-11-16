@@ -78,8 +78,8 @@
                 </el-select>
               </div>
             </div>
-            <div class="m_right">
-              <div class="c_cont">
+            <div class="m_right" v-if="formData.scheduleType=='CRON'">
+              <div class="c_cont" >
                 <span>CRON*</span>
                 <el-input
                   v-model="formData.scheduleConf"
@@ -101,6 +101,15 @@
                 </div>
               </div>
             </div>
+            <div class="m_right" v-if="formData.scheduleType=='FIX_RATE'">
+              <div class="c_cont" >
+                <span>固定速度*</span>
+                <el-input
+                  v-model="formData.scheduleConf"
+                  placeholder="默认秒"
+                />
+              </div>
+            </div>
           </div>
         </div>
         <div class="child_form">
@@ -115,6 +124,7 @@
                   filterable
                   placeholder="Select"
                   style="width: 210px"
+                  @change="handleChangeGlueType"
                 >
                   <el-option
                     v-for="item in glueTypeList"
@@ -126,7 +136,7 @@
               </div>
             </div>
             <div class="m_right">
-              <div class="c_cont" v-if="formData.glueType!='API'">
+              <div class="c_cont" v-if="formData.glueType=='BEAN'">
                 <span>JobHandler*</span>
                 <el-input
                   v-model="formData.executorHandler"
@@ -134,7 +144,7 @@
                   autocomplete="off"
                 />
               </div>
-              <div class="c_cont" v-else>
+              <div class="c_cont" v-if="formData.glueType=='API'">
                 <span>请求类型*</span>
                 <el-select
                   v-model="formData.reqType"
@@ -333,7 +343,31 @@ const glueTypeList = [
   {
     type: "API",
     title: "API"
-  }
+  },
+  {
+    type: "GLUE_GROOVY",
+    title: "GLUE(Java)"
+  },
+  {
+    type: "GLUE_SHELL",
+    title: "GLUE(Shell)"
+  },
+  {
+    type: "GLUE_PYTHON",
+    title: "GLUE(Python)"
+  },
+  {
+    type: "GLUE_PHP",
+    title: "GLUE(PHP)"
+  },
+  {
+    type: "GLUE_NODEJS",
+    title: "GLUE(Nodejs)"
+  },
+  {
+    type: "GLUE_POWERSHELL",
+    title: "GLUE(PowerShell)"
+  },
 ];
 
 const routeStrategyList = [
@@ -415,6 +449,15 @@ watch(
   () => {
   }
 );
+
+function handleChangeGlueType(data:any){
+   props.formData.executorHandler = ''
+   props.formData.reqType =''
+   props.formData.reqUrl =''
+   props.formData.reqHeader = ''
+   props.formData.reqBody =''
+   props.formData.executorParam = ''
+}
 
 async function fetchTaskGroupList() {
   const data = await TaskGroupAPI.getAllTaskGroupList();

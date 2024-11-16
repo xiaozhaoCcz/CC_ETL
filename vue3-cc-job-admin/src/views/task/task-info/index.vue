@@ -196,6 +196,7 @@
                   >下次执行时间
                   </el-dropdown-item
                   >
+                  <el-dropdown-item divided v-if="!['BEAN','API'].includes(scope.row.glueType)"  @click="glueClick(scope.row.id)">GLUE IDE</el-dropdown-item>
                   <el-dropdown-item
                     divided
                     @click="startTask(scope.row.id)"
@@ -249,6 +250,8 @@
       @handleResetQuery="handleResetQuery"
     ></EditTaskInfo>
 
+    <CodeEditor :glueTaskId="glueTaskId" :glueVisible="glueVisible" :code="code" :nowDate="new Date()" @close="closeGlue"></CodeEditor>
+
     <el-dialog
       v-model="nextTriggerTimeVisible"
       title="下一次的执行时间"
@@ -265,6 +268,8 @@
 </template>
 
 <script setup lang="ts">
+import { getThemeCode } from "@/utils/theme";
+
 defineOptions({
   name: "TaskInfo",
   inheritAttrs: false
@@ -279,6 +284,7 @@ import ExecuteOne from "./operation/executeone.vue";
 import EditTaskInfo from "./operation/edit-task-info.vue";
 import TaskGroupAPI from "@/api/task/task-group";
 import router from "@/router";
+import CodeEditor from "@/components/CodeEdit/index.vue";
 
 const queryFormRef = ref(ElForm);
 
@@ -307,6 +313,26 @@ const taskId = ref();
 const nextTriggerTimeVisible = ref(false);
 const nextTriggerTimeList = ref([]);
 const taskGroupList = ref([]);
+const glueVisible = ref(false)
+const code = ref('');
+const glueTaskId = ref(null)
+
+function closeGlue(){
+  glueVisible.value = false;
+}
+
+function glueClick(id: number){
+  glueVisible.value = true;
+  glueTaskId.value = id;
+  TaskInfoAPI.getFormData(id).then((data) => {
+     const glueType = data.glueType;
+     if(data.glueSource==null||data.glueSource.length<=0){
+       code.value = getThemeCode(glueType);
+     }else{
+       code.value = data.glueSource;
+     }
+  });
+}
 
 function getTaskTriggerLog(id: number) {
   router.push({

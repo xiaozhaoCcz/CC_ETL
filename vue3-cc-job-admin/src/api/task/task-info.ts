@@ -121,6 +121,21 @@ const TaskInfoAPI = {
       data: data,
     });
   },
+
+  saveGlueSource(data: any) {
+    return request({
+      url: `${TASKINFO_BASE_URL}/saveGlueSource`,
+      method: "post",
+      data: data,
+    });
+  },
+
+  getGlueList(id: number) {
+    return request({
+      url: `${TASKINFO_BASE_URL}/getGlueList/${id}`,
+      method: "get",
+    });
+  },
 };
 
 export default TaskInfoAPI;

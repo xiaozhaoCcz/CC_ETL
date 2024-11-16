@@ -53,7 +53,7 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="CRON">
+        <el-form-item label="CRON" v-if="formData.scheduleType=='CRON'">
           <el-input
             v-model="formData.scheduleConf"
             placeholder="cron表达式..."
@@ -72,6 +72,12 @@
               @close="cronPopover = false"
             />
           </div>
+        </el-form-item  >
+        <el-form-item label="固定秒" v-if="formData.scheduleType=='FIX_RATE'">
+          <el-input
+            v-model="formData.scheduleConf"
+            placeholder="默认秒"
+          />
         </el-form-item>
         <el-form-item label="运行模式*">
           <el-select

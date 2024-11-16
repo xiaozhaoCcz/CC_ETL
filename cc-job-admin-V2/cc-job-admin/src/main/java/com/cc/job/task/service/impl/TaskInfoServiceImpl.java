@@ -8,11 +8,11 @@ import com.cc.job.common.exception.BusinessException;
 import com.cc.job.core.cron.CronExpression;
 import com.cc.job.task.enums.*;
 import com.cc.job.task.mapper.TaskEdgeMapper;
+import com.cc.job.task.mapper.TaskLogglueMapper;
 import com.cc.job.task.mapper.TaskNodeMapper;
 import com.cc.job.task.model.dto.TaskInfoTriggerDto;
-import com.cc.job.task.model.entity.TaskEdge;
-import com.cc.job.task.model.entity.TaskGroup;
-import com.cc.job.task.model.entity.TaskNode;
+import com.cc.job.task.model.entity.*;
+import com.cc.job.task.model.form.TaskGlueForm;
 import com.cc.job.task.model.vo.TaskNodeVo;
 import com.cc.job.task.service.TaskEdgeService;
 import com.cc.job.task.service.TaskGroupService;
@@ -36,7 +36,6 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.cc.job.task.mapper.TaskInfoMapper;
 import com.cc.job.task.service.TaskInfoService;
-import com.cc.job.task.model.entity.TaskInfo;
 import com.cc.job.task.model.form.TaskInfoForm;
 import com.cc.job.task.model.query.TaskInfoQuery;
 import com.cc.job.task.model.vo.TaskInfoVO;
@@ -63,13 +62,13 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> implements TaskInfoService {
 
-    private final TaskInfoConverter taskInfoConverter;
-
     private final TaskGroupService taskGroupService;
 
     private final TaskNodeService taskNodeService;
 
     private final TaskEdgeService taskEdgeService;
+
+    private final TaskLogglueMapper taskLogglueMapper;
 
     /**
      * 获取task_info分页列表
@@ -101,6 +100,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             wrapper.eq(TaskInfo::getExecutorHandler, queryParams.getExecutorHandler());
         }
 
+        wrapper.in(TaskInfo::getJobType,0,2);
 
         Page<TaskInfo> page = this.page(new Page<>(queryParams.getPageNum(), queryParams.getPageSize()), wrapper);
         List<TaskInfo> records = page.getRecords();
@@ -578,6 +578,26 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
 //            }
 //        }
         return true;
+    }
+
+    @Override
+    public boolean saveGlueSource(TaskGlueForm formData) {
+        TaskInfo taskInfo = this.getById(formData.getTaskId());
+        taskInfo.setGlueRemark(formData.getGlueRemark());
+        taskInfo.setGlueSource(formData.getGlueSource());
+        this.updateById(taskInfo);
+        TaskLogglue taskLogglue = new TaskLogglue();
+        taskLogglue.setGlueSource(formData.getGlueSource());
+        taskLogglue.setGlueRemark(formData.getGlueRemark());
+        taskLogglue.setJobId(formData.getTaskId());
+        taskLogglue.setGlueType(taskInfo.getGlueType());
+        taskLogglueMapper.insert(taskLogglue);
+        return true;
+    }
+
+    @Override
+    public List<TaskLogglue> getGlueList(Long id) {
+        return taskLogglueMapper.selectList(new LambdaQueryWrapper<TaskLogglue>().eq(TaskLogglue::getJobId, id));
     }
 
     @NotNull

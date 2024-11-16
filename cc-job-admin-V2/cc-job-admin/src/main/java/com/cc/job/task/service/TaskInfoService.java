@@ -2,6 +2,8 @@ package com.cc.job.task.service;
 
 import com.cc.job.task.model.dto.TaskInfoTriggerDto;
 import com.cc.job.task.model.entity.TaskInfo;
+import com.cc.job.task.model.entity.TaskLogglue;
+import com.cc.job.task.model.form.TaskGlueForm;
 import com.cc.job.task.model.form.TaskInfoForm;
 import com.cc.job.task.model.query.TaskInfoQuery;
 import com.cc.job.task.model.vo.TaskInfoVO;
@@ -71,4 +73,8 @@ public interface TaskInfoService extends IService<TaskInfo> {
     boolean updateTaskSet( Long id,TaskInfoForm formData);
 
     boolean stopTaskSet(Long id);
+
+    boolean saveGlueSource(TaskGlueForm formData);
+
+    List<TaskLogglue> getGlueList(Long id);
 }

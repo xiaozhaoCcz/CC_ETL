@@ -3,6 +3,8 @@ package com.cc.job.task.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.task.model.dto.TaskInfoTriggerDto;
 import com.cc.job.task.model.entity.TaskInfo;
+import com.cc.job.task.model.entity.TaskLogglue;
+import com.cc.job.task.model.form.TaskGlueForm;
 import com.cc.job.task.service.TaskInfoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -143,5 +145,19 @@ public class TaskInfoController {
     public Result<Void> stopTaskSet(@PathVariable Long id) {
         boolean result = taskInfoService.stopTaskSet(id);
         return Result.judge(result);
+    }
+
+    @Operation(summary = "保存GlueSource")
+    @PostMapping("saveGlueSource")
+    public Result<Void>  saveGlueSource(@RequestBody @Valid TaskGlueForm formData){
+        boolean result = taskInfoService.saveGlueSource(formData);
+        return Result.judge(result);
+    }
+
+
+    @GetMapping("getGlueList/{id}")
+    public Result<List<TaskLogglue>> getGlueList(@PathVariable Long id){
+        List<TaskLogglue> list =  taskInfoService.getGlueList(id);
+        return Result.success(list);
     }
 }
