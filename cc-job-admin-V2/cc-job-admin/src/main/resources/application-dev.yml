@@ -94,7 +94,6 @@ security:
     - /api/v1/auth/captcha
     - /ws/**
     - /xxl-job-admin/api/**
-    - /api/v1/taskInfos/**
 
 # 文件存储配置
 oss:

@@ -12,10 +12,11 @@ const TaskInfoAPI = {
     });
   },
 
-  getList() {
+  getList(jobType?:number) {
     return request({
       url: `${TASKINFO_BASE_URL}/list`,
       method: "get",
+      params: {jobType},
     });
   },
   /**

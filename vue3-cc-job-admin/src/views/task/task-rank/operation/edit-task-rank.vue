@@ -293,9 +293,7 @@ const blockStrategyList = [
 
 const cronPopover = ref(false);
 
-function handleTableData(val){
-  props.formData.reqHeader = JSON.stringify(val);
-}
+
 watch(
   () => props.taskRankVisible,
   () => {
@@ -316,7 +314,7 @@ function submitForm() {
   props.formData.glueType = 'BEAN'
   props.formData.executorHandler = 'runTaskRankXxlJob'
   if (id) {
-      TaskInfoAPI.update(id, props.formData)
+      TaskInfoAPI.updateTaskSet(id, props.formData)
         .then(() => {
           ElMessage.success("修改成功");
           handleCloseDialog();

@@ -1,5 +1,6 @@
 package com.cc.job.task.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.task.model.dto.TaskInfoTriggerDto;
 import com.cc.job.task.model.entity.TaskInfo;
 import com.cc.job.task.service.TaskInfoService;
@@ -45,8 +46,12 @@ public class TaskInfoController {
 
     @Operation(summary = "task_info分页列表")
     @GetMapping("/list")
-    public Result<List<TaskInfo>> getTaskInfoList() {
-        List<TaskInfo> list = taskInfoService.list();
+    public Result<List<TaskInfo>> getTaskInfoList(Integer jobType) {
+        LambdaQueryWrapper<TaskInfo> wrapper = new LambdaQueryWrapper<>();
+        if(jobType!=null){
+            wrapper.eq(TaskInfo::getJobType, jobType);
+        }
+        List<TaskInfo> list = taskInfoService.list(wrapper);
         return Result.success(list);
     }
 
