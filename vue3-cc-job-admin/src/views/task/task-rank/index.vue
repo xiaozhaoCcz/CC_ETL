@@ -245,7 +245,6 @@ function removeEdge(id) {
 }
 
 
-
 const filterTaskSetText = ref('')
 
 const filterTaskInfoText = ref('')
@@ -288,7 +287,7 @@ function stopTrigger(){
     ElMessage.warning("请选择任务组～")
     return;
   }
-  TaskInfoAPI.stopTask(taskRankId.value).then(()=>{
+  TaskInfoAPI.stopTaskSet(taskRankId.value).then(()=>{
     triggerOneVisible.value = false;
   })
 }

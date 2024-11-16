@@ -304,6 +304,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             TaskInfo copyTaskInfo = this.getById(taskId);
             copyTaskInfo.setId(null);
             copyTaskInfo.setJobType(1);
+            copyTaskInfo.setParentId(taskInfo.getId());
             this.save(copyTaskInfo);
             node.setTaskId(copyTaskInfo.getId());
 
@@ -520,6 +521,11 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             item.setNodeOutDegree(taskAddEdgeList.stream().filter(v -> v.getFromNodeId().equals(item.getId())).count());
         });
         return taskNodeService.updateBatchById(nodeFromDbList2);
+    }
+
+    @Override
+    public boolean stopTaskSet(Long id) {
+        return true;
     }
 
     @NotNull

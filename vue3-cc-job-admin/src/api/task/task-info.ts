@@ -89,6 +89,13 @@ const TaskInfoAPI = {
     });
   },
 
+  stopTaskSet(id: number) {
+    return request({
+      url: `${TASKINFO_BASE_URL}/stopTaskSet/${id}`,
+      method: "get",
+    });
+  },
+
 
   nextTriggerTime(scheduleType: string, scheduleConf: string) {
     return request({

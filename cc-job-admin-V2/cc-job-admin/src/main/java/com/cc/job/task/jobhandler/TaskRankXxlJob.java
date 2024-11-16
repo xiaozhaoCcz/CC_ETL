@@ -3,6 +3,7 @@ package com.cc.job.task.jobhandler;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.task.model.dto.TaskInfoTriggerDto;
 import com.cc.job.task.model.entity.TaskEdge;
+import com.cc.job.task.model.entity.TaskInfo;
 import com.cc.job.task.model.entity.TaskNode;
 import com.cc.job.task.service.TaskEdgeService;
 import com.cc.job.task.service.TaskInfoService;
@@ -85,6 +86,7 @@ public class TaskRankXxlJob {
             futures.clear();
         }
 
+        final List<Long> taskIds = nodes.stream().map(TaskNode::getTaskId).toList();
         nodeMap.forEach((k, v) -> {
             TaskNode currentNode = nodes.stream().filter(item -> item.getId().equals(k)).findFirst().orElse(null);
             CompletableFuture<TaskNode> future = CompletableFuture.supplyAsync(() -> {
@@ -97,7 +99,7 @@ public class TaskRankXxlJob {
                     }
                 }
                 //执行任务
-                runT(currentNode);
+                runT(currentNode,taskIds);
                 return currentNode;
             });
             futureMap.put(k, future);
@@ -111,8 +113,9 @@ public class TaskRankXxlJob {
     }
 
 
-    private void runT(TaskNode node) {
-        System.out.println("start node" + node.getTaskId());
+    private void runT(TaskNode node,List<Long> taskIds) {
+        TaskInfo taskInfo = taskInfoService.getById(node.getTaskId());
+        System.out.println("start node " + node.getTaskId()+"task:"+taskInfo.getJobDesc());
 
         TaskInfoTriggerDto taskInfoTriggerDto = new TaskInfoTriggerDto();
         taskInfoTriggerDto.setId(node.getTaskId());
@@ -127,9 +130,19 @@ public class TaskRankXxlJob {
                     List<ReturnT<Long>> list = new ArrayList<>(vector);
                     for (ReturnT<Long> res : list) {
                         if(res.getContent().equals(node.getTaskId())){
-                            System.out.println("end node" + node.getTaskId());
-                            TriggerCallbackThread.vector.remove(res);
-                            break Label;
+                            System.out.println(res+"end node" + node.getTaskId()+"task:"+taskInfo.getJobDesc());
+                            if(res.getCode()==ReturnT.SUCCESS_CODE){
+                                TriggerCallbackThread.vector.remove(res);
+                                break Label;
+                            }else{
+                                if("DO_NOTHING".equalsIgnoreCase(taskInfo.getExecutorBlockStrategy())){
+                                    TriggerCallbackThread.vector.remove(res);
+                                    break Label;
+                                }else{
+                                    // 立即停止当前任务
+                                    throw new RuntimeException(res.getMsg());
+                                }
+                            }
                         }
                     }
                 }
@@ -140,7 +153,10 @@ public class TaskRankXxlJob {
 
             Boolean tempResult = futureTask.get();
         }catch (Exception e){
-
+             // 节点清空
+             Vector<ReturnT<Long>> vector = TriggerCallbackThread.vector;
+             vector.removeIf(res -> taskIds.contains(res.getContent()));
+             throw new RuntimeException(e.getMessage());
         }
     }
 
