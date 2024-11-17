@@ -1,7 +1,7 @@
 # vue3-xxl-job
 
 <p align=center>
-    基于xxl-job设计的一个可视化任务编排功能
+    基于xxl-job设计的一个可视化任务编排工具
 </p>
 <p align="center">
 
