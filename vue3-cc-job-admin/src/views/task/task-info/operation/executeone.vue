@@ -57,9 +57,7 @@ const taskInfoTriggerDto = reactive({
   id: 0,
   executorParam: "",
   addressList: "",
-})
-
-
+});
 
 watch(
   () => props.executeOneVal,

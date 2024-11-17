@@ -13,7 +13,7 @@
     <template #footer>
       <div class="footer">
         <div>
-          <span style="font-size: 14px;margin-right: 5px">备注*</span>
+          <span class="m_title">备注</span>
           <el-input
             v-model="_input"
             placeholder="备注"
@@ -132,5 +132,11 @@ function submitForm(){
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+.m_title::after {
+  content: "*";
+  color: red;
+  font-size: 16px;
+  margin-right: 5px
 }
 </style>

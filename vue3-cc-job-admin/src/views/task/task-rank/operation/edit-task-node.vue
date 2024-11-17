@@ -1,8 +1,8 @@
 <template>
   <el-drawer v-model="drawVisible" @close="cancelClick">
     <template #default>
-      <el-form :model="formData" label-width="auto" style="max-width: 600px">
-        <el-form-item label="执行器*">
+      <el-form :model="formData" label-width="auto" style="max-width: 600px"  :rules="rules">
+        <el-form-item label="执行器" prop="jobGroup">
           <el-select
             v-model="formData.jobGroup"
             filterable
@@ -17,19 +17,11 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="负责人*">
-          <el-input
-            v-model="formData.author"
-            type="text"
-            autocomplete="off"
-          />
+        <el-form-item label="负责人" prop="author">
+          <el-input v-model="formData.author" type="text" autocomplete="off" />
         </el-form-item>
-        <el-form-item label="任务描述*">
-          <el-input
-            v-model="formData.jobDesc"
-            type="text"
-            autocomplete="off"
-          />
+        <el-form-item label="任务描述" prop="jobDesc">
+          <el-input v-model="formData.jobDesc" type="text" autocomplete="off" />
         </el-form-item>
         <el-form-item label="报警邮件">
           <el-input
@@ -38,13 +30,7 @@
             autocomplete="off"
           />
         </el-form-item>
-        <el-form-item label="固定秒" v-if="formData.scheduleType=='FIX_RATE'">
-          <el-input
-            v-model="formData.scheduleConf"
-            placeholder="默认秒"
-          />
-        </el-form-item>
-        <el-form-item label="运行模式*" >
+        <el-form-item label="运行模式" prop="glueType">
           <el-select
             v-model="formData.glueType"
             filterable
@@ -60,64 +46,66 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="运行模式*" v-if="!['BEAN','API'].includes(formData.glueType)" >
-            <el-button type="success" @click="glueClick">GLUE IDE</el-button>
+        <el-form-item
+          label="GLUE IDE"
+          v-if="!['BEAN', 'API'].includes(formData.glueType)"
+        >
+          <el-button type="success" @click="glueClick">GLUE IDE</el-button>
         </el-form-item>
-        <el-form-item label="JobHandler*" v-if="formData.glueType=='BEAN'">
+        <el-form-item label="JobHandler" prop="executorHandler" v-if="formData.glueType == 'BEAN'">
           <el-input
             v-model="formData.executorHandler"
             type="text"
             autocomplete="off"
           />
         </el-form-item>
-        <el-form-item label="请求类型*" v-if="formData.glueType=='API'">
+        <el-form-item label="请求类型" prop="reqType" v-if="formData.glueType == 'API'">
           <el-select
             v-model="formData.reqType"
             filterable
-            placeholder="Select"
             style="width: 210px"
           >
-            <el-option
-              key="GET"
-              label="GET"
-              value="GET"
-            />
-            <el-option
-              key="POST"
-              label="POST"
-              value="POST"
-            />
+            <el-option key="GET" label="GET" value="GET" />
+            <el-option key="POST" label="POST" value="POST" />
           </el-select>
         </el-form-item>
-        <el-form-item label="请求地址"  v-if="formData.glueType==='API'">
+        <el-form-item label="请求地址" prop="reqUrl" v-if="formData.glueType === 'API'">
           <el-input
             v-model="formData.reqUrl"
             type="textarea"
             autocomplete="off"
           />
         </el-form-item>
-        <el-form-item label="请求头" v-if="formData.glueType==='API'">
-          <EditTable :list="formData.reqHeader==null?[]:JSON.parse(formData.reqHeader)" @handleTableData="handleTableData"  style="width: 720px"/>
+        <el-form-item label="请求头" prop="reqHeader" v-if="formData.glueType === 'API'">
+          <EditTable
+            :list="
+              formData.reqHeader == null ? [] : JSON.parse(formData.reqHeader)
+            "
+            @handleTableData="handleTableData"
+            style="width: 720px"
+          />
         </el-form-item>
-        <el-form-item label="body" v-if="formData.glueType==='API'&&formData.reqType==='POST'">
+        <el-form-item
+          label="body"
+          v-if="formData.glueType === 'API' && formData.reqType === 'POST'"
+        >
           <el-input
             v-model="formData.reqBody"
             type="textarea"
             autocomplete="off"
           />
         </el-form-item>
-        <el-form-item label="任务参数"  v-if="formData.glueType!=='API'">
+        <el-form-item label="任务参数" v-if="formData.glueType !== 'API'">
           <el-input
             v-model="formData.executorParam"
             type="textarea"
             autocomplete="off"
           />
         </el-form-item>
-        <el-form-item label="调度过期策略">
+        <el-form-item label="调度过期策略" prop="misfireStrategy">
           <el-select
             v-model="formData.misfireStrategy"
             filterable
-            placeholder="Select"
           >
             <el-option
               v-for="item in misfireStrategyList"
@@ -134,7 +122,7 @@
             autocomplete="off"
           />
         </el-form-item>
-        <el-form-item label="任务失败策略">
+        <el-form-item label="任务失败策略" prop="executorBlockStrategy">
           <el-select
             v-model="formData.executorBlockStrategy"
             filterable
@@ -165,10 +153,15 @@
     </template>
   </el-drawer>
 
-  <CodeEditor :glueTaskId="props.nodeTaskId" :glueVisible="glueVisible" :code="code" :nowDate="new Date()" @close="closeGlue"></CodeEditor>
+  <CodeEditor
+    :glueTaskId="props.nodeTaskId"
+    :glueVisible="glueVisible"
+    :code="code"
+    :nowDate="new Date()"
+    @close="closeGlue"
+  ></CodeEditor>
 </template>
 <script setup lang="ts">
-
 import EditTable from "@/components/EditTable/EditTable.vue";
 import TaskGroupAPI from "@/api/task/task-group";
 import TaskInfoAPI from "@/api/task/task-info";
@@ -178,137 +171,148 @@ import CodeEditor from "@/components/CodeEdit/index.vue";
 const props = defineProps({
   taskNodeVisible: {
     type: Boolean,
-    default: false
+    default: false,
   },
   nodeTaskId: {
     type: Number,
-    default: -1
+    default: -1,
   },
-  nowDate:{
+  nowDate: {
     type: Date,
-    default:null
-  }
+    default: null,
+  },
 });
 const emit = defineEmits(["close"]);
 const drawVisible = ref(false);
 const formData = reactive({});
 const taskGroupList = ref([]);
+const rules = reactive({
+  jobGroup:[{required: true}],
+  author:[{required: true}],
+  jobDesc:[{required: true}],
+  glueType:[{required: true}],
+  executorHandler:[{required: true}],
+  reqType:[{required: true}],
+  reqUrl:[{required: true}],
+  misfireStrategy:[{required: true}],
+  executorBlockStrategy:[{required: true}],
+});
 
 const glueTypeList = [
   {
     type: "BEAN",
-    title: "BEAN"
+    title: "BEAN",
   },
   {
     type: "API",
-    title: "API"
+    title: "API",
   },
   {
     type: "GLUE_GROOVY",
-    title: "GLUE(Java)"
+    title: "GLUE(Java)",
   },
   {
     type: "GLUE_SHELL",
-    title: "GLUE(Shell)"
+    title: "GLUE(Shell)",
   },
   {
     type: "GLUE_PYTHON",
-    title: "GLUE(Python)"
+    title: "GLUE(Python)",
   },
   {
     type: "GLUE_PHP",
-    title: "GLUE(PHP)"
+    title: "GLUE(PHP)",
   },
   {
     type: "GLUE_NODEJS",
-    title: "GLUE(Nodejs)"
+    title: "GLUE(Nodejs)",
   },
   {
     type: "GLUE_POWERSHELL",
-    title: "GLUE(PowerShell)"
+    title: "GLUE(PowerShell)",
   },
 ];
 const misfireStrategyList = [
   {
     type: "DO_NOTHING",
-    title: "忽略"
+    title: "忽略",
   },
   {
     type: "FIRE_ONCE_NOW",
-    title: "立即执行一次"
-  }
+    title: "立即执行一次",
+  },
 ];
 const blockStrategyList = [
   {
     type: "SERIAL_EXECUTION",
-    title: "单机串行"
+    title: "单机串行",
   },
   {
     type: "DO_NOTHING",
-    title: "忽略"
+    title: "忽略",
   },
 ];
 
-watch(()=>props.taskNodeVisible,(val)=>{
-  drawVisible.value = val;
-})
+watch(
+  () => props.taskNodeVisible,
+  (val) => {
+    drawVisible.value = val;
+  }
+);
 
-watch(()=>props.nowDate,()=>{
-   if(props.nodeTaskId)
-   {
-     getTaskInfo();
-   }
-})
+watch(
+  () => props.nowDate,
+  () => {
+    if (props.nodeTaskId) {
+      getTaskInfo();
+    }
+  }
+);
 
-const glueVisible = ref(false)
-const code = ref('');
+const glueVisible = ref(false);
+const code = ref("");
 
-function glueClick(){
+function glueClick() {
   glueVisible.value = true;
   const glueType = formData.glueType;
   TaskInfoAPI.getFormData(props.nodeTaskId).then((data) => {
-    console.log(glueType,data.glueSource);
-    if(data.glueSource==null||data.glueSource.length<=0){
-      console.log(1111);
+    if (data.glueSource == null || data.glueSource.length <= 0) {
       code.value = getThemeCode(glueType);
-    }else{
+    } else {
       code.value = data.glueSource;
     }
-    console.log(code.value);
   });
 }
 
-function handleChangeGlueType(data:any) {
-  formData.executorHandler = ''
-  formData.reqUrl = ''
-  formData.reqHeader = null
-  formData.reqBody = ''
-  formData.executorParam = ''
+function handleChangeGlueType(data: any) {
+  formData.executorHandler = "";
+  formData.reqUrl = "";
+  formData.reqHeader = null;
+  formData.reqBody = "";
+  formData.executorParam = "";
 }
 
-function closeGlue(){
+function closeGlue() {
   glueVisible.value = false;
 }
 
-function handleTableData(val){
+function handleTableData(val) {
   formData.reqHeader = JSON.stringify(val);
 }
 
-
 function cancelClick() {
-    emit("close");
+  emit("close");
 }
 function confirmClick() {
-    if(!props.nodeTaskId){
-      return;
-    }
-  formData.scheduleType ='NONE'
-  TaskInfoAPI.update(props.nodeTaskId,formData)
+  if (!props.nodeTaskId) {
+    return;
+  }
+  formData.scheduleType = "NONE";
+  TaskInfoAPI.update(props.nodeTaskId, formData)
     .then(() => {
       ElMessage.success("修改成功");
     })
-    .finally(() => {
-    });
+    .finally(() => {});
 }
 
 async function fetchTaskGroupList() {
@@ -316,17 +320,16 @@ async function fetchTaskGroupList() {
   taskGroupList.value = data as any;
 }
 
-async function  getTaskInfo(){
-  if(props.nodeTaskId){
+async function getTaskInfo() {
+  if (props.nodeTaskId) {
     TaskInfoAPI.getFormData(props.nodeTaskId).then((data) => {
       Object.assign(formData, data);
     });
   }
 }
-onMounted( () => {
-   fetchTaskGroupList();
+onMounted(() => {
+  fetchTaskGroupList();
 });
 </script>
 <style scoped lang="scss">
-
 </style>

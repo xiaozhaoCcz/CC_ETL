@@ -287,6 +287,10 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
     @Transactional(rollbackFor = Exception.class)
     public boolean saveTaskSet(TaskInfoForm formData) {
         TaskInfo taskInfo = baseSaveTaskInfo(formData);
+        if(StringUtils.isBlank(formData.getNodes())){
+            throw new BusinessException("任务节点不能为空");
+        }
+
         taskInfo.setJobType(2);
         this.save(taskInfo);
         taskInfo.setExecutorParam(String.valueOf(taskInfo.getId()));
@@ -414,6 +418,10 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             formData.setGlueSource(formData.getGlueSource().replaceAll("\r", ""));
         }
 
+        if(GlueTypeEnum.API == GlueTypeEnum.match(formData.getGlueType())&&(StringUtils.isBlank(formData.getReqUrl())||StringUtils.isBlank(formData.getReqType()))){
+            throw new BusinessException("请求地址和请求类型不能为空");
+        }
+
         if (ExecutorRouteStrategyEnum.match(formData.getExecutorRouteStrategy(), null) == null) {
             throw new BusinessException(I18nUtil.getString("jobinfo_field_executorRouteStrategy") + I18nUtil.getString("system_unvalid"));
 
@@ -460,8 +468,10 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
     public boolean updateTaskSet( Long id,TaskInfoForm formData) {
         // valid trigger
         TaskInfo existsJobInfo = baseUpdateTaskInfo(id, formData);
+        if(StringUtils.isBlank(formData.getNodes())){
+            throw new BusinessException("任务节点不能为空");
+        }
         this.updateById(existsJobInfo);
-
         // 更新节点
         List<Map> nodeList = JSONUtil.parseArray(formData.getNodes()).toList(Map.class);
         List<Map> edgeList = JSONUtil.parseArray(formData.getEdges()).toList(Map.class);
@@ -624,6 +634,21 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             }
         }
 
+        if (GlueTypeEnum.match(formData.getGlueType()) == null) {
+            throw new BusinessException(I18nUtil.getString("jobinfo_field_gluetype") + I18nUtil.getString("system_unvalid"));
+        }
+        if (GlueTypeEnum.BEAN == GlueTypeEnum.match(formData.getGlueType()) && (formData.getExecutorHandler() == null || formData.getExecutorHandler().trim().length() == 0)) {
+            throw new BusinessException(I18nUtil.getString("system_please_input") + "JobHandler");
+        }
+        // 》fix "\r" in shell
+        if (GlueTypeEnum.GLUE_SHELL == GlueTypeEnum.match(formData.getGlueType()) && formData.getGlueSource() != null) {
+            formData.setGlueSource(formData.getGlueSource().replaceAll("\r", ""));
+        }
+
+        if(GlueTypeEnum.API == GlueTypeEnum.match(formData.getGlueType())&&(StringUtils.isBlank(formData.getReqUrl())||StringUtils.isBlank(formData.getReqType()))){
+            throw new BusinessException("请求地址和请求类型不能为空");
+        }
+
         // valid advanced
         if (ExecutorRouteStrategyEnum.match(formData.getExecutorRouteStrategy(), null) == null) {
             throw new BusinessException(I18nUtil.getString("jobinfo_field_executorRouteStrategy") + I18nUtil.getString("system_unvalid"));
@@ -689,27 +714,10 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
                 throw new BusinessException(I18nUtil.getString("schedule_type") + I18nUtil.getString("system_unvalid"));
             }
         }
-        existsJobInfo.setJobGroup(formData.getJobGroup());
-        existsJobInfo.setJobDesc(formData.getJobDesc());
-        existsJobInfo.setAuthor(formData.getAuthor());
-        existsJobInfo.setAlarmEmail(formData.getAlarmEmail());
-        existsJobInfo.setScheduleType(formData.getScheduleType());
-        existsJobInfo.setScheduleConf(formData.getScheduleConf());
-        existsJobInfo.setMisfireStrategy(formData.getMisfireStrategy());
-        existsJobInfo.setExecutorRouteStrategy(formData.getExecutorRouteStrategy());
-        existsJobInfo.setExecutorHandler(formData.getExecutorHandler());
-        existsJobInfo.setExecutorParam(formData.getExecutorParam());
-        existsJobInfo.setExecutorBlockStrategy(formData.getExecutorBlockStrategy());
-        existsJobInfo.setExecutorTimeout(formData.getExecutorTimeout());
-        existsJobInfo.setExecutorFailRetryCount(formData.getExecutorFailRetryCount());
-        existsJobInfo.setChildJobid(formData.getChildJobid());
+
+        BeanUtil.copyProperties(formData,existsJobInfo);
+        existsJobInfo.setGlueUpdatetime(LocalDateTime.now());
         existsJobInfo.setTriggerNextTime(nextTriggerTime);
-        existsJobInfo.setJobType(formData.getJobType());
-        existsJobInfo.setReqType(formData.getReqType());
-        existsJobInfo.setParentId(formData.getParentId());
-        existsJobInfo.setReqHeader(formData.getReqHeader());
-        existsJobInfo.setReqBody(formData.getReqBody());
-        existsJobInfo.setReqUrl(formData.getReqUrl());
         return existsJobInfo;
     }
 

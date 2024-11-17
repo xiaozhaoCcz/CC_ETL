@@ -234,10 +234,7 @@
             <div class="m_left">
               <div class="c_cont">
                 <span class="m_title">路由策略</span>
-                <el-select
-                  v-model="formData.executorRouteStrategy"
-                  filterable
-                >
+                <el-select v-model="formData.executorRouteStrategy" filterable>
                   <el-option
                     v-for="item in routeStrategyList"
                     :key="item.type"

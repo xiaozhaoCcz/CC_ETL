@@ -26,7 +26,7 @@ onMounted(() => {
       language: props.language,
       theme: props.theme,
       readOnly: false,
-      domReadOnly: true,
+      domReadOnly: false,
       quickSuggestions: false,
       minimap: { enabled: false },
       lineNumbersMinChars: 1,

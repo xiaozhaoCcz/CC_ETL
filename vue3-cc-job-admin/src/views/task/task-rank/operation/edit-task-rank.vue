@@ -13,12 +13,8 @@
           <div class="child_main">
             <div class="m_left">
               <div class="c_cont">
-                <span>执行器*</span>
-                <el-select
-                  v-model="formData.jobGroup"
-                  filterable
-                  placeholder="Select"
-                >
+                <span class="m_title">执行器</span>
+                <el-select v-model="formData.jobGroup" filterable>
                   <el-option
                     v-for="item in taskGroupList"
                     :key="item.id"
@@ -28,7 +24,7 @@
                 </el-select>
               </div>
               <div class="c_cont">
-                <span>负责人*</span>
+                <span class="m_title">负责人</span>
                 <el-input
                   v-model="formData.author"
                   type="text"
@@ -38,7 +34,7 @@
             </div>
             <div class="m_right">
               <div class="c_cont">
-                <span>任务描述*</span>
+                <span class="m_title">任务描述</span>
                 <el-input
                   v-model="formData.jobDesc"
                   type="text"
@@ -62,11 +58,11 @@
           <div class="child_main" style="margin-left: 6px">
             <div class="m_left">
               <div class="c_cont">
-                <span>调度类型*</span>
+                <span class="m_title">调度类型</span>
                 <el-select
                   v-model="formData.scheduleType"
                   filterable
-                  placeholder="Select"
+                  placeholder="请输入调度类型"
                   style="width: 210px"
                 >
                   <el-option
@@ -78,9 +74,9 @@
                 </el-select>
               </div>
             </div>
-            <div class="m_right">
+            <div class="m_right" v-if="formData.scheduleType == 'CRON'">
               <div class="c_cont">
-                <span>CRON*</span>
+                <span class="m_title">CRON</span>
                 <el-input
                   v-model="formData.scheduleConf"
                   placeholder="cron表达式..."
@@ -101,6 +97,15 @@
                 </div>
               </div>
             </div>
+            <div class="m_right" v-if="formData.scheduleType == 'FIX_RATE'">
+              <div class="c_cont">
+                <span class="m_title">固定速度</span>
+                <el-input
+                  v-model="formData.scheduleConf"
+                  placeholder="默认秒"
+                />
+              </div>
+            </div>
           </div>
         </div>
         <div class="child_form">
@@ -109,7 +114,7 @@
           <div class="child_main">
             <div class="m_left">
               <div class="c_cont">
-                <span>路由策略*</span>
+                <span class="m_title">路由策略*</span>
                 <el-select
                   v-model="formData.executorRouteStrategy"
                   filterable
@@ -124,7 +129,7 @@
                 </el-select>
               </div>
               <div class="c_cont">
-                <span>调度过期策略</span>
+                <span class="m_title">调度过期策略</span>
                 <el-select
                   v-model="formData.misfireStrategy"
                   filterable
@@ -157,8 +162,7 @@
                 />
               </div>
               <div class="c_cont">
-                <span>阻塞处理策略</span>
-
+                <span class="m_title">阻塞处理策略</span>
                 <el-select
                   v-model="formData.executorBlockStrategy"
                   filterable
@@ -196,19 +200,18 @@ import TaskGroupAPI from "@/api/task/task-group";
 import TaskInfoAPI from "@/api/task/task-info";
 //当前使用的页面引入
 import NoVue3Cron from "@/components/NoVue3Cron/index.vue";
-import EditTable from "@/components/EditTable/EditTable.vue"
 
 const emit = defineEmits(["close"]);
 
 const props = defineProps({
   taskRankVisible: {
     type: Object,
-    default: null
+    default: null,
   },
   formData: {
     type: Object,
-    default: null
-  }
+    default: null,
+  },
 });
 
 const taskGroupList = ref([]);
@@ -216,88 +219,86 @@ const taskGroupList = ref([]);
 const scheduleTypeList = [
   {
     type: "CRON",
-    title: "CRON"
+    title: "CRON",
   },
   { type: "NONE", title: "无" },
-  { type: "FIX_RATE", title: "固定速度" }
+  { type: "FIX_RATE", title: "固定速度" },
 ];
 
 const routeStrategyList = [
   {
     type: "FIRST",
-    title: "第一个"
+    title: "第一个",
   },
   {
     type: "LAST",
-    title: "最后一个"
+    title: "最后一个",
   },
   {
     type: "ROUND",
-    title: "轮询"
+    title: "轮询",
   },
   {
     type: "RANDOM",
-    title: "随机"
+    title: "随机",
   },
   {
     type: "CONSISTENT_HASH",
-    title: "一致性哈希"
+    title: "一致性哈希",
   },
   {
     type: "LEASTY_FREQUENTY_USED",
-    title: "最不经常使用"
+    title: "最不经常使用",
   },
   {
     type: "LEASTY_RECENTLY_USED",
-    title: "最近最久未使用"
+    title: "最近最久未使用",
   },
   {
     type: "FAILOVER",
-    title: "故障转移"
+    title: "故障转移",
   },
   {
     type: "BUSYOVER",
-    title: "忙碌转移"
+    title: "忙碌转移",
   },
   {
     type: "SHARDING_BORADCAST",
-    title: "分片广播"
-  }
+    title: "分片广播",
+  },
 ];
 
 const misfireStrategyList = [
   {
     type: "DO_NOTHING",
-    title: "忽略"
+    title: "忽略",
   },
   {
     type: "FIRE_ONCE_NOW",
-    title: "立即执行一次"
-  }
+    title: "立即执行一次",
+  },
 ];
 
 const blockStrategyList = [
   {
     type: "SERIAL_EXECUTION",
-    title: "单机串行"
+    title: "单机串行",
   },
   {
     type: "DISCARD_LATER",
-    title: "丢弃后续调度"
+    title: "丢弃后续调度",
   },
   {
     type: "COVER_EARLY",
-    title: "覆盖之前调度"
-  }
+    title: "覆盖之前调度",
+  },
 ];
 
 const cronPopover = ref(false);
 
-
 watch(
   () => props.taskRankVisible,
-  () => {
-  }
+  () => {}
 );
 
 async function fetchTaskGroupList() {
@@ -311,24 +312,22 @@ function changeCron(cron: string) {
 
 function submitForm() {
   const id = props.formData.id;
-  props.formData.glueType = 'BEAN'
-  props.formData.executorHandler = 'runTaskRankXxlJob'
+  props.formData.glueType = "BEAN";
+  props.formData.executorHandler = "runTaskRankXxlJob";
   if (id) {
-      TaskInfoAPI.updateTaskSet(id, props.formData)
-        .then(() => {
-          ElMessage.success("修改成功");
-          handleCloseDialog();
-        })
-        .finally(() => {
-        });
+    TaskInfoAPI.updateTaskSet(id, props.formData)
+      .then(() => {
+        ElMessage.success("修改成功");
+        handleCloseDialog();
+      })
+      .finally(() => {});
   } else {
     TaskInfoAPI.saveTaskSet(props.formData)
       .then(() => {
         ElMessage.success("新增成功");
         handleCloseDialog();
       })
-      .finally(() => {
-      });
+      .finally(() => {});
   }
 }
 
@@ -343,6 +342,12 @@ onMounted(() => {
 });
 </script>
 <style lang="scss" scoped>
+.m_title::after {
+  content: "*";
+  color: red;
+  font-size: 16px;
+}
+
 .info_form {
   width: 100%;
 

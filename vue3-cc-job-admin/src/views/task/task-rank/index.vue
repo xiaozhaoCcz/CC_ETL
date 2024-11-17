@@ -1,23 +1,44 @@
-
 <template>
-  <div class="app-container ">
+  <div class="app-container">
     <div class="task_rank_top">
       <div class="btn_left_list">
-        <el-button type="primary" v-if="!showTaskVisible" @click="showTaskVisible=true">展示任务</el-button>
-        <el-button type="info" v-else @click="showTaskVisible=false">隐藏任务</el-button>
+        <el-button
+          type="primary"
+          v-if="!showTaskVisible"
+          @click="showTaskVisible = true"
+        >
+          展示任务
+        </el-button>
+        <el-button type="info" v-else @click="showTaskVisible = false">
+          隐藏任务
+        </el-button>
       </div>
       <div class="btn_right_list">
-        <el-button type="warning" :icon="Loading" circle  @click="stopTrigger" v-if="triggerOneVisible"/>
-        <el-button type="success" :icon="ArrowRight" circle  @click="triggerOne" v-else />
-        <el-button type="info" :icon="Folder" circle  @click="handleOpenDialog" />
+        <el-button
+          type="warning"
+          :icon="Loading"
+          circle
+          @click="stopTrigger"
+          v-if="triggerOneVisible"
+        />
+        <el-button
+          type="success"
+          :icon="ArrowRight"
+          circle
+          @click="triggerOne"
+          v-else
+        />
+        <el-button
+          type="info"
+          :icon="Folder"
+          circle
+          @click="handleOpenDialog"
+        />
       </div>
     </div>
     <div class="task_rank">
       <div class="task_set_tree">
-        <el-input
-          v-model="filterTaskSetText"
-          placeholder="Filter keyword"
-        />
+        <el-input v-model="filterTaskSetText" placeholder="Filter keyword" />
 
         <el-tree
           ref="treeTaskSetRef"
@@ -26,14 +47,11 @@
           :props="defaultProps"
           default-expand-all
           :filter-node-method="filterTaskSetNode"
-          @node-click = "selectTaskSetNode"
+          @node-click="selectTaskSetNode"
         />
       </div>
       <div class="task_info_tree" v-if="showTaskVisible">
-        <el-input
-          v-model="filterTaskInfoText"
-          placeholder="Filter keyword"
-        />
+        <el-input v-model="filterTaskInfoText" placeholder="Filter keyword" />
 
         <el-tree
           ref="taskInfoTreeRef"
@@ -45,58 +63,65 @@
         >
           <template #default="{ node, data }">
             <span @dblclick="handleDblClick(node)">
-            {{ node.label }}
-          </span>
+              {{ node.label }}
+            </span>
             <div style="margin-left: 5px">
-              <el-tag  type="primary" round  size="small" v-if="data.jobType==2">任务组</el-tag>
+              <el-tag
+                type="primary"
+                round
+                size="small"
+                v-if="data.jobType == 2"
+              >
+                任务组
+              </el-tag>
             </div>
           </template>
         </el-tree>
-
       </div>
       <div class="vue_flow_platform">
-        <VueFlow :nodes="nodes"
-                 :edges="edges"
-                 @connect="onConnect"
-                 @edge-update="onEdgeUpdate"
-                 @edge-update-start="onEdgeUpdateStart"
-                 @edge-update-end="onEdgeUpdateEnd">
-        </VueFlow>
+        <VueFlow
+          :nodes="nodes"
+          :edges="edges"
+          @connect="onConnect"
+          @edge-update="onEdgeUpdate"
+          @edge-update-start="onEdgeUpdateStart"
+          @edge-update-end="onEdgeUpdateEnd"
+        ></VueFlow>
       </div>
     </div>
 
-    <EditTaskRank :taskRankVisible="taskRankVisible"   :formData="formData"
-                  @close="handleCloseDialog"
-                 ></EditTaskRank>
+    <EditTaskRank
+      :taskRankVisible="taskRankVisible"
+      :formData="formData"
+      @close="handleCloseDialog"
+    ></EditTaskRank>
 
-    <EditTaskNode :taskNodeVisible = "taskNodeVisible" :nodeTaskId = "nodeTaskId" :nowDate="nowDate" @close="closeDraw"></EditTaskNode>
+    <EditTaskNode
+      :taskNodeVisible="taskNodeVisible"
+      :nodeTaskId="nodeTaskId"
+      :nowDate="nowDate"
+      @close="closeDraw"
+    ></EditTaskNode>
   </div>
-
 </template>
 <script setup lang="ts">
 /* these are necessary styles for vue flow */
-import '@vue-flow/core/dist/style.css';
+import "@vue-flow/core/dist/style.css";
 /* this contains the default theme, these are optional styles */
-import '@vue-flow/core/dist/theme-default.css';
-import { ref, onMounted } from 'vue'
-import { VueFlow,useVueFlow, MarkerType } from "@vue-flow/core";
-import {
-  Folder,
-  ArrowRight,
-  Loading
-} from '@element-plus/icons-vue'
+import "@vue-flow/core/dist/theme-default.css";
+import { ref, onMounted } from "vue";
+import { VueFlow, useVueFlow, MarkerType } from "@vue-flow/core";
+import { Folder, ArrowRight, Loading } from "@element-plus/icons-vue";
 import TaskInfoAPI, { TaskInfoForm } from "@/api/task/task-info";
 const {
   updateEdge,
   onNodesChange,
   onNodeDragStop,
   onEdgesChange,
-  removeEdges,
   onNodeDoubleClick,
 } = useVueFlow();
 import EditTaskRank from "./operation/edit-task-rank.vue";
 import EditTaskNode from "./operation/edit-task-node.vue";
-import { getToken } from "@/utils/auth";
 
 const showTaskVisible = ref(true);
 const taskRankVisible = reactive({
@@ -106,23 +131,23 @@ const taskRankVisible = reactive({
 const triggerOneVisible = ref(false);
 const taskRankId = ref(null);
 const formData = reactive<TaskInfoForm>({});
-const g_position = ref([140,140])
+const g_position = ref([140, 140]);
 
-const taskSetList =ref([
+const taskSetList = ref([
   {
     id: 1,
-    label: '默认分组',
-    children: []
+    label: "默认分组",
+    children: [],
   },
-])
+]);
 const taskInfoList = ref([
   {
     id: 1,
-    label: '默认分组',
-    jobType:-1,
-    children: []
+    label: "默认分组",
+    jobType: -1,
+    children: [],
   },
-])
+]);
 
 const nodes = ref([]);
 
@@ -132,7 +157,7 @@ const edges = ref([]);
 function handleOpenDialog() {
   taskRankVisible.visible = true;
   if (taskRankId.value) {
-    taskRankVisible.title = "修改taskRank";
+    taskRankVisible.title = "修改任务组";
     TaskInfoAPI.getFormData(taskRankId.value).then((data) => {
       Object.assign(formData, data);
       formData.nodes = JSON.stringify(nodes.value);
@@ -141,7 +166,7 @@ function handleOpenDialog() {
   } else {
     formData.nodes = JSON.stringify(nodes.value);
     formData.edges = JSON.stringify(edges.value);
-    taskRankVisible.title = "新增taskRank";
+    taskRankVisible.title = "新增任务组";
   }
 }
 
@@ -157,10 +182,10 @@ function handleCloseDialog() {
 
 function generateNode(val: any) {
   console.log(val);
-  g_position.value[0] = g_position.value[0]+10
-  g_position.value[1] = g_position.value[1]+10
+  g_position.value[0] = g_position.value[0] + 10;
+  g_position.value[1] = g_position.value[1] + 10;
   return {
-    id:  "node:"+Date.now().toString(),
+    id: "node:" + Date.now().toString(),
     data: {
       taskId: val.id,
       label: val.label,
@@ -190,7 +215,6 @@ const handleDblClick = (node) => {
     console.log(nodes.value);
   }
 };
-
 
 function onConnect(params) {
   edges.value.push(generateEdge(params));
@@ -240,7 +264,7 @@ onEdgesChange(async (changes) => {
 });
 
 const nodeTaskId = ref(null);
-const taskNodeVisible =ref(false)
+const taskNodeVisible = ref(false);
 const nowDate = ref(null);
 
 onNodeDoubleClick(async (changes) => {
@@ -249,7 +273,7 @@ onNodeDoubleClick(async (changes) => {
   nowDate.value = new Date();
 });
 
-function closeDraw(){
+function closeDraw() {
   nodeTaskId.value = null;
   taskNodeVisible.value = false;
 }
@@ -262,30 +286,29 @@ function removeEdge(id) {
   edges.value = edges.value.filter((edge) => edge.target !== id);
 }
 
+const filterTaskSetText = ref("");
 
-const filterTaskSetText = ref('')
-
-const filterTaskInfoText = ref('')
-const taskInfoTreeRef = ref<InstanceType<typeof ElTree>>()
-const treeTaskSetRef = ref<InstanceType<typeof ElTree>>()
+const filterTaskInfoText = ref("");
+const taskInfoTreeRef = ref<InstanceType<typeof ElTree>>();
+const treeTaskSetRef = ref<InstanceType<typeof ElTree>>();
 const defaultProps = {
-  children: 'children',
-  label: 'label',
-}
+  children: "children",
+  label: "label",
+};
 
 watch(filterTaskInfoText, (val) => {
-  taskInfoTreeRef.value!.filter(val)
-})
+  taskInfoTreeRef.value!.filter(val);
+});
 
 watch(filterTaskSetText, (val) => {
-  treeTaskSetRef.value!.filter(val)
-})
+  treeTaskSetRef.value!.filter(val);
+});
 
-function triggerOne(){
-    if(taskRankId.value==null){
-       ElMessage.warning("请选择任务组～")
-      return;
-    }
+function triggerOne() {
+  if (taskRankId.value == null) {
+    ElMessage.warning("请选择任务组～");
+    return;
+  }
   connectWs(taskRankId.value);
   const taskInfoTriggerDto = {};
   taskInfoTriggerDto.id = taskRankId.value;
@@ -302,25 +325,25 @@ function triggerOne(){
     .finally(() => {});
 }
 
-function stopTrigger(){
-  if(taskRankId.value==null){
-    ElMessage.warning("请选择任务组～")
+function stopTrigger() {
+  if (taskRankId.value == null) {
+    ElMessage.warning("请选择任务组～");
     return;
   }
-  TaskInfoAPI.stopTaskSet(taskRankId.value).then(()=>{
+  TaskInfoAPI.stopTaskSet(taskRankId.value).then(() => {
     triggerOneVisible.value = false;
     updateEdgeStyle();
-  })
+  });
 }
 
-function filterTaskInfoNode(value: string, data: any){
-  if (!value) return true
-  return data.label.includes(value)
+function filterTaskInfoNode(value: string, data: any) {
+  if (!value) return true;
+  return data.label.includes(value);
 }
 
-function filterTaskSetNode(value: string, data: any){
-  if (!value) return true
-  return data.label.includes(value)
+function filterTaskSetNode(value: string, data: any) {
+  if (!value) return true;
+  return data.label.includes(value);
 }
 
 function updateEdgeStyle() {
@@ -350,23 +373,21 @@ function updateEdgeStyle() {
   edges.value = convertEdge;
 }
 
-
-function selectTaskSetNode (node){
-  console.log(node);
+function selectTaskSetNode(node) {
   connectWs(node.id);
-  g_position.value = [140,140]
+  g_position.value = [140, 140];
   nodes.value = [];
-  edges.value= [];
+  edges.value = [];
   taskRankId.value = node.id;
   TaskInfoAPI.getFormData(node.id).then((data) => {
     Object.assign(formData, data);
     console.log(data);
-    const _nodes = JSON.parse(data.nodes)
-    const _edges = JSON.parse(data.edges)
+    const _nodes = JSON.parse(data.nodes);
+    const _edges = JSON.parse(data.edges);
 
     _nodes.forEach((item) => {
       const nodeObj = {} as any;
-      nodeObj.id = item.id+'';
+      nodeObj.id = item.id + "";
       nodeObj.data = {
         taskId: item.taskId,
         label: item.taskName,
@@ -378,14 +399,14 @@ function selectTaskSetNode (node){
       //   borderRadius: "8px",
       //   width: "140px",
       // }),
-        nodes.value.push(nodeObj);
+      nodes.value.push(nodeObj);
     });
 
     _edges.forEach((item) => {
       const edgeObj = {} as any;
       edgeObj.id = item.fromNodeId + "-" + item.endNodeId;
-      edgeObj.source = item.fromNodeId+'';
-      edgeObj.target = item.endNodeId+'';
+      edgeObj.source = item.fromNodeId + "";
+      edgeObj.target = item.endNodeId + "";
       edgeObj.updatable = true;
       edgeObj.markerEnd = MarkerType.ArrowClosed;
       edges.value.push(edgeObj);
@@ -393,29 +414,28 @@ function selectTaskSetNode (node){
   });
 }
 
-
-function getTaskInfoList(){
-  TaskInfoAPI.getList().then(data=>{
-    data.forEach((item)=>{
-        const obj = {};
-        obj.id = item.id;
-        obj.label = item.jobDesc;
-        obj.jobType = item.jobType;
-
-      taskInfoList.value[0].children.push(obj)
-    })
-  })
-}
-
-function getTaskSetList(){
-  TaskInfoAPI.getList(2).then(data=>{
-    data.forEach((item)=>{
+function getTaskInfoList() {
+  TaskInfoAPI.getList().then((data) => {
+    data.forEach((item) => {
       const obj = {};
       obj.id = item.id;
       obj.label = item.jobDesc;
-      taskSetList.value[0].children.push(obj)
-    })
-  })
+      obj.jobType = item.jobType;
+
+      taskInfoList.value[0].children.push(obj);
+    });
+  });
+}
+
+function getTaskSetList() {
+  TaskInfoAPI.getList(2).then((data) => {
+    data.forEach((item) => {
+      const obj = {};
+      obj.id = item.id;
+      obj.label = item.jobDesc;
+      taskSetList.value[0].children.push(obj);
+    });
+  });
 }
 
 //--------------------------------------------------ws------------------
@@ -433,10 +453,10 @@ const connectWs = (id: number) => {
   ws.value.onclose = () => {
     console.log("连接断开");
     reconnectAttempts.value++;
-    if(reconnectAttempts.value<=maxReconnectAttempts){
+    if (reconnectAttempts.value <= maxReconnectAttempts) {
       console.log("进行重连");
       connectWs(id);
-    }else{
+    } else {
       console.log("连接关闭");
     }
   };
@@ -452,7 +472,7 @@ const connectWs = (id: number) => {
     if (node) {
       node.style = {
         border: "1px solid " + color,
-        color: color
+        color: color,
       };
       nodes.value = [...nodes.value]; // 触发Vue反应性更新
     }
@@ -472,51 +492,48 @@ const getNodeColor = (status: number) => {
   }
 };
 
-
-onMounted(()=>{
+onMounted(() => {
   getTaskInfoList();
   getTaskSetList();
-})
+});
 </script>
 
 <style lang="scss" scoped>
-
-.task_rank_top{
+.task_rank_top {
   margin-bottom: 2px;
   display: flex;
   justify-content: space-between;
   align-items: center;
 
-  .btn_right_list{
+  .btn_right_list {
     background: #fff;
     padding: 5px 10px;
     border-radius: 8px;
   }
 }
 
-.task_rank{
-   width: 100%;
+.task_rank {
+  width: 100%;
   display: flex;
   justify-content: left;
   height: 80vh;
-  .task_set_tree{
-      width: 20%;
-      background: #fff;
-      padding: 10px;
+  .task_set_tree {
+    width: 20%;
+    background: #fff;
+    padding: 10px;
   }
 
-  .task_info_tree{
+  .task_info_tree {
     border-left: 1px solid #f0f0f0;
     width: 20%;
     background: #fff;
     padding: 10px;
   }
 
-  .vue_flow_platform{
+  .vue_flow_platform {
     background: #fff;
     border: 1px solid #f0f0f0;
     width: 100%;
   }
 }
-
 </style>

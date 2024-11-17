@@ -198,7 +198,10 @@
               </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item @click="executeOne(scope.row)">
+                  <el-dropdown-item
+                    @click="executeOne(scope.row)"
+                    :disabled="scope.row.triggerStatus == 1"
+                  >
                     执行一次
                   </el-dropdown-item>
                   <el-dropdown-item @click="getTaskTriggerLog(scope.row.id)">
@@ -218,6 +221,7 @@
                     divided
                     v-if="!['BEAN', 'API'].includes(scope.row.glueType)"
                     @click="glueClick(scope.row.id)"
+                    :disabled="scope.row.triggerStatus == 1"
                   >
                     GLUE IDE
                   </el-dropdown-item>
@@ -236,13 +240,22 @@
                     停止
                   </el-dropdown-item>
 
-                  <el-dropdown-item @click="handleOpenDialog(scope.row.id)">
+                  <el-dropdown-item
+                    @click="handleOpenDialog(scope.row.id)"
+                    :disabled="scope.row.triggerStatus == 1"
+                  >
                     编辑
                   </el-dropdown-item>
-                  <el-dropdown-item @click="handleDelete(scope.row.id)">
+                  <el-dropdown-item
+                    @click="handleDelete(scope.row.id)"
+                    :disabled="scope.row.triggerStatus == 1"
+                  >
                     删除
                   </el-dropdown-item>
-                  <el-dropdown-item @click="handleCopy(scope.row.id)">
+                  <el-dropdown-item
+                    @click="handleCopy(scope.row.id)"
+                    :disabled="scope.row.triggerStatus == 1"
+                  >
                     复制
                   </el-dropdown-item>
                 </el-dropdown-menu>
