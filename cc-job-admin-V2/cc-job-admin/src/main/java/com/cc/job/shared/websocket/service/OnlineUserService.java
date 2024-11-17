@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
  * @since 2024/9/26
  */
 
-@Service
+//@Service
 public class OnlineUserService {
 
     private final Set<String> onlineUsers = ConcurrentHashMap.newKeySet();

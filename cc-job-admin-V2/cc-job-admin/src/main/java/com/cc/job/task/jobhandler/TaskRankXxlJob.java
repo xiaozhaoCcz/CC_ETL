@@ -8,6 +8,8 @@ import com.cc.job.task.model.entity.TaskNode;
 import com.cc.job.task.service.TaskEdgeService;
 import com.cc.job.task.service.TaskInfoService;
 import com.cc.job.task.service.TaskNodeService;
+import com.cc.job.task.websocket.WebSocketServer;
+import com.cc.job.task.websocket.model.Message;
 import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.executor.XxlJobExecutor;
@@ -32,6 +34,8 @@ public class TaskRankXxlJob {
     final TaskNodeService taskNodeService;
 
     final TaskEdgeService taskEdgeService;
+
+    final WebSocketServer webSocketServer;
 
     @XxlJob("runTaskRankXxlJob")
     public void runTaskRankXxlJob() {
@@ -123,6 +127,13 @@ public class TaskRankXxlJob {
         taskInfoTriggerDto.setId(node.getTaskId());
         taskInfoService.triggerJob(taskInfoTriggerDto);
 
+        Message message = new Message();
+        message.setParentTaskId(node.getTaskParentId());
+        message.setTaskId(node.getTaskId());
+        message.setNodeId(node.getId());
+        message.setStatus(2);
+        webSocketServer.sendInfo(message);
+
         Thread futureThread = null;
         FutureTask<Boolean> futureTask = new FutureTask<Boolean>(() -> {
             Label:
@@ -133,9 +144,13 @@ public class TaskRankXxlJob {
                     if (res.getContent().equals(node.getTaskId())) {
                         System.out.println(res + "end node" + node.getTaskId() + ">>>>>>>>>>> task:" + taskInfo.getJobDesc());
                         if (res.getCode() == ReturnT.SUCCESS_CODE) {
+                            message.setStatus(1);
+                            webSocketServer.sendInfo(message);
                             TriggerCallbackThread.vector.remove(res);
                             break Label;
                         } else {
+                            message.setStatus(0);
+                            webSocketServer.sendInfo(message);
                             if ("DO_NOTHING".equalsIgnoreCase(taskInfo.getExecutorBlockStrategy())) {
                                 TriggerCallbackThread.vector.remove(res);
                                 break Label;

@@ -20,8 +20,8 @@ import java.security.Principal;
  * @author Ray
  * @since 2.3.0
  */
-@RestController
-@RequestMapping("/websocket")
+//@RestController
+//@RequestMapping("/websocket")
 @RequiredArgsConstructor
 @Slf4j
 public class WebsocketController {

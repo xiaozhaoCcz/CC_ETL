@@ -97,6 +97,7 @@ const {
 } = useVueFlow();
 import EditTaskRank from "./operation/edit-task-rank.vue";
 import EditTaskNode from "./operation/edit-task-node.vue";
+import { getToken } from "@/utils/auth";
 
 const showTaskVisible = ref(true);
 const taskRankVisible = reactive({
@@ -267,7 +268,7 @@ const filterTaskSetText = ref('')
 
 const filterTaskInfoText = ref('')
 const taskInfoTreeRef = ref<InstanceType<typeof ElTree>>()
-
+const treeTaskSetRef = ref<InstanceType<typeof ElTree>>()
 const defaultProps = {
   children: 'children',
   label: 'label',
@@ -286,6 +287,7 @@ function triggerOne(){
        ElMessage.warning("请选择任务组～")
       return;
     }
+  connectWs(taskRankId.value);
   const taskInfoTriggerDto = {};
   taskInfoTriggerDto.id = taskRankId.value;
   taskInfoTriggerDto.executorParam = taskRankId.value;
@@ -293,6 +295,7 @@ function triggerOne(){
     .then((data) => {
       ElMessage.success("执行任务成功");
       triggerOneVisible.value = true;
+      updateEdgeStyle();
     })
     .catch((e) => {
       ElMessage.error(e);
@@ -307,6 +310,7 @@ function stopTrigger(){
   }
   TaskInfoAPI.stopTaskSet(taskRankId.value).then(()=>{
     triggerOneVisible.value = false;
+    updateEdgeStyle();
   })
 }
 
@@ -320,8 +324,37 @@ function filterTaskSetNode(value: string, data: any){
   return data.label.includes(value)
 }
 
+function updateEdgeStyle() {
+  if (triggerOneVisible.value) {
+    const convertEdge = [] as any;
+    // 所有边变色
+    edges.value.forEach((edge) => {
+      // animated: true,
+      // style: { stroke: "#10b981" },
+      const obj = {} as any;
+      Object.assign(obj, edge);
+      obj.style = { stroke: "#10b981" };
+      obj.animated = true;
+      convertEdge.push(obj);
+    });
+    edges.value = convertEdge;
+    return;
+  }
+  const convertEdge = [] as any;
+  edges.value.forEach((edge) => {
+    const obj = {} as any;
+    Object.assign(obj, edge);
+    obj.style = {};
+    obj.animated = false;
+    convertEdge.push(obj);
+  });
+  edges.value = convertEdge;
+};
+
+
 function selectTaskSetNode (node){
   console.log(node);
+  connectWs(node.id);
   g_position.value = [140,140]
   nodes.value = [];
   edges.value= [];
@@ -385,6 +418,59 @@ function getTaskSetList(){
     })
   })
 }
+
+//--------------------------------------------------ws------------------
+const ws = ref();
+const message = ref();
+const reconnectAttempts = ref(0);
+const maxReconnectAttempts = 3; // 自定义最大重试次数
+
+const connectWs = (id: number) => {
+  ws.value = new WebSocket("ws://localhost:8989/ws/" + id);
+  ws.value.onopen = () => {
+    reconnectAttempts.value = 0;
+    console.log("连接成功");
+  };
+  ws.value.onclose = () => {
+    console.log("连接断开");
+    reconnectAttempts.value++;
+    if(reconnectAttempts.value<=maxReconnectAttempts){
+      console.log("进行重连");
+      connectWs(id);
+    }else{
+      console.log("连接关闭");
+    }
+  };
+  ws.value.onmessage = (e: any) => {
+    const _message = JSON.parse(e.data);
+    message.value = _message;
+    console.log("接收到消息", _message);
+    // 接收到消息后，需要做出相应的操作，比如更新节点或边
+    const node = nodes.value.find((node: any) => node.id == _message.nodeId);
+    //
+    const color = getNodeColor(_message.status);
+    console.log("node", node, nodes.value, color);
+    if (node) {
+      node.style = {
+        border: "1px solid " + color
+      };
+      nodes.value = [...nodes.value]; // 触发Vue反应性更新
+    }
+  };
+};
+
+const getNodeColor = (status: number) => {
+  switch (status) {
+    case 0:
+      return "red";
+    case 1:
+      return "green";
+    case 2:
+      return "gold";
+    default:
+      return "#000";
+  }
+};
 
 
 onMounted(()=>{

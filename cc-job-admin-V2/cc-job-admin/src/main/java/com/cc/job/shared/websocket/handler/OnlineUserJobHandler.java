@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
  * @since 2024/10/7
  *
  */
-@Component
+//@Component
 @Slf4j
 @RequiredArgsConstructor
 public class OnlineUserJobHandler {

@@ -29,8 +29,8 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
  * @since 2.4.0
  */
 // 启用WebSocket消息代理功能和配置STOMP协议，实现实时双向通信和消息传递
-@EnableWebSocketMessageBroker
-@Configuration
+//@EnableWebSocketMessageBroker
+//@Configuration
 @Slf4j
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 

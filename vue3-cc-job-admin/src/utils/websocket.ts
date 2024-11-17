@@ -39,6 +39,7 @@ class WebSocketManager {
         this.reconnectAttempts = 0; // 重置重连计数
         this.messageHandlers.forEach((handlers, topic) => {
           handlers.forEach((handler) => {
+
             this.subscribeToTopic(topic, handler);
           });
         });

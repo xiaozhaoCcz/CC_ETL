@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
  * @author haoxr
  * @since 2024/9/25
  */
-@Component
+//@Component
 @RequiredArgsConstructor
 @Slf4j
 public class OnlineUserListener {
