@@ -30,12 +30,12 @@ public interface TaskLogMapper extends BaseMapper<TaskLog> {
                           @Param("oldAlarmStatus") int oldAlarmStatus,
                           @Param("newAlarmStatus") int newAlarmStatus);
 
-    public Map<String, Object> findLogReport(@Param("from") Date from,
-                                             @Param("to") Date to);
+    Map<String, Object> findLogReport(@Param("from") Date from,
+                                      @Param("to") Date to);
 
-    public List<Long> findClearLogIds(@Param("jobGroup") int jobGroup,
-                                      @Param("jobId") int jobId,
-                                      @Param("clearBeforeTime") Date clearBeforeTime,
-                                      @Param("clearBeforeNum") int clearBeforeNum,
-                                      @Param("pagesize") int pagesize);
+    List<Long> findClearLogIds(@Param("jobGroup") int jobGroup,
+                               @Param("jobId") int jobId,
+                               @Param("clearBeforeTime") Date clearBeforeTime,
+                               @Param("clearBeforeNum") int clearBeforeNum,
+                               @Param("pagesize") int pagesize);
 }

@@ -152,8 +152,8 @@
           align="center"
         >
           <template #default="{ row }">
-            <el-tag type="warning" v-if="row.jobType==2">任务组</el-tag>
-            <el-tag type="success" v-if="row.jobType==0">任务</el-tag>
+            <el-tag type="warning" v-if="row.jobType == 2">任务组</el-tag>
+            <el-tag type="success" v-if="row.jobType == 0">任务</el-tag>
           </template>
         </el-table-column>
 
@@ -165,62 +165,86 @@
           align="center"
         >
           <template #default="scope">
-            <el-tag type="info" v-if="scope.row.triggerStatus === 0">停止</el-tag>
-            <el-tag type="success" v-if="scope.row.triggerStatus === 1">运行</el-tag>
+            <el-tag type="info" v-if="scope.row.triggerStatus === 0">
+              停止
+            </el-tag>
+            <el-tag type="success" v-if="scope.row.triggerStatus === 1">
+              运行
+            </el-tag>
           </template>
         </el-table-column>
-        <el-table-column fixed="right" label="操作" width="220">
+        <el-table-column
+          key="createTime"
+          label="创建时间"
+          prop="createTime"
+          min-width="200"
+          align="center"
+        />
+        <el-table-column
+          key="updateTime"
+          label="修改时间"
+          prop="updateTime"
+          min-width="200"
+          align="center"
+        />
+        <el-table-column fixed="right" label="操作" width="120" align="center">
           <template #default="scope">
             <el-dropdown>
               <el-button type="primary">
                 操作
                 <el-icon class="el-icon--right">
-                  <arrow-down/>
+                  <arrow-down />
                 </el-icon>
               </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item @click="executeOne(scope.row)"
-                  >执行一次
-                  </el-dropdown-item
-                  >
-                  <el-dropdown-item @click="getTaskTriggerLog(scope.row.id)"
-                  >查询日志
-                  </el-dropdown-item
-                  >
-                  <el-dropdown-item>注册节点</el-dropdown-item>
+                  <el-dropdown-item @click="executeOne(scope.row)">
+                    执行一次
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="getTaskTriggerLog(scope.row.id)">
+                    查询日志
+                  </el-dropdown-item>
                   <el-dropdown-item
                     @click="
-                      nextTriggerTime(scope.row.scheduleType, scope.row.scheduleConf)
+                      nextTriggerTime(
+                        scope.row.scheduleType,
+                        scope.row.scheduleConf
+                      )
                     "
-                  >下次执行时间
-                  </el-dropdown-item
                   >
-                  <el-dropdown-item divided v-if="!['BEAN','API'].includes(scope.row.glueType)"  @click="glueClick(scope.row.id)">GLUE IDE</el-dropdown-item>
+                    下次执行时间
+                  </el-dropdown-item>
+                  <el-dropdown-item
+                    divided
+                    v-if="!['BEAN', 'API'].includes(scope.row.glueType)"
+                    @click="glueClick(scope.row.id)"
+                  >
+                    GLUE IDE
+                  </el-dropdown-item>
                   <el-dropdown-item
                     divided
                     @click="startTask(scope.row.id)"
                     v-if="scope.row.triggerStatus === 0"
-                  >启动
-                  </el-dropdown-item
                   >
-                  <el-dropdown-item divided @click="stopTask(scope.row.id)" v-else
-                  >停止
-                  </el-dropdown-item
+                    启动
+                  </el-dropdown-item>
+                  <el-dropdown-item
+                    divided
+                    @click="stopTask(scope.row.id)"
+                    v-else
                   >
+                    停止
+                  </el-dropdown-item>
 
                   <el-dropdown-item @click="handleOpenDialog(scope.row.id)">
                     编辑
-                  </el-dropdown-item
-                  >
-                  <el-dropdown-item @click="handleDelete(scope.row.id)"
-                  >删除
-                  </el-dropdown-item
-                  >
-                  <el-dropdown-item @click="handleCopy(scope.row.id)"
-                  >复制
-                  </el-dropdown-item
-                  >
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="handleDelete(scope.row.id)">
+                    删除
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="handleCopy(scope.row.id)">
+                    复制
+                  </el-dropdown-item>
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
@@ -250,7 +274,13 @@
       @handleResetQuery="handleResetQuery"
     ></EditTaskInfo>
 
-    <CodeEditor :glueTaskId="glueTaskId" :glueVisible="glueVisible" :code="code" :nowDate="new Date()" @close="closeGlue"></CodeEditor>
+    <CodeEditor
+      :glueTaskId="glueTaskId"
+      :glueVisible="glueVisible"
+      :code="code"
+      :nowDate="new Date()"
+      @close="closeGlue"
+    ></CodeEditor>
 
     <el-dialog
       v-model="nextTriggerTimeVisible"
@@ -272,13 +302,13 @@ import { getThemeCode } from "@/utils/theme";
 
 defineOptions({
   name: "TaskInfo",
-  inheritAttrs: false
+  inheritAttrs: false,
 });
 
 import TaskInfoAPI, {
   TaskInfoPageVO,
   TaskInfoForm,
-  TaskInfoPageQuery
+  TaskInfoPageQuery,
 } from "@/api/task/task-info";
 import ExecuteOne from "./operation/executeone.vue";
 import EditTaskInfo from "./operation/edit-task-info.vue";
@@ -294,7 +324,7 @@ const total = ref(0);
 
 const queryParams = reactive<TaskInfoPageQuery>({
   pageNum: 1,
-  pageSize: 10
+  pageSize: 10,
 });
 
 // task_info表格数据
@@ -303,7 +333,7 @@ const pageData = ref<TaskInfoPageVO[]>([]);
 const taskInfoVisible = reactive({
   title: "",
   visible: false,
-  isCopy: false
+  isCopy: false,
 });
 
 // task_info表单数据
@@ -313,31 +343,31 @@ const taskId = ref();
 const nextTriggerTimeVisible = ref(false);
 const nextTriggerTimeList = ref([]);
 const taskGroupList = ref([]);
-const glueVisible = ref(false)
-const code = ref('');
-const glueTaskId = ref(null)
+const glueVisible = ref(false);
+const code = ref("");
+const glueTaskId = ref(null);
 
-function closeGlue(){
+function closeGlue() {
   glueVisible.value = false;
 }
 
-function glueClick(id: number){
+function glueClick(id: number) {
   glueVisible.value = true;
   glueTaskId.value = id;
   TaskInfoAPI.getFormData(id).then((data) => {
-     const glueType = data.glueType;
-     if(data.glueSource==null||data.glueSource.length<=0){
-       code.value = getThemeCode(glueType);
-     }else{
-       code.value = data.glueSource;
-     }
+    const glueType = data.glueType;
+    if (data.glueSource == null || data.glueSource.length <= 0) {
+      code.value = getThemeCode(glueType);
+    } else {
+      code.value = data.glueSource;
+    }
   });
 }
 
 function getTaskTriggerLog(id: number) {
   router.push({
     path: "/task/task-log",
-    query: { id }
+    query: { id },
   });
 }
 
@@ -348,7 +378,7 @@ function closeNextTriggerTimeDialog() {
 
 function executeOne(obj: any) {
   console.log(obj);
-  if(obj.jobType==2){
+  if (obj.jobType == 2) {
     const taskInfoTriggerDto = {};
     taskInfoTriggerDto.id = obj.id;
     taskInfoTriggerDto.executorParam = obj.id;
@@ -360,7 +390,7 @@ function executeOne(obj: any) {
         ElMessage.error(e);
       })
       .finally(() => {});
-  }else{
+  } else {
     executeOneVal.value = true;
     taskId.value = obj.id;
   }
@@ -431,12 +461,12 @@ function handleSelectionChange(selection: any) {
 function handleOpenDialog(id?: number) {
   taskInfoVisible.visible = true;
   if (id) {
-    taskInfoVisible.title = "修改taskInfo";
+    taskInfoVisible.title = "修改任务";
     TaskInfoAPI.getFormData(id).then((data) => {
       Object.assign(formData, data);
     });
   } else {
-    taskInfoVisible.title = "新增taskInfo";
+    taskInfoVisible.title = "新增任务";
   }
 }
 
@@ -460,7 +490,7 @@ function handleDelete(id?: number) {
   ElMessageBox.confirm("确认删除已选中的数据项?", "警告", {
     confirmButtonText: "确定",
     cancelButtonText: "取消",
-    type: "warning"
+    type: "warning",
   }).then(
     () => {
       loading.value = true;

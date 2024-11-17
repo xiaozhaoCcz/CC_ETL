@@ -13,11 +13,11 @@
           <div class="child_main">
             <div class="m_left">
               <div class="c_cont">
-                <span>执行器*</span>
+                <span class="m_title">执行器</span>
                 <el-select
                   v-model="formData.jobGroup"
                   filterable
-                  placeholder="Select"
+                  placeholder="选择执行器"
                 >
                   <el-option
                     v-for="item in taskGroupList"
@@ -28,21 +28,23 @@
                 </el-select>
               </div>
               <div class="c_cont">
-                <span>负责人*</span>
+                <span class="m_title">负责人</span>
                 <el-input
                   v-model="formData.author"
                   type="text"
                   autocomplete="off"
+                  placeholder="输入负责人"
                 />
               </div>
             </div>
             <div class="m_right">
               <div class="c_cont">
-                <span>任务描述*</span>
+                <span class="m_title">任务描述</span>
                 <el-input
                   v-model="formData.jobDesc"
                   type="text"
                   autocomplete="off"
+                  placeholder="任务描述"
                 />
               </div>
               <div class="c_cont">
@@ -62,7 +64,7 @@
           <div class="child_main" style="margin-left: 6px">
             <div class="m_left">
               <div class="c_cont">
-                <span>调度类型*</span>
+                <span class="m_title">调度类型</span>
                 <el-select
                   v-model="formData.scheduleType"
                   filterable
@@ -78,9 +80,9 @@
                 </el-select>
               </div>
             </div>
-            <div class="m_right" v-if="formData.scheduleType=='CRON'">
-              <div class="c_cont" >
-                <span>CRON*</span>
+            <div class="m_right" v-if="formData.scheduleType == 'CRON'">
+              <div class="c_cont">
+                <span class="m_title">CRON</span>
                 <el-input
                   v-model="formData.scheduleConf"
                   placeholder="cron表达式..."
@@ -101,9 +103,9 @@
                 </div>
               </div>
             </div>
-            <div class="m_right" v-if="formData.scheduleType=='FIX_RATE'">
-              <div class="c_cont" >
-                <span>固定速度*</span>
+            <div class="m_right" v-if="formData.scheduleType == 'FIX_RATE'">
+              <div class="c_cont">
+                <span class="m_title">固定速度</span>
                 <el-input
                   v-model="formData.scheduleConf"
                   placeholder="默认秒"
@@ -118,11 +120,11 @@
           <div class="child_main" style="margin-left: 6px">
             <div class="m_left">
               <div class="c_cont">
-                <span>运行模式*</span>
+                <span class="m_title">运行模式</span>
                 <el-select
                   v-model="formData.glueType"
                   filterable
-                  placeholder="Select"
+                  placeholder="选择运行模式"
                   style="width: 210px"
                   @change="handleChangeGlueType"
                 >
@@ -136,32 +138,24 @@
               </div>
             </div>
             <div class="m_right">
-              <div class="c_cont" v-if="formData.glueType=='BEAN'">
-                <span>JobHandler*</span>
+              <div class="c_cont" v-if="formData.glueType == 'BEAN'">
+                <span class="m_title">JobHandler</span>
                 <el-input
                   v-model="formData.executorHandler"
                   type="text"
                   autocomplete="off"
                 />
               </div>
-              <div class="c_cont" v-if="formData.glueType=='API'">
-                <span>请求类型*</span>
+              <div class="c_cont" v-if="formData.glueType == 'API'">
+                <span class="m_title">请求类型</span>
                 <el-select
                   v-model="formData.reqType"
                   filterable
                   placeholder="Select"
                   style="width: 210px"
                 >
-                  <el-option
-                    key="GET"
-                    label="GET"
-                    value="GET"
-                  />
-                  <el-option
-                    key="POST"
-                    label="POST"
-                    value="POST"
-                  />
+                  <el-option key="GET" label="GET" value="GET" />
+                  <el-option key="POST" label="POST" value="POST" />
                 </el-select>
               </div>
             </div>
@@ -170,9 +164,8 @@
         <div class="child_form">
           <div class="child_main">
             <div class="m_left">
-
-              <div class="c_cont_param" v-if="formData.glueType==='API'">
-                <span>请求地址</span>
+              <div class="c_cont_param" v-if="formData.glueType === 'API'">
+                <span class="m_title">请求地址</span>
                 <el-input
                   v-model="formData.reqUrl"
                   type="textarea"
@@ -182,13 +175,25 @@
             </div>
           </div>
         </div>
-        <div class="child_form" v-if="formData.glueType==='API'" style="margin-bottom: 10px">
+        <div
+          class="child_form"
+          v-if="formData.glueType === 'API'"
+          style="margin-bottom: 10px"
+        >
           <div class="child_main">
             <div class="m_left">
               <div class="c_cont_param">
                 <span>请求头</span>
                 <!-- 可编辑表格 -->
-                <EditTable :list="formData.reqHeader==null?[]:JSON.parse(formData.reqHeader)" @handleTableData="handleTableData"  style="width: 720px"/>
+                <EditTable
+                  :list="
+                    formData.reqHeader == null
+                      ? []
+                      : JSON.parse(formData.reqHeader)
+                  "
+                  @handleTableData="handleTableData"
+                  style="width: 720px"
+                />
               </div>
             </div>
           </div>
@@ -196,7 +201,12 @@
         <div class="child_form">
           <div class="child_main">
             <div class="m_left">
-              <div class="c_cont_param" v-if="formData.glueType==='API'&&formData.reqType==='POST'">
+              <div
+                class="c_cont_param"
+                v-if="
+                  formData.glueType === 'API' && formData.reqType === 'POST'
+                "
+              >
                 <span>body</span>
                 <el-input
                   v-model="formData.reqBody"
@@ -205,7 +215,7 @@
                 />
               </div>
 
-              <div class="c_cont_param" v-if="formData.glueType!=='API'">
+              <div class="c_cont_param" v-if="formData.glueType !== 'API'">
                 <span>任务参数</span>
                 <el-input
                   v-model="formData.executorParam"
@@ -223,11 +233,10 @@
           <div class="child_main">
             <div class="m_left">
               <div class="c_cont">
-                <span>路由策略*</span>
+                <span class="m_title">路由策略</span>
                 <el-select
                   v-model="formData.executorRouteStrategy"
                   filterable
-                  placeholder="Select"
                 >
                   <el-option
                     v-for="item in routeStrategyList"
@@ -238,7 +247,7 @@
                 </el-select>
               </div>
               <div class="c_cont">
-                <span>调度过期策略</span>
+                <span class="m_title">调度过期策略</span>
                 <el-select
                   v-model="formData.misfireStrategy"
                   filterable
@@ -268,10 +277,11 @@
                   v-model="formData.childJobid"
                   type="text"
                   autocomplete="off"
+                  placeholder="多个子任务使用逗号分隔"
                 />
               </div>
               <div class="c_cont">
-                <span>阻塞处理策略</span>
+                <span class="m_title">阻塞处理策略</span>
 
                 <el-select
                   v-model="formData.executorBlockStrategy"
@@ -310,19 +320,19 @@ import TaskGroupAPI from "@/api/task/task-group";
 import TaskInfoAPI from "@/api/task/task-info";
 //当前使用的页面引入
 import NoVue3Cron from "@/components/NoVue3Cron/index.vue";
-import EditTable from "@/components/EditTable/EditTable.vue"
+import EditTable from "@/components/EditTable/EditTable.vue";
 
 const emit = defineEmits(["close", "handleResetQuery"]);
 
 const props = defineProps({
   taskInfoVisible: {
     type: Object,
-    default: null
+    default: null,
   },
   formData: {
     type: Object,
-    default: null
-  }
+    default: null,
+  },
 });
 
 const taskGroupList = ref([]);
@@ -330,133 +340,132 @@ const taskGroupList = ref([]);
 const scheduleTypeList = [
   {
     type: "CRON",
-    title: "CRON"
+    title: "CRON",
   },
   { type: "NONE", title: "无" },
-  { type: "FIX_RATE", title: "固定速度" }
+  { type: "FIX_RATE", title: "固定速度" },
 ];
 const glueTypeList = [
   {
     type: "BEAN",
-    title: "BEAN"
+    title: "BEAN",
   },
   {
     type: "API",
-    title: "API"
+    title: "API",
   },
   {
     type: "GLUE_GROOVY",
-    title: "GLUE(Java)"
+    title: "GLUE(Java)",
   },
   {
     type: "GLUE_SHELL",
-    title: "GLUE(Shell)"
+    title: "GLUE(Shell)",
   },
   {
     type: "GLUE_PYTHON",
-    title: "GLUE(Python)"
+    title: "GLUE(Python)",
   },
   {
     type: "GLUE_PHP",
-    title: "GLUE(PHP)"
+    title: "GLUE(PHP)",
   },
   {
     type: "GLUE_NODEJS",
-    title: "GLUE(Nodejs)"
+    title: "GLUE(Nodejs)",
   },
   {
     type: "GLUE_POWERSHELL",
-    title: "GLUE(PowerShell)"
+    title: "GLUE(PowerShell)",
   },
 ];
 
 const routeStrategyList = [
   {
     type: "FIRST",
-    title: "第一个"
+    title: "第一个",
   },
   {
     type: "LAST",
-    title: "最后一个"
+    title: "最后一个",
   },
   {
     type: "ROUND",
-    title: "轮询"
+    title: "轮询",
   },
   {
     type: "RANDOM",
-    title: "随机"
+    title: "随机",
   },
   {
     type: "CONSISTENT_HASH",
-    title: "一致性哈希"
+    title: "一致性哈希",
   },
   {
     type: "LEASTY_FREQUENTY_USED",
-    title: "最不经常使用"
+    title: "最不经常使用",
   },
   {
     type: "LEASTY_RECENTLY_USED",
-    title: "最近最久未使用"
+    title: "最近最久未使用",
   },
   {
     type: "FAILOVER",
-    title: "故障转移"
+    title: "故障转移",
   },
   {
     type: "BUSYOVER",
-    title: "忙碌转移"
+    title: "忙碌转移",
   },
   {
     type: "SHARDING_BORADCAST",
-    title: "分片广播"
-  }
+    title: "分片广播",
+  },
 ];
 
 const misfireStrategyList = [
   {
     type: "DO_NOTHING",
-    title: "忽略"
+    title: "忽略",
   },
   {
     type: "FIRE_ONCE_NOW",
-    title: "立即执行一次"
-  }
+    title: "立即执行一次",
+  },
 ];
 
 const blockStrategyList = [
   {
     type: "SERIAL_EXECUTION",
-    title: "单机串行"
+    title: "单机串行",
   },
   {
     type: "DISCARD_LATER",
-    title: "丢弃后续调度"
+    title: "丢弃后续调度",
   },
   {
     type: "COVER_EARLY",
-    title: "覆盖之前调度"
-  }
+    title: "覆盖之前调度",
+  },
 ];
 
 const cronPopover = ref(false);
 
-function handleTableData(val){
-   props.formData.reqHeader = JSON.stringify(val);
+function handleTableData(val) {
+  props.formData.reqHeader = JSON.stringify(val);
 }
 watch(
   () => props.taskInfoVisible,
-  () => {
-  }
+  () => {}
 );
 
-function handleChangeGlueType(data:any){
-   props.formData.executorHandler = ''
-   props.formData.reqType =''
-   props.formData.reqUrl =''
-   props.formData.reqHeader = null
-   props.formData.reqBody =''
-   props.formData.executorParam = ''
+function handleChangeGlueType(data: any) {
+  props.formData.executorHandler = "";
+  props.formData.reqType = "";
+  props.formData.reqUrl = "";
+  props.formData.reqHeader = null;
+  props.formData.reqBody = "";
+  props.formData.executorParam = "";
 }
 
 async function fetchTaskGroupList() {
@@ -479,9 +488,7 @@ function submitForm() {
           handleCloseDialog();
           emit("handleResetQuery");
         })
-        .finally(() => {
-
-        });
+        .finally(() => {});
     } else {
       TaskInfoAPI.update(id, props.formData)
         .then(() => {
@@ -489,8 +496,7 @@ function submitForm() {
           handleCloseDialog();
           emit("handleResetQuery");
         })
-        .finally(() => {
-        });
+        .finally(() => {});
     }
   } else {
     TaskInfoAPI.add(props.formData)
@@ -499,8 +505,7 @@ function submitForm() {
         handleCloseDialog();
         emit("handleResetQuery");
       })
-      .finally(() => {
-      });
+      .finally(() => {});
   }
 }
 
@@ -515,6 +520,12 @@ onMounted(() => {
 });
 </script>
 <style lang="scss" scoped>
+.m_title::after {
+  content: "*";
+  color: red;
+  font-size: 16px;
+}
+
 .info_form {
   width: 100%;
 

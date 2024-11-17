@@ -3,6 +3,8 @@ package com.cc.job.task.model.vo;
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.LocalDateTime;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 import lombok.Setter;
@@ -26,7 +28,9 @@ public class TaskInfoVO implements Serializable {
     @Schema(description = "执行器主键ID")
     private Long jobGroup;
     private String jobDesc;
-    private LocalDateTime addTime;
+    @JsonFormat(pattern="yyyy-MM-dd HH:mm:ss",timezone = "GMT+8")
+    private LocalDateTime createTime;
+    @JsonFormat(pattern="yyyy-MM-dd HH:mm:ss",timezone = "GMT+8")
     private LocalDateTime updateTime;
     @Schema(description = "作者")
     private String author;

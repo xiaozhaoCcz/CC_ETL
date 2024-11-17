@@ -348,7 +348,7 @@ function updateEdgeStyle() {
     convertEdge.push(obj);
   });
   edges.value = convertEdge;
-};
+}
 
 
 function selectTaskSetNode (node){

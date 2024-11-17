@@ -102,6 +102,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         }
 
         wrapper.in(TaskInfo::getJobType,0,2);
+        wrapper.orderByDesc(TaskInfo::getUpdateTime);
 
         Page<TaskInfo> page = this.page(new Page<>(queryParams.getPageNum(), queryParams.getPageSize()), wrapper);
         List<TaskInfo> records = page.getRecords();

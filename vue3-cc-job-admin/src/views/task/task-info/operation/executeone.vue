@@ -17,14 +17,14 @@
           <el-form-item label="任务参数" prop="pass">
             <el-input
               v-model="taskInfoTriggerDto.executorParam"
-              type="text"
+              type="textarea"
               autocomplete="off"
             />
           </el-form-item>
           <el-form-item label="机器地址" prop="checkPass">
             <el-input
               v-model="taskInfoTriggerDto.addressList"
-              type="text"
+              type="textarea"
               autocomplete="off"
             />
           </el-form-item>
