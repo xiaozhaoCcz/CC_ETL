@@ -352,7 +352,7 @@ const taskInfoVisible = reactive({
 // task_info表单数据
 const formData = reactive<TaskInfoForm>({});
 const executeOneVal = ref(false);
-const taskId = ref();
+const taskId = ref(null);
 const nextTriggerTimeVisible = ref(false);
 const nextTriggerTimeList = ref([]);
 const taskGroupList = ref([]);
