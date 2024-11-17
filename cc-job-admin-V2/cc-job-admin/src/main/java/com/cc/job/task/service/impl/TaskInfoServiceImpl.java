@@ -476,7 +476,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
 
         nodeList.forEach(item -> {
             TaskNode node = new TaskNode();
-            String nodeId = (String) item.get("id");
+            String nodeId = String.valueOf(item.get("id"));
             node.setTaskParentId(id);
             Map<String, Object> position = (Map<String, Object>) item.get("position");
             node.setNodePositionX(Double.valueOf(String.valueOf(position.get("x"))));

@@ -142,6 +142,9 @@ public class TaskRankXxlJob {
         message.setTaskId(node.getTaskId());
 
         while (stopMap.get(taskInfo.getParentId()).getFirst()){
+
+            //TODO 所有依赖的节点都需要暂停
+
             message.setNodeId(stopMap.get(taskInfo.getParentId()).getSecond());
             message.setStatus(0);
             webSocketServer.sendInfo(message);

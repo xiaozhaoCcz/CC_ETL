@@ -135,6 +135,8 @@ function handleOpenDialog() {
     taskRankVisible.title = "修改taskRank";
     TaskInfoAPI.getFormData(taskRankId.value).then((data) => {
       Object.assign(formData, data);
+      formData.nodes = JSON.stringify(nodes.value);
+      formData.edges = JSON.stringify(edges.value);
     });
   } else {
     formData.nodes = JSON.stringify(nodes.value);
@@ -152,8 +154,6 @@ function handleCloseDialog() {
   Object.assign(formData, obj);
   taskRankVisible.visible = false;
 }
-
-
 
 function generateNode(val: any) {
   console.log(val);
