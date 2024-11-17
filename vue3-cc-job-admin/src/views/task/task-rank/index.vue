@@ -79,8 +79,7 @@ import '@vue-flow/core/dist/style.css';
 /* this contains the default theme, these are optional styles */
 import '@vue-flow/core/dist/theme-default.css';
 import { ref, onMounted } from 'vue'
-import { VueFlow, Panel, Position,useVueFlow, MarkerType } from "@vue-flow/core";
-import { Background } from '@vue-flow/background'
+import { VueFlow,useVueFlow, MarkerType } from "@vue-flow/core";
 import {
   Folder,
   ArrowRight,
@@ -491,6 +490,7 @@ onMounted(()=>{
   .btn_right_list{
     background: #fff;
     padding: 5px 10px;
+    border-radius: 8px;
   }
 }
 

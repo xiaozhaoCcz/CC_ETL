@@ -583,6 +583,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         TaskInfo taskInfo = this.getById(formData.getTaskId());
         taskInfo.setGlueRemark(formData.getGlueRemark());
         taskInfo.setGlueSource(formData.getGlueSource());
+        taskInfo.setGlueUpdatetime(LocalDateTime.now());
         this.updateById(taskInfo);
         TaskLogglue taskLogglue = new TaskLogglue();
         taskLogglue.setGlueSource(formData.getGlueSource());

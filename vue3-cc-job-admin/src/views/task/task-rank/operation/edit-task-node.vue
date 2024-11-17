@@ -280,9 +280,8 @@ function glueClick(){
 
 function handleChangeGlueType(data:any) {
   formData.executorHandler = ''
-  formData.reqType = ''
   formData.reqUrl = ''
-  formData.reqHeader = ''
+  formData.reqHeader = null
   formData.reqBody = ''
   formData.executorParam = ''
 }

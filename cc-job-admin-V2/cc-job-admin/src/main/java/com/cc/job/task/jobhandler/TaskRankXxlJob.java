@@ -190,6 +190,7 @@ public class TaskRankXxlJob {
                                 throw new RuntimeException();
                             }
                         }
+
                     }
                 }
             }

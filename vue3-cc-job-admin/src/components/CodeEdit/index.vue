@@ -100,7 +100,7 @@ function handleCloseDialog(){
 function handleGlueChange(val:any){
   console.log(val);
   if(val!=null){
-     _code.value = glueList.value.find((item)=>item.id=val).glueSource;
+     _code.value = glueList.value.find((item)=>item.id==val).glueSource;
   }
 }
 
