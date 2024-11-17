@@ -1,6 +1,7 @@
 package com.cc.job.task.jobhandler;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cc.job.common.exception.BusinessException;
 import com.cc.job.task.model.dto.TaskInfoTriggerDto;
 import com.cc.job.task.model.entity.TaskEdge;
 import com.cc.job.task.model.entity.TaskInfo;
@@ -17,11 +18,15 @@ import com.xxl.job.core.handler.annotation.XxlJob;
 import com.xxl.job.core.thread.JobThread;
 import com.xxl.job.core.thread.TriggerCallbackThread;
 import jakarta.annotation.Resource;
+import kotlin.Pair;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.awt.*;
 import java.util.*;
+import java.util.List;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 @Component
@@ -37,10 +42,19 @@ public class TaskRankXxlJob {
 
     final WebSocketServer webSocketServer;
 
+    static final ConcurrentHashMap<Long, Pair<Boolean,Long>> stopMap = new ConcurrentHashMap<Long,Pair<Boolean,Long>>();
+
+    public static void processStopMap(Long parentId,boolean flag,Long id){
+        stopMap.put(parentId,new Pair<>(flag,id));
+    }
+
+    public static void removeStopMap(Long parentId){
+        stopMap.remove(parentId);
+    }
+
     @XxlJob("runTaskRankXxlJob")
     public void runTaskRankXxlJob() {
         String jobId = XxlJobHelper.getJobParam();
-        System.out.println(">>>>>>>runTaskRankXxlJob" + jobId);
         List<TaskNode> nodes = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, jobId));
         List<TaskEdge> edges = taskEdgeService.list(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId, jobId));
 
@@ -93,6 +107,7 @@ public class TaskRankXxlJob {
         }
 
         final List<Long> taskIds = nodes.stream().map(TaskNode::getTaskId).toList();
+        stopMap.put(Long.valueOf(jobId),new Pair<>(false,-1L));
         nodeMap.forEach((k, v) -> {
             TaskNode currentNode = nodes.stream().filter(item -> item.getId().equals(k)).findFirst().orElse(null);
             CompletableFuture<TaskNode> future = CompletableFuture.supplyAsync(() -> {
@@ -121,21 +136,34 @@ public class TaskRankXxlJob {
 
     private void runT(TaskNode node, List<Long> taskIds) {
         TaskInfo taskInfo = taskInfoService.getById(node.getTaskId());
-        System.out.println("start node " + node.getTaskId() + ">>>>>>>>>>> task:" + taskInfo.getJobDesc());
+
+        Message message = new Message();
+        message.setParentTaskId(node.getTaskParentId());
+        message.setTaskId(node.getTaskId());
+
+        while (stopMap.get(taskInfo.getParentId()).getFirst()){
+            message.setNodeId(stopMap.get(taskInfo.getParentId()).getSecond());
+            message.setStatus(0);
+            webSocketServer.sendInfo(message);
+            XxlJobExecutor.removeJobThread(taskInfo.getParentId().intValue(),"stop task"+taskInfo.getParentId());
+            // 节点清空
+            Vector<ReturnT<Long>> vector = TriggerCallbackThread.vector;
+            vector.removeIf(res -> taskIds.contains(res.getContent()));
+            throw new  BusinessException(taskInfo.getParentId()+" task stop");
+        }
 
         TaskInfoTriggerDto taskInfoTriggerDto = new TaskInfoTriggerDto();
         taskInfoTriggerDto.setId(node.getTaskId());
         taskInfoService.triggerJob(taskInfoTriggerDto);
 
-        Message message = new Message();
-        message.setParentTaskId(node.getTaskParentId());
-        message.setTaskId(node.getTaskId());
         message.setNodeId(node.getId());
         message.setStatus(2);
         webSocketServer.sendInfo(message);
 
+
         Thread futureThread = null;
         FutureTask<Boolean> futureTask = new FutureTask<Boolean>(() -> {
+            int retryCount = 0;
             Label:
             while (true) {
                 Vector<ReturnT<Long>> vector = TriggerCallbackThread.vector;
@@ -149,14 +177,17 @@ public class TaskRankXxlJob {
                             TriggerCallbackThread.vector.remove(res);
                             break Label;
                         } else {
-                            message.setStatus(0);
-                            webSocketServer.sendInfo(message);
+                            retryCount++;
+                            if(retryCount<=taskInfo.getExecutorFailRetryCount()){
+                                message.setStatus(0);
+                                webSocketServer.sendInfo(message);
+                            }
                             if ("DO_NOTHING".equalsIgnoreCase(taskInfo.getExecutorBlockStrategy())) {
                                 TriggerCallbackThread.vector.remove(res);
                                 break Label;
                             } else {
-                                // TODO 立即停止当前任务
-                                taskInfoService.stopTaskSet(taskInfo.getParentId());
+                                stopMap.put(taskInfo.getParentId(),new Pair<>(true,node.getId()));
+                                throw new RuntimeException();
                             }
                         }
                     }
@@ -164,15 +195,13 @@ public class TaskRankXxlJob {
             }
             return true;
         });
+
         futureThread = new Thread(futureTask);
         futureThread.start();
 
         try {
             Boolean tempResult = futureTask.get();
         } catch (Exception e) {
-            // 节点清空
-            Vector<ReturnT<Long>> vector = TriggerCallbackThread.vector;
-            vector.removeIf(res -> taskIds.contains(res.getContent()));
             throw new RuntimeException(e.getMessage());
         }
     }

@@ -38,53 +38,19 @@
             autocomplete="off"
           />
         </el-form-item>
-        <el-form-item label="调度类型*">
-          <el-select
-            v-model="formData.scheduleType"
-            filterable
-            placeholder="Select"
-            style="width: 210px"
-          >
-            <el-option
-              v-for="item in scheduleTypeList"
-              :key="item.type"
-              :label="item.title"
-              :value="item.type"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="CRON" v-if="formData.scheduleType=='CRON'">
-          <el-input
-            v-model="formData.scheduleConf"
-            placeholder="cron表达式..."
-          >
-            <template #append>
-              <el-button @click="cronPopover = !cronPopover">
-                设置
-              </el-button>
-            </template>
-          </el-input>
-          <div v-show="cronPopover" class="cronPopover">
-            <noVue3Cron
-              :cron-value="formData.scheduleConf"
-              i18n="cn"
-              @change="changeCron"
-              @close="cronPopover = false"
-            />
-          </div>
-        </el-form-item  >
         <el-form-item label="固定秒" v-if="formData.scheduleType=='FIX_RATE'">
           <el-input
             v-model="formData.scheduleConf"
             placeholder="默认秒"
           />
         </el-form-item>
-        <el-form-item label="运行模式*">
+        <el-form-item label="运行模式*" >
           <el-select
             v-model="formData.glueType"
             filterable
             placeholder="Select"
             style="width: 210px"
+            @change="handleChangeGlueType"
           >
             <el-option
               v-for="item in glueTypeList"
@@ -94,7 +60,10 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="JobHandler*">
+        <el-form-item label="运行模式*" v-if="!['BEAN','API'].includes(formData.glueType)" >
+            <el-button type="success" @click="glueClick">GLUE IDE</el-button>
+        </el-form-item>
+        <el-form-item label="JobHandler*" v-if="formData.glueType=='BEAN'">
           <el-input
             v-model="formData.executorHandler"
             type="text"
@@ -190,18 +159,21 @@
     </template>
     <template #footer>
       <div style="flex: auto">
-        <el-button @click="cancelClick">cancel</el-button>
-        <el-button type="primary" @click="confirmClick">confirm</el-button>
+        <el-button @click="cancelClick">取消</el-button>
+        <el-button type="primary" @click="confirmClick">确认</el-button>
       </div>
     </template>
   </el-drawer>
+
+  <CodeEditor :glueTaskId="props.nodeTaskId" :glueVisible="glueVisible" :code="code" :nowDate="new Date()" @close="closeGlue"></CodeEditor>
 </template>
 <script setup lang="ts">
 
-import NoVue3Cron from "@/components/NoVue3Cron/index.vue";
 import EditTable from "@/components/EditTable/EditTable.vue";
 import TaskGroupAPI from "@/api/task/task-group";
 import TaskInfoAPI from "@/api/task/task-info";
+import { getThemeCode } from "@/utils/theme";
+import CodeEditor from "@/components/CodeEdit/index.vue";
 
 const props = defineProps({
   taskNodeVisible: {
@@ -221,14 +193,7 @@ const emit = defineEmits(["close"]);
 const drawVisible = ref(false);
 const formData = reactive({});
 const taskGroupList = ref([]);
-const scheduleTypeList = [
-  {
-    type: "CRON",
-    title: "CRON"
-  },
-  { type: "NONE", title: "无" },
-  { type: "FIX_RATE", title: "固定速度" }
-];
+
 const glueTypeList = [
   {
     type: "BEAN",
@@ -237,7 +202,31 @@ const glueTypeList = [
   {
     type: "API",
     title: "API"
-  }
+  },
+  {
+    type: "GLUE_GROOVY",
+    title: "GLUE(Java)"
+  },
+  {
+    type: "GLUE_SHELL",
+    title: "GLUE(Shell)"
+  },
+  {
+    type: "GLUE_PYTHON",
+    title: "GLUE(Python)"
+  },
+  {
+    type: "GLUE_PHP",
+    title: "GLUE(PHP)"
+  },
+  {
+    type: "GLUE_NODEJS",
+    title: "GLUE(Nodejs)"
+  },
+  {
+    type: "GLUE_POWERSHELL",
+    title: "GLUE(PowerShell)"
+  },
 ];
 const misfireStrategyList = [
   {
@@ -271,13 +260,41 @@ watch(()=>props.nowDate,()=>{
    }
 })
 
+const glueVisible = ref(false)
+const code = ref('');
+
+function glueClick(){
+  glueVisible.value = true;
+  const glueType = formData.glueType;
+  TaskInfoAPI.getFormData(props.nodeTaskId).then((data) => {
+    console.log(glueType,data.glueSource);
+    if(data.glueSource==null||data.glueSource.length<=0){
+      console.log(1111);
+      code.value = getThemeCode(glueType);
+    }else{
+      code.value = data.glueSource;
+    }
+    console.log(code.value);
+  });
+}
+
+function handleChangeGlueType(data:any) {
+  formData.executorHandler = ''
+  formData.reqType = ''
+  formData.reqUrl = ''
+  formData.reqHeader = ''
+  formData.reqBody = ''
+  formData.executorParam = ''
+}
+
+function closeGlue(){
+  glueVisible.value = false;
+}
+
 function handleTableData(val){
   formData.reqHeader = JSON.stringify(val);
 }
 
-function changeCron(cron: string) {
-  formData.scheduleConf = cron;
-}
 
 function cancelClick() {
     emit("close");
@@ -286,6 +303,7 @@ function confirmClick() {
     if(!props.nodeTaskId){
       return;
     }
+  formData.scheduleType ='NONE'
   TaskInfoAPI.update(props.nodeTaskId,formData)
     .then(() => {
       ElMessage.success("修改成功");

@@ -86,7 +86,9 @@ watch(()=>props.code,(val)=>{
 
 watch(()=>props.glueTaskId,(val)=>{
   taskId.value = val;
-  getGlueList(val)
+  if(val) {
+    getGlueList(val)
+  }
 })
 
 watch(()=>props.nowDate,()=>{})

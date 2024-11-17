@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.common.exception.BusinessException;
 import com.cc.job.core.cron.CronExpression;
 import com.cc.job.task.enums.*;
+import com.cc.job.task.jobhandler.TaskRankXxlJob;
 import com.cc.job.task.mapper.TaskEdgeMapper;
 import com.cc.job.task.mapper.TaskLogglueMapper;
 import com.cc.job.task.mapper.TaskNodeMapper;
@@ -201,10 +202,14 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
     @Override
     public boolean triggerJob(TaskInfoTriggerDto taskInfoTriggerDto) {
 
-//        XxlJobInfo xxlJobInfo = xxlJobInfoDao.loadById(jobId);
-//        if (xxlJobInfo == null) {
-//            return new ReturnT<String>(ReturnT.FAIL.getCode(), I18nUtil.getString("jobinfo_glue_jobid_unvalid"));
-//        }
+        TaskInfo taskInfo = this.getById(taskInfoTriggerDto.getId());
+        if (taskInfo == null) {
+            return false;
+        }
+
+        if(taskInfo.getJobType()==2){
+            TaskRankXxlJob.removeStopMap(taskInfo.getId());
+        }
         // force cover job param
         if (taskInfoTriggerDto.getExecutorParam() == null) {
             taskInfoTriggerDto.setExecutorParam("");
@@ -568,15 +573,8 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         XxlJobExecutor.removeJobThread(id.intValue(),"stop task"+id);
         // 得到当前任务的所有子任务
         List<TaskNode> taskNodeList = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, id));
-//        for (TaskNode node : taskNodeList) {
-//            XxlJobExecutor.removeJobThread(node.getTaskId().intValue(),"stop task"+node.getTaskId());
-//        }
-//        while (true){
-//            ConcurrentMap<Integer, JobThread> jobThreadRepository = XxlJobExecutor.jobThreadRepository;
-//            if(!jobThreadRepository.isEmpty()){
-//                System.out.println(jobThreadRepository);
-//            }
-//        }
+        List<Long> nodes = taskNodeList.stream().map(TaskNode::getId).toList();
+        nodes.forEach(item-> TaskRankXxlJob.processStopMap(id,true,item));
         return true;
     }
 

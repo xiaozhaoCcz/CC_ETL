@@ -452,7 +452,8 @@ const connectWs = (id: number) => {
     console.log("node", node, nodes.value, color);
     if (node) {
       node.style = {
-        border: "1px solid " + color
+        border: "1px solid " + color,
+        color: color
       };
       nodes.value = [...nodes.value]; // 触发Vue反应性更新
     }
