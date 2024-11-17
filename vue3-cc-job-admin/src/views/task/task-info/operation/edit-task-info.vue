@@ -454,7 +454,7 @@ function handleChangeGlueType(data:any){
    props.formData.executorHandler = ''
    props.formData.reqType =''
    props.formData.reqUrl =''
-   props.formData.reqHeader = ''
+   props.formData.reqHeader = null
    props.formData.reqBody =''
    props.formData.executorParam = ''
 }
