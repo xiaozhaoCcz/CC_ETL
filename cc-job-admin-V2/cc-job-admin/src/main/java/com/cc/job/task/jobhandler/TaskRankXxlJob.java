@@ -166,7 +166,7 @@ public class TaskRankXxlJob {
 
         Thread futureThread = null;
         FutureTask<Boolean> futureTask = new FutureTask<Boolean>(() -> {
-            int retryCount = 0;
+            int retryCount = -1;
             Label:
             while (true) {
                 Vector<ReturnT<Long>> vector = TriggerCallbackThread.vector;

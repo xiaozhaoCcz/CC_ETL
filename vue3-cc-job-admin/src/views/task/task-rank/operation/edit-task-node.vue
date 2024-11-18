@@ -136,7 +136,7 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="任务超时时间">
+        <el-form-item label="任务重试次数">
           <el-input
             v-model="formData.executorFailRetryCount"
             type="text"
