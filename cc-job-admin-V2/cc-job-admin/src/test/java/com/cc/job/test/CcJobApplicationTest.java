@@ -230,9 +230,10 @@ public class CcJobApplicationTest {
             }
             nodeList.clear();
             nodeList.addAll(resNodeList);
+            resNodeList.clear();
         }
 
-        System.out.println(resNodeList);
+        System.out.println(nodeList);
         System.out.println(edgeList);
 
     }
@@ -247,26 +248,39 @@ public class CcJobApplicationTest {
 
         if(taskInfo.getJobType()==2&&Objects.equals(currentNode.getTaskParentId(), jobId)){
             stop = true;
+
+            List<TaskEdge> collectEdges = edgeList.stream().filter(v -> v.getTaskParentId().equals(currentNode.getId())).toList();
+            for (TaskEdge edge : collectEdges) {
+                edge.setTaskParentId(jobId);
+                edgeList.add(edge);
+            }
+
             //得到当前节点的所有开始节点
             List<Long> fromIds = edgeList.stream().filter(v -> v.getEndNodeId().equals(currentNode.getId())).map(TaskEdge::getFromNodeId).toList();
+
+            List<TaskNode> fromNodes = taskNodeMapper.selectBatchIds(fromIds);
 
             //得到当前节点的所有孩子节点
             List<TaskNode> childrenNode = taskNodeMapper.selectList(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, taskInfo.getId()));
 
-            for (TaskNode taskNode : childrenNode) {
-                 taskNode.setTaskParentId(jobId);
-                 resNodeList.add(taskNode);
+            // 得到孩子节点的开始节点
+            List<TaskNode> startNodes = childrenNode.stream().filter(v -> v.getNodeInDegree() == 0).toList();
+
+            for (TaskNode fromNode : fromNodes) {
+                fromNode.setNodeOutDegree(fromNode.getNodeOutDegree()-1+startNodes.size());
             }
 
-            // 得到孩子节点的开始节点
-            List<TaskNode> startNode = childrenNode.stream().filter(v -> v.getNodeInDegree() == 0).toList();
+            for (TaskNode startNode : startNodes) {
+                startNode.setNodeInDegree(startNode.getNodeInDegree()+fromNodes.size());
+            }
 
             if(!fromIds.isEmpty()){
-                for (TaskNode taskNode : startNode) {
+                for (TaskNode taskNode : startNodes) {
                     for (Long fromId : fromIds) {
                         TaskEdge taskEdge = new TaskEdge();
                         taskEdge.setFromNodeId(fromId);
                         taskEdge.setEndNodeId(taskNode.getId());
+                        taskEdge.setTaskParentId(jobId);
                         edgeList.add(taskEdge);
                     }
                 }
@@ -274,17 +288,33 @@ public class CcJobApplicationTest {
 
             List<Long> endIds = edgeList.stream().filter(v -> v.getFromNodeId().equals(currentNode.getId())).map(TaskEdge::getEndNodeId).toList();
 
-            List<TaskNode> endNodes = childrenNode.stream().filter(v -> v.getNodeOutDegree() == 0).toList();
+            List<TaskNode> endNodes = taskNodeMapper.selectBatchIds(endIds);
 
-            if(!endNodes.isEmpty()){
-                for (TaskNode endNode : endNodes) {
+            List<TaskNode> childEndNodes = childrenNode.stream().filter(v -> v.getNodeOutDegree() == 0).toList();
+
+            for (TaskNode endNode : endNodes) {
+                endNode.setNodeInDegree(endNode.getNodeInDegree()-1+childEndNodes.size());
+            }
+
+            for (TaskNode childEndNode : childEndNodes) {
+                childEndNode.setNodeOutDegree(childEndNode.getNodeOutDegree()+endNodes.size());
+            }
+
+            if(!childEndNodes.isEmpty()){
+                for (TaskNode endNode : childEndNodes) {
                     for (Long endId : endIds) {
                         TaskEdge edge = new TaskEdge();
                         edge.setFromNodeId(endNode.getId());
                         edge.setEndNodeId(endId);
+                        edge.setTaskParentId(jobId);
                         edgeList.add(edge);
                     }
                 }
+            }
+
+            for (TaskNode taskNode : childrenNode) {
+                taskNode.setTaskParentId(jobId);
+                resNodeList.add(taskNode);
             }
 
             edgeList.removeIf(v->(fromIds.contains(v.getFromNodeId())&&v.getEndNodeId().equals(currentNode.getId()))||(v.getFromNodeId().equals(currentNode.getId())&&endIds.contains(v.getEndNodeId())));
