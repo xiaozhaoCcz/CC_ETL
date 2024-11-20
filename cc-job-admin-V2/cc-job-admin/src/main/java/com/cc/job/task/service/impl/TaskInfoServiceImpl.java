@@ -172,12 +172,28 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
      * @return
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public boolean updateTaskInfo(Long id, TaskInfoForm formData) {
         // valid trigger
         TaskInfo existsJobInfo = baseUpdateTaskInfo(id, formData);
-        return this.updateById(existsJobInfo);
+        updateChild(existsJobInfo);
+        return true;
     }
 
+    public void updateChild(TaskInfo taskInfo){
+        if(taskInfo.getJobType()==2&& "Y".equalsIgnoreCase(taskInfo.getIsNode())){
+            //下面的子节点全部更新
+            List<TaskInfo> taskInfos = this.list(new LambdaQueryWrapper<TaskInfo>().eq(TaskInfo::getParentId, taskInfo.getId()));
+            for (TaskInfo info : taskInfos) {
+                info.setMisfireStrategy(taskInfo.getMisfireStrategy());
+                info.setExecutorTimeout(taskInfo.getExecutorTimeout());
+                info.setExecutorBlockStrategy(taskInfo.getExecutorBlockStrategy());
+                info.setExecutorFailRetryCount(taskInfo.getExecutorFailRetryCount());
+                updateChild(info);
+            }
+        }
+        this.updateById(taskInfo);
+    }
     /**
      * 删除task_info
      *
@@ -310,6 +326,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         }
 
         taskInfo.setJobType(2);
+        taskInfo.setIsNode("N");
         this.save(taskInfo);
         taskInfo.setExecutorParam(String.valueOf(taskInfo.getId()));
         this.updateById(taskInfo);
@@ -362,6 +379,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
 
             TaskInfo copyTaskInfo = BeanUtil.copyProperties(taskInfo, TaskInfo.class);
             copyTaskInfo.setId(null);
+            copyTaskInfo.setIsNode("Y");
             copyTaskInfo.setParentId(parentTask.getId());
             this.save(copyTaskInfo);
 
@@ -582,11 +600,24 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
     @Override
     public boolean stopTaskSet(Long id) {
         XxlJobExecutor.removeJobThread(id.intValue(),"stop task"+id);
+        List<Long> allNodeIds = new ArrayList<>();
         // 得到当前任务的所有子任务
-        List<TaskNode> taskNodeList = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, id));
-        List<Long> nodes = taskNodeList.stream().map(TaskNode::getId).toList();
-        nodes.forEach(item-> TaskRankXxlJob.processStopMap(id,true,item));
+        getChildNode(id,allNodeIds);
+        allNodeIds.forEach(item-> TaskRankXxlJob.processStopMap(id,true,item));
         return true;
+    }
+
+    private void getChildNode(Long id,List<Long> allNodeIds){
+        List<TaskNode> taskNodeList = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, id));
+        List<Long> taskIds = taskNodeList.stream().map(TaskNode::getTaskId).toList();
+        List<TaskInfo> taskInfos = this.listByIds(taskIds);
+        for (TaskInfo taskInfo : taskInfos) {
+            if(taskInfo.getJobType()==2){
+                getChildNode(taskInfo.getId(),allNodeIds);
+            }
+        }
+        List<Long> nodes = taskNodeList.stream().map(TaskNode::getId).toList();
+        allNodeIds.addAll(nodes);
     }
 
     @Override

@@ -167,7 +167,7 @@ public class TaskRankXxlJob {
 
         if(taskInfo.getJobType()==2&&Objects.equals(currentNode.getTaskParentId(), jobId)){
             flagMap.put(jobId, true);
-            List<TaskEdge> collectEdges = taskEdgeService.list(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId,Long.valueOf(taskInfo.getExecutorParam())));
+            List<TaskEdge> collectEdges = taskEdgeService.list(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId,taskInfo.getId()));
             for (TaskEdge edge : collectEdges) {
                 edge.setTaskParentId(jobId);
                 edgeList.add(edge);
@@ -179,7 +179,7 @@ public class TaskRankXxlJob {
             List<TaskNode> fromNodes = taskNodeService.listByIds(fromIds);
 
             //得到当前节点的所有孩子节点
-            List<TaskNode> childrenNode = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, Long.valueOf(taskInfo.getExecutorParam())));
+            List<TaskNode> childrenNode = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, taskInfo.getId()));
 
             // 得到孩子节点的开始节点
             List<TaskNode> startNodes = childrenNode.stream().filter(v -> v.getNodeInDegree() == 0).toList();
@@ -250,9 +250,6 @@ public class TaskRankXxlJob {
         message.setTaskId(node.getTaskId());
 
         while (stopMap.get(node.getTaskParentId()).getFirst()){
-
-            //TODO 所有依赖的节点都需要暂停
-
             message.setNodeId(stopMap.get(node.getTaskParentId()).getSecond());
             message.setStatus(0);
             webSocketServer.sendInfo(message);

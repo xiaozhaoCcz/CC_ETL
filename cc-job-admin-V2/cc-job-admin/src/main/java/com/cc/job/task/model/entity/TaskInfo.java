@@ -114,4 +114,6 @@ public class TaskInfo extends BaseEntity {
     private String reqBody;
 
     private String reqUrl;
+
+    private String isNode;
 }

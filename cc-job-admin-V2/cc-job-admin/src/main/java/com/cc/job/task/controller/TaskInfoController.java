@@ -55,6 +55,7 @@ public class TaskInfoController {
         }else{
             wrapper.in(TaskInfo::getJobType,0,2);
         }
+        wrapper.eq(TaskInfo::getIsNode,"N");
         List<TaskInfo> list = taskInfoService.list(wrapper);
         return Result.success(list);
     }
