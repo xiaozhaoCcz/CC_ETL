@@ -249,7 +249,7 @@ public class TaskRankXxlJob {
         message.setTaskId(node.getTaskId());
 
         while (stopMap.get(node.getTaskParentId()).getFirst()) {
-            message.setNodeId(stopMap.get(node.getTaskParentId()).getSecond());
+           // message.setNodeId(stopMap.get(node.getTaskParentId()).getSecond());
             message.setStatus(0);
             webSocketServer.sendInfo(message);
             taskInfoService.stopTaskSet(node.getTaskParentId());
@@ -263,7 +263,7 @@ public class TaskRankXxlJob {
         taskInfoTriggerDto.setId(node.getTaskId());
         taskInfoService.triggerJob(taskInfoTriggerDto);
 
-        message.setNodeId(node.getId());
+        //message.setNodeId(node.getId());
         message.setStatus(2);
         webSocketServer.sendInfo(message);
 
@@ -293,7 +293,7 @@ public class TaskRankXxlJob {
                                 TriggerCallbackThread.vector.remove(res);
                                 break Label;
                             } else {
-                                stopMap.put(node.getTaskParentId(), new Pair<>(true, node.getId()));
+                                stopMap.put(node.getTaskParentId(), new Pair<>(true, node.getTaskId()));
                                 throw new RuntimeException();
                             }
                         }

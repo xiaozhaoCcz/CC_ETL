@@ -465,7 +465,9 @@ const connectWs = (id: number) => {
     message.value = _message;
     console.log("接收到消息", _message);
     // 接收到消息后，需要做出相应的操作，比如更新节点或边
-    const node = nodes.value.find((node: any) => node.id == _message.nodeId);
+    const node = nodes.value.find(
+      (node: any) => node.data.taskId == _message.taskId
+    );
     //
     const color = getNodeColor(_message.status);
     console.log("node", node, nodes.value, color);

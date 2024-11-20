@@ -600,24 +600,22 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
     @Override
     public boolean stopTaskSet(Long id) {
         XxlJobExecutor.removeJobThread(id.intValue(), "stop task" + id);
-        List<Long> allNodeIds = new ArrayList<>();
+        List<Long> allTaskInfoIds = new ArrayList<>();
         // 得到当前任务的所有子任务
-        getChildNode(id, allNodeIds);
-        allNodeIds.forEach(item -> TaskRankXxlJob.processStopMap(id, true, item));
+        getChildTaskInfos(id, allTaskInfoIds);
+        allTaskInfoIds.forEach(item -> TaskRankXxlJob.processStopMap(id, true, item));
         return true;
     }
 
-    private void getChildNode(Long id, List<Long> allNodeIds) {
-        List<TaskNode> taskNodeList = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, id));
-        List<Long> taskIds = taskNodeList.stream().map(TaskNode::getTaskId).toList();
-        List<TaskInfo> taskInfos = this.listByIds(taskIds);
+    private void getChildTaskInfos(Long id, List<Long> allTaskInfoIds) {
+        List<TaskInfo> taskInfos = this.list(new LambdaQueryWrapper<TaskInfo>().eq(TaskInfo::getParentId, id));
         for (TaskInfo taskInfo : taskInfos) {
             if (taskInfo.getJobType() == 2) {
-                getChildNode(taskInfo.getId(), allNodeIds);
+                getChildTaskInfos(taskInfo.getId(), allTaskInfoIds);
             }
         }
-        List<Long> nodes = taskNodeList.stream().map(TaskNode::getId).toList();
-        allNodeIds.addAll(nodes);
+        List<Long> ids = taskInfos.stream().map(TaskInfo::getId).toList();
+        allTaskInfoIds.addAll(ids);
     }
 
     @Override
