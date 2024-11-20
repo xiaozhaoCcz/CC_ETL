@@ -104,12 +104,12 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             wrapper.eq(TaskInfo::getExecutorHandler, queryParams.getExecutorHandler());
         }
 
-        wrapper.in(TaskInfo::getJobType,0,2);
+        wrapper.in(TaskInfo::getJobType, 0, 2);
         wrapper.orderByDesc(TaskInfo::getUpdateTime);
 
         Page<TaskInfo> page = this.page(new Page<>(queryParams.getPageNum(), queryParams.getPageSize()), wrapper);
         List<TaskInfo> records = page.getRecords();
-        List<TaskInfoVO> voList = records.stream().map(v->BeanUtil.copyProperties(v,TaskInfoVO.class)).toList();
+        List<TaskInfoVO> voList = records.stream().map(v -> BeanUtil.copyProperties(v, TaskInfoVO.class)).toList();
         pageVO.setRecords(voList);
         pageVO.setTotal(page.getTotal());
         return pageVO;
@@ -125,7 +125,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
     public TaskInfoForm getTaskInfoFormData(Long id) {
         TaskInfo entity = this.getById(id);
         TaskInfoForm taskInfoForm = BeanUtil.copyProperties(entity, TaskInfoForm.class);
-        if(entity.getJobType()==2){
+        if (entity.getJobType() == 2) {
             List<TaskNode> taskNodeList = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, id));
             List<TaskEdge> taskEdgeList = taskEdgeService.list(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId, id));
             List<TaskNodeVo> taskNodeVoList = new ArrayList<>();
@@ -180,8 +180,8 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         return true;
     }
 
-    public void updateChild(TaskInfo taskInfo){
-        if(taskInfo.getJobType()==2&& "Y".equalsIgnoreCase(taskInfo.getIsNode())){
+    public void updateChild(TaskInfo taskInfo) {
+        if (taskInfo.getJobType() == 2 && "Y".equalsIgnoreCase(taskInfo.getIsNode())) {
             //下面的子节点全部更新
             List<TaskInfo> taskInfos = this.list(new LambdaQueryWrapper<TaskInfo>().eq(TaskInfo::getParentId, taskInfo.getId()));
             for (TaskInfo info : taskInfos) {
@@ -194,6 +194,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         }
         this.updateById(taskInfo);
     }
+
     /**
      * 删除task_info
      *
@@ -214,11 +215,11 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         return true;
     }
 
-    private void delNodes(Long jobId){
+    private void delNodes(Long jobId) {
         TaskInfo taskInfo = this.getById(jobId);
-        if(taskInfo.getJobType()==2){
+        if (taskInfo.getJobType() == 2) {
             List<TaskInfo> taskInfos = this.list(new LambdaQueryWrapper<TaskInfo>().eq(TaskInfo::getParentId, jobId));
-            if(taskInfos.isEmpty()){
+            if (taskInfos.isEmpty()) {
                 return;
             }
             List<Long> childTaskIds = taskInfos.stream().map(TaskInfo::getId).toList();
@@ -242,7 +243,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             return false;
         }
 
-        if(taskInfo.getJobType()==2){
+        if (taskInfo.getJobType() == 2) {
             TaskRankXxlJob.removeStopMap(taskInfo.getId());
         }
         // force cover job param
@@ -321,7 +322,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
     @Transactional(rollbackFor = Exception.class)
     public boolean saveTaskSet(TaskInfoForm formData) {
         TaskInfo taskInfo = baseSaveTaskInfo(formData);
-        if(StringUtils.isBlank(formData.getNodes())){
+        if (StringUtils.isBlank(formData.getNodes())) {
             throw new BusinessException("任务节点不能为空");
         }
 
@@ -337,7 +338,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         List<TaskNodeDto> taskNodeDtoList = new ArrayList<>();
         List<TaskEdgeDto> taskEdgeDtoList = new ArrayList<>();
 
-        Map<String,String> nodeMap = new HashMap<>();
+        Map<String, String> nodeMap = new HashMap<>();
         nodeList.forEach(item -> {
             TaskNodeDto node = new TaskNodeDto();
             String nodeId = (String) item.get("id");
@@ -363,16 +364,16 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         //计算节点的出度和人度
 
         for (TaskNodeDto taskNodeDto : taskNodeDtoList) {
-            taskNodeDto.setNodeOutDegree(taskEdgeDtoList.stream().filter(v->v.getFromNodeId().equalsIgnoreCase(taskNodeDto.getId())).count());
-            taskNodeDto.setNodeInDegree(taskEdgeDtoList.stream().filter(v->v.getEndNodeId().equalsIgnoreCase(taskNodeDto.getId())).count());
+            taskNodeDto.setNodeOutDegree(taskEdgeDtoList.stream().filter(v -> v.getFromNodeId().equalsIgnoreCase(taskNodeDto.getId())).count());
+            taskNodeDto.setNodeInDegree(taskEdgeDtoList.stream().filter(v -> v.getEndNodeId().equalsIgnoreCase(taskNodeDto.getId())).count());
         }
 
-        addNode(taskNodeDtoList,taskEdgeDtoList,taskInfo);
+        addNode(taskNodeDtoList, taskEdgeDtoList, taskInfo);
         return true;
     }
 
-    private void addNode(List<TaskNodeDto> nodeList,List<TaskEdgeDto> edgeList,TaskInfo parentTask){
-        Map<String,Long> nodeMap = new HashMap<>();
+    private void addNode(List<TaskNodeDto> nodeList, List<TaskEdgeDto> edgeList, TaskInfo parentTask) {
+        Map<String, Long> nodeMap = new HashMap<>();
 
         for (TaskNodeDto taskNode : nodeList) {
             TaskInfo taskInfo = this.getById(taskNode.getTaskId());
@@ -383,21 +384,21 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             copyTaskInfo.setParentId(parentTask.getId());
             this.save(copyTaskInfo);
 
-            if(taskInfo.getJobType()==2){
+            if (taskInfo.getJobType() == 2) {
                 List<TaskNode> childNodes = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, taskInfo.getId()));
                 List<TaskEdge> childEdges = taskEdgeService.list(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId, taskInfo.getId()));
 
-                List<TaskNodeDto> taskNodeDtos = BeanUtil.copyToList(childNodes, TaskNodeDto.class,CopyOptions.create());
-                List<TaskEdgeDto> taskEdgeDtos = BeanUtil.copyToList(childEdges, TaskEdgeDto.class,CopyOptions.create());
-                addNode(taskNodeDtos,taskEdgeDtos,copyTaskInfo);
+                List<TaskNodeDto> taskNodeDtos = BeanUtil.copyToList(childNodes, TaskNodeDto.class, CopyOptions.create());
+                List<TaskEdgeDto> taskEdgeDtos = BeanUtil.copyToList(childEdges, TaskEdgeDto.class, CopyOptions.create());
+                addNode(taskNodeDtos, taskEdgeDtos, copyTaskInfo);
             }
 
-            TaskNode copyTaskNode = BeanUtil.copyProperties(taskNode,TaskNode.class,"id");
+            TaskNode copyTaskNode = BeanUtil.copyProperties(taskNode, TaskNode.class, "id");
             copyTaskNode.setId(null);
             copyTaskNode.setTaskId(copyTaskInfo.getId());
             copyTaskNode.setTaskParentId(parentTask.getId());
             taskNodeService.save(copyTaskNode);
-            nodeMap.put(String.valueOf(taskNode.getId()),copyTaskNode.getId());
+            nodeMap.put(String.valueOf(taskNode.getId()), copyTaskNode.getId());
         }
 
         for (TaskEdgeDto taskEdge : edgeList) {
@@ -408,7 +409,6 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             taskEdgeService.save(edge);
         }
     }
-
 
 
     private TaskInfo baseSaveTaskInfo(TaskInfoForm formData) {
@@ -451,7 +451,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             formData.setGlueSource(formData.getGlueSource().replaceAll("\r", ""));
         }
 
-        if(GlueTypeEnum.API == GlueTypeEnum.match(formData.getGlueType())&&(StringUtils.isBlank(formData.getReqUrl())||StringUtils.isBlank(formData.getReqType()))){
+        if (GlueTypeEnum.API == GlueTypeEnum.match(formData.getGlueType()) && (StringUtils.isBlank(formData.getReqUrl()) || StringUtils.isBlank(formData.getReqType()))) {
             throw new BusinessException("请求地址和请求类型不能为空");
         }
 
@@ -492,16 +492,16 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             formData.setChildJobid(temp);
         }
         formData.setGlueUpdatetime(LocalDateTime.now());
-        TaskInfo taskInfo = BeanUtil.copyProperties(formData,TaskInfo.class);
+        TaskInfo taskInfo = BeanUtil.copyProperties(formData, TaskInfo.class);
         return taskInfo;
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean updateTaskSet( Long id,TaskInfoForm formData) {
+    public boolean updateTaskSet(Long id, TaskInfoForm formData) {
         // valid trigger
         TaskInfo existsJobInfo = baseUpdateTaskInfo(id, formData);
-        if(StringUtils.isBlank(formData.getNodes())){
+        if (StringUtils.isBlank(formData.getNodes())) {
             throw new BusinessException("任务节点不能为空");
         }
         this.updateById(existsJobInfo);
@@ -515,7 +515,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         List<TaskNode> taskUpdateNodeList = new ArrayList<>();
         List<TaskEdge> taskAddEdgeList = new ArrayList<>();
 
-        Map<String,Long> nodeMap = new HashMap<>();
+        Map<String, Long> nodeMap = new HashMap<>();
 
         nodeList.forEach(item -> {
             TaskNode node = new TaskNode();
@@ -527,7 +527,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             Map<String, Object> data = (Map<String, Object>) item.get("data");
             //node.setTaskId(Long.parseLong(String.valueOf(data.get("taskId"))));
             long taskId = Long.parseLong(String.valueOf(data.get("taskId")));
-            if(nodeId.startsWith("node:")){
+            if (nodeId.startsWith("node:")) {
                 TaskInfo copyTaskInfo = this.getById(taskId);
                 copyTaskInfo.setId(null);
                 copyTaskInfo.setJobType(1);
@@ -535,17 +535,17 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
                 this.save(copyTaskInfo);
                 node.setTaskId(copyTaskInfo.getId());
 
-                if(copyTaskInfo.getJobType()==2){
+                if (copyTaskInfo.getJobType() == 2) {
                     List<TaskNode> taskNodeList = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, taskId));
                     List<TaskEdge> taskEdgeList = taskEdgeService.list(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId, taskId));
                     List<TaskNodeDto> taskNodeDtos = BeanUtil.copyToList(taskNodeList, TaskNodeDto.class);
                     List<TaskEdgeDto> taskEdgeDtos = BeanUtil.copyToList(taskEdgeList, TaskEdgeDto.class);
-                    addNode(taskNodeDtos,taskEdgeDtos,copyTaskInfo);
+                    addNode(taskNodeDtos, taskEdgeDtos, copyTaskInfo);
                 }
 
                 taskNodeService.save(node);
-                nodeMap.put(nodeId,node.getId());
-            }else {
+                nodeMap.put(nodeId, node.getId());
+            } else {
                 node.setTaskId(taskId);
                 node.setId(Long.parseLong(nodeId));
                 taskUpdateNodeList.add(node);
@@ -556,30 +556,30 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             TaskEdge edge = new TaskEdge();
             edge.setTaskParentId(id);
             String sourceId = (String) item.get("source");
-            if(sourceId.startsWith("node:")){
+            if (sourceId.startsWith("node:")) {
                 edge.setFromNodeId(nodeMap.get(sourceId));
-            }else{
+            } else {
                 edge.setFromNodeId(Long.parseLong(sourceId));
             }
             String targetId = (String) item.get("target");
-            if(targetId.startsWith("node:")){
+            if (targetId.startsWith("node:")) {
                 edge.setEndNodeId(nodeMap.get(targetId));
-            }else{
+            } else {
                 edge.setEndNodeId(Long.parseLong(targetId));
             }
             taskAddEdgeList.add(edge);
         });
 
         // 得到数据库中的边
-        taskEdgeService.remove(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId,id));
+        taskEdgeService.remove(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId, id));
         taskEdgeService.saveBatch(taskAddEdgeList);
 
         List<Long> nodeIds = taskUpdateNodeList.stream().map(TaskNode::getId).toList();
         List<TaskNode> delNodeDbs = nodeFromDbList.stream().filter(v -> !nodeIds.contains(v.getId())).toList();
-        if(!delNodeDbs.isEmpty()){
+        if (!delNodeDbs.isEmpty()) {
             for (TaskNode delNodeDb : delNodeDbs) {
                 TaskInfo delTaskInfo = this.getById(delNodeDb.getTaskId());
-                if(delTaskInfo.getJobType()==2){
+                if (delTaskInfo.getJobType() == 2) {
                     delNodes(delTaskInfo.getId());
                 }
             }
@@ -599,21 +599,21 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
 
     @Override
     public boolean stopTaskSet(Long id) {
-        XxlJobExecutor.removeJobThread(id.intValue(),"stop task"+id);
+        XxlJobExecutor.removeJobThread(id.intValue(), "stop task" + id);
         List<Long> allNodeIds = new ArrayList<>();
         // 得到当前任务的所有子任务
-        getChildNode(id,allNodeIds);
-        allNodeIds.forEach(item-> TaskRankXxlJob.processStopMap(id,true,item));
+        getChildNode(id, allNodeIds);
+        allNodeIds.forEach(item -> TaskRankXxlJob.processStopMap(id, true, item));
         return true;
     }
 
-    private void getChildNode(Long id,List<Long> allNodeIds){
+    private void getChildNode(Long id, List<Long> allNodeIds) {
         List<TaskNode> taskNodeList = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, id));
         List<Long> taskIds = taskNodeList.stream().map(TaskNode::getTaskId).toList();
         List<TaskInfo> taskInfos = this.listByIds(taskIds);
         for (TaskInfo taskInfo : taskInfos) {
-            if(taskInfo.getJobType()==2){
-                getChildNode(taskInfo.getId(),allNodeIds);
+            if (taskInfo.getJobType() == 2) {
+                getChildNode(taskInfo.getId(), allNodeIds);
             }
         }
         List<Long> nodes = taskNodeList.stream().map(TaskNode::getId).toList();
@@ -676,7 +676,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             formData.setGlueSource(formData.getGlueSource().replaceAll("\r", ""));
         }
 
-        if(GlueTypeEnum.API == GlueTypeEnum.match(formData.getGlueType())&&(StringUtils.isBlank(formData.getReqUrl())||StringUtils.isBlank(formData.getReqType()))){
+        if (GlueTypeEnum.API == GlueTypeEnum.match(formData.getGlueType()) && (StringUtils.isBlank(formData.getReqUrl()) || StringUtils.isBlank(formData.getReqType()))) {
             throw new BusinessException("请求地址和请求类型不能为空");
         }
 
@@ -687,7 +687,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         if (MisfireStrategyEnum.match(formData.getMisfireStrategy(), null) == null) {
             throw new BusinessException(I18nUtil.getString("misfire_strategy") + I18nUtil.getString("system_unvalid"));
         }
-        if (ExecutorBlockStrategyEnum.match(formData.getExecutorBlockStrategy(), null) == null&&!"DO_NOTHING".equalsIgnoreCase(formData.getExecutorBlockStrategy())) {
+        if (ExecutorBlockStrategyEnum.match(formData.getExecutorBlockStrategy(), null) == null && !"DO_NOTHING".equalsIgnoreCase(formData.getExecutorBlockStrategy())) {
             throw new BusinessException(I18nUtil.getString("jobinfo_field_executorBlockStrategy") + I18nUtil.getString("system_unvalid"));
         }
 
@@ -746,7 +746,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             }
         }
 
-        BeanUtil.copyProperties(formData,existsJobInfo);
+        BeanUtil.copyProperties(formData, existsJobInfo);
         existsJobInfo.setGlueUpdatetime(LocalDateTime.now());
         existsJobInfo.setTriggerNextTime(nextTriggerTime);
         return existsJobInfo;

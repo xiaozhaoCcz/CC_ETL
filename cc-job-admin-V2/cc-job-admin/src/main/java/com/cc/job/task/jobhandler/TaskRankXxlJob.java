@@ -43,36 +43,37 @@ public class TaskRankXxlJob {
 
     final WebSocketServer webSocketServer;
 
-    static final ConcurrentHashMap<Long, Pair<Boolean,Long>> stopMap = new ConcurrentHashMap<Long,Pair<Boolean,Long>>();
+    static final ConcurrentHashMap<Long, Pair<Boolean, Long>> stopMap = new ConcurrentHashMap<Long, Pair<Boolean, Long>>();
 
-    public static void processStopMap(Long parentId,boolean flag,Long id){
-        stopMap.put(parentId,new Pair<>(flag,id));
+    public static void processStopMap(Long parentId, boolean flag, Long id) {
+        stopMap.put(parentId, new Pair<>(flag, id));
     }
 
-    public static void removeStopMap(Long parentId){
+    public static void removeStopMap(Long parentId) {
         stopMap.remove(parentId);
     }
 
-    static final  ConcurrentHashMap<Long,Boolean> flagMap = new ConcurrentHashMap<>();
+    static final ConcurrentHashMap<Long, Boolean> flagMap = new ConcurrentHashMap<>();
 
     @XxlJob("runTaskRankXxlJob")
     public void runTaskRankXxlJob() {
         String jobId = XxlJobHelper.getJobParam();
 
-        if(StringUtils.isBlank(jobId)){
+        if (StringUtils.isBlank(jobId)) {
             throw new BusinessException("jobId is null");
         }
 
         List<TaskNode> nodes = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, jobId));
         List<TaskEdge> edges = taskEdgeService.list(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId, jobId));
 
-        flagMap.put(Long.valueOf(jobId),true);
+        flagMap.put(Long.valueOf(jobId), true);
+
 
         Set<TaskNode> resNodeList = new HashSet<>();
-        while (flagMap.get(Long.valueOf(jobId))){
-            flagMap.put(Long.valueOf(jobId),false);
+        while (flagMap.get(Long.valueOf(jobId))) {
+            flagMap.put(Long.valueOf(jobId), false);
             for (TaskNode taskNode : nodes) {
-                buildNode(taskNode,edges,resNodeList,Long.valueOf(jobId));
+                buildNode(taskNode, edges, resNodeList, Long.valueOf(jobId));
             }
             nodes.clear();
             nodes.addAll(resNodeList);
@@ -126,12 +127,12 @@ public class TaskRankXxlJob {
             futures.clear();
         }
 
-        System.out.println("nodes:"+nodes);
-        System.out.println("edges:"+edges);
-        System.out.println("nodeMap"+nodeMap);
+        System.out.println("nodes:" + nodes);
+        System.out.println("edges:" + edges);
+        System.out.println("nodeMap" + nodeMap);
 
         final List<Long> taskIds = nodes.stream().map(TaskNode::getTaskId).toList();
-        stopMap.put(Long.valueOf(jobId),new Pair<>(false,-1L));
+        stopMap.put(Long.valueOf(jobId), new Pair<>(false, -1L));
         nodeMap.forEach((k, v) -> {
             TaskNode currentNode = nodes.stream().filter(item -> item.getId().equals(k)).findFirst().orElse(null);
             CompletableFuture<TaskNode> future = CompletableFuture.supplyAsync(() -> {
@@ -157,17 +158,17 @@ public class TaskRankXxlJob {
         }
     }
 
-    private void buildNode(TaskNode currentNode,List<TaskEdge> edgeList,Set<TaskNode> resNodeList,Long jobId) {
+    private void buildNode(TaskNode currentNode, List<TaskEdge> edgeList, Set<TaskNode> resNodeList, Long jobId) {
         // 获取当前任务
         TaskInfo taskInfo = taskInfoService.getById(currentNode.getTaskId());
-        if(taskInfo.getJobType()!=2&& Objects.equals(currentNode.getTaskParentId(), jobId)){
+        if (taskInfo.getJobType() != 2 && Objects.equals(currentNode.getTaskParentId(), jobId)) {
             resNodeList.add(currentNode);
             return;
         }
 
-        if(taskInfo.getJobType()==2&&Objects.equals(currentNode.getTaskParentId(), jobId)){
+        if (taskInfo.getJobType() == 2 && Objects.equals(currentNode.getTaskParentId(), jobId)) {
             flagMap.put(jobId, true);
-            List<TaskEdge> collectEdges = taskEdgeService.list(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId,taskInfo.getId()));
+            List<TaskEdge> collectEdges = taskEdgeService.list(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId, taskInfo.getId()));
             for (TaskEdge edge : collectEdges) {
                 edge.setTaskParentId(jobId);
                 edgeList.add(edge);
@@ -185,14 +186,14 @@ public class TaskRankXxlJob {
             List<TaskNode> startNodes = childrenNode.stream().filter(v -> v.getNodeInDegree() == 0).toList();
 
             for (TaskNode fromNode : fromNodes) {
-                fromNode.setNodeOutDegree(fromNode.getNodeOutDegree()-1+startNodes.size());
+                fromNode.setNodeOutDegree(fromNode.getNodeOutDegree() - 1 + startNodes.size());
             }
 
             for (TaskNode startNode : startNodes) {
-                startNode.setNodeInDegree(startNode.getNodeInDegree()+fromNodes.size());
+                startNode.setNodeInDegree(startNode.getNodeInDegree() + fromNodes.size());
             }
 
-            if(!fromIds.isEmpty()){
+            if (!fromIds.isEmpty()) {
                 for (TaskNode taskNode : startNodes) {
                     for (Long fromId : fromIds) {
                         TaskEdge taskEdge = new TaskEdge();
@@ -211,14 +212,14 @@ public class TaskRankXxlJob {
             List<TaskNode> childEndNodes = childrenNode.stream().filter(v -> v.getNodeOutDegree() == 0).toList();
 
             for (TaskNode endNode : endNodes) {
-                endNode.setNodeInDegree(endNode.getNodeInDegree()-1+childEndNodes.size());
+                endNode.setNodeInDegree(endNode.getNodeInDegree() - 1 + childEndNodes.size());
             }
 
             for (TaskNode childEndNode : childEndNodes) {
-                childEndNode.setNodeOutDegree(childEndNode.getNodeOutDegree()+endNodes.size());
+                childEndNode.setNodeOutDegree(childEndNode.getNodeOutDegree() + endNodes.size());
             }
 
-            if(!childEndNodes.isEmpty()){
+            if (!childEndNodes.isEmpty()) {
                 for (TaskNode endNode : childEndNodes) {
                     for (Long endId : endIds) {
                         TaskEdge edge = new TaskEdge();
@@ -235,11 +236,9 @@ public class TaskRankXxlJob {
                 resNodeList.add(taskNode);
             }
 
-            edgeList.removeIf(v->(fromIds.contains(v.getFromNodeId())&&v.getEndNodeId().equals(currentNode.getId()))||(v.getFromNodeId().equals(currentNode.getId())&&endIds.contains(v.getEndNodeId())));
+            edgeList.removeIf(v -> (fromIds.contains(v.getFromNodeId()) && v.getEndNodeId().equals(currentNode.getId())) || (v.getFromNodeId().equals(currentNode.getId()) && endIds.contains(v.getEndNodeId())));
         }
     }
-
-
 
 
     private void runT(TaskNode node, List<Long> taskIds) {
@@ -249,15 +248,15 @@ public class TaskRankXxlJob {
         message.setParentTaskId(node.getTaskParentId());
         message.setTaskId(node.getTaskId());
 
-        while (stopMap.get(node.getTaskParentId()).getFirst()){
+        while (stopMap.get(node.getTaskParentId()).getFirst()) {
             message.setNodeId(stopMap.get(node.getTaskParentId()).getSecond());
             message.setStatus(0);
             webSocketServer.sendInfo(message);
-            XxlJobExecutor.removeJobThread(node.getTaskParentId().intValue(),"stop task"+node.getTaskParentId());
+            taskInfoService.stopTaskSet(node.getTaskParentId());
             // 节点清空
             Vector<ReturnT<Long>> vector = TriggerCallbackThread.vector;
             vector.removeIf(res -> taskIds.contains(res.getContent()));
-            throw new  BusinessException(node.getTaskParentId()+" task stop");
+            throw new BusinessException(node.getTaskParentId() + " task stop");
         }
 
         TaskInfoTriggerDto taskInfoTriggerDto = new TaskInfoTriggerDto();
@@ -286,7 +285,7 @@ public class TaskRankXxlJob {
                             break Label;
                         } else {
                             retryCount++;
-                            if(retryCount<=taskInfo.getExecutorFailRetryCount()){
+                            if (retryCount <= taskInfo.getExecutorFailRetryCount()) {
                                 message.setStatus(0);
                                 webSocketServer.sendInfo(message);
                             }
@@ -294,7 +293,7 @@ public class TaskRankXxlJob {
                                 TriggerCallbackThread.vector.remove(res);
                                 break Label;
                             } else {
-                                stopMap.put(node.getTaskParentId(),new Pair<>(true,node.getId()));
+                                stopMap.put(node.getTaskParentId(), new Pair<>(true, node.getId()));
                                 throw new RuntimeException();
                             }
                         }
