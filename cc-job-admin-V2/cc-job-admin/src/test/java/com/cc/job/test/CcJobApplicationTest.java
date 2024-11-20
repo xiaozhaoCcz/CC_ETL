@@ -1,5 +1,6 @@
 package com.cc.job.test;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.CcJobApplication;
 import com.cc.job.task.mapper.TaskEdgeMapper;
@@ -322,6 +323,61 @@ public class CcJobApplicationTest {
     }
 
 
+    private void addNode(List<TaskNode> nodeList,List<TaskEdge> edgeList,TaskInfo parentTask){
+        Map<String,Long> nodeMap = new HashMap<>();
+
+        for (TaskNode taskNode : nodeList) {
+             TaskInfo taskInfo = taskInfoMapper.selectById(taskNode.getId());
+
+            TaskInfo copyTaskInfo = BeanUtil.copyProperties(taskInfo, TaskInfo.class);
+            copyTaskInfo.setParentId(parentTask.getId());
+            taskInfoMapper.insert(copyTaskInfo);
+
+            if(taskInfo.getJobType()==2){
+                List<TaskNode> childNodes = taskNodeMapper.selectList(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, taskInfo.getId()));
+                List<TaskEdge> childEdges = taskEdgeMapper.selectList(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId, taskInfo.getId()));
+
+                addNode(childNodes,childEdges,copyTaskInfo);
+            }
+
+            TaskNode copyTaskNode = BeanUtil.copyProperties(taskNode, TaskNode.class);
+            copyTaskNode.setTaskId(copyTaskInfo.getId());
+            copyTaskNode.setTaskParentId(parentTask.getId());
+            taskNodeMapper.insert(copyTaskNode);
+
+            nodeMap.put(String.valueOf(taskNode.getId()),copyTaskNode.getId());
+        }
+
+        for (TaskEdge taskEdge : edgeList) {
+
+            TaskEdge copyEdge = BeanUtil.copyProperties(taskEdge, TaskEdge.class);
+            copyEdge.setTaskParentId(parentTask.getId());
+            copyEdge.setFromNodeId(nodeMap.get(String.valueOf(taskEdge.getFromNodeId())));
+            copyEdge.setEndNodeId(nodeMap.get(String.valueOf(taskEdge.getEndNodeId())));
+            taskEdgeMapper.insert(copyEdge);
+        }
+    }
+
+
+    public void delNodes(Long jobId){
+        TaskInfo taskInfo = taskInfoMapper.selectById(jobId);
+        if(taskInfo.getJobType()==2){
+            List<TaskInfo> taskInfos = taskInfoMapper.selectList(new LambdaQueryWrapper<TaskInfo>().eq(TaskInfo::getParentId, jobId));
+            if(taskInfos.isEmpty()){
+                return;
+            }
+            List<Long> childTaskIds = taskInfos.stream().map(TaskInfo::getId).toList();
+
+           taskNodeMapper.delete(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, taskInfo.getId()));
+            taskEdgeMapper.delete(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId, taskInfo.getId()));
+
+            for (Long childTaskId : childTaskIds) {
+                delNodes(childTaskId);
+            }
+        }
+
+        taskInfoMapper.deleteById(jobId);
+    }
 
     @Test
     public void test3(){

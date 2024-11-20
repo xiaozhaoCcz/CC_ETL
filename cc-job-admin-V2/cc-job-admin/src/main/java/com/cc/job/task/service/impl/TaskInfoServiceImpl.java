@@ -299,9 +299,14 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         List<Map> nodeList = JSONUtil.parseArray(formData.getNodes()).toList(Map.class);
         List<Map> edgeList = JSONUtil.parseArray(formData.getEdges()).toList(Map.class);
 
-
+        List<TaskNode> taskNodeList = new ArrayList<>();
         List<TaskEdge> taskEdgeList = new ArrayList<>();
 
+
+
+
+
+        List<TaskEdge> taskEdgeList = new ArrayList<>();
         Map<String,Long> nodeMap = new HashMap<>();
 
         nodeList.forEach(item -> {
@@ -319,35 +324,6 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             copyTaskInfo.setParentId(taskInfo.getId());
             this.save(copyTaskInfo);
             node.setTaskId(copyTaskInfo.getId());
-
-//            if(copyTaskInfo.getJobType()==2){
-//                //TODO 还需要复制节点和边
-//                // 得到当前节点的子节点
-//                // 获取节点和边
-//                List<TaskNode> nodeFromDbList = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, taskId));
-//                List<TaskEdge> edgeFromDbList = taskEdgeService.list(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId, taskId));
-//
-//                Map<Long, TaskNode> taskNodeMap = nodeFromDbList.stream().collect(Collectors.toMap(TaskNode::getId, m -> m));
-//
-//                for (TaskEdge edge : edgeFromDbList) {
-//                    Long fromNodeId = edge.getFromNodeId();
-//                    Long endNodeId = edge.getEndNodeId();
-//                    TaskNode node1 = taskNodeMap.get(fromNodeId);
-//                    TaskNode node2 = taskNodeMap.get(endNodeId);
-//                    if (node1!= null && node2!= null) {
-//                        node1.setId(null);
-//                        node2.setId(null);
-//                        node1.setTaskParentId(copyTaskInfo.getId());
-//                        node2.setTaskParentId(copyTaskInfo.getId());
-//                        taskNodeService.save(node1);
-//                        taskNodeService.save(node2);
-//                    }
-//                    TaskEdge copyEdge = new TaskEdge();
-//                    copyEdge.setFromNodeId(node1.getId());
-//                    copyEdge.setEndNodeId(node2.getId());
-//                    taskEdgeService.save(copyEdge);
-//                }
-//            }
 
             if(nodeId.startsWith("node:")){
                 taskNodeService.save(node);
