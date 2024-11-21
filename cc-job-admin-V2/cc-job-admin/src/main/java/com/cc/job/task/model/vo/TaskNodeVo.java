@@ -25,4 +25,6 @@ public class TaskNodeVo implements Serializable {
 
     private Integer sort;
 
+    private String nodePatentId;
+
 }

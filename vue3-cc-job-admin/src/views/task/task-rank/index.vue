@@ -154,7 +154,49 @@ const taskInfoList = ref([
   },
 ]);
 
-const nodes = ref([]);
+// 计算父节点尺寸的函数
+function calculateParentNodeSize() {
+  const parentNode = nodes.value.find(node => node.id === '2');
+  if (!parentNode) return;
+
+  const children = nodes.value.filter(node => node.parentNode==='2');
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+  children.forEach(child => {
+    const { x, y } = child.position;
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+  });
+
+  // 计算父节点的新位置和尺寸
+  parentNode.position = { x: minX, y: minY };
+  parentNode.width = maxX - minX;
+  parentNode.height = maxY - minY;
+}
+
+
+const nodes = ref([
+  {
+    id: '2',
+    data: { label: 'parent node' },
+    position: { x: 100, y: 100 },
+    style: { backgroundColor: 'rgba(255, 255, 255, 0.01)',zIndex:100,
+    },
+
+  },
+
+  {
+    id: '999',
+    data: { label: 'Drag me to extend area!' },
+    position: { x: 20, y: 100 },
+    expandParent: true,
+    parentNode: '2',
+    style:{zIndex:1}
+  },
+]);
+
 
 const edges = ref([]);
 

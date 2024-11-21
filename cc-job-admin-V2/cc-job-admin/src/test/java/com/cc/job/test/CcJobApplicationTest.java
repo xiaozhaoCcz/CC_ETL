@@ -9,6 +9,8 @@ import com.cc.job.task.mapper.TaskNodeMapper;
 import com.cc.job.task.model.entity.TaskEdge;
 import com.cc.job.task.model.entity.TaskInfo;
 import com.cc.job.task.model.entity.TaskNode;
+import com.cc.job.task.model.vo.TaskEdgeVo;
+import com.cc.job.task.model.vo.TaskNodeVo;
 import com.cc.job.test.entity.Edge;
 import com.cc.job.test.entity.Node;
 import com.xxl.job.core.biz.model.ReturnT;
@@ -383,6 +385,22 @@ public class CcJobApplicationTest {
     public void test3(){
 
 
+    }
+
+
+    public void getChildNodeAndEdge(Long taskId,String nodeId,List<TaskNodeVo> taskNodeVos,List<TaskEdgeVo> taskEdgeVos){
+        List<TaskNode> taskNodes = taskNodeMapper.selectList(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, taskId));
+        List<TaskEdge> taskEdges = taskEdgeMapper.selectList(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId, taskId));
+
+        for (TaskNode taskNode : taskNodes) {
+            TaskNodeVo taskNodeVo = BeanUtil.copyProperties(taskNode,TaskNodeVo.class);
+            taskNodeVo.setNodePatentId(nodeId);
+            taskNodeVos.add(taskNodeVo);
+            getChildNodeAndEdge(taskNode.getTaskId(),String.valueOf(taskNode.getId()),taskNodeVos,taskEdgeVos);
+        }
+
+        List<TaskEdgeVo> copyTaskEdges = BeanUtil.copyToList(taskEdges, TaskEdgeVo.class);
+        taskEdgeVos.addAll(copyTaskEdges);
     }
 }
 
