@@ -176,28 +176,7 @@ function calculateParentNodeSize() {
   parentNode.height = maxY - minY;
 }
 
-
-const nodes = ref([
-  {
-    id: '2',
-    data: { label: 'parent node' },
-    position: { x: 100, y: 100 },
-    style: { backgroundColor: 'rgba(255, 255, 255, 0.01)',zIndex:100,
-    },
-
-  },
-
-  {
-    id: '999',
-    data: { label: 'Drag me to extend area!' },
-    position: { x: 20, y: 100 },
-    expandParent: true,
-    parentNode: '2',
-    style:{zIndex:1}
-  },
-]);
-
-
+const nodes = ref([]);
 const edges = ref([]);
 
 /** 打开task_info弹窗 */

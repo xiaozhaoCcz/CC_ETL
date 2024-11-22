@@ -62,12 +62,10 @@ public class TaskRankXxlJob {
         if (StringUtils.isBlank(jobId)) {
             throw new BusinessException("jobId is null");
         }
-
         List<TaskNode> nodes = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, jobId));
         List<TaskEdge> edges = taskEdgeService.list(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId, jobId));
 
         flagMap.put(Long.valueOf(jobId), true);
-
 
         Set<TaskNode> resNodeList = new HashSet<>();
         while (flagMap.get(Long.valueOf(jobId))) {
