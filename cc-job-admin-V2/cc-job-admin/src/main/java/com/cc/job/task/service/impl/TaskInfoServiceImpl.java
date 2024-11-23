@@ -24,6 +24,7 @@ import com.cc.job.task.service.TaskNodeService;
 import com.cc.job.task.thread.JobScheduleHelper;
 import com.cc.job.task.thread.JobTriggerPoolHelper;
 import com.cc.job.task.utils.I18nUtil;
+import com.cc.job.task.websocket.WebSocketServer;
 import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
 import com.xxl.job.core.executor.XxlJobExecutor;
@@ -73,6 +74,8 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
     private final TaskEdgeService taskEdgeService;
 
     private final TaskLogglueMapper taskLogglueMapper;
+
+    private final WebSocketServer webSocketServer;
 
     /**
      * 获取task_info分页列表
@@ -609,6 +612,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         // 得到当前任务的所有子任务
         getChildTaskInfos(id, allTaskInfoIds);
         allTaskInfoIds.forEach(item -> TaskRankXxlJob.processStopMap(id, true, item));
+        webSocketServer.onClose(id);
         return true;
     }
 

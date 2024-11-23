@@ -25,17 +25,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import java.awt.*;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 @Component
 @AllArgsConstructor
 public class TaskRankXxlJob {
-
 
     final TaskInfoService taskInfoService;
 
@@ -69,37 +66,12 @@ public class TaskRankXxlJob {
         List<TaskNode> nodes = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, jobId));
         List<TaskEdge> edges = taskEdgeService.list(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId, jobId));
 
-        List<Long> ids = nodes.stream().map(TaskNode::getTaskId).toList();
-        List<TaskInfo> taskInfos = taskInfoService.listByIds(ids);
-        Map<Long, TaskInfo> taskInfoMap = taskInfos.stream().collect(Collectors.toMap(TaskInfo::getId, t -> t));
-
-        for (TaskNode node : nodes) {
-            TaskInfo taskInfo = taskInfoMap.get(node.getTaskId());
-            ArrayList<Long> idList = new ArrayList<>();
-            getTaskInfoIds(taskInfo.getId(),idList);
-            taskIdMap.computeIfAbsent(Long.valueOf(jobId),k->new HashMap<>())
-                    .computeIfAbsent(taskInfo.getId(), k->new HashSet<>())
-                    .addAll(idList);
-        }
+        setTaskIdMap(nodes, jobId);
 
         flagMap.put(Long.valueOf(jobId), true);
 
         Set<TaskNode> resNodeList = new HashSet<>();
-        while (Boolean.TRUE.equals(flagMap.get(Long.valueOf(jobId)))) {
-            flagMap.put(Long.valueOf(jobId), false);
-            for (TaskNode taskNode : nodes) {
-                buildNode(taskNode, edges, resNodeList, Long.valueOf(jobId));
-            }
-            nodes.clear();
-            nodes.addAll(resNodeList);
-            resNodeList.clear();
-        }
-
-        // 计算节点的出度和入度
-        for (TaskNode node : nodes) {
-            node.setNodeInDegree(edges.stream().filter(v->v.getEndNodeId().equals(node.getId())).count());
-            node.setNodeOutDegree(edges.stream().filter(v->v.getFromNodeId().equals(node.getId())).count());
-        }
+        buildGraph(jobId, nodes, edges, resNodeList);
 
         List<TaskNode> startNodes = nodes.stream().filter(v -> v.getNodeInDegree().equals(0L)).toList();
 
@@ -107,49 +79,18 @@ public class TaskRankXxlJob {
         Queue<Long> queue = new ConcurrentLinkedQueue<>();
 
         Map<Long, List<Long>> nodeMap = new HashMap<>();
-
         Map<Long, CompletableFuture<TaskNode>> futureMap = new HashMap<>();
 
-        startNodes.forEach(item -> {
-            queue.add(item.getId());
-            visited.add(item.getId());
-        });
-
-        ExecutorService executor = Executors.newFixedThreadPool(4);
-        List<Future<?>> futures = new ArrayList<>();
-
-        while (!queue.isEmpty()) {
-            List<Long> currentLevelNodes = new ArrayList<>();
-            while (!queue.isEmpty()) {
-                Long poll = queue.poll();
-                List<Long> collect = edges.stream().filter(v -> v.getEndNodeId().equals(poll)).map(TaskEdge::getFromNodeId).toList();
-                nodeMap.put(poll, collect);
-                currentLevelNodes.add(poll);
-            }
-
-            for (Long node : currentLevelNodes) {
-                futures.add(executor.submit(() -> {
-                    for (long neighbor : getNeighbors(node, edges)) {
-                        if (!visited.contains(neighbor)) {
-                            visited.add(neighbor);
-                            queue.add(neighbor);
-                        }
-                    }
-                }));
-            }
-
-            for (Future<?> future : futures) {
-                try {
-                    future.get();
-                } catch (ExecutionException | InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-            futures.clear();
-        }
+        buildNodeMap(startNodes, queue, visited, edges, nodeMap);
 
         final List<Long> taskIds = nodes.stream().map(TaskNode::getTaskId).toList();
+
         stopMap.put(Long.valueOf(jobId), new Pair<>(false, -1L));
+
+        executeTask(nodeMap, nodes, futureMap, taskIds);
+    }
+
+    private void executeTask(Map<Long, List<Long>> nodeMap, List<TaskNode> nodes, Map<Long, CompletableFuture<TaskNode>> futureMap, List<Long> taskIds) {
         nodeMap.forEach((k, v) -> {
             TaskNode currentNode = nodes.stream().filter(item -> item.getId().equals(k)).findFirst().orElse(null);
             CompletableFuture<TaskNode> future = CompletableFuture.supplyAsync(() -> {
@@ -174,6 +115,77 @@ public class TaskRankXxlJob {
             voidCompletableFuture.get();
         } catch (InterruptedException | ExecutionException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    private void buildNodeMap(List<TaskNode> startNodes, Queue<Long> queue, List<Long> visited, List<TaskEdge> edges, Map<Long, List<Long>> nodeMap) {
+        startNodes.forEach(item -> {
+            queue.add(item.getId());
+            visited.add(item.getId());
+        });
+
+        ExecutorService executor = Executors.newFixedThreadPool(4);
+        List<Future<?>> futures = new ArrayList<>();
+
+        while (!queue.isEmpty()) {
+            List<Long> currentLevelNodes = new ArrayList<>();
+            while (!queue.isEmpty()) {
+                Long poll = queue.poll();
+                List<Long> collect = edges.stream().filter(v -> v.getEndNodeId().equals(poll)).map(TaskEdge::getFromNodeId).toList();
+                nodeMap.put(poll, collect);
+                currentLevelNodes.add(poll);
+            }
+            for (Long node : currentLevelNodes) {
+                futures.add(executor.submit(() -> {
+                    for (long neighbor : getNeighbors(node, edges)) {
+                        if (!visited.contains(neighbor)) {
+                            visited.add(neighbor);
+                            queue.add(neighbor);
+                        }
+                    }
+                }));
+            }
+            for (Future<?> future : futures) {
+                try {
+                    future.get();
+                } catch (ExecutionException | InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            futures.clear();
+        }
+    }
+
+    private void buildGraph(String jobId, List<TaskNode> nodes, List<TaskEdge> edges, Set<TaskNode> resNodeList) {
+        while (Boolean.TRUE.equals(flagMap.get(Long.valueOf(jobId)))) {
+            flagMap.put(Long.valueOf(jobId), false);
+            for (TaskNode taskNode : nodes) {
+                buildNode(taskNode, edges, resNodeList, Long.valueOf(jobId));
+            }
+            nodes.clear();
+            nodes.addAll(resNodeList);
+            resNodeList.clear();
+        }
+
+        // 计算节点的出度和入度
+        for (TaskNode node : nodes) {
+            node.setNodeInDegree(edges.stream().filter(v->v.getEndNodeId().equals(node.getId())).count());
+            node.setNodeOutDegree(edges.stream().filter(v->v.getFromNodeId().equals(node.getId())).count());
+        }
+    }
+
+    private void setTaskIdMap(List<TaskNode> nodes, String jobId) {
+        List<Long> ids = nodes.stream().map(TaskNode::getTaskId).toList();
+        List<TaskInfo> taskInfos = taskInfoService.listByIds(ids);
+        Map<Long, TaskInfo> taskInfoMap = taskInfos.stream().collect(Collectors.toMap(TaskInfo::getId, t -> t));
+
+        for (TaskNode node : nodes) {
+            TaskInfo taskInfo = taskInfoMap.get(node.getTaskId());
+            ArrayList<Long> idList = new ArrayList<>();
+            getTaskInfoIds(taskInfo.getId(),idList);
+            taskIdMap.computeIfAbsent(Long.valueOf(jobId), k->new HashMap<>())
+                    .computeIfAbsent(taskInfo.getId(), k->new HashSet<>())
+                    .addAll(idList);
         }
     }
 
@@ -263,11 +275,12 @@ public class TaskRankXxlJob {
         message.setTaskId(node.getTaskId());
 
         while (Boolean.TRUE.equals(stopMap.get(node.getTaskParentId()).getFirst())) {
-            taskInfoService.stopTaskSet(node.getTaskParentId());
+            XxlJobExecutor.removeJobThread(node.getTaskParentId().intValue(), "stop task" + node.getTaskParentId());
             // 节点清空
             Vector<ReturnT<Long>> vector = TriggerCallbackThread.vector;
             vector.removeIf(res -> taskIds.contains(res.getContent()));
             taskIdMap.remove(node.getTaskParentId());
+            webSocketServer.onClose(node.getTaskParentId());
             throw new BusinessException(node.getTaskParentId() + " task stop");
         }
 

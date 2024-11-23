@@ -154,28 +154,6 @@ const taskInfoList = ref([
   },
 ]);
 
-// 计算父节点尺寸的函数
-function calculateParentNodeSize() {
-  const parentNode = nodes.value.find(node => node.id === '2');
-  if (!parentNode) return;
-
-  const children = nodes.value.filter(node => node.parentNode==='2');
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-
-  children.forEach(child => {
-    const { x, y } = child.position;
-    minX = Math.min(minX, x);
-    minY = Math.min(minY, y);
-    maxX = Math.max(maxX, x);
-    maxY = Math.max(maxY, y);
-  });
-
-  // 计算父节点的新位置和尺寸
-  parentNode.position = { x: minX, y: minY };
-  parentNode.width = maxX - minX;
-  parentNode.height = maxY - minY;
-}
-
 const nodes = ref([]);
 const edges = ref([]);
 
@@ -233,6 +211,10 @@ function generateEdge(val: any) {
 }
 
 const handleDblClick = (node) => {
+  if (triggerOneVisible.value) {
+    ElMessage.warning("有任务正在运行，请先停止任务～");
+    return;
+  }
   // 在这里处理双击事件
   if (node.data != undefined && node.data) {
     console.log("双击了节点:", node.data);
@@ -294,6 +276,10 @@ const taskNodeVisible = ref(false);
 const nowDate = ref(null);
 
 onNodeDoubleClick(async (changes) => {
+  if (triggerOneVisible.value) {
+    ElMessage.warning("任务正在运行，请先停止任务～");
+    return;
+  }
   taskNodeVisible.value = true;
   nodeTaskId.value = changes.node.data.taskId;
   nowDate.value = new Date();
@@ -400,6 +386,10 @@ function updateEdgeStyle() {
 }
 
 function selectTaskSetNode(node) {
+  if (triggerOneVisible.value) {
+    ElMessage.warning("有任务正在运行，请先停止任务～");
+    return;
+  }
   connectWs(node.id);
   g_position.value = [140, 140];
   nodes.value = [];
