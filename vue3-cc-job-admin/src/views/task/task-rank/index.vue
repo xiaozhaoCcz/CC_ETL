@@ -3,30 +3,30 @@
     <div class="task_rank_top">
       <div class="btn_left_list">
         <el-button
-          type="primary"
           v-if="!showTaskVisible"
+          type="primary"
           @click="showTaskVisible = true"
         >
           展示任务
         </el-button>
-        <el-button type="info" v-else @click="showTaskVisible = false">
+        <el-button v-else type="info" @click="showTaskVisible = false">
           隐藏任务
         </el-button>
       </div>
       <div class="btn_right_list">
         <el-button
+          v-if="triggerOneVisible"
           type="warning"
           :icon="Loading"
           circle
           @click="stopTrigger"
-          v-if="triggerOneVisible"
         />
         <el-button
+          v-else
           type="success"
           :icon="ArrowRight"
           circle
           @click="triggerOne"
-          v-else
         />
         <el-button
           type="info"
@@ -50,7 +50,7 @@
           @node-click="selectTaskSetNode"
         />
       </div>
-      <div class="task_info_tree" v-if="showTaskVisible">
+      <div v-if="showTaskVisible" class="task_info_tree">
         <el-input v-model="filterTaskInfoText" placeholder="Filter keyword" />
 
         <el-tree
@@ -67,10 +67,10 @@
             </span>
             <div style="margin-left: 5px">
               <el-tag
+                v-if="data.jobType == 2"
                 type="primary"
                 round
                 size="small"
-                v-if="data.jobType == 2"
               >
                 任务组
               </el-tag>
@@ -86,7 +86,10 @@
           @edge-update="onEdgeUpdate"
           @edge-update-start="onEdgeUpdateStart"
           @edge-update-end="onEdgeUpdateEnd"
-        ></VueFlow>
+        >
+          <MiniMap />
+          <Background />
+        </VueFlow>
       </div>
     </div>
 
@@ -94,14 +97,14 @@
       :taskRankVisible="taskRankVisible"
       :formData="formData"
       @close="handleCloseDialog"
-    ></EditTaskRank>
+    />
 
     <EditTaskNode
       :taskNodeVisible="taskNodeVisible"
       :nodeTaskId="nodeTaskId"
       :nowDate="nowDate"
       @close="closeDraw"
-    ></EditTaskNode>
+    />
   </div>
 </template>
 <script setup lang="ts">
@@ -111,6 +114,8 @@ import "@vue-flow/core/dist/style.css";
 import "@vue-flow/core/dist/theme-default.css";
 import { ref, onMounted } from "vue";
 import { VueFlow, useVueFlow, MarkerType } from "@vue-flow/core";
+import { Background } from "@vue-flow/background";
+import { MiniMap } from "@vue-flow/minimap";
 import { Folder, ArrowRight, Loading } from "@element-plus/icons-vue";
 import TaskInfoAPI, { TaskInfoForm } from "@/api/task/task-info";
 const {
@@ -150,7 +155,6 @@ const taskInfoList = ref([
 ]);
 
 const nodes = ref([]);
-
 const edges = ref([]);
 
 /** 打开task_info弹窗 */
@@ -207,6 +211,10 @@ function generateEdge(val: any) {
 }
 
 const handleDblClick = (node) => {
+  if (triggerOneVisible.value) {
+    ElMessage.warning("有任务正在运行，请先停止任务～");
+    return;
+  }
   // 在这里处理双击事件
   if (node.data != undefined && node.data) {
     console.log("双击了节点:", node.data);
@@ -268,6 +276,10 @@ const taskNodeVisible = ref(false);
 const nowDate = ref(null);
 
 onNodeDoubleClick(async (changes) => {
+  if (triggerOneVisible.value) {
+    ElMessage.warning("任务正在运行，请先停止任务～");
+    return;
+  }
   taskNodeVisible.value = true;
   nodeTaskId.value = changes.node.data.taskId;
   nowDate.value = new Date();
@@ -374,6 +386,10 @@ function updateEdgeStyle() {
 }
 
 function selectTaskSetNode(node) {
+  if (triggerOneVisible.value) {
+    ElMessage.warning("有任务正在运行，请先停止任务～");
+    return;
+  }
   connectWs(node.id);
   g_position.value = [140, 140];
   nodes.value = [];
@@ -465,7 +481,9 @@ const connectWs = (id: number) => {
     message.value = _message;
     console.log("接收到消息", _message);
     // 接收到消息后，需要做出相应的操作，比如更新节点或边
-    const node = nodes.value.find((node: any) => node.id == _message.nodeId);
+    const node = nodes.value.find(
+      (node: any) => node.data.taskId == _message.taskId
+    );
     //
     const color = getNodeColor(_message.status);
     console.log("node", node, nodes.value, color);

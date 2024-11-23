@@ -1,13 +1,23 @@
 package com.cc.job.test;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.CcJobApplication;
+import com.cc.job.task.mapper.TaskEdgeMapper;
+import com.cc.job.task.mapper.TaskInfoMapper;
+import com.cc.job.task.mapper.TaskNodeMapper;
+import com.cc.job.task.model.entity.TaskEdge;
+import com.cc.job.task.model.entity.TaskInfo;
+import com.cc.job.task.model.entity.TaskNode;
+import com.cc.job.task.model.vo.TaskEdgeVo;
+import com.cc.job.task.model.vo.TaskNodeVo;
 import com.cc.job.test.entity.Edge;
 import com.cc.job.test.entity.Node;
 import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.biz.model.TriggerParam;
 import com.xxl.job.core.executor.XxlJobExecutor;
 import com.xxl.job.core.thread.JobThread;
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -20,6 +30,15 @@ import java.util.stream.Collectors;
 @SpringBootTest(classes = CcJobApplication.class)
 public class CcJobApplicationTest {
 
+
+    @Resource
+    TaskInfoMapper taskInfoMapper;
+
+    @Resource
+    TaskNodeMapper taskNodeMapper;
+
+    @Resource
+    TaskEdgeMapper taskEdgeMapper;
 
     // 实现任务串并行调度
     @Test
@@ -196,16 +215,208 @@ public class CcJobApplicationTest {
     }
 
 
-
+    static  boolean stop = true;
     @Test
     public void test2(){
 
+        long jobId = 0L;
+
+        List<TaskNode> nodeList = taskNodeMapper.selectList(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, jobId));
+        List<TaskEdge> edgeList = taskEdgeMapper.selectList(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId, jobId));
+
+
+        Set<TaskNode> resNodeList = new HashSet<>();
+        while (stop){
+            stop = false;
+            for (TaskNode taskNode : nodeList) {
+                buildNode(taskNode,edgeList,resNodeList,jobId);
+            }
+            nodeList.clear();
+            nodeList.addAll(resNodeList);
+            resNodeList.clear();
+        }
+
+        System.out.println(nodeList);
+        System.out.println(edgeList);
+
+    }
+
+    private void buildNode(TaskNode currentNode,List<TaskEdge> edgeList,Set<TaskNode> resNodeList,Long jobId) {
+        // 获取当前任务
+        TaskInfo taskInfo = taskInfoMapper.selectById(currentNode.getTaskId());
+        if(taskInfo.getJobType()!=2&& Objects.equals(currentNode.getTaskParentId(), jobId)){
+            resNodeList.add(currentNode);
+            return;
+        }
+
+        if(taskInfo.getJobType()==2&&Objects.equals(currentNode.getTaskParentId(), jobId)){
+            stop = true;
+
+            List<TaskEdge> collectEdges = edgeList.stream().filter(v -> v.getTaskParentId().equals(currentNode.getId())).toList();
+            for (TaskEdge edge : collectEdges) {
+                edge.setTaskParentId(jobId);
+                edgeList.add(edge);
+            }
+
+            //得到当前节点的所有开始节点
+            List<Long> fromIds = edgeList.stream().filter(v -> v.getEndNodeId().equals(currentNode.getId())).map(TaskEdge::getFromNodeId).toList();
+
+            List<TaskNode> fromNodes = taskNodeMapper.selectBatchIds(fromIds);
+
+            //得到当前节点的所有孩子节点
+            List<TaskNode> childrenNode = taskNodeMapper.selectList(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, taskInfo.getId()));
+
+            // 得到孩子节点的开始节点
+            List<TaskNode> startNodes = childrenNode.stream().filter(v -> v.getNodeInDegree() == 0).toList();
+
+            for (TaskNode fromNode : fromNodes) {
+                fromNode.setNodeOutDegree(fromNode.getNodeOutDegree()-1+startNodes.size());
+            }
+
+            for (TaskNode startNode : startNodes) {
+                startNode.setNodeInDegree(startNode.getNodeInDegree()+fromNodes.size());
+            }
+
+            if(!fromIds.isEmpty()){
+                for (TaskNode taskNode : startNodes) {
+                    for (Long fromId : fromIds) {
+                        TaskEdge taskEdge = new TaskEdge();
+                        taskEdge.setFromNodeId(fromId);
+                        taskEdge.setEndNodeId(taskNode.getId());
+                        taskEdge.setTaskParentId(jobId);
+                        edgeList.add(taskEdge);
+                    }
+                }
+            }
+
+            List<Long> endIds = edgeList.stream().filter(v -> v.getFromNodeId().equals(currentNode.getId())).map(TaskEdge::getEndNodeId).toList();
+
+            List<TaskNode> endNodes = taskNodeMapper.selectBatchIds(endIds);
+
+            List<TaskNode> childEndNodes = childrenNode.stream().filter(v -> v.getNodeOutDegree() == 0).toList();
+
+            for (TaskNode endNode : endNodes) {
+                endNode.setNodeInDegree(endNode.getNodeInDegree()-1+childEndNodes.size());
+            }
+
+            for (TaskNode childEndNode : childEndNodes) {
+                childEndNode.setNodeOutDegree(childEndNode.getNodeOutDegree()+endNodes.size());
+            }
+
+            if(!childEndNodes.isEmpty()){
+                for (TaskNode endNode : childEndNodes) {
+                    for (Long endId : endIds) {
+                        TaskEdge edge = new TaskEdge();
+                        edge.setFromNodeId(endNode.getId());
+                        edge.setEndNodeId(endId);
+                        edge.setTaskParentId(jobId);
+                        edgeList.add(edge);
+                    }
+                }
+            }
+
+            for (TaskNode taskNode : childrenNode) {
+                taskNode.setTaskParentId(jobId);
+                resNodeList.add(taskNode);
+            }
+
+            edgeList.removeIf(v->(fromIds.contains(v.getFromNodeId())&&v.getEndNodeId().equals(currentNode.getId()))||(v.getFromNodeId().equals(currentNode.getId())&&endIds.contains(v.getEndNodeId())));
+        }
+    }
+
+
+    private void addNode(List<TaskNode> nodeList,List<TaskEdge> edgeList,TaskInfo parentTask){
+        Map<String,Long> nodeMap = new HashMap<>();
+
+        for (TaskNode taskNode : nodeList) {
+             TaskInfo taskInfo = taskInfoMapper.selectById(taskNode.getId());
+
+            TaskInfo copyTaskInfo = BeanUtil.copyProperties(taskInfo, TaskInfo.class);
+            copyTaskInfo.setParentId(parentTask.getId());
+            taskInfoMapper.insert(copyTaskInfo);
+
+            if(taskInfo.getJobType()==2){
+                List<TaskNode> childNodes = taskNodeMapper.selectList(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, taskInfo.getId()));
+                List<TaskEdge> childEdges = taskEdgeMapper.selectList(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId, taskInfo.getId()));
+
+                addNode(childNodes,childEdges,copyTaskInfo);
+            }
+
+            TaskNode copyTaskNode = BeanUtil.copyProperties(taskNode, TaskNode.class);
+            copyTaskNode.setTaskId(copyTaskInfo.getId());
+            copyTaskNode.setTaskParentId(parentTask.getId());
+            taskNodeMapper.insert(copyTaskNode);
+
+            nodeMap.put(String.valueOf(taskNode.getId()),copyTaskNode.getId());
+        }
+
+        for (TaskEdge taskEdge : edgeList) {
+
+            TaskEdge copyEdge = BeanUtil.copyProperties(taskEdge, TaskEdge.class);
+            copyEdge.setTaskParentId(parentTask.getId());
+            copyEdge.setFromNodeId(nodeMap.get(String.valueOf(taskEdge.getFromNodeId())));
+            copyEdge.setEndNodeId(nodeMap.get(String.valueOf(taskEdge.getEndNodeId())));
+            taskEdgeMapper.insert(copyEdge);
+        }
+    }
+
+
+    public void delNodes(Long jobId){
+        TaskInfo taskInfo = taskInfoMapper.selectById(jobId);
+        if(taskInfo.getJobType()==2){
+            List<TaskInfo> taskInfos = taskInfoMapper.selectList(new LambdaQueryWrapper<TaskInfo>().eq(TaskInfo::getParentId, jobId));
+            if(taskInfos.isEmpty()){
+                return;
+            }
+            List<Long> childTaskIds = taskInfos.stream().map(TaskInfo::getId).toList();
+
+           taskNodeMapper.delete(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, taskInfo.getId()));
+            taskEdgeMapper.delete(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId, taskInfo.getId()));
+
+            for (Long childTaskId : childTaskIds) {
+                delNodes(childTaskId);
+            }
+        }
+
+        taskInfoMapper.deleteById(jobId);
+    }
+
+    public void getTaskInfoIds(Long jobId,List<Long> ids){
+        TaskInfo taskInfo = taskInfoMapper.selectById(jobId);
+        if(taskInfo.getJobType()!=2){
+            ids.add(taskInfo.getId());
+        }else{
+            List<TaskInfo> taskInfos = taskInfoMapper.selectList(new LambdaQueryWrapper<TaskInfo>().eq(TaskInfo::getParentId, jobId));
+            if(taskInfos.isEmpty()){
+                return;
+            }
+            List<Long> childTaskIds = taskInfos.stream().map(TaskInfo::getId).toList();
+            for (Long childTaskId : childTaskIds) {
+                getTaskInfoIds(childTaskId,ids);
+            }
+        }
     }
 
     @Test
     public void test3(){
 
 
+    }
+
+
+    public void getChildNodeAndEdge(Long taskId,String nodeId,List<TaskNodeVo> taskNodeVos,List<TaskEdgeVo> taskEdgeVos){
+        List<TaskNode> taskNodes = taskNodeMapper.selectList(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, taskId));
+        List<TaskEdge> taskEdges = taskEdgeMapper.selectList(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId, taskId));
+
+        for (TaskNode taskNode : taskNodes) {
+            TaskNodeVo taskNodeVo = BeanUtil.copyProperties(taskNode,TaskNodeVo.class);
+            taskNodeVo.setNodePatentId(nodeId);
+            taskNodeVos.add(taskNodeVo);
+            getChildNodeAndEdge(taskNode.getTaskId(),String.valueOf(taskNode.getId()),taskNodeVos,taskEdgeVos);
+        }
+
+        List<TaskEdgeVo> copyTaskEdges = BeanUtil.copyToList(taskEdges, TaskEdgeVo.class);
+        taskEdgeVos.addAll(copyTaskEdges);
     }
 }
 

@@ -1,17 +1,15 @@
-package com.cc.job.task.model.vo;
+package com.cc.job.task.model.dto;
 
 import lombok.Data;
 
 import java.io.Serializable;
 
 @Data
-public class TaskNodeVo implements Serializable {
+public class TaskNodeDto implements Serializable {
 
-    private Long id;
+    private String id;
 
     private Long taskId;
-
-    private String taskName;
 
     private Long taskParentId;
 
@@ -22,9 +20,4 @@ public class TaskNodeVo implements Serializable {
     private Long nodeInDegree;
 
     private Long nodeOutDegree;
-
-    private Integer sort;
-
-    private String nodePatentId;
-
 }

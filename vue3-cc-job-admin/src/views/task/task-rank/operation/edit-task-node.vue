@@ -8,6 +8,7 @@
             filterable
             placeholder="Select"
             style="width: 200px"
+            :disabled="formData.jobType==2"
           >
             <el-option
               v-for="item in taskGroupList"
@@ -37,6 +38,7 @@
             placeholder="Select"
             style="width: 210px"
             @change="handleChangeGlueType"
+            :disabled="formData.jobType==2"
           >
             <el-option
               v-for="item in glueTypeList"
@@ -57,6 +59,7 @@
             v-model="formData.executorHandler"
             type="text"
             autocomplete="off"
+            :disabled="formData.jobType==2"
           />
         </el-form-item>
         <el-form-item label="请求类型" prop="reqType" v-if="formData.glueType == 'API'">
@@ -100,6 +103,7 @@
             v-model="formData.executorParam"
             type="textarea"
             autocomplete="off"
+            :disabled="formData.jobType==2"
           />
         </el-form-item>
         <el-form-item label="调度过期策略" prop="misfireStrategy">
@@ -136,7 +140,7 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="任务超时时间">
+        <el-form-item label="任务重试次数">
           <el-input
             v-model="formData.executorFailRetryCount"
             type="text"
