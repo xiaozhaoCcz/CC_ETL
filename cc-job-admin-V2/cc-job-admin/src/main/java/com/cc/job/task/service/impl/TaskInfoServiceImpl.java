@@ -2,16 +2,13 @@ package com.cc.job.task.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
-import cn.hutool.core.lang.Pair;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.common.exception.BusinessException;
 import com.cc.job.core.cron.CronExpression;
 import com.cc.job.task.enums.*;
 import com.cc.job.task.jobhandler.TaskRankXxlJob;
-import com.cc.job.task.mapper.TaskEdgeMapper;
 import com.cc.job.task.mapper.TaskLogglueMapper;
-import com.cc.job.task.mapper.TaskNodeMapper;
 import com.cc.job.task.model.dto.TaskEdgeDto;
 import com.cc.job.task.model.dto.TaskInfoTriggerDto;
 import com.cc.job.task.model.dto.TaskNodeDto;
@@ -25,12 +22,9 @@ import com.cc.job.task.thread.JobScheduleHelper;
 import com.cc.job.task.thread.JobTriggerPoolHelper;
 import com.cc.job.task.utils.I18nUtil;
 import com.cc.job.task.websocket.WebSocketServer;
-import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
 import com.xxl.job.core.executor.XxlJobExecutor;
 import com.xxl.job.core.glue.GlueTypeEnum;
-import com.xxl.job.core.thread.JobThread;
-import com.xxl.job.core.thread.TriggerCallbackThread;
 import com.xxl.job.core.util.DateUtil;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
@@ -44,12 +38,10 @@ import com.cc.job.task.service.TaskInfoService;
 import com.cc.job.task.model.form.TaskInfoForm;
 import com.cc.job.task.model.query.TaskInfoQuery;
 import com.cc.job.task.model.vo.TaskInfoVO;
-import com.cc.job.task.converter.TaskInfoConverter;
 
 import java.text.MessageFormat;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 import cn.hutool.core.lang.Assert;
@@ -331,7 +323,6 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         }
 
         taskInfo.setJobType(2);
-        taskInfo.setIsNode("N");
         this.save(taskInfo);
         taskInfo.setExecutorParam(String.valueOf(taskInfo.getId()));
         this.updateById(taskInfo);
@@ -342,7 +333,6 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         List<TaskNodeDto> taskNodeDtoList = new ArrayList<>();
         List<TaskEdgeDto> taskEdgeDtoList = new ArrayList<>();
 
-        Map<String, String> nodeMap = new HashMap<>();
         nodeList.forEach(item -> {
             TaskNodeDto node = new TaskNodeDto();
             String nodeId = (String) item.get("id");
@@ -499,6 +489,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         }
         formData.setGlueUpdatetime(LocalDateTime.now());
         TaskInfo taskInfo = BeanUtil.copyProperties(formData, TaskInfo.class);
+        taskInfo.setIsNode("N");
         return taskInfo;
     }
 
@@ -756,6 +747,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         BeanUtil.copyProperties(formData, existsJobInfo);
         existsJobInfo.setGlueUpdatetime(LocalDateTime.now());
         existsJobInfo.setTriggerNextTime(nextTriggerTime);
+        existsJobInfo.setIsNode("N");
         return existsJobInfo;
     }
 

@@ -13,6 +13,8 @@
 
 ## 项目运行
 首先需要将前端和后端代码启动起来
+## 项目介绍
+https://www.yuque.com/xiaozhao-igpfn/kb/six39vboy38eaq87?singleDoc# 《vue3-xxl-job-admin》
 ### 修改配置
 与xxl-job后端的配置一样，只不过`admin.addresses`地址要换成`8989`，并且执行器端口不能为`9999`
 路径地址也需要进行配置
