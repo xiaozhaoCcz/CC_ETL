@@ -381,6 +381,22 @@ public class CcJobApplicationTest {
         taskInfoMapper.deleteById(jobId);
     }
 
+    public void getTaskInfoIds(Long jobId,List<Long> ids){
+        TaskInfo taskInfo = taskInfoMapper.selectById(jobId);
+        if(taskInfo.getJobType()!=2){
+            ids.add(taskInfo.getId());
+        }else{
+            List<TaskInfo> taskInfos = taskInfoMapper.selectList(new LambdaQueryWrapper<TaskInfo>().eq(TaskInfo::getParentId, jobId));
+            if(taskInfos.isEmpty()){
+                return;
+            }
+            List<Long> childTaskIds = taskInfos.stream().map(TaskInfo::getId).toList();
+            for (Long childTaskId : childTaskIds) {
+                getTaskInfoIds(childTaskId,ids);
+            }
+        }
+    }
+
     @Test
     public void test3(){
 
