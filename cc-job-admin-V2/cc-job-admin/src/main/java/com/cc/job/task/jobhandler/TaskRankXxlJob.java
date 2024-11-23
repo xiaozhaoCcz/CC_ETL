@@ -95,6 +95,12 @@ public class TaskRankXxlJob {
             resNodeList.clear();
         }
 
+        // 计算节点的出度和入度
+        for (TaskNode node : nodes) {
+            node.setNodeInDegree(edges.stream().filter(v->v.getEndNodeId().equals(node.getId())).count());
+            node.setNodeOutDegree(edges.stream().filter(v->v.getFromNodeId().equals(node.getId())).count());
+        }
+
         List<TaskNode> startNodes = nodes.stream().filter(v -> v.getNodeInDegree().equals(0L)).toList();
 
         List<Long> visited = new CopyOnWriteArrayList<>();
@@ -150,7 +156,9 @@ public class TaskRankXxlJob {
                 for (long d : v) {
                     //阻塞等待
                     try {
-                        futureMap.get(d).get();
+                        if(futureMap.get(d)!=null){
+                            futureMap.get(d).get();
+                        }
                     } catch (InterruptedException | ExecutionException e) {
                         throw new RuntimeException(e);
                     }
@@ -187,17 +195,17 @@ public class TaskRankXxlJob {
 
             //得到当前节点的所有开始节点
             List<Long> fromIds = edgeList.stream().filter(v -> v.getEndNodeId().equals(currentNode.getId())).map(TaskEdge::getFromNodeId).toList();
-            List<TaskNode> fromNodes = taskNodeService.listByIds(fromIds);
+           // List<TaskNode> fromNodes = taskNodeService.listByIds(fromIds);
             //得到当前节点的所有孩子节点
             List<TaskNode> childrenNode = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, taskInfo.getId()));
             // 得到孩子节点的开始节点
             List<TaskNode> startNodes = childrenNode.stream().filter(v -> v.getNodeInDegree() == 0).toList();
-            for (TaskNode fromNode : fromNodes) {
-                fromNode.setNodeOutDegree(fromNode.getNodeOutDegree() - 1 + startNodes.size());
-            }
-            for (TaskNode startNode : startNodes) {
-                startNode.setNodeInDegree(startNode.getNodeInDegree() + fromNodes.size());
-            }
+//            for (TaskNode fromNode : fromNodes) {
+//                fromNode.setNodeOutDegree(fromNode.getNodeOutDegree() - 1 + startNodes.size());
+//            }
+//            for (TaskNode startNode : startNodes) {
+//                startNode.setNodeInDegree(startNode.getNodeInDegree() + fromNodes.size());
+//            }
             if (!fromIds.isEmpty()) {
                 for (TaskNode taskNode : startNodes) {
                     for (Long fromId : fromIds) {
@@ -212,17 +220,18 @@ public class TaskRankXxlJob {
 
             List<Long> endIds = edgeList.stream().filter(v -> v.getFromNodeId().equals(currentNode.getId())).map(TaskEdge::getEndNodeId).toList();
 
-            List<TaskNode> endNodes = taskNodeService.listByIds(endIds);
-
             List<TaskNode> childEndNodes = childrenNode.stream().filter(v -> v.getNodeOutDegree() == 0).toList();
 
-            for (TaskNode endNode : endNodes) {
-                endNode.setNodeInDegree(endNode.getNodeInDegree() - 1 + childEndNodes.size());
-            }
+//            if(!endIds.isEmpty()){
+//                List<TaskNode> endNodes = taskNodeService.listByIds(endIds);
+//                for (TaskNode endNode : endNodes) {
+//                    endNode.setNodeInDegree(endNode.getNodeInDegree() - 1 + childEndNodes.size());
+//                }
+//            }
 
-            for (TaskNode childEndNode : childEndNodes) {
-                childEndNode.setNodeOutDegree(childEndNode.getNodeOutDegree() + endNodes.size());
-            }
+//            for (TaskNode childEndNode : childEndNodes) {
+//                childEndNode.setNodeOutDegree(childEndNode.getNodeOutDegree() + endIds.size());
+//            }
 
             if (!childEndNodes.isEmpty()) {
                 for (TaskNode endNode : childEndNodes) {
@@ -253,7 +262,7 @@ public class TaskRankXxlJob {
         message.setParentTaskId(node.getTaskParentId());
         message.setTaskId(node.getTaskId());
 
-        while (stopMap.get(node.getTaskParentId()).getFirst()) {
+        while (Boolean.TRUE.equals(stopMap.get(node.getTaskParentId()).getFirst())) {
             taskInfoService.stopTaskSet(node.getTaskParentId());
             // 节点清空
             Vector<ReturnT<Long>> vector = TriggerCallbackThread.vector;
@@ -266,7 +275,6 @@ public class TaskRankXxlJob {
         taskInfoTriggerDto.setId(node.getTaskId());
         taskInfoService.triggerJob(taskInfoTriggerDto);
 
-        //message.setNodeId(node.getId());
         message.setStatus(2);
         webSocketServer.sendInfo(message);
 
@@ -282,7 +290,6 @@ public class TaskRankXxlJob {
 
         Thread futureThread = null;
         FutureTask<Boolean> futureTask = new FutureTask<Boolean>(() -> {
-            int retryCount = -1;
             Label:
             while (true) {
                 Vector<ReturnT<Long>> vector = TriggerCallbackThread.vector;
@@ -313,11 +320,6 @@ public class TaskRankXxlJob {
 
                             break Label;
                         } else {
-                            retryCount++;
-                            if (retryCount <= taskInfo.getExecutorFailRetryCount()) {
-                                message.setStatus(0);
-                                webSocketServer.sendInfo(message);
-                            }
                             if ("DO_NOTHING".equalsIgnoreCase(taskInfo.getExecutorBlockStrategy())) {
                                 TriggerCallbackThread.vector.remove(res);
                                 break Label;

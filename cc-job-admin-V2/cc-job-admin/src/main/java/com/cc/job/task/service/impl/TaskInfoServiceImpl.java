@@ -105,6 +105,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         }
 
         wrapper.in(TaskInfo::getJobType, 0, 2);
+        wrapper.in(TaskInfo::getIsNode, "N");
         wrapper.orderByDesc(TaskInfo::getUpdateTime);
 
         Page<TaskInfo> page = this.page(new Page<>(queryParams.getPageNum(), queryParams.getPageSize()), wrapper);
@@ -391,6 +392,8 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
                 List<TaskNodeDto> taskNodeDtos = BeanUtil.copyToList(childNodes, TaskNodeDto.class, CopyOptions.create());
                 List<TaskEdgeDto> taskEdgeDtos = BeanUtil.copyToList(childEdges, TaskEdgeDto.class, CopyOptions.create());
                 addNode(taskNodeDtos, taskEdgeDtos, copyTaskInfo);
+                copyTaskInfo.setExecutorParam(String.valueOf(copyTaskInfo.getId()));
+                this.updateById(copyTaskInfo);
             }
 
             TaskNode copyTaskNode = BeanUtil.copyProperties(taskNode, TaskNode.class, "id");
@@ -530,8 +533,8 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             if (nodeId.startsWith("node:")) {
                 TaskInfo copyTaskInfo = this.getById(taskId);
                 copyTaskInfo.setId(null);
-                copyTaskInfo.setJobType(1);
                 copyTaskInfo.setParentId(id);
+                copyTaskInfo.setIsNode("Y");
                 this.save(copyTaskInfo);
                 node.setTaskId(copyTaskInfo.getId());
 
@@ -541,6 +544,8 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
                     List<TaskNodeDto> taskNodeDtos = BeanUtil.copyToList(taskNodeList, TaskNodeDto.class);
                     List<TaskEdgeDto> taskEdgeDtos = BeanUtil.copyToList(taskEdgeList, TaskEdgeDto.class);
                     addNode(taskNodeDtos, taskEdgeDtos, copyTaskInfo);
+                    copyTaskInfo.setExecutorParam(String.valueOf(copyTaskInfo.getId()));
+                    this.updateById(copyTaskInfo);
                 }
 
                 taskNodeService.save(node);
