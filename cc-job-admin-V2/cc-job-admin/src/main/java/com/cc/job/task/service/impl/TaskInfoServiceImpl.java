@@ -611,14 +611,12 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
     @Override
     public boolean stopTaskSet(Long id) {
         int flag = taskInfoMapper.stopTaskSet(id);
-        if(flag>0){
-            XxlJobExecutor.removeJobThread(id.intValue(), "stop task" + id);
-            List<Long> allTaskInfoIds = new ArrayList<>();
-            // 得到当前任务的所有子任务
-            getChildTaskInfos(id, allTaskInfoIds);
-            allTaskInfoIds.forEach(item -> TaskRankXxlJob.processStopMap(id, true, item));
-            webSocketServer.onClose(id);
-        }
+        XxlJobExecutor.removeJobThread(id.intValue(), "stop task" + id);
+        List<Long> allTaskInfoIds = new ArrayList<>();
+        // 得到当前任务的所有子任务
+        getChildTaskInfos(id, allTaskInfoIds);
+        allTaskInfoIds.forEach(item -> TaskRankXxlJob.processStopMap(id, true, item));
+        webSocketServer.onClose(id);
         return true;
     }
 
