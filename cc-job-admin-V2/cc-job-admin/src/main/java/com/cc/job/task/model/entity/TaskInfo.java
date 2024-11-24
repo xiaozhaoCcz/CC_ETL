@@ -116,4 +116,6 @@ public class TaskInfo extends BaseEntity {
     private String reqUrl;
 
     private String isNode;
+
+    private Integer rankTriggerStatus;
 }

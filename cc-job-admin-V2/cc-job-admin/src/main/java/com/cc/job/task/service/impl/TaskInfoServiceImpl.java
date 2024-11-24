@@ -69,6 +69,8 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
 
     private final WebSocketServer webSocketServer;
 
+    private final TaskInfoMapper taskInfoMapper;
+
     /**
      * 获取task_info分页列表
      *
@@ -239,6 +241,10 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             return false;
         }
 
+        if(taskInfo.getJobType()==2&&taskInfo.getRankTriggerStatus()==1){
+            throw new BusinessException("当前任务正在运行中～");
+        }
+
         if (taskInfo.getJobType() == 2) {
             TaskRankXxlJob.removeStopMap(taskInfo.getId());
         }
@@ -248,6 +254,9 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         }
 
         JobTriggerPoolHelper.trigger(taskInfoTriggerDto.getId().intValue(), TriggerTypeEnum.MANUAL, -1, null, taskInfoTriggerDto.getExecutorParam(), taskInfoTriggerDto.getAddressList());
+
+        taskInfo.setRankTriggerStatus(1);
+        this.updateById(taskInfo);
         return true;
     }
 
@@ -281,12 +290,15 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public boolean stopTask(Long id) {
         TaskInfo xxlJobInfo = this.getById(id);
-
         xxlJobInfo.setTriggerStatus(0);
         xxlJobInfo.setTriggerLastTime(0L);
         xxlJobInfo.setTriggerNextTime(0L);
+        if(xxlJobInfo.getJobType()==2){
+            this.stopTaskSet(id);
+        }
         return this.updateById(xxlJobInfo);
     }
 
@@ -598,6 +610,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
 
     @Override
     public boolean stopTaskSet(Long id) {
+        int flag = taskInfoMapper.stopTaskSet(id);
         XxlJobExecutor.removeJobThread(id.intValue(), "stop task" + id);
         List<Long> allTaskInfoIds = new ArrayList<>();
         // 得到当前任务的所有子任务

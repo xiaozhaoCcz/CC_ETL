@@ -2,6 +2,7 @@ package com.cc.job.task.jobhandler;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.common.exception.BusinessException;
+import com.cc.job.task.enums.TriggerTypeEnum;
 import com.cc.job.task.model.dto.TaskInfoTriggerDto;
 import com.cc.job.task.model.entity.TaskEdge;
 import com.cc.job.task.model.entity.TaskInfo;
@@ -9,6 +10,7 @@ import com.cc.job.task.model.entity.TaskNode;
 import com.cc.job.task.service.TaskEdgeService;
 import com.cc.job.task.service.TaskInfoService;
 import com.cc.job.task.service.TaskNodeService;
+import com.cc.job.task.thread.JobTriggerPoolHelper;
 import com.cc.job.task.websocket.WebSocketServer;
 import com.cc.job.task.websocket.model.Message;
 import com.xxl.job.core.biz.model.ReturnT;
@@ -52,26 +54,25 @@ public class TaskRankXxlJob {
         stopMap.remove(parentId);
     }
 
-    static final ConcurrentHashMap<Long, Boolean> flagMap = new ConcurrentHashMap<>();
-
     static final Map<Long,Map<Long,Set<Long>>> taskIdMap = new ConcurrentHashMap<>();
 
     @XxlJob("runTaskRankXxlJob")
     public void runTaskRankXxlJob() {
-        String jobId = XxlJobHelper.getJobParam();
-
-        if (StringUtils.isBlank(jobId)) {
-            throw new BusinessException("jobId is null");
+        //得到任务运行的参数
+        String jobParam = XxlJobHelper.getJobParam();
+        if (StringUtils.isBlank(jobParam)) {
+            throw new BusinessException("jobParam is null");
         }
+
+        long jobId = Long.parseLong(jobParam);
+
         List<TaskNode> nodes = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, jobId));
         List<TaskEdge> edges = taskEdgeService.list(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId, jobId));
 
         setTaskIdMap(nodes, jobId);
 
-        flagMap.put(Long.valueOf(jobId), true);
-
-        Set<TaskNode> resNodeList = new HashSet<>();
-        buildGraph(jobId, nodes, edges, resNodeList);
+        // 构图
+        buildGraph(Long.valueOf(jobId), nodes, edges);
 
         List<TaskNode> startNodes = nodes.stream().filter(v -> v.getNodeInDegree().equals(0L)).toList();
 
@@ -156,83 +157,54 @@ public class TaskRankXxlJob {
         }
     }
 
-    private void buildGraph(String jobId, List<TaskNode> nodes, List<TaskEdge> edges, Set<TaskNode> resNodeList) {
-        while (Boolean.TRUE.equals(flagMap.get(Long.valueOf(jobId)))) {
-            flagMap.put(Long.valueOf(jobId), false);
-            for (TaskNode taskNode : nodes) {
-                buildNode(taskNode, edges, resNodeList, Long.valueOf(jobId));
-            }
-            nodes.clear();
-            nodes.addAll(resNodeList);
-            resNodeList.clear();
-        }
-
-        // 计算节点的出度和入度
-        for (TaskNode node : nodes) {
-            node.setNodeInDegree(edges.stream().filter(v->v.getEndNodeId().equals(node.getId())).count());
-            node.setNodeOutDegree(edges.stream().filter(v->v.getFromNodeId().equals(node.getId())).count());
-        }
-    }
-
-    private void setTaskIdMap(List<TaskNode> nodes, String jobId) {
-        List<Long> ids = nodes.stream().map(TaskNode::getTaskId).toList();
-        List<TaskInfo> taskInfos = taskInfoService.listByIds(ids);
-        Map<Long, TaskInfo> taskInfoMap = taskInfos.stream().collect(Collectors.toMap(TaskInfo::getId, t -> t));
-
-        for (TaskNode node : nodes) {
-            TaskInfo taskInfo = taskInfoMap.get(node.getTaskId());
-            ArrayList<Long> idList = new ArrayList<>();
-            getTaskInfoIds(taskInfo.getId(),idList);
-            taskIdMap.computeIfAbsent(Long.valueOf(jobId), k->new HashMap<>())
-                    .computeIfAbsent(taskInfo.getId(), k->new HashSet<>())
-                    .addAll(idList);
-        }
-    }
-
-    private void buildNode(TaskNode currentNode, List<TaskEdge> edgeList, Set<TaskNode> resNodeList, Long jobId) {
-        // 获取当前任务
-        TaskInfo taskInfo = taskInfoService.getById(currentNode.getTaskId());
-        if (taskInfo.getJobType() != 2 && Objects.equals(currentNode.getTaskParentId(), jobId)) {
-            resNodeList.add(currentNode);
-            return;
-        }
-
-        if (taskInfo.getJobType() == 2 && Objects.equals(currentNode.getTaskParentId(), jobId)) {
-            flagMap.put(jobId, true);
-            List<TaskEdge> collectEdges = taskEdgeService.list(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId, taskInfo.getId()));
-            for (TaskEdge edge : collectEdges) {
-                edge.setTaskParentId(jobId);
-                edgeList.add(edge);
-            }
-
-            //得到当前节点的所有开始节点
-            List<Long> fromIds = edgeList.stream().filter(v -> v.getEndNodeId().equals(currentNode.getId())).map(TaskEdge::getFromNodeId).toList();
-           // List<TaskNode> fromNodes = taskNodeService.listByIds(fromIds);
-            //得到当前节点的所有孩子节点
-            List<TaskNode> childrenNode = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, taskInfo.getId()));
-            // 得到孩子节点的开始节点
-            List<TaskNode> startNodes = childrenNode.stream().filter(v -> v.getNodeInDegree() == 0).toList();
-//            for (TaskNode fromNode : fromNodes) {
-//                fromNode.setNodeOutDegree(fromNode.getNodeOutDegree() - 1 + startNodes.size());
-//            }
-//            for (TaskNode startNode : startNodes) {
-//                startNode.setNodeInDegree(startNode.getNodeInDegree() + fromNodes.size());
-//            }
-            if (!fromIds.isEmpty()) {
-                for (TaskNode taskNode : startNodes) {
-                    for (Long fromId : fromIds) {
-                        TaskEdge taskEdge = new TaskEdge();
-                        taskEdge.setFromNodeId(fromId);
-                        taskEdge.setEndNodeId(taskNode.getId());
-                        taskEdge.setTaskParentId(jobId);
-                        edgeList.add(taskEdge);
-                    }
+    private void buildGraph(Long jobId, List<TaskNode> nodes, List<TaskEdge> edgeList) {
+        boolean stop = true;
+        Set<TaskNode> resNodeList = new HashSet<>();
+        while (stop) {
+            stop = false;
+            for (TaskNode currentNode : nodes) {
+                TaskInfo taskInfo = taskInfoService.getById(currentNode.getTaskId());
+                if (taskInfo.getJobType() != 2 && Objects.equals(currentNode.getTaskParentId(), jobId)) {
+                    resNodeList.add(currentNode);
+                    continue;
                 }
-            }
 
-            List<Long> endIds = edgeList.stream().filter(v -> v.getFromNodeId().equals(currentNode.getId())).map(TaskEdge::getEndNodeId).toList();
+                if (taskInfo.getJobType() == 2 && Objects.equals(currentNode.getTaskParentId(), jobId)) {
+                    stop = true;
+                    List<TaskEdge> collectEdges = taskEdgeService.list(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId, taskInfo.getId()));
+                    for (TaskEdge edge : collectEdges) {
+                        edge.setTaskParentId(jobId);
+                        edgeList.add(edge);
+                    }
 
-            List<TaskNode> childEndNodes = childrenNode.stream().filter(v -> v.getNodeOutDegree() == 0).toList();
+                    //得到当前节点的所有开始节点
+                    List<Long> fromIds = edgeList.stream().filter(v -> v.getEndNodeId().equals(currentNode.getId())).map(TaskEdge::getFromNodeId).toList();
+                    // List<TaskNode> fromNodes = taskNodeService.listByIds(fromIds);
+                    //得到当前节点的所有孩子节点
+                    List<TaskNode> childrenNode = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, taskInfo.getId()));
+                    // 得到孩子节点的开始节点
+                    List<TaskNode> startNodes = childrenNode.stream().filter(v -> v.getNodeInDegree() == 0).toList();
+                    //            for (TaskNode fromNode : fromNodes) {
+                    //                fromNode.setNodeOutDegree(fromNode.getNodeOutDegree() - 1 + startNodes.size());
+                    //            }
+                    //            for (TaskNode startNode : startNodes) {
+                    //                startNode.setNodeInDegree(startNode.getNodeInDegree() + fromNodes.size());
+                    //            }
+                    if (!fromIds.isEmpty()) {
+                        for (TaskNode taskNode : startNodes) {
+                            for (Long fromId : fromIds) {
+                                TaskEdge taskEdge = new TaskEdge();
+                                taskEdge.setFromNodeId(fromId);
+                                taskEdge.setEndNodeId(taskNode.getId());
+                                taskEdge.setTaskParentId(jobId);
+                                edgeList.add(taskEdge);
+                            }
+                        }
+                    }
+
+                    List<Long> endIds = edgeList.stream().filter(v -> v.getFromNodeId().equals(currentNode.getId())).map(TaskEdge::getEndNodeId).toList();
+
+                    List<TaskNode> childEndNodes = childrenNode.stream().filter(v -> v.getNodeOutDegree() == 0).toList();
 
 //            if(!endIds.isEmpty()){
 //                List<TaskNode> endNodes = taskNodeService.listByIds(endIds);
@@ -245,26 +217,53 @@ public class TaskRankXxlJob {
 //                childEndNode.setNodeOutDegree(childEndNode.getNodeOutDegree() + endIds.size());
 //            }
 
-            if (!childEndNodes.isEmpty()) {
-                for (TaskNode endNode : childEndNodes) {
-                    for (Long endId : endIds) {
-                        TaskEdge edge = new TaskEdge();
-                        edge.setFromNodeId(endNode.getId());
-                        edge.setEndNodeId(endId);
-                        edge.setTaskParentId(jobId);
-                        edgeList.add(edge);
+                    if (!childEndNodes.isEmpty()) {
+                        for (TaskNode endNode : childEndNodes) {
+                            for (Long endId : endIds) {
+                                TaskEdge edge = new TaskEdge();
+                                edge.setFromNodeId(endNode.getId());
+                                edge.setEndNodeId(endId);
+                                edge.setTaskParentId(jobId);
+                                edgeList.add(edge);
+                            }
+                        }
                     }
+
+                    for (TaskNode taskNode : childrenNode) {
+                        taskNode.setTaskParentId(jobId);
+                        resNodeList.add(taskNode);
+                    }
+
+                    edgeList.removeIf(v -> (fromIds.contains(v.getFromNodeId()) && v.getEndNodeId().equals(currentNode.getId())) || (v.getFromNodeId().equals(currentNode.getId()) && endIds.contains(v.getEndNodeId())));
                 }
             }
+            nodes.clear();
+            nodes.addAll(resNodeList);
+            resNodeList.clear();
+        }
 
-            for (TaskNode taskNode : childrenNode) {
-                taskNode.setTaskParentId(jobId);
-                resNodeList.add(taskNode);
-            }
-
-            edgeList.removeIf(v -> (fromIds.contains(v.getFromNodeId()) && v.getEndNodeId().equals(currentNode.getId())) || (v.getFromNodeId().equals(currentNode.getId()) && endIds.contains(v.getEndNodeId())));
+        // 计算节点的出度和入度
+        for (TaskNode node : nodes) {
+            node.setNodeInDegree(edgeList.stream().filter(v -> v.getEndNodeId().equals(node.getId())).count());
+            node.setNodeOutDegree(edgeList.stream().filter(v -> v.getFromNodeId().equals(node.getId())).count());
         }
     }
+
+    private void setTaskIdMap(List<TaskNode> nodes, Long jobId) {
+        List<Long> ids = nodes.stream().map(TaskNode::getTaskId).toList();
+        List<TaskInfo> taskInfos = taskInfoService.listByIds(ids);
+        Map<Long, TaskInfo> taskInfoMap = taskInfos.stream().collect(Collectors.toMap(TaskInfo::getId, t -> t));
+
+        for (TaskNode node : nodes) {
+            TaskInfo taskInfo = taskInfoMap.get(node.getTaskId());
+            ArrayList<Long> idList = new ArrayList<>();
+            getTaskInfoIds(taskInfo.getId(),idList);
+            taskIdMap.computeIfAbsent(jobId, k->new HashMap<>())
+                    .computeIfAbsent(taskInfo.getId(), k->new HashSet<>())
+                    .addAll(idList);
+        }
+    }
+
 
 
     private void runT(TaskNode node, List<Long> taskIds) {
@@ -284,9 +283,7 @@ public class TaskRankXxlJob {
             throw new BusinessException(node.getTaskParentId() + " task stop");
         }
 
-        TaskInfoTriggerDto taskInfoTriggerDto = new TaskInfoTriggerDto();
-        taskInfoTriggerDto.setId(node.getTaskId());
-        taskInfoService.triggerJob(taskInfoTriggerDto);
+        JobTriggerPoolHelper.trigger(taskInfo.getId().intValue(), TriggerTypeEnum.MANUAL, -1, null, taskInfo.getExecutorParam(), "");
 
         message.setStatus(2);
         webSocketServer.sendInfo(message);

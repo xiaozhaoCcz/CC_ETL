@@ -321,13 +321,15 @@ function triggerOne() {
     ElMessage.warning("请选择任务组～");
     return;
   }
-  connectWs(taskRankId.value);
+
+  const taskId = taskRankId.value;
   const taskInfoTriggerDto = {};
-  taskInfoTriggerDto.id = taskRankId.value;
-  taskInfoTriggerDto.executorParam = taskRankId.value;
+  taskInfoTriggerDto.id =taskId;
+  taskInfoTriggerDto.executorParam = taskId;
   TaskInfoAPI.triggerJob(taskInfoTriggerDto)
     .then((data) => {
       ElMessage.success("执行任务成功");
+      connectWs(taskId);
       triggerOneVisible.value = true;
       updateEdgeStyle();
     })
@@ -390,7 +392,6 @@ function selectTaskSetNode(node) {
     ElMessage.warning("有任务正在运行，请先停止任务～");
     return;
   }
-  connectWs(node.id);
   g_position.value = [140, 140];
   nodes.value = [];
   edges.value = [];
