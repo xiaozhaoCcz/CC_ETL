@@ -30,6 +30,10 @@
 		t.trigger_next_time
     </sql>
 
+    <update id="stopTaskSet">
+		update task_info set rank_trigger_status = 0 where id = #{id} and rank_trigger_status = 1;
+	</update>
+
 
     <select id="scheduleJobQuery" parameterType="java.util.HashMap" resultType="com.cc.job.task.model.entity.TaskInfo">
         SELECT <include refid="Base_Column_List" />
