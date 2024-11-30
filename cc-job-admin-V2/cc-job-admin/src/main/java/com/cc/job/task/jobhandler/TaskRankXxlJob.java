@@ -10,6 +10,7 @@ import com.cc.job.task.model.entity.TaskNode;
 import com.cc.job.task.service.TaskEdgeService;
 import com.cc.job.task.service.TaskInfoService;
 import com.cc.job.task.service.TaskNodeService;
+import com.cc.job.task.thread.JobCompleteHelper;
 import com.cc.job.task.thread.JobTriggerPoolHelper;
 import com.cc.job.task.websocket.WebSocketServer;
 import com.cc.job.task.websocket.model.Message;
@@ -276,8 +277,8 @@ public class TaskRankXxlJob {
         while (Boolean.TRUE.equals(stopMap.get(node.getTaskParentId()).getFirst())) {
             XxlJobExecutor.removeJobThread(node.getTaskParentId().intValue(), "stop task" + node.getTaskParentId());
             // 节点清空
-            Vector<ReturnT<Long>> vector = TriggerCallbackThread.vector;
-            vector.removeIf(res -> taskIds.contains(res.getContent()));
+            List<ReturnT<String>> returnTList = JobCompleteHelper.getReturnTList();
+            returnTList.removeIf(res -> taskIds.contains(Long.valueOf(res.getContent())));
             taskIdMap.remove(node.getTaskParentId());
             webSocketServer.onClose(node.getTaskParentId());
             throw new BusinessException(node.getTaskParentId() + " task stop");
@@ -302,15 +303,15 @@ public class TaskRankXxlJob {
         FutureTask<Boolean> futureTask = new FutureTask<Boolean>(() -> {
             Label:
             while (true) {
-                Vector<ReturnT<Long>> vector = TriggerCallbackThread.vector;
-                List<ReturnT<Long>> list = new ArrayList<>(vector);
-                for (ReturnT<Long> res : list) {
-                    if (res.getContent().equals(node.getTaskId())) {
+                List<ReturnT<String>> returnTList = JobCompleteHelper.getReturnTList();
+                ArrayList<ReturnT<String>> returnTS = new ArrayList<>(returnTList);
+                for (ReturnT<String> res : returnTS) {
+                    if (res.getContent().equals(String.valueOf(node.getTaskId()))) {
                         logger.info("{}end node{}>>>>>>>>>>> task:{}", res, node.getTaskId(), taskInfo.getJobDesc());
                         if (res.getCode() == ReturnT.SUCCESS_CODE) {
                             message.setStatus(1);
                             webSocketServer.sendInfo(message);
-                            TriggerCallbackThread.vector.remove(res);
+                            JobCompleteHelper.removeReturnT(res);
                             Long pValue = findParent(node.getTaskId(),node.getTaskParentId());
 
                             if(!taskIdMap.get(node.getTaskParentId()).isEmpty()){
@@ -331,7 +332,7 @@ public class TaskRankXxlJob {
                             break Label;
                         } else {
                             if ("DO_NOTHING".equalsIgnoreCase(taskInfo.getExecutorBlockStrategy())) {
-                                TriggerCallbackThread.vector.remove(res);
+                                JobCompleteHelper.removeReturnT(res);
                                 break Label;
                             } else {
                                 message.setStatus(0);
