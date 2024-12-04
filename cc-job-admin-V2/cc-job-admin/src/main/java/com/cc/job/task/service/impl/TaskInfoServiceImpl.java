@@ -22,6 +22,7 @@ import com.cc.job.task.thread.JobScheduleHelper;
 import com.cc.job.task.thread.JobTriggerPoolHelper;
 import com.cc.job.task.utils.I18nUtil;
 import com.cc.job.task.websocket.WebSocketServer;
+import com.cc.tasktool.executor.Async;
 import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
 import com.xxl.job.core.executor.XxlJobExecutor;
 import com.xxl.job.core.glue.GlueTypeEnum;
@@ -612,11 +613,12 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
     public boolean stopTaskSet(Long id) {
         int flag = taskInfoMapper.stopTaskSet(id);
         XxlJobExecutor.removeJobThread(id.intValue(), "stop task" + id);
-        List<Long> allTaskInfoIds = new ArrayList<>();
-        // 得到当前任务的所有子任务
-        getChildTaskInfos(id, allTaskInfoIds);
-        allTaskInfoIds.forEach(item -> TaskRankXxlJob.processStopMap(id, true, item));
-        webSocketServer.onClose(id);
+        Async.stopWork();
+//        List<Long> allTaskInfoIds = new ArrayList<>();
+//        // 得到当前任务的所有子任务
+//        getChildTaskInfos(id, allTaskInfoIds);
+//        allTaskInfoIds.forEach(item -> TaskRankXxlJob.processStopMap(id, true, item));
+//        webSocketServer.onClose(id);
         return true;
     }
 

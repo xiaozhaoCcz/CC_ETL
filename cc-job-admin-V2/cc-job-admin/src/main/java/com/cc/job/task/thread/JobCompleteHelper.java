@@ -1,5 +1,6 @@
 package com.cc.job.task.thread;
 
+import cn.hutool.core.lang.Pair;
 import com.cc.job.common.result.Result;
 import com.cc.job.task.complete.XxlJobCompleter;
 import com.cc.job.task.config.XxlJobAdminConfig;
@@ -13,10 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.*;
 
 /**
@@ -33,14 +31,16 @@ public class JobCompleteHelper {
 		return instance;
 	}
 
-	private static final List<ReturnT<String>> returnTList = Collections.synchronizedList(new ArrayList<>());
+	private static final List<Pair<Long,Boolean>> callbackRes = Collections.synchronizedList(new ArrayList<>());
 
-	public static List<ReturnT<String>> getReturnTList() {
-		return returnTList;
+	public  static  List<Pair<Long,Boolean>> getCallbackRes() {
+		return callbackRes;
 	}
 
-	public static void removeReturnT(ReturnT<String> res) {
-		returnTList.remove(res);
+	public static void removeCallbackRes(Long jobId) {
+		if (jobId != null) {
+			callbackRes.removeIf(pair -> jobId.equals(pair.getKey()));
+		}
 	}
 	// ---------------------- monitor ----------------------
 
@@ -172,27 +172,16 @@ public class JobCompleteHelper {
 		// valid log item
 		TaskLog log = XxlJobAdminConfig.getAdminConfig().getTaskLogMapper().selectById(handleCallbackParam.getLogId());
 		if (log == null) {
-			ReturnT<String> returnT = new ReturnT<>(ReturnT.FAIL_CODE, "log item not found.");
-			returnT.setContent(String.valueOf(log.getJobId()));
-			returnTList.add(returnT);
-			return returnT;
+			callbackRes.add(new Pair<>(handleCallbackParam.getJobId(), false));
+			return new ReturnT<>(ReturnT.FAIL_CODE, "log item not found.");
 		}
 		if (log.getHandleCode() > 0) {
-			ReturnT<String> returnT = new ReturnT<>(ReturnT.FAIL_CODE, "log repeate callback.");
-			returnT.setContent(String.valueOf(log.getJobId()));
-			returnTList.add(returnT);
-			return returnT;
+			callbackRes.add(new Pair<>(handleCallbackParam.getJobId(), false));
+			return new ReturnT<>(ReturnT.FAIL_CODE, "log repeate callback.");
 		}
 
 		// 处理结果
-		ReturnT<String> result = new ReturnT<>();
-
-		result.setCode(handleCallbackParam.getHandleCode());
-		result.setMsg(handleCallbackParam.getHandleMsg());
-
-
-		result.setContent(String.valueOf(log.getJobId()));
-		returnTList.add(result);
+		callbackRes.add(new Pair<>(handleCallbackParam.getJobId(), true));
 		// handle msg
 		StringBuffer handleMsg = new StringBuffer();
 		if (log.getHandleMsg() != null) {
