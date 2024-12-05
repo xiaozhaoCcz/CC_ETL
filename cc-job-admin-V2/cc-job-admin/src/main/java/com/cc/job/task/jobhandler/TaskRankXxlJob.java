@@ -175,6 +175,7 @@ public class TaskRankXxlJob {
         int count = 0;
         Label:
         while (true) {
+            // TODO  后续需要优化，支持多节点
             List<Pair<Long, Boolean>> callbackRes = JobCompleteHelper.getCallbackRes();
             for (Pair<Long, Boolean> pair : new ArrayList<>(callbackRes)) {
                 if (pair.getKey().equals(taskId)) {
@@ -363,6 +364,32 @@ public class TaskRankXxlJob {
         }
     }
 
+    private Long findParent(Long taskId, Long parentTaskId) {
+        Map<Long, Set<Long>> map = taskIdMap.get(parentTaskId);
+        Long valueToFind = null;
+        //从map中拿到key
+        for (Map.Entry<Long, Set<Long>> entry : map.entrySet()) {
+            Set<Long> values = entry.getValue();
+            if (values.contains(taskId)) {
+                valueToFind = entry.getKey();
+                break; // 如果只需要找到第一个匹配的键，找到后就可以退出循环
+            }
+        }
+        return valueToFind;
+    }
+
+    public void getTaskInfoIds(Long jobId, List<Long> ids) {
+        TaskInfo taskInfo = taskInfoService.getById(jobId);
+        if (taskInfo.getJobType() != 2) {
+            ids.add(taskInfo.getId());
+        } else {
+            List<TaskInfo> taskInfos = taskInfoService.list(new LambdaQueryWrapper<TaskInfo>().eq(TaskInfo::getParentId, jobId));
+            if (!taskInfos.isEmpty()) {
+                taskInfos.stream().map(TaskInfo::getId).forEach(childTaskId -> getTaskInfoIds(childTaskId, ids));
+            }
+        }
+    }
+
     private class TaskCallback implements ICallback<Long, String> {
         private final TaskNode node;
 
@@ -394,33 +421,6 @@ public class TaskRankXxlJob {
         }
     }
 
-
-
-    private Long findParent(Long taskId, Long parentTaskId) {
-        Map<Long, Set<Long>> map = taskIdMap.get(parentTaskId);
-        Long valueToFind = null;
-        //从map中拿到key
-        for (Map.Entry<Long, Set<Long>> entry : map.entrySet()) {
-            Set<Long> values = entry.getValue();
-            if (values.contains(taskId)) {
-                valueToFind = entry.getKey();
-                break; // 如果只需要找到第一个匹配的键，找到后就可以退出循环
-            }
-        }
-        return valueToFind;
-    }
-
-    public void getTaskInfoIds(Long jobId, List<Long> ids) {
-        TaskInfo taskInfo = taskInfoService.getById(jobId);
-        if (taskInfo.getJobType() != 2) {
-            ids.add(taskInfo.getId());
-        } else {
-            List<TaskInfo> taskInfos = taskInfoService.list(new LambdaQueryWrapper<TaskInfo>().eq(TaskInfo::getParentId, jobId));
-            if (!taskInfos.isEmpty()) {
-                taskInfos.stream().map(TaskInfo::getId).forEach(childTaskId -> getTaskInfoIds(childTaskId, ids));
-            }
-        }
-    }
 
 //    private List<Long> getNeighbors(Long node, List<TaskEdge> edges) {
 //        return edges.stream().filter(v -> v.getFromNodeId().equals(node)).map(TaskEdge::getEndNodeId).toList();
