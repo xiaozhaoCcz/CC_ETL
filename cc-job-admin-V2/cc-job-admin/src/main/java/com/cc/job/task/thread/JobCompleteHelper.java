@@ -181,7 +181,7 @@ public class JobCompleteHelper {
 		}
 
 		// 处理结果
-		callbackRes.add(new Pair<>(handleCallbackParam.getJobId(), true));
+		callbackRes.add(new Pair<>(handleCallbackParam.getJobId(), handleCallbackParam.getHandleCode()==ReturnT.SUCCESS_CODE));
 		// handle msg
 		StringBuffer handleMsg = new StringBuffer();
 		if (log.getHandleMsg() != null) {

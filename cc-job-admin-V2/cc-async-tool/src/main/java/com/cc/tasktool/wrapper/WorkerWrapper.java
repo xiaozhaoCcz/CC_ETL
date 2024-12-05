@@ -174,6 +174,16 @@ public class WorkerWrapper<T, V> {
         }
         return this;
     }
+
+    public WorkerWrapper<T, V> next(boolean selfIsMust,WorkerWrapper<?, ?>... wrappers) {
+        if (wrappers == null) {
+            return this;
+        }
+        for (WorkerWrapper<?, ?> wrapper : wrappers) {
+            next(wrapper,selfIsMust);
+        }
+        return this;
+    }
     /**
      * 开始工作
      * fromWrapper代表这次work是由哪个上游wrapper发起的
@@ -536,6 +546,10 @@ public class WorkerWrapper<T, V> {
 
     public String getId() {
         return id;
+    }
+
+    public T getParam() {
+        return param;
     }
 
     private boolean compareAndSetState(int expect, int update) {

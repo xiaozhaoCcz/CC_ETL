@@ -20,25 +20,22 @@ import com.cc.tasktool.callback.IWorker;
 import com.cc.tasktool.executor.Async;
 import com.cc.tasktool.worker.WorkResult;
 import com.cc.tasktool.wrapper.WorkerWrapper;
-import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.context.XxlJobHelper;
-import com.xxl.job.core.executor.XxlJobExecutor;
 import com.xxl.job.core.handler.annotation.XxlJob;
-import com.xxl.job.core.thread.JobThread;
-import com.xxl.job.core.thread.TriggerCallbackThread;
-import jakarta.annotation.Resource;
 import lombok.AllArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import java.awt.*;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
+/**
+ * @author xiaozhao
+ */
 @Component
 @AllArgsConstructor
 public class TaskRankXxlJob {
@@ -51,17 +48,17 @@ public class TaskRankXxlJob {
 
     final WebSocketServer webSocketServer;
 
-    static final ConcurrentHashMap<Long, Pair<Boolean, Long>> stopMap = new ConcurrentHashMap<Long, Pair<Boolean, Long>>();
+    static final ConcurrentHashMap<Long, WorkerWrapper<Long, String>> stopMap = new ConcurrentHashMap<>();
 
-    public static void processStopMap(Long parentId, boolean flag, Long id) {
-        stopMap.put(parentId, new Pair<>(flag, id));
-    }
-
-    public static void removeStopMap(Long parentId) {
+    public static void removeWorkWrapper(Long parentId) {
         stopMap.remove(parentId);
     }
 
-    static final Map<Long,Map<Long,Set<Long>>> taskIdMap = new ConcurrentHashMap<>();
+    public static WorkerWrapper<Long, String> getWorkWrapper(Long parentId) {
+        return stopMap.get(parentId);
+    }
+
+    static final Map<Long, Map<Long, Set<Long>>> taskIdMap = new ConcurrentHashMap<>();
 
     @XxlJob("runTaskRankXxlJob")
     public void runTaskRankXxlJob() {
@@ -83,7 +80,7 @@ public class TaskRankXxlJob {
         buildGraph(Long.valueOf(jobId), nodes, edges);
 
         // 找到依赖的节点
-        Map<Long,List<TaskNode>> nextMap = buildNextNode(nodes,edges);
+        Map<Long, List<TaskNode>> nextMap = buildNextNode(nodes, edges);
 
         // 构建任务
         List<WorkerWrapper<Long, String>> workerWrappers = buildWorkerWrappers(nodes, nextMap);
@@ -92,13 +89,36 @@ public class TaskRankXxlJob {
 
         List<WorkerWrapper<Long, String>> startWrappers = workerWrappers.stream().filter(v -> startNodes.contains(Long.valueOf(v.getId()))).toList();
 
+        WorkerWrapper<Long, String> startWork = new WorkerWrapper<Long, String>()
+                .id(String.valueOf(jobId))
+                .param(jobId)
+                .worker(new IWorker<Long, String>() {
+                    @Override
+                    public String action(Long id, Map<String, WorkerWrapper> allWrappers) {
+                        logger.info("{} start ... ", id);
+                        return "";
+                    }
+                }).next(startWrappers.toArray(new WorkerWrapper[0]));
+
+        stopMap.put(jobId, startWork);
+
         try {
-            Async.beginWork(taskInfo.getExecutorTimeout(),startWrappers.toArray(new WorkerWrapper[0]));
+            Async.beginWork(taskInfo.getExecutorTimeout(), startWork);
         } catch (ExecutionException | InterruptedException e) {
             throw new RuntimeException(e);
         }
 
-        logger.info("{}任务运行完成",jobId);
+        logger.info("{}任务运行完成", jobId);
+
+        Message message = new Message();
+        message.setTaskId(jobId);
+        message.setParentTaskId(jobId);
+        message.setStatus(1);
+        webSocketServer.sendInfo(message);
+
+        taskIdMap.remove(jobId);
+        stopMap.remove(jobId);
+
         //Async.shutDown();
 //
 //        List<Long> visited = new CopyOnWriteArrayList<>();
@@ -116,59 +136,101 @@ public class TaskRankXxlJob {
 //        executeTask(nodeMap, nodes, futureMap, taskIds);
     }
 
-    private List<WorkerWrapper<Long,String>> buildWorkerWrappers(List<TaskNode> nodes, Map<Long, List<TaskNode>> nextMap) {
-        List<WorkerWrapper<Long,String>> result = new ArrayList<>();
+    private List<WorkerWrapper<Long, String>> buildWorkerWrappers(List<TaskNode> nodes, Map<Long, List<TaskNode>> nextMap) {
+        List<WorkerWrapper<Long, String>> result = new ArrayList<>();
         List<Long> taskIds = nodes.stream().map(TaskNode::getTaskId).toList();
         List<TaskInfo> taskInfos = taskInfoService.listByIds(taskIds);
-        final Map<Long,TaskInfo> taskInfoMap = taskInfos.stream().collect(Collectors.toMap(TaskInfo::getId, t -> t));
+        final Map<Long, TaskInfo> taskInfoMap = taskInfos.stream().collect(Collectors.toMap(TaskInfo::getId, t -> t));
         for (TaskNode node : nodes) {
+            final TaskInfo taskInfo = taskInfoMap.get(node.getTaskId());
             WorkerWrapper<Long, String> worker = new WorkerWrapper<Long, String>()
                     .id(String.valueOf(node.getId()))
                     .param(node.getTaskId())
+                    .timeout(taskInfo.getExecutorTimeout())
                     .worker((taskId, allWrappers) -> {
-                        TaskInfo taskInfo = taskInfoMap.get(taskId);
                         JobTriggerPoolHelper.trigger(taskId.intValue(), TriggerTypeEnum.MANUAL, -1, null, taskInfo.getExecutorParam(), "");
+
+                        int count = 0;
                         Label:
+                        // TODO 在多节点情况下会有问题
                         while (true) {
                             List<Pair<Long, Boolean>> callbackRes = JobCompleteHelper.getCallbackRes();
                             ArrayList<Pair<Long, Boolean>> list = new ArrayList<>(callbackRes);
                             for (Pair<Long, Boolean> pair : list) {
                                 if (pair.getKey().equals(taskId)) {
-                                    logger.info("end node{}>>>>>>>>>>> task:{}", node.getTaskId(), taskInfo.getJobDesc());
+                                    logger.info("end task:{}, status:{}", taskId, pair.getValue() ? "success" : "fail");
                                     Message message = new Message();
                                     message.setTaskId(taskId);
+                                    message.setParentTaskId(node.getTaskParentId());
+                                    Long pValue = findParent(taskId, node.getTaskParentId());
                                     if (pair.getValue()) {
-//                                        message.setStatus(1);
-//                                        webSocketServer.sendInfo(message);
+                                        message.setStatus(1);
+                                        webSocketServer.sendInfo(message);
                                         JobCompleteHelper.removeCallbackRes(taskId);
+                                        if (!taskIdMap.get(node.getTaskParentId()).isEmpty()) {
+                                            Set<Long> ids = taskIdMap.get(node.getTaskParentId()).get(pValue);
+                                            ids.remove(node.getTaskId());
+                                            taskIdMap.computeIfAbsent(node.getTaskParentId(), k -> new HashMap<>())
+                                                    .computeIfAbsent(pValue, k -> new HashSet<>())
+                                                    .addAll(ids);
+                                            if (ids.isEmpty()) {
+                                                Message pMessage = new Message();
+                                                pMessage.setParentTaskId(node.getTaskParentId());
+                                                pMessage.setTaskId(pValue);
+                                                pMessage.setStatus(1);
+                                                webSocketServer.sendInfo(pMessage);
+                                            }
+                                        }
                                     } else {
-//                                        message.setStatus(0);
-//                                        webSocketServer.sendInfo(message);
-//                                        Long pValue = findParent(taskId,node.getTaskParentId());
-//                                        if(taskIdMap.get(node.getTaskParentId())!=null&&pValue!=null) {
-//                                            Message pMessage = new Message();
-//                                            pMessage.setParentTaskId(node.getTaskParentId());
-//                                            pMessage.setTaskId(pValue);
-//                                            pMessage.setStatus(0);
-//                                            webSocketServer.sendInfo(pMessage);
-//                                        }
                                         JobCompleteHelper.removeCallbackRes(taskId);
-                                        throw new RuntimeException();
+                                        if (++count <= taskInfo.getExecutorFailRetryCount()) {
+                                            System.out.println("count" + count);
+                                            break;
+                                        }
+                                        message.setStatus(0);
+                                        webSocketServer.sendInfo(message);
+                                        if (taskIdMap.get(node.getTaskParentId()) != null && pValue != null) {
+                                            Message pMessage = new Message();
+                                            pMessage.setParentTaskId(node.getTaskParentId());
+                                            pMessage.setTaskId(pValue);
+                                            pMessage.setStatus(0);
+                                            webSocketServer.sendInfo(pMessage);
+                                        }
+                                        if ("DO_NOTHING".equalsIgnoreCase(taskInfo.getExecutorBlockStrategy())) {
+
+                                        } else {
+
+
+                                            throw new RuntimeException(taskId + " run fail");
+                                        }
                                     }
                                     break Label;
                                 }
                             }
                         }
                         return "";
-                    }).callback(new ICallback<Long, String>() {
+                    }).callback(new ICallback<>() {
                         @Override
-                        public void begin(Long taskId){
-                            logger.info(" {} begin start",taskId);
+                        public void begin(Long taskId) {
+                            logger.info(" {} begin ...", taskId);
+                            Message message = new Message();
+                            message.setTaskId(taskId);
+                            message.setStatus(2);
+                            message.setParentTaskId(node.getTaskParentId());
+                            webSocketServer.sendInfo(message);
+                            Long pValue = findParent(taskId, node.getTaskParentId());
+                            if (taskIdMap.get(node.getTaskParentId()) != null && pValue != null) {
+                                Message pMessage = new Message();
+                                pMessage.setParentTaskId(node.getTaskParentId());
+                                pMessage.setTaskId(pValue);
+                                pMessage.setStatus(2);
+                                webSocketServer.sendInfo(pMessage);
+                            }
                         }
 
                         @Override
                         public void result(boolean success, Long param, WorkResult<String> workResult) {
-
+                            logger.info("job:{}, status:{},result:{}", param, success, workResult.getResult());
                         }
                     });
             result.add(worker);
@@ -176,8 +238,10 @@ public class TaskRankXxlJob {
 
         for (WorkerWrapper<Long, String> workerWrapper : result) {
             String id = workerWrapper.getId();
+            Long taskId = workerWrapper.getParam();
+            TaskInfo taskInfo = taskInfoMap.get(taskId);
             List<TaskNode> taskNodes = nextMap.get(Long.valueOf(id));
-            if(taskNodes.isEmpty()){
+            if (taskNodes.isEmpty()) {
                 continue;
             }
             List<Long> cNodeIds = taskNodes.stream().map(TaskNode::getId).toList();
@@ -191,8 +255,8 @@ public class TaskRankXxlJob {
         Map<Long, List<TaskNode>> result = new HashMap<>();
         for (TaskNode node : nodes) {
             List<Long> nodeIds = edges.stream().filter(v -> v.getFromNodeId().equals(node.getId())).map(TaskEdge::getEndNodeId).toList();
-            List<TaskNode> cNodes = nodes.stream().filter(v->nodeIds.contains(v.getId())).toList();
-            result.put(node.getId(),cNodes);
+            List<TaskNode> cNodes = nodes.stream().filter(v -> nodeIds.contains(v.getId())).toList();
+            result.put(node.getId(), cNodes);
         }
         return result;
     }
@@ -204,7 +268,7 @@ public class TaskRankXxlJob {
                 for (long d : v) {
                     //阻塞等待
                     try {
-                        if(futureMap.get(d)!=null){
+                        if (futureMap.get(d) != null) {
                             futureMap.get(d).get();
                         }
                     } catch (InterruptedException | ExecutionException e) {
@@ -363,13 +427,12 @@ public class TaskRankXxlJob {
         for (TaskNode node : nodes) {
             TaskInfo taskInfo = taskInfoMap.get(node.getTaskId());
             ArrayList<Long> idList = new ArrayList<>();
-            getTaskInfoIds(taskInfo.getId(),idList);
-            taskIdMap.computeIfAbsent(jobId, k->new HashMap<>())
-                    .computeIfAbsent(taskInfo.getId(), k->new HashSet<>())
+            getTaskInfoIds(taskInfo.getId(), idList);
+            taskIdMap.computeIfAbsent(jobId, k -> new HashMap<>())
+                    .computeIfAbsent(taskInfo.getId(), k -> new HashSet<>())
                     .addAll(idList);
         }
     }
-
 
 
     private void runT(TaskNode node, List<Long> taskIds) {
@@ -475,11 +538,11 @@ public class TaskRankXxlJob {
         return edges.stream().filter(v -> v.getFromNodeId().equals(node)).map(TaskEdge::getEndNodeId).toList();
     }
 
-    private Long findParent(Long taskId,Long parentTaskId){
+    private Long findParent(Long taskId, Long parentTaskId) {
         Map<Long, Set<Long>> map = taskIdMap.get(parentTaskId);
         Long valueToFind = null;
         //从map中拿到key
-        for (Map.Entry<Long, Set<Long>> entry: map.entrySet()) {
+        for (Map.Entry<Long, Set<Long>> entry : map.entrySet()) {
             Set<Long> values = entry.getValue();
             if (values.contains(taskId)) {
                 valueToFind = entry.getKey();
@@ -489,18 +552,18 @@ public class TaskRankXxlJob {
         return valueToFind;
     }
 
-    public void getTaskInfoIds(Long jobId,List<Long> ids){
+    public void getTaskInfoIds(Long jobId, List<Long> ids) {
         TaskInfo taskInfo = taskInfoService.getById(jobId);
-        if(taskInfo.getJobType()!=2){
+        if (taskInfo.getJobType() != 2) {
             ids.add(taskInfo.getId());
-        }else{
+        } else {
             List<TaskInfo> taskInfos = taskInfoService.list(new LambdaQueryWrapper<TaskInfo>().eq(TaskInfo::getParentId, jobId));
-            if(taskInfos.isEmpty()){
+            if (taskInfos.isEmpty()) {
                 return;
             }
             List<Long> childTaskIds = taskInfos.stream().map(TaskInfo::getId).toList();
             for (Long childTaskId : childTaskIds) {
-                getTaskInfoIds(childTaskId,ids);
+                getTaskInfoIds(childTaskId, ids);
             }
         }
     }
