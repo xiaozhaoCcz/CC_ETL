@@ -324,7 +324,7 @@ function triggerOne() {
 
   const taskId = taskRankId.value;
   const taskInfoTriggerDto = {};
-  taskInfoTriggerDto.id =taskId;
+  taskInfoTriggerDto.id = taskId;
   taskInfoTriggerDto.executorParam = taskId;
   TaskInfoAPI.triggerJob(taskInfoTriggerDto)
     .then((data) => {
@@ -481,6 +481,12 @@ const connectWs = (id: number) => {
     const _message = JSON.parse(e.data);
     message.value = _message;
     console.log("接收到消息", _message);
+
+    if (_message.taskId == taskRankId.value) {
+      // 关闭任务
+      stopTrigger();
+    }
+
     // 接收到消息后，需要做出相应的操作，比如更新节点或边
     const node = nodes.value.find(
       (node: any) => node.data.taskId == _message.taskId

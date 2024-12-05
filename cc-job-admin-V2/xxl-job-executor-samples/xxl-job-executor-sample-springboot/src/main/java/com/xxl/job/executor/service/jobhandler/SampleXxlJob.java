@@ -14,6 +14,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * XxlJob开发示例（Bean模式）
@@ -67,6 +68,8 @@ public class SampleXxlJob {
         System.out.println(">>>>>>>> demoJobHandler2 end");
     }
 
+    AtomicInteger count = new AtomicInteger(0); //模拟任务重试2次后，任务成功运行
+
     @XxlJob("demoJobHandler3")
     public void demoJobHandler3() throws Exception {
 
@@ -79,7 +82,10 @@ public class SampleXxlJob {
             TimeUnit.SECONDS.sleep(1);
         }
 
-       //throw  new RuntimeException();
+//        if(count.incrementAndGet()<=2){
+//            System.out.println(">>>>>>>>count"+count.get());
+//            throw  new RuntimeException();
+//        }
         //default success
         XxlJobHelper.log(">>>>>>>> demoJobHandler3 end");
         System.out.println(">>>>>>>> demoJobHandler3 end");

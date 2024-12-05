@@ -22,11 +22,14 @@ import com.cc.job.task.thread.JobScheduleHelper;
 import com.cc.job.task.thread.JobTriggerPoolHelper;
 import com.cc.job.task.utils.I18nUtil;
 import com.cc.job.task.websocket.WebSocketServer;
+import com.cc.tasktool.executor.Async;
+import com.cc.tasktool.wrapper.WorkerWrapper;
 import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
 import com.xxl.job.core.executor.XxlJobExecutor;
 import com.xxl.job.core.glue.GlueTypeEnum;
 import com.xxl.job.core.util.DateUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
@@ -57,6 +60,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> implements TaskInfoService {
 
     private final TaskGroupService taskGroupService;
@@ -245,9 +249,6 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             throw new BusinessException("当前任务正在运行中～");
         }
 
-        if (taskInfo.getJobType() == 2) {
-            TaskRankXxlJob.removeStopMap(taskInfo.getId());
-        }
         // force cover job param
         if (taskInfoTriggerDto.getExecutorParam() == null) {
             taskInfoTriggerDto.setExecutorParam("");
@@ -612,23 +613,13 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
     public boolean stopTaskSet(Long id) {
         int flag = taskInfoMapper.stopTaskSet(id);
         XxlJobExecutor.removeJobThread(id.intValue(), "stop task" + id);
-        List<Long> allTaskInfoIds = new ArrayList<>();
-        // 得到当前任务的所有子任务
-        getChildTaskInfos(id, allTaskInfoIds);
-        allTaskInfoIds.forEach(item -> TaskRankXxlJob.processStopMap(id, true, item));
-        webSocketServer.onClose(id);
-        return true;
-    }
-
-    private void getChildTaskInfos(Long id, List<Long> allTaskInfoIds) {
-        List<TaskInfo> taskInfos = this.list(new LambdaQueryWrapper<TaskInfo>().eq(TaskInfo::getParentId, id));
-        for (TaskInfo taskInfo : taskInfos) {
-            if (taskInfo.getJobType() == 2) {
-                getChildTaskInfos(taskInfo.getId(), allTaskInfoIds);
-            }
+        WorkerWrapper<Long, String> workWrapper = TaskRankXxlJob.getWorkWrapper(id);
+        if(workWrapper!=null){
+            log.info(">>>>>>>>> stop task:{}",workWrapper.getId());
+            Async.stopWork(workWrapper);
         }
-        List<Long> ids = taskInfos.stream().map(TaskInfo::getId).toList();
-        allTaskInfoIds.addAll(ids);
+        TaskRankXxlJob.removeWorkWrapper(id);
+        return true;
     }
 
     @Override

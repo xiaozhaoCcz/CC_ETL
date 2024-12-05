@@ -1,5 +1,6 @@
 package com.cc.job.task.thread;
 
+import cn.hutool.core.lang.Pair;
 import com.cc.job.common.result.Result;
 import com.cc.job.task.complete.XxlJobCompleter;
 import com.cc.job.task.config.XxlJobAdminConfig;
@@ -13,8 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.*;
 
 /**
@@ -31,6 +31,17 @@ public class JobCompleteHelper {
 		return instance;
 	}
 
+	private static final List<Pair<Long,Boolean>> callbackRes = Collections.synchronizedList(new ArrayList<>());
+
+	public  static  List<Pair<Long,Boolean>> getCallbackRes() {
+		return callbackRes;
+	}
+
+	public static void removeCallbackRes(Long jobId) {
+		if (jobId != null) {
+			callbackRes.removeIf(pair -> jobId.equals(pair.getKey()));
+		}
+	}
 	// ---------------------- monitor ----------------------
 
 	private ThreadPoolExecutor callbackThreadPool = null;
@@ -161,26 +172,16 @@ public class JobCompleteHelper {
 		// valid log item
 		TaskLog log = XxlJobAdminConfig.getAdminConfig().getTaskLogMapper().selectById(handleCallbackParam.getLogId());
 		if (log == null) {
-			return new ReturnT<String>(ReturnT.FAIL_CODE, "log item not found.");
+			callbackRes.add(new Pair<>(handleCallbackParam.getJobId(), false));
+			return new ReturnT<>(ReturnT.FAIL_CODE, "log item not found.");
 		}
 		if (log.getHandleCode() > 0) {
-			ReturnT<Long> returnT = new ReturnT<>(ReturnT.FAIL_CODE, "log repeate callback.");// avoid repeat callback, trigger child job etc
-			returnT.setContent(log.getJobId());
-			TriggerCallbackThread.vector.add(returnT);
+			callbackRes.add(new Pair<>(handleCallbackParam.getJobId(), false));
 			return new ReturnT<>(ReturnT.FAIL_CODE, "log repeate callback.");
 		}
 
 		// 处理结果
-		ReturnT<Long> result = new ReturnT<Long>();
-
-		result.setCode(handleCallbackParam.getHandleCode());
-		result.setMsg(handleCallbackParam.getHandleMsg());
-
-		System.out.println("result: " + result);
-
-		result.setContent(log.getJobId());
-		TriggerCallbackThread.vector.add(result);
-
+		callbackRes.add(new Pair<>(handleCallbackParam.getJobId(), handleCallbackParam.getHandleCode()==ReturnT.SUCCESS_CODE));
 		// handle msg
 		StringBuffer handleMsg = new StringBuffer();
 		if (log.getHandleMsg() != null) {
