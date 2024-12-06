@@ -4,10 +4,10 @@ import cn.hutool.core.lang.Pair;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.common.exception.BusinessException;
 import com.cc.job.task.enums.TriggerTypeEnum;
-import com.cc.job.task.model.dto.TaskInfoTriggerDto;
 import com.cc.job.task.model.entity.TaskEdge;
 import com.cc.job.task.model.entity.TaskInfo;
 import com.cc.job.task.model.entity.TaskNode;
+import com.cc.job.task.redis.StreamConsumer;
 import com.cc.job.task.service.TaskEdgeService;
 import com.cc.job.task.service.TaskInfoService;
 import com.cc.job.task.service.TaskNodeService;
@@ -26,8 +26,14 @@ import lombok.AllArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.connection.stream.MapRecord;
+import org.springframework.data.redis.connection.stream.ReadOffset;
+import org.springframework.data.redis.connection.stream.StreamOffset;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.stream.StreamMessageListenerContainer;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.*;
@@ -39,6 +45,8 @@ import java.util.stream.Collectors;
 @Component
 @AllArgsConstructor
 public class TaskRankXxlJob {
+
+    final RedisTemplate redisTemplate;
 
     final TaskInfoService taskInfoService;
 
@@ -172,11 +180,11 @@ public class TaskRankXxlJob {
 
     private String executeTask(Long taskId, TaskNode node, TaskInfo taskInfo) {
         JobTriggerPoolHelper.trigger(taskId.intValue(), TriggerTypeEnum.MANUAL, -1, null, taskInfo.getExecutorParam(), "");
+
         int count = 0;
         Label:
         while (true) {
-            // TODO  后续需要优化，支持多节点
-            List<Pair<Long, Boolean>> callbackRes = JobCompleteHelper.getCallbackRes();
+            List<Pair<Long, Boolean>> callbackRes = StreamConsumer.getCallbackRes();
             for (Pair<Long, Boolean> pair : new ArrayList<>(callbackRes)) {
                 if (pair.getKey().equals(taskId)) {
                     handleTaskCompletion(pair, node, taskInfo, count);
@@ -199,10 +207,10 @@ public class TaskRankXxlJob {
         if (success) {
             message.setStatus(1);
             webSocketServer.sendInfo(message);
-            JobCompleteHelper.removeCallbackRes(taskId);
+            StreamConsumer.removeCallbackRes(taskId);
             updateTaskIdMap(node, pValue);
         } else {
-            JobCompleteHelper.removeCallbackRes(taskId);
+            StreamConsumer.removeCallbackRes(taskId);
             if (++count <= taskInfo.getExecutorFailRetryCount()) {
                 logger.info("Retrying task: {}, attempt: {}", taskId, count);
             } else {
@@ -420,7 +428,6 @@ public class TaskRankXxlJob {
             logger.info("job:{}, status:{},result:{}", param, success, workResult.getResult());
         }
     }
-
 
 //    private List<Long> getNeighbors(Long node, List<TaskEdge> edges) {
 //        return edges.stream().filter(v -> v.getFromNodeId().equals(node)).map(TaskEdge::getEndNodeId).toList();

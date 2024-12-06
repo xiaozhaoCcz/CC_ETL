@@ -2,16 +2,27 @@ package com.cc.job.task.thread;
 
 import cn.hutool.core.lang.Pair;
 import com.cc.job.common.result.Result;
+import com.cc.job.config.RedisConfig;
 import com.cc.job.task.complete.XxlJobCompleter;
 import com.cc.job.task.config.XxlJobAdminConfig;
 import com.cc.job.task.model.entity.TaskLog;
+import com.cc.job.task.redis.StreamConsumer;
 import com.cc.job.task.utils.I18nUtil;
 import com.xxl.job.core.biz.model.HandleCallbackParam;
 import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.thread.TriggerCallbackThread;
 import com.xxl.job.core.util.DateUtil;
+import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.data.redis.connection.stream.MapRecord;
+import org.springframework.data.redis.connection.stream.RecordId;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.serializer.RedisSerializer;
+import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -31,17 +42,6 @@ public class JobCompleteHelper {
 		return instance;
 	}
 
-	private static final List<Pair<Long,Boolean>> callbackRes = Collections.synchronizedList(new ArrayList<>());
-
-	public  static  List<Pair<Long,Boolean>> getCallbackRes() {
-		return callbackRes;
-	}
-
-	public static void removeCallbackRes(Long jobId) {
-		if (jobId != null) {
-			callbackRes.removeIf(pair -> jobId.equals(pair.getKey()));
-		}
-	}
 	// ---------------------- monitor ----------------------
 
 	private ThreadPoolExecutor callbackThreadPool = null;
@@ -49,7 +49,6 @@ public class JobCompleteHelper {
 	private volatile boolean toStop = false;
 
 	public void start(){
-
 		// for callback
 		callbackThreadPool = new ThreadPoolExecutor(
 				2,
@@ -172,16 +171,23 @@ public class JobCompleteHelper {
 		// valid log item
 		TaskLog log = XxlJobAdminConfig.getAdminConfig().getTaskLogMapper().selectById(handleCallbackParam.getLogId());
 		if (log == null) {
-			callbackRes.add(new Pair<>(handleCallbackParam.getJobId(), false));
+			Map<Long,Boolean> result = new HashMap<>();
+			result.put(handleCallbackParam.getJobId(),false);
+			XxlJobAdminConfig.redisUtils.sendMessage(StreamConsumer.TASK_SET_STREAM,result);
 			return new ReturnT<>(ReturnT.FAIL_CODE, "log item not found.");
 		}
 		if (log.getHandleCode() > 0) {
-			callbackRes.add(new Pair<>(handleCallbackParam.getJobId(), false));
+			Map<Long,Boolean> result = new HashMap<>();
+			result.put(handleCallbackParam.getJobId(),false);
+			XxlJobAdminConfig.redisUtils.sendMessage(StreamConsumer.TASK_SET_STREAM,result);
 			return new ReturnT<>(ReturnT.FAIL_CODE, "log repeate callback.");
 		}
 
 		// 处理结果
-		callbackRes.add(new Pair<>(handleCallbackParam.getJobId(), handleCallbackParam.getHandleCode()==ReturnT.SUCCESS_CODE));
+		Map<String,Boolean> map = new HashMap<>();
+		map.put(String.valueOf(handleCallbackParam.getJobId()),handleCallbackParam.getHandleCode()==ReturnT.SUCCESS_CODE);
+		XxlJobAdminConfig.redisUtils.sendMessage(StreamConsumer.TASK_SET_STREAM,map);
+
 		// handle msg
 		StringBuffer handleMsg = new StringBuffer();
 		if (log.getHandleMsg() != null) {
