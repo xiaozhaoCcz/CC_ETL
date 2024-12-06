@@ -8,6 +8,7 @@ import com.cc.job.task.model.dto.TaskInfoTriggerDto;
 import com.cc.job.task.model.entity.TaskEdge;
 import com.cc.job.task.model.entity.TaskInfo;
 import com.cc.job.task.model.entity.TaskNode;
+import com.cc.job.task.redis.StreamConsumer;
 import com.cc.job.task.service.TaskEdgeService;
 import com.cc.job.task.service.TaskInfoService;
 import com.cc.job.task.service.TaskNodeService;
@@ -26,8 +27,14 @@ import lombok.AllArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.connection.stream.MapRecord;
+import org.springframework.data.redis.connection.stream.ReadOffset;
+import org.springframework.data.redis.connection.stream.StreamOffset;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.stream.StreamMessageListenerContainer;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.*;
@@ -39,6 +46,8 @@ import java.util.stream.Collectors;
 @Component
 @AllArgsConstructor
 public class TaskRankXxlJob {
+
+    final RedisTemplate redisTemplate;
 
     final TaskInfoService taskInfoService;
 
@@ -172,10 +181,11 @@ public class TaskRankXxlJob {
 
     private String executeTask(Long taskId, TaskNode node, TaskInfo taskInfo) {
         JobTriggerPoolHelper.trigger(taskId.intValue(), TriggerTypeEnum.MANUAL, -1, null, taskInfo.getExecutorParam(), "");
+
         int count = 0;
         Label:
         while (true) {
-            List<Pair<Long, Boolean>> callbackRes = JobCompleteHelper.getCallbackRes();
+            List<Pair<Long, Boolean>> callbackRes = StreamConsumer.getCallbackRes();
             for (Pair<Long, Boolean> pair : new ArrayList<>(callbackRes)) {
                 if (pair.getKey().equals(taskId)) {
                     handleTaskCompletion(pair, node, taskInfo, count);
@@ -198,10 +208,10 @@ public class TaskRankXxlJob {
         if (success) {
             message.setStatus(1);
             webSocketServer.sendInfo(message);
-            JobCompleteHelper.removeCallbackRes(taskId);
+            StreamConsumer.removeCallbackRes(taskId);
             updateTaskIdMap(node, pValue);
         } else {
-            JobCompleteHelper.removeCallbackRes(taskId);
+            StreamConsumer.removeCallbackRes(taskId);
             if (++count <= taskInfo.getExecutorFailRetryCount()) {
                 logger.info("Retrying task: {}, attempt: {}", taskId, count);
             } else {
@@ -363,6 +373,32 @@ public class TaskRankXxlJob {
         }
     }
 
+    private Long findParent(Long taskId, Long parentTaskId) {
+        Map<Long, Set<Long>> map = taskIdMap.get(parentTaskId);
+        Long valueToFind = null;
+        //从map中拿到key
+        for (Map.Entry<Long, Set<Long>> entry : map.entrySet()) {
+            Set<Long> values = entry.getValue();
+            if (values.contains(taskId)) {
+                valueToFind = entry.getKey();
+                break; // 如果只需要找到第一个匹配的键，找到后就可以退出循环
+            }
+        }
+        return valueToFind;
+    }
+
+    public void getTaskInfoIds(Long jobId, List<Long> ids) {
+        TaskInfo taskInfo = taskInfoService.getById(jobId);
+        if (taskInfo.getJobType() != 2) {
+            ids.add(taskInfo.getId());
+        } else {
+            List<TaskInfo> taskInfos = taskInfoService.list(new LambdaQueryWrapper<TaskInfo>().eq(TaskInfo::getParentId, jobId));
+            if (!taskInfos.isEmpty()) {
+                taskInfos.stream().map(TaskInfo::getId).forEach(childTaskId -> getTaskInfoIds(childTaskId, ids));
+            }
+        }
+    }
+
     private class TaskCallback implements ICallback<Long, String> {
         private final TaskNode node;
 
@@ -391,34 +427,6 @@ public class TaskRankXxlJob {
         @Override
         public void result(boolean success, Long param, WorkResult<String> workResult) {
             logger.info("job:{}, status:{},result:{}", param, success, workResult.getResult());
-        }
-    }
-
-
-
-    private Long findParent(Long taskId, Long parentTaskId) {
-        Map<Long, Set<Long>> map = taskIdMap.get(parentTaskId);
-        Long valueToFind = null;
-        //从map中拿到key
-        for (Map.Entry<Long, Set<Long>> entry : map.entrySet()) {
-            Set<Long> values = entry.getValue();
-            if (values.contains(taskId)) {
-                valueToFind = entry.getKey();
-                break; // 如果只需要找到第一个匹配的键，找到后就可以退出循环
-            }
-        }
-        return valueToFind;
-    }
-
-    public void getTaskInfoIds(Long jobId, List<Long> ids) {
-        TaskInfo taskInfo = taskInfoService.getById(jobId);
-        if (taskInfo.getJobType() != 2) {
-            ids.add(taskInfo.getId());
-        } else {
-            List<TaskInfo> taskInfos = taskInfoService.list(new LambdaQueryWrapper<TaskInfo>().eq(TaskInfo::getParentId, jobId));
-            if (!taskInfos.isEmpty()) {
-                taskInfos.stream().map(TaskInfo::getId).forEach(childTaskId -> getTaskInfoIds(childTaskId, ids));
-            }
         }
     }
 
