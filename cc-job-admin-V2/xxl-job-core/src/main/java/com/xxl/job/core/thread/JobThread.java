@@ -208,7 +208,6 @@ public class JobThread extends Thread{
                     // callback handler info
                     if (!toStop) {
                         // commonm
-						System.out.println(">>>>>>> 添加回滚任务"+triggerParam.getJobId());
                         TriggerCallbackThread.pushCallBack(new HandleCallbackParam(
 								triggerParam.getJobId(),
 								triggerParam.getLogId(),

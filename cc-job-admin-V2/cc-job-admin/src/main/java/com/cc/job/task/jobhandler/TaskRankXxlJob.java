@@ -39,8 +39,6 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class TaskRankXxlJob {
 
-    final RedisTemplate redisTemplate;
-
     final TaskInfoService taskInfoService;
 
     final TaskNodeService taskNodeService;
@@ -98,12 +96,13 @@ public class TaskRankXxlJob {
         try {
             Async.beginWork(taskInfo.getExecutorTimeout(), startWork);
         } catch (ExecutionException | InterruptedException e) {
-            throw new RuntimeException(e);
+            XxlJobHelper.log("{}任务运行异常,message:{}", jobId,e.getMessage());
+            throw new BusinessException(e.getMessage());
         }
 
         logger.info("{}任务运行完成", jobId);
+        XxlJobHelper.log("{}任务运行完成", jobId);
         sendCompletionMessage(jobId);
-
         taskIdMap.remove(jobId);
         stopMap.remove(jobId);
 
@@ -130,6 +129,7 @@ public class TaskRankXxlJob {
                 .param(jobId)
                 .worker((id, allWrappers) -> {
                     logger.info("{} start ... ", id);
+                    XxlJobHelper.log("task:{} start",id);
                     return "";
                 }).next(startWrappers.toArray(new WorkerWrapper[0]));
     }
@@ -173,7 +173,7 @@ public class TaskRankXxlJob {
 
     private String executeTask(Long taskId, TaskNode node, TaskInfo taskInfo) {
         JobTriggerPoolHelper.trigger(taskId.intValue(), TriggerTypeEnum.MANUAL, -1, null, taskInfo.getExecutorParam(), "");
-
+        String result;
         int count = 0;
         Label:
         while (true) {
@@ -181,17 +181,19 @@ public class TaskRankXxlJob {
             for (Pair<Long, Boolean> pair : new ArrayList<>(callbackRes)) {
                 if (pair.getKey().equals(taskId)) {
                     handleTaskCompletion(pair, node, taskInfo, count);
+                    result ="end task:"+taskId;
                     break Label;
                 }
             }
         }
-        return "";
+        return result;
     }
 
     private void handleTaskCompletion(Pair<Long, Boolean> pair, TaskNode node, TaskInfo taskInfo, int count) {
         Long taskId = pair.getKey();
         boolean success = pair.getValue();
         logger.info("end task:{}, status:{}", taskId, success ? "success" : "fail");
+        XxlJobHelper.log("task:{}, status:{}", taskId, success ? "success" : "fail");
         Message message = new Message();
         message.setTaskId(taskId);
         message.setParentTaskId(node.getTaskParentId());
@@ -206,6 +208,7 @@ public class TaskRankXxlJob {
             StreamConsumer.removeCallbackRes(taskId);
             if (++count <= taskInfo.getExecutorFailRetryCount()) {
                 logger.info("Retrying task: {}, attempt: {}", taskId, count);
+                XxlJobHelper.log("Retrying task: {}, attempt: {}", taskId, count);
             } else {
                 message.setStatus(0);
                 webSocketServer.sendInfo(message);
@@ -213,7 +216,7 @@ public class TaskRankXxlJob {
                     sendParentFailureMessage(node, pValue);
                 }
                 if (!"DO_NOTHING".equalsIgnoreCase(taskInfo.getExecutorBlockStrategy())) {
-                    throw new RuntimeException(taskId + " run fail");
+                    throw new RuntimeException();
                 }
             }
         }
@@ -400,7 +403,8 @@ public class TaskRankXxlJob {
 
         @Override
         public void begin(Long taskId) {
-            logger.info(" {} begin ...", taskId);
+            logger.info(" {} start ...", taskId);
+            XxlJobHelper.log(" {} start ...", taskId);
             Message message = new Message();
             message.setTaskId(taskId);
             message.setStatus(2);
@@ -419,6 +423,7 @@ public class TaskRankXxlJob {
         @Override
         public void result(boolean success, Long param, WorkResult<String> workResult) {
             logger.info("job:{}, status:{},result:{}", param, success, workResult.getResult());
+            XxlJobHelper.log("job:{}, status:{},result:{}", param, success, workResult.getResult());
         }
     }
 
