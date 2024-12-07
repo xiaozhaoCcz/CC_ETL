@@ -196,6 +196,7 @@ function generateNode(val: any) {
     data: {
       taskId: val.id,
       label: val.label,
+      randomId: "",
     },
     position: { x: g_position.value[0], y: g_position.value[0] },
   };
@@ -330,6 +331,10 @@ function triggerOne() {
 
   randomId.value = snowflake.nextId(1);
 
+  nodes.value.forEach((node) => {
+    node.data.randomId = randomId.value;
+  });
+
   const taskId = taskRankId.value;
   const taskInfoTriggerDto = {};
   taskInfoTriggerDto.id = taskId;
@@ -352,7 +357,7 @@ function stopTrigger() {
     ElMessage.warning("请选择任务组～");
     return;
   }
-  TaskInfoAPI.stopTaskSet(taskRankId.value,randomId.value).then(() => {
+  TaskInfoAPI.stopTaskSet(taskRankId.value, randomId.value).then(() => {
     triggerOneVisible.value = false;
     updateEdgeStyle();
   });
@@ -490,14 +495,19 @@ const connectWs = (id: number) => {
     message.value = _message;
     console.log("接收到消息", _message);
 
-    if (_message.taskId == taskRankId.value) {
+    if (
+      _message.taskId == taskRankId.value &&
+      _message.randomId == randomId.value
+    ) {
       // 关闭任务
       stopTrigger();
     }
 
     // 接收到消息后，需要做出相应的操作，比如更新节点或边
     const node = nodes.value.find(
-      (node: any) => node.data.taskId == _message.taskId
+      (node: any) =>
+        node.data.taskId == _message.taskId &&
+        node.data.randomId == _message.randomId
     );
     //
     const color = getNodeColor(_message.status);
