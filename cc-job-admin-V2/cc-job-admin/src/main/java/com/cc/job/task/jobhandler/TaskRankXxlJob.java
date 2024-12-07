@@ -1,6 +1,8 @@
 package com.cc.job.task.jobhandler;
 
 import cn.hutool.core.lang.Pair;
+import cn.hutool.json.JSON;
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.common.exception.BusinessException;
 import com.cc.job.task.enums.TriggerTypeEnum;
@@ -12,6 +14,7 @@ import com.cc.job.task.service.TaskEdgeService;
 import com.cc.job.task.service.TaskInfoService;
 import com.cc.job.task.service.TaskNodeService;
 import com.cc.job.task.thread.JobTriggerPoolHelper;
+import com.cc.job.task.utils.RedisUtils;
 import com.cc.job.task.websocket.WebSocketServer;
 import com.cc.job.task.websocket.model.Message;
 import com.cc.tasktool.callback.ICallback;
@@ -24,6 +27,8 @@ import lombok.AllArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.connection.stream.MapRecord;
+import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -38,6 +43,8 @@ import java.util.stream.Collectors;
 @Component
 @AllArgsConstructor
 public class TaskRankXxlJob {
+
+    final RedisTemplate redisTemplate;
 
     final TaskInfoService taskInfoService;
 
@@ -92,6 +99,8 @@ public class TaskRankXxlJob {
         WorkerWrapper<Long, String> startWork = createStartWorkWrapper(jobId, startWrappers);
 
         stopMap.put(jobId, startWork);
+        // 往redis中添加任务组
+        redisTemplate.opsForValue().set(String.valueOf(jobId),"");
 
         try {
             Async.beginWork(taskInfo.getExecutorTimeout(), startWork);
