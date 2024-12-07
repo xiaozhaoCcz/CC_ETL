@@ -152,8 +152,8 @@
           align="center"
         >
           <template #default="{ row }">
-            <el-tag type="warning" v-if="row.jobType == 2">任务组</el-tag>
-            <el-tag type="success" v-if="row.jobType == 0">任务</el-tag>
+            <el-tag type="warning" effect="dark" v-if="row.jobType == 2">任务组</el-tag>
+            <el-tag type="primary" effect="dark" v-if="row.jobType == 0">任务</el-tag>
           </template>
         </el-table-column>
 

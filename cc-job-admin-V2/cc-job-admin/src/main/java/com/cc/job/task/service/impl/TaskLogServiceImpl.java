@@ -1,11 +1,13 @@
 package com.cc.job.task.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.common.exception.BusinessException;
 import com.cc.job.common.result.ResultCode;
 import com.cc.job.task.model.entity.TaskInfo;
 import com.cc.job.task.model.vo.TaskGroupVO;
 import com.cc.job.task.scheduler.XxlJobScheduler;
+import com.cc.job.task.service.TaskInfoService;
 import com.cc.job.task.utils.DateUtils;
 import com.cc.job.task.utils.I18nUtil;
 import com.xxl.job.core.biz.ExecutorBiz;
@@ -26,8 +28,10 @@ import com.cc.job.task.model.vo.TaskLogVO;
 import com.cc.job.task.converter.TaskLogConverter;
 
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import cn.hutool.core.lang.Assert;
@@ -47,6 +51,8 @@ public class TaskLogServiceImpl extends ServiceImpl<TaskLogMapper, TaskLog> impl
 
     private final TaskLogConverter taskLogConverter;
 
+    private final TaskInfoService taskInfoService;
+
     /**
     * 获取task_log分页列表
     *
@@ -61,13 +67,24 @@ public class TaskLogServiceImpl extends ServiceImpl<TaskLogMapper, TaskLog> impl
         if(queryParams.getJobId()!=null){
             wrapper.eq(TaskLog::getJobId,queryParams.getJobId());
         }
-
         baseWrapper(queryParams, wrapper);
-
         wrapper.orderByDesc(TaskLog::getTriggerTime);
 
         Page<TaskLog> page = this.page(new Page<>(queryParams.getPageNum(), queryParams.getPageSize()), wrapper);
-        List<TaskLogVO> voList = page.getRecords().stream().map(taskLogConverter::toVo).toList();
+        List<TaskLog> taskLogList = page.getRecords();
+        List<Long> taskIds = taskLogList.stream().map(TaskLog::getJobId).toList();
+
+        List<TaskInfo> taskInfos = taskInfoService.listByIds(taskIds);
+        Map<Long, TaskInfo> taskInfoMap = taskInfos.stream().collect(Collectors.toMap(TaskInfo::getId, t -> t));
+
+        List<TaskLogVO> voList  = new ArrayList<>();
+
+        for (TaskLog taskLog : taskLogList) {
+            TaskLogVO taskLogVO = BeanUtil.copyProperties(taskLog, TaskLogVO.class);
+            TaskInfo taskInfo = taskInfoMap.get(taskLog.getJobId());
+            taskLogVO.setJobType(taskInfo.getJobType());
+            voList.add(taskLogVO);
+        }
         pageVO.setRecords(voList);
         pageVO.setTotal(page.getTotal());
         return pageVO;

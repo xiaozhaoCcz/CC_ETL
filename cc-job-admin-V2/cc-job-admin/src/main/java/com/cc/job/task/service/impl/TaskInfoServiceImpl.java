@@ -72,8 +72,6 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
 
     private final TaskLogglueMapper taskLogglueMapper;
 
-    private final WebSocketServer webSocketServer;
-
     private final TaskInfoMapper taskInfoMapper;
 
     private final RedisTemplate redisTemplate;
