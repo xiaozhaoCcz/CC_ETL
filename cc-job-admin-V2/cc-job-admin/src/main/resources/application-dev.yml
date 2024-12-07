@@ -177,7 +177,7 @@ xxl:
       slow:
         max: 200
     logretentiondays: 30
-    logpath: #日志文件地址
+    logpath: /Users/zhaowenpeng/logs #日志文件地址
 
 
 

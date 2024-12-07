@@ -135,7 +135,9 @@ const taskRankVisible = reactive({
 });
 const triggerOneVisible = ref(false);
 const taskRankId = ref(null);
-const formData = reactive<TaskInfoForm>({});
+const formData = reactive<TaskInfoForm>({
+  executorTimeout: 60000
+});
 const g_position = ref([140, 140]);
 
 const taskSetList = ref([
@@ -546,6 +548,7 @@ onMounted(() => {
     width: 20%;
     background: #fff;
     padding: 10px;
+    overflow-y: auto;
   }
 
   .task_info_tree {
@@ -553,6 +556,7 @@ onMounted(() => {
     width: 20%;
     background: #fff;
     padding: 10px;
+    overflow-y: auto;
   }
 
   .vue_flow_platform {

@@ -32,6 +32,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -74,6 +75,8 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
     private final WebSocketServer webSocketServer;
 
     private final TaskInfoMapper taskInfoMapper;
+
+    private final RedisTemplate redisTemplate;
 
     /**
      * 获取task_info分页列表
@@ -613,12 +616,17 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
     public boolean stopTaskSet(Long id) {
         int flag = taskInfoMapper.stopTaskSet(id);
         XxlJobExecutor.removeJobThread(id.intValue(), "stop task" + id);
-        WorkerWrapper<Long, String> workWrapper = TaskRankXxlJob.getWorkWrapper(id);
-        if(workWrapper!=null){
-            log.info(">>>>>>>>> stop task:{}",workWrapper.getId());
-            Async.stopWork(workWrapper);
+
+        if (redisTemplate.hasKey(String.valueOf(id))) {
+            WorkerWrapper<Long, String> workWrapper = TaskRankXxlJob.getWorkWrapper(id);
+            if (workWrapper != null) {
+                log.info(">>>>>>>>> stop task:{}", workWrapper.getId());
+                Async.stopWork(workWrapper);
+                TaskRankXxlJob.removeWorkWrapper(id);
+                redisTemplate.delete(String.valueOf(id));
+            }
         }
-        TaskRankXxlJob.removeWorkWrapper(id);
+
         return true;
     }
 

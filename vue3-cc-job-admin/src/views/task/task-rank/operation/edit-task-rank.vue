@@ -149,6 +149,7 @@
                   v-model="formData.executorTimeout"
                   type="text"
                   autocomplete="off"
+                  placeholder="任务组必须设置任务的超时时间"
                 />
               </div>
             </div>
