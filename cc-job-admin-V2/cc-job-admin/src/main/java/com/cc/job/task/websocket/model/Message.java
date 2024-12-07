@@ -17,4 +17,6 @@ public class Message implements Serializable {
     private Long taskId;
 
     private Integer status;
+
+    private String randomId;
 }

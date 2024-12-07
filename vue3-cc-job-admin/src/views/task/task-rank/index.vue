@@ -118,6 +118,7 @@ import { Background } from "@vue-flow/background";
 import { MiniMap } from "@vue-flow/minimap";
 import { Folder, ArrowRight, Loading } from "@element-plus/icons-vue";
 import TaskInfoAPI, { TaskInfoForm } from "@/api/task/task-info";
+import Snowflake from "@/utils/snowflake";
 const {
   updateEdge,
   onNodesChange,
@@ -136,7 +137,7 @@ const taskRankVisible = reactive({
 const triggerOneVisible = ref(false);
 const taskRankId = ref(null);
 const formData = reactive<TaskInfoForm>({
-  executorTimeout: 60000
+  executorTimeout: 60000,
 });
 const g_position = ref([140, 140]);
 
@@ -318,16 +319,21 @@ watch(filterTaskSetText, (val) => {
   treeTaskSetRef.value!.filter(val);
 });
 
+const snowflake = new Snowflake(31, 31, true);
+const randomId = ref("");
+
 function triggerOne() {
   if (taskRankId.value == null) {
     ElMessage.warning("请选择任务组～");
     return;
   }
 
+  randomId.value = snowflake.nextId(1);
+
   const taskId = taskRankId.value;
   const taskInfoTriggerDto = {};
   taskInfoTriggerDto.id = taskId;
-  taskInfoTriggerDto.executorParam = taskId;
+  taskInfoTriggerDto.executorParam = taskId + ":" + randomId.value;
   TaskInfoAPI.triggerJob(taskInfoTriggerDto)
     .then((data) => {
       ElMessage.success("执行任务成功");
@@ -346,7 +352,7 @@ function stopTrigger() {
     ElMessage.warning("请选择任务组～");
     return;
   }
-  TaskInfoAPI.stopTaskSet(taskRankId.value).then(() => {
+  TaskInfoAPI.stopTaskSet(taskRankId.value,randomId.value).then(() => {
     triggerOneVisible.value = false;
     updateEdgeStyle();
   });

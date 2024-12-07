@@ -142,9 +142,9 @@ public class TaskInfoController {
     }
 
     @Operation(summary = "停止任务集")
-    @GetMapping("/stopTaskSet/{id}")
-    public Result<Void> stopTaskSet(@PathVariable Long id) {
-        boolean result = taskInfoService.stopTaskSet(id);
+    @GetMapping("/stopTaskSet/{id}/{randomId}")
+    public Result<Void> stopTaskSet(@PathVariable Long id,@PathVariable String randomId) {
+        boolean result = taskInfoService.stopTaskSet(id,randomId);
         return Result.judge(result);
     }
 
