@@ -106,19 +106,19 @@
             :disabled="formData.jobType==2"
           />
         </el-form-item>
-        <el-form-item label="调度过期策略" prop="misfireStrategy">
-          <el-select
-            v-model="formData.misfireStrategy"
-            filterable
-          >
-            <el-option
-              v-for="item in misfireStrategyList"
-              :key="item.type"
-              :label="item.title"
-              :value="item.type"
-            />
-          </el-select>
-        </el-form-item>
+<!--        <el-form-item label="调度过期策略" prop="misfireStrategy">-->
+<!--          <el-select-->
+<!--            v-model="formData.misfireStrategy"-->
+<!--            filterable-->
+<!--          >-->
+<!--            <el-option-->
+<!--              v-for="item in misfireStrategyList"-->
+<!--              :key="item.type"-->
+<!--              :label="item.title"-->
+<!--              :value="item.type"-->
+<!--            />-->
+<!--          </el-select>-->
+<!--        </el-form-item>-->
         <el-form-item label="任务超时时间">
           <el-input
             v-model="formData.executorTimeout"
@@ -236,16 +236,16 @@ const glueTypeList = [
     title: "GLUE(PowerShell)",
   },
 ];
-const misfireStrategyList = [
-  {
-    type: "DO_NOTHING",
-    title: "忽略",
-  },
-  {
-    type: "FIRE_ONCE_NOW",
-    title: "立即执行一次",
-  },
-];
+// const misfireStrategyList = [
+//   {
+//     type: "DO_NOTHING",
+//     title: "忽略",
+//   },
+//   {
+//     type: "FIRE_ONCE_NOW",
+//     title: "立即执行一次",
+//   },
+// ];
 const blockStrategyList = [
   {
     type: "SERIAL_EXECUTION",
@@ -311,6 +311,7 @@ function confirmClick() {
   if (!props.nodeTaskId) {
     return;
   }
+  formData.misfireStrategy = "DO_NOTHING";
   formData.scheduleType = "NONE";
   TaskInfoAPI.update(props.nodeTaskId, formData)
     .then(() => {
