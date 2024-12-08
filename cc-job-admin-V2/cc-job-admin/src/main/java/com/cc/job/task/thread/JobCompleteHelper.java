@@ -13,6 +13,7 @@ import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.thread.TriggerCallbackThread;
 import com.xxl.job.core.util.DateUtil;
 import jakarta.annotation.Resource;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
@@ -170,22 +171,27 @@ public class JobCompleteHelper {
 	private ReturnT<String> callback(HandleCallbackParam handleCallbackParam) {
 		// valid log item
 		TaskLog log = XxlJobAdminConfig.getAdminConfig().getTaskLogMapper().selectById(handleCallbackParam.getLogId());
+		String randomId = "";
+		if(StringUtils.isNotBlank(log.getExecutorParam())){
+			logger.info(">>>>>>>executorParam:{}",log.getExecutorParam());
+			randomId = ":"+log.getExecutorParam();
+		}
 		if (log == null) {
-			Map<Long,Boolean> result = new HashMap<>();
-			result.put(handleCallbackParam.getJobId(),false);
+			Map<String,Boolean> result = new HashMap<>();
+			result.put(handleCallbackParam.getJobId()+randomId,false);
 			XxlJobAdminConfig.redisUtils.sendMessage(StreamConsumer.TASK_SET_STREAM,result);
 			return new ReturnT<>(ReturnT.FAIL_CODE, "log item not found.");
 		}
 		if (log.getHandleCode() > 0) {
-			Map<Long,Boolean> result = new HashMap<>();
-			result.put(handleCallbackParam.getJobId(),false);
+			Map<String,Boolean> result = new HashMap<>();
+			result.put(handleCallbackParam.getJobId()+randomId,false);
 			XxlJobAdminConfig.redisUtils.sendMessage(StreamConsumer.TASK_SET_STREAM,result);
 			return new ReturnT<>(ReturnT.FAIL_CODE, "log repeate callback.");
 		}
 
 		// 处理结果
 		Map<String,Boolean> map = new HashMap<>();
-		map.put(String.valueOf(handleCallbackParam.getJobId()),handleCallbackParam.getHandleCode()==ReturnT.SUCCESS_CODE);
+		map.put(handleCallbackParam.getJobId()+randomId,handleCallbackParam.getHandleCode()==ReturnT.SUCCESS_CODE);
 		XxlJobAdminConfig.redisUtils.sendMessage(StreamConsumer.TASK_SET_STREAM,map);
 
 		// handle msg

@@ -72,8 +72,6 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
 
     private final TaskLogglueMapper taskLogglueMapper;
 
-    private final WebSocketServer webSocketServer;
-
     private final TaskInfoMapper taskInfoMapper;
 
     private final RedisTemplate redisTemplate;
@@ -300,9 +298,9 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         xxlJobInfo.setTriggerStatus(0);
         xxlJobInfo.setTriggerLastTime(0L);
         xxlJobInfo.setTriggerNextTime(0L);
-        if(xxlJobInfo.getJobType()==2){
-            this.stopTaskSet(id);
-        }
+//        if(xxlJobInfo.getJobType()==2){
+//            this.stopTaskSet(id);
+//        }
         return this.updateById(xxlJobInfo);
     }
 
@@ -613,17 +611,17 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
     }
 
     @Override
-    public boolean stopTaskSet(Long id) {
+    public boolean stopTaskSet(Long id,String randomId) {
         int flag = taskInfoMapper.stopTaskSet(id);
         XxlJobExecutor.removeJobThread(id.intValue(), "stop task" + id);
 
-        if (redisTemplate.hasKey(String.valueOf(id))) {
-            WorkerWrapper<Long, String> workWrapper = TaskRankXxlJob.getWorkWrapper(id);
+        if (redisTemplate.hasKey(id+":"+randomId)) {
+            WorkerWrapper<Long, String> workWrapper = TaskRankXxlJob.getWorkWrapper(id,randomId);
             if (workWrapper != null) {
                 log.info(">>>>>>>>> stop task:{}", workWrapper.getId());
                 Async.stopWork(workWrapper);
-                TaskRankXxlJob.removeWorkWrapper(id);
-                redisTemplate.delete(String.valueOf(id));
+                TaskRankXxlJob.removeWorkWrapper(id,randomId);
+                redisTemplate.delete(id+":"+randomId);
             }
         }
 

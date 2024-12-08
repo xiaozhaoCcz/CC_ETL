@@ -161,6 +161,18 @@
             </el-button>
           </template>
         </el-table-column>
+        <el-table-column
+          key="jobType"
+          label="任务类型"
+          prop="jobType"
+          min-width="150"
+          align="center"
+        >
+          <template #default="{ row }">
+            <el-tag type="warning" effect="dark" v-if="row.jobType == 2">任务组</el-tag>
+            <el-tag type="primary"  effect="dark" v-if="row.jobType == 0">任务</el-tag>
+          </template>
+        </el-table-column>
       </el-table>
 
       <pagination

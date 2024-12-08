@@ -27,13 +27,13 @@ public class StreamConsumer {
 
     public static final String TASK_SET_STREAM = "TASK_SET_STREAM";
 
-    private static final List<Pair<Long,Boolean>> callbackRes = Collections.synchronizedList(new ArrayList<>());
+    private static final List<Pair<String,Boolean>> callbackRes = Collections.synchronizedList(new ArrayList<>());
 
-    public  static  List<Pair<Long,Boolean>> getCallbackRes() {
+    public  static  List<Pair<String,Boolean>> getCallbackRes() {
         return callbackRes;
     }
 
-    public static void removeCallbackRes(Long jobId) {
+    public static void removeCallbackRes(String jobId) {
         if (jobId != null) {
             callbackRes.removeIf(pair -> jobId.equals(pair.getKey()));
         }
@@ -55,7 +55,7 @@ public class StreamConsumer {
         listenerContainer.receive(StreamOffset.create(TASK_SET_STREAM, ReadOffset.lastConsumed()), message -> {
             Map<String, String> value = message.getValue();
             value.forEach((k,v)->{
-                callbackRes.add(new Pair<>(Long.valueOf(k),Boolean.valueOf(v)));
+                callbackRes.add(new Pair<>(k,Boolean.valueOf(v)));
             });
         });
 

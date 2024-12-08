@@ -12,11 +12,11 @@ const TaskInfoAPI = {
     });
   },
 
-  getList(jobType?:number) {
+  getList(jobType?: number) {
     return request({
       url: `${TASKINFO_BASE_URL}/list`,
       method: "get",
-      params: {jobType},
+      params: { jobType },
     });
   },
   /**
@@ -89,13 +89,12 @@ const TaskInfoAPI = {
     });
   },
 
-  stopTaskSet(id: number) {
+  stopTaskSet(id: number, randomId: string) {
     return request({
-      url: `${TASKINFO_BASE_URL}/stopTaskSet/${id}`,
+      url: `${TASKINFO_BASE_URL}/stopTaskSet/${id}/${randomId}`,
       method: "get",
     });
   },
-
 
   nextTriggerTime(scheduleType: string, scheduleConf: string) {
     return request({
@@ -141,7 +140,7 @@ const TaskInfoAPI = {
 export default TaskInfoAPI;
 
 /** task_info分页查询参数 */
-export interface TaskInfoPageQuery extends PageQuery { }
+export interface TaskInfoPageQuery extends PageQuery {}
 
 /** task_info表单对象 */
 export interface TaskInfoForm {
@@ -189,15 +188,14 @@ export interface TaskInfoForm {
   triggerLastTime?: number;
   /** 下次调度时间 */
   triggerNextTime?: number;
-  jobType?:number;
+  jobType?: number;
   parentId?: number;
-  reqType?:string;
-  reqHeader?:string;
-  reqBody?:string;
-  reqUrl?:string;
-  nodes?:string;
-  edges?:string;
-
+  reqType?: string;
+  reqHeader?: string;
+  reqBody?: string;
+  reqUrl?: string;
+  nodes?: string;
+  edges?: string;
 }
 
 /** task_info分页对象 */

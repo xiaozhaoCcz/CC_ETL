@@ -51,4 +51,6 @@ public class TaskLogVO implements Serializable {
     private String handleMsg;
     @Schema(description = "告警状态：0-默认、1-无需告警、2-告警成功、3-告警失败")
     private Integer alarmStatus;
+    @Schema(description = "任务类型")
+    private Integer jobType;
 }

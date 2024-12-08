@@ -118,6 +118,7 @@ import { Background } from "@vue-flow/background";
 import { MiniMap } from "@vue-flow/minimap";
 import { Folder, ArrowRight, Loading } from "@element-plus/icons-vue";
 import TaskInfoAPI, { TaskInfoForm } from "@/api/task/task-info";
+import Snowflake from "@/utils/snowflake";
 const {
   updateEdge,
   onNodesChange,
@@ -136,7 +137,7 @@ const taskRankVisible = reactive({
 const triggerOneVisible = ref(false);
 const taskRankId = ref(null);
 const formData = reactive<TaskInfoForm>({
-  executorTimeout: 60000
+  executorTimeout: 60000,
 });
 const g_position = ref([140, 140]);
 
@@ -195,6 +196,7 @@ function generateNode(val: any) {
     data: {
       taskId: val.id,
       label: val.label,
+      randomId: "",
     },
     position: { x: g_position.value[0], y: g_position.value[0] },
   };
@@ -318,24 +320,34 @@ watch(filterTaskSetText, (val) => {
   treeTaskSetRef.value!.filter(val);
 });
 
+const snowflake = new Snowflake(31, 31, true);
+const randomId = ref("");
+
 function triggerOne() {
   if (taskRankId.value == null) {
     ElMessage.warning("请选择任务组～");
     return;
   }
 
+  randomId.value = snowflake.nextId(1);
+
+  nodes.value.forEach((node) => {
+    node.data.randomId = randomId.value;
+  });
+
   const taskId = taskRankId.value;
   const taskInfoTriggerDto = {};
   taskInfoTriggerDto.id = taskId;
-  taskInfoTriggerDto.executorParam = taskId;
+  taskInfoTriggerDto.executorParam = taskId + ":" + randomId.value;
   TaskInfoAPI.triggerJob(taskInfoTriggerDto)
     .then((data) => {
       ElMessage.success("执行任务成功");
-      connectWs(taskId);
+      connectWs(taskId+":"+randomId.value);
       triggerOneVisible.value = true;
       updateEdgeStyle();
     })
     .catch((e) => {
+      triggerOneVisible.value = true;
       ElMessage.error(e);
     })
     .finally(() => {});
@@ -346,7 +358,7 @@ function stopTrigger() {
     ElMessage.warning("请选择任务组～");
     return;
   }
-  TaskInfoAPI.stopTaskSet(taskRankId.value).then(() => {
+  TaskInfoAPI.stopTaskSet(taskRankId.value, randomId.value).then(() => {
     triggerOneVisible.value = false;
     updateEdgeStyle();
   });
@@ -463,7 +475,7 @@ const message = ref();
 const reconnectAttempts = ref(0);
 const maxReconnectAttempts = 3; // 自定义最大重试次数
 
-const connectWs = (id: number) => {
+const connectWs = (id: string) => {
   ws.value = new WebSocket("ws://localhost:8989/ws/" + id);
   ws.value.onopen = () => {
     reconnectAttempts.value = 0;
@@ -484,14 +496,19 @@ const connectWs = (id: number) => {
     message.value = _message;
     console.log("接收到消息", _message);
 
-    if (_message.taskId == taskRankId.value) {
+    if (
+      _message.taskId == taskRankId.value &&
+      _message.randomId == randomId.value
+    ) {
       // 关闭任务
       stopTrigger();
     }
 
     // 接收到消息后，需要做出相应的操作，比如更新节点或边
     const node = nodes.value.find(
-      (node: any) => node.data.taskId == _message.taskId
+      (node: any) =>
+        node.data.taskId == _message.taskId &&
+        node.data.randomId == _message.randomId
     );
     //
     const color = getNodeColor(_message.status);

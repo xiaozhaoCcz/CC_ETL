@@ -72,7 +72,7 @@ public interface TaskInfoService extends IService<TaskInfo> {
 
     boolean updateTaskSet( Long id,TaskInfoForm formData);
 
-    boolean stopTaskSet(Long id);
+    boolean stopTaskSet(Long id,String randomId);
 
     boolean saveGlueSource(TaskGlueForm formData);
 
