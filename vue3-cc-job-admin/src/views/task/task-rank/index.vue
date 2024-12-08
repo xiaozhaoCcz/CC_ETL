@@ -342,7 +342,7 @@ function triggerOne() {
   TaskInfoAPI.triggerJob(taskInfoTriggerDto)
     .then((data) => {
       ElMessage.success("执行任务成功");
-      connectWs(taskId+":"+randomId.value);
+      connectWs(taskId + ":" + randomId.value);
       triggerOneVisible.value = true;
       updateEdgeStyle();
     })
