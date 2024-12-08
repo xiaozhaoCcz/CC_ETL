@@ -298,9 +298,9 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         xxlJobInfo.setTriggerStatus(0);
         xxlJobInfo.setTriggerLastTime(0L);
         xxlJobInfo.setTriggerNextTime(0L);
-        if(xxlJobInfo.getJobType()==2){
-            this.stopTaskSet(id);
-        }
+//        if(xxlJobInfo.getJobType()==2){
+//            this.stopTaskSet(id);
+//        }
         return this.updateById(xxlJobInfo);
     }
 

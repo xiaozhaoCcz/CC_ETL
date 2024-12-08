@@ -22,7 +22,7 @@ public class WebSocketServer {
     private static final AtomicInteger ONLINE_NUM = new AtomicInteger();
 
     //concurrent包的线程安全Set，用来存放每个客户端对应的WebSocketServer对象。
-    private  static final ConcurrentHashMap<Long, Session> SESSION_POOLS = new ConcurrentHashMap<>();
+    private  static final ConcurrentHashMap<String, Session> SESSION_POOLS = new ConcurrentHashMap<>();
 
     private final Object lockObj = new Object();
 
@@ -42,7 +42,7 @@ public class WebSocketServer {
 
     //给指定用户发送信息
     public void sendInfo(Message message) {
-        Session session = SESSION_POOLS.get(message.getParentTaskId());
+        Session session = SESSION_POOLS.get(message.getParentTaskId()+":"+message.getRandomId());
         try {
             sendMessage(session, message);
         } catch (Exception e) {
@@ -63,7 +63,7 @@ public class WebSocketServer {
 
     //建立连接成功调用
     @OnOpen
-    public void onOpen(Session session, @PathParam(value = "id") Long id) {
+    public void onOpen(Session session, @PathParam(value = "id") String id) {
         SESSION_POOLS.put(id, session);
         addOnlineCount();
         log.info("{}加入webSocket！当前人数为={}", id, ONLINE_NUM);
@@ -71,7 +71,7 @@ public class WebSocketServer {
 
     //关闭连接时调用
     @OnClose
-    public void onClose(@PathParam(value = "id") Long id) {
+    public void onClose(@PathParam(value = "id") String id) {
         SESSION_POOLS.remove(id);
         subOnlineCount();
         log.info("{}断开webSocket连接！当前人数为={}", id, ONLINE_NUM);
@@ -104,7 +104,7 @@ public class WebSocketServer {
         return ONLINE_NUM;
     }
 
-    public static ConcurrentMap<Long, Session> getSessionPools() {
+    public static ConcurrentMap<String, Session> getSessionPools() {
         return SESSION_POOLS;
     }
 }

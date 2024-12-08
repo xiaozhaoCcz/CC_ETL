@@ -342,11 +342,12 @@ function triggerOne() {
   TaskInfoAPI.triggerJob(taskInfoTriggerDto)
     .then((data) => {
       ElMessage.success("执行任务成功");
-      connectWs(taskId);
+      connectWs(taskId+":"+randomId.value);
       triggerOneVisible.value = true;
       updateEdgeStyle();
     })
     .catch((e) => {
+      triggerOneVisible.value = true;
       ElMessage.error(e);
     })
     .finally(() => {});
@@ -474,7 +475,7 @@ const message = ref();
 const reconnectAttempts = ref(0);
 const maxReconnectAttempts = 3; // 自定义最大重试次数
 
-const connectWs = (id: number) => {
+const connectWs = (id: string) => {
   ws.value = new WebSocket("ws://localhost:8989/ws/" + id);
   ws.value.onopen = () => {
     reconnectAttempts.value = 0;

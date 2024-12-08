@@ -173,6 +173,7 @@ public class JobCompleteHelper {
 		TaskLog log = XxlJobAdminConfig.getAdminConfig().getTaskLogMapper().selectById(handleCallbackParam.getLogId());
 		String randomId = "";
 		if(StringUtils.isNotBlank(log.getExecutorParam())){
+			logger.info(">>>>>>>executorParam:{}",log.getExecutorParam());
 			randomId = ":"+log.getExecutorParam();
 		}
 		if (log == null) {
