@@ -1,8 +1,6 @@
 package com.cc.job.task.jobhandler;
 
 import cn.hutool.core.lang.Pair;
-import cn.hutool.json.JSON;
-import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.common.exception.BusinessException;
 import com.cc.job.task.enums.TriggerTypeEnum;
@@ -14,7 +12,6 @@ import com.cc.job.task.service.TaskEdgeService;
 import com.cc.job.task.service.TaskInfoService;
 import com.cc.job.task.service.TaskNodeService;
 import com.cc.job.task.thread.JobTriggerPoolHelper;
-import com.cc.job.task.utils.RedisUtils;
 import com.cc.job.task.websocket.WebSocketServer;
 import com.cc.job.task.websocket.model.Message;
 import com.cc.tasktool.callback.ICallback;
@@ -27,8 +24,6 @@ import lombok.AllArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.redis.connection.stream.MapRecord;
-import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -68,74 +63,76 @@ public class TaskRankXxlJob {
 
     @XxlJob("runTaskRankXxlJob")
     public void runTaskRankXxlJob() {
-        //得到任务运行的参数
         String executeParam = XxlJobHelper.getJobParam();
-        if (StringUtils.isBlank(executeParam)) {
-            throw new BusinessException("executeParam is null");
-        }
-
-        System.out.println(">>>>>executeParam"+executeParam);
+        validateExecuteParam(executeParam);
 
         String[] split = executeParam.split(":");
-        String jobIdStr = split[0];
+        long jobId = Long.parseLong(split[0]);
         String randomId = split[1];
 
-        long jobId = Long.parseLong(jobIdStr);
-        TaskInfo taskInfo = Optional.ofNullable(taskInfoService.getById(jobId))
-                .orElseThrow(() -> new BusinessException("TaskInfo not found for jobId: " + jobId));
+        TaskInfo taskInfo = getTaskInfoById(jobId);
+        List<TaskNode> nodes = getTaskNodesByJobId(jobId);
+        List<TaskEdge> edges = getTaskEdgesByJobId(jobId);
 
-        List<TaskNode> nodes = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, jobId));
-        List<TaskEdge> edges = taskEdgeService.list(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId, jobId));
-
-        setTaskIdMap(nodes, jobId,randomId);
-
-        // 构图
+        setTaskIdMap(nodes, jobId, randomId);
         buildGraph(jobId, nodes, edges);
-
-        // 找到依赖的节点
         Map<Long, List<TaskNode>> nextMap = buildNextNode(nodes, edges);
 
-        // 构建任务
-        List<WorkerWrapper<Long, String>> workerWrappers = buildWorkerWrappers(nodes, nextMap,randomId);
-
-        List<Long> startNodes = nodes.stream().filter(v -> v.getNodeInDegree().equals(0L)).map(TaskNode::getId).toList();
-
-        List<WorkerWrapper<Long, String>> startWrappers = workerWrappers.stream().filter(v -> startNodes.contains(Long.valueOf(v.getId()))).toList();
+        List<WorkerWrapper<Long, String>> workerWrappers = buildWorkerWrappers(nodes, nextMap, randomId);
+        List<Long> startNodes = getStartNodes(nodes);
+        List<WorkerWrapper<Long, String>> startWrappers = getStartWrappers(workerWrappers, startNodes);
 
         WorkerWrapper<Long, String> startWork = createStartWorkWrapper(jobId, startWrappers);
-
-        stopMap.put(setExecuteJobId(jobId,randomId), startWork);
-        // 往redis中添加任务组
-        redisTemplate.opsForValue().set(setExecuteJobId(jobId,randomId),"");
+        stopMap.put(setExecuteJobId(jobId, randomId), startWork);
+        redisTemplate.opsForValue().set(setExecuteJobId(jobId, randomId), "");
 
         try {
             Async.beginWork(taskInfo.getExecutorTimeout(), startWork);
         } catch (ExecutionException | InterruptedException e) {
-            XxlJobHelper.log("{}任务运行异常,message:{}", jobId,e.getMessage());
-            throw new BusinessException(e.getMessage());
+            handleExecutionException(jobId, e);
         }
 
+        completeJobExecution(jobId, randomId);
+    }
+
+    private void validateExecuteParam(String executeParam) {
+        if (StringUtils.isBlank(executeParam)) {
+            throw new BusinessException("executeParam is null");
+        }
+    }
+
+    private TaskInfo getTaskInfoById(long jobId) {
+        return Optional.ofNullable(taskInfoService.getById(jobId))
+                .orElseThrow(() -> new BusinessException("TaskInfo not found for jobId: " + jobId));
+    }
+
+    private List<TaskNode> getTaskNodesByJobId(long jobId) {
+        return taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, jobId));
+    }
+
+    private List<TaskEdge> getTaskEdgesByJobId(long jobId) {
+        return taskEdgeService.list(new LambdaQueryWrapper<TaskEdge>().eq(TaskEdge::getTaskParentId, jobId));
+    }
+
+    private List<Long> getStartNodes(List<TaskNode> nodes) {
+        return nodes.stream().filter(v -> v.getNodeInDegree().equals(0L)).map(TaskNode::getId).toList();
+    }
+
+    private List<WorkerWrapper<Long, String>> getStartWrappers(List<WorkerWrapper<Long, String>> workerWrappers, List<Long> startNodes) {
+        return workerWrappers.stream().filter(v -> startNodes.contains(Long.valueOf(v.getId()))).toList();
+    }
+
+    private void handleExecutionException(long jobId, Exception e) {
+        XxlJobHelper.log("{}任务运行异常,message:{}", jobId, e.getMessage());
+        throw new BusinessException(e.getMessage());
+    }
+
+    private void completeJobExecution(long jobId, String randomId) {
         logger.info("{}任务运行完成", jobId);
         XxlJobHelper.log("{}任务运行完成", jobId);
-        sendCompletionMessage(jobId,randomId);
-        taskIdMap.remove(setExecuteJobId(jobId,randomId));
-        stopMap.remove(setExecuteJobId(jobId,randomId));
-
-        //Async.shutDown();
-//
-//        List<Long> visited = new CopyOnWriteArrayList<>();
-//        Queue<Long> queue = new ConcurrentLinkedQueue<>();
-//
-//        Map<Long, List<Long>> nodeMap = new HashMap<>();
-//        Map<Long, CompletableFuture<TaskNode>> futureMap = new HashMap<>();
-
-//        buildNodeMap(startNodes, queue, visited, edges, nodeMap);
-
-//        final List<Long> taskIds = nodes.stream().map(TaskNode::getTaskId).toList();
-//
-//        stopMap.put(Long.valueOf(jobId), new Pair<>(false, -1L));
-//
-//        executeTask(nodeMap, nodes, futureMap, taskIds);
+        sendCompletionMessage(jobId, randomId);
+        taskIdMap.remove(setExecuteJobId(jobId, randomId));
+        stopMap.remove(setExecuteJobId(jobId, randomId));
     }
 
     private static WorkerWrapper<Long, String> createStartWorkWrapper(long jobId, List<WorkerWrapper<Long, String>> startWrappers) {

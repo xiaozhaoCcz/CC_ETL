@@ -6,27 +6,21 @@
     :before-close="handleCloseDialog"
   >
     <div class="editor-container">
-      <MonacoEditor
-        v-model:value="_code"
-      />
+      <MonacoEditor v-model:value="_code" />
     </div>
     <template #footer>
       <div class="footer">
         <div>
           <span class="m_title">备注</span>
-          <el-input
-            v-model="_input"
-            placeholder="备注"
-            style="width: 200px;"
-          />
+          <el-input v-model="_input" placeholder="备注" style="width: 200px" />
         </div>
         <div>
           <el-select
             v-model="glueId"
             filterable
             placeholder="Select"
+            style="width: 200px"
             @change="handleGlueChange"
-            style="width: 200px;"
           >
             <el-option
               v-for="item in glueList"
@@ -41,93 +35,91 @@
           <el-button @click="handleCloseDialog()">取消</el-button>
         </div>
       </div>
-
     </template>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
-import MonacoEditor from './MonacoEditor.vue'
+import MonacoEditor from "./MonacoEditor.vue";
 import TaskInfoAPI from "@/api/task/task-info";
 const emit = defineEmits(["close"]);
 const props = defineProps({
-  glueVisible: {
-    type: Boolean,
-    default: false
-  },
-  code:{
-     type:String,
-     default:'',
-  },
-  glueTaskId:{
-    type:Number,
-    default:null,
-  },
-  nowDate:{
-    type:Date,
-    default:null,
-  }
+  glueVisible: Boolean,
+  code: String,
+  glueTaskId: Number,
+  nowDate: Date,
 });
 
-const _glueVisible = ref(false)
-const _input =ref('')
-const _code = ref('');
-const taskId = ref(null)
+const _glueVisible = ref(false);
+const _input = ref("");
+const _code = ref("");
+const taskId = ref(null);
 const glueList = ref([{}]);
 const glueId = ref(null);
 
-watch(()=>props.glueVisible,(val)=>{
-  _glueVisible.value = val;
-})
-
-watch(()=>props.code,(val)=>{
-  _code.value = val;
-})
-
-watch(()=>props.glueTaskId,(val)=>{
-  taskId.value = val;
-  if(val) {
-    getGlueList(val)
+watch(
+  () => props.glueVisible,
+  (val) => {
+    _glueVisible.value = val;
   }
-})
+);
 
-watch(()=>props.nowDate,()=>{})
+watch(
+  () => props.code,
+  (val) => {
+    _code.value = val;
+  }
+);
 
-function handleCloseDialog(){
-    emit('close')
+watch(
+  () => props.glueTaskId,
+  (val) => {
+    if (val) {
+      taskId.value = val;
+      getGlueList(val);
+    }
+  }
+);
+
+watch(
+  () => props.nowDate,
+  () => {}
+);
+
+function handleCloseDialog() {
+  emit("close");
 }
 
-function handleGlueChange(val:any){
-  console.log(val);
-  if(val!=null){
-     _code.value = glueList.value.find((item)=>item.id==val).glueSource;
+function handleGlueChange(val: any) {
+  if (val != null) {
+    _code.value = glueList.value.find((item) => item.id == val)?.glueSource;
   }
 }
 
-function getGlueList(){
-  TaskInfoAPI.getGlueList(taskId.value).then((data)=>{
+function getGlueList() {
+  TaskInfoAPI.getGlueList(taskId.value).then((data) => {
     glueList.value = data;
-  })
+  });
 }
 
-function submitForm(){
-  if(_input.value==''||_input.value.trim().length<=0){
-    ElMessage.warning("请输入备注～")
+function submitForm() {
+  if (_input.value == "" || _input.value.trim().length <= 0) {
+    ElMessage.warning("请输入备注～");
     return;
   }
-  const obj = {};
-  obj.taskId = taskId.value;
-  obj.glueRemark = _input.value
-  obj.glueSource = _code.value;
-  TaskInfoAPI.saveGlueSource(obj).then(data=>{
-    _input.value = ''
-    ElMessage.success("保存成功")
-  })
+  const obj = {
+    taskId: taskId.value,
+    glueRemark: _input.value,
+    glueSource: _code.value,
+  };
+  TaskInfoAPI.saveGlueSource(obj).then((data) => {
+    _input.value = "";
+    ElMessage.success("保存成功");
+  });
 }
-
 </script>
 <style lang="scss" scoped>
-.footer{
+.footer {
   margin-top: 20px;
   display: flex;
   justify-content: space-between;
@@ -137,6 +129,6 @@ function submitForm(){
   content: "*";
   color: red;
   font-size: 16px;
-  margin-right: 5px
+  margin-right: 5px;
 }
 </style>
