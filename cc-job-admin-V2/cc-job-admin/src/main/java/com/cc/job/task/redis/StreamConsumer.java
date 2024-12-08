@@ -1,11 +1,8 @@
 package com.cc.job.task.redis;
 
 import cn.hutool.core.lang.Pair;
-import com.xxl.job.core.biz.model.ReturnT;
 import jakarta.annotation.PostConstruct;
-import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.connection.stream.Consumer;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.ReadOffset;
 import org.springframework.data.redis.connection.stream.StreamOffset;

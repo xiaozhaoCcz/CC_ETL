@@ -1,8 +1,6 @@
 package com.cc.job.task.jobhandler;
 
 import cn.hutool.core.lang.Pair;
-import cn.hutool.json.JSON;
-import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.common.exception.BusinessException;
 import com.cc.job.task.enums.TriggerTypeEnum;
@@ -14,7 +12,6 @@ import com.cc.job.task.service.TaskEdgeService;
 import com.cc.job.task.service.TaskInfoService;
 import com.cc.job.task.service.TaskNodeService;
 import com.cc.job.task.thread.JobTriggerPoolHelper;
-import com.cc.job.task.utils.RedisUtils;
 import com.cc.job.task.websocket.WebSocketServer;
 import com.cc.job.task.websocket.model.Message;
 import com.cc.tasktool.callback.ICallback;
@@ -27,8 +24,6 @@ import lombok.AllArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.redis.connection.stream.MapRecord;
-import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -121,21 +116,6 @@ public class TaskRankXxlJob {
         taskIdMap.remove(setExecuteJobId(jobId,randomId));
         stopMap.remove(setExecuteJobId(jobId,randomId));
 
-        //Async.shutDown();
-//
-//        List<Long> visited = new CopyOnWriteArrayList<>();
-//        Queue<Long> queue = new ConcurrentLinkedQueue<>();
-//
-//        Map<Long, List<Long>> nodeMap = new HashMap<>();
-//        Map<Long, CompletableFuture<TaskNode>> futureMap = new HashMap<>();
-
-//        buildNodeMap(startNodes, queue, visited, edges, nodeMap);
-
-//        final List<Long> taskIds = nodes.stream().map(TaskNode::getTaskId).toList();
-//
-//        stopMap.put(Long.valueOf(jobId), new Pair<>(false, -1L));
-//
-//        executeTask(nodeMap, nodes, futureMap, taskIds);
     }
 
     private static WorkerWrapper<Long, String> createStartWorkWrapper(long jobId, List<WorkerWrapper<Long, String>> startWrappers) {
@@ -309,12 +289,6 @@ public class TaskRankXxlJob {
                     List<TaskNode> childrenNode = taskNodeService.list(new LambdaQueryWrapper<TaskNode>().eq(TaskNode::getTaskParentId, taskInfo.getId()));
                     // 得到孩子节点的开始节点
                     List<TaskNode> startNodes = childrenNode.stream().filter(v -> v.getNodeInDegree() == 0).toList();
-                    //            for (TaskNode fromNode : fromNodes) {
-                    //                fromNode.setNodeOutDegree(fromNode.getNodeOutDegree() - 1 + startNodes.size());
-                    //            }
-                    //            for (TaskNode startNode : startNodes) {
-                    //                startNode.setNodeInDegree(startNode.getNodeInDegree() + fromNodes.size());
-                    //            }
                     if (!fromIds.isEmpty()) {
                         for (TaskNode taskNode : startNodes) {
                             for (Long fromId : fromIds) {
@@ -331,16 +305,6 @@ public class TaskRankXxlJob {
 
                     List<TaskNode> childEndNodes = childrenNode.stream().filter(v -> v.getNodeOutDegree() == 0).toList();
 
-//            if(!endIds.isEmpty()){
-//                List<TaskNode> endNodes = taskNodeService.listByIds(endIds);
-//                for (TaskNode endNode : endNodes) {
-//                    endNode.setNodeInDegree(endNode.getNodeInDegree() - 1 + childEndNodes.size());
-//                }
-//            }
-
-//            for (TaskNode childEndNode : childEndNodes) {
-//                childEndNode.setNodeOutDegree(childEndNode.getNodeOutDegree() + endIds.size());
-//            }
 
                     if (!childEndNodes.isEmpty()) {
                         for (TaskNode endNode : childEndNodes) {
@@ -455,175 +419,6 @@ public class TaskRankXxlJob {
             XxlJobHelper.log("job:{}, status:{},result:{}", param, success, workResult.getResult());
         }
     }
-
-//    private List<Long> getNeighbors(Long node, List<TaskEdge> edges) {
-//        return edges.stream().filter(v -> v.getFromNodeId().equals(node)).map(TaskEdge::getEndNodeId).toList();
-//    }
-
-//    private void executeTask(Map<Long, List<Long>> nodeMap, List<TaskNode> nodes, Map<Long, CompletableFuture<TaskNode>> futureMap, List<Long> taskIds) {
-//        nodeMap.forEach((k, v) -> {
-//            TaskNode currentNode = nodes.stream().filter(item -> item.getId().equals(k)).findFirst().orElse(null);
-//            CompletableFuture<TaskNode> future = CompletableFuture.supplyAsync(() -> {
-//                for (long d : v) {
-//                    //阻塞等待
-//                    try {
-//                        if (futureMap.get(d) != null) {
-//                            futureMap.get(d).get();
-//                        }
-//                    } catch (InterruptedException | ExecutionException e) {
-//                        throw new RuntimeException(e);
-//                    }
-//                }
-//                //执行任务
-//                runT(currentNode, taskIds);
-//                return currentNode;
-//            });
-//            futureMap.put(k, future);
-//        });
-//        CompletableFuture<Void> voidCompletableFuture = CompletableFuture.allOf(futureMap.values().toArray(new CompletableFuture[0]));
-//        try {
-//            voidCompletableFuture.get();
-//        } catch (InterruptedException | ExecutionException e) {
-//            throw new RuntimeException(e);
-//        }
-//    }
-
-//    private void buildNodeMap(List<TaskNode> startNodes, Queue<Long> queue, List<Long> visited, List<TaskEdge> edges, Map<Long, List<Long>> nodeMap) {
-//        startNodes.forEach(item -> {
-//            queue.add(item.getId());
-//            visited.add(item.getId());
-//        });
-//
-//        ExecutorService executor = Executors.newFixedThreadPool(4);
-//        List<Future<?>> futures = new ArrayList<>();
-//
-//        while (!queue.isEmpty()) {
-//            List<Long> currentLevelNodes = new ArrayList<>();
-//            while (!queue.isEmpty()) {
-//                Long poll = queue.poll();
-//                List<Long> collect = edges.stream().filter(v -> v.getEndNodeId().equals(poll)).map(TaskEdge::getFromNodeId).toList();
-//                nodeMap.put(poll, collect);
-//                currentLevelNodes.add(poll);
-//            }
-//            for (Long node : currentLevelNodes) {
-//                futures.add(executor.submit(() -> {
-//                    for (long neighbor : getNeighbors(node, edges)) {
-//                        if (!visited.contains(neighbor)) {
-//                            visited.add(neighbor);
-//                            queue.add(neighbor);
-//                        }
-//                    }
-//                }));
-//            }
-//            for (Future<?> future : futures) {
-//                try {
-//                    future.get();
-//                } catch (ExecutionException | InterruptedException e) {
-//                    e.printStackTrace();
-//                }
-//            }
-//            futures.clear();
-//        }
-//    }
-
-//    private void runT(TaskNode node, List<Long> taskIds) {
-//        TaskInfo taskInfo = taskInfoService.getById(node.getTaskId());
-//
-//        Message message = new Message();
-//        message.setParentTaskId(node.getTaskParentId());
-//        message.setTaskId(node.getTaskId());
-//
-//        while (Boolean.TRUE.equals(stopMap.get(node.getTaskParentId()).getFirst())) {
-//            XxlJobExecutor.removeJobThread(node.getTaskParentId().intValue(), "stop task" + node.getTaskParentId());
-//            // 节点清空
-//            List<ReturnT<String>> returnTList = JobCompleteHelper.getReturnTList();
-//            returnTList.removeIf(res -> taskIds.contains(Long.valueOf(res.getContent())));
-//            taskIdMap.remove(node.getTaskParentId());
-//            webSocketServer.onClose(node.getTaskParentId());
-//            throw new BusinessException(node.getTaskParentId() + " task stop");
-//        }
-//
-//        JobTriggerPoolHelper.trigger(taskInfo.getId().intValue(), TriggerTypeEnum.MANUAL, -1, null, taskInfo.getExecutorParam(), "");
-//
-//        message.setStatus(2);
-//        webSocketServer.sendInfo(message);
-//
-//            //往父亲节点发送消息
-//        Long valueToFind = findParent(taskInfo.getId(), node.getTaskParentId());
-//        if(valueToFind!=null){
-//            Message pMessage = new Message();
-//            pMessage.setParentTaskId(node.getTaskParentId());
-//            pMessage.setTaskId(valueToFind);
-//            pMessage.setStatus(2);
-//            webSocketServer.sendInfo(pMessage);
-//        }
-//
-//        Thread futureThread = null;
-//        FutureTask<Boolean> futureTask = new FutureTask<Boolean>(() -> {
-//            Label:
-//            while (true) {
-//                List<ReturnT<String>> returnTList = JobCompleteHelper.getReturnTList();
-//                ArrayList<ReturnT<String>> returnTS = new ArrayList<>(returnTList);
-//                for (ReturnT<String> res : returnTS) {
-//                    if (res.getContent().equals(String.valueOf(node.getTaskId()))) {
-//                        logger.info("{}end node{}>>>>>>>>>>> task:{}", res, node.getTaskId(), taskInfo.getJobDesc());
-//                        if (res.getCode() == ReturnT.SUCCESS_CODE) {
-//                            message.setStatus(1);
-//                            webSocketServer.sendInfo(message);
-//                            JobCompleteHelper.removeReturnT(res);
-//                            Long pValue = findParent(node.getTaskId(),node.getTaskParentId());
-//
-//                            if(!taskIdMap.get(node.getTaskParentId()).isEmpty()){
-//                                Set<Long> ids = taskIdMap.get(node.getTaskParentId()).get(pValue);
-//                                ids.remove(node.getTaskId());
-//                                taskIdMap.computeIfAbsent(node.getTaskParentId(),k->new HashMap<>())
-//                                                .computeIfAbsent(pValue,k->new HashSet<>())
-//                                                        .addAll(ids);
-//                                if(ids.isEmpty()){
-//                                    Message pMessage = new Message();
-//                                    pMessage.setParentTaskId(node.getTaskParentId());
-//                                    pMessage.setTaskId(pValue);
-//                                    pMessage.setStatus(1);
-//                                    webSocketServer.sendInfo(pMessage);
-//                                }
-//                            }
-//
-//                            break Label;
-//                        } else {
-//                            if ("DO_NOTHING".equalsIgnoreCase(taskInfo.getExecutorBlockStrategy())) {
-//                                JobCompleteHelper.removeReturnT(res);
-//                                break Label;
-//                            } else {
-//                                message.setStatus(0);
-//                                webSocketServer.sendInfo(message);
-//                                stopMap.put(node.getTaskParentId(), new Pair<>(true, node.getTaskId()));
-//                                Long pValue = findParent(node.getTaskId(),node.getTaskParentId());
-//                                if(taskIdMap.get(node.getTaskParentId())!=null&&pValue!=null) {
-//                                    Message pMessage = new Message();
-//                                    pMessage.setParentTaskId(node.getTaskParentId());
-//                                    pMessage.setTaskId(pValue);
-//                                    pMessage.setStatus(0);
-//                                    webSocketServer.sendInfo(pMessage);
-//                                }
-//                                throw new RuntimeException();
-//                            }
-//                        }
-//
-//                    }
-//                }
-//            }
-//            return true;
-//        });
-//
-//        futureThread = new Thread(futureTask);
-//        futureThread.start();
-//
-//        try {
-//            Boolean tempResult = futureTask.get();
-//        } catch (Exception e) {
-//            throw new RuntimeException(e.getMessage());
-//        }
-//   }
 
     private static Logger logger = LoggerFactory.getLogger(TaskRankXxlJob.class);
 

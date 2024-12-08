@@ -21,7 +21,6 @@ import com.cc.job.task.service.TaskNodeService;
 import com.cc.job.task.thread.JobScheduleHelper;
 import com.cc.job.task.thread.JobTriggerPoolHelper;
 import com.cc.job.task.utils.I18nUtil;
-import com.cc.job.task.websocket.WebSocketServer;
 import com.cc.tasktool.executor.Async;
 import com.cc.tasktool.wrapper.WorkerWrapper;
 import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
@@ -246,7 +245,7 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
             return false;
         }
 
-        if(taskInfo.getJobType()==2&&taskInfo.getRankTriggerStatus()==1){
+        if (taskInfo.getJobType() == 2 && taskInfo.getRankTriggerStatus() == 1) {
             throw new BusinessException("当前任务正在运行中～");
         }
 
@@ -298,9 +297,6 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
         xxlJobInfo.setTriggerStatus(0);
         xxlJobInfo.setTriggerLastTime(0L);
         xxlJobInfo.setTriggerNextTime(0L);
-//        if(xxlJobInfo.getJobType()==2){
-//            this.stopTaskSet(id);
-//        }
         return this.updateById(xxlJobInfo);
     }
 
@@ -611,17 +607,17 @@ public class TaskInfoServiceImpl extends ServiceImpl<TaskInfoMapper, TaskInfo> i
     }
 
     @Override
-    public boolean stopTaskSet(Long id,String randomId) {
+    public boolean stopTaskSet(Long id, String randomId) {
         int flag = taskInfoMapper.stopTaskSet(id);
         XxlJobExecutor.removeJobThread(id.intValue(), "stop task" + id);
 
-        if (redisTemplate.hasKey(id+":"+randomId)) {
-            WorkerWrapper<Long, String> workWrapper = TaskRankXxlJob.getWorkWrapper(id,randomId);
+        if (redisTemplate.hasKey(id + ":" + randomId)) {
+            WorkerWrapper<Long, String> workWrapper = TaskRankXxlJob.getWorkWrapper(id, randomId);
             if (workWrapper != null) {
                 log.info(">>>>>>>>> stop task:{}", workWrapper.getId());
                 Async.stopWork(workWrapper);
-                TaskRankXxlJob.removeWorkWrapper(id,randomId);
-                redisTemplate.delete(id+":"+randomId);
+                TaskRankXxlJob.removeWorkWrapper(id, randomId);
+                redisTemplate.delete(id + ":" + randomId);
             }
         }
 

@@ -1,8 +1,5 @@
 package com.cc.job.task.thread;
 
-import cn.hutool.core.lang.Pair;
-import com.cc.job.common.result.Result;
-import com.cc.job.config.RedisConfig;
 import com.cc.job.task.complete.XxlJobCompleter;
 import com.cc.job.task.config.XxlJobAdminConfig;
 import com.cc.job.task.model.entity.TaskLog;
@@ -10,20 +7,10 @@ import com.cc.job.task.redis.StreamConsumer;
 import com.cc.job.task.utils.I18nUtil;
 import com.xxl.job.core.biz.model.HandleCallbackParam;
 import com.xxl.job.core.biz.model.ReturnT;
-import com.xxl.job.core.thread.TriggerCallbackThread;
 import com.xxl.job.core.util.DateUtil;
-import jakarta.annotation.Resource;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.data.redis.connection.stream.MapRecord;
-import org.springframework.data.redis.connection.stream.RecordId;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.serializer.RedisSerializer;
-import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -39,7 +26,7 @@ public class JobCompleteHelper {
 
 	private static JobCompleteHelper instance = new JobCompleteHelper();
 
-	public static JobCompleteHelper getInstance(){
+	public static JobCompleteHelper getInstance() {
 		return instance;
 	}
 
@@ -49,7 +36,7 @@ public class JobCompleteHelper {
 	private Thread monitorThread;
 	private volatile boolean toStop = false;
 
-	public void start(){
+	public void start() {
 		// for callback
 		callbackThreadPool = new ThreadPoolExecutor(
 				2,
@@ -92,17 +79,17 @@ public class JobCompleteHelper {
 					try {
 						// 任务结果丢失处理：调度记录停留在 "运行中" 状态超过10min，且对应执行器心跳注册失败不在线，则将本地调度主动标记失败；
 						Date losedTime = DateUtil.addMinutes(new Date(), -10);
-						List<Long> losedJobIds  = XxlJobAdminConfig.getAdminConfig().getTaskLogMapper().findLostJobIds(losedTime);
+						List<Long> losedJobIds = XxlJobAdminConfig.getAdminConfig().getTaskLogMapper().findLostJobIds(losedTime);
 
-						if (losedJobIds!=null && losedJobIds.size()>0) {
-							for (Long logId: losedJobIds) {
+						if (losedJobIds != null && losedJobIds.size() > 0) {
+							for (Long logId : losedJobIds) {
 
 								TaskLog jobLog = new TaskLog();
 								jobLog.setId(logId);
 
 								jobLog.setHandleTime(LocalDateTime.now());
 								jobLog.setHandleCode(ReturnT.FAIL_CODE);
-								jobLog.setHandleMsg( I18nUtil.getString("joblog_lost_fail") );
+								jobLog.setHandleMsg(I18nUtil.getString("joblog_lost_fail"));
 
 								XxlJobCompleter.updateHandleInfoAndFinish(jobLog);
 							}
@@ -114,15 +101,15 @@ public class JobCompleteHelper {
 						}
 					}
 
-                    try {
-                        TimeUnit.SECONDS.sleep(60);
-                    } catch (Exception e) {
-                        if (!toStop) {
-                            logger.error(e.getMessage(), e);
-                        }
-                    }
+					try {
+						TimeUnit.SECONDS.sleep(60);
+					} catch (Exception e) {
+						if (!toStop) {
+							logger.error(e.getMessage(), e);
+						}
+					}
 
-                }
+				}
 
 				logger.info(">>>>>>>>>>> xxl-job, JobLosedMonitorHelper stop");
 
@@ -133,7 +120,7 @@ public class JobCompleteHelper {
 		monitorThread.start();
 	}
 
-	public void toStop(){
+	public void toStop() {
 		toStop = true;
 
 		// stop registryOrRemoveThreadPool
@@ -156,11 +143,11 @@ public class JobCompleteHelper {
 		callbackThreadPool.execute(new Runnable() {
 			@Override
 			public void run() {
-				for (HandleCallbackParam handleCallbackParam: callbackParamList) {
+				for (HandleCallbackParam handleCallbackParam : callbackParamList) {
 					System.out.println("callbackParam: " + handleCallbackParam);
 					ReturnT<String> callbackResult = callback(handleCallbackParam);
 					logger.debug(">>>>>>>>> JobApiController.callback {}, handleCallbackParam={}, callbackResult={}",
-							(callbackResult.getCode()== ReturnT.SUCCESS_CODE?"success":"fail"), handleCallbackParam, callbackResult);
+							(callbackResult.getCode() == ReturnT.SUCCESS_CODE ? "success" : "fail"), handleCallbackParam, callbackResult);
 				}
 			}
 		});
@@ -172,27 +159,27 @@ public class JobCompleteHelper {
 		// valid log item
 		TaskLog log = XxlJobAdminConfig.getAdminConfig().getTaskLogMapper().selectById(handleCallbackParam.getLogId());
 		String randomId = "";
-		if(StringUtils.isNotBlank(log.getExecutorParam())){
-			logger.info(">>>>>>>executorParam:{}",log.getExecutorParam());
-			randomId = ":"+log.getExecutorParam();
+		if (log != null && StringUtils.isNotBlank(log.getExecutorParam())) {
+			logger.info(">>>>>>>executorParam:{}", log.getExecutorParam());
+			randomId = ":" + log.getExecutorParam();
 		}
 		if (log == null) {
-			Map<String,Boolean> result = new HashMap<>();
-			result.put(handleCallbackParam.getJobId()+randomId,false);
-			XxlJobAdminConfig.redisUtils.sendMessage(StreamConsumer.TASK_SET_STREAM,result);
+			Map<String, Boolean> result = new HashMap<>();
+			result.put(handleCallbackParam.getJobId() + randomId, false);
+			XxlJobAdminConfig.redisUtils.sendMessage(StreamConsumer.TASK_SET_STREAM, result);
 			return new ReturnT<>(ReturnT.FAIL_CODE, "log item not found.");
 		}
 		if (log.getHandleCode() > 0) {
-			Map<String,Boolean> result = new HashMap<>();
-			result.put(handleCallbackParam.getJobId()+randomId,false);
-			XxlJobAdminConfig.redisUtils.sendMessage(StreamConsumer.TASK_SET_STREAM,result);
+			Map<String, Boolean> result = new HashMap<>();
+			result.put(handleCallbackParam.getJobId() + randomId, false);
+			XxlJobAdminConfig.redisUtils.sendMessage(StreamConsumer.TASK_SET_STREAM, result);
 			return new ReturnT<>(ReturnT.FAIL_CODE, "log repeate callback.");
 		}
 
 		// 处理结果
-		Map<String,Boolean> map = new HashMap<>();
-		map.put(handleCallbackParam.getJobId()+randomId,handleCallbackParam.getHandleCode()==ReturnT.SUCCESS_CODE);
-		XxlJobAdminConfig.redisUtils.sendMessage(StreamConsumer.TASK_SET_STREAM,map);
+		Map<String, Boolean> map = new HashMap<>();
+		map.put(handleCallbackParam.getJobId() + randomId, handleCallbackParam.getHandleCode() == ReturnT.SUCCESS_CODE);
+		XxlJobAdminConfig.redisUtils.sendMessage(StreamConsumer.TASK_SET_STREAM, map);
 
 		// handle msg
 		StringBuffer handleMsg = new StringBuffer();
@@ -211,7 +198,5 @@ public class JobCompleteHelper {
 
 		return ReturnT.SUCCESS;
 	}
-
-
 
 }
