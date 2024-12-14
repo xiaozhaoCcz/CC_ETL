@@ -118,4 +118,6 @@ public class JobInfo extends BaseEntity {
     private String isNode;
 
     private Integer rankTriggerStatus;
+
+    private Long jdbcDatasourceId;
 }
