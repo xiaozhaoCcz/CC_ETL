@@ -352,6 +352,10 @@ const glueTypeList = [
     title: "API",
   },
   {
+    type: "SQL",
+    title: "SQL",
+  },
+  {
     type: "GLUE_GROOVY",
     title: "GLUE(Java)",
   },

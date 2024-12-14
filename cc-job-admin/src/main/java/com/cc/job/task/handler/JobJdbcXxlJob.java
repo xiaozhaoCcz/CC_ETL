@@ -40,7 +40,7 @@ public class JobJdbcXxlJob {
         if(!StringUtils.hasText(sql)){
             throw new RuntimeException("sql is empty");
         }
-        XxlJobHelper.log("execute sql {} ",sql);
+        XxlJobHelper.log("execute sql: {} ",sql);
         PreparedStatement ps =null;
         ResultSet rs=null;
         CallableStatement cs=null;
@@ -50,14 +50,18 @@ public class JobJdbcXxlJob {
             if(type.equalsIgnoreCase(SqlEnum.DELETE.getName())||type.equalsIgnoreCase(SqlEnum.INSERT.getName())||type.equalsIgnoreCase(SqlEnum.UPDATE.getName())){
                 int i = ps.executeUpdate();
                 XxlJobHelper.log("result {} executeUpdate {}",jobId,i>0?"success":"fail");
-            }else if(type.equalsIgnoreCase(SqlEnum.SELECT.getName())){
-                rs = ps.executeQuery();
-                // 获取数量
-                XxlJobHelper.log("jobId:{},data row {} ",jobId,rs.getRow());
             } else if(type.equalsIgnoreCase(SqlEnum.CALL.getName())){
-                cs= connection.prepareCall(sql);
+                cs= connection.prepareCall("{"+sql+"}");
                 cs.execute();
                 XxlJobHelper.log("execute call jobId:{}",jobId);
+            }else {
+                rs = ps.executeQuery("select count(*) from (" + sql + ") t");
+                int count = 0;
+                while (rs.next()) {
+                    count = rs.getInt(1);
+                }
+                // 获取数量
+                XxlJobHelper.log("jobId:{},data row: {} ", jobId, count);
             }
         } catch (SQLException e) {
             throw new RuntimeException(e);

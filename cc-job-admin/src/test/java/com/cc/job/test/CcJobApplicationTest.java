@@ -8,20 +8,27 @@ import com.cc.job.task.mapper.JobInfoMapper;
 import com.cc.job.task.mapper.JobNodeMapper;
 import com.cc.job.task.model.entity.JobEdge;
 import com.cc.job.task.model.entity.JobInfo;
+import com.cc.job.task.model.entity.JobJdbcDatasource;
 import com.cc.job.task.model.entity.JobNode;
 import com.cc.job.task.model.vo.JobEdgeVo;
 import com.cc.job.task.model.vo.JobNodeVo;
+import com.cc.job.task.service.JobJdbcDatasourceService;
+import com.cc.job.task.utils.JdbcUtils;
 import com.cc.job.test.entity.Edge;
 import com.cc.job.test.entity.Node;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
-@SpringBootTest(classes = CcJobApplication.class)
+@SpringBootTest(classes = CcJobApplication.class,webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class CcJobApplicationTest {
 
 
@@ -411,6 +418,33 @@ public class CcJobApplicationTest {
 
         List<JobEdgeVo> copyTaskEdges = BeanUtil.copyToList(taskEdges, JobEdgeVo.class);
         taskEdgeVos.addAll(copyTaskEdges);
+    }
+
+    @Resource
+    JobJdbcDatasourceService jobJdbcDatasourceService;
+
+    @Test
+    public void test5() throws SQLException {
+        String sql = "select * from job_log t";
+        System.out.println(sql);
+        JobJdbcDatasource jobJdbcDatasource = jobJdbcDatasourceService.getById(6);
+        Connection connection = JdbcUtils.getConnection(jobJdbcDatasource.getJdbcDriverClass(), jobJdbcDatasource.getJdbcUrl(), jobJdbcDatasource.getJdbcUsername(), jobJdbcDatasource.getJdbcPassword());
+
+        PreparedStatement preparedStatement = connection.prepareStatement(sql);
+        ResultSet rs = preparedStatement.executeQuery();
+
+        List<Map<String, Object>> list = new ArrayList<>();
+        while (rs.next()) {
+            Map<String, Object> map = new HashMap<>();
+            for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) {
+                map.put(rs.getMetaData().getColumnName(i), rs.getObject(i));
+            }
+            list.add(map);
+        }
+
+        System.out.println(list);
+        JdbcUtils.close(rs);
+        JdbcUtils.close(preparedStatement);
     }
 }
 

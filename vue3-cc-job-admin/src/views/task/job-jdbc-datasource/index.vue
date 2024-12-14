@@ -193,12 +193,6 @@
       @close="handleCloseDialog"
     >
       <el-form ref="dataFormRef" :model="formData" :rules="rules" label-width="100px">
-        <el-form-item label="自增主键" prop="id">
-          <el-input
-            v-model="formData.id"
-            placeholder="自增主键"
-          />
-        </el-form-item>
         <el-form-item label="数据源名称" prop="datasourceName">
           <el-input
             v-model="formData.datasourceName"
@@ -245,40 +239,6 @@
           <el-input
             v-model="formData.jdbcDriverClass"
             placeholder="jdbc驱动类"
-          />
-        </el-form-item>
-        <el-form-item label="状态：0删除 1启用 2禁用" prop="status">
-          <el-input
-            v-model="formData.status"
-            placeholder="状态：0删除 1启用 2禁用"
-          />
-        </el-form-item>
-        <el-form-item label="创建人" prop="createBy">
-          <el-input
-            v-model="formData.createBy"
-            placeholder="创建人"
-          />
-        </el-form-item>
-        <el-form-item label="创建时间" prop="createTime">
-          <el-date-picker
-            v-model="formData.createTime"
-            type="datetime"
-            placeholder="创建时间"
-            value-format="YYYY-MM-DD HH:mm:ss"
-          />
-        </el-form-item>
-        <el-form-item label="更新人" prop="updateBy">
-          <el-input
-            v-model="formData.updateBy"
-            placeholder="更新人"
-          />
-        </el-form-item>
-        <el-form-item label="更新时间" prop="updateTime">
-          <el-date-picker
-            v-model="formData.updateTime"
-            type="datetime"
-            placeholder="更新时间"
-            value-format="YYYY-MM-DD HH:mm:ss"
           />
         </el-form-item>
         <el-form-item label="备注" prop="comments">

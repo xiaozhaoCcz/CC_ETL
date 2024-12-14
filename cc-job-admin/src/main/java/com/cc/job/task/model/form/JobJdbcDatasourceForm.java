@@ -22,9 +22,6 @@ public class JobJdbcDatasourceForm implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    @Schema(description = "自增主键")
-    private Long id;
-
     @Schema(description = "数据源名称")
     @Size(max=200, message="数据源名称长度不能超过200个字符")
     private String datasourceName;
@@ -61,27 +58,6 @@ public class JobJdbcDatasourceForm implements Serializable {
     @NotBlank(message = "jdbc驱动类不能为空")
     @Size(max=200, message="jdbc驱动类长度不能超过200个字符")
     private String jdbcDriverClass;
-
-    @Schema(description = "状态：0删除 1启用 2禁用")
-    private Integer status;
-
-    @Schema(description = "创建人")
-    @NotBlank(message = "创建人不能为空")
-    @Size(max=20, message="创建人长度不能超过20个字符")
-    private String createBy;
-
-    @Schema(description = "创建时间")
-    @NotNull(message = "创建时间不能为空")
-    private LocalDateTime createTime;
-
-    @Schema(description = "更新人")
-    @NotBlank(message = "更新人不能为空")
-    @Size(max=20, message="更新人长度不能超过20个字符")
-    private String updateBy;
-
-    @Schema(description = "更新时间")
-    @NotNull(message = "更新时间不能为空")
-    private LocalDateTime updateTime;
 
     @Schema(description = "备注")
     @NotBlank(message = "备注不能为空")
