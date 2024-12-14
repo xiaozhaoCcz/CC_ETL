@@ -1,10 +1,9 @@
 package com.cc.job.task.converter;
 
-import com.cc.job.task.model.vo.TaskLogVO;
+import com.cc.job.task.model.vo.JobLogVO;
 import org.mapstruct.Mapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.cc.job.task.model.entity.TaskLog;
-import com.cc.job.task.model.form.TaskLogForm;
+import com.cc.job.task.model.entity.JobLog;
+import com.cc.job.task.model.form.JobLogForm;
 
 /**
  * task_log对象转换器
@@ -15,9 +14,9 @@ import com.cc.job.task.model.form.TaskLogForm;
 @Mapper(componentModel = "spring")
 public interface TaskLogConverter{
 
-    TaskLogForm toForm(TaskLog entity);
+    JobLogForm toForm(JobLog entity);
 
-    TaskLog toEntity(TaskLogForm formData);
+    JobLog toEntity(JobLogForm formData);
 
-    TaskLogVO toVo(TaskLog taskLog);
+    JobLogVO toVo(JobLog taskLog);
 }

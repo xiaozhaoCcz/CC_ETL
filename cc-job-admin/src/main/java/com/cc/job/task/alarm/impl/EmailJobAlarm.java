@@ -3,9 +3,9 @@ package com.cc.job.task.alarm.impl;
 
 import com.cc.job.task.alarm.JobAlarm;
 import com.cc.job.task.config.XxlJobAdminConfig;
-import com.cc.job.task.model.entity.TaskGroup;
-import com.cc.job.task.model.entity.TaskInfo;
-import com.cc.job.task.model.entity.TaskLog;
+import com.cc.job.task.model.entity.JobGroup;
+import com.cc.job.task.model.entity.JobInfo;
+import com.cc.job.task.model.entity.JobLog;
 import com.cc.job.task.utils.I18nUtil;
 import com.xxl.job.core.biz.model.ReturnT;
 import jakarta.mail.internet.MimeMessage;
@@ -34,7 +34,7 @@ public class EmailJobAlarm implements JobAlarm {
      * @param jobLog
      */
     @Override
-    public boolean doAlarm(TaskInfo info, TaskLog jobLog){
+    public boolean doAlarm(JobInfo info, JobLog jobLog){
         boolean alarmResult = true;
 
         // send monitor email
@@ -50,7 +50,7 @@ public class EmailJobAlarm implements JobAlarm {
             }
 
             // email info
-            TaskGroup group = XxlJobAdminConfig.getAdminConfig().getTaskGroupMapper().selectById(info.getJobGroup());
+            JobGroup group = XxlJobAdminConfig.getAdminConfig().getTaskGroupMapper().selectById(info.getJobGroup());
             String personal = I18nUtil.getString("admin_name_full");
             String title = I18nUtil.getString("jobconf_monitor");
             String content = MessageFormat.format(loadEmailJobAlarmTemplate(),

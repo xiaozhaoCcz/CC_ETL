@@ -1,9 +1,8 @@
 package com.cc.job.task.converter;
 
 import org.mapstruct.Mapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.cc.job.task.model.entity.TaskLock;
-import com.cc.job.task.model.form.TaskLockForm;
+import com.cc.job.task.model.entity.JobLock;
+import com.cc.job.task.model.form.JobLockForm;
 
 /**
  * task_lock对象转换器
@@ -14,7 +13,7 @@ import com.cc.job.task.model.form.TaskLockForm;
 @Mapper(componentModel = "spring")
 public interface TaskLockConverter{
 
-    TaskLockForm toForm(TaskLock entity);
+    JobLockForm toForm(JobLock entity);
 
-    TaskLock toEntity(TaskLockForm formData);
+    JobLock toEntity(JobLockForm formData);
 }

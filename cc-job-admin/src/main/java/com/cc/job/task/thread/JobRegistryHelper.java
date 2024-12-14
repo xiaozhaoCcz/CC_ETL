@@ -3,8 +3,8 @@ package com.cc.job.task.thread;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.task.config.XxlJobAdminConfig;
-import com.cc.job.task.model.entity.TaskGroup;
-import com.cc.job.task.model.entity.TaskRegistry;
+import com.cc.job.task.model.entity.JobGroup;
+import com.cc.job.task.model.entity.JobRegistry;
 import com.xxl.job.core.biz.model.RegistryParam;
 import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.enums.RegistryConfig;
@@ -62,7 +62,7 @@ public class JobRegistryHelper {
 				while (!toStop) {
 					try {
 						// auto registry group
-						List<TaskGroup> groupList = XxlJobAdminConfig.getAdminConfig().getTaskGroupMapper().selectList(new LambdaQueryWrapper<TaskGroup>().eq(TaskGroup::getAddressType,0));
+						List<JobGroup> groupList = XxlJobAdminConfig.getAdminConfig().getTaskGroupMapper().selectList(new LambdaQueryWrapper<JobGroup>().eq(JobGroup::getAddressType,0));
 						if (groupList!=null && !groupList.isEmpty()) {
 
 							// remove dead address (admin/executor)
@@ -73,9 +73,9 @@ public class JobRegistryHelper {
 
 							// fresh online address (admin/executor)
 							HashMap<String, List<String>> appAddressMap = new HashMap<String, List<String>>();
-							List<TaskRegistry> list = XxlJobAdminConfig.getAdminConfig().getTaskRegistryMapper().findAll(RegistryConfig.DEAD_TIMEOUT, new Date());
+							List<JobRegistry> list = XxlJobAdminConfig.getAdminConfig().getTaskRegistryMapper().findAll(RegistryConfig.DEAD_TIMEOUT, new Date());
 							if (list != null) {
-								for (TaskRegistry item: list) {
+								for (JobRegistry item: list) {
 									if (RegistryConfig.RegistType.EXECUTOR.name().equals(item.getRegistryGroup())) {
 										String appname = item.getRegistryKey();
 										List<String> registryList = appAddressMap.get(appname);
@@ -92,7 +92,7 @@ public class JobRegistryHelper {
 							}
 
 							// fresh group address
-							for (TaskGroup group: groupList) {
+							for (JobGroup group: groupList) {
 								List<String> registryList = appAddressMap.get(group.getAppName());
 								String addressListStr = null;
 								if (registryList!=null && !registryList.isEmpty()) {

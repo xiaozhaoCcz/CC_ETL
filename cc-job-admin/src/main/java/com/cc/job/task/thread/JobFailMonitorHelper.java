@@ -3,8 +3,8 @@ package com.cc.job.task.thread;
 
 import com.cc.job.task.config.XxlJobAdminConfig;
 import com.cc.job.task.enums.TriggerTypeEnum;
-import com.cc.job.task.model.entity.TaskInfo;
-import com.cc.job.task.model.entity.TaskLog;
+import com.cc.job.task.model.entity.JobInfo;
+import com.cc.job.task.model.entity.JobLog;
 import com.cc.job.task.utils.I18nUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,8 +48,8 @@ public class JobFailMonitorHelper {
 								if (lockRet < 1) {
 									continue;
 								}
-								TaskLog log = XxlJobAdminConfig.getAdminConfig().getTaskLogMapper().selectById(failLogId);
-								TaskInfo info = XxlJobAdminConfig.getAdminConfig().getTaskInfoMapper().selectById(log.getJobId());
+								JobLog log = XxlJobAdminConfig.getAdminConfig().getTaskLogMapper().selectById(failLogId);
+								JobInfo info = XxlJobAdminConfig.getAdminConfig().getTaskInfoMapper().selectById(log.getJobId());
 
 								// 1、fail retry monitor
 								if (log.getExecutorFailRetryCount() > 0) {

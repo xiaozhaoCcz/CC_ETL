@@ -3,9 +3,9 @@ package com.cc.job.task.trigger;
 import com.cc.job.task.config.XxlJobAdminConfig;
 import com.cc.job.task.enums.ExecutorRouteStrategyEnum;
 import com.cc.job.task.enums.TriggerTypeEnum;
-import com.cc.job.task.model.entity.TaskGroup;
-import com.cc.job.task.model.entity.TaskInfo;
-import com.cc.job.task.model.entity.TaskLog;
+import com.cc.job.task.model.entity.JobGroup;
+import com.cc.job.task.model.entity.JobInfo;
+import com.cc.job.task.model.entity.JobLog;
 import com.cc.job.task.scheduler.XxlJobScheduler;
 import com.cc.job.task.utils.I18nUtil;
 import com.xxl.job.core.biz.ExecutorBiz;
@@ -15,7 +15,6 @@ import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
 import com.xxl.job.core.glue.GlueTypeEnum;
 import com.xxl.job.core.util.IpUtil;
 import com.xxl.job.core.util.ThrowableUtil;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,7 +52,7 @@ public class XxlJobTrigger {
                                String addressList) {
 
         // load data
-        TaskInfo jobInfo = XxlJobAdminConfig.getAdminConfig().getTaskInfoMapper().selectById(jobId);
+        JobInfo jobInfo = XxlJobAdminConfig.getAdminConfig().getTaskInfoMapper().selectById(jobId);
         if (jobInfo == null) {
             logger.warn(">>>>>>>>>>>> trigger fail, jobId invalid，jobId={}", jobId);
             return;
@@ -62,7 +61,7 @@ public class XxlJobTrigger {
             jobInfo.setExecutorParam(executorParam);
         }
         int finalFailRetryCount = failRetryCount>=0?failRetryCount:jobInfo.getExecutorFailRetryCount();
-        TaskGroup group = XxlJobAdminConfig.getAdminConfig().getTaskGroupMapper().selectById(jobInfo.getJobGroup());
+        JobGroup group = XxlJobAdminConfig.getAdminConfig().getTaskGroupMapper().selectById(jobInfo.getJobGroup());
 
         // cover addressList
         if (addressList!=null && addressList.trim().length()>0) {
@@ -112,7 +111,7 @@ public class XxlJobTrigger {
      * @param index                     sharding index
      * @param total                     sharding index
      */
-    private static void processTrigger(TaskGroup group, TaskInfo jobInfo, int finalFailRetryCount, TriggerTypeEnum triggerType, int index, int total){
+    private static void processTrigger(JobGroup group, JobInfo jobInfo, int finalFailRetryCount, TriggerTypeEnum triggerType, int index, int total){
 
         // param
         ExecutorBlockStrategyEnum blockStrategy = ExecutorBlockStrategyEnum.match(jobInfo.getExecutorBlockStrategy(), ExecutorBlockStrategyEnum.SERIAL_EXECUTION);  // block strategy
@@ -120,7 +119,7 @@ public class XxlJobTrigger {
         String shardingParam = (ExecutorRouteStrategyEnum.SHARDING_BROADCAST==executorRouteStrategyEnum)?String.valueOf(index).concat("/").concat(String.valueOf(total)):null;
 
         // 1、save log-id
-        TaskLog jobLog = new TaskLog();
+        JobLog jobLog = new JobLog();
         jobLog.setJobGroup(jobInfo.getJobGroup());
         jobLog.setJobId(jobInfo.getId());
         jobLog.setTriggerTime(LocalDateTime.now());

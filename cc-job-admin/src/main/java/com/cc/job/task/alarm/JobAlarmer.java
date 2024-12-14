@@ -1,7 +1,7 @@
 package com.cc.job.task.alarm;
 
-import com.cc.job.task.model.entity.TaskInfo;
-import com.cc.job.task.model.entity.TaskLog;
+import com.cc.job.task.model.entity.JobInfo;
+import com.cc.job.task.model.entity.JobLog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeansException;
@@ -41,7 +41,7 @@ public class JobAlarmer implements ApplicationContextAware, InitializingBean {
      * @param jobLog
      * @return
      */
-    public boolean alarm(TaskInfo info, TaskLog jobLog) {
+    public boolean alarm(JobInfo info, JobLog jobLog) {
 
         boolean result = false;
         if (jobAlarmList!=null && jobAlarmList.size()>0) {

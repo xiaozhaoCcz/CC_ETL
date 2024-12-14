@@ -5,7 +5,7 @@ import com.cc.job.task.config.XxlJobAdminConfig;
 import com.cc.job.task.enums.MisfireStrategyEnum;
 import com.cc.job.task.enums.ScheduleTypeEnum;
 import com.cc.job.task.enums.TriggerTypeEnum;
-import com.cc.job.task.model.entity.TaskInfo;
+import com.cc.job.task.model.entity.JobInfo;
 import org.redisson.executor.CronExpression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,17 +71,17 @@ public class JobScheduleHelper {
                         connAutoCommit = conn.getAutoCommit();
                         conn.setAutoCommit(false);
 
-                        preparedStatement = conn.prepareStatement(  "select * from task_lock where lock_name = 'schedule_lock' for update" );
+                        preparedStatement = conn.prepareStatement(  "select * from job_lock where lock_name = 'schedule_lock' for update" );
                         preparedStatement.execute();
 
                         // tx start
 
                         // 1、pre read
                         long nowTime = System.currentTimeMillis();
-                        List<TaskInfo> scheduleList = XxlJobAdminConfig.getAdminConfig().getTaskInfoMapper().scheduleJobQuery(nowTime + PRE_READ_MS, preReadCount);
+                        List<JobInfo> scheduleList = XxlJobAdminConfig.getAdminConfig().getTaskInfoMapper().scheduleJobQuery(nowTime + PRE_READ_MS, preReadCount);
                         if (scheduleList!=null && scheduleList.size()>0) {
                             // 2、push time-ring
-                            for (TaskInfo jobInfo: scheduleList) {
+                            for (JobInfo jobInfo: scheduleList) {
 
                                 // time-ring jump
                                 if (nowTime > jobInfo.getTriggerNextTime() + PRE_READ_MS) {
@@ -140,7 +140,7 @@ public class JobScheduleHelper {
                             }
 
                             // 3、update trigger info
-                            for (TaskInfo jobInfo: scheduleList) {
+                            for (JobInfo jobInfo: scheduleList) {
                                 XxlJobAdminConfig.getAdminConfig().getTaskInfoMapper().updateById(jobInfo);
                             }
 
@@ -270,7 +270,7 @@ public class JobScheduleHelper {
         ringThread.start();
     }
 
-    private void refreshNextValidTime(TaskInfo jobInfo, Date fromTime) throws Exception {
+    private void refreshNextValidTime(JobInfo jobInfo, Date fromTime) throws Exception {
         Date nextValidTime = generateNextValidTime(jobInfo, fromTime);
         if (nextValidTime != null) {
             jobInfo.setTriggerLastTime(jobInfo.getTriggerNextTime());
@@ -352,7 +352,7 @@ public class JobScheduleHelper {
 
 
     // ---------------------- tools ----------------------
-    public static Date generateNextValidTime(TaskInfo jobInfo, Date fromTime) throws Exception {
+    public static Date generateNextValidTime(JobInfo jobInfo, Date fromTime) throws Exception {
         ScheduleTypeEnum scheduleTypeEnum = ScheduleTypeEnum.match(jobInfo.getScheduleType(), null);
         if (ScheduleTypeEnum.CRON == scheduleTypeEnum) {
             return new CronExpression(jobInfo.getScheduleConf()).getNextValidTimeAfter(fromTime);

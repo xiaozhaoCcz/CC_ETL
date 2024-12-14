@@ -3,8 +3,8 @@ package com.cc.job.task.complete;
 
 import com.cc.job.task.config.XxlJobAdminConfig;
 import com.cc.job.task.enums.TriggerTypeEnum;
-import com.cc.job.task.model.entity.TaskInfo;
-import com.cc.job.task.model.entity.TaskLog;
+import com.cc.job.task.model.entity.JobInfo;
+import com.cc.job.task.model.entity.JobLog;
 import com.cc.job.task.thread.JobTriggerPoolHelper;
 import com.cc.job.task.utils.I18nUtil;
 import com.xxl.job.core.biz.model.ReturnT;
@@ -26,7 +26,7 @@ public class XxlJobCompleter {
      * @param taskLog
      * @return
      */
-    public static int updateHandleInfoAndFinish(TaskLog taskLog) {
+    public static int updateHandleInfoAndFinish(JobLog taskLog) {
 
         // finish
         finishJob(taskLog);
@@ -44,12 +44,12 @@ public class XxlJobCompleter {
     /**
      * do somethind to finish job
      */
-    private static void finishJob(TaskLog taskLog){
+    private static void finishJob(JobLog taskLog){
 
         // 1、handle success, to trigger child job
         String triggerChildMsg = null;
         if (XxlJobContext.HANDLE_CODE_SUCCESS == taskLog.getHandleCode()) {
-            TaskInfo xxlJobInfo = XxlJobAdminConfig.getAdminConfig().getTaskInfoMapper().selectById(taskLog.getJobId());
+            JobInfo xxlJobInfo = XxlJobAdminConfig.getAdminConfig().getTaskInfoMapper().selectById(taskLog.getJobId());
             if (xxlJobInfo!=null && xxlJobInfo.getChildJobid()!=null && xxlJobInfo.getChildJobid().trim().length()>0) {
                 triggerChildMsg = "<br><br><span style=\"color:#00c0ef;\" > >>>>>>>>>>>"+ I18nUtil.getString("jobconf_trigger_child_run") +"<<<<<<<<<<< </span><br>";
 

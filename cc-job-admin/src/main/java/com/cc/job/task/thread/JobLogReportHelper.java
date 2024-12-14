@@ -2,12 +2,11 @@ package com.cc.job.task.thread;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.task.config.XxlJobAdminConfig;
-import com.cc.job.task.model.entity.TaskLogReport;
+import com.cc.job.task.model.entity.JobLogReport;
 import com.cc.job.task.utils.DateUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.LocalDateTime;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -65,7 +64,7 @@ public class JobLogReportHelper {
                             Date todayTo = itemDay.getTime();
 
                             // refresh log-report every minute
-                            TaskLogReport xxlJobLogReport = new TaskLogReport();
+                            JobLogReport xxlJobLogReport = new JobLogReport();
                             xxlJobLogReport.setTriggerDay(DateUtils.asLocalDateTime(todayFrom));
                             xxlJobLogReport.setRunningCount(0);
                             xxlJobLogReport.setSucCount(0);
@@ -84,7 +83,7 @@ public class JobLogReportHelper {
                             }
 
                             // do refresh
-                            int ret = XxlJobAdminConfig.getAdminConfig().getTaskLogReportMapper().update(xxlJobLogReport,new LambdaQueryWrapper<TaskLogReport>().eq(TaskLogReport::getTriggerDay,xxlJobLogReport.getTriggerDay()));
+                            int ret = XxlJobAdminConfig.getAdminConfig().getTaskLogReportMapper().update(xxlJobLogReport,new LambdaQueryWrapper<JobLogReport>().eq(JobLogReport::getTriggerDay,xxlJobLogReport.getTriggerDay()));
                             if (ret < 1) {
                                 XxlJobAdminConfig.getAdminConfig().getTaskLogReportMapper().insert(xxlJobLogReport);
                             }

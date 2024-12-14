@@ -10,7 +10,6 @@ import com.xxl.job.core.util.IpUtil;
 import jakarta.annotation.Resource;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -85,15 +84,15 @@ public class XxlJobAdminConfig implements InitializingBean, DisposableBean {
     // dao, service
 
     @Resource
-    private TaskLogMapper taskLogMapper;
+    private JobLogMapper taskLogMapper;
     @Resource
-    private TaskInfoMapper taskInfoMapper;
+    private JobInfoMapper taskInfoMapper;
     @Resource
-    private TaskRegistryMapper taskRegistryMapper;
+    private JobRegistryMapper taskRegistryMapper;
     @Resource
-    private TaskGroupMapper taskGroupMapper;
+    private JobGroupMapper taskGroupMapper;
     @Resource
-    private TaskLogReportMapper taskLogReportMapper;
+    private JobLogReportMapper taskLogReportMapper;
     @Resource
     private JavaMailSender mailSender;
     @Resource
@@ -138,23 +137,23 @@ public class XxlJobAdminConfig implements InitializingBean, DisposableBean {
         return logretentiondays;
     }
 
-    public TaskLogMapper getTaskLogMapper() {
+    public JobLogMapper getTaskLogMapper() {
         return taskLogMapper;
     }
 
-    public TaskInfoMapper getTaskInfoMapper() {
+    public JobInfoMapper getTaskInfoMapper() {
         return taskInfoMapper;
     }
 
-    public TaskRegistryMapper getTaskRegistryMapper() {
+    public JobRegistryMapper getTaskRegistryMapper() {
         return taskRegistryMapper;
     }
 
-    public TaskGroupMapper getTaskGroupMapper() {
+    public JobGroupMapper getTaskGroupMapper() {
         return taskGroupMapper;
     }
 
-    public TaskLogReportMapper getTaskLogReportMapper() {
+    public JobLogReportMapper getTaskLogReportMapper() {
         return taskLogReportMapper;
     }
 

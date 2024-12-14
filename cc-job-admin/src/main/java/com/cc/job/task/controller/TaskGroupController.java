@@ -1,20 +1,19 @@
 package com.cc.job.task.controller;
 
-import com.cc.job.task.model.entity.TaskGroup;
-import com.cc.job.task.service.TaskGroupService;
+import com.cc.job.task.model.entity.JobGroup;
+import com.cc.job.task.service.JobGroupService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import com.cc.job.task.model.form.TaskGroupForm;
-import com.cc.job.task.model.query.TaskGroupQuery;
-import com.cc.job.task.model.vo.TaskGroupVO;
+import com.cc.job.task.model.form.JobGroupForm;
+import com.cc.job.task.model.query.JobGroupQuery;
+import com.cc.job.task.model.vo.JobGroupVO;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cc.job.common.result.PageResult;
 import com.cc.job.common.result.Result;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
@@ -33,20 +32,20 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TaskGroupController  {
 
-    private final TaskGroupService taskGroupService;
+    private final JobGroupService taskGroupService;
 
     @Operation(summary = "task_group分页列表")
     @GetMapping("/page")
     //@PreAuthorize("@ss.hasPerm('task:taskGroup:query')")
-    public PageResult<TaskGroupVO> getTaskGroupPage(TaskGroupQuery queryParams ) {
-        IPage<TaskGroupVO> result = taskGroupService.getTaskGroupPage(queryParams);
+    public PageResult<JobGroupVO> getTaskGroupPage(JobGroupQuery queryParams ) {
+        IPage<JobGroupVO> result = taskGroupService.getTaskGroupPage(queryParams);
         return PageResult.success(result);
     }
 
     @Operation(summary = "新增task_group")
     @PostMapping
     //@PreAuthorize("@ss.hasPerm('task:taskGroup:add')")
-    public Result<Void> saveTaskGroup(@RequestBody @Valid TaskGroupForm formData ) {
+    public Result<Void> saveTaskGroup(@RequestBody @Valid JobGroupForm formData ) {
         boolean result = taskGroupService.saveTaskGroup(formData);
         return Result.judge(result);
     }
@@ -54,10 +53,10 @@ public class TaskGroupController  {
     @Operation(summary = "获取task_group表单数据")
     @GetMapping("/{id}/form")
     //@PreAuthorize("@ss.hasPerm('task:taskGroup:edit')")
-    public Result<TaskGroupForm> getTaskGroupForm(
+    public Result<JobGroupForm> getTaskGroupForm(
         @Parameter(description = "task_groupID") @PathVariable Long id
     ) {
-        TaskGroupForm formData = taskGroupService.getTaskGroupFormData(id);
+        JobGroupForm formData = taskGroupService.getTaskGroupFormData(id);
         return Result.success(formData);
     }
 
@@ -66,7 +65,7 @@ public class TaskGroupController  {
     //@PreAuthorize("@ss.hasPerm('task:taskGroup:edit')")
     public Result<Void> updateTaskGroup(
             @Parameter(description = "task_groupID") @PathVariable Long id,
-            @RequestBody @Validated TaskGroupForm formData
+            @RequestBody @Validated JobGroupForm formData
     ) {
         boolean result = taskGroupService.updateTaskGroup(id, formData);
         return Result.judge(result);
@@ -92,8 +91,8 @@ public class TaskGroupController  {
 
     @Operation(summary = "获取所有taskGroup")
     @GetMapping("/getAllTaskGroupList")
-    public Result<List<TaskGroup>> getAllTaskGroupList(){
-        List<TaskGroup> list = taskGroupService.list();
+    public Result<List<JobGroup>> getAllTaskGroupList(){
+        List<JobGroup> list = taskGroupService.list();
         return Result.success(list);
     }
 }

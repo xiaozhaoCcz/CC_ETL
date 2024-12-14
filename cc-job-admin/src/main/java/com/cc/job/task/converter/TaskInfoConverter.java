@@ -1,10 +1,9 @@
 package com.cc.job.task.converter;
 
-import com.cc.job.task.model.vo.TaskInfoVO;
+import com.cc.job.task.model.vo.JobInfoVO;
 import org.mapstruct.Mapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.cc.job.task.model.entity.TaskInfo;
-import com.cc.job.task.model.form.TaskInfoForm;
+import com.cc.job.task.model.entity.JobInfo;
+import com.cc.job.task.model.form.JobInfoForm;
 
 /**
  * task_info对象转换器
@@ -15,9 +14,9 @@ import com.cc.job.task.model.form.TaskInfoForm;
 @Mapper(componentModel = "spring")
 public interface TaskInfoConverter{
 
-    TaskInfoForm toForm(TaskInfo entity);
+    JobInfoForm toForm(JobInfo entity);
 
-    TaskInfo toEntity(TaskInfoForm formData);
+    JobInfo toEntity(JobInfoForm formData);
 
-    TaskInfoVO toVo(TaskInfo taskInfo);
+    JobInfoVO toVo(JobInfo taskInfo);
 }

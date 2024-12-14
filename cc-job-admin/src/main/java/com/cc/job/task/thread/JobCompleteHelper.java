@@ -2,7 +2,7 @@ package com.cc.job.task.thread;
 
 import com.cc.job.task.complete.XxlJobCompleter;
 import com.cc.job.task.config.XxlJobAdminConfig;
-import com.cc.job.task.model.entity.TaskLog;
+import com.cc.job.task.model.entity.JobLog;
 import com.cc.job.task.redis.StreamConsumer;
 import com.cc.job.task.utils.I18nUtil;
 import com.xxl.job.core.biz.model.HandleCallbackParam;
@@ -84,7 +84,7 @@ public class JobCompleteHelper {
 						if (losedJobIds != null && losedJobIds.size() > 0) {
 							for (Long logId : losedJobIds) {
 
-								TaskLog jobLog = new TaskLog();
+								JobLog jobLog = new JobLog();
 								jobLog.setId(logId);
 
 								jobLog.setHandleTime(LocalDateTime.now());
@@ -157,7 +157,7 @@ public class JobCompleteHelper {
 
 	private ReturnT<String> callback(HandleCallbackParam handleCallbackParam) {
 		// valid log item
-		TaskLog log = XxlJobAdminConfig.getAdminConfig().getTaskLogMapper().selectById(handleCallbackParam.getLogId());
+		JobLog log = XxlJobAdminConfig.getAdminConfig().getTaskLogMapper().selectById(handleCallbackParam.getLogId());
 		String randomId = "";
 		if (log != null && StringUtils.isNotBlank(log.getExecutorParam())) {
 			logger.info(">>>>>>>executorParam:{}", log.getExecutorParam());

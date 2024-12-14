@@ -1,10 +1,9 @@
 package com.cc.job.task.converter;
 
-import com.cc.job.task.model.vo.TaskGroupVO;
+import com.cc.job.task.model.vo.JobGroupVO;
 import org.mapstruct.Mapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.cc.job.task.model.entity.TaskGroup;
-import com.cc.job.task.model.form.TaskGroupForm;
+import com.cc.job.task.model.entity.JobGroup;
+import com.cc.job.task.model.form.JobGroupForm;
 
 /**
  * task_group对象转换器
@@ -15,9 +14,9 @@ import com.cc.job.task.model.form.TaskGroupForm;
 @Mapper(componentModel = "spring")
 public interface TaskGroupConverter{
 
-    TaskGroupForm toForm(TaskGroup entity);
+    JobGroupForm toForm(JobGroup entity);
 
-    TaskGroup toEntity(TaskGroupForm formData);
+    JobGroup toEntity(JobGroupForm formData);
 
-    TaskGroupVO toVo(TaskGroup entity);
+    JobGroupVO toVo(JobGroup entity);
 }

@@ -1,24 +1,19 @@
 package com.cc.job.task.controller;
 
-import com.cc.job.task.service.TaskLogService;
+import com.cc.job.task.service.JobLogService;
 import com.xxl.job.core.biz.model.LogResult;
 import com.xxl.job.core.biz.model.ReturnT;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import com.cc.job.task.model.form.TaskLogForm;
-import com.cc.job.task.model.query.TaskLogQuery;
-import com.cc.job.task.model.vo.TaskLogVO;
+import com.cc.job.task.model.query.JobLogQuery;
+import com.cc.job.task.model.vo.JobLogVO;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cc.job.common.result.PageResult;
 import com.cc.job.common.result.Result;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-import jakarta.validation.Valid;
 
 /**
  * task_log前端控制层
@@ -32,13 +27,13 @@ import jakarta.validation.Valid;
 @RequiredArgsConstructor
 public class TaskLogController  {
 
-    private final TaskLogService taskLogService;
+    private final JobLogService taskLogService;
 
     @Operation(summary = "task_log分页列表")
     @GetMapping("/page")
     //@PreAuthorize("@ss.hasPerm('task:taskLog:query')")
-    public PageResult<TaskLogVO> getTaskLogPage(TaskLogQuery queryParams ) {
-        IPage<TaskLogVO> result = taskLogService.getTaskLogPage(queryParams);
+    public PageResult<JobLogVO> getTaskLogPage(JobLogQuery queryParams ) {
+        IPage<JobLogVO> result = taskLogService.getTaskLogPage(queryParams);
         return PageResult.success(result);
     }
 
@@ -46,7 +41,7 @@ public class TaskLogController  {
     @DeleteMapping
     //@PreAuthorize("@ss.hasPerm('task:taskLog:delete')")
     public Result<Void> deleteTaskLogs(
-            TaskLogQuery queryParams
+            JobLogQuery queryParams
     ) {
         boolean result = taskLogService.deleteTaskLogs(queryParams);
         return Result.judge(result);

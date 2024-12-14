@@ -1,24 +1,23 @@
 package com.cc.job.task.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.cc.job.task.model.dto.TaskInfoTriggerDto;
-import com.cc.job.task.model.entity.TaskInfo;
-import com.cc.job.task.model.entity.TaskLogglue;
-import com.cc.job.task.model.form.TaskGlueForm;
-import com.cc.job.task.service.TaskInfoService;
+import com.cc.job.task.model.dto.JobInfoTriggerDto;
+import com.cc.job.task.model.entity.JobInfo;
+import com.cc.job.task.model.entity.JobLogglue;
+import com.cc.job.task.model.form.JobGlueForm;
+import com.cc.job.task.service.JobInfoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import com.cc.job.task.model.form.TaskInfoForm;
-import com.cc.job.task.model.query.TaskInfoQuery;
-import com.cc.job.task.model.vo.TaskInfoVO;
+import com.cc.job.task.model.form.JobInfoForm;
+import com.cc.job.task.model.query.JobInfoQuery;
+import com.cc.job.task.model.vo.JobInfoVO;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cc.job.common.result.PageResult;
 import com.cc.job.common.result.Result;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
@@ -37,42 +36,42 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TaskInfoController {
 
-    private final TaskInfoService taskInfoService;
+    private final JobInfoService taskInfoService;
 
     @Operation(summary = "task_info分页列表")
     @GetMapping("/page")
-    public PageResult<TaskInfoVO> getTaskInfoPage(TaskInfoQuery queryParams) {
-        IPage<TaskInfoVO> result = taskInfoService.getTaskInfoPage(queryParams);
+    public PageResult<JobInfoVO> getTaskInfoPage(JobInfoQuery queryParams) {
+        IPage<JobInfoVO> result = taskInfoService.getTaskInfoPage(queryParams);
         return PageResult.success(result);
     }
 
     @Operation(summary = "task_info分页列表")
     @GetMapping("/list")
-    public Result<List<TaskInfo>> getTaskInfoList(Integer jobType) {
-        LambdaQueryWrapper<TaskInfo> wrapper = new LambdaQueryWrapper<>();
+    public Result<List<JobInfo>> getTaskInfoList(Integer jobType) {
+        LambdaQueryWrapper<JobInfo> wrapper = new LambdaQueryWrapper<>();
         if(jobType!=null){
-            wrapper.eq(TaskInfo::getJobType, jobType);
+            wrapper.eq(JobInfo::getJobType, jobType);
         }else{
-            wrapper.in(TaskInfo::getJobType,0,2);
+            wrapper.in(JobInfo::getJobType,0,2);
         }
-        wrapper.eq(TaskInfo::getIsNode,"N");
-        List<TaskInfo> list = taskInfoService.list(wrapper);
+        wrapper.eq(JobInfo::getIsNode,"N");
+        List<JobInfo> list = taskInfoService.list(wrapper);
         return Result.success(list);
     }
 
     @Operation(summary = "新增task_info")
     @PostMapping
-    public Result<Void> saveTaskInfo(@RequestBody @Valid TaskInfoForm formData) {
+    public Result<Void> saveTaskInfo(@RequestBody @Valid JobInfoForm formData) {
         boolean result = taskInfoService.saveTaskInfo(formData);
         return Result.judge(result);
     }
 
     @Operation(summary = "获取task_info表单数据")
     @GetMapping("/{id}/form")
-    public Result<TaskInfoForm> getTaskInfoForm(
+    public Result<JobInfoForm> getTaskInfoForm(
             @Parameter(description = "task_infoID") @PathVariable Long id
     ) {
-        TaskInfoForm formData = taskInfoService.getTaskInfoFormData(id);
+        JobInfoForm formData = taskInfoService.getTaskInfoFormData(id);
         return Result.success(formData);
     }
 
@@ -80,7 +79,7 @@ public class TaskInfoController {
     @PutMapping(value = "/{id}")
     public Result<Void> updateTaskInfo(
             @Parameter(description = "task_infoID") @PathVariable Long id,
-            @RequestBody @Validated TaskInfoForm formData
+            @RequestBody @Validated JobInfoForm formData
     ) {
         boolean result = taskInfoService.updateTaskInfo(id, formData);
         return Result.judge(result);
@@ -97,7 +96,7 @@ public class TaskInfoController {
 
     @Operation(summary = "执行任务一次")
     @PostMapping("/trigger")
-    public Result<Void> triggerJob(@RequestBody TaskInfoTriggerDto taskInfoTriggerDto) {
+    public Result<Void> triggerJob(@RequestBody JobInfoTriggerDto taskInfoTriggerDto) {
         boolean result = taskInfoService.triggerJob(taskInfoTriggerDto);
         return Result.judge(result);
     }
@@ -126,7 +125,7 @@ public class TaskInfoController {
 
     @Operation(summary = "保存任务运行集")
     @PostMapping("saveTaskSet")
-    public Result<Void>  saveTaskSet(@RequestBody @Valid TaskInfoForm formData){
+    public Result<Void>  saveTaskSet(@RequestBody @Valid JobInfoForm formData){
         // 实现任务运行集的保存
         boolean result = taskInfoService.saveTaskSet(formData);
         return Result.judge(result);
@@ -135,7 +134,7 @@ public class TaskInfoController {
     @Operation(summary = "修改任务运行集")
     @PutMapping("updateTaskSet/{id}")
     public Result<Void>  updateTaskSet(@Parameter(description = "task_infoID") @PathVariable Long id,
-                                       @RequestBody @Validated TaskInfoForm formData){
+                                       @RequestBody @Validated JobInfoForm formData){
         // 实现任务运行集的保存
         boolean result = taskInfoService.updateTaskSet(id,formData);
         return Result.judge(result);
@@ -150,15 +149,15 @@ public class TaskInfoController {
 
     @Operation(summary = "保存GlueSource")
     @PostMapping("saveGlueSource")
-    public Result<Void>  saveGlueSource(@RequestBody @Valid TaskGlueForm formData){
+    public Result<Void>  saveGlueSource(@RequestBody @Valid JobGlueForm formData){
         boolean result = taskInfoService.saveGlueSource(formData);
         return Result.judge(result);
     }
 
 
     @GetMapping("getGlueList/{id}")
-    public Result<List<TaskLogglue>> getGlueList(@PathVariable Long id){
-        List<TaskLogglue> list =  taskInfoService.getGlueList(id);
+    public Result<List<JobLogglue>> getGlueList(@PathVariable Long id){
+        List<JobLogglue> list =  taskInfoService.getGlueList(id);
         return Result.success(list);
     }
 }

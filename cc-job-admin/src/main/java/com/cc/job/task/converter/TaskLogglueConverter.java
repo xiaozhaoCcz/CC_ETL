@@ -1,9 +1,8 @@
 package com.cc.job.task.converter;
 
 import org.mapstruct.Mapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.cc.job.task.model.entity.TaskLogglue;
-import com.cc.job.task.model.form.TaskLogglueForm;
+import com.cc.job.task.model.entity.JobLogglue;
+import com.cc.job.task.model.form.JobLogglueForm;
 
 /**
  * task_logglue对象转换器
@@ -14,7 +13,7 @@ import com.cc.job.task.model.form.TaskLogglueForm;
 @Mapper(componentModel = "spring")
 public interface TaskLogglueConverter{
 
-    TaskLogglueForm toForm(TaskLogglue entity);
+    JobLogglueForm toForm(JobLogglue entity);
 
-    TaskLogglue toEntity(TaskLogglueForm formData);
+    JobLogglue toEntity(JobLogglueForm formData);
 }

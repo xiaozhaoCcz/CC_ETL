@@ -1,8 +1,8 @@
 package com.cc.job.task.alarm;
 
 
-import com.cc.job.task.model.entity.TaskInfo;
-import com.cc.job.task.model.entity.TaskLog;
+import com.cc.job.task.model.entity.JobInfo;
+import com.cc.job.task.model.entity.JobLog;
 
 /**
  * @author xuxueli 2020-01-19
@@ -16,6 +16,6 @@ public interface JobAlarm {
      * @param jobLog
      * @return
      */
-    public boolean doAlarm(TaskInfo info, TaskLog jobLog);
+    public boolean doAlarm(JobInfo info, JobLog jobLog);
 
 }
