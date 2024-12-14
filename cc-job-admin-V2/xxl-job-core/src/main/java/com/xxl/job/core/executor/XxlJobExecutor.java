@@ -257,7 +257,6 @@ public class XxlJobExecutor  {
     public static JobThread removeJobThread(int jobId, String removeOldReason){
         JobThread oldJobThread = jobThreadRepository.remove(jobId);
         if (oldJobThread != null) {
-            System.out.println(">>>>>>> delJob"+oldJobThread);
             oldJobThread.toStop(removeOldReason);
             oldJobThread.interrupt();
 

@@ -156,11 +156,9 @@ public class ExecutorBizImpl implements ExecutorBiz {
 
         // replace thread (new or exists invalid)
         if (jobThread == null) {
-            System.out.println("replace thread (new or exists invalid"+triggerParam.getJobId());
             jobThread = XxlJobExecutor.registJobThread(triggerParam.getJobId(), jobHandler, removeOldReason);
         }
 
-        System.out.println("pushTriggerQueue"+triggerParam.getJobId());
         // push data to queue
         ReturnT<String> pushResult = jobThread.pushTriggerQueue(triggerParam);
         return pushResult;

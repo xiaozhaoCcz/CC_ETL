@@ -342,7 +342,7 @@ function triggerOne() {
   TaskInfoAPI.triggerJob(taskInfoTriggerDto)
     .then((data) => {
       ElMessage.success("执行任务成功");
-      connectWs(taskId+":"+randomId.value);
+      connectWs(taskId + ":" + randomId.value);
       triggerOneVisible.value = true;
       updateEdgeStyle();
     })
@@ -501,7 +501,10 @@ const connectWs = (id: string) => {
       _message.randomId == randomId.value
     ) {
       // 关闭任务
-      stopTrigger();
+      setTimeout(() => {
+        triggerOneVisible.value = false;
+        updateEdgeStyle();
+      }, 1000);
     }
 
     // 接收到消息后，需要做出相应的操作，比如更新节点或边
