@@ -4,6 +4,7 @@ import cn.hutool.core.lang.Pair;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.common.exception.BusinessException;
 import com.cc.job.task.enums.TriggerTypeEnum;
+import com.cc.job.task.mapper.TaskInfoMapper;
 import com.cc.job.task.model.entity.TaskEdge;
 import com.cc.job.task.model.entity.TaskInfo;
 import com.cc.job.task.model.entity.TaskNode;
@@ -48,6 +49,8 @@ public class TaskRankXxlJob {
     final TaskEdgeService taskEdgeService;
 
     final WebSocketServer webSocketServer;
+
+    final TaskInfoMapper taskInfoMapper;
 
     static final ConcurrentHashMap<String, WorkerWrapper<Long, String>> stopMap = new ConcurrentHashMap<>();
 
@@ -133,6 +136,7 @@ public class TaskRankXxlJob {
         sendCompletionMessage(jobId, randomId);
         taskIdMap.remove(setExecuteJobId(jobId, randomId));
         stopMap.remove(setExecuteJobId(jobId, randomId));
+        taskInfoMapper.stopTaskSet(jobId);
     }
 
     private static WorkerWrapper<Long, String> createStartWorkWrapper(long jobId, List<WorkerWrapper<Long, String>> startWrappers) {
