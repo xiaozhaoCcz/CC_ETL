@@ -34,7 +34,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/taskInfos")
 @RequiredArgsConstructor
-public class TaskInfoController {
+public class JobInfoController {
 
     private final JobInfoService taskInfoService;
 

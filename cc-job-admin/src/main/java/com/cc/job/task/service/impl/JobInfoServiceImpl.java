@@ -7,7 +7,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.common.exception.BusinessException;
 import com.cc.job.core.cron.CronExpression;
 import com.cc.job.task.enums.*;
-import com.cc.job.task.jobSetHandler.JobSetXxlJob;
+import com.cc.job.task.handler.JobGroupXxlJob;
 import com.cc.job.task.mapper.JobLogglueMapper;
 import com.cc.job.task.model.dto.JobEdgeDto;
 import com.cc.job.task.model.dto.JobInfoTriggerDto;
@@ -612,11 +612,11 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         XxlJobExecutor.removeJobThread(id.intValue(), "stop task" + id);
 
         if (redisTemplate.hasKey(id + ":" + randomId)) {
-            WorkerWrapper<Long, String> workWrapper = JobSetXxlJob.getWorkWrapper(id, randomId);
+            WorkerWrapper<Long, String> workWrapper = JobGroupXxlJob.getWorkWrapper(id, randomId);
             if (workWrapper != null) {
                 log.info(">>>>>>>>> stop task:{}", workWrapper.getId());
                 Async.stopWork(workWrapper);
-                JobSetXxlJob.removeWorkWrapper(id, randomId);
+                JobGroupXxlJob.removeWorkWrapper(id, randomId);
                 redisTemplate.delete(id + ":" + randomId);
             }
         }

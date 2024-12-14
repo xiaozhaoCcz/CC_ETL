@@ -1,15 +1,12 @@
 package com.cc.job.task.controller;
 
-import com.cc.job.task.config.XxlJobAdminConfig;
 import com.xxl.job.core.biz.AdminBiz;
 import com.xxl.job.core.biz.model.HandleCallbackParam;
 import com.xxl.job.core.biz.model.RegistryParam;
 import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.util.GsonTool;
-import com.xxl.job.core.util.XxlJobRemotingUtil;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,7 +17,7 @@ import java.util.List;
  */
 @Controller
 @RequestMapping("/xxl-job-admin/api")
-public class TaskApiController {
+public class JobApiController {
 
     @Resource
     private  AdminBiz adminBiz;

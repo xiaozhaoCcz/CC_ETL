@@ -67,6 +67,9 @@ public class JobLogServiceImpl extends ServiceImpl<JobLogMapper, JobLog> impleme
         List<JobLog> taskLogList = page.getRecords();
         List<Long> taskIds = taskLogList.stream().map(JobLog::getJobId).toList();
 
+        if(taskIds.isEmpty()){
+            return pageVO;
+        }
         List<JobInfo> taskInfos = taskInfoService.listByIds(taskIds);
         Map<Long, JobInfo> taskInfoMap = taskInfos.stream().collect(Collectors.toMap(JobInfo::getId, t -> t));
 

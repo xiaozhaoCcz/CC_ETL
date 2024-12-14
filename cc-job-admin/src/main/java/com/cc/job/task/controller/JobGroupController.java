@@ -30,7 +30,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/taskGroups")
 @RequiredArgsConstructor
-public class TaskGroupController  {
+public class JobGroupController {
 
     private final JobGroupService taskGroupService;
 

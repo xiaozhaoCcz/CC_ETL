@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/taskLogs")
 @RequiredArgsConstructor
-public class TaskLogController  {
+public class JobLogController {
 
     private final JobLogService taskLogService;
 

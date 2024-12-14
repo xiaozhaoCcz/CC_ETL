@@ -1,4 +1,4 @@
-package com.cc.job.task.jobSetHandler;
+package com.cc.job.task.handler;
 
 import cn.hutool.core.lang.Pair;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
  */
 @Component
 @AllArgsConstructor
-public class JobSetXxlJob {
+public class JobGroupXxlJob {
 
     final RedisTemplate redisTemplate;
 
@@ -64,7 +64,7 @@ public class JobSetXxlJob {
 
     static final Map<String, Map<Long, Set<Long>>> taskIdMap = new ConcurrentHashMap<>();
 
-    @XxlJob("runTaskRankXxlJob")
+    @XxlJob("runJobGroupXxlJob")
     public void runTaskRankXxlJob() {
         String executeParam = XxlJobHelper.getJobParam();
         validateExecuteParam(executeParam);
@@ -626,6 +626,6 @@ public class JobSetXxlJob {
 //        }
 //   }
 
-    private static Logger logger = LoggerFactory.getLogger(JobSetXxlJob.class);
+    private static Logger logger = LoggerFactory.getLogger(JobGroupXxlJob.class);
 
 }
