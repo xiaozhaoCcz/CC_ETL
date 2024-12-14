@@ -3,6 +3,7 @@ package com.cc.job.task.service.impl;
 
 
 import cn.hutool.core.bean.BeanUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.task.mapper.JobJdbcDatasourceMapper;
 import com.cc.job.task.model.entity.JobJdbcDatasource;
 import com.cc.job.task.model.form.JobJdbcDatasourceForm;
@@ -42,6 +43,16 @@ public class JobJdbcDatasourceServiceImpl extends ServiceImpl<JobJdbcDatasourceM
     @Override
     public IPage<JobJdbcDatasourceVO> getJdbcDatasourcePage(JobJdbcDatasourceQuery queryParams) {
         Page<JobJdbcDatasourceVO> pageVO = new Page<>();
+        LambdaQueryWrapper<JobJdbcDatasource> wrapper = new LambdaQueryWrapper<>();
+
+        Page<JobJdbcDatasource> page = this.page(new Page<>(queryParams.getPageNum(), queryParams.getPageSize()), wrapper);
+        List<JobJdbcDatasource> list = page.getRecords();
+
+        List<JobJdbcDatasourceVO> voList = list.stream()
+                .map(entity -> BeanUtil.copyProperties(entity, JobJdbcDatasourceVO.class))
+                .toList();
+        pageVO.setRecords(voList);
+        pageVO.setTotal(page.getTotal());
         return pageVO;
     }
 

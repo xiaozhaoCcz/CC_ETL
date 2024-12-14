@@ -18,7 +18,6 @@
     <el-card shadow="never" class="table-container">
       <template #header>
         <el-button
-          v-hasPerm="['xz:jobJdbcDatasource:add']"
           type="success"
           @click="handleOpenDialog()"
         >
@@ -26,7 +25,6 @@
           新增
         </el-button>
         <el-button
-          v-hasPerm="['xz:jobJdbcDatasource:delete']"
           type="danger"
           :disabled="removeIds.length === 0"
           @click="handleDelete()"
@@ -67,13 +65,6 @@
           align="center"
         />
         <el-table-column
-          key="datasourceGroup"
-          label="数据源分组"
-          prop="datasourceGroup"
-          min-width="150"
-          align="center"
-        />
-        <el-table-column
           key="databaseName"
           label="数据库名"
           prop="databaseName"
@@ -84,13 +75,6 @@
           key="jdbcUsername"
           label="用户名"
           prop="jdbcUsername"
-          min-width="150"
-          align="center"
-        />
-        <el-table-column
-          key="jdbcPassword"
-          label="密码"
-          prop="jdbcPassword"
           min-width="150"
           align="center"
         />
@@ -109,30 +93,9 @@
           align="center"
         />
         <el-table-column
-          key="status"
-          label="状态：0删除 1启用 2禁用"
-          prop="status"
-          min-width="150"
-          align="center"
-        />
-        <el-table-column
-          key="createBy"
-          label="创建人"
-          prop="createBy"
-          min-width="150"
-          align="center"
-        />
-        <el-table-column
           key="createTime"
           label="创建时间"
           prop="createTime"
-          min-width="150"
-          align="center"
-        />
-        <el-table-column
-          key="updateBy"
-          label="更新人"
-          prop="updateBy"
           min-width="150"
           align="center"
         />
@@ -143,17 +106,9 @@
           min-width="150"
           align="center"
         />
-        <el-table-column
-          key="comments"
-          label="备注"
-          prop="comments"
-          min-width="150"
-          align="center"
-        />
         <el-table-column fixed="right" label="操作" width="220">
           <template #default="scope">
             <el-button
-              v-hasPerm="['xz:jobJdbcDatasource:edit']"
               type="primary"
               size="small"
               link
@@ -163,7 +118,6 @@
               编辑
             </el-button>
             <el-button
-              v-hasPerm="['xz:jobJdbcDatasource:delete']"
               type="danger"
               size="small"
               link
@@ -205,12 +159,6 @@
             placeholder="数据源"
           />
         </el-form-item>
-        <el-form-item label="数据源分组" prop="datasourceGroup">
-          <el-input
-            v-model="formData.datasourceGroup"
-            placeholder="数据源分组"
-          />
-        </el-form-item>
         <el-form-item label="数据库名" prop="databaseName">
           <el-input
             v-model="formData.databaseName"
@@ -229,16 +177,16 @@
             placeholder="密码"
           />
         </el-form-item>
-        <el-form-item label="jdbc url" prop="jdbcUrl">
+        <el-form-item label="address" prop="address">
           <el-input
             v-model="formData.jdbcUrl"
-            placeholder="jdbc url"
+            placeholder="address"
           />
         </el-form-item>
-        <el-form-item label="jdbc驱动类" prop="jdbcDriverClass">
+        <el-form-item label="port" prop="port">
           <el-input
-            v-model="formData.jdbcDriverClass"
-            placeholder="jdbc驱动类"
+            v-model="formData.jdbcUrl"
+            placeholder="port"
           />
         </el-form-item>
         <el-form-item label="备注" prop="comments">
