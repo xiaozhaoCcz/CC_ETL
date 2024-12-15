@@ -1,4 +1,5 @@
 package com.cc.job.task.utils;
+import com.cc.job.common.exception.BusinessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -11,15 +12,18 @@ public class JdbcUtils {
 
     private static Connection dbConn = null;
 
+    private static String oldDriverClassName;
+
     public static Connection getConnection(String driverClassName, String url, String username, String password) {
-        if(dbConn!=null){
+        if(dbConn!=null&&oldDriverClassName.equalsIgnoreCase(driverClassName)){
             return dbConn;
         }
         try {
             Class.forName(driverClassName);
             dbConn = DriverManager.getConnection(url, username, password);
+            oldDriverClassName = driverClassName;
         } catch (Exception e) {
-            e.printStackTrace();
+           throw new BusinessException(e.getMessage());
         }
         return dbConn;
     }

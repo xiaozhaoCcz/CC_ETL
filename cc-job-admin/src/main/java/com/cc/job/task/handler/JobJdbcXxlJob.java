@@ -69,6 +69,7 @@ public class JobJdbcXxlJob {
             JdbcUtils.close(rs);
             JdbcUtils.close(cs);
             JdbcUtils.close(ps);
+            JdbcUtils.close(connection);
         }
 
     }

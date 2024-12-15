@@ -148,10 +148,11 @@ public class JobJdbcDatasourceServiceImpl extends ServiceImpl<JobJdbcDatasourceM
         List<String> tables = new ArrayList<>();
         JobJdbcDatasource jobJdbcDatasource = this.getById(id);
         Connection con = JdbcUtils.getConnection(jobJdbcDatasource.getJdbcDriverClass(), jobJdbcDatasource.getJdbcUrl(), jobJdbcDatasource.getJdbcUsername(), jobJdbcDatasource.getJdbcPassword());
+        ResultSet rs =null;
         try {
             DatabaseMetaData metaData = con.getMetaData();
             // 获取所有表的名称
-            ResultSet rs = metaData.getTables(con.getCatalog(), null, null, new String[]{"TABLE"});
+            rs = metaData.getTables(con.getCatalog(), null, null, new String[]{"TABLE"});
 
             // 遍历结果集并打印表名
             while (rs.next()) {
@@ -159,7 +160,9 @@ public class JobJdbcDatasourceServiceImpl extends ServiceImpl<JobJdbcDatasourceM
                 tables.add(tableName);
             }
         } catch (SQLException e) {
-            throw new RuntimeException(e);
+             throw new RuntimeException(e);
+        }finally {
+            JdbcUtils.close(rs);
         }
         return tables;
     }

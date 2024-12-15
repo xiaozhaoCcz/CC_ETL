@@ -5,7 +5,17 @@
     label-width="auto"
     class="writer-form"
   >
-    <el-form-item label="数据源" prop="jdbcDatasourceId">
+    <el-form-item label="数据源" prop="datasource">
+      <el-select
+        v-model="readerForm.datasource"
+        filterable
+        placeholder="Select"
+        style="width: 210px"
+      >
+        <el-option v-for="item in datasourceList" :label="item" :value="item" />
+      </el-select>
+    </el-form-item>
+    <el-form-item label="数据库" prop="jdbcDatasourceId">
       <el-select
         v-model="writerForm.jdbcDatasourceId"
         filterable
@@ -82,6 +92,16 @@ const props = defineProps({
   preFormData: Object,
 });
 
+const datasourceList = ["MYSQL", "ORACLE"];
+
+watch(
+  () => writerForm.value.datasource,
+  (val) => {
+    console.log(val);
+    fetchJdbcDatasource(val);
+  }
+);
+
 watch(
   () => props.preData,
   async (data) => {
@@ -106,6 +126,7 @@ watch(
   () => writerForm.value.tableName,
   (val) => {
     console.log(val);
+    writerForm.value.sql = "";
     getColumns(writerForm.value.jdbcDatasourceId);
   }
 );
@@ -114,7 +135,7 @@ function next() {
   writerForm.value.datasource = jdbcDatasourceList.value.find(
     (v) => v.id === writerForm.value.jdbcDatasourceId
   );
-  emit("next", writerForm.value,props.preFormData);
+  emit("next", writerForm.value, props.preFormData);
 }
 
 function pre() {
@@ -140,14 +161,10 @@ async function getColumns(id: number) {
   });
 }
 
-async function fetchJdbcDatasource() {
+async function fetchJdbcDatasource(datasource: string) {
   const data = await JobJdbcDatasourceAPI.getJdbcDatasourceList();
-  jdbcDatasourceList.value = data as any;
+  jdbcDatasourceList.value = data.filter((v) => v.datasource == datasource);
 }
-
-onMounted(() => {
-  fetchJdbcDatasource();
-});
 </script>
 
 <style scoped lang="scss">

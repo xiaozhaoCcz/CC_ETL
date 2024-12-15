@@ -5,7 +5,17 @@
     label-width="auto"
     class="reader-form"
   >
-    <el-form-item label="数据源" prop="jdbcDatasourceId">
+    <el-form-item label="数据源" prop="datasource">
+      <el-select
+        v-model="readerForm.datasource"
+        filterable
+        placeholder="Select"
+        style="width: 210px"
+      >
+        <el-option v-for="item in datasourceList" :label="item" :value="item" />
+      </el-select>
+    </el-form-item>
+    <el-form-item label="数据库" prop="jdbcDatasourceId">
       <el-select
         v-model="readerForm.jdbcDatasourceId"
         filterable
@@ -36,7 +46,7 @@
       <el-input
         v-model="readerForm.sql"
         type="textarea"
-        rows="6"
+        :rows="6"
         autocomplete="off"
       />
     </el-form-item>
@@ -48,7 +58,7 @@
         sql解析
       </el-button>
     </el-form-item>
-    <el-form-item label="表字段" v-if="readerForm.tableName">
+    <el-form-item label="表字段" v-if="columnList.length > 0">
       <el-checkbox-group v-model="readerForm.columns">
         <el-checkbox
           v-for="item in columnList"
@@ -80,6 +90,16 @@ const props = defineProps({
   preData: Object,
 });
 
+const datasourceList = ["MYSQL", "ORACLE"];
+
+watch(
+  () => readerForm.value.datasource,
+  (val) => {
+    console.log(val);
+    fetchJdbcDatasource(val);
+  }
+);
+
 watch(
   () => props.preData,
   async (data) => {
@@ -96,7 +116,7 @@ watch(
 watch(
   () => readerForm.value.jdbcDatasourceId,
   (val) => {
-    console.log(val);
+    console.log(1111,val);
     getTables(val);
   }
 );
@@ -105,16 +125,20 @@ watch(
   () => readerForm.value.tableName,
   (val) => {
     console.log(val);
+    readerForm.value.sql = "";
     getColumns(readerForm.value.jdbcDatasourceId);
   }
 );
 
 function next() {
-  readerForm.value.datasource = jdbcDatasourceList.value.find(v =>v.id === readerForm.value.jdbcDatasourceId );
+  readerForm.value.datasource = jdbcDatasourceList.value.find(
+    (v) => v.id === readerForm.value.jdbcDatasourceId
+  );
   emit("next", readerForm.value);
 }
 
 async function getTables(id: number) {
+  tableList.value = [];
   await JobDataXAPI.getTables(id).then((data) => {
     tableList.value = data;
   });
@@ -128,19 +152,16 @@ async function getColumns(id: number) {
   if (readerForm.value.sql != null) {
     params.sql = readerForm.value.sql;
   }
+  columnList.value = [];
   await JobDataXAPI.getColumns(id, params).then((data) => {
     columnList.value = data;
   });
 }
 
-async function fetchJdbcDatasource() {
+async function fetchJdbcDatasource(datasource: string) {
   const data = await JobJdbcDatasourceAPI.getJdbcDatasourceList();
-  jdbcDatasourceList.value = data as any;
+  jdbcDatasourceList.value = data.filter((v) => v.datasource == datasource);
 }
-
-onMounted(() => {
-  fetchJdbcDatasource();
-});
 </script>
 <style lang="scss" scoped>
 .reader-form {

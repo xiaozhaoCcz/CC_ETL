@@ -293,6 +293,8 @@ function getDriver(datasource?: string) {
   let jdbcDriverClass = "";
   if (datasource == "MYSQL") {
     jdbcDriverClass = "com.mysql.cj.jdbc.Driver";
+  } else if (datasource == "ORACLE") {
+    jdbcDriverClass = "oracle.jdbc.driver.OracleDriver";
   }
   return jdbcDriverClass;
 }
@@ -302,6 +304,9 @@ function getJdbcUrl(datasource?: string, ip?: string, port?: string) {
   if (datasource == "MYSQL") {
     port = port == null || port.trim() == "" ? 3306 : port;
     jdbcUrl = `jdbc:mysql://${ip}:${port}/${formData.databaseName}`;
+  } else if (datasource == "ORACLE") {
+    port = port == null || port.trim() == "" ? 1521 : port;
+    jdbcUrl = `jdbc:oracle:thin:@//${ip}:${port}/${formData.databaseName}`;
   }
   return jdbcUrl;
 }
