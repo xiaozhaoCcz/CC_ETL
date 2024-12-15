@@ -22,6 +22,9 @@ public class JobJdbcDatasourceForm implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
+    @Schema(description = "主键")
+    private Long id;
+
     @Schema(description = "数据源名称")
     @Size(max=200, message="数据源名称长度不能超过200个字符")
     private String datasourceName;
@@ -31,8 +34,6 @@ public class JobJdbcDatasourceForm implements Serializable {
     private String datasource;
 
     @Schema(description = "数据源分组")
-    @NotBlank(message = "数据源分组不能为空")
-    @Size(max=200, message="数据源分组长度不能超过200个字符")
     private String datasourceGroup;
 
     @Schema(description = "数据库名")

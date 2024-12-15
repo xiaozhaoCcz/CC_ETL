@@ -1,14 +1,19 @@
 <template>
   <el-drawer v-model="drawVisible" @close="cancelClick">
     <template #default>
-      <el-form :model="formData" label-width="auto" style="max-width: 600px"  :rules="rules">
+      <el-form
+        :model="formData"
+        label-width="auto"
+        style="max-width: 600px"
+        :rules="rules"
+      >
         <el-form-item label="执行器" prop="jobGroup">
           <el-select
             v-model="formData.jobGroup"
             filterable
             placeholder="Select"
             style="width: 200px"
-            :disabled="formData.jobType==2"
+            :disabled="formData.jobType == 2"
           >
             <el-option
               v-for="item in taskGroupList"
@@ -38,7 +43,7 @@
             placeholder="Select"
             style="width: 210px"
             @change="handleChangeGlueType"
-            :disabled="formData.jobType==2"
+            :disabled="formData.jobType == 2"
           >
             <el-option
               v-for="item in glueTypeList"
@@ -50,36 +55,65 @@
         </el-form-item>
         <el-form-item
           label="GLUE IDE"
-          v-if="!['BEAN', 'API'].includes(formData.glueType)"
+          v-if="!['BEAN', 'API', 'SQL'].includes(formData.glueType)"
         >
           <el-button type="success" @click="glueClick">GLUE IDE</el-button>
         </el-form-item>
-        <el-form-item label="JobHandler" prop="executorHandler" v-if="formData.glueType == 'BEAN'">
+        <el-form-item
+          label="JobHandler"
+          prop="executorHandler"
+          v-if="formData.glueType == 'BEAN'"
+        >
           <el-input
             v-model="formData.executorHandler"
             type="text"
             autocomplete="off"
-            :disabled="formData.jobType==2"
+            :disabled="formData.jobType == 2"
           />
         </el-form-item>
-        <el-form-item label="请求类型" prop="reqType" v-if="formData.glueType == 'API'">
-          <el-select
-            v-model="formData.reqType"
-            filterable
-            style="width: 210px"
-          >
+        <el-form-item
+          label="请求类型"
+          prop="reqType"
+          v-if="formData.glueType == 'API'"
+        >
+          <el-select v-model="formData.reqType" filterable style="width: 210px">
             <el-option key="GET" label="GET" value="GET" />
             <el-option key="POST" label="POST" value="POST" />
           </el-select>
         </el-form-item>
-        <el-form-item label="请求地址" prop="reqUrl" v-if="formData.glueType === 'API'">
+        <el-form-item
+          label="数据库"
+          v-if="formData.glueType == 'SQL'"
+        >
+          <el-select
+            v-model="formData.jdbcDatasourceId"
+            filterable
+            style="width: 210px"
+          >
+            <el-option
+              v-for="item in jdbcDatasourceList"
+              :key="item.id"
+              :label="item.databaseName"
+              :value="item.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item
+          label="请求地址"
+          prop="reqUrl"
+          v-if="formData.glueType === 'API'"
+        >
           <el-input
             v-model="formData.reqUrl"
             type="textarea"
             autocomplete="off"
           />
         </el-form-item>
-        <el-form-item label="请求头" prop="reqHeader" v-if="formData.glueType === 'API'">
+        <el-form-item
+          label="请求头"
+          prop="reqHeader"
+          v-if="formData.glueType === 'API'"
+        >
           <EditTable
             :list="
               formData.reqHeader == null ? [] : JSON.parse(formData.reqHeader)
@@ -103,22 +137,22 @@
             v-model="formData.executorParam"
             type="textarea"
             autocomplete="off"
-            :disabled="formData.jobType==2"
+            :disabled="formData.jobType == 2"
           />
         </el-form-item>
-<!--        <el-form-item label="调度过期策略" prop="misfireStrategy">-->
-<!--          <el-select-->
-<!--            v-model="formData.misfireStrategy"-->
-<!--            filterable-->
-<!--          >-->
-<!--            <el-option-->
-<!--              v-for="item in misfireStrategyList"-->
-<!--              :key="item.type"-->
-<!--              :label="item.title"-->
-<!--              :value="item.type"-->
-<!--            />-->
-<!--          </el-select>-->
-<!--        </el-form-item>-->
+        <!--        <el-form-item label="调度过期策略" prop="misfireStrategy">-->
+        <!--          <el-select-->
+        <!--            v-model="formData.misfireStrategy"-->
+        <!--            filterable-->
+        <!--          >-->
+        <!--            <el-option-->
+        <!--              v-for="item in misfireStrategyList"-->
+        <!--              :key="item.type"-->
+        <!--              :label="item.title"-->
+        <!--              :value="item.type"-->
+        <!--            />-->
+        <!--          </el-select>-->
+        <!--        </el-form-item>-->
         <el-form-item label="任务超时时间">
           <el-input
             v-model="formData.executorTimeout"
@@ -171,6 +205,7 @@ import TaskGroupAPI from "@/api/task/task-group";
 import TaskInfoAPI from "@/api/task/task-info";
 import { getThemeCode } from "@/utils/theme";
 import CodeEditor from "@/components/CodeEdit/index.vue";
+import JobJdbcDatasourceAPI from "@/api/task/job-jdbc-datasource";
 
 const props = defineProps({
   taskNodeVisible: {
@@ -191,16 +226,17 @@ const drawVisible = ref(false);
 const formData = reactive({});
 const taskGroupList = ref([]);
 const rules = reactive({
-  jobGroup:[{required: true}],
-  author:[{required: true}],
-  jobDesc:[{required: true}],
-  glueType:[{required: true}],
-  executorHandler:[{required: true}],
-  reqType:[{required: true}],
-  reqUrl:[{required: true}],
-  misfireStrategy:[{required: true}],
-  executorBlockStrategy:[{required: true}],
+  jobGroup: [{ required: true }],
+  author: [{ required: true }],
+  jobDesc: [{ required: true }],
+  glueType: [{ required: true }],
+  executorHandler: [{ required: true }],
+  reqType: [{ required: true }],
+  reqUrl: [{ required: true }],
+  misfireStrategy: [{ required: true }],
+  executorBlockStrategy: [{ required: true }],
 });
+const jdbcDatasourceList = ref([]);
 
 const glueTypeList = [
   {
@@ -210,6 +246,10 @@ const glueTypeList = [
   {
     type: "API",
     title: "API",
+  },
+  {
+    type: "SQL",
+    title: "SQL",
   },
   {
     type: "GLUE_GROOVY",
@@ -304,12 +344,20 @@ function handleTableData(val) {
   formData.reqHeader = JSON.stringify(val);
 }
 
+async function fetchJdbcDatasource() {
+  const data = await JobJdbcDatasourceAPI.getJdbcDatasourceList();
+  jdbcDatasourceList.value = data as any;
+}
+
 function cancelClick() {
   emit("close");
 }
 function confirmClick() {
   if (!props.nodeTaskId) {
     return;
+  }
+  if (formData.glueType == "SQL") {
+    formData.executorHandler = "runJobJdbcXxlJob";
   }
   formData.misfireStrategy = "DO_NOTHING";
   formData.scheduleType = "NONE";
@@ -334,7 +382,7 @@ async function getTaskInfo() {
 }
 onMounted(() => {
   fetchTaskGroupList();
+  fetchJdbcDatasource();
 });
 </script>
-<style scoped lang="scss">
-</style>
+<style scoped lang="scss"></style>

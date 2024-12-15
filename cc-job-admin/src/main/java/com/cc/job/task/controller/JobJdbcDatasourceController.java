@@ -3,6 +3,7 @@ package com.cc.job.task.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cc.job.common.result.PageResult;
 import com.cc.job.common.result.Result;
+import com.cc.job.task.model.entity.JobJdbcDatasource;
 import com.cc.job.task.model.form.JobJdbcDatasourceForm;
 import com.cc.job.task.model.query.JobJdbcDatasourceQuery;
 import com.cc.job.task.model.vo.JobJdbcDatasourceVO;
@@ -14,6 +15,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @Tag(name = "jdbcDatasource接口")
 @RestController
@@ -28,6 +31,13 @@ public class JobJdbcDatasourceController {
     public PageResult<JobJdbcDatasourceVO> getJdbcDatasourcePage(JobJdbcDatasourceQuery queryParams ) {
         IPage<JobJdbcDatasourceVO> result = jobJdbcDatasourceService.getJdbcDatasourcePage(queryParams);
         return PageResult.success(result);
+    }
+
+    @Operation(summary = "jdbc数据源配置列表")
+    @GetMapping("/list")
+    public Result<List<JobJdbcDatasource>> getJdbcDatasourceList() {
+        List<JobJdbcDatasource> list = jobJdbcDatasourceService.list();
+        return Result.success(list);
     }
 
     @Operation(summary = "新增jdbc数据源配置")

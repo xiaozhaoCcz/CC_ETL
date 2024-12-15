@@ -158,6 +158,22 @@
                   <el-option key="POST" label="POST" value="POST" />
                 </el-select>
               </div>
+              <div class="c_cont" v-if="formData.glueType == 'SQL'">
+                <span class="m_title">数据库</span>
+                <el-select
+                  v-model="formData.jdbcDatasourceId"
+                  filterable
+                  placeholder="Select"
+                  style="width: 210px"
+                >
+                  <el-option
+                    v-for="item in jdbcDatasourceList"
+                    :key="item.id"
+                    :label="item.databaseName"
+                    :value="item.id"
+                  />
+                </el-select>
+              </div>
             </div>
           </div>
         </div>
@@ -318,6 +334,7 @@ import TaskInfoAPI from "@/api/task/task-info";
 //当前使用的页面引入
 import NoVue3Cron from "@/components/NoVue3Cron/index.vue";
 import EditTable from "@/components/EditTable/EditTable.vue";
+import JobJdbcDatasourceAPI from "@/api/task/job-jdbc-datasource";
 
 const emit = defineEmits(["close", "handleResetQuery"]);
 
@@ -333,6 +350,7 @@ const props = defineProps({
 });
 
 const taskGroupList = ref([]);
+const jdbcDatasourceList = ref([]);
 
 const scheduleTypeList = [
   {
@@ -474,11 +492,20 @@ async function fetchTaskGroupList() {
   taskGroupList.value = data as any;
 }
 
+async function fetchJdbcDatasource() {
+  const data = await JobJdbcDatasourceAPI.getJdbcDatasourceList();
+  jdbcDatasourceList.value = data as any;
+}
+
 function changeCron(cron: string) {
   props.formData.scheduleConf = cron;
 }
 
 function submitForm() {
+  if (props.formData.glueType == "SQL") {
+    props.formData.executorHandler = "runJobJdbcXxlJob";
+  }
+
   const id = props.formData.id;
   if (id) {
     if (props.taskInfoVisible.isCopy) {
@@ -518,6 +545,7 @@ function handleCloseDialog() {
 
 onMounted(() => {
   fetchTaskGroupList();
+  fetchJdbcDatasource();
 });
 </script>
 <style lang="scss" scoped>

@@ -101,4 +101,6 @@ public class JobInfoForm implements Serializable {
     private String nodes;
 
     private String edges;
+
+    private Long jdbcDatasourceId;
 }

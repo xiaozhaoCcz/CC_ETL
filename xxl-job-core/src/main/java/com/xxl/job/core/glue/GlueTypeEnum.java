@@ -4,6 +4,7 @@ package com.xxl.job.core.glue;
  * Created by xuxueli on 17/4/26.
  */
 public enum GlueTypeEnum {
+    SQL("SQL",false,null,null),
     API("API",false,null,null),
     BEAN("BEAN", false, null, null),
     GLUE_GROOVY("GLUE(Java)", false, null, null),

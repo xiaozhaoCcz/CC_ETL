@@ -24,6 +24,13 @@ const JobJdbcDatasourceAPI = {
     });
   },
 
+  getJdbcDatasourceList() {
+    return request<any, JobJdbcDatasourceForm>({
+      url: `${JOBJDBCDATASOURCE_BASE_URL}/list`,
+      method: "get",
+    });
+  },
+
   /** 添加jdbc数据源配置*/
   add(data: JobJdbcDatasourceForm) {
     return request({
@@ -97,6 +104,10 @@ export interface JobJdbcDatasourceForm {
   updateTime?: Date;
   /** 备注 */
   comments?: string;
+
+  ip?: string;
+
+  port?: string;
 }
 
 /** jdbc数据源配置分页对象 */

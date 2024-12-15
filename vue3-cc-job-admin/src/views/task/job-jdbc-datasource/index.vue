@@ -17,10 +17,7 @@
 
     <el-card shadow="never" class="table-container">
       <template #header>
-        <el-button
-          type="success"
-          @click="handleOpenDialog()"
-        >
+        <el-button type="success" @click="handleOpenDialog()">
           <template #icon><Plus /></template>
           新增
         </el-button>
@@ -43,13 +40,6 @@
         @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection" width="55" align="center" />
-        <el-table-column
-          key="id"
-          label="自增主键"
-          prop="id"
-          min-width="150"
-          align="center"
-        />
         <el-table-column
           key="datasourceName"
           label="数据源名称"
@@ -146,7 +136,12 @@
       width="500px"
       @close="handleCloseDialog"
     >
-      <el-form ref="dataFormRef" :model="formData" :rules="rules" label-width="100px">
+      <el-form
+        ref="dataFormRef"
+        :model="formData"
+        :rules="rules"
+        label-width="100px"
+      >
         <el-form-item label="数据源名称" prop="datasourceName">
           <el-input
             v-model="formData.datasourceName"
@@ -154,46 +149,37 @@
           />
         </el-form-item>
         <el-form-item label="数据源" prop="datasource">
-          <el-input
+          <el-select
             v-model="formData.datasource"
+            filterable
             placeholder="数据源"
-          />
+            style="width: 210px"
+          >
+            <el-option
+              v-for="item in datasourceList"
+              :key="item.type"
+              :label="item.title"
+              :value="item.type"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="数据库名" prop="databaseName">
-          <el-input
-            v-model="formData.databaseName"
-            placeholder="数据库名"
-          />
+          <el-input v-model="formData.databaseName" placeholder="数据库名" />
         </el-form-item>
         <el-form-item label="用户名" prop="jdbcUsername">
-          <el-input
-            v-model="formData.jdbcUsername"
-            placeholder="用户名"
-          />
+          <el-input v-model="formData.jdbcUsername" placeholder="用户名" />
         </el-form-item>
         <el-form-item label="密码" prop="jdbcPassword">
-          <el-input
-            v-model="formData.jdbcPassword"
-            placeholder="密码"
-          />
+          <el-input v-model="formData.jdbcPassword" placeholder="密码" />
         </el-form-item>
         <el-form-item label="address" prop="address">
-          <el-input
-            v-model="formData.jdbcUrl"
-            placeholder="address"
-          />
+          <el-input v-model="formData.ip" placeholder="address" />
         </el-form-item>
         <el-form-item label="port" prop="port">
-          <el-input
-            v-model="formData.jdbcUrl"
-            placeholder="port"
-          />
+          <el-input v-model="formData.port" placeholder="port" />
         </el-form-item>
         <el-form-item label="备注" prop="comments">
-          <el-input
-            v-model="formData.comments"
-            placeholder="备注"
-          />
+          <el-input v-model="formData.comments" placeholder="备注" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -212,7 +198,11 @@ defineOptions({
   inheritAttrs: false,
 });
 
-import JobJdbcDatasourceAPI, { JobJdbcDatasourcePageVO, JobJdbcDatasourceForm, JobJdbcDatasourcePageQuery } from "@/api/task/job-jdbc-datasource";
+import JobJdbcDatasourceAPI, {
+  JobJdbcDatasourcePageVO,
+  JobJdbcDatasourceForm,
+  JobJdbcDatasourcePageQuery,
+} from "@/api/task/job-jdbc-datasource";
 
 const queryFormRef = ref(ElForm);
 const dataFormRef = ref(ElForm);
@@ -235,20 +225,24 @@ const dialog = reactive({
   visible: false,
 });
 
+const datasourceList = [
+  {
+    type: "MYSQL",
+    title: "MYSQL",
+  },
+  { type: "ORACLE", title: "ORACLE" },
+];
+
 // jdbc数据源配置表单数据
 const formData = reactive<JobJdbcDatasourceForm>({});
 
 // jdbc数据源配置表单校验规则
 const rules = reactive({
-  datasourceGroup: [{ required: true, message: "请输入数据源分组", trigger: "blur" }],
-  databaseName: [{ required: true, message: "请输入数据库名", trigger: "blur" }],
+  databaseName: [
+    { required: true, message: "请输入数据库名", trigger: "blur" },
+  ],
   jdbcUsername: [{ required: true, message: "请输入用户名", trigger: "blur" }],
   jdbcPassword: [{ required: true, message: "请输入密码", trigger: "blur" }],
-  jdbcDriverClass: [{ required: true, message: "请输入jdbc驱动类", trigger: "blur" }],
-  createBy: [{ required: true, message: "请输入创建人", trigger: "blur" }],
-  createTime: [{ required: true, message: "请输入创建时间", trigger: "blur" }],
-  updateBy: [{ required: true, message: "请输入更新人", trigger: "blur" }],
-  updateTime: [{ required: true, message: "请输入更新时间", trigger: "blur" }],
   comments: [{ required: true, message: "请输入备注", trigger: "blur" }],
 });
 
@@ -284,10 +278,32 @@ function handleOpenDialog(id?: number) {
     dialog.title = "修改jdbc数据源配置";
     JobJdbcDatasourceAPI.getFormData(id).then((data) => {
       Object.assign(formData, data);
+      const match = data.jdbcUrl.match(/\/\/([^:]+):([^\/]+)/);
+      if (match) {
+        formData.ip = match[1]; // IP地址
+        formData.port = match[2]; // 端口号
+      }
     });
   } else {
     dialog.title = "新增jdbc数据源配置";
   }
+}
+
+function getDriver(datasource?: string) {
+  let jdbcDriverClass = "";
+  if (datasource == "MYSQL") {
+    jdbcDriverClass = "com.mysql.cj.jdbc.Driver";
+  }
+  return jdbcDriverClass;
+}
+
+function getJdbcUrl(datasource?: string, ip?: string, port?: string) {
+  let jdbcUrl = "";
+  if (datasource == "MYSQL") {
+    port = port == null || port.trim() == "" ? 3306 : port;
+    jdbcUrl = `jdbc:mysql://${ip}:${port}/${formData.databaseName}`;
+  }
+  return jdbcUrl;
 }
 
 /** 提交jdbc数据源配置表单 */
@@ -296,6 +312,12 @@ function handleSubmit() {
     if (valid) {
       loading.value = true;
       const id = formData.id;
+      formData.jdbcDriverClass = getDriver(formData.datasource);
+      formData.jdbcUrl = getJdbcUrl(
+        formData.datasource,
+        formData.ip,
+        formData.port
+      );
       if (id) {
         JobJdbcDatasourceAPI.update(id, formData)
           .then(() => {
@@ -323,6 +345,8 @@ function handleCloseDialog() {
   dataFormRef.value.resetFields();
   dataFormRef.value.clearValidate();
   formData.id = undefined;
+  formData.ip = "";
+  formData.port = "";
 }
 
 /** 删除jdbc数据源配置 */
