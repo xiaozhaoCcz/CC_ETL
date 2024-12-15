@@ -191,15 +191,20 @@
           <div class="m_left">
             <div class="c_cont">
               <span class="m_title">Json</span>
-              111
+              <json-editor-vue
+                @update:modelValue="updateModel"
+                @validationError="editError"
+                class="editor"
+                v-model="jsonData"
+                style="height: 800px; width: 800px"
+              />
             </div>
           </div>
         </div>
       </div>
-
     </div>
+    <el-button @click="pre">上一步</el-button>
     <el-button type="primary" @click="submitForm()">保存</el-button>
-    <el-button @click="handleCloseDialog()">取消</el-button>
   </div>
 </template>
 <script setup lang="ts">
@@ -207,25 +212,37 @@ import TaskGroupAPI from "@/api/task/task-group";
 import TaskInfoAPI from "@/api/task/task-info";
 //当前使用的页面引入
 import NoVue3Cron from "@/components/NoVue3Cron/index.vue";
-import EditTable from "@/components/EditTable/EditTable.vue";
-import JobJdbcDatasourceAPI from "@/api/task/job-jdbc-datasource";
 
-const emit = defineEmits(["close", "handleResetQuery"]);
+const emit = defineEmits(["pre"]);
 
-// const props = defineProps({
-//   taskInfoVisible: {
-//     type: Object,
-//     default: null,
-//   },
-//   formData: {
-//     type: Object,
-//     default: null,
-//   },
-// });
+const props = defineProps({
+  finalJson: String,
+  preData: Object,
+  preFormData: Object,
+});
 
 const taskGroupList = ref([]);
-const jdbcDatasourceList = ref([]);
-const formData = reactive({});
+const formData = ref({});
+const jsonData = ref(null);
+
+watch(
+  () => props.finalJson,
+  (val) => {
+    if (val != null && val != "") {
+      formData.value.executorParam = val;
+      jsonData.value = JSON.parse(val);
+    }
+  },
+  { immediate: true }
+);
+
+watch(
+  () => props.preFormData,
+  (val) => {
+    formData.value = val;
+  },
+  { immediate: true, deep: true }
+);
 
 const scheduleTypeList = [
   {
@@ -307,26 +324,39 @@ const blockStrategyList = [
 
 const cronPopover = ref(false);
 
+function pre() {
+  emit("pre", props.preData, formData.value);
+}
+
+function updateModel(val: any) {
+  jsonData.value = val;
+}
+
+const errors = ref(0);
+// 错误行数
+const line = ref();
+
+function editError(a: any, e: any) {
+  errors.value = e.length;
+  if (e[0]) {
+    line.value = e[0].line;
+  }
+}
+
 async function fetchTaskGroupList() {
   const data = await TaskGroupAPI.getAllTaskGroupList();
   taskGroupList.value = data as any;
 }
 
-async function fetchJdbcDatasource() {
-  const data = await JobJdbcDatasourceAPI.getJdbcDatasourceList();
-  jdbcDatasourceList.value = data as any;
-}
-
 function changeCron(cron: string) {
-  formData.scheduleConf = cron;
+  formData.value.scheduleConf = cron;
 }
 
 function submitForm() {
-  if (formData.glueType == "SQL") {
-    formData.executorHandler = "runJobJdbcXxlJob";
-  }
-
-  const id = formData.id;
+  formData.value.glueType = "BEAN";
+  formData.value.executorHandler = "runDataxHandler";
+  formData.value.executorParam = JSON.stringify(jsonData.value);
+  const id = formData.value.id;
   if (id) {
     // if (taskInfoVisible.isCopy) {
     //   formData.id = undefined;
@@ -338,20 +368,20 @@ function submitForm() {
     //     })
     //     .finally(() => {});
     // } else {
-    TaskInfoAPI.update(id, formData)
+    TaskInfoAPI.update(id, formData.value)
       .then(() => {
         ElMessage.success("修改成功");
         handleCloseDialog();
-        emit("handleResetQuery");
+        emit("handleReset");
       })
       .finally(() => {});
     //}
   } else {
-    TaskInfoAPI.add(formData)
+    TaskInfoAPI.add(formData.value)
       .then(() => {
         ElMessage.success("新增成功");
         handleCloseDialog();
-        emit("handleResetQuery");
+        emit("handleReset");
       })
       .finally(() => {});
   }
@@ -359,13 +389,12 @@ function submitForm() {
 
 /** 关闭task_group弹窗 */
 function handleCloseDialog() {
+  formData.value = {};
   cronPopover.value = false;
-  emit("close");
 }
 
 onMounted(() => {
-  // fetchTaskGroupList();
-  // fetchJdbcDatasource();
+  fetchTaskGroupList();
 });
 </script>
 <style lang="scss" scoped>

@@ -20,7 +20,7 @@ const JobDataXAPI = {
 
   getJson(data: any) {
     return request({
-      url: `${JOB_DATAX_BASE_URL}/getJson/`,
+      url: `${JOB_DATAX_BASE_URL}/getJson`,
       method: "post",
       data: data,
     });

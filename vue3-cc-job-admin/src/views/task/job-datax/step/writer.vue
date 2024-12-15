@@ -79,6 +79,7 @@ const emit = defineEmits(["pre", "next"]);
 
 const props = defineProps({
   preData: Object,
+  preFormData: Object,
 });
 
 watch(
@@ -110,11 +111,14 @@ watch(
 );
 
 function next() {
-  emit("next", writerForm.value);
+  writerForm.value.datasource = jdbcDatasourceList.value.find(
+    (v) => v.id === writerForm.value.jdbcDatasourceId
+  );
+  emit("next", writerForm.value,props.preFormData);
 }
 
 function pre() {
-  emit("pre", writerForm.value);
+  emit("pre", writerForm.value, props.preFormData);
 }
 
 async function getTables(id: number) {

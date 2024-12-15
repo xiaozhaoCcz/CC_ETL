@@ -11,9 +11,11 @@ import "@/styles/index.scss";
 import "uno.css";
 import "animate.css";
 import { InstallCodeMirror } from "codemirror-editor-vue3";
+import JsonEditorVue from "json-editor-vue3";
 
 const app = createApp(App);
 // 注册插件
 app.use(setupPlugins);
 app.use(InstallCodeMirror);
+app.use(JsonEditorVue);
 app.mount("#app");

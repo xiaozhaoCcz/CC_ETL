@@ -110,12 +110,12 @@ watch(
 );
 
 function next() {
+  readerForm.value.datasource = jdbcDatasourceList.value.find(v =>v.id === readerForm.value.jdbcDatasourceId );
   emit("next", readerForm.value);
 }
 
 async function getTables(id: number) {
   await JobDataXAPI.getTables(id).then((data) => {
-    console.log("11122233");
     tableList.value = data;
   });
 }

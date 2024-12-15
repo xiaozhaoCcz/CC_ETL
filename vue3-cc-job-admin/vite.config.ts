@@ -25,6 +25,8 @@ const __APP_INFO__ = {
 };
 
 const pathSrc = resolve(__dirname, "src");
+
+import { viteCommonjs } from "@originjs/vite-plugin-commonjs";
 // Vite配置  https://cn.vitejs.dev/config
 export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
   const env = loadEnv(mode, process.cwd());
@@ -63,6 +65,7 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
     },
     plugins: [
       vue(),
+      viteCommonjs(),
       env.VITE_MOCK_DEV_SERVER === "true" ? mockDevServerPlugin() : null,
       UnoCSS({
         hmrTopLevelAwait: false,
