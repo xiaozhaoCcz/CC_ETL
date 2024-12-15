@@ -23,10 +23,7 @@ public class DataxHandler {
 
     @XxlJob("runDataxHandler")
     public void runDataxHandler(){
-        long jobId = XxlJobHelper.getJobId();
-        // 根据jobId获取最终执行的内容
-
-        String json = "";
+        String json = XxlJobHelper.getJobParam();
 
         String temJsonFile = DataxUtils.generateTemJsonFile(jsonPath,json);
         ProcessBuilder processBuilder = new ProcessBuilder("python", dataxPy, temJsonFile);

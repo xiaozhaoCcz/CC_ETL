@@ -10,15 +10,20 @@ import com.cc.job.task.model.form.JobJdbcDatasourceForm;
 import com.cc.job.task.model.query.JobJdbcDatasourceQuery;
 import com.cc.job.task.model.vo.JobJdbcDatasourceVO;
 import com.cc.job.task.service.JobJdbcDatasourceService;
+import com.cc.job.task.utils.JdbcUtils;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 
 
+import java.sql.*;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import cn.hutool.core.lang.Assert;
@@ -107,6 +112,53 @@ public class JobJdbcDatasourceServiceImpl extends ServiceImpl<JobJdbcDatasourceM
                 .map(Long::parseLong)
                 .toList();
         return this.removeByIds(idList);
+    }
+
+    @Override
+    public List<String> getColumns(Long id, Map<String, String> params) {
+        JobJdbcDatasource jobJdbcDatasource = this.getById(id);
+        Connection con = JdbcUtils.getConnection(jobJdbcDatasource.getJdbcDriverClass(), jobJdbcDatasource.getJdbcUrl(), jobJdbcDatasource.getJdbcUsername(), jobJdbcDatasource.getJdbcPassword());
+        String tableName = params.get("tableName");
+        String sql  = params.get("sql");
+        if(StringUtils.isBlank(sql)){
+            sql = "select * from "+tableName + " t";
+        }
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            ps = con.prepareStatement(sql);
+            rs = ps.executeQuery();
+            ResultSetMetaData metaData = rs.getMetaData();
+            for (int i = 1; i <= metaData.getColumnCount();i++) {
+                String columnName = metaData.getColumnName(i);
+                
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+        return List.of();
+    }
+
+    @Override
+    public List<String> getTables(Long id) {
+        List<String> tables = new ArrayList<>();
+        JobJdbcDatasource jobJdbcDatasource = this.getById(id);
+        Connection con = JdbcUtils.getConnection(jobJdbcDatasource.getJdbcDriverClass(), jobJdbcDatasource.getJdbcUrl(), jobJdbcDatasource.getJdbcUsername(), jobJdbcDatasource.getJdbcPassword());
+        try {
+            DatabaseMetaData metaData = con.getMetaData();
+            // 获取所有表的名称
+            String[] types = {"TABLE"};
+            ResultSet rs = metaData.getTables(null, null, "%", types);
+
+            // 遍历结果集并打印表名
+            while (rs.next()) {
+                String tableName = rs.getString("TABLE_NAME");
+                tables.add(tableName);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+        return tables;
     }
 
 }

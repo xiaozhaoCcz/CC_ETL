@@ -1,12 +1,13 @@
-package com.cc.job.datax.executor.reader;
+package com.cc.job.task.datax.reader;
 
 import cn.hutool.json.JSONObject;
-import com.cc.job.datax.executor.model.DataXParams;
+import com.cc.job.task.datax.BaseRW;
+import com.cc.job.task.model.datax.DataXParams;
 
 import java.util.Map;
 
 
-public class MysqlReader implements BaseReader{
+public class MysqlReader implements BaseRW {
     @Override
     public JSONObject buildJson(DataXParams dataXParams) {
         // 生成 MySQL reader 配置

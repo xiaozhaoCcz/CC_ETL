@@ -1,4 +1,4 @@
-package com.cc.job.datax.executor.model;
+package com.cc.job.task.model.datax;
 
 import lombok.Data;
 
@@ -30,4 +30,6 @@ public class DataXParams implements Serializable {
     private Map<String,String> otherParams;
 
     private String writeMode;
+
+    private Integer type;
 }

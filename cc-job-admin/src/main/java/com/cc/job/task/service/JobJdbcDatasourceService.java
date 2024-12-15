@@ -8,6 +8,9 @@ import com.cc.job.task.model.query.JobJdbcDatasourceQuery;
 import com.cc.job.task.model.vo.JobJdbcDatasourceVO;
 import jakarta.validation.Valid;
 
+import java.util.List;
+import java.util.Map;
+
 public interface JobJdbcDatasourceService extends IService<JobJdbcDatasource>  {
 
     IPage<JobJdbcDatasourceVO> getJdbcDatasourcePage(JobJdbcDatasourceQuery queryParams);
@@ -19,4 +22,8 @@ public interface JobJdbcDatasourceService extends IService<JobJdbcDatasource>  {
     boolean updateJdbcDatasource(Long id, JobJdbcDatasourceForm formData);
 
     boolean deleteJdbcDatasources(String ids);
+
+    List<String> getColumns(Long id, Map<String, String> params);
+
+    List<String> getTables(Long id);
 }
