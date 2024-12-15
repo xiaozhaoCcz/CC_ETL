@@ -27,7 +27,7 @@ public class JobDataxController {
 
     @Operation(summary = "根据数据源获取所有的表")
     @GetMapping("/getTables/{id}")
-    public Result<List<String>> getTables(Long id) {
+    public Result<List<String>> getTables(@PathVariable  Long id) {
         List<String> tables = jobJdbcDatasourceService.getTables(id);
         return Result.success(tables);
     }
@@ -35,11 +35,12 @@ public class JobDataxController {
 
     @Operation(summary = "根据表获取所有的字段")
     @PostMapping("/getColumns/{id}")
-    public Result<List<String>> getColumns(Long id, @RequestBody Map<String,String> params) {
+    public Result<List<String>> getColumns(@PathVariable Long id, @RequestBody Map<String,String> params) {
         List<String> tables = jobJdbcDatasourceService.getColumns(id,params);
         return Result.success(tables);
     }
 
+    @Operation(summary = "得到json")
     @PostMapping("/getJson")
     public Result<String> getJson(@RequestBody DataXParams dataXParams) {
         String json = dataxService.getJson(dataXParams);

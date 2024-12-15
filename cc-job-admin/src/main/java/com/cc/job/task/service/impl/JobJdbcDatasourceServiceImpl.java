@@ -116,6 +116,7 @@ public class JobJdbcDatasourceServiceImpl extends ServiceImpl<JobJdbcDatasourceM
 
     @Override
     public List<String> getColumns(Long id, Map<String, String> params) {
+        List<String> columns = new ArrayList<>();
         JobJdbcDatasource jobJdbcDatasource = this.getById(id);
         Connection con = JdbcUtils.getConnection(jobJdbcDatasource.getJdbcDriverClass(), jobJdbcDatasource.getJdbcUrl(), jobJdbcDatasource.getJdbcUsername(), jobJdbcDatasource.getJdbcPassword());
         String tableName = params.get("tableName");
@@ -131,12 +132,15 @@ public class JobJdbcDatasourceServiceImpl extends ServiceImpl<JobJdbcDatasourceM
             ResultSetMetaData metaData = rs.getMetaData();
             for (int i = 1; i <= metaData.getColumnCount();i++) {
                 String columnName = metaData.getColumnName(i);
-                
+                columns.add(columnName);
             }
         } catch (SQLException e) {
             throw new RuntimeException(e);
+        }finally {
+            JdbcUtils.close(rs);
+            JdbcUtils.close(ps);
         }
-        return List.of();
+        return columns;
     }
 
     @Override
@@ -147,8 +151,7 @@ public class JobJdbcDatasourceServiceImpl extends ServiceImpl<JobJdbcDatasourceM
         try {
             DatabaseMetaData metaData = con.getMetaData();
             // 获取所有表的名称
-            String[] types = {"TABLE"};
-            ResultSet rs = metaData.getTables(null, null, "%", types);
+            ResultSet rs = metaData.getTables(con.getCatalog(), null, null, new String[]{"TABLE"});
 
             // 遍历结果集并打印表名
             while (rs.next()) {
