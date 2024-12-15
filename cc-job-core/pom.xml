@@ -6,7 +6,7 @@
 		<artifactId>cc-job</artifactId>
 		<version>2.4.2-SNAPSHOT</version>
 	</parent>
-	<artifactId>xxl-job-core</artifactId>
+	<artifactId>cc-job-core</artifactId>
 	<packaging>jar</packaging>
 
 	<name>${project.artifactId}</name>

@@ -5,10 +5,10 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.ccJob</groupId>
-        <artifactId>xxl-job-executor-samples</artifactId>
+        <artifactId>cc-job-executor-samples</artifactId>
         <version>2.4.2-SNAPSHOT</version>
     </parent>
-    <artifactId>xxl-job-executor-sample-springboot</artifactId>
+    <artifactId>cc-job-executor-sample-springboot</artifactId>
     <packaging>jar</packaging>
 
     <name>${project.artifactId}</name>
@@ -46,7 +46,7 @@
         <!-- xxl-job-core -->
         <dependency>
             <groupId>com.ccJob</groupId>
-            <artifactId>xxl-job-core</artifactId>
+            <artifactId>cc-job-core</artifactId>
             <version>2.4.2-SNAPSHOT</version>
         </dependency>
 

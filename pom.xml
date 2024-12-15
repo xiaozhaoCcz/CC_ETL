@@ -14,9 +14,9 @@
     <url>https://www.xuxueli.com/</url>
 
     <modules>
-        <module>xxl-job-core</module>
+        <module>cc-job-core</module>
         <module>cc-job-admin</module>
-        <module>xxl-job-executor-samples</module>
+        <module>cc-job-executor-samples</module>
         <module>cc-async-tool</module>
     </modules>
 

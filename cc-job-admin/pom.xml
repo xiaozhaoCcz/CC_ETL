@@ -112,7 +112,7 @@
 
         <dependency>
             <groupId>com.ccJob</groupId>
-            <artifactId>xxl-job-core</artifactId>
+            <artifactId>cc-job-core</artifactId>
             <version>2.4.2-SNAPSHOT</version>
         </dependency>
 
