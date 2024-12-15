@@ -166,21 +166,20 @@ public class JobCompleteHelper {
 		if (log == null) {
 			Map<String, Boolean> result = new HashMap<>();
 			result.put(handleCallbackParam.getJobId() + randomId, false);
-			XxlJobAdminConfig.redisUtils.sendMessage(StreamConsumer.TASK_SET_STREAM, result);
+			XxlJobAdminConfig.getAdminConfig().getRedisTemplate().opsForStream().add(StreamConsumer.TASK_SET_STREAM, result);
 			return new ReturnT<>(ReturnT.FAIL_CODE, "log item not found.");
 		}
 		if (log.getHandleCode() > 0) {
 			Map<String, Boolean> result = new HashMap<>();
 			result.put(handleCallbackParam.getJobId() + randomId, false);
-			XxlJobAdminConfig.redisUtils.sendMessage(StreamConsumer.TASK_SET_STREAM, result);
+			XxlJobAdminConfig.getAdminConfig().getRedisTemplate().opsForStream().add(StreamConsumer.TASK_SET_STREAM, result);
 			return new ReturnT<>(ReturnT.FAIL_CODE, "log repeate callback.");
 		}
 
 		// 处理结果
-		Map<String, Boolean> map = new HashMap<>();
-		map.put(handleCallbackParam.getJobId() + randomId, handleCallbackParam.getHandleCode() == ReturnT.SUCCESS_CODE);
-		XxlJobAdminConfig.redisUtils.sendMessage(StreamConsumer.TASK_SET_STREAM, map);
-
+		Map<String, Boolean> result = new HashMap<>();
+		result.put(handleCallbackParam.getJobId() + randomId, handleCallbackParam.getHandleCode() == ReturnT.SUCCESS_CODE);
+		XxlJobAdminConfig.getAdminConfig().getRedisTemplate().opsForStream().add(StreamConsumer.TASK_SET_STREAM, result);
 		// handle msg
 		StringBuffer handleMsg = new StringBuffer();
 		if (log.getHandleMsg() != null) {

@@ -4,7 +4,6 @@ package com.cc.job.task.config;
 import com.cc.job.task.alarm.JobAlarmer;
 import com.cc.job.task.mapper.*;
 import com.cc.job.task.scheduler.XxlJobScheduler;
-import com.cc.job.task.utils.RedisUtils;
 import com.xxl.job.core.executor.impl.XxlJobSpringExecutor;
 import com.xxl.job.core.util.IpUtil;
 import jakarta.annotation.Resource;
@@ -39,23 +38,17 @@ public class XxlJobAdminConfig implements InitializingBean, DisposableBean {
 
     private XxlJobScheduler xxlJobScheduler;
 
-    @Resource
-    private final RedisTemplate redisTemplate = null;
-
-    public static RedisUtils redisUtils;
-
     @Override
     public void afterPropertiesSet() throws Exception {
         adminConfig = this;
 
         xxlJobScheduler = new XxlJobScheduler();
         xxlJobScheduler.init();
-
-        redisUtils = new RedisUtils(redisTemplate);
     }
 
     @Override
     public void destroy() throws Exception {
+        System.out.println(">>>>>>>> destroy");
         xxlJobScheduler.destroy();
     }
 
@@ -99,6 +92,8 @@ public class XxlJobAdminConfig implements InitializingBean, DisposableBean {
     private DataSource dataSource;
     @Resource
     private JobAlarmer jobAlarmer;
+    @Resource
+    private RedisTemplate redisTemplate;
 
 
     public String getI18n() {
@@ -169,6 +164,9 @@ public class XxlJobAdminConfig implements InitializingBean, DisposableBean {
         return jobAlarmer;
     }
 
+    public RedisTemplate getRedisTemplate() {
+        return redisTemplate;
+    }
 
     @Value("${xxl.job.logpath}")
     private String logPath;

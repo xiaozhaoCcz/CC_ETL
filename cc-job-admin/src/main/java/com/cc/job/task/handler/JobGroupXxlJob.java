@@ -3,6 +3,7 @@ package com.cc.job.task.handler;
 import cn.hutool.core.lang.Pair;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.common.exception.BusinessException;
+import com.cc.job.task.config.XxlJobAdminConfig;
 import com.cc.job.task.enums.TriggerTypeEnum;
 import com.cc.job.task.mapper.JobInfoMapper;
 import com.cc.job.task.model.entity.JobEdge;
@@ -454,6 +455,16 @@ public class JobGroupXxlJob {
         public void result(boolean success, Long param, WorkResult<String> workResult) {
             logger.info("job:{}, status:{},result:{}", param, success, workResult.getResult());
             XxlJobHelper.log("job:{}, status:{},result:{}", param, success, workResult.getResult());
+        }
+    }
+
+    // 停止所有任务
+    public static void stopJobGroup(){
+        Set<String> keySet = taskIdMap.keySet();
+        for (String key : keySet) {
+            String[] split = key.split(":");
+            Long jobId = Long.parseLong(split[0]);
+            XxlJobAdminConfig.getAdminConfig().getTaskInfoMapper().stopTaskSet(jobId);
         }
     }
 
