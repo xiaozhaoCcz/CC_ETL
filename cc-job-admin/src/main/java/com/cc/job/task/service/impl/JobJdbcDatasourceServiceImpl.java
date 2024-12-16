@@ -4,13 +4,13 @@ package com.cc.job.task.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cc.job.task.command.JdbcCommand;
 import com.cc.job.task.mapper.JobJdbcDatasourceMapper;
 import com.cc.job.task.model.entity.JobJdbcDatasource;
 import com.cc.job.task.model.form.JobJdbcDatasourceForm;
 import com.cc.job.task.model.query.JobJdbcDatasourceQuery;
 import com.cc.job.task.model.vo.JobJdbcDatasourceVO;
 import com.cc.job.task.service.JobJdbcDatasourceService;
-import com.cc.job.task.utils.JdbcUtils;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
@@ -118,7 +117,8 @@ public class JobJdbcDatasourceServiceImpl extends ServiceImpl<JobJdbcDatasourceM
     public List<String> getColumns(Long id, Map<String, String> params) {
         List<String> columns = new ArrayList<>();
         JobJdbcDatasource jobJdbcDatasource = this.getById(id);
-        Connection con = JdbcUtils.getConnection(jobJdbcDatasource.getJdbcDriverClass(), jobJdbcDatasource.getJdbcUrl(), jobJdbcDatasource.getJdbcUsername(), jobJdbcDatasource.getJdbcPassword());
+        JdbcCommand jdbcCommand = new JdbcCommand(jobJdbcDatasource.getJdbcDriverClass(), jobJdbcDatasource.getJdbcUrl(), jobJdbcDatasource.getJdbcUsername(), jobJdbcDatasource.getJdbcPassword());
+        Connection con = jdbcCommand.getConnection();
         String tableName = params.get("tableName");
         String sql  = params.get("sql");
         if(StringUtils.isBlank(sql)){
@@ -137,8 +137,8 @@ public class JobJdbcDatasourceServiceImpl extends ServiceImpl<JobJdbcDatasourceM
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }finally {
-            JdbcUtils.close(rs);
-            JdbcUtils.close(ps);
+            JdbcCommand.close(rs);
+            JdbcCommand.close(ps);
         }
         return columns;
     }
@@ -147,8 +147,9 @@ public class JobJdbcDatasourceServiceImpl extends ServiceImpl<JobJdbcDatasourceM
     public List<String> getTables(Long id) {
         List<String> tables = new ArrayList<>();
         JobJdbcDatasource jobJdbcDatasource = this.getById(id);
-        Connection con = JdbcUtils.getConnection(jobJdbcDatasource.getJdbcDriverClass(), jobJdbcDatasource.getJdbcUrl(), jobJdbcDatasource.getJdbcUsername(), jobJdbcDatasource.getJdbcPassword());
-        ResultSet rs =null;
+        JdbcCommand jdbcCommand = new JdbcCommand(jobJdbcDatasource.getJdbcDriverClass(), jobJdbcDatasource.getJdbcUrl(), jobJdbcDatasource.getJdbcUsername(), jobJdbcDatasource.getJdbcPassword());
+        Connection con = jdbcCommand.getConnection();
+        ResultSet rs = null;
         try {
             DatabaseMetaData metaData = con.getMetaData();
             // 获取所有表的名称
@@ -162,7 +163,7 @@ public class JobJdbcDatasourceServiceImpl extends ServiceImpl<JobJdbcDatasourceM
         } catch (SQLException e) {
              throw new RuntimeException(e);
         }finally {
-            JdbcUtils.close(rs);
+            JdbcCommand.close(rs);
         }
         return tables;
     }

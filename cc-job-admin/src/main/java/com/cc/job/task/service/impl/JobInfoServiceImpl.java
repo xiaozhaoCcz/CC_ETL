@@ -254,6 +254,10 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
             taskInfoTriggerDto.setExecutorParam("");
         }
 
+        if("runDataxHandler".equalsIgnoreCase(taskInfo.getExecutorHandler())){
+            taskInfoTriggerDto.setExecutorParam(taskInfo.getExecutorParam());
+        }
+
         JobTriggerPoolHelper.trigger(taskInfoTriggerDto.getId().intValue(), TriggerTypeEnum.MANUAL, -1, null, taskInfoTriggerDto.getExecutorParam(), taskInfoTriggerDto.getAddressList());
 
         taskInfo.setRankTriggerStatus(1);

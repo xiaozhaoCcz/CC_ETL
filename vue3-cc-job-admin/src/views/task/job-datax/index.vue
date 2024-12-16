@@ -101,7 +101,7 @@ async function buildJson() {
     ip: getIpAndPort(writerForm.value.datasource.jdbcUrl).ip,
     port: getIpAndPort(writerForm.value.datasource.jdbcUrl).port,
     type: 1,
-    writeMode: "insert",
+    writeMode: writerForm.value.writeMode,
   };
   let readerJson = "";
   let writerJson = "";

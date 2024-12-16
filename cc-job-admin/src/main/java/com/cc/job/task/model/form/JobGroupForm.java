@@ -25,11 +25,11 @@ public class JobGroupForm implements Serializable {
     private Long id;
 
     @Schema(description = "执行器AppName")
-    @Size(max=64, message="执行器AppName长度不能超过64个字符")
+    @Size(max=40, message="执行器AppName长度不能超过40个字符")
     private String appName;
 
     @Schema(description = "执行器名称")
-    @Size(max=12, message="执行器名称长度不能超过12个字符")
+    @Size(max=40, message="执行器名称长度不能超过40个字符")
     private String title;
 
     @Schema(description = "执行器地址类型：0=自动注册、1=手动录入")

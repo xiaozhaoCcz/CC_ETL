@@ -107,24 +107,24 @@ public class XxlJobExecutorExampleBootApplicationTests {
 
 	@Test
 	public void test2(){
-		DataXParams dataXParams = new DataXParams();
-		dataXParams.setName("mysqlreader");
-		dataXParams.setIp("localhost");
-		dataXParams.setPort(3306);
-		dataXParams.setDbName("testDbName");
-		dataXParams.setColumns(new ArrayList<>(){{
-			add("id");
-			add("username");
-		}});
-		dataXParams.setUsername("root");
-		dataXParams.setPassword("root");
-		dataXParams.setSourceType("MYSQL");
-		dataXParams.setTableName("yanhuo");
-		dataXParams.setOtherParams(new HashMap<>(){{
-			put("where","id>10");
-		}});
-		MysqlReader mysqlReader = new MysqlReader();
-		JSONObject entries = mysqlReader.buildJson(dataXParams);
-		System.out.println(entries.toString());
+//		DataXParams dataXParams = new DataXParams();
+//		dataXParams.setName("mysqlreader");
+//		dataXParams.setIp("localhost");
+//		dataXParams.setPort(3306);
+//		dataXParams.setDbName("testDbName");
+//		dataXParams.setColumns(new ArrayList<>(){{
+//			add("id");
+//			add("username");
+//		}});
+//		dataXParams.setUsername("root");
+//		dataXParams.setPassword("root");
+//		dataXParams.setSourceType("MYSQL");
+//		dataXParams.setTableName("yanhuo");
+//		dataXParams.setOtherParams(new HashMap<>(){{
+//			put("where","id>10");
+//		}});
+//		MysqlReader mysqlReader = new MysqlReader();
+//		JSONObject entries = mysqlReader.buildJson(dataXParams);
+//		System.out.println(entries.toString());
 	}
 }

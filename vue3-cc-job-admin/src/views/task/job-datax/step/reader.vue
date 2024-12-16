@@ -59,6 +59,13 @@
       </el-button>
     </el-form-item>
     <el-form-item label="表字段" v-if="columnList.length > 0">
+      <el-checkbox
+        v-model="checkAll"
+        :indeterminate="isIndeterminate"
+        @change="handleCheckAllChange"
+      >
+        全选
+      </el-checkbox>
       <el-checkbox-group v-model="readerForm.columns">
         <el-checkbox
           v-for="item in columnList"
@@ -91,6 +98,8 @@ const props = defineProps({
 });
 
 const datasourceList = ["MYSQL", "ORACLE"];
+const checkAll = ref(false);
+const isIndeterminate = ref(true);
 
 watch(
   () => readerForm.value.datasource,
@@ -108,6 +117,7 @@ watch(
       readerForm.value = data;
       await getTables(data.jdbcDatasourceId);
       await getColumns(data.jdbcDatasourceId);
+      await fetchJdbcDatasource(data.datasource.datasource);
     }
   },
   { immediate: true, deep: true }
@@ -116,7 +126,7 @@ watch(
 watch(
   () => readerForm.value.jdbcDatasourceId,
   (val) => {
-    console.log(1111,val);
+    console.log(1111, val);
     getTables(val);
   }
 );
@@ -130,7 +140,20 @@ watch(
   }
 );
 
+function handleCheckAllChange(val: boolean) {
+  readerForm.value.columns = val ? columnList.value : [];
+  isIndeterminate.value = false;
+}
+
 function next() {
+  if (
+    readerForm.value.columns == null ||
+    readerForm.value.columns.length <= 0
+  ) {
+    ElMessage.warning("请选择要同步的数据列");
+    return;
+  }
+
   readerForm.value.datasource = jdbcDatasourceList.value.find(
     (v) => v.id === readerForm.value.jdbcDatasourceId
   );

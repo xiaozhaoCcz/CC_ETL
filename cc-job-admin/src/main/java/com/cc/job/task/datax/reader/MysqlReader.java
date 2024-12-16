@@ -20,7 +20,6 @@ public class MysqlReader implements BaseRW {
                 .append("jdbcUrl", "jdbc:mysql://" + dataXParams.getIp() + ":" + dataXParams.getPort()+"/"+dataXParams.getDbName())
                 .append("table", dataXParams.getTableName()));
         parameter.putOnce("column", dataXParams.getColumns());
-        parameter.putOnce("splitPk", "id");
         if(dataXParams.getOtherParams()!=null){
             for (Map.Entry<String, String> entry : dataXParams.getOtherParams().entrySet()) {
                 parameter.putOnce(entry.getKey(), entry.getValue());

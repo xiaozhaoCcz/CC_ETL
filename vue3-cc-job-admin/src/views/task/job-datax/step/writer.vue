@@ -7,7 +7,7 @@
   >
     <el-form-item label="数据源" prop="datasource">
       <el-select
-        v-model="readerForm.datasource"
+        v-model="writerForm.datasource"
         filterable
         placeholder="Select"
         style="width: 210px"
@@ -59,6 +59,13 @@
       </el-button>
     </el-form-item>
     <el-form-item label="表字段" v-if="writerForm.tableName">
+      <el-checkbox
+        v-model="checkAll"
+        :indeterminate="isIndeterminate"
+        @change="handleCheckAllChange"
+      >
+        全选
+      </el-checkbox>
       <el-checkbox-group v-model="writerForm.columns">
         <el-checkbox
           v-for="item in columnList"
@@ -68,6 +75,19 @@
           style="margin-top: 5px"
         />
       </el-checkbox-group>
+    </el-form-item>
+
+    <el-form-item label="写入模式">
+      <el-radio-group v-model="writerForm.writeMode">
+        <el-radio
+          v-for="item in writeModeList"
+          border
+          :value="item"
+          style="margin-top: 5px"
+        >
+          {{ item }}
+        </el-radio>
+      </el-radio-group>
     </el-form-item>
     <el-form-item>
       <el-button type="info" @click="pre">上一步</el-button>
@@ -80,10 +100,14 @@
 import JobJdbcDatasourceAPI from "@/api/task/job-jdbc-datasource";
 import JobDataXAPI from "@/api/task/job-datax";
 
-const writerForm = ref({});
+const writerForm = ref({
+  writeMode: "insert",
+});
 const jdbcDatasourceList = ref([]);
 const tableList = ref([]);
 const columnList = ref([]);
+const checkAll = ref(false);
+const isIndeterminate = ref(true);
 
 const emit = defineEmits(["pre", "next"]);
 
@@ -93,6 +117,8 @@ const props = defineProps({
 });
 
 const datasourceList = ["MYSQL", "ORACLE"];
+
+const writeModeList = ["insert", "update", "replace"];
 
 watch(
   () => writerForm.value.datasource,
@@ -109,6 +135,7 @@ watch(
       writerForm.value = data;
       await getTables(data.jdbcDatasourceId);
       await getColumns(data.jdbcDatasourceId);
+      await fetchJdbcDatasource(data.datasource.datasource);
     }
   },
   { immediate: true, deep: true }
@@ -125,13 +152,24 @@ watch(
 watch(
   () => writerForm.value.tableName,
   (val) => {
-    console.log(val);
     writerForm.value.sql = "";
     getColumns(writerForm.value.jdbcDatasourceId);
   }
 );
 
+function handleCheckAllChange(val: boolean) {
+  writerForm.value.columns = val ? columnList.value : [];
+  isIndeterminate.value = false;
+}
+
 function next() {
+  if (
+    writerForm.value.columns == null ||
+    writerForm.value.columns.length <= 0
+  ) {
+    ElMessage.warning("请选择要写入的数据列");
+    return;
+  }
   writerForm.value.datasource = jdbcDatasourceList.value.find(
     (v) => v.id === writerForm.value.jdbcDatasourceId
   );
