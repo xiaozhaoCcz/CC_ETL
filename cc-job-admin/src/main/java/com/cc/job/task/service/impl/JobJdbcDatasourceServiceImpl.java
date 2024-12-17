@@ -49,6 +49,20 @@ public class JobJdbcDatasourceServiceImpl extends ServiceImpl<JobJdbcDatasourceM
         Page<JobJdbcDatasourceVO> pageVO = new Page<>();
         LambdaQueryWrapper<JobJdbcDatasource> wrapper = new LambdaQueryWrapper<>();
 
+        if(StringUtils.isNotBlank(queryParams.getDatasource())){
+            wrapper.eq(JobJdbcDatasource::getDatasource,queryParams.getDatasource());
+        }
+
+        if (StringUtils.isNotBlank(queryParams.getDatasourceName())){
+            wrapper.like(JobJdbcDatasource::getDatasourceName,queryParams.getDatasourceName());
+        }
+
+        if(StringUtils.isNotBlank(queryParams.getDatabaseName())){
+            wrapper.like(JobJdbcDatasource::getDatabaseName,queryParams.getDatabaseName());
+        }
+
+        wrapper.orderByDesc(JobJdbcDatasource::getUpdateTime);
+
         Page<JobJdbcDatasource> page = this.page(new Page<>(queryParams.getPageNum(), queryParams.getPageSize()), wrapper);
         List<JobJdbcDatasource> list = page.getRecords();
 

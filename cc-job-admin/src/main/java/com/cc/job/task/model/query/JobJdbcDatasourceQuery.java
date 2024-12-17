@@ -10,4 +10,9 @@ import lombok.Setter;
 @Setter
 public class JobJdbcDatasourceQuery extends BasePageQuery {
 
+    private String datasourceName;
+
+    private String datasource;
+
+    private String databaseName;
 }

@@ -2,6 +2,38 @@
   <div class="app-container">
     <div class="search-container">
       <el-form ref="queryFormRef" :model="queryParams" :inline="true">
+        <el-form-item label="数据源名称" prop="datasourceName">
+          <el-input
+            v-model="queryParams.datasourceName"
+            placeholder="请输入数据源名称"
+            clearable
+            @keyup.enter="handleQuery"
+          />
+        </el-form-item>
+
+        <el-form-item label="数据源" prop="datasource">
+          <el-select
+            v-model="queryParams.datasource"
+            placeholder="全部"
+            clearable
+            class="!w-[100px]"
+          >
+            <el-option
+              v-for="item in datasourceList"
+              :label="item.type"
+              :value="item.type"
+              :key="item.type"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="数据库名" prop="databaseName">
+          <el-input
+            v-model="queryParams.databaseName"
+            placeholder="请输入数据库名"
+            clearable
+            @keyup.enter="handleQuery"
+          />
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleQuery">
             <template #icon><Search /></template>
@@ -72,13 +104,6 @@
           key="jdbcUrl"
           label="jdbc url"
           prop="jdbcUrl"
-          min-width="150"
-          align="center"
-        />
-        <el-table-column
-          key="jdbcDriverClass"
-          label="jdbc驱动类"
-          prop="jdbcDriverClass"
           min-width="150"
           align="center"
         />
