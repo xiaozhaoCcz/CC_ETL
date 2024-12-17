@@ -44,7 +44,7 @@
     </el-form-item>
     <el-form-item label="sql">
       <el-input
-        v-model="writerForm.sql"
+        v-model="writerForm.querySql"
         type="textarea"
         rows="6"
         autocomplete="off"
@@ -152,7 +152,7 @@ watch(
 watch(
   () => writerForm.value.tableName,
   (val) => {
-    writerForm.value.sql = "";
+    writerForm.value.querySql = "";
     getColumns(writerForm.value.jdbcDatasourceId);
   }
 );
@@ -191,8 +191,8 @@ async function getColumns(id: number) {
   if (writerForm.value.tableName != null) {
     params.tableName = writerForm.value.tableName;
   }
-  if (writerForm.value.sql != null) {
-    params.sql = writerForm.value.sql;
+  if (writerForm.value.querySql != null) {
+    params.querySql = writerForm.value.querySql;
   }
   await JobDataXAPI.getColumns(id, params).then((data) => {
     columnList.value = data;

@@ -120,7 +120,7 @@ public class JobJdbcDatasourceServiceImpl extends ServiceImpl<JobJdbcDatasourceM
         JdbcCommand jdbcCommand = new JdbcCommand(jobJdbcDatasource.getJdbcDriverClass(), jobJdbcDatasource.getJdbcUrl(), jobJdbcDatasource.getJdbcUsername(), jobJdbcDatasource.getJdbcPassword());
         Connection con = jdbcCommand.getConnection();
         String tableName = params.get("tableName");
-        String sql  = params.get("sql");
+        String sql  = params.get("querySql");
         if(StringUtils.isBlank(sql)){
             sql = "select * from "+tableName + " t";
         }

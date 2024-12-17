@@ -44,7 +44,7 @@
     </el-form-item>
     <el-form-item label="sql">
       <el-input
-        v-model="readerForm.sql"
+        v-model="readerForm.querySql"
         type="textarea"
         :rows="6"
         autocomplete="off"
@@ -135,7 +135,7 @@ watch(
   () => readerForm.value.tableName,
   (val) => {
     console.log(val);
-    readerForm.value.sql = "";
+    readerForm.value.querySql = "";
     getColumns(readerForm.value.jdbcDatasourceId);
   }
 );
@@ -146,12 +146,15 @@ function handleCheckAllChange(val: boolean) {
 }
 
 function next() {
+
   if (
     readerForm.value.columns == null ||
     readerForm.value.columns.length <= 0
   ) {
-    ElMessage.warning("请选择要同步的数据列");
-    return;
+    if(readerForm.value.querySql.trim()==''){
+      ElMessage.warning("请选择要同步的数据列");
+      return;
+    }
   }
 
   readerForm.value.datasource = jdbcDatasourceList.value.find(
@@ -172,8 +175,8 @@ async function getColumns(id: number) {
   if (readerForm.value.tableName != null) {
     params.tableName = readerForm.value.tableName;
   }
-  if (readerForm.value.sql != null) {
-    params.sql = readerForm.value.sql;
+  if (readerForm.value.querySql != null) {
+    params.querySql = readerForm.value.querySql;
   }
   columnList.value = [];
   await JobDataXAPI.getColumns(id, params).then((data) => {

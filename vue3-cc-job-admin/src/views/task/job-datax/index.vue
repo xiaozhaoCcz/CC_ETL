@@ -89,6 +89,7 @@ async function buildJson() {
     tableName: readerForm.value.tableName,
     ip: getIpAndPort(readerForm.value.datasource.jdbcUrl).ip,
     port: getIpAndPort(readerForm.value.datasource.jdbcUrl).port,
+    querySql:readerForm.value.querySql,
     type: 0,
   };
   const writerDataXParams = {

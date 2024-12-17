@@ -353,7 +353,7 @@ function changeCron(cron: string) {
 }
 
 function submitForm() {
-  formData.value.glueType = "BEAN";
+  formData.value.glueType = "DATAX";
   formData.value.executorHandler = "runDataxHandler";
   formData.value.executorParam = JSON.stringify(jsonData.value);
   const id = formData.value.id;

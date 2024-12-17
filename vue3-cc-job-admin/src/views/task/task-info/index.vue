@@ -219,7 +219,7 @@
                   </el-dropdown-item>
                   <el-dropdown-item
                     divided
-                    v-if="!['BEAN', 'API'].includes(scope.row.glueType)"
+                    v-if="!['BEAN', 'API','DATAX'].includes(scope.row.glueType)"
                     @click="glueClick(scope.row.id)"
                     :disabled="scope.row.triggerStatus == 1"
                   >

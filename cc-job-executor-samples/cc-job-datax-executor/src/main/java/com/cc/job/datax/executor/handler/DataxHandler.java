@@ -4,6 +4,8 @@ import com.cc.job.datax.executor.utils.DataxUtils;
 import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.handler.annotation.XxlJob;
 import lombok.AllArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -14,6 +16,8 @@ import java.util.concurrent.FutureTask;
 
 @Component
 public class DataxHandler {
+
+    private static Logger logger = LoggerFactory.getLogger(DataxHandler.class);
 
     @Value("${datax.executor.jsonpath}")
     private String jsonPath;
@@ -37,6 +41,7 @@ public class DataxHandler {
                     String line;
                     while ((line = reader.readLine()) != null) {
                         // 处理每行输出
+                        logger.info(line);
                         XxlJobHelper.log(line);
                     }
                 } catch (Exception e) {
@@ -51,6 +56,7 @@ public class DataxHandler {
                 BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
                 String errorLine;
                 while ((errorLine = errorReader.readLine()) != null) {
+                    logger.info(errorLine);
                     XxlJobHelper.log( errorLine);
                 }
                 return true;
@@ -69,5 +75,4 @@ public class DataxHandler {
             DataxUtils.deleteTemJsonFile(temJsonFile);
         }
     }
-
 }
