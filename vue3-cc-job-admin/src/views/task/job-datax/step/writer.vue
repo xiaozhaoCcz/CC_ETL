@@ -7,7 +7,7 @@
   >
     <el-form-item label="数据源" prop="datasource">
       <el-select
-        v-model="writerForm.datasource"
+        v-model="writerForm.ds"
         filterable
         placeholder="Select"
         style="width: 210px"
@@ -121,7 +121,7 @@ const datasourceList = ["MYSQL", "ORACLE"];
 const writeModeList = ["insert", "update", "replace"];
 
 watch(
-  () => writerForm.value.datasource,
+  () => writerForm.value.ds,
   (val) => {
     console.log(val);
     fetchJdbcDatasource(val);
@@ -199,9 +199,9 @@ async function getColumns(id: number) {
   });
 }
 
-async function fetchJdbcDatasource(datasource: string) {
+async function fetchJdbcDatasource(ds: string) {
   const data = await JobJdbcDatasourceAPI.getJdbcDatasourceList();
-  jdbcDatasourceList.value = data.filter((v) => v.datasource == datasource);
+  jdbcDatasourceList.value = data.filter((v) => v.datasource == ds);
 }
 </script>
 

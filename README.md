@@ -6,13 +6,18 @@
 <p align="center">
 
 ## 项目介绍
-使用vue3对xxl-job-admin模块进行重构，xxl-job所有功能都已实现，支持glue模式，并新增api任务调度和可视化任务编码
-
+使用vue3对xxl-job-admin模块进行重构，并集成datax工具实现不同数据源的数据同步，支持glue模式，并新增api任务调度和可视化任务编排，支持单任务-单任务串并联，单任务-任务集串并联和单任务-任务集-任务集串并联
 ## 数据库地址
 /doc/cc_job_admin.sql
 
-## 项目运行
-首先需要将前端和后端代码启动起来
+## 项目功能
+- xxl-job的所有功能都已集成
+- 新增datax数据同步功能
+- 支持存储过程调用和sql调用
+- 支持api任务调度
+- 可视化任务编排
+
+
 ## 项目介绍
 https://www.yuque.com/xiaozhao-igpfn/kb/six39vboy38eaq87?singleDoc# 《vue3-xxl-job-admin》
 ### 修改配置

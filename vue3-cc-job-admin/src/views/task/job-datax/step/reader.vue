@@ -7,7 +7,7 @@
   >
     <el-form-item label="数据源" prop="datasource">
       <el-select
-        v-model="readerForm.datasource"
+        v-model="readerForm.ds"
         filterable
         placeholder="Select"
         style="width: 210px"
@@ -102,9 +102,9 @@ const checkAll = ref(false);
 const isIndeterminate = ref(true);
 
 watch(
-  () => readerForm.value.datasource,
+  () => readerForm.value.ds,
   (val) => {
-    console.log(val);
+    console.log(111,val);
     fetchJdbcDatasource(val);
   }
 );
@@ -184,9 +184,9 @@ async function getColumns(id: number) {
   });
 }
 
-async function fetchJdbcDatasource(datasource: string) {
+async function fetchJdbcDatasource(ds: string) {
   const data = await JobJdbcDatasourceAPI.getJdbcDatasourceList();
-  jdbcDatasourceList.value = data.filter((v) => v.datasource == datasource);
+  jdbcDatasourceList.value = data.filter((v) => v.datasource == ds);
 }
 </script>
 <style lang="scss" scoped>
