@@ -231,8 +231,12 @@
                 />
               </div>
 
-              <div class="c_cont_param" v-if="formData.glueType !== 'API'">
-                <span>任务参数</span>
+              <div
+                class="c_cont_param"
+                v-if="!['API', 'DATAX'].includes(formData.glueType)"
+              >
+                <span v-if="formData.glueType == 'SQL'">SQL</span>
+                <span v-else>任务参数</span>
                 <el-input
                   v-model="formData.executorParam"
                   type="textarea"
@@ -320,6 +324,25 @@
             </div>
           </div>
         </div>
+
+        <div class="child_form" v-if="formData.glueType == 'DATAX'">
+          <div style="color: #8e8e8e; font-size: 14px">JSON</div>
+          <el-divider style="margin: 8px" />
+          <div class="child_main" style="margin-left: 6px">
+            <div class="m_left">
+              <div class="c_cont">
+                <span class="m_title">JSON</span>
+                <json-editor-vue
+                  @update:modelValue="updateModel"
+                  @validationError="editError"
+                  class="editor"
+                  v-model="jsonData"
+                  style="height: 600px; width: 600px"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
       <template #footer>
         <el-button type="primary" @click="submitForm()">保存</el-button>
@@ -351,6 +374,22 @@ const props = defineProps({
 
 const taskGroupList = ref([]);
 const jdbcDatasourceList = ref([]);
+const jsonData = ref(null);
+
+function updateModel(val: any) {
+  jsonData.value = val;
+}
+
+const errors = ref(0);
+// 错误行数
+const line = ref();
+
+function editError(a: any, e: any) {
+  errors.value = e.length;
+  if (e[0]) {
+    line.value = e[0].line;
+  }
+}
 
 const scheduleTypeList = [
   {
@@ -372,6 +411,10 @@ const glueTypeList = [
   {
     type: "SQL",
     title: "SQL",
+  },
+  {
+    type: "DATAX",
+    title: "DATAX",
   },
   {
     type: "GLUE_GROOVY",
@@ -473,18 +516,36 @@ const cronPopover = ref(false);
 function handleTableData(val) {
   props.formData.reqHeader = JSON.stringify(val);
 }
+
+watch(
+  () => props.formData,
+  (data) => {
+    if (data.id && data.glueType == "DATAX") {
+      jsonData.value = JSON.parse(data.executorParam);
+    }
+  },
+  {
+    immediate: true,
+    deep: true,
+  }
+);
+
 watch(
   () => props.taskInfoVisible,
   () => {}
 );
 
-function handleChangeGlueType(data: any) {
+function handleChangeGlueType() {
   props.formData.executorHandler = "";
   props.formData.reqType = "";
   props.formData.reqUrl = "";
   props.formData.reqHeader = null;
   props.formData.reqBody = "";
-  props.formData.executorParam = "";
+  if (props.formData.glueType == "DATAX") {
+    props.formData.executorParam = JSON.stringify(jsonData.value);
+  } else {
+    props.formData.executorParam = "";
+  }
 }
 
 async function fetchTaskGroupList() {
@@ -504,6 +565,9 @@ function changeCron(cron: string) {
 function submitForm() {
   if (props.formData.glueType == "SQL") {
     props.formData.executorHandler = "runJobJdbcXxlJob";
+  }
+  if (props.formData.glueType == "DATAX") {
+    props.formData.executorHandler = "runDataxHandler";
   }
 
   const id = props.formData.id;

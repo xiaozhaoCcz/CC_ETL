@@ -254,7 +254,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
             taskInfoTriggerDto.setExecutorParam("");
         }
 
-        if("runDataxHandler".equalsIgnoreCase(taskInfo.getExecutorHandler())){
+        if(GlueTypeEnum.DATAX.getDesc().equalsIgnoreCase(taskInfo.getGlueType())){
             taskInfoTriggerDto.setExecutorParam(taskInfo.getExecutorParam());
         }
 

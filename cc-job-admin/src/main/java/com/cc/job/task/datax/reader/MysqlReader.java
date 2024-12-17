@@ -3,6 +3,7 @@ package com.cc.job.task.datax.reader;
 import cn.hutool.json.JSONObject;
 import com.cc.job.task.datax.BaseRW;
 import com.cc.job.task.model.datax.DataXParams;
+import org.apache.commons.lang3.StringUtils;
 
 import java.util.Map;
 
@@ -16,14 +17,19 @@ public class MysqlReader implements BaseRW {
         JSONObject parameter = new JSONObject();
         parameter.putOnce("username", dataXParams.getUsername());
         parameter.putOnce("password", dataXParams.getPassword());
-        parameter.append("connection",new JSONObject()
-                .append("jdbcUrl", "jdbc:mysql://" + dataXParams.getIp() + ":" + dataXParams.getPort()+"/"+dataXParams.getDbName())
-                .append("table", dataXParams.getTableName()));
-        parameter.putOnce("column", dataXParams.getColumns());
-        if(dataXParams.getOtherParams()!=null){
-            for (Map.Entry<String, String> entry : dataXParams.getOtherParams().entrySet()) {
-                parameter.putOnce(entry.getKey(), entry.getValue());
-            }
+        JSONObject connection = new JSONObject();
+        connection.append("jdbcUrl", "jdbc:mysql://" + dataXParams.getIp() + ":" + dataXParams.getPort()+"/"+dataXParams.getDbName());
+        if(StringUtils.isNotBlank(dataXParams.getTableName())){
+            connection.append("table", dataXParams.getTableName());
+        }
+
+        if(StringUtils.isNotBlank(dataXParams.getQuerySql())){
+            connection.append("querySql", dataXParams.getQuerySql());
+        }
+
+        parameter.append("connection",connection);
+        if(dataXParams.getColumns()!=null&&!dataXParams.getColumns().isEmpty()){
+            parameter.putOnce("column", dataXParams.getColumns());
         }
         readerConfig.putOnce("parameter", parameter);
         return readerConfig;

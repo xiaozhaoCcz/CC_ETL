@@ -4,6 +4,7 @@ package com.xxl.job.core.glue;
  * Created by xuxueli on 17/4/26.
  */
 public enum GlueTypeEnum {
+    DATAX("DataX",false,null,null),
     SQL("SQL",false,null,null),
     API("API",false,null,null),
     BEAN("BEAN", false, null, null),

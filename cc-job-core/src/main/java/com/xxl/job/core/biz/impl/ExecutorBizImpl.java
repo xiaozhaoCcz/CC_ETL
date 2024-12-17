@@ -53,7 +53,7 @@ public class ExecutorBizImpl implements ExecutorBiz {
 
         // valid：jobHandler + jobThread
         GlueTypeEnum glueTypeEnum = GlueTypeEnum.match(triggerParam.getGlueType());
-        if (GlueTypeEnum.BEAN == glueTypeEnum||GlueTypeEnum.SQL==glueTypeEnum) {
+        if (GlueTypeEnum.BEAN == glueTypeEnum||GlueTypeEnum.SQL==glueTypeEnum||GlueTypeEnum.DATAX == glueTypeEnum) {
 
             // new jobhandler
             IJobHandler newJobHandler = XxlJobExecutor.loadJobHandler(triggerParam.getExecutorHandler());

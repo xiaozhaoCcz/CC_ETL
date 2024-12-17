@@ -20,11 +20,7 @@ public class OracleWriter implements BaseRW {
                 .append("table", dataXParams.getTableName()));
         parameter.putOnce("column", dataXParams.getColumns());
         parameter.putOnce("writeMode", dataXParams.getWriteMode());
-        if(dataXParams.getOtherParams()!=null){
-            for (Map.Entry<String, String> entry : dataXParams.getOtherParams().entrySet()) {
-                parameter.putOnce(entry.getKey(), entry.getValue());
-            }
-        }
+
         readerConfig.putOnce("parameter", parameter);
         return readerConfig;
     }

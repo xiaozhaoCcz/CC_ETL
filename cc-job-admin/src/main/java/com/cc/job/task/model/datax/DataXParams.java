@@ -27,7 +27,7 @@ public class DataXParams implements Serializable {
 
     private Integer port;
 
-    private Map<String,String> otherParams;
+    private String querySql;
 
     private String writeMode;
 

@@ -405,7 +405,8 @@ onMounted(() => {
 }
 
 .info_form {
-  width: 100%;
+  width: 50%;
+  margin:0 auto;
 
   .child_form {
     width: 100%;
