@@ -14,8 +14,6 @@
       <!-- 语言选择 -->
       <LangSelect />
 
-      <!-- 消息通知 -->
-      <Notification />
     </template>
 
     <!-- 用户头像（个人中心、注销登录等） -->
@@ -37,7 +35,6 @@ import { DeviceEnum } from "@/enums/DeviceEnum";
 import { useAppStore, useSettingsStore } from "@/store";
 
 import UserProfile from "./UserProfile.vue";
-import Notification from "./Notification.vue";
 
 const appStore = useAppStore();
 const settingStore = useSettingsStore();

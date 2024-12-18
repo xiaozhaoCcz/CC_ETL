@@ -12,8 +12,6 @@ import com.cc.job.common.constant.RedisConstants;
 import com.cc.job.common.constant.SystemConstants;
 import com.cc.job.system.enums.ContactType;
 import com.cc.job.common.model.Option;
-import com.cc.job.shared.mail.service.MailService;
-import com.cc.job.shared.sms.service.SmsService;
 import com.cc.job.system.model.entity.User;
 import com.cc.job.system.model.form.*;
 import com.cc.job.config.property.AliyunSmsProperties;
@@ -68,9 +66,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     private final PermissionService permissionService;
 
-    private final SmsService smsService;
-
-    private final MailService mailService;
 
     private final AliyunSmsProperties aliyunSmsProperties;
 
@@ -358,12 +353,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         switch (type) {
             case MOBILE:
                 // 获取修改密码的模板code
-                String changePasswordSmsTemplateCode = aliyunSmsProperties.getTemplateCodes().get("changePassword");
-                smsService.sendSms(contact, changePasswordSmsTemplateCode, "[{\"code\":\"" + code + "\"}]");
                 verificationCodePrefix = RedisConstants.MOBILE_VERIFICATION_CODE_PREFIX;
                 break;
             case EMAIL:
-                mailService.sendMail(contact, "验证码", "您的验证码是：" + code);
                 verificationCodePrefix = RedisConstants.EMAIL_VERIFICATION_CODE_PREFIX;
                 break;
             default:
