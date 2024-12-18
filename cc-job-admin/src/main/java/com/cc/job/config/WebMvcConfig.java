@@ -19,6 +19,9 @@ import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.validation.beanvalidation.SpringConstraintValidatorFactory;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.math.BigInteger;
@@ -58,22 +61,37 @@ public class WebMvcConfig implements WebMvcConfigurer {
 //        converters.add(1, jackson2HttpMessageConverter);
     }
 
-    /**
-     * 配置校验器
-     *
-     * @param autowireCapableBeanFactory 用于注入 SpringConstraintValidatorFactory
-     * @return Validator 实例
-     */
-    @Bean
-    public Validator validator(final AutowireCapableBeanFactory autowireCapableBeanFactory) {
-        try (ValidatorFactory validatorFactory = Validation.byProvider(HibernateValidator.class)
-                .configure()
-                .failFast(true) // failFast=true 时，遇到第一个校验失败则立即返回，false 表示校验所有参数
-                .constraintValidatorFactory(new SpringConstraintValidatorFactory(autowireCapableBeanFactory))
-                .buildValidatorFactory()) {
+//    /**
+//     * 配置校验器
+//     *
+//     * @param autowireCapableBeanFactory 用于注入 SpringConstraintValidatorFactory
+//     * @return Validator 实例
+//     */
+//    @Bean
+//    public Validator validator(final AutowireCapableBeanFactory autowireCapableBeanFactory) {
+//        try (ValidatorFactory validatorFactory = Validation.byProvider(HibernateValidator.class)
+//                .configure()
+//                .failFast(true) // failFast=true 时，遇到第一个校验失败则立即返回，false 表示校验所有参数
+//                .constraintValidatorFactory(new SpringConstraintValidatorFactory(autowireCapableBeanFactory))
+//                .buildValidatorFactory()) {
+//
+//            // 使用 try-with-resources 确保 ValidatorFactory 被正确关闭
+//            return validatorFactory.getValidator();
+//        }
+//    }
 
-            // 使用 try-with-resources 确保 ValidatorFactory 被正确关闭
-            return validatorFactory.getValidator();
-        }
+
+    @Bean
+    public CorsFilter corsFilter()
+    {
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowCredentials(true);
+        //config.addAllowedOrigin("*");
+        config.addAllowedOriginPattern("*");
+        config.addAllowedHeader("*");
+        config.addAllowedMethod("*");
+        source.registerCorsConfiguration("/**", config); // CORS 配置对所有接口都有效
+        return new CorsFilter(source);
     }
 }

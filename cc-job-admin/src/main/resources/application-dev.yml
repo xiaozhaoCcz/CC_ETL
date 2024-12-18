@@ -76,24 +76,24 @@ mybatis-plus:
 
 
 # 安全配置
-security:
-  jwt:
-    # JWT 秘钥
-    key: SecretKey012345678901234567890123456789012345678901234567890123456789
-    # JWT 有效期(单位：秒)
-    ttl: 7200
-  # 白名单列表
-  ignore-urls:
-    - /v3/api-docs/**
-    - /doc.html
-    - /swagger-resources/**
-    - /webjars/**
-    - /doc.html
-    - /swagger-ui/**
-    - /swagger-ui.html
-    - /api/v1/auth/captcha
-    - /ws/**
-    - /xxl-job-admin/api/**
+#security:
+#  jwt:
+#    # JWT 秘钥
+#    key: SecretKey012345678901234567890123456789012345678901234567890123456789
+#    # JWT 有效期(单位：秒)
+#    ttl: 7200
+#  # 白名单列表
+#  ignore-urls:
+#    - /v3/api-docs/**
+#    - /doc.html
+#    - /swagger-resources/**
+#    - /webjars/**
+#    - /doc.html
+#    - /swagger-ui/**
+#    - /swagger-ui.html
+#    - /api/v1/auth/captcha
+#    - /ws/**
+#    - /xxl-job-admin/api/**
 
 # 文件存储配置
 oss:
@@ -139,32 +139,32 @@ sms:
       # 修改密码
       changePassword: SMS_22xxx773
 
-# springdoc配置： https://springdoc.org/properties.html
-springdoc:
-  swagger-ui:
-    path: /swagger-ui.html
-    operationsSorter: alpha
-    tags-sorter: alpha
-  api-docs:
-    path: /v3/api-docs
-  group-configs:
-    - group: '系统管理'
-      paths-to-match: "/**"
-      packages-to-scan:
-        - com.youlai.boot.system.controller
-        - com.youlai.boot.shared.auth.controller
-        - com.youlai.boot.shared.file.controller
-        - com.youlai.boot.shared.codegen.controller
-  default-flat-param-object: true
-
-# knife4j 接口文档配置
-knife4j:
-  # 是否开启 Knife4j 增强功能
-  enable: true  # 设置为 true 表示开启增强功能
-  # 生产环境配置
-  production: false  # 设置为 true 表示在生产环境中不显示文档，为 false 表示显示文档（通常在开发环境中使用）
-  setting:
-    language: zh_cn
+## springdoc配置： https://springdoc.org/properties.html
+#springdoc:
+#  swagger-ui:
+#    path: /swagger-ui.html
+#    operationsSorter: alpha
+#    tags-sorter: alpha
+#  api-docs:
+#    path: /v3/api-docs
+#  group-configs:
+#    - group: '系统管理'
+#      paths-to-match: "/**"
+#      packages-to-scan:
+#        - com.youlai.boot.system.controller
+#        - com.youlai.boot.shared.auth.controller
+#        - com.youlai.boot.shared.file.controller
+#        - com.youlai.boot.shared.codegen.controller
+#  default-flat-param-object: true
+#
+## knife4j 接口文档配置
+#knife4j:
+#  # 是否开启 Knife4j 增强功能
+#  enable: true  # 设置为 true 表示开启增强功能
+#  # 生产环境配置
+#  production: false  # 设置为 true 表示在生产环境中不显示文档，为 false 表示显示文档（通常在开发环境中使用）
+#  setting:
+#    language: zh_cn
 
 # xxl-job 定时任务配置
 xxl:
@@ -184,31 +184,31 @@ xxl:
 
 
 # 验证码配置
-captcha:
-    # 验证码类型 circle-圆圈干扰验证码|gif-Gif验证码|line-干扰线验证码|shear-扭曲干扰验证码
-    type: circle
-    # 验证码宽度
-    width: 120
-    # 验证码高度
-    height: 40
-    # 验证码干扰元素个数
-    interfere-count: 2
-    # 文本透明度(0.0-1.0)
-    text-alpha: 0.8
-    # 验证码字符配置
-    code:
-      # 验证码字符类型 math-算术|random-随机字符
-      type: math
-      # 验证码字符长度，type=算术时，表示运算位数(1:个位数运算 2:十位数运算)；type=随机字符时，表示字符个数
-      length: 1
-    # 验证码字体
-    font:
-      # 字体名称 Dialog|DialogInput|Monospaced|Serif|SansSerif
-      name: SansSerif
-      # 字体样式 0-普通|1-粗体|2-斜体
-      weight: 1
-      # 字体大小
-      size: 24
-    # 验证码有效期(秒)
-    expire-seconds: 120
+#captcha:
+#    # 验证码类型 circle-圆圈干扰验证码|gif-Gif验证码|line-干扰线验证码|shear-扭曲干扰验证码
+#    type: circle
+#    # 验证码宽度
+#    width: 120
+#    # 验证码高度
+#    height: 40
+#    # 验证码干扰元素个数
+#    interfere-count: 2
+#    # 文本透明度(0.0-1.0)
+#    text-alpha: 0.8
+#    # 验证码字符配置
+#    code:
+#      # 验证码字符类型 math-算术|random-随机字符
+#      type: math
+#      # 验证码字符长度，type=算术时，表示运算位数(1:个位数运算 2:十位数运算)；type=随机字符时，表示字符个数
+#      length: 1
+#    # 验证码字体
+#    font:
+#      # 字体名称 Dialog|DialogInput|Monospaced|Serif|SansSerif
+#      name: SansSerif
+#      # 字体样式 0-普通|1-粗体|2-斜体
+#      weight: 1
+#      # 字体大小
+#      size: 24
+#    # 验证码有效期(秒)
+#    expire-seconds: 120
 

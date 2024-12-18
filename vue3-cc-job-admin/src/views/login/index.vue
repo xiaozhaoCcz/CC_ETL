@@ -102,25 +102,25 @@
           </el-tooltip>
 
           <!-- 验证码 -->
-          <el-form-item prop="captchaCode">
-            <div class="input-wrapper">
-              <svg-icon icon-class="captcha" class="mx-2" />
-              <el-input
-                v-model="loginData.captchaCode"
-                auto-complete="off"
-                size="large"
-                class="flex-1"
-                :placeholder="$t('login.captchaCode')"
-                @keyup.enter="handleLoginSubmit"
-              />
+<!--          <el-form-item prop="captchaCode">-->
+<!--            <div class="input-wrapper">-->
+<!--              <svg-icon icon-class="captcha" class="mx-2" />-->
+<!--              <el-input-->
+<!--                v-model="loginData.captchaCode"-->
+<!--                auto-complete="off"-->
+<!--                size="large"-->
+<!--                class="flex-1"-->
+<!--                :placeholder="$t('login.captchaCode')"-->
+<!--                @keyup.enter="handleLoginSubmit"-->
+<!--              />-->
 
-              <el-image
-                :src="captchaBase64"
-                class="captcha-img"
-                @click="getCaptcha"
-              />
-            </div>
-          </el-form-item>
+<!--              <el-image-->
+<!--                :src="captchaBase64"-->
+<!--                class="captcha-img"-->
+<!--                @click="getCaptcha"-->
+<!--              />-->
+<!--            </div>-->
+<!--          </el-form-item>-->
 
           <div class="flex-x-between w-full py-1">
             <el-checkbox>
@@ -258,11 +258,13 @@ async function handleLoginSubmit() {
       userStore
         .login(loginData.value)
         .then(async () => {
-          await userStore.getUserInfo();
+          userStore.userInfo = {userId:1,username:"admin"};
+          //await userStore.getUserInfo();
           // 需要在路由跳转前加载字典数据，否则会出现字典数据未加载完成导致页面渲染异常
-          await dictStore.loadDictionaries();
+          //await dictStore.loadDictionaries();
           // 跳转到登录前的页面
           const { path, queryParams } = parseRedirect();
+          console.log(path,queryParams)
           router.push({ path: path, query: queryParams });
         })
         .catch(() => {
@@ -319,9 +321,9 @@ const setLoginCredentials = (username: string, password: string) => {
   loginData.value.password = password;
 };
 
-onMounted(() => {
-  getCaptcha();
-});
+// onMounted(() => {
+//   getCaptcha();
+// });
 </script>
 
 <style lang="scss" scoped>

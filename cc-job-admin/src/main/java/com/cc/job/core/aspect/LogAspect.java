@@ -8,7 +8,7 @@ import cn.hutool.http.useragent.UserAgentUtil;
 import com.cc.job.common.annotation.Log;
 import com.cc.job.common.constant.SecurityConstants;
 import com.cc.job.common.util.IPUtils;
-import com.cc.job.core.security.util.SecurityUtils;
+//import com.cc.job.core.security.util.SecurityUtils;
 import com.cc.job.system.service.LogService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -44,9 +44,9 @@ public class LogAspect {
 
         Long userId = null;
         // 非登录请求获取用户ID，登录请求在登录成功后(joinPoint.proceed())获取用户ID
-        if (!SecurityConstants.LOGIN_PATH.equals(requestURI)) {
-            userId = SecurityUtils.getUserId();
-        }
+//        if (!SecurityConstants.LOGIN_PATH.equals(requestURI)) {
+//            userId = SecurityUtils.getUserId();
+//        }
 
         TimeInterval timer = DateUtil.timer();
         // 执行方法
@@ -59,9 +59,9 @@ public class LogAspect {
         log.setContent(logAnnotation.value());
         log.setRequestUri(requestURI);
         // 登录方法需要在登录成功后获取用户ID
-        if (userId == null) {
-            userId = SecurityUtils.getUserId();
-        }
+//        if (userId == null) {
+//            userId = SecurityUtils.getUserId();
+//        }
         log.setCreateBy(userId);
         String ipAddr = IPUtils.getIpAddr(request);
         if (StrUtil.isNotBlank(ipAddr)) {

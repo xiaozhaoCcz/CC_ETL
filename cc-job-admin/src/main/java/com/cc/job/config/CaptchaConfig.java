@@ -16,7 +16,7 @@ import java.awt.*;
  * @author haoxr
  * @since 2023/11/24
  */
-@Configuration
+//@Configuration
 public class CaptchaConfig {
 
     @Autowired

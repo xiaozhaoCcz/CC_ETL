@@ -21,7 +21,7 @@ import org.springframework.http.HttpHeaders;
  * @see <a href="https://doc.xiaominfo.com/docs/quick-start">knife4j 快速开始</a>
  * @since 2023/2/17
  */
-@Configuration
+//@Configuration
 @Slf4j
 @RequiredArgsConstructor
 public class SwaggerConfig {

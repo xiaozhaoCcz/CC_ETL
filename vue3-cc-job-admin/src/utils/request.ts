@@ -20,6 +20,7 @@ const service = axios.create({
 // 请求拦截器
 service.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    console.log("拦截")
     const accessToken = getToken();
     if (accessToken) {
       config.headers.Authorization = accessToken;
@@ -43,6 +44,7 @@ service.interceptors.response.use(
     }
 
     const { code, data, msg } = response.data;
+    console.log(code, data);
     if (code === ResultEnum.SUCCESS) {
       return data;
     }

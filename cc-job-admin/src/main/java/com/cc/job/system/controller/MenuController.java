@@ -1,6 +1,5 @@
 package com.cc.job.system.controller;
 
-import com.cc.job.core.security.util.SecurityUtils;
 import com.cc.job.system.model.form.MenuForm;
 import com.cc.job.system.model.query.MenuQuery;
 import com.cc.job.system.model.vo.MenuVO;
@@ -16,9 +15,9 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -58,7 +57,9 @@ public class MenuController {
     @Operation(summary = "菜单路由列表")
     @GetMapping("/routes")
     public Result<List<RouteVO>> listRoutes() {
-        Set<String> roles = SecurityUtils.getRoles();
+        Set<String> roles = new HashSet<>(){{
+            add("admin");
+        }};
         List<RouteVO> routeList = menuService.listRoutes(roles);
         return Result.success(routeList);
     }
@@ -74,7 +75,6 @@ public class MenuController {
 
     @Operation(summary = "新增菜单")
     @PostMapping
-    @PreAuthorize("@ss.hasPerm('sys:menu:add')")
     @RepeatSubmit
     public Result<?> addMenu(@RequestBody MenuForm menuForm) {
         boolean result = menuService.saveMenu(menuForm);
@@ -83,7 +83,6 @@ public class MenuController {
 
     @Operation(summary = "修改菜单")
     @PutMapping(value = "/{id}")
-    @PreAuthorize("@ss.hasPerm('sys:menu:edit')")
     public Result<?> updateMenu(
             @RequestBody MenuForm menuForm
     ) {
@@ -93,7 +92,6 @@ public class MenuController {
 
     @Operation(summary = "删除菜单")
     @DeleteMapping("/{id}")
-    @PreAuthorize("@ss.hasPerm('sys:menu:delete')")
     public Result<?> deleteMenu(
             @Parameter(description = "菜单ID，多个以英文(,)分割") @PathVariable("id") Long id
     ) {
