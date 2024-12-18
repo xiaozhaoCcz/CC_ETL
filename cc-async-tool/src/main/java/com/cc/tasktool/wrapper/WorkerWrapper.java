@@ -411,7 +411,7 @@ public class WorkerWrapper<T, V> {
         return true;
     }
 
-    private final AtomicInteger count = new AtomicInteger(0);
+    private int count = 0;
 
     /**
      * 具体的单个worker执行任务
@@ -429,13 +429,23 @@ public class WorkerWrapper<T, V> {
 
             callback.begin(param);
 
-            FutureTask<V> futureTask = new FutureTask<>(() -> {
-                return worker.action(param, forParamUseWrappers);
-            });
-            Thread thread = new Thread(futureTask);
-            thread.start();
+            V resultValue;
 
-            V resultValue = timeout > 0 ? futureTask.get(timeout, TimeUnit.MILLISECONDS) : futureTask.get();
+            if(timeout>0){
+                Thread thread =null;
+                try {
+                    FutureTask<V> futureTask = new FutureTask<>(() -> worker.action(param, forParamUseWrappers));
+                    thread = new Thread(futureTask);
+                    thread.start();
+                    resultValue = futureTask.get(timeout, TimeUnit.MILLISECONDS);
+                }catch (Exception e){
+                    throw new RuntimeException(e);
+                }finally {
+                    thread.interrupt();
+                }
+            }else {
+                resultValue = worker.action(param, forParamUseWrappers);
+            }
 
             //如果状态不是在working,说明别的地方已经修改了
             if (!compareAndSetState(WORKING, FINISH)) {
@@ -449,7 +459,7 @@ public class WorkerWrapper<T, V> {
 
             return workResult;
         } catch (Exception e) {
-            if(retryCount!=null&&count.incrementAndGet()<=retryCount){
+            if(retryCount!=null&&++count<=retryCount){
                 this.state.set(INIT);
                 workerDoJob();
             }
