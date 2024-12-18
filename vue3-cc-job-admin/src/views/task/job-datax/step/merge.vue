@@ -75,7 +75,7 @@
             </div>
           </div>
           <div class="m_right" v-if="formData.scheduleType == 'CRON'">
-            <div class="c_cont">
+            <div class="c_cont" style="position: relative">
               <span class="m_title">CRON</span>
               <el-input
                 v-model="formData.scheduleConf"
@@ -450,8 +450,8 @@ onMounted(() => {
 
     .cronPopover {
       position: absolute;
-      top: -100px;
-      left: 300px;
+      top: 100%;
+      left: 20%;
       width: 700px;
 
       z-index: 1000;

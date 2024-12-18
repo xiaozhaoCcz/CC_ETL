@@ -65,6 +65,15 @@ const JobJdbcDatasourceAPI = {
       method: "delete",
     });
   },
+
+  /** 添加jdbc数据源配置*/
+  isConnect(data: JobJdbcDatasourceForm) {
+    return request({
+      url: `${JOBJDBCDATASOURCE_BASE_URL}/isConnect`,
+      method: "post",
+      data: data,
+    });
+  },
 };
 
 export default JobJdbcDatasourceAPI;

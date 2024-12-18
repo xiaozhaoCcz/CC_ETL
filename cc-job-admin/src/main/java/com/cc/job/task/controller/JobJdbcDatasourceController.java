@@ -74,4 +74,11 @@ public class JobJdbcDatasourceController {
         boolean result = jobJdbcDatasourceService.deleteJdbcDatasources(ids);
         return Result.judge(result);
     }
+
+    @Operation(summary = "判断是否连接成功")
+    @PostMapping("/isConnect")
+    public Result<Boolean> isConnect(@RequestBody @Valid JobJdbcDatasourceForm formData ) {
+        boolean result = jobJdbcDatasourceService.isConnect(formData);
+        return Result.success(result);
+    }
 }

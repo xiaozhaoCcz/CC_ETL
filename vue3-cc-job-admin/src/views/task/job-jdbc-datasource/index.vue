@@ -206,6 +206,9 @@
         <el-form-item label="备注" prop="comments">
           <el-input v-model="formData.comments" placeholder="备注" />
         </el-form-item>
+        <el-form-item >
+          <el-button type="success" @click="isConnect">测试连接</el-button>
+        </el-form-item>
       </el-form>
       <template #footer>
         <div class="dialog-footer">
@@ -336,20 +339,38 @@ function getJdbcUrl(datasource?: string, ip?: string, port?: string) {
   return jdbcUrl;
 }
 
+async function isConnect() {
+  let _isConnect = false;
+  formData.jdbcDriverClass = getDriver(formData.datasource);
+  formData.jdbcUrl = getJdbcUrl(
+    formData.datasource,
+    formData.ip,
+    formData.port
+  );
+  await JobJdbcDatasourceAPI.isConnect(formData).then((data: any) => {
+    if (data) {
+      ElMessage.success("数据库连接成功");
+    }
+    _isConnect = data;
+  });
+  return _isConnect;
+}
+
 /** 提交jdbc数据源配置表单 */
 function handleSubmit() {
-  dataFormRef.value.validate((valid: any) => {
+  dataFormRef.value.validate(async (valid: any) => {
     if (valid) {
       loading.value = true;
       const id = formData.id;
-      formData.jdbcDriverClass = getDriver(formData.datasource);
-      formData.jdbcUrl = getJdbcUrl(
-        formData.datasource,
-        formData.ip,
-        formData.port
-      );
+
+      const _isConnect = await isConnect();
+      if (!_isConnect) {
+        ElMessage.error("数据库连接失败");
+        return;
+      }
+
       if (id) {
-        JobJdbcDatasourceAPI.update(id, formData)
+        await JobJdbcDatasourceAPI.update(id, formData)
           .then(() => {
             ElMessage.success("修改成功");
             handleCloseDialog();
@@ -357,7 +378,7 @@ function handleSubmit() {
           })
           .finally(() => (loading.value = false));
       } else {
-        JobJdbcDatasourceAPI.add(formData)
+        await JobJdbcDatasourceAPI.add(formData)
           .then(() => {
             ElMessage.success("新增成功");
             handleCloseDialog();

@@ -9,7 +9,7 @@
       <el-select
         v-model="writerForm.ds"
         filterable
-        placeholder="Select"
+        placeholder="选择数据源"
         style="width: 210px"
       >
         <el-option v-for="item in datasourceList" :label="item" :value="item" />
@@ -19,7 +19,7 @@
       <el-select
         v-model="writerForm.jdbcDatasourceId"
         filterable
-        placeholder="Select"
+        placeholder="选择数据库"
         style="width: 210px"
       >
         <el-option

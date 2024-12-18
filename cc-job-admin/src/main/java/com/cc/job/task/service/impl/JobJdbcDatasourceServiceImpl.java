@@ -4,6 +4,7 @@ package com.cc.job.task.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cc.job.common.exception.BusinessException;
 import com.cc.job.task.command.JdbcCommand;
 import com.cc.job.task.mapper.JobJdbcDatasourceMapper;
 import com.cc.job.task.model.entity.JobJdbcDatasource;
@@ -180,6 +181,20 @@ public class JobJdbcDatasourceServiceImpl extends ServiceImpl<JobJdbcDatasourceM
             JdbcCommand.close(rs);
         }
         return tables;
+    }
+
+    @Override
+    public boolean isConnect(JobJdbcDatasourceForm formData) {
+        JdbcCommand jdbcCommand = new JdbcCommand(formData.getJdbcDriverClass(), formData.getJdbcUrl(), formData.getJdbcUsername(), formData.getJdbcPassword());
+        Connection con = null;
+        try {
+            con = jdbcCommand.getConnection();
+            return con!=null;
+        }catch (Exception e){
+            throw new BusinessException(e);
+        }finally {
+            JdbcCommand.close(con);
+        }
     }
 
 }

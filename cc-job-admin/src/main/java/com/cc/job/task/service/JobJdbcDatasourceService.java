@@ -26,4 +26,6 @@ public interface JobJdbcDatasourceService extends IService<JobJdbcDatasource>  {
     List<String> getColumns(Long id, Map<String, String> params);
 
     List<String> getTables(Long id);
+
+    boolean isConnect(@Valid JobJdbcDatasourceForm formData);
 }

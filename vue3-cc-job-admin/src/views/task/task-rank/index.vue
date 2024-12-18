@@ -12,7 +12,9 @@
         <el-button v-else type="info" @click="showTaskVisible = false">
           隐藏任务
         </el-button>
+
       </div>
+        <span class="task_title">{{ taskTitle }}</span>
       <div class="btn_right_list">
         <el-button
           v-if="triggerOneVisible"
@@ -140,6 +142,7 @@ const formData = reactive<TaskInfoForm>({
   executorTimeout: 60000,
 });
 const g_position = ref([140, 140]);
+const taskTitle = ref("");
 
 const taskSetList = ref([
   {
@@ -412,7 +415,7 @@ function selectTaskSetNode(node) {
   taskRankId.value = node.id;
   TaskInfoAPI.getFormData(node.id).then((data) => {
     Object.assign(formData, data);
-    console.log(data);
+    taskTitle.value = data.jobDesc;
     const _nodes = JSON.parse(data.nodes);
     const _edges = JSON.parse(data.edges);
 
@@ -551,6 +554,16 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+
+  .task_title{
+     font-weight: bold;
+    font-size: 18px;
+  }
+
+  .task_title:before{
+    content: '任务组：';
+    color: #5174fd;
+  }
 
   .btn_right_list {
     background: #fff;
