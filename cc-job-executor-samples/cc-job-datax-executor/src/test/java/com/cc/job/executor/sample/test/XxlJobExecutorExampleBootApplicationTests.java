@@ -3,8 +3,6 @@ package com.cc.job.executor.sample.test;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.IdUtil;
 import com.cc.job.datax.DataxJobExecutorApplication;
-import com.cc.job.datax.executor.model.DataXParams;
-import com.cc.job.datax.executor.reader.MysqlReader;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

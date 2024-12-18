@@ -1,7 +1,6 @@
 package com.cc.job.system.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.cc.job.shared.codegen.model.entity.GenConfig;
 import com.cc.job.system.model.entity.Menu;
 import com.cc.job.system.model.form.MenuForm;
 import com.cc.job.system.model.query.MenuQuery;
@@ -35,7 +34,7 @@ public interface MenuService extends IService<Menu> {
     /**
      * 新增菜单
      *
-     * @param menuForm  菜单表单对象
+     * @param menuForm 菜单表单对象
      */
     boolean saveMenu(MenuForm menuForm);
 
@@ -46,8 +45,8 @@ public interface MenuService extends IService<Menu> {
 
     /**
      * 修改菜单显示状态
-     * 
-     * @param menuId 菜单ID
+     *
+     * @param menuId  菜单ID
      * @param visible 是否显示(1-显示 0-隐藏)
      */
     boolean updateMenuVisible(Long menuId, Integer visible);
@@ -66,11 +65,4 @@ public interface MenuService extends IService<Menu> {
      */
     boolean deleteMenu(Long id);
 
-    /**
-     * 代码生成时添加菜单
-     *
-     * @param parentMenuId 父菜单ID
-     * @param genConfig   实体名
-     */
-    void addMenuForCodegen(Long parentMenuId, GenConfig genConfig);
 }
