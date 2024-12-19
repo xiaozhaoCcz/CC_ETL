@@ -2,7 +2,7 @@ package com.cc.job.task.thread;
 
 import com.cc.job.task.complete.XxlJobCompleter;
 import com.cc.job.task.config.XxlJobAdminConfig;
-import com.cc.job.task.model.entity.JobLog;
+import com.cc.job.xo.model.entity.JobLog;
 import com.cc.job.task.redis.StreamConsumer;
 import com.cc.job.task.utils.I18nUtil;
 import com.xxl.job.core.biz.model.HandleCallbackParam;

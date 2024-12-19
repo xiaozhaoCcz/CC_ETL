@@ -3,8 +3,8 @@ package com.cc.job.task.thread;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.task.config.XxlJobAdminConfig;
-import com.cc.job.task.model.entity.JobGroup;
-import com.cc.job.task.model.entity.JobRegistry;
+import com.cc.job.xo.model.entity.JobGroup;
+import com.cc.job.xo.model.entity.JobRegistry;
 import com.xxl.job.core.biz.model.RegistryParam;
 import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.enums.RegistryConfig;

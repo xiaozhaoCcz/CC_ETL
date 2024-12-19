@@ -1,7 +1,7 @@
 package com.cc.job.task.alarm;
 
-import com.cc.job.task.model.entity.JobInfo;
-import com.cc.job.task.model.entity.JobLog;
+import com.cc.job.xo.model.entity.JobInfo;
+import com.cc.job.xo.model.entity.JobLog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeansException;

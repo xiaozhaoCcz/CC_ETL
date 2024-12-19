@@ -1,8 +1,8 @@
 package com.cc.job.task.converter;
 
 import org.mapstruct.Mapper;
-import com.cc.job.task.model.entity.JobLock;
-import com.cc.job.task.model.form.JobLockForm;
+import com.cc.job.xo.model.entity.JobLock;
+import com.cc.job.xo.model.form.JobLockForm;
 
 /**
  * task_lock对象转换器

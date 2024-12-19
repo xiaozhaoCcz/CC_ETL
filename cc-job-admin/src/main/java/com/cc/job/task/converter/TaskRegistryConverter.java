@@ -1,8 +1,8 @@
 package com.cc.job.task.converter;
 
 import org.mapstruct.Mapper;
-import com.cc.job.task.model.entity.JobRegistry;
-import com.cc.job.task.model.form.JobRegistryForm;
+import com.cc.job.xo.model.entity.JobRegistry;
+import com.cc.job.xo.model.form.JobRegistryForm;
 
 /**
  * 执行器对象转换器

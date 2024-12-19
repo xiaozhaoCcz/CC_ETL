@@ -2,10 +2,10 @@ package com.cc.job.task.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.cc.job.task.model.entity.JobJdbcDatasource;
-import com.cc.job.task.model.form.JobJdbcDatasourceForm;
-import com.cc.job.task.model.query.JobJdbcDatasourceQuery;
-import com.cc.job.task.model.vo.JobJdbcDatasourceVO;
+import com.cc.job.xo.model.entity.JobJdbcDatasource;
+import com.cc.job.xo.model.form.JobJdbcDatasourceForm;
+import com.cc.job.xo.model.query.JobJdbcDatasourceQuery;
+import com.cc.job.xo.model.vo.JobJdbcDatasourceVO;
 import jakarta.validation.Valid;
 
 import java.util.List;

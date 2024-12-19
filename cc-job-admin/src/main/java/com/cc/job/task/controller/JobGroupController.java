@@ -1,13 +1,13 @@
 package com.cc.job.task.controller;
 
-import com.cc.job.task.model.entity.JobGroup;
+import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.task.service.JobGroupService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import com.cc.job.task.model.form.JobGroupForm;
-import com.cc.job.task.model.query.JobGroupQuery;
-import com.cc.job.task.model.vo.JobGroupVO;
+import com.cc.job.xo.model.form.JobGroupForm;
+import com.cc.job.xo.model.query.JobGroupQuery;
+import com.cc.job.xo.model.vo.JobGroupVO;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cc.job.common.result.PageResult;
 import com.cc.job.common.result.Result;

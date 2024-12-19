@@ -1,0 +1,28 @@
+package com.cc.job.xo.model.query;
+
+import com.cc.job.xo.common.BasePageQuery;
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Getter;
+import lombok.Setter;
+
+/**
+ * task_info分页查询对象
+ *
+ * @author ccjob
+ * @since 2024-11-03 08:21
+ */
+@Schema(description ="task_info查询对象")
+@Getter
+@Setter
+public class JobInfoQuery extends BasePageQuery {
+
+    private Long jobGroup;
+
+    private Integer triggerStatus;
+
+    private String jobDesc;
+
+    private String executorHandler;
+
+    private String author;
+}

@@ -2,9 +2,7 @@ package com.cc.job.task.datax.writer;
 
 import cn.hutool.json.JSONObject;
 import com.cc.job.task.datax.BaseRW;
-import com.cc.job.task.model.datax.DataXParams;
-
-import java.util.Map;
+import com.cc.job.xo.model.datax.DataXParams;
 
 public class MysqlWriter implements BaseRW {
     @Override

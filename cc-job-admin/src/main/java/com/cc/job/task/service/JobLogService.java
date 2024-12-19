@@ -1,8 +1,8 @@
 package com.cc.job.task.service;
 
-import com.cc.job.task.model.entity.JobLog;
-import com.cc.job.task.model.query.JobLogQuery;
-import com.cc.job.task.model.vo.JobLogVO;
+import com.cc.job.xo.model.entity.JobLog;
+import com.cc.job.xo.model.query.JobLogQuery;
+import com.cc.job.xo.model.vo.JobLogVO;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.xxl.job.core.biz.model.LogResult;

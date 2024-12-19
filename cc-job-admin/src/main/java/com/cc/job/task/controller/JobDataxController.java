@@ -1,14 +1,11 @@
 package com.cc.job.task.controller;
 
 import com.cc.job.common.result.Result;
-import com.cc.job.task.model.datax.DataXParams;
-import com.cc.job.task.model.entity.JobJdbcDatasource;
-import com.cc.job.task.model.form.JobGroupForm;
+import com.cc.job.xo.model.datax.DataXParams;
 import com.cc.job.task.service.DataxService;
 import com.cc.job.task.service.JobJdbcDatasourceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 

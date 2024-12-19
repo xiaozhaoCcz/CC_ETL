@@ -2,8 +2,8 @@ package com.cc.job.task.config;
 
 
 import com.cc.job.task.alarm.JobAlarmer;
-import com.cc.job.task.mapper.*;
 import com.cc.job.task.scheduler.XxlJobScheduler;
+import com.cc.job.xo.mapper.*;
 import com.xxl.job.core.executor.impl.XxlJobSpringExecutor;
 import com.xxl.job.core.util.IpUtil;
 import jakarta.annotation.Resource;

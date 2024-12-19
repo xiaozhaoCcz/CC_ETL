@@ -1,17 +1,17 @@
 package com.cc.job.task.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.cc.job.task.model.dto.JobInfoTriggerDto;
-import com.cc.job.task.model.entity.JobInfo;
-import com.cc.job.task.model.entity.JobLogglue;
-import com.cc.job.task.model.form.JobGlueForm;
+import com.cc.job.xo.model.dto.JobInfoTriggerDto;
+import com.cc.job.xo.model.entity.JobInfo;
+import com.cc.job.xo.model.entity.JobLogglue;
+import com.cc.job.xo.model.form.JobGlueForm;
 import com.cc.job.task.service.JobInfoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import com.cc.job.task.model.form.JobInfoForm;
-import com.cc.job.task.model.query.JobInfoQuery;
-import com.cc.job.task.model.vo.JobInfoVO;
+import com.cc.job.xo.model.form.JobInfoForm;
+import com.cc.job.xo.model.query.JobInfoQuery;
+import com.cc.job.xo.model.vo.JobInfoVO;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cc.job.common.result.PageResult;
 import com.cc.job.common.result.Result;

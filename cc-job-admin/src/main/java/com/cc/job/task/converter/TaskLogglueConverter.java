@@ -1,8 +1,8 @@
 package com.cc.job.task.converter;
 
 import org.mapstruct.Mapper;
-import com.cc.job.task.model.entity.JobLogglue;
-import com.cc.job.task.model.form.JobLogglueForm;
+import com.cc.job.xo.model.entity.JobLogglue;
+import com.cc.job.xo.model.form.JobLogglueForm;
 
 /**
  * task_logglue对象转换器

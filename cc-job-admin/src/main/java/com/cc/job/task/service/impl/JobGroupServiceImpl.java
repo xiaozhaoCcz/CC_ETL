@@ -7,12 +7,12 @@ import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.cc.job.task.mapper.JobGroupMapper;
+import com.cc.job.xo.mapper.JobGroupMapper;
 import com.cc.job.task.service.JobGroupService;
-import com.cc.job.task.model.entity.JobGroup;
-import com.cc.job.task.model.form.JobGroupForm;
-import com.cc.job.task.model.query.JobGroupQuery;
-import com.cc.job.task.model.vo.JobGroupVO;
+import com.cc.job.xo.model.entity.JobGroup;
+import com.cc.job.xo.model.form.JobGroupForm;
+import com.cc.job.xo.model.query.JobGroupQuery;
+import com.cc.job.xo.model.vo.JobGroupVO;
 import com.cc.job.task.converter.TaskGroupConverter;
 
 import java.util.ArrayList;

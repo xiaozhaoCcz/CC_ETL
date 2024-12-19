@@ -1,9 +1,9 @@
 package com.cc.job.task.service;
 
-import com.cc.job.task.model.entity.JobGroup;
-import com.cc.job.task.model.form.JobGroupForm;
-import com.cc.job.task.model.query.JobGroupQuery;
-import com.cc.job.task.model.vo.JobGroupVO;
+import com.cc.job.xo.model.entity.JobGroup;
+import com.cc.job.xo.model.form.JobGroupForm;
+import com.cc.job.xo.model.query.JobGroupQuery;
+import com.cc.job.xo.model.vo.JobGroupVO;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 

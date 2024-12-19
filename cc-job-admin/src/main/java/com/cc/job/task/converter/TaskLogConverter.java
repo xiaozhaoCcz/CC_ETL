@@ -1,9 +1,9 @@
 package com.cc.job.task.converter;
 
-import com.cc.job.task.model.vo.JobLogVO;
+import com.cc.job.xo.model.vo.JobLogVO;
 import org.mapstruct.Mapper;
-import com.cc.job.task.model.entity.JobLog;
-import com.cc.job.task.model.form.JobLogForm;
+import com.cc.job.xo.model.entity.JobLog;
+import com.cc.job.xo.model.form.JobLogForm;
 
 /**
  * task_log对象转换器

@@ -1,9 +1,9 @@
 package com.cc.job.task.converter;
 
-import com.cc.job.task.model.vo.JobGroupVO;
+import com.cc.job.xo.model.vo.JobGroupVO;
 import org.mapstruct.Mapper;
-import com.cc.job.task.model.entity.JobGroup;
-import com.cc.job.task.model.form.JobGroupForm;
+import com.cc.job.xo.model.entity.JobGroup;
+import com.cc.job.xo.model.form.JobGroupForm;
 
 /**
  * task_group对象转换器

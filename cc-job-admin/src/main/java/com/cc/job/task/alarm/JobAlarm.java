@@ -1,8 +1,8 @@
 package com.cc.job.task.alarm;
 
 
-import com.cc.job.task.model.entity.JobInfo;
-import com.cc.job.task.model.entity.JobLog;
+import com.cc.job.xo.model.entity.JobInfo;
+import com.cc.job.xo.model.entity.JobLog;
 
 /**
  * @author xuxueli 2020-01-19

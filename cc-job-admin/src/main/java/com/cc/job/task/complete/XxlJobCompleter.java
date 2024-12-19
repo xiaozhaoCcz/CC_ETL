@@ -3,8 +3,8 @@ package com.cc.job.task.complete;
 
 import com.cc.job.task.config.XxlJobAdminConfig;
 import com.cc.job.task.enums.TriggerTypeEnum;
-import com.cc.job.task.model.entity.JobInfo;
-import com.cc.job.task.model.entity.JobLog;
+import com.cc.job.xo.model.entity.JobInfo;
+import com.cc.job.xo.model.entity.JobLog;
 import com.cc.job.task.thread.JobTriggerPoolHelper;
 import com.cc.job.task.utils.I18nUtil;
 import com.xxl.job.core.biz.model.ReturnT;

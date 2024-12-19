@@ -1,7 +1,7 @@
 package com.cc.job.task.datax;
 
 import cn.hutool.json.JSONObject;
-import com.cc.job.task.model.datax.DataXParams;
+import com.cc.job.xo.model.datax.DataXParams;
 
 
 public interface BaseRW {

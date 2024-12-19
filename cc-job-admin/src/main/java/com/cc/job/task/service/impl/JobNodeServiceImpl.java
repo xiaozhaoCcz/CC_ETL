@@ -1,8 +1,8 @@
 package com.cc.job.task.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.cc.job.task.mapper.JobNodeMapper;
-import com.cc.job.task.model.entity.JobNode;
+import com.cc.job.xo.mapper.JobNodeMapper;
+import com.cc.job.xo.model.entity.JobNode;
 import com.cc.job.task.service.JobNodeService;
 import org.springframework.stereotype.Service;
 

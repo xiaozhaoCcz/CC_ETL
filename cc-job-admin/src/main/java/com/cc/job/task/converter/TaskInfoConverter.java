@@ -1,9 +1,9 @@
 package com.cc.job.task.converter;
 
-import com.cc.job.task.model.vo.JobInfoVO;
+import com.cc.job.xo.model.vo.JobInfoVO;
 import org.mapstruct.Mapper;
-import com.cc.job.task.model.entity.JobInfo;
-import com.cc.job.task.model.form.JobInfoForm;
+import com.cc.job.xo.model.entity.JobInfo;
+import com.cc.job.xo.model.form.JobInfoForm;
 
 /**
  * task_info对象转换器

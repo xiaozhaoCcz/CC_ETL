@@ -2,10 +2,8 @@ package com.cc.job.task.datax.reader;
 
 import cn.hutool.json.JSONObject;
 import com.cc.job.task.datax.BaseRW;
-import com.cc.job.task.model.datax.DataXParams;
+import com.cc.job.xo.model.datax.DataXParams;
 import org.apache.commons.lang3.StringUtils;
-
-import java.util.Map;
 
 
 public class MysqlReader implements BaseRW {

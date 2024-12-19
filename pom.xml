@@ -18,6 +18,7 @@
         <module>cc-job-admin</module>
         <module>cc-job-executor-samples</module>
         <module>cc-async-tool</module>
+        <module>cc-job-xo</module>
     </modules>
 
     <properties>
@@ -26,17 +27,14 @@
         <hutool.version>5.8.27</hutool.version>
         <mysql.version>8.0.28</mysql.version>
         <druid.version>1.2.23</druid.version>
-        <mybatis-plus.version>3.5.5</mybatis-plus.version>
+        <mybatis-plus.version>3.5.3</mybatis-plus.version>
         <knife4j.version>4.5.0</knife4j.version>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
         <easyexcel.version>3.2.1</easyexcel.version>
 
-        <!-- 对象存储 -->
-        <minio.version>8.5.10</minio.version>
         <okhttp3.version>4.8.1</okhttp3.version>
 
-        <aliyun-sdk-oss.version>3.16.3</aliyun-sdk-oss.version>
 
         <!-- redisson 分布式锁 -->
         <redisson.version>3.30.0</redisson.version>
@@ -64,7 +62,6 @@
             <spring.version>5.3.34</spring.version>
             <spring-boot.version>2.7.18</spring-boot.version>
 
-            <mybatis-spring-boot-starter.version>2.3.2</mybatis-spring-boot-starter.version>
             <mysql-connector-j.version>8.3.0</mysql-connector-j.version>
 
             <slf4j-api.version>2.0.13</slf4j-api.version>

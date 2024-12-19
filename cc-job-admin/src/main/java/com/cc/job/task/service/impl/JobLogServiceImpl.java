@@ -2,7 +2,7 @@ package com.cc.job.task.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.cc.job.task.model.entity.JobInfo;
+import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.task.scheduler.XxlJobScheduler;
 import com.cc.job.task.service.JobInfoService;
 import com.cc.job.task.utils.DateUtils;
@@ -16,11 +16,11 @@ import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.cc.job.task.mapper.JobLogMapper;
+import com.cc.job.xo.mapper.JobLogMapper;
 import com.cc.job.task.service.JobLogService;
-import com.cc.job.task.model.entity.JobLog;
-import com.cc.job.task.model.query.JobLogQuery;
-import com.cc.job.task.model.vo.JobLogVO;
+import com.cc.job.xo.model.entity.JobLog;
+import com.cc.job.xo.model.query.JobLogQuery;
+import com.cc.job.xo.model.vo.JobLogVO;
 import com.cc.job.task.converter.TaskLogConverter;
 
 import java.time.ZoneOffset;

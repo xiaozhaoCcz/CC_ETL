@@ -6,7 +6,7 @@ import com.cc.job.task.datax.reader.OracleReader;
 import com.cc.job.task.datax.writer.MysqlWriter;
 import com.cc.job.task.datax.writer.OracleWriter;
 import com.cc.job.task.enums.DatasourceEnum;
-import com.cc.job.task.model.datax.DataXParams;
+import com.cc.job.xo.model.datax.DataXParams;
 import com.cc.job.task.service.DataxService;
 import org.springframework.stereotype.Service;
 

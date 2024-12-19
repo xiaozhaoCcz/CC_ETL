@@ -5,7 +5,7 @@ import com.cc.job.task.config.XxlJobAdminConfig;
 import com.cc.job.task.enums.MisfireStrategyEnum;
 import com.cc.job.task.enums.ScheduleTypeEnum;
 import com.cc.job.task.enums.TriggerTypeEnum;
-import com.cc.job.task.model.entity.JobInfo;
+import com.cc.job.xo.model.entity.JobInfo;
 import org.redisson.executor.CronExpression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
