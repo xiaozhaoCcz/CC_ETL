@@ -101,27 +101,6 @@
             </el-form-item>
           </el-tooltip>
 
-          <!-- 验证码 -->
-<!--          <el-form-item prop="captchaCode">-->
-<!--            <div class="input-wrapper">-->
-<!--              <svg-icon icon-class="captcha" class="mx-2" />-->
-<!--              <el-input-->
-<!--                v-model="loginData.captchaCode"-->
-<!--                auto-complete="off"-->
-<!--                size="large"-->
-<!--                class="flex-1"-->
-<!--                :placeholder="$t('login.captchaCode')"-->
-<!--                @keyup.enter="handleLoginSubmit"-->
-<!--              />-->
-
-<!--              <el-image-->
-<!--                :src="captchaBase64"-->
-<!--                class="captcha-img"-->
-<!--                @click="getCaptcha"-->
-<!--              />-->
-<!--            </div>-->
-<!--          </el-form-item>-->
-
           <div class="flex-x-between w-full py-1">
             <el-checkbox>
               {{ $t("login.rememberMe") }}
@@ -198,7 +177,6 @@ const loading = ref(false); // 按钮 loading 状态
 const isCapslock = ref(false); // 是否大写锁定
 const captchaBase64 = ref(); // 验证码图片Base64字符串
 
-const logo = ref(new URL("../../assets/logo.png", import.meta.url).href);
 const loginImage = ref(
   new URL("../../assets/images/login-image.svg", import.meta.url).href
 );
@@ -241,14 +219,6 @@ const loginRules = computed(() => {
   };
 });
 
-// 获取验证码
-function getCaptcha() {
-  AuthAPI.getCaptcha().then((data) => {
-    loginData.value.captchaKey = data.captchaKey;
-    captchaBase64.value = data.captchaBase64;
-  });
-}
-
 // 登录
 async function handleLoginSubmit() {
   loginFormRef.value?.validate((valid: boolean) => {
@@ -257,18 +227,16 @@ async function handleLoginSubmit() {
       userStore
         .login(loginData.value)
         .then(async () => {
-          userStore.userInfo = {userId:1,username:"admin"};
+          userStore.userInfo = { userId: 1, username: "admin" };
           //await userStore.getUserInfo();
           // 需要在路由跳转前加载字典数据，否则会出现字典数据未加载完成导致页面渲染异常
           //await dictStore.loadDictionaries();
           // 跳转到登录前的页面
           const { path, queryParams } = parseRedirect();
-          console.log(path,queryParams)
+          console.log(path, queryParams);
           router.push({ path: path, query: queryParams });
         })
-        .catch(() => {
-          getCaptcha();
-        })
+        .catch(() => {})
         .finally(() => {
           loading.value = false;
         });

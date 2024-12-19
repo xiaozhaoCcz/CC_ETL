@@ -27,14 +27,6 @@ const AuthAPI = {
       method: "delete",
     });
   },
-
-  /** 获取验证码 接口*/
-  getCaptcha() {
-    return request<any, CaptchaResult>({
-      url: `${AUTH_BASE_URL}/captcha`,
-      method: "get",
-    });
-  },
 };
 
 export default AuthAPI;
@@ -63,10 +55,3 @@ export interface LoginResult {
   tokenType?: string;
 }
 
-/** 验证码响应 */
-export interface CaptchaResult {
-  /** 验证码缓存key */
-  captchaKey: string;
-  /** 验证码图片Base64字符串 */
-  captchaBase64: string;
-}
