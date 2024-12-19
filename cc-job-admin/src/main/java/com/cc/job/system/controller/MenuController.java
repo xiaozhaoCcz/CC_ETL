@@ -1,14 +1,9 @@
 package com.cc.job.system.controller;
 
-import com.cc.job.system.model.form.MenuForm;
-import com.cc.job.system.model.query.MenuQuery;
-import com.cc.job.system.model.vo.MenuVO;
 import com.cc.job.system.model.vo.RouteVO;
 import com.cc.job.common.result.Result;
-import com.cc.job.common.model.Option;
 import com.cc.job.system.service.MenuService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

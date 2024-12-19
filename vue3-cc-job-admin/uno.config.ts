@@ -1,4 +1,4 @@
-// uno.config.ts
+// uno
 import {
   defineConfig,
   presetAttributify,

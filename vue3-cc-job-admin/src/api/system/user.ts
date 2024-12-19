@@ -68,40 +68,7 @@ const UserAPI = {
     });
   },
 
-  /**
-   * 修改用户密码
-   *
-   * @param id 用户ID
-   * @param password 新密码
-   */
-  resetPassword(id: number, password: string) {
-    return request({
-      url: `${USER_BASE_URL}/${id}/password/reset`,
-      method: "put",
-      params: { password: password },
-    });
-  },
 
-  /**
-   * 批量删除用户，多个以英文逗号(,)分割
-   *
-   * @param ids 用户ID字符串，多个以英文逗号(,)分割
-   */
-  deleteByIds(ids: string) {
-    return request({
-      url: `${USER_BASE_URL}/${ids}`,
-      method: "delete",
-    });
-  },
-
-  /** 下载用户导入模板 */
-  downloadTemplate() {
-    return request({
-      url: `${USER_BASE_URL}/template`,
-      method: "get",
-      responseType: "arraybuffer",
-    });
-  },
 
   /**
    * 导出用户
@@ -163,19 +130,7 @@ const UserAPI = {
     });
   },
 
-  /**
-   *   发送手机/邮箱验证码
-   *
-   * @param contact 联系方式  手机号/邮箱
-   * @param contactType 联系方式类型 MOBILE:手机;EMAIL:邮箱
-   */
-  sendVerificationCode(contact: string, contactType: string) {
-    return request({
-      url: `${USER_BASE_URL}/send-verification-code`,
-      method: "get",
-      params: { contact: contact, contactType: contactType },
-    });
-  },
+
 
   /** 绑定个人中心用户手机 */
   bindMobile(data: MobileBindingForm) {
@@ -195,15 +150,6 @@ const UserAPI = {
     });
   },
 
-  /**
-   *  获取用户下拉列表
-   */
-  getOptions() {
-    return request<any, OptionType[]>({
-      url: `${USER_BASE_URL}/options`,
-      method: "get",
-    });
-  },
 };
 
 export default UserAPI;

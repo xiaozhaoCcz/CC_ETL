@@ -15,20 +15,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.cc.job.system.mapper.MenuMapper;
 import com.cc.job.system.model.bo.RouteBO;
 import com.cc.job.system.model.entity.Menu;
-import com.cc.job.system.model.form.MenuForm;
-import com.cc.job.system.model.query.MenuQuery;
-import com.cc.job.system.model.vo.MenuVO;
 import com.cc.job.system.enums.MenuTypeEnum;
-import com.cc.job.common.model.KeyValue;
-import com.cc.job.common.model.Option;
 import com.cc.job.system.service.MenuService;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * 菜单业务实现类
