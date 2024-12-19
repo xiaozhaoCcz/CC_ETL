@@ -144,10 +144,6 @@
     </el-row>
 
     <el-row :gutter="10" class="mt-5">
-      <el-col :xs="24" :span="16">
-        <!-- 访问趋势统计图 -->
-        <VisitTrend id="VisitTrend" width="100%" height="400px" />
-      </el-col>
       <el-col :xs="24" :span="8">
         <el-card>
           <template #header>
@@ -174,13 +170,10 @@ defineOptions({
   inheritAttrs: false,
 });
 
-import VisitTrend from "./components/VisitTrend.vue";
 
-import WebSocketManager from "@/utils/websocket";
 import router from "@/router";
 
 import { useUserStore } from "@/store/modules/user";
-import StatsAPI, { VisitStatsVO } from "@/api/system/log";
 
 const userStore = useUserStore();
 const date: Date = new Date();
@@ -237,29 +230,7 @@ interface VisitStats {
   todayCount: number;
   totalCount: number;
 }
-// 加载访问统计数据
-const loadVisitStatsData = async () => {
-  const list: VisitStatsVO[] = await StatsAPI.getVisitStats();
 
-  if (list) {
-    const tagTypes: ("primary" | "success" | "warning")[] = [
-      "primary",
-      "success",
-      "warning",
-    ];
-    const transformedList: VisitStats[] = list.map((item, index) => ({
-      title: item.title,
-      icon: getVisitStatsIcon(item.type),
-      tagType: tagTypes[index % tagTypes.length],
-      growthRate: item.growthRate,
-      granularity: "日",
-      todayCount: item.todayCount,
-      totalCount: item.totalCount,
-    }));
-    visitStatsList.value = transformedList;
-    visitStatsLoading.value = false;
-  }
-};
 
 /** 格式化增长率 */
 const formatGrowthRate = (growthRate: number): string => {
@@ -303,16 +274,6 @@ function viewMoreNotice() {
   router.push({ path: "/myNotice" });
 }
 
-
-
-onMounted(() => {
-  loadVisitStatsData();
-
-  WebSocketManager.subscribeToTopic("/topic/onlineUserCount", (data) => {
-    console.log("收到在线用户数量：", data);
-    onlineUserCount.value = JSON.parse(data);
-  });
-});
 </script>
 
 <style lang="scss" scoped>

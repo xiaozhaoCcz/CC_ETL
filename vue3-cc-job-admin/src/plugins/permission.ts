@@ -28,12 +28,12 @@ export function setupPermission() {
             // 路由未匹配，跳转到404
             next("/404");
           } else {
-            // 动态设置页面标题
-            // const title =
-            //   (to.params.title as string) || (to.query.title as string);
-            // if (title) {
-            //   to.meta.title = title;
-            // }
+            //动态设置页面标题
+            const title =
+              (to.params.title as string) || (to.query.title as string);
+            if (title) {
+              to.meta.title = title;
+            }
             next();
           }
         } else {
@@ -45,7 +45,7 @@ export function setupPermission() {
               router.addRoute(route)
             );
             next({ ...to, replace: true }); // 添加动态路由后重新导航
-            //next();
+
           } catch (error) {
             console.error(error);
             // 路由加载失败，重置 token 并重定向到登录页

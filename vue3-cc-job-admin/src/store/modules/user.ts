@@ -1,6 +1,5 @@
 import { store } from "@/store";
 import { usePermissionStoreHook } from "@/store/modules/permission";
-import { useDictStoreHook } from "@/store/modules/dict";
 
 import AuthAPI, { type LoginData } from "@/api/auth";
 import UserAPI, { type UserInfo } from "@/api/system/user";
@@ -77,7 +76,7 @@ export const useUserStore = defineStore("user", () => {
     return new Promise<void>((resolve) => {
       clearToken();
       usePermissionStoreHook().resetRouter();
-      useDictStoreHook().clearDictionaryCache();
+      //useDictStoreHook().clearDictionaryCache();
       resolve();
     });
   }

@@ -12,8 +12,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * @since 0.0.1
  */
 @SpringBootApplication
-//@ConfigurationPropertiesScan
-//@EnableScheduling
 public class CcJobApplication {
 
     public static void main(String[] args) {

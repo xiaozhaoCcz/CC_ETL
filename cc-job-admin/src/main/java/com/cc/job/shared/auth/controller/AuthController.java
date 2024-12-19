@@ -1,11 +1,9 @@
 package com.cc.job.shared.auth.controller;
 
-import com.cc.job.system.model.dto.CaptchaResult;
-import com.cc.job.system.model.dto.LoginResult;
-import com.cc.job.common.enums.LogModuleEnum;
+
 import com.cc.job.common.result.Result;
 import com.cc.job.shared.auth.service.AuthService;
-import com.cc.job.common.annotation.Log;
+import com.cc.job.system.model.dto.LoginResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,8 +28,7 @@ public class AuthController {
 
     @Operation(summary = "登录")
     @PostMapping("/login")
-    @Log(value = "登录", module = LogModuleEnum.LOGIN)
-    public Result<LoginResult> login(
+    public Result<Object> login(
             @Parameter(description = "用户名", example = "admin") @RequestParam String username,
             @Parameter(description = "密码", example = "123456") @RequestParam String password
     ) {
@@ -41,16 +38,9 @@ public class AuthController {
 
     @Operation(summary = "注销")
     @DeleteMapping("/logout")
-    @Log(value = "注销", module = LogModuleEnum.LOGIN)
     public Result<?> logout() {
         authService.logout();
         return Result.success();
     }
 
-    @Operation(summary = "获取验证码")
-    @GetMapping("/captcha")
-    public Result<CaptchaResult> getCaptcha() {
-        CaptchaResult captcha = authService.getCaptcha();
-        return Result.success(captcha);
-    }
 }

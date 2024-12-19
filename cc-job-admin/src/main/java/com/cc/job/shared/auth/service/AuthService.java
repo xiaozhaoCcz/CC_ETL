@@ -1,6 +1,6 @@
 package com.cc.job.shared.auth.service;
 
-import com.cc.job.system.model.dto.CaptchaResult;
+
 import com.cc.job.system.model.dto.LoginResult;
 
 /**
@@ -25,10 +25,4 @@ public interface AuthService {
      */
     void logout();
 
-    /**
-     * 获取验证码
-     *
-     * @return 验证码
-     */
-    CaptchaResult getCaptcha();
 }

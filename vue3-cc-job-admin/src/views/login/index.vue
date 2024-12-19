@@ -184,11 +184,10 @@ import type { FormInstance } from "element-plus";
 import defaultSettings from "@/settings";
 import { ThemeEnum } from "@/enums/ThemeEnum";
 
-import { useSettingsStore, useUserStore, useDictStore } from "@/store";
+import { useSettingsStore, useUserStore } from "@/store";
 
 const userStore = useUserStore();
 const settingsStore = useSettingsStore();
-const dictStore = useDictStore();
 
 const route = useRoute();
 const { t } = useI18n();
