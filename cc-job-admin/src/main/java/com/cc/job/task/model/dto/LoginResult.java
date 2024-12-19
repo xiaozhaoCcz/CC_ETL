@@ -1,4 +1,4 @@
-package com.cc.job.system.model.dto;
+package com.cc.job.task.model.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;

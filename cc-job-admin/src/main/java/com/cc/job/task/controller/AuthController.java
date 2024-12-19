@@ -1,9 +1,8 @@
-package com.cc.job.shared.auth.controller;
+package com.cc.job.task.controller;
 
 
 import com.cc.job.common.result.Result;
-import com.cc.job.shared.auth.service.AuthService;
-import com.cc.job.system.model.dto.LoginResult;
+import com.cc.job.task.model.dto.LoginResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,23 +23,22 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 public class AuthController {
 
-    private final AuthService authService;
-
     @Operation(summary = "登录")
     @PostMapping("/login")
-    public Result<Object> login(
+    public Result<LoginResult> login(
             @Parameter(description = "用户名", example = "admin") @RequestParam String username,
             @Parameter(description = "密码", example = "123456") @RequestParam String password
     ) {
-        LoginResult loginResult = authService.login(username, password);
-        return Result.success(loginResult);
+
+        return Result.success(LoginResult.builder()
+                .tokenType("Bearer")
+                .accessToken("default_token")
+                .build());
     }
 
     @Operation(summary = "注销")
     @DeleteMapping("/logout")
     public Result<?> logout() {
-        authService.logout();
         return Result.success();
     }
-
 }

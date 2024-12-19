@@ -56,12 +56,6 @@ export const constantRoutes: RouteRecordRaw[] = [
         component: () => import("@/views/error/404.vue"),
         meta: { hidden: true },
       },
-      {
-        path: "profile",
-        name: "Profile",
-        component: () => import("@/views/profile/index.vue"),
-        meta: { title: "个人中心", icon: "user", hidden: true },
-      }
     ],
   },
   {
@@ -86,6 +80,17 @@ export const constantRoutes: RouteRecordRaw[] = [
         },
       },
       {
+        path: "task-group",
+        component: () => import("@/views/task/task-group/index.vue"),
+        // 用于 keep-alive 功能，需要与 SFC 中自动推导或显式声明的组件名称一致
+        // 参考文档: https://cn.vuejs.org/guide/built-ins/keep-alive.html#include-exclude
+        name: "taskGroup",
+        meta: {
+          title: "执行器管理",
+          icon: "homepage",
+        },
+      },
+      {
         path: "job-jdbc-datasource",
         component: () => import("@/views/task/job-jdbc-datasource/index.vue"),
         // 用于 keep-alive 功能，需要与 SFC 中自动推导或显式声明的组件名称一致
@@ -96,8 +101,42 @@ export const constantRoutes: RouteRecordRaw[] = [
           icon: "homepage",
         },
       },
-    ]
-  }
+
+      {
+        path: "job-datax",
+        component: () => import("@/views/task/job-datax/index.vue"),
+        // 用于 keep-alive 功能，需要与 SFC 中自动推导或显式声明的组件名称一致
+        // 参考文档: https://cn.vuejs.org/guide/built-ins/keep-alive.html#include-exclude
+        name: "jobDatax",
+        meta: {
+          title: "数据源同步",
+          icon: "homepage",
+        },
+      },
+      {
+        path: "task-rank",
+        component: () => import("@/views/task/task-rank/index.vue"),
+        // 用于 keep-alive 功能，需要与 SFC 中自动推导或显式声明的组件名称一致
+        // 参考文档: https://cn.vuejs.org/guide/built-ins/keep-alive.html#include-exclude
+        name: "taskRank",
+        meta: {
+          title: "任务编排",
+          icon: "homepage",
+        },
+      },
+      {
+        path: "task-log",
+        component: () => import("@/views/task/task-log/index.vue"),
+        // 用于 keep-alive 功能，需要与 SFC 中自动推导或显式声明的组件名称一致
+        // 参考文档: https://cn.vuejs.org/guide/built-ins/keep-alive.html#include-exclude
+        name: "taskLog",
+        meta: {
+          title: "任务日志",
+          icon: "homepage",
+        },
+      },
+    ],
+  },
 ];
 
 /**
