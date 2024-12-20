@@ -227,7 +227,7 @@ async function handleLoginSubmit() {
       userStore
         .login(loginData.value)
         .then(async () => {
-          userStore.userInfo = { userId: 1, username: "admin" };
+          userStore.userInfo = { userId: 1, username: "admin",nickname:"admin",avatar:"https://foruda.gitee.com/avatar/1677084428450863653/7573881_xzjsccz_1604058944.png!avatar200" };
           //await userStore.getUserInfo();
           // 需要在路由跳转前加载字典数据，否则会出现字典数据未加载完成导致页面渲染异常
           //await dictStore.loadDictionaries();

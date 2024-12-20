@@ -65,7 +65,7 @@ export const constantRoutes: RouteRecordRaw[] = [
     redirect: "/task-info",
     meta: {
       title: "任务管理",
-      icon: "homepage",
+      icon: "system",
     },
     children: [
       {
@@ -76,7 +76,7 @@ export const constantRoutes: RouteRecordRaw[] = [
         name: "taskInfo",
         meta: {
           title: "任务管理",
-          icon: "homepage",
+          icon: "menu",
         },
       },
       {
@@ -87,7 +87,7 @@ export const constantRoutes: RouteRecordRaw[] = [
         name: "taskGroup",
         meta: {
           title: "执行器管理",
-          icon: "homepage",
+          icon: "fullscreen",
         },
       },
       {
@@ -98,7 +98,7 @@ export const constantRoutes: RouteRecordRaw[] = [
         name: "jobJdbcDatasource",
         meta: {
           title: "数据源管理",
-          icon: "homepage",
+          icon: "menu",
         },
       },
 
@@ -110,7 +110,7 @@ export const constantRoutes: RouteRecordRaw[] = [
         name: "jobDatax",
         meta: {
           title: "数据源同步",
-          icon: "homepage",
+          icon: "close_other",
         },
       },
       {
@@ -121,7 +121,7 @@ export const constantRoutes: RouteRecordRaw[] = [
         name: "taskRank",
         meta: {
           title: "任务编排",
-          icon: "homepage",
+          icon: "cascader",
         },
       },
       {
@@ -132,7 +132,7 @@ export const constantRoutes: RouteRecordRaw[] = [
         name: "taskLog",
         meta: {
           title: "任务日志",
-          icon: "homepage",
+          icon: "document",
         },
       },
     ],

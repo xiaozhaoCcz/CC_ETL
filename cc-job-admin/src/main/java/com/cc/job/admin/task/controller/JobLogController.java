@@ -31,7 +31,6 @@ public class JobLogController {
 
     @Operation(summary = "task_log分页列表")
     @GetMapping("/page")
-    //@PreAuthorize("@ss.hasPerm('task:taskLog:query')")
     public PageResult<JobLogVO> getTaskLogPage(JobLogQuery queryParams ) {
         IPage<JobLogVO> result = taskLogService.getTaskLogPage(queryParams);
         return PageResult.success(result);
@@ -39,7 +38,6 @@ public class JobLogController {
 
     @Operation(summary = "删除task_log")
     @DeleteMapping
-    //@PreAuthorize("@ss.hasPerm('task:taskLog:delete')")
     public Result<Void> deleteTaskLogs(
             JobLogQuery queryParams
     ) {
