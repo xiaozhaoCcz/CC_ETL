@@ -568,6 +568,7 @@ function submitForm() {
   }
   if (props.formData.glueType == "DATAX") {
     props.formData.executorHandler = "runDataxHandler";
+    props.formData.executorParam = JSON.stringify(jsonData.value);
   }
   if (props.formData.glueType == "API") {
     props.formData.executorHandler = "runApiHandler";

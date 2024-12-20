@@ -13,7 +13,6 @@
     <modules>
         <module>cc-job-executor-sample-frameless</module>
         <module>cc-job-executor-sample-springboot</module>
-        <module>cc-job-executor-sample-springboot2</module>
     </modules>
 
     <properties>

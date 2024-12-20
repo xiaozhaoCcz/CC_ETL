@@ -314,7 +314,7 @@ function changeCron(cron: string) {
 function submitForm() {
   const id = props.formData.id;
   props.formData.glueType = "BEAN";
-  props.formData.executorHandler = "runTaskRankXxlJob";
+  props.formData.executorHandler = "runJobGroupXxlJob";
   if (id) {
     TaskInfoAPI.updateTaskSet(id, props.formData)
       .then(() => {

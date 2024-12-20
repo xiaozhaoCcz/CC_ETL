@@ -8,6 +8,7 @@ import com.cc.job.xo.model.entity.JobInfo;
 import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.handler.annotation.XxlJob;
 import lombok.AllArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
@@ -15,10 +16,10 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-@AllArgsConstructor
 public class ApiHandler {
 
-    final JobInfoMapper jobInfoMapper;
+    @Autowired
+    JobInfoMapper jobInfoMapper;
 
     @XxlJob("runApiHandler")
     public void  runApiHandler(){

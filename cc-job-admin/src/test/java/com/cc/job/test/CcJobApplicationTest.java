@@ -2,7 +2,7 @@ package com.cc.job.test;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.cc.job.CcJobApplication;
+import com.cc.job.admin.CcJobApplication;
 import com.cc.job.xo.mapper.JobEdgeMapper;
 import com.cc.job.xo.mapper.JobInfoMapper;
 import com.cc.job.xo.mapper.JobNodeMapper;
