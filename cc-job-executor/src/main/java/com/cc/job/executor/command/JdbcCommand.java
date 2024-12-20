@@ -1,4 +1,4 @@
-package com.cc.job.task.command;
+package com.cc.job.executor.command;
 
 import com.cc.job.xo.common.exception.BusinessException;
 import org.slf4j.Logger;

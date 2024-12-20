@@ -19,6 +19,7 @@
         <module>cc-job-executor-samples</module>
         <module>cc-async-tool</module>
         <module>cc-job-xo</module>
+        <module>cc-job-executor</module>
     </modules>
 
     <properties>

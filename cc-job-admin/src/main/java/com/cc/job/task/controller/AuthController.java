@@ -1,7 +1,7 @@
 package com.cc.job.task.controller;
 
 
-import com.cc.job.common.result.Result;
+import com.cc.job.xo.common.result.Result;
 import com.cc.job.xo.model.dto.LoginResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

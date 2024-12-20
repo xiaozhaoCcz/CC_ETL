@@ -1,8 +1,8 @@
 package com.cc.job.task.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.cc.job.common.result.PageResult;
-import com.cc.job.common.result.Result;
+import com.cc.job.xo.common.result.PageResult;
+import com.cc.job.xo.common.result.Result;
 import com.cc.job.xo.model.entity.JobJdbcDatasource;
 import com.cc.job.xo.model.form.JobJdbcDatasourceForm;
 import com.cc.job.xo.model.query.JobJdbcDatasourceQuery;

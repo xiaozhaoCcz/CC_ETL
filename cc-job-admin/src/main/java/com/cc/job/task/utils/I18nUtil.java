@@ -1,6 +1,6 @@
 package com.cc.job.task.utils;
 
-import com.cc.job.task.config.XxlJobAdminConfig;
+import com.cc.job.config.XxlJobAdminConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ClassPathResource;

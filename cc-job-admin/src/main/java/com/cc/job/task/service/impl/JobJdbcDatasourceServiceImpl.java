@@ -4,7 +4,7 @@ package com.cc.job.task.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.cc.job.common.exception.BusinessException;
+import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.task.command.JdbcCommand;
 import com.cc.job.xo.mapper.JobJdbcDatasourceMapper;
 import com.cc.job.xo.model.entity.JobJdbcDatasource;

@@ -1,6 +1,6 @@
 package com.cc.job.task.controller;
 
-import com.cc.job.common.result.Result;
+import com.cc.job.xo.common.result.Result;
 import com.cc.job.xo.model.datax.DataXParams;
 import com.cc.job.task.service.DataxService;
 import com.cc.job.task.service.JobJdbcDatasourceService;

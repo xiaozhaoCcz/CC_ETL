@@ -2,8 +2,8 @@ package com.cc.job.task.handler;
 
 import cn.hutool.core.lang.Pair;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.cc.job.common.exception.BusinessException;
-import com.cc.job.task.config.XxlJobAdminConfig;
+import com.cc.job.xo.common.exception.BusinessException;
+import com.cc.job.config.XxlJobAdminConfig;
 import com.cc.job.task.enums.TriggerTypeEnum;
 import com.cc.job.xo.mapper.JobInfoMapper;
 import com.cc.job.xo.model.entity.JobEdge;

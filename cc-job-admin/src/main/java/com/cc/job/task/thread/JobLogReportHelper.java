@@ -1,7 +1,7 @@
 package com.cc.job.task.thread;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.cc.job.task.config.XxlJobAdminConfig;
+import com.cc.job.config.XxlJobAdminConfig;
 import com.cc.job.xo.model.entity.JobLogReport;
 import com.cc.job.task.utils.DateUtils;
 import org.slf4j.Logger;

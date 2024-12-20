@@ -1,7 +1,7 @@
 package com.cc.job.task.thread;
 
 
-import com.cc.job.task.config.XxlJobAdminConfig;
+import com.cc.job.config.XxlJobAdminConfig;
 import com.cc.job.task.enums.MisfireStrategyEnum;
 import com.cc.job.task.enums.ScheduleTypeEnum;
 import com.cc.job.task.enums.TriggerTypeEnum;

@@ -1,7 +1,7 @@
 package com.cc.job.task.complete;
 
 
-import com.cc.job.task.config.XxlJobAdminConfig;
+import com.cc.job.config.XxlJobAdminConfig;
 import com.cc.job.task.enums.TriggerTypeEnum;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobLog;

@@ -1,6 +1,6 @@
 package com.cc.job.task.thread;
 
-import com.cc.job.task.config.XxlJobAdminConfig;
+import com.cc.job.config.XxlJobAdminConfig;
 import com.cc.job.task.enums.TriggerTypeEnum;
 import com.cc.job.task.trigger.XxlJobTrigger;
 import org.slf4j.Logger;

@@ -1,6 +1,6 @@
 package com.cc.job.task.trigger;
 
-import com.cc.job.task.config.XxlJobAdminConfig;
+import com.cc.job.config.XxlJobAdminConfig;
 import com.cc.job.task.enums.ExecutorRouteStrategyEnum;
 import com.cc.job.task.enums.TriggerTypeEnum;
 import com.cc.job.xo.model.entity.JobGroup;
@@ -12,7 +12,6 @@ import com.xxl.job.core.biz.ExecutorBiz;
 import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.biz.model.TriggerParam;
 import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
-import com.xxl.job.core.glue.GlueTypeEnum;
 import com.xxl.job.core.util.IpUtil;
 import com.xxl.job.core.util.ThrowableUtil;
 import org.slf4j.Logger;
@@ -218,14 +217,7 @@ public class XxlJobTrigger {
     public static ReturnT<String> runExecutor(TriggerParam triggerParam, String address){
         ReturnT<String> runResult = null;
         try {
-            ExecutorBiz executorBiz = null;
-            // 新增api调度任务
-            GlueTypeEnum glueTypeEnum = GlueTypeEnum.match(triggerParam.getGlueType());
-            if(GlueTypeEnum.API==glueTypeEnum){
-                executorBiz = XxlJobScheduler.getExecutorBiz();
-            }else {
-                executorBiz = XxlJobScheduler.getExecutorBiz(address);
-            }
+            ExecutorBiz executorBiz = XxlJobScheduler.getExecutorBiz(address);
             runResult = executorBiz.run(triggerParam);
         } catch (Exception e) {
             logger.error(">>>>>>>>>>> xxl-job trigger error, please check if the executor[{}] is running.", address, e);

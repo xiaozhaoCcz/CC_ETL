@@ -1,7 +1,7 @@
 package com.cc.job.task.controller;
 
 
-import com.cc.job.common.result.Result;
+import com.cc.job.xo.common.result.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

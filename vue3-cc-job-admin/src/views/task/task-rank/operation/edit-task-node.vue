@@ -81,10 +81,7 @@
             <el-option key="POST" label="POST" value="POST" />
           </el-select>
         </el-form-item>
-        <el-form-item
-          label="数据库"
-          v-if="formData.glueType == 'SQL'"
-        >
+        <el-form-item label="数据库" v-if="formData.glueType == 'SQL'">
           <el-select
             v-model="formData.jdbcDatasourceId"
             filterable
@@ -359,6 +356,10 @@ function confirmClick() {
   if (formData.glueType == "SQL") {
     formData.executorHandler = "runJobJdbcXxlJob";
   }
+  if (formData.glueType == "API") {
+    formData.executorHandler = "runApiHandler";
+  }
+
   formData.misfireStrategy = "DO_NOTHING";
   formData.scheduleType = "NONE";
   TaskInfoAPI.update(props.nodeTaskId, formData)

@@ -569,7 +569,9 @@ function submitForm() {
   if (props.formData.glueType == "DATAX") {
     props.formData.executorHandler = "runDataxHandler";
   }
-
+  if (props.formData.glueType == "API") {
+    props.formData.executorHandler = "runApiHandler";
+  }
   const id = props.formData.id;
   if (id) {
     if (props.taskInfoVisible.isCopy) {
