@@ -228,11 +228,11 @@
               >
                 <el-option
                   label="YYYY/MM/DD hh:mm:ss"
-                  value="YYYY/MM/DD hh:mm:ss"
+                  value="yyyy/MM/dd hh:mm:ss"
                 />
                 <el-option
                   label="YYYY-MM-DD hh:mm:ss"
-                  value="YYYY-MM-DD hh:mm:ss"
+                  value="yyyy-MM-dd hh:mm:ss"
                 />
                 <el-option label="timestamp" value="timestamp" />
               </el-select>
@@ -322,7 +322,7 @@ watch(
   () => props.preFormData,
   (val) => {
     formData.value = val;
-    console.log(val)
+    console.log(val);
   },
   { immediate: true, deep: true }
 );
@@ -489,7 +489,7 @@ onMounted(() => {
 
 .info_form {
   width: 50%;
-  margin:0 auto;
+  margin: 0 auto;
 
   .child_form {
     width: 100%;

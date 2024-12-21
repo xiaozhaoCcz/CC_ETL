@@ -367,11 +367,11 @@
                 >
                   <el-option
                     label="YYYY/MM/DD hh:mm:ss"
-                    value="YYYY/MM/DD hh:mm:ss"
+                    value="yyyy/MM/dd hh:mm:ss"
                   />
                   <el-option
                     label="YYYY-MM-DD hh:mm:ss"
-                    value="YYYY-MM-DD hh:mm:ss"
+                    value="yyyy-MM-dd hh:mm:ss"
                   />
                   <el-option label="timestamp" value="timestamp" />
                 </el-select>

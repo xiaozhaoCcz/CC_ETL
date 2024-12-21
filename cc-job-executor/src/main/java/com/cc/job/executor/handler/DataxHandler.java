@@ -22,6 +22,7 @@ import org.springframework.stereotype.Component;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.sql.*;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -72,14 +73,16 @@ public class DataxHandler {
             sb.append("\"");
             if(jobInfo.getIncrColumnType()==0){
                 sb.append("-D"+jobInfo.getIncrParam()+"="+jobInfo.getIncrId());
+                sb.append("\"");
+                cmdList.add(sb.toString().replaceAll(" ","\" \""));
             }else{
                 LocalDateTime incrTime = jobInfo.getIncrTime();
                 DateTimeFormatter dateTimeFormatter =DateTimeFormatter.ofPattern(jobInfo.getTimeFormat());
                 String format = incrTime.format(dateTimeFormatter);
-                sb.append("-D"+jobInfo.getIncrParam()+"="+format);
+                sb.append("-D"+jobInfo.getIncrParam()+"='"+format+"'");
+                sb.append("\"");
+                cmdList.add(sb.toString());
             }
-            sb.append("\"");
-            cmdList.add(sb.toString().replaceAll(" ","\" \""));
         }
 
         String[] command = cmdList.toArray(new String[0]);
@@ -170,7 +173,11 @@ public class DataxHandler {
             ps= con.prepareStatement(sql);
             rs = ps.executeQuery();
             if (rs.next()) {
-                jobInfo.setIncrId(rs.getLong(1));
+                long aLong = rs.getLong(1);
+                if(aLong!=0){
+                    jobInfo.setIncrId(aLong);
+                    jobInfoMapper.updateById(jobInfo);
+                }
                 jobInfoMapper.updateById(jobInfo);
             }
         }finally {
@@ -189,8 +196,10 @@ public class DataxHandler {
              rs = ps.executeQuery();
             if (rs.next()) {
                 Timestamp timestamp = rs.getTimestamp(1);
-                jobInfo.setIncrTime(timestamp.toLocalDateTime());
-                jobInfoMapper.updateById(jobInfo);
+                if(timestamp!=null){
+                    jobInfo.setIncrTime(timestamp.toLocalDateTime());
+                    jobInfoMapper.updateById(jobInfo);
+                }
             }
         }finally {
             JdbcCommand.close(ps);
