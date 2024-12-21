@@ -389,6 +389,14 @@
                   <el-option label="时间自增" :value="1" />
                 </el-select>
               </div>
+              <div class="c_cont" v-if="formData.incrColumnType == 1">
+                <span>数据列</span>
+                <el-input
+                  v-model="formData.incrColumnName"
+                  style="width: 210px"
+                  placeholder="Please input"
+                />
+              </div>
               <div class="c_cont" v-if="formData.incrType == 1">
                 <span>默认参数</span>
                 <el-input
@@ -396,9 +404,6 @@
                   style="width: 210px"
                   placeholder="Please input"
                 />
-              </div>
-              <div class="c_cont" v-if="formData.incrColumnType == 1">
-                <span>&nbsp;</span>
               </div>
             </div>
           </div>

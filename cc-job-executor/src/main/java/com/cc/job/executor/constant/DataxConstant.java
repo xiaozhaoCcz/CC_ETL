@@ -23,6 +23,8 @@ public interface DataxConstant {
 
     String CONTENT = "content";
 
+    String READER = "reader";
+
     String WRITER = "writer";
 
     String PARAMETER = "parameter";

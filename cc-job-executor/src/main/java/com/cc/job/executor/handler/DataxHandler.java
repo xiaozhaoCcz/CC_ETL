@@ -24,6 +24,8 @@ import java.sql.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.FutureTask;
 
 @Component
@@ -133,8 +135,20 @@ public class DataxHandler {
     }
 
     private void refreshJobInfo(JobInfo jobInfo) {
-        JobJdbcDatasource jobJdbcDatasource = jobJdbcDatasourceMapper.selectById(jobInfo.getJdbcDatasourceId());
-        String tableName = getTableName(jobInfo.getExecutorParam());
+//        JobJdbcDatasource jobJdbcDatasource = jobJdbcDatasourceMapper.selectById(jobInfo.getJdbcDatasourceId());
+        Map<String, String> conMap = getTableName(jobInfo.getExecutorParam());
+        String jdbcUrl = conMap.get("jdbcUrl");
+        String username = conMap.get("username");
+        String password = conMap.get("password");
+        String tableName = conMap.get("table");
+        String name = conMap.get("name");
+        JobJdbcDatasource jobJdbcDatasource = new JobJdbcDatasource();
+        jobJdbcDatasource.setJdbcUrl(jdbcUrl);
+        jobJdbcDatasource.setJdbcUsername(username);
+        jobJdbcDatasource.setJdbcPassword(password);
+        if("mysqlreader".equalsIgnoreCase(name)){
+            jobJdbcDatasource.setJdbcDriverClass("com.mysql.cj.jdbc.Driver");
+        }
         String incrParam = jobInfo.getIncrParam();
         try (Connection con = getJdbcConnection(jobJdbcDatasource)) {
             if (jobInfo.getIncrColumnType() == 0) {
@@ -158,7 +172,7 @@ public class DataxHandler {
     }
 
     private void updateIncrId(Connection con, String tableName, JobInfo jobInfo) throws Exception {
-        String sql = "SELECT MAX(id) FROM " + tableName + " t";
+        String sql = "SELECT MAX(id) FROM " + tableName + " t" + " WHERE t.id > " + jobInfo.getIncrId();
         PreparedStatement ps=null;
         ResultSet rs =null;
         try {
@@ -170,7 +184,6 @@ public class DataxHandler {
                     jobInfo.setIncrId(aLong);
                     jobInfoMapper.updateById(jobInfo);
                 }
-                jobInfoMapper.updateById(jobInfo);
             }
         }finally {
             JdbcCommand.close(ps);
@@ -179,8 +192,8 @@ public class DataxHandler {
         }
     }
 
-    private void updateIncrTime(Connection con, String tableName, String incrParam, JobInfo jobInfo) throws Exception {
-        String sql = "SELECT MAX(" + incrParam + ") FROM " + tableName + " t";
+    private void updateIncrTime(Connection con, String tableName, String columnName, JobInfo jobInfo) throws Exception {
+        String sql = "SELECT MAX(" + columnName + ") FROM " + tableName + " t" + " WHERE t." + columnName + " > '" + jobInfo.getIncrTime().format(DateTimeFormatter.ofPattern(jobInfo.getTimeFormat())) + "'";
         PreparedStatement ps=null;
         ResultSet rs =null;
         try {
@@ -201,18 +214,32 @@ public class DataxHandler {
     }
 
 
-    private String getTableName(String jsonStr){
+    private Map<String,String> getTableName(String jsonStr){
+        Map<String,String> result =  new HashMap<>();
         JSONObject jsonObject = new JSONObject(jsonStr);
         JSONObject job = jsonObject.getJSONObject(DataxConstant.JOB);
         JSONArray content= job.getJSONArray(DataxConstant.CONTENT);
-        JSONObject writer = ((JSONObject) content.get(0)).getJSONObject(DataxConstant.WRITER);
-        JSONObject parameter = writer.getJSONObject(DataxConstant.PARAMETER);
+        JSONObject reader = ((JSONObject) content.get(0)).getJSONObject(DataxConstant.READER);
+        JSONObject parameter = reader.getJSONObject(DataxConstant.PARAMETER);
         JSONArray connection = parameter.getJSONArray(DataxConstant.CONNECTION);
-
         // 由于只有一个连接，我们取第一个元素
         JSONObject connectionObj = connection.getJSONObject(0);
         JSONArray tables = connectionObj.getJSONArray(DataxConstant.TABLE);
-        // 构建连接参数
-        return tables.getStr(0);
+        JSONArray jdbcUrl = connectionObj.getJSONArray("jdbcUrl");
+        String username = parameter.getStr("username");
+        String password = parameter.getStr("password");
+        String name = reader.getStr("name");
+        // TODO 需要支持querySql
+        if(tables==null || tables.isEmpty()){
+
+        }else{
+
+        }
+        result.put("table",tables.getStr(0));
+        result.put("jdbcUrl",jdbcUrl.getStr(0));
+        result.put("username",username);
+        result.put("password",password);
+        result.put("name",name);
+        return result;
     }
 }

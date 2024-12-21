@@ -196,6 +196,7 @@ export interface TaskInfoForm {
   reqUrl?: string;
   nodes?: string;
   edges?: string;
+  incrType?: number;
 }
 
 /** task_info分页对象 */

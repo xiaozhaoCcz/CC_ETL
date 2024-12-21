@@ -468,6 +468,45 @@ public class CcJobApplicationTest {
         System.out.println("Password: " + password);
 
     }
+
+    @Test
+    public void test7(){
+        String jsonStr = """
+        {"job":{"content":[{"reader":{"name":"mysqlreader","parameter":{"username":"root","password":"root","connection":[{"jdbcUrl":["jdbc:mysql://localhost:3306/test1"],"table":["stu"]}],"column":["id","name","create_time","update_time"],"where":"id > ${tt}"}},"writer":{"name":"mysqlwriter","parameter":{"username":"root","password":"root","connection":[{"jdbcUrl":"jdbc:mysql://localhost:3306/test2","table":["stu"]}],"column":["id","name","create_time","update_time"],"writeMode":"insert"}}}],"setting":{"speed":{"channel":3,"byte":-1},"errorLimit":{"record":0,"percentage":0.02}}}}
+        """;
+        JSONObject jsonObject = new JSONObject(jsonStr);
+        JSONObject job = jsonObject.getJSONObject("job");
+        JSONArray content= job.getJSONArray("content");
+        JSONObject writer = ((JSONObject) content.get(0)).getJSONObject("reader");
+        JSONObject parameter = writer.getJSONObject("parameter");
+        String where = parameter.getStr("where");
+        // 构建连接参数
+//        System.out.println(where.toString());
+
+        String[] split = where.split(" ");
+        int index =0;
+        for (; index < split.length; index++) {
+             if(split[index].equals("${tt}")){
+                 split[index] = "100";
+                 break;
+             }
+        }
+
+        int columIndex = index-2;
+
+        split[columIndex] = "tttttt";
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < split.length; i++) {
+            sb.append(split[i]);
+            if(i!=split.length-1){
+                sb.append(" ");
+            }
+        }
+        parameter.replace("where",sb.toString());
+
+        System.out.println(jsonObject.toString());
+    }
 }
 
 

@@ -115,4 +115,6 @@ public class JobInfoForm implements Serializable {
     private String incrParam;
 
     private Integer incrColumnType;
+
+    private String incrColumnName;
 }

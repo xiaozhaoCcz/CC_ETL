@@ -130,6 +130,7 @@ async function buildJson() {
   fromData.value.timeFormat = readerForm.value.timeFormat;
   fromData.value.incrParam = readerForm.value.incrParam;
   fromData.value.incrColumnType = readerForm.value.incrColumnType;
+  fromData.value.incrColumnName = readerForm.value.incrColumnName;
   fromData.value.jdbcDatasourceId = writerForm.value.datasource.id;
 }
 

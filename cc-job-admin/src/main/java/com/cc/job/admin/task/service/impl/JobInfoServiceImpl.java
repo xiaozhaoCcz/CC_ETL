@@ -258,7 +258,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
             taskInfoTriggerDto.setExecutorParam("");
         }
 
-        if(GlueTypeEnum.DATAX.getDesc().equalsIgnoreCase(taskInfo.getGlueType())){
+        if (GlueTypeEnum.DATAX.getDesc().equalsIgnoreCase(taskInfo.getGlueType())) {
             taskInfoTriggerDto.setExecutorParam(taskInfo.getExecutorParam());
         }
 
@@ -507,7 +507,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         }
         formData.setGlueUpdatetime(LocalDateTime.now());
         JobInfo taskInfo = BeanUtil.copyProperties(formData, JobInfo.class);
-        if(StringUtils.isNotBlank(formData.getIncrTime())){
+        if (StringUtils.isNotBlank(formData.getIncrTime())) {
             taskInfo.setIncrTime(DateUtils.processDate(formData.getIncrTime()));
         }
         taskInfo.setIsNode("N");
@@ -761,7 +761,6 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         }
 
 
-
         String oldParam = existsJobInfo.getIncrParam();
 
         BeanUtil.copyProperties(formData, existsJobInfo);
@@ -769,12 +768,48 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         existsJobInfo.setTriggerNextTime(nextTriggerTime);
         existsJobInfo.setIsNode("N");
 
-        if(GlueTypeEnum.DATAX.getDesc().equalsIgnoreCase(formData.getGlueType())){
-            String replaceVal = existsJobInfo.getExecutorParam().replace("${" + oldParam + "}", "${" + formData.getIncrParam() + "}");
-            existsJobInfo.setExecutorParam(replaceVal);
+        if (GlueTypeEnum.DATAX.getDesc().equalsIgnoreCase(formData.getGlueType())) {
+            if (StringUtils.isBlank(formData.getIncrColumnName())) {
+                formData.setIncrColumnName("id");
+            }
+            String finalJson = finalJson(existsJobInfo.getExecutorParam(), oldParam, formData.getIncrParam(), formData.getIncrColumnName());
+            existsJobInfo.setExecutorParam(finalJson);
         }
 
         return existsJobInfo;
     }
 
+
+    private String finalJson(String jsonStr, String oldParam, String newParam, String columnName) {
+        JSONObject jsonObject = new JSONObject(jsonStr);
+        JSONObject job = jsonObject.getJSONObject("job");
+        JSONArray content = job.getJSONArray("content");
+        JSONObject writer = ((JSONObject) content.get(0)).getJSONObject("reader");
+        JSONObject parameter = writer.getJSONObject("parameter");
+        String where = parameter.getStr("where");
+        if(StringUtils.isBlank(where)){
+            return jsonStr;
+        }
+        String[] split = where.split(" ");
+        int index = 0;
+        for (; index < split.length; index++) {
+            if (split[index].equals("${" + oldParam + "}")) {
+                split[index] = "${" + newParam + "}";
+                break;
+            }
+        }
+
+        int columIndex = index - 2;
+        split[columIndex] = columnName;
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < split.length; i++) {
+            sb.append(split[i]);
+            if (i != split.length - 1) {
+                sb.append(" ");
+            }
+        }
+        parameter.replace("where", sb.toString());
+        return jsonObject.toString();
+    }
 }

@@ -152,8 +152,12 @@
           align="center"
         >
           <template #default="{ row }">
-            <el-tag type="warning" effect="dark" v-if="row.jobType == 2">任务组</el-tag>
-            <el-tag type="primary" effect="dark" v-if="row.jobType == 0">任务</el-tag>
+            <el-tag type="warning" effect="dark" v-if="row.jobType == 2">
+              任务组
+            </el-tag>
+            <el-tag type="primary" effect="dark" v-if="row.jobType == 0">
+              任务
+            </el-tag>
           </template>
         </el-table-column>
 
@@ -219,7 +223,11 @@
                   </el-dropdown-item>
                   <el-dropdown-item
                     divided
-                    v-if="!['BEAN', 'API','DATAX','SQL'].includes(scope.row.glueType)"
+                    v-if="
+                      !['BEAN', 'API', 'DATAX', 'SQL'].includes(
+                        scope.row.glueType
+                      )
+                    "
                     @click="glueClick(scope.row.id)"
                     :disabled="scope.row.triggerStatus == 1"
                   >
@@ -350,7 +358,9 @@ const taskInfoVisible = reactive({
 });
 
 // task_info表单数据
-const formData = reactive<TaskInfoForm>({});
+const formData = reactive<TaskInfoForm>({
+  incrType: 0,
+});
 const executeOneVal = ref(false);
 const taskId = ref(null);
 const nextTriggerTimeVisible = ref(false);
