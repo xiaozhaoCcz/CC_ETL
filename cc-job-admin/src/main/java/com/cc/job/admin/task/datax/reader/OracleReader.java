@@ -26,6 +26,9 @@ public class OracleReader implements BaseRW {
         parameter.append("connection",connection);
         if(dataXParams.getColumns()!=null&&!dataXParams.getColumns().isEmpty()){
             parameter.putOnce("column", dataXParams.getColumns());
+            if(dataXParams.getIncrType()==1) {
+                parameter.putOnce("where", dataXParams.getIncrColumnName() + " > ${" + dataXParams.getIncrParam()+"}");
+            }
         }
         readerConfig.putOnce("parameter", parameter);
         return readerConfig;

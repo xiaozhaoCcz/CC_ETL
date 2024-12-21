@@ -2,8 +2,11 @@ package com.cc.job.admin.task.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
+import cn.hutool.json.JSONArray;
+import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cc.job.admin.task.utils.DateUtils;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.admin.cron.CronExpression;
 import com.cc.job.admin.task.enums.*;
@@ -44,6 +47,8 @@ import com.cc.job.xo.model.vo.JobInfoVO;
 import java.text.MessageFormat;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import cn.hutool.core.lang.Assert;
@@ -502,6 +507,9 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         }
         formData.setGlueUpdatetime(LocalDateTime.now());
         JobInfo taskInfo = BeanUtil.copyProperties(formData, JobInfo.class);
+        if(StringUtils.isNotBlank(formData.getIncrTime())){
+            taskInfo.setIncrTime(DateUtils.processDate(formData.getIncrTime()));
+        }
         taskInfo.setIsNode("N");
         return taskInfo;
     }
@@ -752,10 +760,20 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
             }
         }
 
+
+
+        String oldParam = existsJobInfo.getIncrParam();
+
         BeanUtil.copyProperties(formData, existsJobInfo);
         existsJobInfo.setGlueUpdatetime(LocalDateTime.now());
         existsJobInfo.setTriggerNextTime(nextTriggerTime);
         existsJobInfo.setIsNode("N");
+
+        if(GlueTypeEnum.DATAX.getDesc().equalsIgnoreCase(formData.getGlueType())){
+            String replaceVal = existsJobInfo.getExecutorParam().replace("${" + oldParam + "}", "${" + formData.getIncrParam() + "}");
+            existsJobInfo.setExecutorParam(replaceVal);
+        }
+
         return existsJobInfo;
     }
 

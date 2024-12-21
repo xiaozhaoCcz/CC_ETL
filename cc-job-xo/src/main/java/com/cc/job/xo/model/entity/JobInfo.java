@@ -120,4 +120,16 @@ public class JobInfo extends BaseEntity {
     private Integer rankTriggerStatus;
 
     private Long jdbcDatasourceId;
+
+    private Integer incrType;
+
+    private Long incrId;
+
+    private LocalDateTime incrTime;
+
+    private String timeFormat;
+
+    private String incrParam;
+
+    private Integer incrColumnType;
 }

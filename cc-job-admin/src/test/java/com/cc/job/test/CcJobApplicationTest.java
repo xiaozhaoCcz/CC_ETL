@@ -1,6 +1,8 @@
 package com.cc.job.test;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.json.JSONArray;
+import cn.hutool.json.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.admin.CcJobApplication;
 import com.cc.job.xo.mapper.JobEdgeMapper;
@@ -17,8 +19,13 @@ import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.sql.SQLOutput;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @SpringBootTest(classes = CcJobApplication.class,webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -413,8 +420,52 @@ public class CcJobApplicationTest {
         taskEdgeVos.addAll(copyTaskEdges);
     }
 
+
     @Test
     public void test5(){
+        JobInfo jobInfo = taskInfoMapper.selectById(279);
+        List<String> cmdList = new ArrayList<>();
+        if(jobInfo.getIncrType()==1){
+            StringBuilder sb = new StringBuilder();
+            sb.append(" -p ");
+            if("id".equalsIgnoreCase(jobInfo.getIncrParam())){
+                sb.append("\"-D"+jobInfo.getIncrParam()+"="+jobInfo.getIncrId()+"\"");
+            }else{
+                LocalDateTime incrTime = jobInfo.getIncrTime();
+                DateTimeFormatter dateTimeFormatter =DateTimeFormatter.ofPattern(jobInfo.getTimeFormat());
+                String format = incrTime.format(dateTimeFormatter);
+                sb.append("\"-D"+jobInfo.getIncrParam()+"="+format+"\"");
+            }
+            cmdList.add(sb.toString());
+        }
+
+        System.out.println(cmdList);
+    }
+
+    @Test
+    public void test6(){
+        String jsonStr = """
+        {"job":{"content":[{"reader":{"name":"mysqlreader","parameter":{"username":"root","password":"root","connection":[{"jdbcUrl":["jdbc:mysql://localhost:3306/test1"],"table":["stu"]}],"column":["id","name","create_time","update_time"],"where":"id >= ${tt}"}},"writer":{"name":"mysqlwriter","parameter":{"username":"root","password":"root","connection":[{"jdbcUrl":"jdbc:mysql://localhost:3306/test2","table":["stu"]}],"column":["id","name","create_time","update_time"],"writeMode":"insert"}}}],"setting":{"speed":{"channel":3,"byte":-1},"errorLimit":{"record":0,"percentage":0.02}}}}
+        """;
+
+        JSONObject jsonObject = new JSONObject(jsonStr);
+        JSONObject job = jsonObject.getJSONObject("job");
+        JSONArray  content= job.getJSONArray("content");
+        JSONObject writer = ((JSONObject) content.get(0)).getJSONObject("writer");
+        JSONObject parameter = writer.getJSONObject("parameter");
+        JSONArray connection = parameter.getJSONArray("connection");
+
+        // 由于只有一个连接，我们取第一个元素
+        JSONObject connectionObj = connection.getJSONObject(0);
+        String jdbcUrl = connectionObj.getStr("jdbcUrl");
+        JSONArray tables = connectionObj.getJSONArray("table");
+        String username = parameter.getStr("username");
+        String password = parameter.getStr("password");
+
+        System.out.println("JDBC URL: " + jdbcUrl);
+        System.out.println("Tables: "+tables.getStr(0));
+        System.out.println("Username: " + username);
+        System.out.println("Password: " + password);
 
     }
 }

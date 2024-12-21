@@ -32,4 +32,11 @@ public class DataXParams implements Serializable {
     private String writeMode;
 
     private Integer type;
+
+    private Integer incrType;
+
+    private String incrColumnName;
+
+    private String incrParam;
+
 }

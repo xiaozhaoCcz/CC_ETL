@@ -9,6 +9,9 @@ import org.apache.commons.lang3.StringUtils;
 public class MysqlReader implements BaseRW {
     @Override
     public JSONObject buildJson(DataXParams dataXParams) {
+        if(StringUtils.isBlank(dataXParams.getIncrColumnName())){
+            dataXParams.setIncrColumnName("id");
+        }
         // 生成 MySQL reader 配置
         JSONObject readerConfig = new JSONObject();
         readerConfig.putOnce("name", "mysqlreader");
@@ -28,6 +31,9 @@ public class MysqlReader implements BaseRW {
         parameter.append("connection",connection);
         if(dataXParams.getColumns()!=null&&!dataXParams.getColumns().isEmpty()){
             parameter.putOnce("column", dataXParams.getColumns());
+            if(dataXParams.getIncrType()==1) {
+                parameter.putOnce("where", dataXParams.getIncrColumnName() + " > ${" + dataXParams.getIncrParam()+"}");
+            }
         }
         readerConfig.putOnce("parameter", parameter);
         return readerConfig;

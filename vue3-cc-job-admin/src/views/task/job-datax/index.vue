@@ -80,6 +80,7 @@ function getIpAndPort(url: string) {
 }
 
 async function buildJson() {
+  console.log(readerForm.value);
   const readerDataXParams = {
     columns: readerForm.value.columns,
     sourceType: readerForm.value.datasource.datasource,
@@ -89,8 +90,11 @@ async function buildJson() {
     tableName: readerForm.value.tableName,
     ip: getIpAndPort(readerForm.value.datasource.jdbcUrl).ip,
     port: getIpAndPort(readerForm.value.datasource.jdbcUrl).port,
-    querySql:readerForm.value.querySql,
+    querySql: readerForm.value.querySql,
     type: 0,
+    incrType: readerForm.value.incrType,
+    incrColumnName: readerForm.value.incrColumnName,
+    incrParam: readerForm.value.incrParam,
   };
   const writerDataXParams = {
     columns: writerForm.value.columns,
@@ -120,6 +124,13 @@ async function buildJson() {
   dataList.push(obj);
   finalJson.value = `{"job":{"content":[ ${getContent(dataList)} ],"setting":{"speed":{"channel":3,"byte":-1},"errorLimit":{"record":0,"percentage":0.02} } }}`;
   console.log("finalJson: ", finalJson.value);
+  fromData.value.incrType = readerForm.value.incrType;
+  fromData.value.incrId = readerForm.value.incrId;
+  fromData.value.incrTime = readerForm.value.incrTime;
+  fromData.value.timeFormat = readerForm.value.timeFormat;
+  fromData.value.incrParam = readerForm.value.incrParam;
+  fromData.value.incrColumnType = readerForm.value.incrColumnType;
+  fromData.value.jdbcDatasourceId = writerForm.value.datasource.id;
 }
 
 function getContent(data: any) {

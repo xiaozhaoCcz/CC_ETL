@@ -76,6 +76,68 @@
         />
       </el-checkbox-group>
     </el-form-item>
+    <el-form-item label="增量备份">
+      <el-radio-group v-model="readerForm.incrType">
+        <el-radio :value="0" style="margin-top: 5px">全量</el-radio>
+        <el-radio :value="1" style="margin-top: 5px">增量</el-radio>
+      </el-radio-group>
+    </el-form-item>
+    <el-form-item label="自增序列" v-if="readerForm.incrType == 1">
+      <el-select
+        v-model="readerForm.incrColumnType"
+        filterable
+        style="width: 210px"
+      >
+        <el-option label="主键自增" :value="0" />
+        <el-option label="时间自增" :value="1" />
+      </el-select>
+    </el-form-item>
+    <el-form-item
+      label="时间数据列"
+      v-if="readerForm.incrType == 1 && readerForm.incrColumnType == 1"
+    >
+      <el-input
+        v-model="readerForm.incrColumnName"
+        style="width: 240px"
+        placeholder="Please input"
+      />
+    </el-form-item>
+    <el-form-item label="默认参数" v-if="readerForm.incrType == 1">
+      <el-input
+        v-model="readerForm.incrParam"
+        style="width: 240px"
+        placeholder="Please input"
+      />
+    </el-form-item>
+    <el-form-item label="默认自增数据" v-if="readerForm.incrType == 1">
+      <el-input
+        v-model="readerForm.incrId"
+        style="width: 240px"
+        placeholder="Please input"
+        v-if="readerForm.incrColumnType == 0"
+      />
+      <el-date-picker
+        v-else
+        v-model="readerForm.incrTime"
+        type="datetime"
+        placeholder="Select date and time"
+        value-format="x"
+      />
+    </el-form-item>
+    <el-form-item
+      label="时间格式"
+      v-if="readerForm.incrType == 1 && readerForm.incrColumnType == 1"
+    >
+      <el-select
+        v-model="readerForm.timeFormat"
+        filterable
+        style="width: 210px"
+      >
+        <el-option label="YYYY/MM/DD hh:mm:ss" value="YYYY/MM/DD hh:mm:ss" />
+        <el-option label="YYYY-MM-DD hh:mm:ss" value="YYYY-MM-DD hh:mm:ss" />
+        <el-option label="timestamp" value="timestamp" />
+      </el-select>
+    </el-form-item>
     <el-form-item>
       <el-button type="primary" @click="next">下一步</el-button>
     </el-form-item>
@@ -86,7 +148,10 @@
 import JobJdbcDatasourceAPI from "@/api/task/job-jdbc-datasource";
 import JobDataXAPI from "@/api/task/job-datax";
 
-const readerForm = ref({});
+const readerForm = ref({
+  incrType: 0,
+  incrId: 0,
+});
 const jdbcDatasourceList = ref([]);
 const tableList = ref([]);
 const columnList = ref([]);
@@ -104,7 +169,6 @@ const isIndeterminate = ref(true);
 watch(
   () => readerForm.value.ds,
   (val) => {
-    console.log(111,val);
     fetchJdbcDatasource(val);
   }
 );
@@ -113,20 +177,18 @@ watch(
   () => props.preData,
   async (data) => {
     if (data.jdbcDatasourceId) {
-      console.log("data", data);
       readerForm.value = data;
       await getTables(data.jdbcDatasourceId);
       await getColumns(data.jdbcDatasourceId);
       await fetchJdbcDatasource(data.datasource.datasource);
     }
   },
-  { immediate: true, deep: true }
+  { immediate: true, deep: true, once: true }
 );
 
 watch(
   () => readerForm.value.jdbcDatasourceId,
   (val) => {
-    console.log(1111, val);
     getTables(val);
   }
 );
@@ -134,7 +196,6 @@ watch(
 watch(
   () => readerForm.value.tableName,
   (val) => {
-    console.log(val);
     readerForm.value.querySql = "";
     getColumns(readerForm.value.jdbcDatasourceId);
   }
@@ -146,12 +207,11 @@ function handleCheckAllChange(val: boolean) {
 }
 
 function next() {
-
   if (
     readerForm.value.columns == null ||
     readerForm.value.columns.length <= 0
   ) {
-    if(readerForm.value.querySql.trim()==''){
+    if (readerForm.value.querySql.trim() == "") {
       ElMessage.warning("请选择要同步的数据列");
       return;
     }

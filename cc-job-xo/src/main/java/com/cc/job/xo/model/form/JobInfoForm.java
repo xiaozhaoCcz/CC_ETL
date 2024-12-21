@@ -103,4 +103,16 @@ public class JobInfoForm implements Serializable {
     private String edges;
 
     private Long jdbcDatasourceId;
+
+    private Integer incrType;
+
+    private Long incrId;
+
+    private String incrTime;
+
+    private String timeFormat;
+
+    private String incrParam;
+
+    private Integer incrColumnType;
 }

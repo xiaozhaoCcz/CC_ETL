@@ -330,6 +330,85 @@
           <el-divider style="margin: 8px" />
           <div class="child_main" style="margin-left: 6px">
             <div class="m_left">
+              <div class="c_cont" style="justify-content: left">
+                <span>增量备份</span>
+                <el-radio-group v-model="formData.incrType">
+                  <el-radio :value="0" style="margin-top: 5px">全量</el-radio>
+                  <el-radio :value="1" style="margin-top: 5px">增量</el-radio>
+                </el-radio-group>
+              </div>
+              <div class="c_cont" v-if="formData.incrType == 1">
+                <span>默认自增数据</span>
+                <el-input
+                  v-model="formData.incrId"
+                  style="width: 210px"
+                  placeholder="Please input"
+                  v-if="formData.incrColumnType == 0"
+                />
+                <el-date-picker
+                  v-else
+                  v-model="formData.incrTime"
+                  type="datetime"
+                  placeholder="Select date and time"
+                  style="width: 210px"
+                  value-format="x"
+                />
+              </div>
+
+              <div
+                class="c_cont"
+                v-if="formData.incrType == 1 && formData.incrColumnType == 1"
+              >
+                <span>时间格式</span>
+                <el-select
+                  v-model="formData.timeFormat"
+                  filterable
+                  style="width: 210px"
+                >
+                  <el-option
+                    label="YYYY/MM/DD hh:mm:ss"
+                    value="YYYY/MM/DD hh:mm:ss"
+                  />
+                  <el-option
+                    label="YYYY-MM-DD hh:mm:ss"
+                    value="YYYY-MM-DD hh:mm:ss"
+                  />
+                  <el-option label="timestamp" value="timestamp" />
+                </el-select>
+              </div>
+            </div>
+            <div class="m_right">
+              <div class="c_cont" v-if="formData.incrType == 1">
+                <span>自增序列</span>
+                <el-select
+                  v-model="formData.incrColumnType"
+                  filterable
+                  style="width: 210px"
+                >
+                  <el-option label="主键自增" :value="0" />
+                  <el-option label="时间自增" :value="1" />
+                </el-select>
+              </div>
+              <div class="c_cont" v-if="formData.incrType == 1">
+                <span>默认参数</span>
+                <el-input
+                  v-model="formData.incrParam"
+                  style="width: 210px"
+                  placeholder="Please input"
+                />
+              </div>
+              <div class="c_cont" v-if="formData.incrColumnType == 1">
+                <span>&nbsp;</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="child_form" v-if="formData.glueType == 'DATAX'">
+          <div style="color: #8e8e8e; font-size: 14px">JSON</div>
+          <el-divider style="margin: 8px" />
+          <div class="child_main" style="margin-left: 6px">
+            <div class="m_left">
               <div class="c_cont">
                 <span class="m_title">JSON</span>
                 <json-editor-vue
