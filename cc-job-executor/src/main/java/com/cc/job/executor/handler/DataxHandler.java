@@ -3,6 +3,7 @@ package com.cc.job.executor.handler;
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import com.cc.job.executor.command.JdbcCommand;
+import com.cc.job.executor.constant.DataxConstant;
 import com.cc.job.executor.utils.DataxUtils;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.xo.mapper.JobInfoMapper;
@@ -12,8 +13,6 @@ import com.cc.job.xo.model.entity.JobJdbcDatasource;
 import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.handler.annotation.XxlJob;
 import jakarta.annotation.Resource;
-import lombok.AllArgsConstructor;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,14 +21,9 @@ import org.springframework.stereotype.Component;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.sql.*;
-import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.FutureTask;
 
 @Component
@@ -63,31 +57,29 @@ public class DataxHandler {
 
         String temJsonFile = DataxUtils.generateTemJsonFile(jsonPath, json);
         ArrayList<String> cmdList = new ArrayList<>();
-        cmdList.add("python");
+        cmdList.add(DataxConstant.PYTHON);
         cmdList.add(dataxPy);
         cmdList.add(temJsonFile);
 
         if(jobInfo.getIncrType()==1){
             StringBuilder sb = new StringBuilder();
-            sb.append("-p");
-            sb.append("\"");
+            sb.append(DataxConstant.PARAM);
+            sb.append(DataxConstant.QUOTATION_MARK);
             if(jobInfo.getIncrColumnType()==0){
-                sb.append("-D"+jobInfo.getIncrParam()+"="+jobInfo.getIncrId());
-                sb.append("\"");
-                cmdList.add(sb.toString().replaceAll(" ","\" \""));
+                sb.append(DataxConstant.DASH).append(jobInfo.getIncrParam()).append(DataxConstant.EQUALS).append(jobInfo.getIncrId());
+                sb.append(DataxConstant.QUOTATION_MARK);
+                cmdList.add(sb.toString().replaceAll(DataxConstant.SPACE,DataxConstant.MULTI_QUOTATION_MARK));
             }else{
                 LocalDateTime incrTime = jobInfo.getIncrTime();
                 DateTimeFormatter dateTimeFormatter =DateTimeFormatter.ofPattern(jobInfo.getTimeFormat());
                 String format = incrTime.format(dateTimeFormatter);
-                sb.append("-D"+jobInfo.getIncrParam()+"='"+format+"'");
-                sb.append("\"");
+                sb.append(DataxConstant.DASH).append(jobInfo.getIncrParam()).append(DataxConstant.EQUALS).append(DataxConstant.SINGLE_QUOTE).append(format).append(DataxConstant.SINGLE_QUOTE);
+                sb.append(DataxConstant.QUOTATION_MARK);
                 cmdList.add(sb.toString());
             }
         }
 
         String[] command = cmdList.toArray(new String[0]);
-//        String[] command = {"python", dataxPy, temJsonFile};
-
         ProcessBuilder processBuilder = new ProcessBuilder(command);
 
         try {
@@ -211,15 +203,15 @@ public class DataxHandler {
 
     private String getTableName(String jsonStr){
         JSONObject jsonObject = new JSONObject(jsonStr);
-        JSONObject job = jsonObject.getJSONObject("job");
-        JSONArray content= job.getJSONArray("content");
-        JSONObject writer = ((JSONObject) content.get(0)).getJSONObject("writer");
-        JSONObject parameter = writer.getJSONObject("parameter");
-        JSONArray connection = parameter.getJSONArray("connection");
+        JSONObject job = jsonObject.getJSONObject(DataxConstant.JOB);
+        JSONArray content= job.getJSONArray(DataxConstant.CONTENT);
+        JSONObject writer = ((JSONObject) content.get(0)).getJSONObject(DataxConstant.WRITER);
+        JSONObject parameter = writer.getJSONObject(DataxConstant.PARAMETER);
+        JSONArray connection = parameter.getJSONArray(DataxConstant.CONNECTION);
 
         // 由于只有一个连接，我们取第一个元素
         JSONObject connectionObj = connection.getJSONObject(0);
-        JSONArray tables = connectionObj.getJSONArray("table");
+        JSONArray tables = connectionObj.getJSONArray(DataxConstant.TABLE);
         // 构建连接参数
         return tables.getStr(0);
     }
