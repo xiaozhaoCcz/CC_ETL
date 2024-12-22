@@ -1,24 +1,27 @@
 package com.cc.job.admin.task.datax.writer;
 
 import cn.hutool.json.JSONObject;
+import com.cc.job.admin.task.constant.DataxConstant;
 import com.cc.job.admin.task.datax.BaseRW;
 import com.cc.job.xo.model.datax.DataXParams;
+
+import static com.cc.job.admin.task.constant.DataxConstant.*;
 
 public class MysqlWriter implements BaseRW {
     @Override
     public JSONObject buildJson(DataXParams dataXParams) {
         // 生成 MySQL reader 配置
         JSONObject readerConfig = new JSONObject();
-        readerConfig.putOnce("name", "mysqlwriter");
+        readerConfig.putOnce(DataxConstant.NAME, MYSQL_WRITER);
         JSONObject parameter = new JSONObject();
-        parameter.putOnce("username", dataXParams.getUsername());
-        parameter.putOnce("password", dataXParams.getPassword());
-        parameter.append("connection",new JSONObject()
-                .putOnce("jdbcUrl", "jdbc:mysql://" + dataXParams.getIp() + ":" + dataXParams.getPort()+"/"+dataXParams.getDbName())
-                .append("table", dataXParams.getTableName()));
-        parameter.putOnce("column", dataXParams.getColumns());
-        parameter.putOnce("writeMode", dataXParams.getWriteMode());
-        readerConfig.putOnce("parameter", parameter);
+        parameter.putOnce(USERNAME, dataXParams.getUsername());
+        parameter.putOnce(PASSWORD, dataXParams.getPassword());
+        parameter.append(CONNECTION,new JSONObject()
+                .putOnce(JDBC_URL,  String.format(MYSQL_JDBC_URL,dataXParams.getIp(),dataXParams.getPort(),dataXParams.getDbName()))
+                .append(TABLE, dataXParams.getTableName()));
+        parameter.putOnce(COLUMN, dataXParams.getColumns());
+        parameter.putOnce(WRITE_MODE, dataXParams.getWriteMode());
+        readerConfig.putOnce(PARAMETER, parameter);
         return readerConfig;
     }
 }

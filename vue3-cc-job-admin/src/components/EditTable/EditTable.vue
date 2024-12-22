@@ -75,7 +75,6 @@ watch(
 
 let tableRowEditId = ref(null); // 控制可编辑的每一行
 let tableColumnEditIndex = ref(null); //控制可编辑的每一列
-const seenIds = new Set();
 
 const showUnitInput = (row, column) => {
   //赋值给定义的变量

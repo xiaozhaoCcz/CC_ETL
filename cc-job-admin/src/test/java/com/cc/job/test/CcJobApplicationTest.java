@@ -5,9 +5,11 @@ import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.admin.CcJobApplication;
+import com.cc.job.admin.task.datax.reader.MysqlReader;
 import com.cc.job.xo.mapper.JobEdgeMapper;
 import com.cc.job.xo.mapper.JobInfoMapper;
 import com.cc.job.xo.mapper.JobNodeMapper;
+import com.cc.job.xo.model.datax.DataXParams;
 import com.cc.job.xo.model.entity.JobEdge;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobNode;
@@ -505,6 +507,33 @@ public class CcJobApplicationTest {
         }
         parameter.replace("where",sb.toString());
 
+        System.out.println(jsonObject.toString());
+    }
+
+
+    //TODO 数据库中还需要一个字段用来存储增量同步的内容
+    @Test
+    public void test8(){
+        JobInfo jobInfo = taskInfoMapper.selectById(292);
+        DataXParams dataXParams = new DataXParams();
+
+        dataXParams.setColumns(new ArrayList<>(){{
+            add("id");
+            add("name");
+        }});
+
+        dataXParams.setSourceType("mysql");
+        dataXParams.setUsername("root");
+        dataXParams.setPassword("root");
+        dataXParams.setDbName("test1");
+        dataXParams.setTableName("table1");
+        dataXParams.setIp("localhost");
+        dataXParams.setPort(3306);
+        dataXParams.setIncrType(1);
+        String json = "[{\"id\":1,\"columnKey\":\"id\",\"columnValue\":\"1000\"},{\"id\":2,\"columnKey\":\"name\",\"columnValue\":\"cc\"}]";
+        dataXParams.setIncrContent(json);
+        MysqlReader mysqlReader = new MysqlReader();
+        JSONObject jsonObject = mysqlReader.buildJson(dataXParams);
         System.out.println(jsonObject.toString());
     }
 }
