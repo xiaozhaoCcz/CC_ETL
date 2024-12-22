@@ -45,7 +45,11 @@ public class DataxHandler {
     @Value("${cc-job.pypath}")
     private String dataxPy;
 
-
+    /**
+     * TODO 1.实现主键自增
+     *      2.使用多表关联同步时，不能使用columns字段，只能使用querySql
+     *      3.页面构建json需要优化
+     */
     @XxlJob("runDataxHandler")
     public void runDataxHandler() {
         String json = XxlJobHelper.getJobParam();
