@@ -80,7 +80,7 @@ public class DataxHandler {
             StringBuilder sb = new StringBuilder();
             JSONArray jsonArray = JSONUtil.parseArray(jobInfo.getIncrContent());
             List<DataxColumn> dataxColumns = jsonArray.toList(DataxColumn.class);
-            sb.append(DataxConstant.QUOTATION_MARK);
+            //sb.append(DataxConstant.QUOTATION_MARK);
             for (DataxColumn dataxColumn : dataxColumns) {
                 sb.append(DASH)
                         .append(dataxColumn.getColumnParam())
@@ -93,19 +93,17 @@ public class DataxHandler {
                     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
                     // 解析字符串为LocalDateTime对象
                     LocalDateTime dateTime = LocalDateTime.parse(dataxColumn.getColumnValue(), formatter);
-                    DateTimeFormatter dateTimeFormatter =DateTimeFormatter.ofPattern(dataxColumn.getColumnTimeFormat());
-                    String format = dateTime.format(dateTimeFormatter);
-                    sb.append(33333);;
+                    long timestamp = dateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+                    sb.append(timestamp/1000);;
                 }else {
                     sb.append(dataxColumn.getColumnValue());
                 }
                 sb.append(SINGLE_QUOTE);
                 sb.append(SPACE);
             }
-            sb.append(DataxConstant.QUOTATION_MARK);
+            //sb.append(DataxConstant.QUOTATION_MARK);
             cmdList.add(sb.toString());
         }
-
         String[] command = cmdList.toArray(new String[0]);
         ProcessBuilder processBuilder = new ProcessBuilder(command);
 
@@ -146,7 +144,7 @@ public class DataxHandler {
 
             //更改数据库字段
             if (exitValue == 0) {
-                refreshJobInfo(jobInfo);
+                //refreshJobInfo(jobInfo);
                 XxlJobHelper.log("Datax job completed successfully.");
             } else {
                 XxlJobHelper.log("Datax job failed with exit value: " + exitValue);

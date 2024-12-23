@@ -17,5 +17,5 @@ public class DataxColumn implements Serializable {
 
     private String columnTimeFormat;
 
-    private String columnType;
+    private Integer columnType;
 }

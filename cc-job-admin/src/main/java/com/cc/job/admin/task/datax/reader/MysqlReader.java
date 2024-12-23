@@ -43,12 +43,27 @@ public class MysqlReader implements BaseRW {
                     sb.append(dataxColumn.getColumnKey())
                             .append(SPACE)
                             .append(GREATER)
-                            .append(SPACE)
-                            .append(DOLLAR_SIGN)
+                            .append(SPACE);
+
+                    if (dataxColumn.getColumnType() == 1) {
+                        sb.append("FROM_UNIXTIME")
+                                .append("(")
+                                .append(DOLLAR_SIGN)
+                                .append(LEFT_CURLY_BRACKET)
+                                .append(dataxColumn.getColumnParam())
+                                .append(RIGHT_CURLY_BRACKET)
+                                .append(",")
+                                .append("'%Y-%m-%d %H:%i:%s'")
+                               .append(")");
+                    } else {
+                        // 非字符串类型
+                        sb .append(DOLLAR_SIGN)
                             .append(LEFT_CURLY_BRACKET)
                             .append(dataxColumn.getColumnParam())
-                            .append(RIGHT_CURLY_BRACKET)
-                            .append(SPACE)
+                            .append(RIGHT_CURLY_BRACKET);
+                    }
+
+                            sb.append(SPACE)
                             .append(AND)
                             .append(SPACE);
                 }
