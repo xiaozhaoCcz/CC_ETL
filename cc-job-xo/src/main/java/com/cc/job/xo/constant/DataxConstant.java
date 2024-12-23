@@ -1,4 +1,4 @@
-package com.cc.job.admin.task.constant;
+package com.cc.job.xo.constant;
 
 public interface DataxConstant {
 
@@ -52,4 +52,37 @@ public interface DataxConstant {
     String ERROR_COLUMN_EMPTY = "列名不能为空";
 
     String ERROR_INCREMENT_CONTENT_EMPTY = "增量同步内容不能为空";
+
+
+    String PYTHON = "python";
+
+    String PARAM = "-p";
+
+    String SINGLE_QUOTE = "'";
+
+    String QUOTATION_MARK= "\"";
+
+
+    String MULTI_QUOTATION_MARK = "\" \"";
+
+    String DASH = "-D";
+
+    String EQUALS = "=";
+
+
+    String JOB= "job";
+
+    String CONTENT = "content";
+
+    String READER = "reader";
+
+    String WRITER = "writer";
+
+
+    String DOLLAR_SIGN = "$";
+
+    String LEFT_CURLY_BRACKET = "{";
+
+    String RIGHT_CURLY_BRACKET = "}";
+
 }

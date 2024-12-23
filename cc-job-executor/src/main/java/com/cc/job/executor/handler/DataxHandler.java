@@ -2,17 +2,20 @@ package com.cc.job.executor.handler;
 
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONUtil;
 import com.cc.job.executor.command.JdbcCommand;
-import com.cc.job.executor.constant.DataxConstant;
+import com.cc.job.xo.constant.DataxConstant;
 import com.cc.job.executor.utils.DataxUtils;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.xo.mapper.JobInfoMapper;
 import com.cc.job.xo.mapper.JobJdbcDatasourceMapper;
+import com.cc.job.xo.model.datax.DataxColumn;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobJdbcDatasource;
 import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.handler.annotation.XxlJob;
 import jakarta.annotation.Resource;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,12 +24,17 @@ import org.springframework.stereotype.Component;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.sql.*;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.FutureTask;
+
+import static com.cc.job.xo.constant.DataxConstant.*;
 
 @Component
 public class DataxHandler {
@@ -68,21 +76,34 @@ public class DataxHandler {
         cmdList.add(temJsonFile);
 
         if(jobInfo.getIncrType()==1){
+            cmdList.add(PARAM);
             StringBuilder sb = new StringBuilder();
-            sb.append(DataxConstant.PARAM);
+            JSONArray jsonArray = JSONUtil.parseArray(jobInfo.getIncrContent());
+            List<DataxColumn> dataxColumns = jsonArray.toList(DataxColumn.class);
             sb.append(DataxConstant.QUOTATION_MARK);
-            if(jobInfo.getIncrColumnType()==0){
-                sb.append(DataxConstant.DASH).append(jobInfo.getIncrParam()).append(DataxConstant.EQUALS).append(jobInfo.getIncrId());
-                sb.append(DataxConstant.QUOTATION_MARK);
-                cmdList.add(sb.toString().replaceAll(DataxConstant.SPACE,DataxConstant.MULTI_QUOTATION_MARK));
-            }else{
-                LocalDateTime incrTime = jobInfo.getIncrTime();
-                DateTimeFormatter dateTimeFormatter =DateTimeFormatter.ofPattern(jobInfo.getTimeFormat());
-                String format = incrTime.format(dateTimeFormatter);
-                sb.append(DataxConstant.DASH).append(jobInfo.getIncrParam()).append(DataxConstant.EQUALS).append(DataxConstant.SINGLE_QUOTE).append(format).append(DataxConstant.SINGLE_QUOTE);
-                sb.append(DataxConstant.QUOTATION_MARK);
-                cmdList.add(sb.toString());
+            for (DataxColumn dataxColumn : dataxColumns) {
+                sb.append(DASH)
+                        .append(dataxColumn.getColumnParam())
+                        .append(EQUALS)
+                        .append(SINGLE_QUOTE);
+                if(StringUtils.isNotBlank(dataxColumn.getColumnTimeFormat())){
+//                    Instant instant = Instant.ofEpochMilli(Long.parseLong(dataxColumn.getColumnValue()));
+//                    // 将Instant转换为LocalDateTime
+//                    LocalDateTime localDateTime = instant.atZone(ZoneId.systemDefault()).toLocalDateTime();
+                    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+                    // 解析字符串为LocalDateTime对象
+                    LocalDateTime dateTime = LocalDateTime.parse(dataxColumn.getColumnValue(), formatter);
+                    DateTimeFormatter dateTimeFormatter =DateTimeFormatter.ofPattern(dataxColumn.getColumnTimeFormat());
+                    String format = dateTime.format(dateTimeFormatter);
+                    sb.append(33333);;
+                }else {
+                    sb.append(dataxColumn.getColumnValue());
+                }
+                sb.append(SINGLE_QUOTE);
+                sb.append(SPACE);
             }
+            sb.append(DataxConstant.QUOTATION_MARK);
+            cmdList.add(sb.toString());
         }
 
         String[] command = cmdList.toArray(new String[0]);

@@ -134,4 +134,6 @@ public class JobInfo extends BaseEntity {
     private Integer incrColumnType;
 
     private String incrColumnName;
+
+    private String incrContent;
 }

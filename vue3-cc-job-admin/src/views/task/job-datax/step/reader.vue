@@ -138,6 +138,16 @@
         <el-option label="timestamp" value="timestamp" />
       </el-select>
     </el-form-item>
+    <el-form-item label="增量参数">
+      <IncrEditTable
+        :list="
+          readerForm.incrContent == null
+            ? []
+            : JSON.parse(readerForm.incrContent)
+        "
+        @handleTableData="handleTableData"
+      ></IncrEditTable>
+    </el-form-item>
     <el-form-item>
       <el-button type="primary" @click="next">下一步</el-button>
     </el-form-item>
@@ -147,6 +157,8 @@
 <script lang="ts" setup>
 import JobJdbcDatasourceAPI from "@/api/task/job-jdbc-datasource";
 import JobDataXAPI from "@/api/task/job-datax";
+import IncrEditTable from "@/views/task/job-datax/componects/IncrEditTable.vue";
+import EditTable from "@/components/EditTable/EditTable.vue";
 
 const readerForm = ref({
   incrType: 0,
@@ -200,6 +212,10 @@ watch(
     getColumns(readerForm.value.jdbcDatasourceId);
   }
 );
+
+function handleTableData(val) {
+  readerForm.value.incrContent = JSON.stringify(val);
+}
 
 function handleCheckAllChange(val: boolean) {
   readerForm.value.columns = val ? columnList.value : [];

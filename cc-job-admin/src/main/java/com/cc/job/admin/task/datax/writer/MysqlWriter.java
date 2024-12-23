@@ -1,11 +1,11 @@
 package com.cc.job.admin.task.datax.writer;
 
 import cn.hutool.json.JSONObject;
-import com.cc.job.admin.task.constant.DataxConstant;
 import com.cc.job.admin.task.datax.BaseRW;
+import com.cc.job.xo.constant.DataxConstant;
 import com.cc.job.xo.model.datax.DataXParams;
 
-import static com.cc.job.admin.task.constant.DataxConstant.*;
+import static com.cc.job.xo.constant.DataxConstant.*;
 
 public class MysqlWriter implements BaseRW {
     @Override

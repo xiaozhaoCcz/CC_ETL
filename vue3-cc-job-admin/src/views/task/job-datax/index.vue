@@ -95,6 +95,7 @@ async function buildJson() {
     incrType: readerForm.value.incrType,
     incrColumnName: readerForm.value.incrColumnName,
     incrParam: readerForm.value.incrParam,
+    incrContent: readerForm.value.incrContent,
   };
   const writerDataXParams = {
     columns: writerForm.value.columns,
@@ -132,6 +133,7 @@ async function buildJson() {
   fromData.value.incrColumnType = readerForm.value.incrColumnType;
   fromData.value.incrColumnName = readerForm.value.incrColumnName;
   fromData.value.jdbcDatasourceId = writerForm.value.datasource.id;
+  fromData.value.incrContent = readerForm.value.incrContent;
 }
 
 function getContent(data: any) {

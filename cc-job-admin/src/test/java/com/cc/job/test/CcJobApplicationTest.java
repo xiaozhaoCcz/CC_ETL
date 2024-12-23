@@ -3,6 +3,7 @@ package com.cc.job.test;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.admin.CcJobApplication;
 import com.cc.job.admin.task.datax.reader.MysqlReader;
@@ -10,6 +11,7 @@ import com.cc.job.xo.mapper.JobEdgeMapper;
 import com.cc.job.xo.mapper.JobInfoMapper;
 import com.cc.job.xo.mapper.JobNodeMapper;
 import com.cc.job.xo.model.datax.DataXParams;
+import com.cc.job.xo.model.datax.DataxColumn;
 import com.cc.job.xo.model.entity.JobEdge;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobNode;
@@ -535,6 +537,14 @@ public class CcJobApplicationTest {
         MysqlReader mysqlReader = new MysqlReader();
         JSONObject jsonObject = mysqlReader.buildJson(dataXParams);
         System.out.println(jsonObject.toString());
+    }
+
+    @Test
+    public void test9(){
+        String json = "[{\"id\":1,\"columnKey\":\"id\",\"columnValue\":\"1848265663802527700\",\"columnParam\":\"id\",\"columnTimeFormat\":\"\"}]";
+        JSONArray objects = JSONUtil.parseArray(json);
+        List<DataxColumn> list = objects.toList(DataxColumn.class);
+        System.out.println(list);
     }
 }
 

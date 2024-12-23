@@ -2,7 +2,7 @@ package com.cc.job.admin.task.utils;
 
 import java.util.List;
 
-import static com.cc.job.admin.task.constant.DataxConstant.SPLIT;
+import static com.cc.job.xo.constant.DataxConstant.SPLIT;
 
 public class DataxUtils {
 
