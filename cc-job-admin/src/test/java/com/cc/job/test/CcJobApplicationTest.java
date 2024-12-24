@@ -24,7 +24,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.sql.SQLOutput;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
@@ -545,6 +548,52 @@ public class CcJobApplicationTest {
         JSONArray objects = JSONUtil.parseArray(json);
         List<DataxColumn> list = objects.toList(DataxColumn.class);
         System.out.println(list);
+    }
+
+    @Test
+    public void test10() {
+        String time = "2024/10/22 22:00:23";
+        long date = isDate(time);
+        System.out.println(date);
+    }
+
+    private long isDate(String time){
+        long res = -1;
+        final SimpleDateFormat dateFormat1 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        final SimpleDateFormat dateFormat2 = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+        final SimpleDateFormat dateFormat3 = new SimpleDateFormat("yyyy-MM-dd ");
+        final SimpleDateFormat dateFormat4 = new SimpleDateFormat("yyyy/MM/dd ");
+        try {
+            LocalDateTime dateTime = LocalDateTime.parse(time, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+            res = dateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+        } catch (Exception e) {
+            try {
+                Date date1 = dateFormat1.parse(time);
+                res = date1.getTime();
+            } catch (ParseException e1) {
+                try {
+                    Date date2 = dateFormat2.parse(time);
+                    res = date2.getTime();
+                } catch (ParseException ex) {
+                    try {
+                        Date date3 = dateFormat3.parse(time);
+                        res = date3.getTime();
+                    } catch (ParseException exception) {
+                        try {
+                            Date date4 = dateFormat4.parse(time);
+                            res = date4.getTime();
+                        }
+                        catch (ParseException exx) {
+                            try {
+                                res = Long.parseLong(time);
+                            }catch (NumberFormatException exxx ){
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return res;
     }
 }
 

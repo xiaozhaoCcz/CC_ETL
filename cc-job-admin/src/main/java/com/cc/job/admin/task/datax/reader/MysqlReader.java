@@ -45,7 +45,7 @@ public class MysqlReader implements BaseRW {
                             .append(GREATER)
                             .append(SPACE);
 
-                    if (dataxColumn.getColumnType() == 1) {
+                    if (dataxColumn.getColumnType() == 1&&!"x".equalsIgnoreCase(dataxColumn.getColumnTimeFormat())) {
                         sb.append("FROM_UNIXTIME")
                                 .append("(")
                                 .append(DOLLAR_SIGN)

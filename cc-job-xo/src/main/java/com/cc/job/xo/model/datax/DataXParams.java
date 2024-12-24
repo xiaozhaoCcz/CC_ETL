@@ -36,10 +36,6 @@ public class DataXParams implements Serializable {
     // 0全量，1增量
     private Integer incrType;
 
-    private String incrColumnName;
-
-    private String incrParam;
-
     // 增量字段，json
     private String incrContent;
 }

@@ -82,63 +82,7 @@
         <el-radio :value="1" style="margin-top: 5px">增量</el-radio>
       </el-radio-group>
     </el-form-item>
-    <el-form-item label="自增序列" v-if="readerForm.incrType == 1">
-      <el-select
-        v-model="readerForm.incrColumnType"
-        filterable
-        style="width: 210px"
-      >
-        <el-option label="主键自增" :value="0" />
-        <el-option label="时间自增" :value="1" />
-      </el-select>
-    </el-form-item>
-    <el-form-item
-      label="时间数据列"
-      v-if="readerForm.incrType == 1 && readerForm.incrColumnType == 1"
-    >
-      <el-input
-        v-model="readerForm.incrColumnName"
-        style="width: 240px"
-        placeholder="Please input"
-      />
-    </el-form-item>
-    <el-form-item label="默认参数" v-if="readerForm.incrType == 1">
-      <el-input
-        v-model="readerForm.incrParam"
-        style="width: 240px"
-        placeholder="Please input"
-      />
-    </el-form-item>
-    <el-form-item label="默认自增数据" v-if="readerForm.incrType == 1">
-      <el-input
-        v-model="readerForm.incrId"
-        style="width: 240px"
-        placeholder="Please input"
-        v-if="readerForm.incrColumnType == 0"
-      />
-      <el-date-picker
-        v-else
-        v-model="readerForm.incrTime"
-        type="datetime"
-        placeholder="Select date and time"
-        value-format="x"
-      />
-    </el-form-item>
-    <el-form-item
-      label="时间格式"
-      v-if="readerForm.incrType == 1 && readerForm.incrColumnType == 1"
-    >
-      <el-select
-        v-model="readerForm.timeFormat"
-        filterable
-        style="width: 210px"
-      >
-        <el-option label="YYYY/MM/DD hh:mm:ss" value="yyyy/MM/dd hh:mm:ss" />
-        <el-option label="YYYY-MM-DD hh:mm:ss" value="yyyy-MM-dd hh:mm:ss" />
-        <el-option label="timestamp" value="timestamp" />
-      </el-select>
-    </el-form-item>
-    <el-form-item label="增量参数">
+    <el-form-item label="增量参数" v-if="readerForm.incrType == 1">
       <IncrEditTable
         :list="
           readerForm.incrContent == null
@@ -158,7 +102,6 @@
 import JobJdbcDatasourceAPI from "@/api/task/job-jdbc-datasource";
 import JobDataXAPI from "@/api/task/job-datax";
 import IncrEditTable from "@/views/task/job-datax/componects/IncrEditTable.vue";
-import EditTable from "@/components/EditTable/EditTable.vue";
 
 const readerForm = ref({
   incrType: 0,

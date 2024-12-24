@@ -507,9 +507,6 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         }
         formData.setGlueUpdatetime(LocalDateTime.now());
         JobInfo taskInfo = BeanUtil.copyProperties(formData, JobInfo.class);
-        if (StringUtils.isNotBlank(formData.getIncrTime())) {
-            taskInfo.setIncrTime(DateUtils.processDate(formData.getIncrTime()));
-        }
         taskInfo.setIsNode("N");
         return taskInfo;
     }
@@ -760,22 +757,10 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
             }
         }
 
-
-        String oldParam = existsJobInfo.getIncrParam();
-
         BeanUtil.copyProperties(formData, existsJobInfo);
         existsJobInfo.setGlueUpdatetime(LocalDateTime.now());
         existsJobInfo.setTriggerNextTime(nextTriggerTime);
         existsJobInfo.setIsNode("N");
-
-        if (GlueTypeEnum.DATAX.getDesc().equalsIgnoreCase(formData.getGlueType())) {
-            if (StringUtils.isBlank(formData.getIncrColumnName())) {
-                formData.setIncrColumnName("id");
-            }
-            String finalJson = finalJson(existsJobInfo.getExecutorParam(), oldParam, formData.getIncrParam(), formData.getIncrColumnName());
-            existsJobInfo.setExecutorParam(finalJson);
-        }
-
         return existsJobInfo;
     }
 

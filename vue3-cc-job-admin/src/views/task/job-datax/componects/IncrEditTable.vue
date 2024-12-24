@@ -54,9 +54,14 @@
             v-model="row.columnValue"
             type="datetime"
             placeholder="Select date and time"
-            value-format="YYYY-MM-DD HH:mm:ss"
+            format="YYYY-MM-DD hh:mm:ss"
+            value-format="x"
           />
-          <span v-else>{{ row.columnValue }}</span>
+          <span v-else>
+            {{
+              row.columnValue === "" ? "" : timestampToDateTime(row.columnValue)
+            }}
+          </span>
         </template>
       </el-table-column>
       <el-table-column
@@ -94,15 +99,11 @@
             filterable
             style="width: 210px"
           >
-            <el-option
-              label="YYYY/MM/DD hh:mm:ss"
-              value="yyyy/MM/dd hh:mm:ss"
-            />
-            <el-option
-              label="YYYY-MM-DD hh:mm:ss"
-              value="yyyy-MM-dd hh:mm:ss"
-            />
-            <el-option label="timestamp" value="timestamp" />
+            <el-option label="YYYY/MM/DD hh:mm:ss" value="%Y/%m/%d %H:%i:%s" />
+            <el-option label="YYYY-MM-DD hh:mm:ss" value="%Y-%m-%d %H:%i:%s" />
+            <el-option label="YYYY/MM/DD" value="%Y/%m/%d" />
+            <el-option label="YYYY-MM-DD" value="%Y-%m-%d" />
+            <el-option label="timestamp" value="x" />
           </el-select>
           <span v-else>{{ row.columnTimeFormat }}</span>
         </template>
@@ -120,6 +121,7 @@
 
 <script setup>
 import { ref } from "vue";
+import { timestampToDateTime } from "@/utils/index.ts";
 const props = defineProps({
   list: {
     type: Array,

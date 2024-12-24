@@ -93,8 +93,6 @@ async function buildJson() {
     querySql: readerForm.value.querySql,
     type: 0,
     incrType: readerForm.value.incrType,
-    incrColumnName: readerForm.value.incrColumnName,
-    incrParam: readerForm.value.incrParam,
     incrContent: readerForm.value.incrContent,
   };
   const writerDataXParams = {
