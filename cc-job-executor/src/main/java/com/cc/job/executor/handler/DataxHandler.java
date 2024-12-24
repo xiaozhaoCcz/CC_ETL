@@ -208,8 +208,8 @@ public class DataxHandler {
         String username = parameter.getStr("username");
         String password = parameter.getStr("password");
         String name = reader.getStr("name");
-        result.put("table",tables.getStr(0));
-        result.put("querySql",querySqls.getStr(0));
+        result.put("table",tables!=null?tables.getStr(0):"");
+        result.put("querySql",querySqls!=null?querySqls.getStr(0):"");
         result.put("jdbcUrl",jdbcUrl.getStr(0));
         result.put("username",username);
         result.put("password",password);
@@ -242,7 +242,7 @@ public class DataxHandler {
                     for (DataxColumn dataxColumn : columnList) {
                         Object val = rs.getObject(dataxColumn.getColumnKey());
                         //判断是否是时间类型
-                        long time = isDate((String) val);
+                        long time = isDate(String.valueOf(val));
                         if (time > 0) {
                             dataxColumn.setColumnValue(String.valueOf(time));
                         } else {
@@ -279,7 +279,20 @@ public class DataxHandler {
             sb.append(SPACE);
             StringBuilder whereSql = new StringBuilder();
             for (DataxColumn dataxColumn : columnList) {
-                whereSql.append("t.").append(dataxColumn.getColumnKey()).append(">").append("'").append(dataxColumn.getColumnValue()).append("'").append(SPACE).append(AND).append(SPACE);
+                whereSql.append("t.").append(dataxColumn.getColumnKey()).append(">");
+                if(dataxColumn.getColumnType()==1){
+                    whereSql.append("FROM_UNIXTIME")
+                            .append("(")
+                            .append(Long.parseLong(dataxColumn.getColumnValue())/1000)
+                            .append(",")
+                            .append("'")
+                            .append(dataxColumn.getColumnTimeFormat())
+                            .append("'")
+                            .append(")");
+                }else{
+                    whereSql.append("'").append(dataxColumn.getColumnValue()).append("'");
+                }
+                whereSql.append(SPACE).append(AND).append(SPACE);
             }
             whereSql.delete(whereSql.length() - 4, whereSql.length());
             sb.append(whereSql);
@@ -293,7 +306,7 @@ public class DataxHandler {
                     for (int i = 0; i < size; i++) {
                         Object val = rs.getObject(i + 1);
                         //判断是否是时间类型
-                        long time = isDate((String) val);
+                        long time = isDate(String.valueOf(val));
                         if (time > 0) {
                             columnList.get(i).setColumnValue(String.valueOf(time));
                         } else {

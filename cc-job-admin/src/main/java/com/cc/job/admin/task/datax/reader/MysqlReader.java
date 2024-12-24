@@ -53,7 +53,9 @@ public class MysqlReader implements BaseRW {
                                 .append(dataxColumn.getColumnParam())
                                 .append(RIGHT_CURLY_BRACKET)
                                 .append(",")
-                                .append("'%Y-%m-%d %H:%i:%s'")
+                                .append("'")
+                                .append(dataxColumn.getColumnTimeFormat())
+                                .append("'")
                                .append(")");
                     } else {
                         // 非字符串类型

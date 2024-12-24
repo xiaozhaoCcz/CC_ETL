@@ -35,33 +35,38 @@
         align="center"
       >
         <template #default="{ row, column }">
-          <el-input
-            v-if="
-              tableRowEditId === row.id &&
-              tableColumnEditIndex === column.id &&
-              row.columnType === 0
-            "
-            v-model="row.columnValue"
-            @blur="blurValueInput(row, column)"
-            @keyup.enter="blurValueInput(row, column)"
-          />
-          <el-date-picker
-            v-if="
-              tableRowEditId === row.id &&
-              tableColumnEditIndex === column.id &&
-              row.columnType === 1
-            "
-            v-model="row.columnValue"
-            type="datetime"
-            placeholder="Select date and time"
-            format="YYYY-MM-DD hh:mm:ss"
-            value-format="x"
-          />
-          <span v-else>
-            {{
-              row.columnValue === "" ? "" : timestampToDateTime(row.columnValue)
-            }}
-          </span>
+          <div v-if="row.columnType === 1">
+            <el-date-picker
+              v-if="
+                tableRowEditId === row.id && tableColumnEditIndex === column.id
+              "
+              v-model="row.columnValue"
+              type="datetime"
+              placeholder="Select date and time"
+              format="YYYY-MM-DD hh:mm:ss"
+              value-format="x"
+            />
+            <span v-else>
+              {{
+                row.columnValue === ""
+                  ? row.columnValue
+                  : timestampToDateTime(row.columnValue)
+              }}
+            </span>
+          </div>
+          <div v-else>
+            <el-input
+              v-if="
+                tableRowEditId === row.id && tableColumnEditIndex === column.id
+              "
+              v-model="row.columnValue"
+              @blur="blurValueInput(row, column)"
+              @keyup.enter="blurValueInput(row, column)"
+            />
+            <span v-else>
+              {{ row.columnValue }}
+            </span>
+          </div>
         </template>
       </el-table-column>
       <el-table-column
