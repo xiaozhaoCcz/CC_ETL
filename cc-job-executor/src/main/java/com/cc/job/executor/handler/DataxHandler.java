@@ -22,11 +22,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.sql.*;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -81,66 +81,18 @@ public class DataxHandler {
         cmdList.add(temJsonFile);
 
         if(jobInfo.getIncrType()==1){
-            cmdList.add(PARAM);
-            StringBuilder sb = new StringBuilder();
-            JSONArray jsonArray = JSONUtil.parseArray(jobInfo.getIncrContent());
-            List<DataxColumn> dataxColumns = jsonArray.toList(DataxColumn.class);
-            for (DataxColumn dataxColumn : dataxColumns) {
-                sb.append(DASH)
-                        .append(dataxColumn.getColumnParam())
-                        .append(EQUALS)
-                        .append(SINGLE_QUOTE);
-                if(dataxColumn.getColumnType()==1){
-//                    Instant instant = Instant.ofEpochMilli(Long.parseLong(dataxColumn.getColumnValue()));
-//                    // 将Instant转换为LocalDateTime
-//                    LocalDateTime localDateTime = instant.atZone(ZoneId.systemDefault()).toLocalDateTime();
-                    //DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-                    // 解析字符串为LocalDateTime对象
-//                    LocalDateTime dateTime = LocalDateTime.parse(dataxColumn.getColumnValue(), formatter);
-//                    long timestamp = dateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
-                    sb.append(Long.parseLong(dataxColumn.getColumnValue())/1000);;
-                }else {
-                    sb.append(dataxColumn.getColumnValue());
-                }
-                sb.append(SINGLE_QUOTE);
-                sb.append(SPACE);
-            }
-            cmdList.add(sb.toString());
+            buildParam(cmdList, jobInfo);
         }
         String[] command = cmdList.toArray(new String[0]);
         ProcessBuilder processBuilder = new ProcessBuilder(command);
 
         try {
             Process process = processBuilder.start();
-            FutureTask<Boolean> futureTask = new FutureTask<>(() -> {
-                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-                try {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        // 处理每行输出
-                        logger.info(line);
-                        XxlJobHelper.log(line);
-                    }
-                } catch (Exception e) {
-
-                }
-                return true;
-            });
-            Thread startThread = new Thread(futureTask);
+            Thread startThread = getThread(process,0);
             startThread.start();
 
-            FutureTask<Boolean> errorFutureTask = new FutureTask<>(() -> {
-                BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
-                String errorLine;
-                while ((errorLine = errorReader.readLine()) != null) {
-                    logger.info(errorLine);
-                    XxlJobHelper.log( errorLine);
-                }
-                return true;
-            });
-            Thread errorThread = new Thread(errorFutureTask);
+            Thread errorThread = getThread(process,1);
             errorThread.start();
-
             int exitValue = process.waitFor();
             startThread.join();
             errorThread.join();
@@ -160,20 +112,63 @@ public class DataxHandler {
         }
     }
 
+    private static void buildParam(ArrayList<String> cmdList, JobInfo jobInfo) {
+        cmdList.add(PARAM);
+        StringBuilder sb = new StringBuilder();
+        JSONArray jsonArray = JSONUtil.parseArray(jobInfo.getIncrContent());
+        List<DataxColumn> dataxColumns = jsonArray.toList(DataxColumn.class);
+        for (DataxColumn dataxColumn : dataxColumns) {
+            sb.append(DASH)
+                    .append(dataxColumn.getColumnParam())
+                    .append(EQUALS)
+                    .append(SINGLE_QUOTE);
+            if(dataxColumn.getColumnType()==1){
+//                    Instant instant = Instant.ofEpochMilli(Long.parseLong(dataxColumn.getColumnValue()));
+//                    // 将Instant转换为LocalDateTime
+//                    LocalDateTime localDateTime = instant.atZone(ZoneId.systemDefault()).toLocalDateTime();
+                //DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+                // 解析字符串为LocalDateTime对象
+//                    LocalDateTime dateTime = LocalDateTime.parse(dataxColumn.getColumnValue(), formatter);
+//                    long timestamp = dateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+                sb.append(Long.parseLong(dataxColumn.getColumnValue())/1000);;
+            }else {
+                sb.append(dataxColumn.getColumnValue());
+            }
+            sb.append(SINGLE_QUOTE);
+            sb.append(SPACE);
+        }
+        cmdList.add(sb.toString());
+    }
+
+    private static Thread getThread(Process process,int type) {
+        FutureTask<Boolean> futureTask = new FutureTask<>(() -> {
+            InputStream inputStream = type==0?process.getInputStream():process.getErrorStream();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    // 处理每行输出
+                    logger.info(line);
+                    XxlJobHelper.log(line);
+                }
+            return true;
+        });
+        return new Thread(futureTask);
+    }
+
     private void refreshJobInfo(JobInfo jobInfo) {
         Map<String, String> conMap = getTableName(jobInfo.getExecutorParam());
-        String jdbcUrl = conMap.get("jdbcUrl");
-        String username = conMap.get("username");
-        String password = conMap.get("password");
-        String tableName = conMap.get("table");
-        String name = conMap.get("name");
-        String querySql = conMap.get("querySql");
+        String jdbcUrl = conMap.get(JDBC_URL);
+        String username = conMap.get(USERNAME);
+        String password = conMap.get(PASSWORD);
+        String tableName = conMap.get(TABLE);
+        String name = conMap.get(NAME);
+        String querySql = conMap.get(QUERY_SQL);
         JobJdbcDatasource jobJdbcDatasource = new JobJdbcDatasource();
         jobJdbcDatasource.setJdbcUrl(jdbcUrl);
         jobJdbcDatasource.setJdbcUsername(username);
         jobJdbcDatasource.setJdbcPassword(password);
-        if("mysqlreader".equalsIgnoreCase(name)){
-            jobJdbcDatasource.setJdbcDriverClass("com.mysql.cj.jdbc.Driver");
+        if(MYSQL_READER.equalsIgnoreCase(name)){
+            jobJdbcDatasource.setJdbcDriverClass(MYSQL_DRIVER);
         }
         try (Connection con = getJdbcConnection(jobJdbcDatasource)) {
             updateJobInfo(con,querySql,tableName,jobInfo);
@@ -204,16 +199,16 @@ public class DataxHandler {
         JSONObject connectionObj = connection.getJSONObject(0);
         JSONArray tables = connectionObj.getJSONArray(DataxConstant.TABLE);
         JSONArray querySqls = connectionObj.getJSONArray(QUERY_SQL);
-        JSONArray jdbcUrl = connectionObj.getJSONArray("jdbcUrl");
-        String username = parameter.getStr("username");
-        String password = parameter.getStr("password");
-        String name = reader.getStr("name");
-        result.put("table",tables!=null?tables.getStr(0):"");
-        result.put("querySql",querySqls!=null?querySqls.getStr(0):"");
-        result.put("jdbcUrl",jdbcUrl.getStr(0));
-        result.put("username",username);
-        result.put("password",password);
-        result.put("name",name);
+        JSONArray jdbcUrl = connectionObj.getJSONArray(JDBC_URL);
+        String username = parameter.getStr(USERNAME);
+        String password = parameter.getStr(PASSWORD);
+        String name = reader.getStr(NAME);
+        result.put(TABLE,tables!=null?tables.getStr(0):"");
+        result.put(QUERY_SQL,querySqls!=null?querySqls.getStr(0):"");
+        result.put(JDBC_URL,jdbcUrl.getStr(0));
+        result.put(USERNAME,username);
+        result.put(PASSWORD,password);
+        result.put(NAME,name);
         return result;
     }
 
@@ -222,108 +217,116 @@ public class DataxHandler {
         JSONArray jsonArray = JSONUtil.parseArray(jobInfo.getIncrContent());
         List<DataxColumn> columnList = jsonArray.toList(DataxColumn.class);
         if (StringUtils.isNotBlank(querySql)) {
-            String pattern = "\\$\\{(.*?)}";
-            Pattern compile = Pattern.compile(pattern);
-            Matcher matcher = compile.matcher(querySql);
-            StringBuilder sb = new StringBuilder();
-            while (matcher.find()) {
-                String group = matcher.group();
-                String str = columnList.stream().filter(v -> group.equalsIgnoreCase("${" + v.getColumnParam() + "}")).map(DataxColumn::getColumnValue).findFirst().orElse("");
-                matcher.appendReplacement(sb, str);
-            }
-            matcher.appendTail(sb);
-            String sql = sb + " limit 1";
-            PreparedStatement ps = null;
-            ResultSet rs = null;
-            try {
-                ps = con.prepareStatement(sql);
-                rs = ps.executeQuery();
-                if (rs.next()) {
-                    for (DataxColumn dataxColumn : columnList) {
-                        Object val = rs.getObject(dataxColumn.getColumnKey());
-                        //判断是否是时间类型
-                        long time = isDate(String.valueOf(val));
-                        if (time > 0) {
-                            dataxColumn.setColumnValue(String.valueOf(time));
-                        } else {
-                            dataxColumn.setColumnValue(val.toString());
-                        }
-                    }
-                }
-                String jsonStr = JSONUtil.toJsonStr(columnList);
-                jobInfo.setIncrContent(jsonStr);
-                jobInfoMapper.updateById(jobInfo);
-            } catch (Exception e) {
-                throw new BusinessException(e);
-            } finally {
-                JdbcCommand.close(ps);
-                JdbcCommand.close(rs);
-                JdbcCommand.close(con);
-            }
+            updateTableByQuerySql(con, querySql, jobInfo, columnList);
         } else {
-            StringBuilder sb = new StringBuilder();
-            sb.append("select");
-            sb.append(SPACE);
-            for (DataxColumn dataxColumn : columnList) {
-                sb.append("MAX").append("(").append(dataxColumn.getColumnKey()).append(")").append(",");
+            updateTableByTableName(con, tableName, jobInfo, columnList);
+        }
+    }
+
+    private void updateTableByTableName(Connection con, String tableName, JobInfo jobInfo, List<DataxColumn> columnList) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(SELECT);
+        sb.append(SPACE);
+        for (DataxColumn dataxColumn : columnList) {
+            sb.append(MAX).append(LEFT_PARENTHESIS).append(dataxColumn.getColumnKey()).append(RIGHT_PARENTHESIS).append(SPLIT);
+        }
+        sb.deleteCharAt(sb.length() - 1);
+        sb.append(SPACE);
+        sb.append(FROM);
+        sb.append(SPACE);
+        sb.append(tableName);
+        sb.append(SPACE);
+        sb.append(T_SIGN);
+        sb.append(SPACE);
+        sb.append(WHERE);
+        sb.append(SPACE);
+        StringBuilder whereSql = new StringBuilder();
+        for (DataxColumn dataxColumn : columnList) {
+            whereSql.append(T_SIGN).append(DOT).append(dataxColumn.getColumnKey()).append(GREATER);
+            if(dataxColumn.getColumnType()==1){
+                whereSql.append(FROM_UNIXTIME)
+                        .append(LEFT_PARENTHESIS)
+                        .append(Long.parseLong(dataxColumn.getColumnValue())/1000)
+                        .append(SPLIT)
+                        .append(SINGLE_QUOTE)
+                        .append(dataxColumn.getColumnTimeFormat())
+                        .append(SINGLE_QUOTE)
+                        .append(RIGHT_PARENTHESIS);
+            }else{
+                whereSql.append(SINGLE_QUOTE).append(dataxColumn.getColumnValue()).append(SINGLE_QUOTE);
             }
-            sb.deleteCharAt(sb.length() - 1);
-            sb.append(SPACE);
-            sb.append("from");
-            sb.append(SPACE);
-            sb.append(tableName);
-            sb.append(SPACE);
-            sb.append("t");
-            sb.append(SPACE);
-            sb.append(WHERE);
-            sb.append(SPACE);
-            StringBuilder whereSql = new StringBuilder();
-            for (DataxColumn dataxColumn : columnList) {
-                whereSql.append("t.").append(dataxColumn.getColumnKey()).append(">");
-                if(dataxColumn.getColumnType()==1){
-                    whereSql.append("FROM_UNIXTIME")
-                            .append("(")
-                            .append(Long.parseLong(dataxColumn.getColumnValue())/1000)
-                            .append(",")
-                            .append("'")
-                            .append(dataxColumn.getColumnTimeFormat())
-                            .append("'")
-                            .append(")");
-                }else{
-                    whereSql.append("'").append(dataxColumn.getColumnValue()).append("'");
-                }
-                whereSql.append(SPACE).append(AND).append(SPACE);
-            }
-            whereSql.delete(whereSql.length() - 4, whereSql.length());
-            sb.append(whereSql);
-            PreparedStatement ps = null;
-            ResultSet rs = null;
-            try {
-                ps = con.prepareStatement(sb.toString());
-                rs = ps.executeQuery();
-                if (rs.next()) {
-                    int size = columnList.size();
-                    for (int i = 0; i < size; i++) {
-                        Object val = rs.getObject(i + 1);
-                        //判断是否是时间类型
-                        long time = isDate(String.valueOf(val));
-                        if (time > 0) {
-                            columnList.get(i).setColumnValue(String.valueOf(time));
-                        } else {
-                            columnList.get(i).setColumnValue(val.toString());
-                        }
+            whereSql.append(SPACE).append(AND).append(SPACE);
+        }
+        whereSql.delete(whereSql.length() - 4, whereSql.length());
+        sb.append(whereSql);
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            ps = con.prepareStatement(sb.toString());
+            rs = ps.executeQuery();
+            if (rs.next()) {
+                int size = columnList.size();
+                for (int i = 0; i < size; i++) {
+                    Object val = rs.getObject(i + 1);
+                    //判断是否是时间类型
+                    long time = isDate(String.valueOf(val));
+                    if (time > 0) {
+                        columnList.get(i).setColumnValue(String.valueOf(time));
+                    } else {
+                        columnList.get(i).setColumnValue(val.toString());
                     }
                 }
-                String jsonStr = JSONUtil.toJsonStr(columnList);
-                jobInfo.setIncrContent(jsonStr);
-                jobInfoMapper.updateById(jobInfo);
-            } catch (Exception e) {
-                throw new BusinessException(e);
-            } finally {
-                JdbcCommand.close(ps);
-                JdbcCommand.close(rs);
-                JdbcCommand.close(con);
             }
+            String jsonStr = JSONUtil.toJsonStr(columnList);
+            jobInfo.setIncrContent(jsonStr);
+            jobInfoMapper.updateById(jobInfo);
+        } catch (Exception e) {
+            throw new BusinessException(e);
+        } finally {
+            JdbcCommand.close(ps);
+            JdbcCommand.close(rs);
+            JdbcCommand.close(con);
+        }
+    }
+
+    private void updateTableByQuerySql(Connection con, String querySql, JobInfo jobInfo, List<DataxColumn> columnList) {
+        String pattern = "\\$\\{(.*?)}";
+        Pattern compile = Pattern.compile(pattern);
+        Matcher matcher = compile.matcher(querySql);
+        StringBuilder sb = new StringBuilder();
+        while (matcher.find()) {
+            String group = matcher.group();
+            String str = columnList.stream().filter(v -> group.equalsIgnoreCase(DOLLAR_SIGN+LEFT_CURLY_BRACKET + v.getColumnParam() + RIGHT_CURLY_BRACKET)).map(DataxColumn::getColumnValue).findFirst().orElse("");
+            matcher.appendReplacement(sb, str);
+        }
+        matcher.appendTail(sb);
+        String sql = sb + " limit 1";
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            ps = con.prepareStatement(sql);
+            rs = ps.executeQuery();
+            if (rs.next()) {
+                for (DataxColumn dataxColumn : columnList) {
+                    Object val = rs.getObject(dataxColumn.getColumnKey());
+                    //判断是否是时间类型
+                    long time = isDate(String.valueOf(val));
+                    if (time > 0) {
+                        dataxColumn.setColumnValue(String.valueOf(time));
+                    } else {
+                        dataxColumn.setColumnValue(val.toString());
+                    }
+                }
+            }
+            String jsonStr = JSONUtil.toJsonStr(columnList);
+            jobInfo.setIncrContent(jsonStr);
+            jobInfoMapper.updateById(jobInfo);
+        } catch (Exception e) {
+            throw new BusinessException(e);
+        } finally {
+            JdbcCommand.close(ps);
+            JdbcCommand.close(rs);
+            JdbcCommand.close(con);
         }
     }
 

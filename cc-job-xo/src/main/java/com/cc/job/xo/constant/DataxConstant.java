@@ -22,6 +22,10 @@ public interface DataxConstant {
 
     String ORACLE_JDBC_URL = "jdbc:oracle:thin:@%s:%s/%s";
 
+    String MYSQL_DRIVER = "com.mysql.cj.jdbc.Driver";
+
+    String ORACLE_DRIVER = "oracle.jdbc.driver.OracleDriver";
+
     String QUERY_SQL = "querySql";
 
     String TABLE = "table";
@@ -85,4 +89,20 @@ public interface DataxConstant {
 
     String RIGHT_CURLY_BRACKET = "}";
 
+    String SELECT = "select";
+
+    String MAX = "max";
+
+    String LEFT_PARENTHESIS = "(";
+
+    String RIGHT_PARENTHESIS = ")";
+
+
+    String FROM = "from";
+
+    String T_SIGN = "t";
+
+    String DOT= ".";
+
+    String FROM_UNIXTIME = "FROM_UNIXTIME";
 }

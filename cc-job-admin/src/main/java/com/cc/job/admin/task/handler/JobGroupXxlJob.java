@@ -69,34 +69,59 @@ public class JobGroupXxlJob {
     public void runTaskRankXxlJob() {
         String executeParam = XxlJobHelper.getJobParam();
         validateExecuteParam(executeParam);
-
-        String[] split = executeParam.split(":");
-        long jobId = Long.parseLong(split[0]);
-        String randomId = split[1];
-
-        JobInfo taskInfo = getTaskInfoById(jobId);
-        List<JobNode> nodes = getTaskNodesByJobId(jobId);
-        List<JobEdge> edges = getTaskEdgesByJobId(jobId);
-
-        setTaskIdMap(nodes, jobId, randomId);
-        buildGraph(jobId, nodes, edges);
-        Map<Long, List<JobNode>> nextMap = buildNextNode(nodes, edges);
-
-        List<WorkerWrapper<Long, String>> workerWrappers = buildWorkerWrappers(nodes, nextMap, randomId);
-        List<Long> startNodes = getStartNodes(nodes);
-        List<WorkerWrapper<Long, String>> startWrappers = getStartWrappers(workerWrappers, startNodes);
-
-        WorkerWrapper<Long, String> startWork = createStartWorkWrapper(jobId, startWrappers);
-        stopMap.put(setExecuteJobId(jobId, randomId), startWork);
-        redisTemplate.opsForValue().set(setExecuteJobId(jobId, randomId), "");
-
+        long jobId = 0;
+        String randomId = "";
         try {
+            String[] split = executeParam.split(":");
+            jobId= Long.parseLong(split[0]);
+            randomId = split.length==1?UUID.randomUUID().toString():split[1];
+            JobInfo taskInfo = getTaskInfoById(jobId);
+            List<JobNode> nodes = getTaskNodesByJobId(jobId);
+            List<JobEdge> edges = getTaskEdgesByJobId(jobId);
+
+            setTaskIdMap(nodes, jobId, randomId);
+            buildGraph(jobId, nodes, edges);
+            Map<Long, List<JobNode>> nextMap = buildNextNode(nodes, edges);
+
+            int avgTime = getAvgTime(nodes, taskInfo);
+
+            List<WorkerWrapper<Long, String>> workerWrappers = buildWorkerWrappers(nodes, nextMap, randomId, avgTime);
+            List<Long> startNodes = getStartNodes(nodes);
+            List<WorkerWrapper<Long, String>> startWrappers = getStartWrappers(workerWrappers, startNodes);
+
+            WorkerWrapper<Long, String> startWork = createStartWorkWrapper(jobId, startWrappers);
+            stopMap.put(setExecuteJobId(jobId, randomId), startWork);
+            redisTemplate.opsForValue().set(setExecuteJobId(jobId, randomId), "");
+
             Async.beginWork(taskInfo.getExecutorTimeout(), startWork);
         } catch (ExecutionException | InterruptedException e) {
             handleExecutionException(jobId, e);
+        } finally {
+            completeJobExecution(jobId, randomId);
         }
 
-        completeJobExecution(jobId, randomId);
+    }
+
+    private int getAvgTime(List<JobNode> nodes, JobInfo taskInfo) {
+        List<JobInfo> taskInfos = getJobInfos(nodes);
+        Integer executorTimeout = taskInfo.getExecutorTimeout();
+        int size = nodes.size();
+        for (JobInfo info : taskInfos) {
+            executorTimeout-=info.getExecutorTimeout();
+            size--;
+            if(executorTimeout<0){
+                throw new BusinessException("子任务运行时长超过任务组");
+            }
+        }
+        if (size==0){
+            size=1;
+        }
+        return executorTimeout/size;
+    }
+
+    private List<JobInfo> getJobInfos(List<JobNode> nodes) {
+        List<Long> taskIds = nodes.stream().map(JobNode::getTaskId).toList();
+        return taskInfoService.listByIds(taskIds);
     }
 
     private void validateExecuteParam(String executeParam) {
@@ -160,10 +185,9 @@ public class JobGroupXxlJob {
         webSocketServer.sendInfo(message);
     }
 
-    private List<WorkerWrapper<Long, String>> buildWorkerWrappers(List<JobNode> nodes, Map<Long, List<JobNode>> nextMap, String randomId) {
+    private List<WorkerWrapper<Long, String>> buildWorkerWrappers(List<JobNode> nodes, Map<Long, List<JobNode>> nextMap, String randomId,int avgTime) {
         List<WorkerWrapper<Long, String>> result = new ArrayList<>();
-        List<Long> taskIds = nodes.stream().map(JobNode::getTaskId).toList();
-        List<JobInfo> taskInfos = taskInfoService.listByIds(taskIds);
+        List<JobInfo> taskInfos = getJobInfos(nodes);
         final Map<Long, JobInfo> taskInfoMap = taskInfos.stream().collect(Collectors.toMap(JobInfo::getId, t -> t));
         for (JobNode node : nodes) {
             final JobInfo taskInfo = taskInfoMap.get(node.getTaskId());
@@ -171,7 +195,7 @@ public class JobGroupXxlJob {
                     .id(String.valueOf(node.getId()))
                     .param(node.getTaskId())
                     .timeout(taskInfo.getExecutorTimeout())
-                    .worker((taskId, allWrappers) -> executeTask(taskId, node, taskInfo,randomId))
+                    .worker((taskId, allWrappers) -> executeTask(taskId, node, taskInfo,randomId,avgTime))
                     .callback(new TaskCallback(node,randomId));
             result.add(worker);
         }
@@ -189,20 +213,30 @@ public class JobGroupXxlJob {
         return result;
     }
 
-    private String executeTask(Long taskId, JobNode node, JobInfo taskInfo, String randomId) {
+    private String executeTask(Long taskId, JobNode node, JobInfo taskInfo, String randomId,int avgTime) {
         JobTriggerPoolHelper.trigger(taskId.intValue(), TriggerTypeEnum.MANUAL, -1, null, randomId, "");
-        String result;
+        String result = "";
         int count = 0;
-        Label:
-        while (true) {
-            List<Pair<String, Boolean>> callbackRes = StreamConsumer.getCallbackRes();
-            for (Pair<String, Boolean> pair : new ArrayList<>(callbackRes)) {
-                if (pair.getKey().equals(setExecuteJobId(taskId,randomId))) {
-                    handleTaskCompletion(pair, node, taskInfo, count,randomId);
-                    result ="end task:"+taskId;
-                    break Label;
+        Thread thread =null;
+        try {
+            FutureTask<String> futureTask = new FutureTask<>(() -> {
+                while (true) {
+                    List<Pair<String, Boolean>> callbackRes = StreamConsumer.getCallbackRes();
+                    for (Pair<String, Boolean> pair : new ArrayList<>(callbackRes)) {
+                        if (pair.getKey().equals(setExecuteJobId(taskId,randomId))) {
+                            handleTaskCompletion(pair, node, taskInfo, count,randomId);
+                            return "end task:"+taskId;
+                        }
+                    }
                 }
-            }
+            });
+            thread = new Thread(futureTask);
+            thread.start();
+            result = taskInfo.getExecutorTimeout()>0?futureTask.get(taskInfo.getExecutorTimeout(), TimeUnit.MILLISECONDS):futureTask.get(avgTime, TimeUnit.MILLISECONDS);
+        }catch (Exception e){
+            throw new BusinessException(e.getMessage());
+        }finally {
+            thread.interrupt();
         }
         return result;
     }
@@ -377,8 +411,7 @@ public class JobGroupXxlJob {
     }
 
     private void setTaskIdMap(List<JobNode> nodes, Long jobId, String randomId) {
-        List<Long> ids = nodes.stream().map(JobNode::getTaskId).toList();
-        List<JobInfo> taskInfos = taskInfoService.listByIds(ids);
+        List<JobInfo> taskInfos = getJobInfos(nodes);
         Map<Long, JobInfo> taskInfoMap = taskInfos.stream().collect(Collectors.toMap(JobInfo::getId, t -> t));
 
         for (JobNode node : nodes) {
