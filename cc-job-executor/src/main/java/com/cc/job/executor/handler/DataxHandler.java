@@ -269,11 +269,13 @@ public class DataxHandler {
                 for (int i = 0; i < size; i++) {
                     Object val = rs.getObject(i + 1);
                     //判断是否是时间类型
-                    long time = isDate(String.valueOf(val));
-                    if (time > 0) {
-                        columnList.get(i).setColumnValue(String.valueOf(time));
-                    } else {
-                        columnList.get(i).setColumnValue(val.toString());
+                    if(val!=null){
+                        long time = isDate(String.valueOf(val));
+                        if (time > 0) {
+                            columnList.get(i).setColumnValue(String.valueOf(time));
+                        } else {
+                            columnList.get(i).setColumnValue(val.toString());
+                        }
                     }
                 }
             }
@@ -300,21 +302,34 @@ public class DataxHandler {
             matcher.appendReplacement(sb, str);
         }
         matcher.appendTail(sb);
-        String sql = sb + " limit 1";
+        //select count sql
+        String countSql = "select count(1) from (" + sb + ") t";
         PreparedStatement ps = null;
         ResultSet rs = null;
         try {
+            ps = con.prepareStatement(countSql);
+            rs = ps.executeQuery();
+            long count = 0;
+            if (rs.next()) {
+                count = rs.getLong(1);
+                if (count == 0) {
+                    return;
+                }
+            }
+            String sql = sb + " limit "+(count-1)+",1";
             ps = con.prepareStatement(sql);
             rs = ps.executeQuery();
             if (rs.next()) {
                 for (DataxColumn dataxColumn : columnList) {
                     Object val = rs.getObject(dataxColumn.getColumnKey());
-                    //判断是否是时间类型
-                    long time = isDate(String.valueOf(val));
-                    if (time > 0) {
-                        dataxColumn.setColumnValue(String.valueOf(time));
-                    } else {
-                        dataxColumn.setColumnValue(val.toString());
+                    if(val!=null){
+                        //判断是否是时间类型
+                        long time = isDate(String.valueOf(val));
+                        if (time > 0) {
+                            dataxColumn.setColumnValue(String.valueOf(time));
+                        } else {
+                            dataxColumn.setColumnValue(val.toString());
+                        }
                     }
                 }
             }

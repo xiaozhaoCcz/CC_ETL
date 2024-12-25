@@ -205,6 +205,7 @@
                   <el-dropdown-item
                     @click="executeOne(scope.row)"
                     :disabled="scope.row.triggerStatus == 1"
+                    v-if="scope.row.jobType != 2"
                   >
                     执行一次
                   </el-dropdown-item>
