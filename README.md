@@ -22,8 +22,6 @@
 https://www.yuque.com/xiaozhao-igpfn/kb/six39vboy38eaq87?singleDoc# 《vue3-xxl-job-admin》
 ## 项目文档
 `/doc/cc-job`
-![image-20241219212046125](./doc/cc-job/images/allp1.png)
-
 [01项目介绍.md](doc/cc-job/01%E9%A1%B9%E7%9B%AE%E4%BB%8B%E7%BB%8D.md)
 ![image-20241219212046125](./doc/cc-job/images/01-ccjob.png)
 
