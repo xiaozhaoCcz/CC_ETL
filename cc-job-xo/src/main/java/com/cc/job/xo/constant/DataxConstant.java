@@ -24,7 +24,7 @@ public interface DataxConstant {
 
     String MYSQL_DRIVER = "com.mysql.cj.jdbc.Driver";
 
-    String ORACLE_DRIVER = "oracle.jdbc.driver.OracleDriver";
+    String ORACLE_DRIVER = "oracle.jdbc.OracleDriver";
 
     String QUERY_SQL = "querySql";
 

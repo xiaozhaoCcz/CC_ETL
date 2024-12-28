@@ -27,7 +27,7 @@ public class MysqlReader implements BaseRW {
         JSONObject connection = new JSONObject();
         connection.append(JDBC_URL, String.format(MYSQL_JDBC_URL, dataXParams.getIp(), dataXParams.getPort(), dataXParams.getDbName()));
 
-        if(dataXParams.getColumns()!=null&&!dataXParams.getColumns().isEmpty()){
+        if (dataXParams.getColumns() != null && !dataXParams.getColumns().isEmpty()) {
             connection.append(TABLE, dataXParams.getTableName());
             parameter.putOnce(COLUMN, dataXParams.getColumns());
             if (dataXParams.getIncrType() == 1) {
@@ -45,37 +45,37 @@ public class MysqlReader implements BaseRW {
                             .append(GREATER)
                             .append(SPACE);
 
-                    if (dataxColumn.getColumnType() == 1&&!"x".equalsIgnoreCase(dataxColumn.getColumnTimeFormat())) {
-                        sb.append("FROM_UNIXTIME")
-                                .append("(")
+                    if (dataxColumn.getColumnType() == 1 && !"x".equalsIgnoreCase(dataxColumn.getColumnTimeFormat())) {
+                        sb.append(FROM_UNIXTIME)
+                                .append(LEFT_PARENTHESIS)
                                 .append(DOLLAR_SIGN)
                                 .append(LEFT_CURLY_BRACKET)
                                 .append(dataxColumn.getColumnParam())
                                 .append(RIGHT_CURLY_BRACKET)
-                                .append(",")
-                                .append("'")
+                                .append(SPLIT)
+                                .append(SINGLE_QUOTE)
                                 .append(dataxColumn.getColumnTimeFormat())
-                                .append("'")
-                               .append(")");
+                                .append(SINGLE_QUOTE)
+                                .append(RIGHT_PARENTHESIS);
                     } else {
                         // 非字符串类型
-                        sb .append(DOLLAR_SIGN)
-                            .append(LEFT_CURLY_BRACKET)
-                            .append(dataxColumn.getColumnParam())
-                            .append(RIGHT_CURLY_BRACKET);
+                        sb.append(DOLLAR_SIGN)
+                                .append(LEFT_CURLY_BRACKET)
+                                .append(dataxColumn.getColumnParam())
+                                .append(RIGHT_CURLY_BRACKET);
                     }
 
-                            sb.append(SPACE)
+                    sb.append(SPACE)
                             .append(AND)
                             .append(SPACE);
                 }
                 sb.delete(sb.length() - 4, sb.length());
                 parameter.putOnce(WHERE, sb.toString());
             }
-        }else{
-             if(StringUtils.isBlank(dataXParams.getQuerySql())) {
-                 throw new BusinessException(ERROR_COLUMN_EMPTY);
-             }
+        } else {
+            if (StringUtils.isBlank(dataXParams.getQuerySql())) {
+                throw new BusinessException(ERROR_COLUMN_EMPTY);
+            }
             connection.append(QUERY_SQL, dataXParams.getQuerySql());
         }
         parameter.append(CONNECTION, connection);

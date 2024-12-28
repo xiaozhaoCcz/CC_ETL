@@ -35,7 +35,7 @@ public class JdbcCommand {
             Class.forName(driverClassName);
             con = DriverManager.getConnection(url, username, password);
         } catch (Exception e) {
-            throw new BusinessException(e.getMessage());
+            throw new BusinessException(e);
         }
         return con;
     }

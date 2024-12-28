@@ -58,11 +58,6 @@ public class DataxHandler {
     @Value("${cc-job.pypath}")
     private String dataxPy;
 
-    /**
-     * TODO 1.实现主键自增
-     *      2.使用多表关联同步时，不能使用columns字段，只能使用querySql
-     *      3.页面构建json需要优化
-     */
     @XxlJob("runDataxHandler")
     public void runDataxHandler() {
         String json = XxlJobHelper.getJobParam();
@@ -123,13 +118,6 @@ public class DataxHandler {
                     .append(EQUALS)
                     .append(SINGLE_QUOTE);
             if(dataxColumn.getColumnType()==1){
-//                    Instant instant = Instant.ofEpochMilli(Long.parseLong(dataxColumn.getColumnValue()));
-//                    // 将Instant转换为LocalDateTime
-//                    LocalDateTime localDateTime = instant.atZone(ZoneId.systemDefault()).toLocalDateTime();
-                //DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-                // 解析字符串为LocalDateTime对象
-//                    LocalDateTime dateTime = LocalDateTime.parse(dataxColumn.getColumnValue(), formatter);
-//                    long timestamp = dateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
                 sb.append(Long.parseLong(dataxColumn.getColumnValue())/1000);;
             }else {
                 sb.append(dataxColumn.getColumnValue());
@@ -169,9 +157,11 @@ public class DataxHandler {
         jobJdbcDatasource.setJdbcPassword(password);
         if(MYSQL_READER.equalsIgnoreCase(name)){
             jobJdbcDatasource.setJdbcDriverClass(MYSQL_DRIVER);
+        }else if(ORACLE_READER.equalsIgnoreCase(name)){
+            jobJdbcDatasource.setJdbcDriverClass(ORACLE_DRIVER);
         }
         try (Connection con = getJdbcConnection(jobJdbcDatasource)) {
-            updateJobInfo(con,querySql,tableName,jobInfo);
+            updateJobInfo(con,querySql,tableName,jobInfo,jobJdbcDatasource);
         } catch (Exception e) {
             throw new BusinessException(e.getMessage());
         }
@@ -213,17 +203,17 @@ public class DataxHandler {
     }
 
 
-    private void updateJobInfo(Connection con,String querySql,String tableName,JobInfo jobInfo) {
+    private void updateJobInfo(Connection con,String querySql,String tableName,JobInfo jobInfo,JobJdbcDatasource jobJdbcDatasource) {
         JSONArray jsonArray = JSONUtil.parseArray(jobInfo.getIncrContent());
         List<DataxColumn> columnList = jsonArray.toList(DataxColumn.class);
         if (StringUtils.isNotBlank(querySql)) {
             updateTableByQuerySql(con, querySql, jobInfo, columnList);
         } else {
-            updateTableByTableName(con, tableName, jobInfo, columnList);
+            updateTableByTableName(con, tableName, jobInfo, columnList,jobJdbcDatasource);
         }
     }
 
-    private void updateTableByTableName(Connection con, String tableName, JobInfo jobInfo, List<DataxColumn> columnList) {
+    private void updateTableByTableName(Connection con, String tableName, JobInfo jobInfo, List<DataxColumn> columnList,JobJdbcDatasource jobJdbcDatasource) {
         StringBuilder sb = new StringBuilder();
         sb.append(SELECT);
         sb.append(SPACE);
@@ -243,7 +233,7 @@ public class DataxHandler {
         StringBuilder whereSql = new StringBuilder();
         for (DataxColumn dataxColumn : columnList) {
             whereSql.append(T_SIGN).append(DOT).append(dataxColumn.getColumnKey()).append(GREATER);
-            if(dataxColumn.getColumnType()==1){
+            if(dataxColumn.getColumnType()==1&&MYSQL_DRIVER.equalsIgnoreCase(jobJdbcDatasource.getJdbcDriverClass())){
                 whereSql.append(FROM_UNIXTIME)
                         .append(LEFT_PARENTHESIS)
                         .append(Long.parseLong(dataxColumn.getColumnValue())/1000)

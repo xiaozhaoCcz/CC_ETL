@@ -322,7 +322,7 @@ function getDriver(datasource?: string) {
   if (datasource == "MYSQL") {
     jdbcDriverClass = "com.mysql.cj.jdbc.Driver";
   } else if (datasource == "ORACLE") {
-    jdbcDriverClass = "oracle.jdbc.driver.OracleDriver";
+    jdbcDriverClass = "oracle.jdbc.OracleDriver";
   }
   return jdbcDriverClass;
 }
