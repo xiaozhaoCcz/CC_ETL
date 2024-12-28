@@ -48,6 +48,7 @@
         type="textarea"
         :rows="6"
         autocomplete="off"
+        placeholder="使用多表查询时，columns必须为空"
       />
     </el-form-item>
     <el-form-item label="解析">

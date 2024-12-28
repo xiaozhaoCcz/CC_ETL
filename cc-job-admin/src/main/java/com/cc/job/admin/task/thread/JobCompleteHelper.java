@@ -176,10 +176,6 @@ public class JobCompleteHelper {
 			return new ReturnT<>(ReturnT.FAIL_CODE, "log repeate callback.");
 		}
 
-		// 处理结果
-		Map<String, Boolean> result = new HashMap<>();
-		result.put(handleCallbackParam.getJobId() + randomId, handleCallbackParam.getHandleCode() == ReturnT.SUCCESS_CODE);
-		XxlJobAdminConfig.getAdminConfig().getRedisTemplate().opsForStream().add(StreamConsumer.TASK_SET_STREAM, result);
 		// handle msg
 		StringBuffer handleMsg = new StringBuffer();
 		if (log.getHandleMsg() != null) {
@@ -194,6 +190,11 @@ public class JobCompleteHelper {
 		log.setHandleCode(handleCallbackParam.getHandleCode());
 		log.setHandleMsg(handleMsg.toString());
 		XxlJobCompleter.updateHandleInfoAndFinish(log);
+
+		// 处理结果
+		Map<String, Boolean> result = new HashMap<>();
+		result.put(handleCallbackParam.getJobId() + randomId, handleCallbackParam.getHandleCode() == ReturnT.SUCCESS_CODE);
+		XxlJobAdminConfig.getAdminConfig().getRedisTemplate().opsForStream().add(StreamConsumer.TASK_SET_STREAM, result);
 
 		return ReturnT.SUCCESS;
 	}

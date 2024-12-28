@@ -428,26 +428,6 @@ public class CcJobApplicationTest {
     }
 
 
-    @Test
-    public void test5(){
-        JobInfo jobInfo = taskInfoMapper.selectById(279);
-        List<String> cmdList = new ArrayList<>();
-        if(jobInfo.getIncrType()==1){
-            StringBuilder sb = new StringBuilder();
-            sb.append(" -p ");
-            if("id".equalsIgnoreCase(jobInfo.getIncrParam())){
-                sb.append("\"-D"+jobInfo.getIncrParam()+"="+jobInfo.getIncrId()+"\"");
-            }else{
-                LocalDateTime incrTime = jobInfo.getIncrTime();
-                DateTimeFormatter dateTimeFormatter =DateTimeFormatter.ofPattern(jobInfo.getTimeFormat());
-                String format = incrTime.format(dateTimeFormatter);
-                sb.append("\"-D"+jobInfo.getIncrParam()+"="+format+"\"");
-            }
-            cmdList.add(sb.toString());
-        }
-
-        System.out.println(cmdList);
-    }
 
     @Test
     public void test6(){

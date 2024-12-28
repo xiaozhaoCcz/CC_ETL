@@ -43,7 +43,7 @@ public class XxlJobTrigger {
      *          null: use executor addressList
      *          not null: cover
      */
-    public static void trigger(Long jobId,
+    public static Long trigger(Long jobId,
                                TriggerTypeEnum triggerType,
                                int failRetryCount,
                                String executorShardingParam,
@@ -54,7 +54,7 @@ public class XxlJobTrigger {
         JobInfo jobInfo = XxlJobAdminConfig.getAdminConfig().getTaskInfoMapper().selectById(jobId);
         if (jobInfo == null) {
             logger.warn(">>>>>>>>>>>> trigger fail, jobId invalid，jobId={}", jobId);
-            return;
+            return -1L;
         }
         if (executorParam != null) {
             jobInfo.setExecutorParam(executorParam);
@@ -88,9 +88,10 @@ public class XxlJobTrigger {
             if (shardingParam == null) {
                 shardingParam = new int[]{0, 1};
             }
-            processTrigger(group, jobInfo, finalFailRetryCount, triggerType, shardingParam[0], shardingParam[1]);
+           return processTrigger(group, jobInfo, finalFailRetryCount, triggerType, shardingParam[0], shardingParam[1]);
         }
 
+        return -1L;
     }
 
     private static boolean isNumeric(String str){
@@ -110,7 +111,7 @@ public class XxlJobTrigger {
      * @param index                     sharding index
      * @param total                     sharding index
      */
-    private static void processTrigger(JobGroup group, JobInfo jobInfo, int finalFailRetryCount, TriggerTypeEnum triggerType, int index, int total){
+    private static Long processTrigger(JobGroup group, JobInfo jobInfo, int finalFailRetryCount, TriggerTypeEnum triggerType, int index, int total){
 
         // param
         ExecutorBlockStrategyEnum blockStrategy = ExecutorBlockStrategyEnum.match(jobInfo.getExecutorBlockStrategy(), ExecutorBlockStrategyEnum.SERIAL_EXECUTION);  // block strategy
@@ -206,6 +207,7 @@ public class XxlJobTrigger {
         XxlJobAdminConfig.getAdminConfig().getTaskLogMapper().updateById(jobLog);
 
         logger.debug(">>>>>>>>>>> xxl-job trigger end, jobId:{}", jobLog.getId());
+        return jobLog.getId();
     }
 
     /**

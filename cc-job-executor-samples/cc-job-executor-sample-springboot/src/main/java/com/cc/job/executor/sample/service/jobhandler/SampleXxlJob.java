@@ -87,8 +87,9 @@ public class SampleXxlJob {
 //            throw  new RuntimeException();
 //        }
         //default success
-        XxlJobHelper.log(">>>>>>>> demoJobHandler3 end");
-        System.out.println(">>>>>>>> demoJobHandler3 end");
+        throw  new RuntimeException();
+//        XxlJobHelper.log(">>>>>>>> demoJobHandler3 end");
+//        System.out.println(">>>>>>>> demoJobHandler3 end");
     }
 
     @XxlJob("demoJobHandler4")
@@ -151,9 +152,8 @@ public class SampleXxlJob {
             TimeUnit.SECONDS.sleep(1);
         }
         //default success
-//        XxlJobHelper.log(">>>>>>>> demoJobHandler7 end");
-//        System.out.println(">>>>>>>> demoJobHandler7 end");
-        throw new RuntimeException();
+        XxlJobHelper.log(">>>>>>>> demoJobHandler7 end");
+        System.out.println(">>>>>>>> demoJobHandler7 end");
     }
 
     @XxlJob("demoJobHandler8")
