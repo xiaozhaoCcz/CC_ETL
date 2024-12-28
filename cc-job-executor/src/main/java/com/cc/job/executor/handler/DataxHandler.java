@@ -94,14 +94,16 @@ public class DataxHandler {
 
             //更改数据库字段
             if (exitValue == 0) {
-                refreshJobInfo(jobInfo);
+                if(jobInfo.getIncrType()==1){
+                    refreshJobInfo(jobInfo);
+                }
                 XxlJobHelper.log("Datax job completed successfully.");
             } else {
                 XxlJobHelper.log("Datax job failed with exit value: " + exitValue);
             }
         } catch (Exception e) {
             XxlJobHelper.log("ERROR: " + e.getMessage());
-            e.printStackTrace();
+            throw new BusinessException(e);
         } finally {
             DataxUtils.deleteTemJsonFile(temJsonFile);
         }

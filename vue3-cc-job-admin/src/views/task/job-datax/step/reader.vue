@@ -30,7 +30,7 @@
         />
       </el-select>
     </el-form-item>
-    <el-form-item label="数据表" v-if="readerForm.jdbcDatasourceId">
+    <el-form-item label="数据表" v-if="readerForm.jdbcDatasourceId&&readerForm.ds!=='ORACLE'">
       <el-radio-group v-model="readerForm.tableName">
         <el-radio
           v-for="item in tableList"

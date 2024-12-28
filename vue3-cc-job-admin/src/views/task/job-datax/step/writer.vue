@@ -30,7 +30,7 @@
         />
       </el-select>
     </el-form-item>
-    <el-form-item label="数据表" v-if="writerForm.jdbcDatasourceId">
+    <el-form-item label="数据表" v-if="writerForm.jdbcDatasourceId&&writerForm.ds!=='ORACLE'">
       <el-radio-group v-model="writerForm.tableName">
         <el-radio
           v-for="item in tableList"
@@ -58,7 +58,7 @@
         sql解析
       </el-button>
     </el-form-item>
-    <el-form-item label="表字段" v-if="writerForm.tableName">
+    <el-form-item label="表字段">
       <el-checkbox
         v-model="checkAll"
         :indeterminate="isIndeterminate"
@@ -157,6 +157,7 @@ watch(
   }
 );
 
+
 function handleCheckAllChange(val: boolean) {
   writerForm.value.columns = val ? columnList.value : [];
   isIndeterminate.value = false;
@@ -196,6 +197,7 @@ async function getColumns(id: number) {
   }
   await JobDataXAPI.getColumns(id, params).then((data) => {
     columnList.value = data;
+    console.log(data);
   });
 }
 

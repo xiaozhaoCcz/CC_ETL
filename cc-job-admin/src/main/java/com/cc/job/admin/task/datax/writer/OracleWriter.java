@@ -21,7 +21,6 @@ public class OracleWriter implements BaseRW {
                 .putOnce(JDBC_URL,  String.format(ORACLE_JDBC_URL,dataXParams.getIp(),dataXParams.getPort(),dataXParams.getDbName()))
                 .append(TABLE, dataXParams.getTableName()));
         parameter.putOnce(COLUMN, dataXParams.getColumns());
-        parameter.putOnce(WRITE_MODE, dataXParams.getWriteMode());
         readerConfig.putOnce(PARAMETER, parameter);
         return readerConfig;
     }

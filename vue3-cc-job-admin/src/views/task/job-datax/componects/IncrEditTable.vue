@@ -104,10 +104,10 @@
             filterable
             style="width: 210px"
           >
-            <el-option label="YYYY/MM/DD hh:mm:ss" value="%Y/%m/%d %H:%i:%s" />
-            <el-option label="YYYY-MM-DD hh:mm:ss" value="%Y-%m-%d %H:%i:%s" />
-            <el-option label="YYYY/MM/DD" value="%Y/%m/%d" />
-            <el-option label="YYYY-MM-DD" value="%Y-%m-%d" />
+            <el-option label="YYYY/MM/DD hh:mm:ss" value="YYYY/MM/DD hh:mm:ss" />
+            <el-option label="YYYY-MM-DD hh:mm:ss" value="YYYY-MM-DD hh:mm:ss" />
+            <el-option label="YYYY/MM/DD" value="YYYY/MM/DD" />
+            <el-option label="YYYY-MM-DD" value="YYYY-MM-DD" />
             <el-option label="timestamp" value="x" />
           </el-select>
           <span v-else>{{ row.columnTimeFormat }}</span>

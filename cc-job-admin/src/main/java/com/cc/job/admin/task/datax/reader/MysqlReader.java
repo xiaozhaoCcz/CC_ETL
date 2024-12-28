@@ -4,6 +4,8 @@ import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.cc.job.admin.task.datax.BaseRW;
+import com.cc.job.admin.task.enums.DatasourceEnum;
+import com.cc.job.admin.task.utils.DataxUtils;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.xo.constant.DataxConstant;
 import com.cc.job.xo.model.datax.DataXParams;
@@ -54,7 +56,7 @@ public class MysqlReader implements BaseRW {
                                 .append(RIGHT_CURLY_BRACKET)
                                 .append(SPLIT)
                                 .append(SINGLE_QUOTE)
-                                .append(dataxColumn.getColumnTimeFormat())
+                                .append(DataxUtils.getDateFormat(DatasourceEnum.MYSQL,dataxColumn.getColumnTimeFormat()))
                                 .append(SINGLE_QUOTE)
                                 .append(RIGHT_PARENTHESIS);
                     } else {

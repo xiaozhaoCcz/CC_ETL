@@ -195,7 +195,7 @@
           <el-input v-model="formData.jdbcUsername" placeholder="用户名" />
         </el-form-item>
         <el-form-item label="密码" prop="jdbcPassword">
-          <el-input v-model="formData.jdbcPassword" placeholder="密码" />
+          <el-input type="password" v-model="formData.jdbcPassword" placeholder="密码" />
         </el-form-item>
         <el-form-item label="address" prop="address">
           <el-input v-model="formData.ip" placeholder="address" />

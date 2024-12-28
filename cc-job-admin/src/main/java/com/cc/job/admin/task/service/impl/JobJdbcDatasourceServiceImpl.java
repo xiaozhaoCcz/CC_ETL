@@ -164,21 +164,22 @@ public class JobJdbcDatasourceServiceImpl extends ServiceImpl<JobJdbcDatasourceM
         JobJdbcDatasource jobJdbcDatasource = this.getById(id);
         JdbcCommand jdbcCommand = new JdbcCommand(jobJdbcDatasource.getJdbcDriverClass(), jobJdbcDatasource.getJdbcUrl(), jobJdbcDatasource.getJdbcUsername(), jobJdbcDatasource.getJdbcPassword());
         Connection con = jdbcCommand.getConnection();
+        Statement stmt = null;
         ResultSet rs = null;
         try {
             DatabaseMetaData metaData = con.getMetaData();
-            // 获取所有表的名称
             rs = metaData.getTables(con.getCatalog(), null, null, new String[]{"TABLE"});
-
             // 遍历结果集并打印表名
-            while (rs.next()) {
+            while (rs!=null&&rs.next()) {
                 String tableName = rs.getString("TABLE_NAME");
                 tables.add(tableName);
             }
         } catch (SQLException e) {
-             throw new RuntimeException(e);
+             throw new BusinessException(e);
         }finally {
             JdbcCommand.close(rs);
+            JdbcCommand.close(stmt);
+            JdbcCommand.close(con);
         }
         return tables;
     }

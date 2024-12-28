@@ -190,29 +190,21 @@
           <div class="m_left">
             <div class="c_cont" style="justify-content: left">
               <span>增量备份</span>
-              <el-radio-group v-model="formData.incrType" disabled>
+              <el-radio-group v-model="formData.incrType">
                 <el-radio :value="0" style="margin-top: 5px">全量</el-radio>
                 <el-radio :value="1" style="margin-top: 5px">增量</el-radio>
               </el-radio-group>
             </div>
             <div class="c_cont" v-if="formData.incrType == 1">
               <span>默认自增数据</span>
-              <el-input
-                v-model="formData.incrId"
-                style="width: 210px"
-                placeholder="Please input"
-                v-if="formData.incrColumnType == 0"
-                disabled
-              />
-              <el-date-picker
-                v-else
-                v-model="formData.incrTime"
-                type="datetime"
-                placeholder="Select date and time"
-                style="width: 210px"
-                value-format="x"
-                disabled
-              />
+              <IncrEditTable
+                :list="
+                  formData.incrContent == null
+                    ? []
+                    : JSON.parse(formData.incrContent)
+                "
+                @handleTableData="handleTableData"
+              ></IncrEditTable>
             </div>
 
             <div
@@ -236,38 +228,6 @@
                 />
                 <el-option label="timestamp" value="timestamp" />
               </el-select>
-            </div>
-          </div>
-          <div class="m_right">
-            <div class="c_cont" v-if="formData.incrType == 1">
-              <span>自增序列</span>
-              <el-select
-                v-model="formData.incrColumnType"
-                filterable
-                style="width: 210px"
-                disabled
-              >
-                <el-option label="主键自增" :value="0" />
-                <el-option label="时间自增" :value="1" />
-              </el-select>
-            </div>
-            <div class="c_cont" v-if="formData.incrColumnType == 1">
-              <span>数据列</span>
-              <el-input
-                v-model="formData.incrColumnName"
-                style="width: 210px"
-                placeholder="Please input"
-                disabled
-              />
-            </div>
-            <div class="c_cont" v-if="formData.incrType == 1">
-              <span>默认参数</span>
-              <el-input
-                v-model="formData.incrParam"
-                style="width: 210px"
-                placeholder="Please input"
-                disabled
-              />
             </div>
           </div>
         </div>
@@ -300,6 +260,7 @@ import TaskGroupAPI from "@/api/task/task-group";
 import TaskInfoAPI from "@/api/task/task-info";
 //当前使用的页面引入
 import NoVue3Cron from "@/components/NoVue3Cron/index.vue";
+import IncrEditTable from "@/views/task/job-datax/componects/IncrEditTable.vue";
 
 const emit = defineEmits(["pre"]);
 

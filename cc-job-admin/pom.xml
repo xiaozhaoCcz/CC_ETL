@@ -118,6 +118,14 @@
             <artifactId>cc-job-xo</artifactId>
             <version>2.4.2-SNAPSHOT</version>
         </dependency>
+
+        <!-- https://mvnrepository.com/artifact/oracle/ojdbc6 -->
+        <dependency>
+            <groupId>com.oracle</groupId>
+            <artifactId>ojdbc6</artifactId>
+            <version>11.2.0.3</version>
+            <scope>system</scope>
+        </dependency>
     </dependencies>
 
 </project>
