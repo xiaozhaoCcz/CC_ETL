@@ -760,7 +760,6 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         BeanUtil.copyProperties(formData, existsJobInfo);
         existsJobInfo.setGlueUpdatetime(LocalDateTime.now());
         existsJobInfo.setTriggerNextTime(nextTriggerTime);
-        existsJobInfo.setIsNode("N");
         return existsJobInfo;
     }
 

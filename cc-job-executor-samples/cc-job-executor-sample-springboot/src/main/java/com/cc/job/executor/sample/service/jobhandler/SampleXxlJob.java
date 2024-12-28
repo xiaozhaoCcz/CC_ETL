@@ -87,9 +87,9 @@ public class SampleXxlJob {
 //            throw  new RuntimeException();
 //        }
         //default success
-        throw  new RuntimeException();
-//        XxlJobHelper.log(">>>>>>>> demoJobHandler3 end");
-//        System.out.println(">>>>>>>> demoJobHandler3 end");
+//        throw  new RuntimeException();
+        XxlJobHelper.log(">>>>>>>> demoJobHandler3 end");
+        System.out.println(">>>>>>>> demoJobHandler3 end");
     }
 
     @XxlJob("demoJobHandler4")
@@ -112,7 +112,6 @@ public class SampleXxlJob {
     public void demoJobHandler5() throws Exception {
 
         XxlJobHelper.log(">>>>>>>> demoJobHandler5 start");
-        System.out.println(">>>>>>>> demoJobHandler5 start");
 
         for (int i = 0; i < 10; i++) {
             XxlJobHelper.log("demoJobHandler5 beat at:" + i);
@@ -120,8 +119,11 @@ public class SampleXxlJob {
             TimeUnit.SECONDS.sleep(1);
         }
         //default success
+//        if(count.incrementAndGet()<=3){
+//            System.out.println(">>>>>>>>count"+count.get());
+//            throw  new RuntimeException();
+//        }
         XxlJobHelper.log(">>>>>>>> demoJobHandler5 end");
-        System.out.println(">>>>>>>> demoJobHandler5 end");
     }
 
     @XxlJob("demoJobHandler6")

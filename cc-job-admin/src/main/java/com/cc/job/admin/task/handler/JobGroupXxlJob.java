@@ -20,6 +20,7 @@ import com.cc.job.admin.task.thread.JobTriggerPoolHelper;
 import com.cc.job.admin.task.websocket.WebSocketServer;
 import com.cc.job.admin.task.websocket.model.Message;
 import com.cc.tasktool.callback.ICallback;
+import com.cc.tasktool.callback.IWorker;
 import com.cc.tasktool.executor.Async;
 import com.cc.tasktool.worker.WorkResult;
 import com.cc.tasktool.wrapper.WorkerWrapper;
@@ -39,6 +40,7 @@ import org.springframework.stereotype.Component;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /**
@@ -204,7 +206,17 @@ public class JobGroupXxlJob {
                     .id(String.valueOf(node.getId()))
                     .param(node.getTaskId())
                     .timeout(taskInfo.getExecutorTimeout())
-                    .worker((taskId, allWrappers) -> executeTask(taskId, node, taskInfo, randomId, avgTime))
+                    .worker(new IWorker<>() {
+                        @Override
+                        public String action(Long taskId, Map<String, WorkerWrapper> allWrappers) {
+                            return executeTask(taskId, node, taskInfo, randomId, avgTime);
+                        }
+
+                        @Override
+                        public String defaultValue() {
+                            return "任务运行超时异常";
+                        }
+                    })
                     .callback(new TaskCallback(node, randomId));
             result.add(worker);
         }
@@ -225,7 +237,7 @@ public class JobGroupXxlJob {
     private String executeTask(Long taskId, JobNode node, JobInfo taskInfo, String randomId, int avgTime) {
         Long logId = XxlJobTrigger.trigger(taskId, TriggerTypeEnum.MANUAL, -1, null, randomId, "");
         String result;
-        int count = 0;
+        AtomicInteger count = new AtomicInteger(0);
         Thread thread = null;
         try {
             FutureTask<String> futureTask = new FutureTask<>(() -> {
@@ -233,8 +245,10 @@ public class JobGroupXxlJob {
                     List<Pair<String, Boolean>> callbackRes = StreamConsumer.getCallbackRes();
                     for (Pair<String, Boolean> pair : new ArrayList<>(callbackRes)) {
                         if (pair.getKey().equals(setExecuteJobId(taskId, randomId))) {
-                            handleTaskCompletion(pair, node, taskInfo, count, randomId,logId);
-                            return String.valueOf(taskId);
+                            int res = handleTaskCompletion(pair, node, taskInfo, count, randomId, logId);
+                            if(res==1){
+                                return String.valueOf(taskId);
+                            }
                         }
                     }
                 }
@@ -250,7 +264,7 @@ public class JobGroupXxlJob {
         return result;
     }
 
-    private void handleTaskCompletion(Pair<String, Boolean> pair, JobNode node, JobInfo taskInfo, int count, String randomId,Long jobLogId) {
+    private int handleTaskCompletion(Pair<String, Boolean> pair, JobNode node, JobInfo taskInfo, AtomicInteger count, String randomId,Long jobLogId) {
         String key = pair.getKey();
         Long taskId = Long.valueOf(key.split(":")[0]);
         boolean success = pair.getValue();
@@ -263,6 +277,7 @@ public class JobGroupXxlJob {
         message.setRandomId(randomId);
         Long pValue = findParent(taskId, node.getTaskParentId(), randomId);
 
+        int res = 1;
         if (success) {
             message.setStatus(1);
             webSocketServer.sendInfo(message);
@@ -270,9 +285,10 @@ public class JobGroupXxlJob {
             updateTaskIdMap(node, pValue, randomId);
         } else {
             StreamConsumer.removeCallbackRes(setExecuteJobId(taskId, randomId));
-            if (++count <= taskInfo.getExecutorFailRetryCount()) {
-                logger.info("Retrying task: {}, attempt: {}", taskId, count);
+            if (count.incrementAndGet() <= taskInfo.getExecutorFailRetryCount()) {
+                logger.info("Retrying task: {}, attempt: {}", taskId, count.get());
                 XxlJobHelper.log(">>>>>>>>>>>>>>>>>>>重试任务: {}, 重试次数: {}>>>>>>>>>>>>>>>", taskId, count);
+                res = 0;
             } else {
                 message.setStatus(0);
                 webSocketServer.sendInfo(message);
@@ -284,6 +300,7 @@ public class JobGroupXxlJob {
                 }
             }
         }
+        return res;
     }
 
     private void updateTaskIdMap(JobNode node, Long pValue, String randomId) {
@@ -497,7 +514,7 @@ public class JobGroupXxlJob {
 
         @Override
         public void result(boolean success, Long param, WorkResult<String> workResult) {
-            XxlJobHelper.log(">>>>>>>>>>>>>>>>>>>>>任务运行完成:{}, 任务运行状态:{}", param, success);
+            XxlJobHelper.log(">>>>>>>>>>>>>>>>>>>>>任务运行完成:{}, 任务运行状态:{},运行结果:{}", param, success,workResult.getResult());
         }
     }
 
