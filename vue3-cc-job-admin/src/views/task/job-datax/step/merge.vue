@@ -206,29 +206,6 @@
                 @handleTableData="handleTableData"
               ></IncrEditTable>
             </div>
-
-            <div
-              class="c_cont"
-              v-if="formData.incrType == 1 && formData.incrColumnType == 1"
-            >
-              <span>时间格式</span>
-              <el-select
-                v-model="formData.timeFormat"
-                filterable
-                style="width: 210px"
-                disabled
-              >
-                <el-option
-                  label="YYYY/MM/DD hh:mm:ss"
-                  value="yyyy/MM/dd hh:mm:ss"
-                />
-                <el-option
-                  label="YYYY-MM-DD hh:mm:ss"
-                  value="yyyy-MM-dd hh:mm:ss"
-                />
-                <el-option label="timestamp" value="timestamp" />
-              </el-select>
-            </div>
           </div>
         </div>
       </div>
@@ -391,6 +368,10 @@ function editError(a: any, e: any) {
   if (e[0]) {
     line.value = e[0].line;
   }
+}
+
+function handleTableData(val) {
+  formData.value.incrContent = JSON.stringify(val);
 }
 
 async function fetchTaskGroupList() {

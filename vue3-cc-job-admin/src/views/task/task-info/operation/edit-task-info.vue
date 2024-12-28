@@ -3,7 +3,7 @@
     <el-dialog
       v-model="taskInfoVisible.visible"
       :title="taskInfoVisible.title"
-      width="850px"
+      width="1080px"
       :before-close="handleCloseDialog"
     >
       <div class="info_form">
@@ -339,71 +339,14 @@
               </div>
               <div class="c_cont" v-if="formData.incrType == 1">
                 <span>默认自增数据</span>
-                <el-input
-                  v-model="formData.incrId"
-                  style="width: 210px"
-                  placeholder="Please input"
-                  v-if="formData.incrColumnType == 0"
-                />
-                <el-date-picker
-                  v-else
-                  v-model="formData.incrTime"
-                  type="datetime"
-                  placeholder="Select date and time"
-                  style="width: 210px"
-                  value-format="x"
-                />
-              </div>
-
-              <div
-                class="c_cont"
-                v-if="formData.incrType == 1 && formData.incrColumnType == 1"
-              >
-                <span>时间格式</span>
-                <el-select
-                  v-model="formData.timeFormat"
-                  filterable
-                  style="width: 210px"
-                >
-                  <el-option
-                    label="YYYY/MM/DD hh:mm:ss"
-                    value="yyyy/MM/dd hh:mm:ss"
-                  />
-                  <el-option
-                    label="YYYY-MM-DD hh:mm:ss"
-                    value="yyyy-MM-dd hh:mm:ss"
-                  />
-                  <el-option label="timestamp" value="timestamp" />
-                </el-select>
-              </div>
-            </div>
-            <div class="m_right">
-              <div class="c_cont" v-if="formData.incrType == 1">
-                <span>自增序列</span>
-                <el-select
-                  v-model="formData.incrColumnType"
-                  filterable
-                  style="width: 210px"
-                >
-                  <el-option label="主键自增" :value="0" />
-                  <el-option label="时间自增" :value="1" />
-                </el-select>
-              </div>
-              <div class="c_cont" v-if="formData.incrColumnType == 1">
-                <span>数据列</span>
-                <el-input
-                  v-model="formData.incrColumnName"
-                  style="width: 210px"
-                  placeholder="Please input"
-                />
-              </div>
-              <div class="c_cont" v-if="formData.incrType == 1">
-                <span>默认参数</span>
-                <el-input
-                  v-model="formData.incrParam"
-                  style="width: 210px"
-                  placeholder="Please input"
-                />
+                <IncrEditTable
+                  :list="
+                  formData.incrContent == null
+                    ? []
+                    : JSON.parse(formData.incrContent)
+                "
+                  @handleTableData="handleTableData2"
+                ></IncrEditTable>
               </div>
             </div>
           </div>
@@ -442,6 +385,7 @@ import TaskInfoAPI from "@/api/task/task-info";
 import NoVue3Cron from "@/components/NoVue3Cron/index.vue";
 import EditTable from "@/components/EditTable/EditTable.vue";
 import JobJdbcDatasourceAPI from "@/api/task/job-jdbc-datasource";
+import IncrEditTable from "@/views/task/job-datax/componects/IncrEditTable.vue";
 
 const emit = defineEmits(["close", "handleResetQuery"]);
 
@@ -599,6 +543,10 @@ const cronPopover = ref(false);
 
 function handleTableData(val) {
   props.formData.reqHeader = JSON.stringify(val);
+}
+
+function handleTableData2(val) {
+  props.formData.incrContent = JSON.stringify(val);
 }
 
 watch(

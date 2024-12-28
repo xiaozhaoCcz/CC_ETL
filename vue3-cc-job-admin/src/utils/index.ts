@@ -42,7 +42,7 @@ export function isExternal(path: string) {
 
 export function timestampToDateTime(timestamp) {
   // 创建一个新的Date对象，使用时间戳作为参数
-  const date = new Date(timestamp);
+  const date = new Date(parseInt(timestamp));
 
   // 获取年、月、日、时、分、秒
   const year = date.getFullYear();
