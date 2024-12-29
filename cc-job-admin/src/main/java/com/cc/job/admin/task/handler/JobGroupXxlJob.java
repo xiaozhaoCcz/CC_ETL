@@ -99,9 +99,7 @@ public class JobGroupXxlJob {
             Map<Long, List<JobNode>> nextMap = buildNextNode(nodes, edges);
 
             int avgTime = getAvgTime(nodes, taskInfo);
-
             CONTEXT_HOLDER.set(XxlJobContext.getXxlJobContext());
-
             List<WorkerWrapper<Long, String>> workerWrappers = buildWorkerWrappers(nodes, nextMap, randomId, avgTime);
             List<Long> startNodes = getStartNodes(nodes);
             List<WorkerWrapper<Long, String>> startWrappers = getStartWrappers(workerWrappers, startNodes);
@@ -124,8 +122,10 @@ public class JobGroupXxlJob {
         Integer executorTimeout = taskInfo.getExecutorTimeout();
         int size = nodes.size();
         for (JobInfo info : taskInfos) {
-            executorTimeout -= info.getExecutorTimeout();
-            size--;
+            if(info.getExecutorTimeout()>0){
+                executorTimeout -= info.getExecutorTimeout();
+                size--;
+            }
             if (executorTimeout < 0) {
                 throw new BusinessException("子任务运行时长超过任务组");
             }
@@ -189,7 +189,7 @@ public class JobGroupXxlJob {
                 .param(jobId)
                 .worker((id, allWrappers) -> {
                     logger.info(">>>>>>>>>>>>>>>>>任务组：{}开始运行>>>>>>>>>>>>>>>> ", id);
-                    XxlJobHelper.log(xxlJobContext,">>>>>>>>>>>>>>>>>任务组：{}开始运行>>>>>>>>>>>>>>>>", id);
+                    XxlJobHelper.log(xxlJobContext, ">>>>>>>>>>>>>>>>>任务组：{}开始运行>>>>>>>>>>>>>>>>", id);
                     return "";
                 }).next(startWrappers.toArray(new WorkerWrapper[0]));
     }
@@ -217,7 +217,7 @@ public class JobGroupXxlJob {
                     .worker(new IWorker<>() {
                         @Override
                         public String action(Long taskId, Map<String, WorkerWrapper> allWrappers) {
-                            return executeTask(xxlJobContext,taskId, node, taskInfo, randomId, avgTime);
+                            return executeTask(xxlJobContext, taskId, node, taskInfo, randomId, avgTime);
                         }
 
                         @Override
@@ -225,7 +225,7 @@ public class JobGroupXxlJob {
                             return "任务运行超时异常";
                         }
                     })
-                    .callback(new TaskCallback(xxlJobContext,node, randomId));
+                    .callback(new TaskCallback(xxlJobContext, node, randomId));
             result.add(worker);
         }
 
@@ -242,7 +242,7 @@ public class JobGroupXxlJob {
         return result;
     }
 
-    private String executeTask(XxlJobContext xxlJobContext,Long taskId, JobNode node, JobInfo taskInfo, String randomId, int avgTime) {
+    private String executeTask(XxlJobContext xxlJobContext, Long taskId, JobNode node, JobInfo taskInfo, String randomId, int avgTime) {
         Long logId = XxlJobTrigger.trigger(taskId, TriggerTypeEnum.MANUAL, -1, null, randomId, "");
         String result;
         AtomicInteger count = new AtomicInteger(0);
@@ -253,8 +253,8 @@ public class JobGroupXxlJob {
                     List<Pair<String, Boolean>> callbackRes = StreamConsumer.getCallbackRes();
                     for (Pair<String, Boolean> pair : new ArrayList<>(callbackRes)) {
                         if (pair.getKey().equals(setExecuteJobId(taskId, randomId))) {
-                            int res = handleTaskCompletion(xxlJobContext,pair, node, taskInfo, count, randomId, logId);
-                            if(res==1){
+                            int res = handleTaskCompletion(xxlJobContext, pair, node, taskInfo, count, randomId, logId);
+                            if (res == 1) {
                                 return String.valueOf(taskId);
                             }
                         }
@@ -272,13 +272,13 @@ public class JobGroupXxlJob {
         return result;
     }
 
-    private int handleTaskCompletion(XxlJobContext xxlJobContext,Pair<String, Boolean> pair, JobNode node, JobInfo taskInfo, AtomicInteger count, String randomId,Long jobLogId) {
+    private int handleTaskCompletion(XxlJobContext xxlJobContext, Pair<String, Boolean> pair, JobNode node, JobInfo taskInfo, AtomicInteger count, String randomId, Long jobLogId) {
         String key = pair.getKey();
         Long taskId = Long.valueOf(key.split(":")[0]);
         boolean success = pair.getValue();
         //得到任务运行的日志结果
         JobLog jobLog = jobLogMapper.selectById(jobLogId);
-        XxlJobHelper.log(xxlJobContext,">>>>>>>>>>>>>>>>任务运行日志jonId:{}, handleCode:{},handleMsg:{}", jobLogId, jobLog.getHandleCode(), jobLog.getHandleMsg());
+        XxlJobHelper.log(xxlJobContext, ">>>>>>>>>>>>>>>>任务运行日志jonId:{}, handleCode:{},handleMsg:{}", jobLogId, jobLog.getHandleCode(), jobLog.getHandleMsg());
         Message message = new Message();
         message.setTaskId(taskId);
         message.setParentTaskId(node.getTaskParentId());
@@ -295,7 +295,7 @@ public class JobGroupXxlJob {
             StreamConsumer.removeCallbackRes(setExecuteJobId(taskId, randomId));
             if (count.incrementAndGet() <= taskInfo.getExecutorFailRetryCount()) {
                 logger.info("Retrying task: {}, attempt: {}", taskId, count.get());
-                XxlJobHelper.log(xxlJobContext,">>>>>>>>>>>>>>>>>>>重试任务: {}, 重试次数: {}>>>>>>>>>>>>>>>", taskId, count);
+                XxlJobHelper.log(xxlJobContext, ">>>>>>>>>>>>>>>>>>>重试任务: {}, 重试次数: {}>>>>>>>>>>>>>>>", taskId, count);
                 res = 0;
             } else {
                 message.setStatus(0);
@@ -496,7 +496,7 @@ public class JobGroupXxlJob {
 
         private final XxlJobContext xxlJobContext;
 
-        public TaskCallback(XxlJobContext xxlJobContext,JobNode node, String randomId) {
+        public TaskCallback(XxlJobContext xxlJobContext, JobNode node, String randomId) {
             this.node = node;
             this.randomId = randomId;
             this.xxlJobContext = xxlJobContext;
@@ -505,7 +505,7 @@ public class JobGroupXxlJob {
         @Override
         public void begin(Long taskId) {
             logger.info(">>>>>>>>>>>>>>>>>>>>>任务：{}开始运行>>>>>>>>>>>>>>>>>>>>>", taskId);
-            XxlJobHelper.log(xxlJobContext,">>>>>>>>>>>>>>>>>>>>>任务：{}开始运行>>>>>>>>>>>>>>>>>>>>>", taskId);
+            XxlJobHelper.log(xxlJobContext, ">>>>>>>>>>>>>>>>>>>>>任务：{}开始运行>>>>>>>>>>>>>>>>>>>>>", taskId);
             Message message = new Message();
             message.setTaskId(taskId);
             message.setStatus(2);
@@ -525,7 +525,7 @@ public class JobGroupXxlJob {
 
         @Override
         public void result(boolean success, Long param, WorkResult<String> workResult) {
-            XxlJobHelper.log(xxlJobContext,">>>>>>>>>>>>>>>>>>>>>任务运行完成:{}, 任务运行状态:{},运行结果:{}", param, success,workResult.getResult());
+            XxlJobHelper.log(xxlJobContext, ">>>>>>>>>>>>>>>>>>>>>任务运行完成:{}, 任务运行状态:{},运行结果:{}", param, success, workResult.getResult());
         }
     }
 
@@ -709,5 +709,4 @@ public class JobGroupXxlJob {
 //   }
 
     private static Logger logger = LoggerFactory.getLogger(JobGroupXxlJob.class);
-
 }
