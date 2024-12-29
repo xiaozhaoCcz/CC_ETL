@@ -19,7 +19,6 @@ import java.util.Date;
 public class XxlJobHelper {
 
     // ---------------------- base info ----------------------
-
     /**
      * current JobId
      *
@@ -118,6 +117,19 @@ public class XxlJobHelper {
         return logDetail(callInfo, appendLog);
     }
 
+    public static boolean log(XxlJobContext xxlJobContext,String appendLogPattern, Object ... appendLogArguments){
+        FormattingTuple ft = MessageFormatter.arrayFormat(appendLogPattern, appendLogArguments);
+        String appendLog = ft.getMessage();
+
+        /*appendLog = appendLogPattern;
+        if (appendLogArguments!=null && appendLogArguments.length>0) {
+            appendLog = MessageFormat.format(appendLogPattern, appendLogArguments);
+        }*/
+
+        StackTraceElement callInfo = new Throwable().getStackTrace()[1];
+        return logDetail(xxlJobContext,callInfo, appendLog);
+    }
+
     /**
      * append exception stack
      *
@@ -141,6 +153,10 @@ public class XxlJobHelper {
      */
     private static boolean logDetail(StackTraceElement callInfo, String appendLog) {
         XxlJobContext xxlJobContext = XxlJobContext.getXxlJobContext();
+        return appendLog(callInfo, appendLog, xxlJobContext);
+    }
+
+    private static boolean appendLog(StackTraceElement callInfo, String appendLog, XxlJobContext xxlJobContext) {
         if (xxlJobContext == null) {
             return false;
         }
@@ -154,7 +170,7 @@ public class XxlJobHelper {
                 .append("["+ callInfo.getClassName() + "#" + callInfo.getMethodName() +"]").append("-")
                 .append("["+ callInfo.getLineNumber() +"]").append("-")
                 .append("["+ Thread.currentThread().getName() +"]").append(" ")
-                .append(appendLog!=null?appendLog:"");
+                .append(appendLog !=null? appendLog :"");
         String formatAppendLog = stringBuffer.toString();
 
         // appendlog
@@ -167,6 +183,11 @@ public class XxlJobHelper {
             logger.info(">>>>>>>>>>> {}", formatAppendLog);
             return false;
         }
+    }
+
+
+    private static boolean logDetail(XxlJobContext xxlJobContext,StackTraceElement callInfo, String appendLog) {
+        return appendLog(callInfo, appendLog, xxlJobContext);
     }
 
     // ---------------------- tool for handleResult ----------------------
