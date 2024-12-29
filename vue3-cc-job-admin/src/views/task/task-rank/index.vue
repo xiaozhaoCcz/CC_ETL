@@ -139,7 +139,7 @@ const taskRankVisible = reactive({
 const triggerOneVisible = ref(false);
 const taskRankId = ref(null);
 const formData = reactive<TaskInfoForm>({
-  executorTimeout: 60000,
+  executorTimeout: 600000,
 });
 const g_position = ref([140, 140]);
 const taskTitle = ref("");
