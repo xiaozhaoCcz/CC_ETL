@@ -99,9 +99,7 @@ public class JobGroupXxlJob {
             Map<Long, List<JobNode>> nextMap = buildNextNode(nodes, edges);
 
             int avgTime = getAvgTime(nodes, taskInfo);
-
             CONTEXT_HOLDER.set(XxlJobContext.getXxlJobContext());
-
             List<WorkerWrapper<Long, String>> workerWrappers = buildWorkerWrappers(nodes, nextMap, randomId, avgTime);
             List<Long> startNodes = getStartNodes(nodes);
             List<WorkerWrapper<Long, String>> startWrappers = getStartWrappers(workerWrappers, startNodes);
@@ -124,8 +122,10 @@ public class JobGroupXxlJob {
         Integer executorTimeout = taskInfo.getExecutorTimeout();
         int size = nodes.size();
         for (JobInfo info : taskInfos) {
-            executorTimeout -= info.getExecutorTimeout();
-            size--;
+            if(info.getExecutorTimeout()>0){
+                executorTimeout -= info.getExecutorTimeout();
+                size--;
+            }
             if (executorTimeout < 0) {
                 throw new BusinessException("子任务运行时长超过任务组");
             }
@@ -709,5 +709,4 @@ public class JobGroupXxlJob {
 //   }
 
     private static Logger logger = LoggerFactory.getLogger(JobGroupXxlJob.class);
-
 }
