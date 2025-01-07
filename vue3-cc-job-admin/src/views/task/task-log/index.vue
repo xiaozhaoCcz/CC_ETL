@@ -208,7 +208,7 @@ defineOptions({
   inheritAttrs: false,
 });
 
-import TaskLogAPI, { TaskLogPageVO } from "@/api/task/task-log";
+import JobLogAPI, { TaskLogPageVO } from "@/api/task/job-log";
 import TaskTriggerLog from "./operstion/task-trigger-log.vue";
 import TaskExecuteLog from "./operstion/task-execute-log.vue";
 import JobGroupAPI from "@/api/task/job-group";
@@ -301,7 +301,7 @@ const shortcuts = [
 /** 查询task_log */
 function handleQuery() {
   loading.value = true;
-  TaskLogAPI.getPage(queryParams)
+  JobLogAPI.getPage(queryParams)
     .then((data) => {
       pageData.value = data.list;
       total.value = data.total;
@@ -338,7 +338,7 @@ function handleDelete() {
   }).then(
     () => {
       loading.value = true;
-      TaskLogAPI.deleteTaskLogs(queryParams)
+      JobLogAPI.deleteTaskLogs(queryParams)
         .then(() => {
           ElMessage.success("删除成功");
           handleResetQuery();

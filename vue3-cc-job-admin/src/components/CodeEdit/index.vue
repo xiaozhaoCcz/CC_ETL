@@ -41,7 +41,7 @@
 
 <script setup lang="ts">
 import MonacoEditor from "./MonacoEditor.vue";
-import TaskInfoAPI from "@/api/task/task-info";
+import JobInfoAPI from "@/api/task/job-info";
 const emit = defineEmits(["close"]);
 const props = defineProps({
   glueVisible: Boolean,
@@ -97,7 +97,7 @@ function handleGlueChange(val: any) {
 }
 
 function getGlueList() {
-  TaskInfoAPI.getGlueList(taskId.value).then((data) => {
+  JobInfoAPI.getGlueList(taskId.value).then((data) => {
     glueList.value = data;
   });
 }
@@ -112,7 +112,7 @@ function submitForm() {
     glueRemark: _input.value,
     glueSource: _code.value,
   };
-  TaskInfoAPI.saveGlueSource(obj).then((data) => {
+  JobInfoAPI.saveGlueSource(obj).then((data) => {
     _input.value = "";
     ElMessage.success("保存成功");
   });

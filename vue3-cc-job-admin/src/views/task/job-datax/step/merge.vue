@@ -234,7 +234,7 @@
 </template>
 <script setup lang="ts">
 import JobGroupAPI from "@/api/task/job-group";
-import TaskInfoAPI from "@/api/task/task-info";
+import JobInfoAPI from "@/api/task/job-info";
 //当前使用的页面引入
 import NoVue3Cron from "@/components/NoVue3Cron/index.vue";
 import IncrEditTable from "@/views/task/job-datax/componects/IncrEditTable.vue";
@@ -391,7 +391,7 @@ function submitForm() {
   if (id) {
     // if (taskInfoVisible.isCopy) {
     //   formData.id = undefined;
-    //   TaskInfoAPI.add(formData)
+    //   JobInfoAPI.add(formData)
     //     .then(() => {
     //       ElMessage.success("新增成功");
     //       handleCloseDialog();
@@ -399,7 +399,7 @@ function submitForm() {
     //     })
     //     .finally(() => {});
     // } else {
-    TaskInfoAPI.update(id, formData.value)
+    JobInfoAPI.update(id, formData.value)
       .then(() => {
         ElMessage.success("修改成功");
         handleCloseDialog();
@@ -408,7 +408,7 @@ function submitForm() {
       .finally(() => {});
     //}
   } else {
-    TaskInfoAPI.add(formData.value)
+    JobInfoAPI.add(formData.value)
       .then(() => {
         ElMessage.success("新增成功");
         handleCloseDialog();

@@ -1,8 +1,8 @@
 import request from "@/utils/request";
 
-const TASKLOG_BASE_URL = "/api/v1/taskLogs";
+const TASKLOG_BASE_URL = "/api/v1/jobLogs";
 
-const TaskLogAPI = {
+const JobLogAPI = {
   /** 获取task_log分页数据 */
   getPage(queryParams?: TaskLogPageQuery) {
     return request<any, PageResult<TaskLogPageVO[]>>({
@@ -41,7 +41,7 @@ const TaskLogAPI = {
   }
 }
 
-export default TaskLogAPI;
+export default JobLogAPI;
 
 /** task_log分页查询参数 */
 export interface TaskLogPageQuery extends PageQuery {

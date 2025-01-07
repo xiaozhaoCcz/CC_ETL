@@ -199,7 +199,7 @@
 <script setup lang="ts">
 import EditTable from "@/components/EditTable/EditTable.vue";
 import JobGroupAPI from "@/api/task/job-group";
-import TaskInfoAPI from "@/api/task/task-info";
+import JobInfoAPI from "@/api/task/job-info";
 import { getThemeCode } from "@/utils/theme";
 import CodeEditor from "@/components/CodeEdit/index.vue";
 import JobJdbcDatasourceAPI from "@/api/task/job-jdbc-datasource";
@@ -316,7 +316,7 @@ const code = ref("");
 function glueClick() {
   glueVisible.value = true;
   const glueType = formData.glueType;
-  TaskInfoAPI.getFormData(props.nodeTaskId).then((data) => {
+  JobInfoAPI.getFormData(props.nodeTaskId).then((data) => {
     if (data.glueSource == null || data.glueSource.length <= 0) {
       code.value = getThemeCode(glueType);
     } else {
@@ -362,7 +362,7 @@ function confirmClick() {
 
   formData.misfireStrategy = "DO_NOTHING";
   formData.scheduleType = "NONE";
-  TaskInfoAPI.update(props.nodeTaskId, formData)
+  JobInfoAPI.update(props.nodeTaskId, formData)
     .then(() => {
       ElMessage.success("修改成功");
     })
@@ -376,7 +376,7 @@ async function fetchTaskGroupList() {
 
 async function getTaskInfo() {
   if (props.nodeTaskId) {
-    TaskInfoAPI.getFormData(props.nodeTaskId).then((data) => {
+    JobInfoAPI.getFormData(props.nodeTaskId).then((data) => {
       Object.assign(formData, data);
     });
   }

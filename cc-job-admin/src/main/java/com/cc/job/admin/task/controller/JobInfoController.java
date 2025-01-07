@@ -32,7 +32,7 @@ import java.util.List;
  */
 @Tag(name = "task_info接口")
 @RestController
-@RequestMapping("/api/v1/taskInfos")
+@RequestMapping("/api/v1/jobInfos")
 @RequiredArgsConstructor
 public class JobInfoController {
 

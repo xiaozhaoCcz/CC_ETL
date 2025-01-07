@@ -119,7 +119,7 @@ import { VueFlow, useVueFlow, MarkerType } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { MiniMap } from "@vue-flow/minimap";
 import { Folder, ArrowRight, Loading } from "@element-plus/icons-vue";
-import TaskInfoAPI, { TaskInfoForm } from "@/api/task/task-info";
+import JobInfoAPI, { TaskInfoForm } from "@/api/task/job-info";
 import Snowflake from "@/utils/snowflake";
 const {
   updateEdge,
@@ -168,7 +168,7 @@ function handleOpenDialog() {
   taskRankVisible.visible = true;
   if (taskRankId.value) {
     taskRankVisible.title = "修改任务组";
-    TaskInfoAPI.getFormData(taskRankId.value).then((data) => {
+    JobInfoAPI.getFormData(taskRankId.value).then((data) => {
       Object.assign(formData, data);
       formData.nodes = JSON.stringify(nodes.value);
       formData.edges = JSON.stringify(edges.value);
@@ -341,7 +341,7 @@ function triggerOne() {
   const taskInfoTriggerDto = {};
   taskInfoTriggerDto.id = taskId;
   taskInfoTriggerDto.executorParam = taskId + ":" + randomId.value;
-  TaskInfoAPI.triggerJob(taskInfoTriggerDto)
+  JobInfoAPI.triggerJob(taskInfoTriggerDto)
     .then((data) => {
       ElMessage.success("执行任务成功");
       connectWs(taskId + ":" + randomId.value);
@@ -360,7 +360,7 @@ function stopTrigger() {
     ElMessage.warning("请选择任务组～");
     return;
   }
-  TaskInfoAPI.stopTaskSet(taskRankId.value, randomId.value).then(() => {
+  JobInfoAPI.stopTaskSet(taskRankId.value, randomId.value).then(() => {
     triggerOneVisible.value = false;
     updateEdgeStyle();
   });
@@ -412,7 +412,7 @@ function selectTaskSetNode(node) {
   nodes.value = [];
   edges.value = [];
   taskRankId.value = node.id;
-  TaskInfoAPI.getFormData(node.id).then((data) => {
+  JobInfoAPI.getFormData(node.id).then((data) => {
     Object.assign(formData, data);
     taskTitle.value = data.jobDesc;
     const _nodes = JSON.parse(data.nodes);
@@ -448,7 +448,7 @@ function selectTaskSetNode(node) {
 }
 
 function getTaskInfoList() {
-  TaskInfoAPI.getList().then((data) => {
+  JobInfoAPI.getList().then((data) => {
     data.forEach((item) => {
       const obj = {};
       obj.id = item.id;
@@ -461,7 +461,7 @@ function getTaskInfoList() {
 }
 
 function getTaskSetList() {
-  TaskInfoAPI.getList(2).then((data) => {
+  JobInfoAPI.getList(2).then((data) => {
     data.forEach((item) => {
       const obj = {};
       obj.id = item.id;

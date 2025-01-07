@@ -1,8 +1,8 @@
 import request from "@/utils/request";
 
-const TASKINFO_BASE_URL = "/api/v1/taskInfos";
+const TASKINFO_BASE_URL = "/api/v1/jobInfos";
 
-const TaskInfoAPI = {
+const JobInfoAPI = {
   /** 获取task_info分页数据 */
   getPage(queryParams?: TaskInfoPageQuery) {
     return request<any, PageResult<TaskInfoPageVO[]>>({
@@ -137,7 +137,7 @@ const TaskInfoAPI = {
   },
 };
 
-export default TaskInfoAPI;
+export default JobInfoAPI;
 
 /** task_info分页查询参数 */
 export interface TaskInfoPageQuery extends PageQuery {}

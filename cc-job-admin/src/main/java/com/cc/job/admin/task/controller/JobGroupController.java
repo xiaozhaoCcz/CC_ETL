@@ -85,7 +85,7 @@ public class JobGroupController {
     }
 
     @Operation(summary = "获取所有taskGroup")
-    @GetMapping("/getAllTaskGroupList")
+    @GetMapping("/getAllJobGroupList")
     public Result<List<JobGroup>> getAllTaskGroupList(){
         List<JobGroup> list = jobGroupService.list();
         return Result.success(list);

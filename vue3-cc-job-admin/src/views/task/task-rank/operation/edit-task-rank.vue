@@ -198,7 +198,7 @@
 </template>
 <script setup lang="ts">
 import JobGroupAPI from "@/api/task/job-group";
-import TaskInfoAPI from "@/api/task/task-info";
+import JobInfoAPI from "@/api/task/job-info";
 //当前使用的页面引入
 import NoVue3Cron from "@/components/NoVue3Cron/index.vue";
 
@@ -316,14 +316,14 @@ function submitForm() {
   props.formData.glueType = "BEAN";
   props.formData.executorHandler = "runJobGroupXxlJob";
   if (id) {
-    TaskInfoAPI.updateTaskSet(id, props.formData)
+    JobInfoAPI.updateTaskSet(id, props.formData)
       .then(() => {
         ElMessage.success("修改成功");
         handleCloseDialog();
       })
       .finally(() => {});
   } else {
-    TaskInfoAPI.saveTaskSet(props.formData)
+    JobInfoAPI.saveTaskSet(props.formData)
       .then(() => {
         ElMessage.success("新增成功");
         handleCloseDialog();

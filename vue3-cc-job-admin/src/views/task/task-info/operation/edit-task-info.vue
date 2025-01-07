@@ -380,7 +380,7 @@
 </template>
 <script setup lang="ts">
 import JobGroupAPI from "@/api/task/job-group";
-import TaskInfoAPI from "@/api/task/task-info";
+import JobInfoAPI from "@/api/task/job-info";
 //当前使用的页面引入
 import NoVue3Cron from "@/components/NoVue3Cron/index.vue";
 import EditTable from "@/components/EditTable/EditTable.vue";
@@ -609,7 +609,7 @@ function submitForm() {
   if (id) {
     if (props.taskInfoVisible.isCopy) {
       props.formData.id = undefined;
-      TaskInfoAPI.add(props.formData)
+      JobInfoAPI.add(props.formData)
         .then(() => {
           ElMessage.success("新增成功");
           handleCloseDialog();
@@ -617,7 +617,7 @@ function submitForm() {
         })
         .finally(() => {});
     } else {
-      TaskInfoAPI.update(id, props.formData)
+      JobInfoAPI.update(id, props.formData)
         .then(() => {
           ElMessage.success("修改成功");
           handleCloseDialog();
@@ -626,7 +626,7 @@ function submitForm() {
         .finally(() => {});
     }
   } else {
-    TaskInfoAPI.add(props.formData)
+    JobInfoAPI.add(props.formData)
       .then(() => {
         ElMessage.success("新增成功");
         handleCloseDialog();
