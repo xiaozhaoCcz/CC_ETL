@@ -174,11 +174,11 @@ defineOptions({
   inheritAttrs: false,
 });
 
-import TaskGroupAPI, {
-  TaskGroupPageVO,
-  TaskGroupForm,
-  TaskGroupPageQuery,
-} from "@/api/task/task-group";
+import JobGroupAPI, {
+  JobGroupPageVO,
+  JobGroupForm,
+  JobGroupPageQuery,
+} from "@/api/task/job-group";
 import EditTaskGroup from "./operation/edit-task-group.vue";
 
 const queryFormRef = ref(ElForm);
@@ -189,13 +189,13 @@ const total = ref(0);
 const addressList = ref([]);
 const addressVisible = ref(false);
 
-const queryParams = reactive<TaskGroupPageQuery>({
+const queryParams = reactive<JobGroupPageQuery>({
   pageNum: 1,
   pageSize: 10,
 });
 
 // task_group表格数据
-const pageData = ref<TaskGroupPageVO[]>([]);
+const pageData = ref<JobGroupPageVO[]>([]);
 
 // 弹窗
 const taskGroupVisible = reactive({
@@ -204,13 +204,13 @@ const taskGroupVisible = reactive({
 });
 
 // task_group表单数据
-const formData = reactive<TaskGroupForm>({
+const formData = reactive<JobGroupForm>({
   addressType: 0,
 });
 
 function findAddressList(id: number) {
   addressVisible.value = true;
-  TaskGroupAPI.findAddressList(id).then((data: any) => {
+  JobGroupAPI.findAddressList(id).then((data: any) => {
     addressList.value = data;
   });
 }
@@ -225,7 +225,7 @@ function handleOpenDialog(id?: number) {
   taskGroupVisible.visible = true;
   if (id) {
     taskGroupVisible.title = "修改taskGroup";
-    TaskGroupAPI.getFormData(id).then((data) => {
+    JobGroupAPI.getFormData(id).then((data) => {
       Object.assign(formData, data);
     });
   } else {
@@ -236,7 +236,7 @@ function handleOpenDialog(id?: number) {
 /** 查询task_group */
 function handleQuery() {
   loading.value = true;
-  TaskGroupAPI.getPage(queryParams)
+  JobGroupAPI.getPage(queryParams)
     .then((data) => {
       pageData.value = data.list;
       total.value = data.total;
@@ -278,7 +278,7 @@ function handleDelete(id?: number) {
   }).then(
     () => {
       loading.value = true;
-      TaskGroupAPI.deleteByIds(ids)
+      JobGroupAPI.deleteByIds(ids)
         .then(() => {
           ElMessage.success("删除成功");
           handleResetQuery();

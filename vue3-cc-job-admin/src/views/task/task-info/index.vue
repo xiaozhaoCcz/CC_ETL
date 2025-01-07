@@ -334,7 +334,7 @@ import TaskInfoAPI, {
 } from "@/api/task/task-info";
 import ExecuteOne from "./operation/executeone.vue";
 import EditTaskInfo from "./operation/edit-task-info.vue";
-import TaskGroupAPI from "@/api/task/task-group";
+import JobGroupAPI from "@/api/task/job-group";
 import router from "@/router";
 import CodeEditor from "@/components/CodeEdit/index.vue";
 
@@ -532,7 +532,7 @@ function handleDelete(id?: number) {
 }
 
 async function fetchTaskGroupList() {
-  const data = await TaskGroupAPI.getAllTaskGroupList();
+  const data = await JobGroupAPI.getAllJobGroupList();
   taskGroupList.value = data as any;
 }
 

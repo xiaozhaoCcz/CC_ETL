@@ -211,7 +211,7 @@ defineOptions({
 import TaskLogAPI, { TaskLogPageVO } from "@/api/task/task-log";
 import TaskTriggerLog from "./operstion/task-trigger-log.vue";
 import TaskExecuteLog from "./operstion/task-execute-log.vue";
-import TaskGroupAPI from "@/api/task/task-group";
+import JobGroupAPI from "@/api/task/job-group";
 import dayjs from "dayjs";
 import { useRoute } from "vue-router";
 const route = useRoute();
@@ -352,7 +352,7 @@ function handleDelete() {
 }
 
 async function fetchTaskGroupList() {
-  const data = await TaskGroupAPI.getAllTaskGroupList();
+  const data = await JobGroupAPI.getAllJobGroupList();
   taskGroupList.value = data as any;
 }
 

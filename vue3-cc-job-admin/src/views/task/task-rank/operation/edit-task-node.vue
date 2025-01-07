@@ -198,7 +198,7 @@
 </template>
 <script setup lang="ts">
 import EditTable from "@/components/EditTable/EditTable.vue";
-import TaskGroupAPI from "@/api/task/task-group";
+import JobGroupAPI from "@/api/task/job-group";
 import TaskInfoAPI from "@/api/task/task-info";
 import { getThemeCode } from "@/utils/theme";
 import CodeEditor from "@/components/CodeEdit/index.vue";
@@ -370,7 +370,7 @@ function confirmClick() {
 }
 
 async function fetchTaskGroupList() {
-  const data = await TaskGroupAPI.getAllTaskGroupList();
+  const data = await JobGroupAPI.getAllJobGroupList();
   taskGroupList.value = data as any;
 }
 
