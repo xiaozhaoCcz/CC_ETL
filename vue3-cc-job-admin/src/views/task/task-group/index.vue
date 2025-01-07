@@ -171,13 +171,13 @@
 <script setup lang="ts">
 defineOptions({
   name: "TaskGroup",
-  inheritAttrs: false
+  inheritAttrs: false,
 });
 
 import TaskGroupAPI, {
   TaskGroupPageVO,
   TaskGroupForm,
-  TaskGroupPageQuery
+  TaskGroupPageQuery,
 } from "@/api/task/task-group";
 import EditTaskGroup from "./operation/edit-task-group.vue";
 
@@ -191,7 +191,7 @@ const addressVisible = ref(false);
 
 const queryParams = reactive<TaskGroupPageQuery>({
   pageNum: 1,
-  pageSize: 10
+  pageSize: 10,
 });
 
 // task_group表格数据
@@ -200,16 +200,15 @@ const pageData = ref<TaskGroupPageVO[]>([]);
 // 弹窗
 const taskGroupVisible = reactive({
   title: "",
-  visible: false
+  visible: false,
 });
 
 // task_group表单数据
 const formData = reactive<TaskGroupForm>({
-  addressType: 0
+  addressType: 0,
 });
 
 function findAddressList(id: number) {
-  console.log(id);
   addressVisible.value = true;
   TaskGroupAPI.findAddressList(id).then((data: any) => {
     addressList.value = data;
@@ -275,7 +274,7 @@ function handleDelete(id?: number) {
   ElMessageBox.confirm("确认删除已选中的数据项?", "警告", {
     confirmButtonText: "确定",
     cancelButtonText: "取消",
-    type: "warning"
+    type: "warning",
   }).then(
     () => {
       loading.value = true;

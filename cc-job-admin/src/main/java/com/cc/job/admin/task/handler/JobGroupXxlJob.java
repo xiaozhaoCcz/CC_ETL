@@ -53,15 +53,15 @@ public class JobGroupXxlJob {
 
     final RedisTemplate redisTemplate;
 
-    final JobInfoService taskInfoService;
+    final JobInfoService jobInfoService;
 
-    final JobNodeService taskNodeService;
+    final JobNodeService jobNodeService;
 
-    final JobEdgeService taskEdgeService;
+    final JobEdgeService jobEdgeService;
 
     final WebSocketServer webSocketServer;
 
-    final JobInfoMapper taskInfoMapper;
+    final JobInfoMapper jobInfoMapper;
 
     final JobLogMapper jobLogMapper;
 
@@ -94,7 +94,7 @@ public class JobGroupXxlJob {
             List<JobNode> nodes = getTaskNodesByJobId(jobId);
             List<JobEdge> edges = getTaskEdgesByJobId(jobId);
 
-            setTaskIdMap(nodes, jobId, randomId);
+            setJobIdMap(nodes, jobId, randomId);
             buildGraph(jobId, nodes, edges);
             Map<Long, List<JobNode>> nextMap = buildNextNode(nodes, edges);
 
@@ -137,8 +137,8 @@ public class JobGroupXxlJob {
     }
 
     private List<JobInfo> getJobInfos(List<JobNode> nodes) {
-        List<Long> taskIds = nodes.stream().map(JobNode::getTaskId).toList();
-        return taskInfoService.listByIds(taskIds);
+        List<Long> taskIds = nodes.stream().map(JobNode::getJobId).toList();
+        return jobInfoService.listByIds(taskIds);
     }
 
     private void validateExecuteParam(String executeParam) {
@@ -148,16 +148,16 @@ public class JobGroupXxlJob {
     }
 
     private JobInfo getTaskInfoById(long jobId) {
-        return Optional.ofNullable(taskInfoService.getById(jobId))
+        return Optional.ofNullable(jobInfoService.getById(jobId))
                 .orElseThrow(() -> new BusinessException("TaskInfo not found for jobId: " + jobId));
     }
 
     private List<JobNode> getTaskNodesByJobId(long jobId) {
-        return taskNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getTaskParentId, jobId));
+        return jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, jobId));
     }
 
     private List<JobEdge> getTaskEdgesByJobId(long jobId) {
-        return taskEdgeService.list(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getTaskParentId, jobId));
+        return jobEdgeService.list(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getJobParentId, jobId));
     }
 
     private List<Long> getStartNodes(List<JobNode> nodes) {
@@ -179,7 +179,7 @@ public class JobGroupXxlJob {
         sendCompletionMessage(jobId, randomId);
         TASK_ID_MAP.remove(setExecuteJobId(jobId, randomId));
         STOP_MAP.remove(setExecuteJobId(jobId, randomId));
-        taskInfoMapper.stopTaskSet(jobId);
+        jobInfoMapper.stopTaskSet(jobId);
     }
 
     private static WorkerWrapper<Long, String> createStartWorkWrapper(long jobId, List<WorkerWrapper<Long, String>> startWrappers) {
@@ -196,8 +196,8 @@ public class JobGroupXxlJob {
 
     private void sendCompletionMessage(long jobId, String randomId) {
         Message message = new Message();
-        message.setTaskId(jobId);
-        message.setParentTaskId(jobId);
+        message.setJobId(jobId);
+        message.setParentJobId(jobId);
         message.setStatus(1);
         message.setRandomId(randomId);
         webSocketServer.sendInfo(message);
@@ -209,10 +209,10 @@ public class JobGroupXxlJob {
         final Map<Long, JobInfo> taskInfoMap = taskInfos.stream().collect(Collectors.toMap(JobInfo::getId, t -> t));
         XxlJobContext xxlJobContext = CONTEXT_HOLDER.get();
         for (JobNode node : nodes) {
-            final JobInfo taskInfo = taskInfoMap.get(node.getTaskId());
+            final JobInfo taskInfo = taskInfoMap.get(node.getJobId());
             WorkerWrapper<Long, String> worker = new WorkerWrapper<Long, String>()
                     .id(String.valueOf(node.getId()))
-                    .param(node.getTaskId())
+                    .param(node.getJobId())
                     .timeout(taskInfo.getExecutorTimeout())
                     .worker(new IWorker<>() {
                         @Override
@@ -280,10 +280,10 @@ public class JobGroupXxlJob {
         JobLog jobLog = jobLogMapper.selectById(jobLogId);
         XxlJobHelper.log(xxlJobContext, ">>>>>>>>>>>>>>>>任务运行日志jonId:{}, handleCode:{},handleMsg:{}", jobLogId, jobLog.getHandleCode(), jobLog.getHandleMsg());
         Message message = new Message();
-        message.setTaskId(taskId);
-        message.setParentTaskId(node.getTaskParentId());
+        message.setJobId(taskId);
+        message.setParentJobId(node.getJobParentId());
         message.setRandomId(randomId);
-        Long pValue = findParent(taskId, node.getTaskParentId(), randomId);
+        Long pValue = findParent(taskId, node.getJobParentId(), randomId);
 
         int res = 1;
         if (success) {
@@ -300,7 +300,7 @@ public class JobGroupXxlJob {
             } else {
                 message.setStatus(0);
                 webSocketServer.sendInfo(message);
-                if (TASK_ID_MAP.get(setExecuteJobId(node.getTaskParentId(), randomId)) != null && pValue != null) {
+                if (TASK_ID_MAP.get(setExecuteJobId(node.getJobParentId(), randomId)) != null && pValue != null) {
                     sendParentFailureMessage(node, pValue, randomId);
                 }
                 if (!"DO_NOTHING".equalsIgnoreCase(taskInfo.getExecutorBlockStrategy())) {
@@ -312,10 +312,10 @@ public class JobGroupXxlJob {
     }
 
     private void updateTaskIdMap(JobNode node, Long pValue, String randomId) {
-        String executeJobId = setExecuteJobId(node.getTaskParentId(), randomId);
+        String executeJobId = setExecuteJobId(node.getJobParentId(), randomId);
         if (!TASK_ID_MAP.get(executeJobId).isEmpty()) {
             Set<Long> ids = TASK_ID_MAP.get(executeJobId).get(pValue);
-            ids.remove(node.getTaskId());
+            ids.remove(node.getJobId());
             TASK_ID_MAP.computeIfAbsent(executeJobId, k -> new HashMap<>())
                     .computeIfAbsent(pValue, k -> new HashSet<>())
                     .addAll(ids);
@@ -327,8 +327,8 @@ public class JobGroupXxlJob {
 
     private void sendParentSuccessMessage(JobNode node, Long pValue, String randomId) {
         Message pMessage = new Message();
-        pMessage.setParentTaskId(node.getTaskParentId());
-        pMessage.setTaskId(pValue);
+        pMessage.setParentJobId(node.getJobParentId());
+        pMessage.setJobId(pValue);
         pMessage.setStatus(1);
         pMessage.setRandomId(randomId);
         webSocketServer.sendInfo(pMessage);
@@ -336,8 +336,8 @@ public class JobGroupXxlJob {
 
     private void sendParentFailureMessage(JobNode node, Long pValue, String randomId) {
         Message pMessage = new Message();
-        pMessage.setParentTaskId(node.getTaskParentId());
-        pMessage.setTaskId(pValue);
+        pMessage.setParentJobId(node.getJobParentId());
+        pMessage.setJobId(pValue);
         pMessage.setStatus(0);
         pMessage.setRandomId(randomId);
         webSocketServer.sendInfo(pMessage);
@@ -359,40 +359,34 @@ public class JobGroupXxlJob {
         while (stop) {
             stop = false;
             for (JobNode currentNode : nodes) {
-                JobInfo taskInfo = taskInfoService.getById(currentNode.getTaskId());
-                if (taskInfo.getJobType() != 2 && Objects.equals(currentNode.getTaskParentId(), jobId)) {
+                JobInfo taskInfo = jobInfoService.getById(currentNode.getJobId());
+                if (taskInfo.getJobType() != 2 && Objects.equals(currentNode.getJobParentId(), jobId)) {
                     resNodeList.add(currentNode);
                     continue;
                 }
 
-                if (taskInfo.getJobType() == 2 && Objects.equals(currentNode.getTaskParentId(), jobId)) {
+                if (taskInfo.getJobType() == 2 && Objects.equals(currentNode.getJobParentId(), jobId)) {
                     stop = true;
-                    List<JobEdge> collectEdges = taskEdgeService.list(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getTaskParentId, taskInfo.getId()));
+                    List<JobEdge> collectEdges = jobEdgeService.list(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getJobParentId, taskInfo.getId()));
                     for (JobEdge edge : collectEdges) {
-                        edge.setTaskParentId(jobId);
+                        edge.setJobParentId(jobId);
                         edgeList.add(edge);
                     }
 
                     //得到当前节点的所有开始节点
                     List<Long> fromIds = edgeList.stream().filter(v -> v.getEndNodeId().equals(currentNode.getId())).map(JobEdge::getFromNodeId).toList();
-                    // List<TaskNode> fromNodes = taskNodeService.listByIds(fromIds);
+                    // List<TaskNode> fromNodes = jobNodeService.listByIds(fromIds);
                     //得到当前节点的所有孩子节点
-                    List<JobNode> childrenNode = taskNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getTaskParentId, taskInfo.getId()));
+                    List<JobNode> childrenNode = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, taskInfo.getId()));
                     // 得到孩子节点的开始节点
                     List<JobNode> startNodes = childrenNode.stream().filter(v -> v.getNodeInDegree() == 0).toList();
-//                    for (TaskNode fromNode : fromNodes) {
-//                        fromNode.setNodeOutDegree(fromNode.getNodeOutDegree() - 1 + startNodes.size());
-//                    }
-//                    for (TaskNode startNode : startNodes) {
-//                        startNode.setNodeInDegree(startNode.getNodeInDegree() + fromNodes.size());
-//                    }
                     if (!fromIds.isEmpty()) {
                         for (JobNode taskNode : startNodes) {
                             for (Long fromId : fromIds) {
                                 JobEdge taskEdge = new JobEdge();
                                 taskEdge.setFromNodeId(fromId);
                                 taskEdge.setEndNodeId(taskNode.getId());
-                                taskEdge.setTaskParentId(jobId);
+                                taskEdge.setJobParentId(jobId);
                                 edgeList.add(taskEdge);
                             }
                         }
@@ -401,32 +395,20 @@ public class JobGroupXxlJob {
                     List<Long> endIds = edgeList.stream().filter(v -> v.getFromNodeId().equals(currentNode.getId())).map(JobEdge::getEndNodeId).toList();
 
                     List<JobNode> childEndNodes = childrenNode.stream().filter(v -> v.getNodeOutDegree() == 0).toList();
-
-//                    if (!endIds.isEmpty()) {
-//                        List<TaskNode> endNodes = taskNodeService.listByIds(endIds);
-//                        for (TaskNode endNode : endNodes) {
-//                            endNode.setNodeInDegree(endNode.getNodeInDegree() - 1 + childEndNodes.size());
-//                        }
-//                    }
-//
-//                    for (TaskNode childEndNode : childEndNodes) {
-//                        childEndNode.setNodeOutDegree(childEndNode.getNodeOutDegree() + endIds.size());
-//                    }
-
                     if (!childEndNodes.isEmpty()) {
                         for (JobNode endNode : childEndNodes) {
                             for (Long endId : endIds) {
                                 JobEdge edge = new JobEdge();
                                 edge.setFromNodeId(endNode.getId());
                                 edge.setEndNodeId(endId);
-                                edge.setTaskParentId(jobId);
+                                edge.setJobParentId(jobId);
                                 edgeList.add(edge);
                             }
                         }
                     }
 
                     for (JobNode taskNode : childrenNode) {
-                        taskNode.setTaskParentId(jobId);
+                        taskNode.setJobParentId(jobId);
                         resNodeList.add(taskNode);
                     }
 
@@ -445,12 +427,12 @@ public class JobGroupXxlJob {
         }
     }
 
-    private void setTaskIdMap(List<JobNode> nodes, Long jobId, String randomId) {
+    private void setJobIdMap(List<JobNode> nodes, Long jobId, String randomId) {
         List<JobInfo> taskInfos = getJobInfos(nodes);
         Map<Long, JobInfo> taskInfoMap = taskInfos.stream().collect(Collectors.toMap(JobInfo::getId, t -> t));
 
         for (JobNode node : nodes) {
-            JobInfo taskInfo = taskInfoMap.get(node.getTaskId());
+            JobInfo taskInfo = taskInfoMap.get(node.getJobId());
             ArrayList<Long> idList = new ArrayList<>();
             getTaskInfoIds(taskInfo.getId(), idList);
             TASK_ID_MAP.computeIfAbsent(setExecuteJobId(jobId, randomId), k -> new HashMap<>())
@@ -478,11 +460,11 @@ public class JobGroupXxlJob {
     }
 
     public void getTaskInfoIds(Long jobId, List<Long> ids) {
-        JobInfo taskInfo = taskInfoService.getById(jobId);
+        JobInfo taskInfo = jobInfoService.getById(jobId);
         if (taskInfo.getJobType() != 2) {
             ids.add(taskInfo.getId());
         } else {
-            List<JobInfo> taskInfos = taskInfoService.list(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getParentId, jobId));
+            List<JobInfo> taskInfos = jobInfoService.list(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getParentId, jobId));
             if (!taskInfos.isEmpty()) {
                 taskInfos.stream().map(JobInfo::getId).forEach(childTaskId -> getTaskInfoIds(childTaskId, ids));
             }
@@ -507,16 +489,16 @@ public class JobGroupXxlJob {
             logger.info(">>>>>>>>>>>>>>>>>>>>>任务：{}开始运行>>>>>>>>>>>>>>>>>>>>>", taskId);
             XxlJobHelper.log(xxlJobContext, ">>>>>>>>>>>>>>>>>>>>>任务：{}开始运行>>>>>>>>>>>>>>>>>>>>>", taskId);
             Message message = new Message();
-            message.setTaskId(taskId);
+            message.setJobId(taskId);
             message.setStatus(2);
             message.setRandomId(randomId);
-            message.setParentTaskId(node.getTaskParentId());
+            message.setParentJobId(node.getJobParentId());
             webSocketServer.sendInfo(message);
-            Long pValue = findParent(taskId, node.getTaskParentId(), randomId);
-            if (TASK_ID_MAP.get(setExecuteJobId(node.getTaskParentId(), randomId)) != null && pValue != null) {
+            Long pValue = findParent(taskId, node.getJobParentId(), randomId);
+            if (TASK_ID_MAP.get(setExecuteJobId(node.getJobParentId(), randomId)) != null && pValue != null) {
                 Message pMessage = new Message();
-                pMessage.setParentTaskId(node.getTaskParentId());
-                pMessage.setTaskId(pValue);
+                pMessage.setParentJobId(node.getJobParentId());
+                pMessage.setJobId(pValue);
                 pMessage.setStatus(2);
                 pMessage.setRandomId(randomId);
                 webSocketServer.sendInfo(pMessage);
@@ -535,7 +517,7 @@ public class JobGroupXxlJob {
         for (String key : keySet) {
             String[] split = key.split(":");
             Long jobId = Long.parseLong(split[0]);
-            XxlJobAdminConfig.getAdminConfig().getTaskInfoMapper().stopTaskSet(jobId);
+            XxlJobAdminConfig.getAdminConfig().getJobInfoMapper().stopTaskSet(jobId);
         }
     }
 
@@ -610,20 +592,20 @@ public class JobGroupXxlJob {
 //    }
 
 //    private void runT(TaskNode node, List<Long> taskIds) {
-//        TaskInfo taskInfo = taskInfoService.getById(node.getTaskId());
+//        TaskInfo taskInfo = jobInfoService.getById(node.getJobId());
 //
 //        Message message = new Message();
-//        message.setParentTaskId(node.getTaskParentId());
-//        message.setTaskId(node.getTaskId());
+//        message.setParentJobId(node.getJobParentId());
+//        message.setJobId(node.getJobId());
 //
-//        while (Boolean.TRUE.equals(stopMap.get(node.getTaskParentId()).getFirst())) {
-//            XxlJobExecutor.removeJobThread(node.getTaskParentId().intValue(), "stop task" + node.getTaskParentId());
+//        while (Boolean.TRUE.equals(stopMap.get(node.getJobParentId()).getFirst())) {
+//            XxlJobExecutor.removeJobThread(node.getJobParentId().intValue(), "stop task" + node.getJobParentId());
 //            // 节点清空
 //            List<ReturnT<String>> returnTList = JobCompleteHelper.getReturnTList();
 //            returnTList.removeIf(res -> taskIds.contains(Long.valueOf(res.getContent())));
-//            taskIdMap.remove(node.getTaskParentId());
-//            webSocketServer.onClose(node.getTaskParentId());
-//            throw new BusinessException(node.getTaskParentId() + " task stop");
+//            taskIdMap.remove(node.getJobParentId());
+//            webSocketServer.onClose(node.getJobParentId());
+//            throw new BusinessException(node.getJobParentId() + " task stop");
 //        }
 //
 //        JobTriggerPoolHelper.trigger(taskInfo.getId().intValue(), TriggerTypeEnum.MANUAL, -1, null, taskInfo.getExecutorParam(), "");
@@ -632,11 +614,11 @@ public class JobGroupXxlJob {
 //        webSocketServer.sendInfo(message);
 //
 //            //往父亲节点发送消息
-//        Long valueToFind = findParent(taskInfo.getId(), node.getTaskParentId());
+//        Long valueToFind = findParent(taskInfo.getId(), node.getJobParentId());
 //        if(valueToFind!=null){
 //            Message pMessage = new Message();
-//            pMessage.setParentTaskId(node.getTaskParentId());
-//            pMessage.setTaskId(valueToFind);
+//            pMessage.setParentJobId(node.getJobParentId());
+//            pMessage.setJobId(valueToFind);
 //            pMessage.setStatus(2);
 //            webSocketServer.sendInfo(pMessage);
 //        }
@@ -648,24 +630,24 @@ public class JobGroupXxlJob {
 //                List<ReturnT<String>> returnTList = JobCompleteHelper.getReturnTList();
 //                ArrayList<ReturnT<String>> returnTS = new ArrayList<>(returnTList);
 //                for (ReturnT<String> res : returnTS) {
-//                    if (res.getContent().equals(String.valueOf(node.getTaskId()))) {
-//                        logger.info("{}end node{}>>>>>>>>>>> task:{}", res, node.getTaskId(), taskInfo.getJobDesc());
+//                    if (res.getContent().equals(String.valueOf(node.getJobId()))) {
+//                        logger.info("{}end node{}>>>>>>>>>>> task:{}", res, node.getJobId(), taskInfo.getJobDesc());
 //                        if (res.getCode() == ReturnT.SUCCESS_CODE) {
 //                            message.setStatus(1);
 //                            webSocketServer.sendInfo(message);
 //                            JobCompleteHelper.removeReturnT(res);
-//                            Long pValue = findParent(node.getTaskId(),node.getTaskParentId());
+//                            Long pValue = findParent(node.getJobId(),node.getJobParentId());
 //
-//                            if(!taskIdMap.get(node.getTaskParentId()).isEmpty()){
-//                                Set<Long> ids = taskIdMap.get(node.getTaskParentId()).get(pValue);
-//                                ids.remove(node.getTaskId());
-//                                taskIdMap.computeIfAbsent(node.getTaskParentId(),k->new HashMap<>())
+//                            if(!taskIdMap.get(node.getJobParentId()).isEmpty()){
+//                                Set<Long> ids = taskIdMap.get(node.getJobParentId()).get(pValue);
+//                                ids.remove(node.getJobId());
+//                                taskIdMap.computeIfAbsent(node.getJobParentId(),k->new HashMap<>())
 //                                                .computeIfAbsent(pValue,k->new HashSet<>())
 //                                                        .addAll(ids);
 //                                if(ids.isEmpty()){
 //                                    Message pMessage = new Message();
-//                                    pMessage.setParentTaskId(node.getTaskParentId());
-//                                    pMessage.setTaskId(pValue);
+//                                    pMessage.setParentJobId(node.getJobParentId());
+//                                    pMessage.setJobId(pValue);
 //                                    pMessage.setStatus(1);
 //                                    webSocketServer.sendInfo(pMessage);
 //                                }
@@ -679,12 +661,12 @@ public class JobGroupXxlJob {
 //                            } else {
 //                                message.setStatus(0);
 //                                webSocketServer.sendInfo(message);
-//                                stopMap.put(node.getTaskParentId(), new Pair<>(true, node.getTaskId()));
-//                                Long pValue = findParent(node.getTaskId(),node.getTaskParentId());
-//                                if(taskIdMap.get(node.getTaskParentId())!=null&&pValue!=null) {
+//                                stopMap.put(node.getJobParentId(), new Pair<>(true, node.getJobId()));
+//                                Long pValue = findParent(node.getJobId(),node.getJobParentId());
+//                                if(taskIdMap.get(node.getJobParentId())!=null&&pValue!=null) {
 //                                    Message pMessage = new Message();
-//                                    pMessage.setParentTaskId(node.getTaskParentId());
-//                                    pMessage.setTaskId(pValue);
+//                                    pMessage.setParentJobId(node.getJobParentId());
+//                                    pMessage.setJobId(pValue);
 //                                    pMessage.setStatus(0);
 //                                    webSocketServer.sendInfo(pMessage);
 //                                }

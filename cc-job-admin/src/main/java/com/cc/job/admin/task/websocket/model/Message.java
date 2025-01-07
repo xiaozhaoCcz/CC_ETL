@@ -7,13 +7,13 @@ import java.io.Serializable;
 @Data
 public class Message implements Serializable {
 
-    private Long parentTaskId;
+    private Long parentJobId;
 
 //    @JsonFormat(shape = JsonFormat.Shape.STRING)
     private Long nodeId;
 
 //    @JsonFormat(shape = JsonFormat.Shape.STRING)
-    private Long taskId;
+    private Long jobId;
 
     private Integer status;
 

@@ -36,12 +36,12 @@ import java.util.List;
 @RequiredArgsConstructor
 public class JobInfoController {
 
-    private final JobInfoService taskInfoService;
+    private final JobInfoService jobInfoService;
 
     @Operation(summary = "task_info分页列表")
     @GetMapping("/page")
     public PageResult<JobInfoVO> getTaskInfoPage(JobInfoQuery queryParams) {
-        IPage<JobInfoVO> result = taskInfoService.getTaskInfoPage(queryParams);
+        IPage<JobInfoVO> result = jobInfoService.getTaskInfoPage(queryParams);
         return PageResult.success(result);
     }
 
@@ -55,14 +55,14 @@ public class JobInfoController {
             wrapper.in(JobInfo::getJobType,0,2);
         }
         wrapper.eq(JobInfo::getIsNode,"N");
-        List<JobInfo> list = taskInfoService.list(wrapper);
+        List<JobInfo> list = jobInfoService.list(wrapper);
         return Result.success(list);
     }
 
     @Operation(summary = "新增task_info")
     @PostMapping
     public Result<Void> saveTaskInfo(@RequestBody @Valid JobInfoForm formData) {
-        boolean result = taskInfoService.saveTaskInfo(formData);
+        boolean result = jobInfoService.saveTaskInfo(formData);
         return Result.judge(result);
     }
 
@@ -71,7 +71,7 @@ public class JobInfoController {
     public Result<JobInfoForm> getTaskInfoForm(
             @Parameter(description = "task_infoID") @PathVariable Long id
     ) {
-        JobInfoForm formData = taskInfoService.getTaskInfoFormData(id);
+        JobInfoForm formData = jobInfoService.getTaskInfoFormData(id);
         return Result.success(formData);
     }
 
@@ -81,7 +81,7 @@ public class JobInfoController {
             @Parameter(description = "task_infoID") @PathVariable Long id,
             @RequestBody @Validated JobInfoForm formData
     ) {
-        boolean result = taskInfoService.updateTaskInfo(id, formData);
+        boolean result = jobInfoService.updateTaskInfo(id, formData);
         return Result.judge(result);
     }
 
@@ -90,35 +90,35 @@ public class JobInfoController {
     public Result<Void> deleteTaskInfos(
             @Parameter(description = "task_infoID，多个以英文逗号(,)分割") @PathVariable String ids
     ) {
-        boolean result = taskInfoService.deleteTaskInfos(ids);
+        boolean result = jobInfoService.deleteTaskInfos(ids);
         return Result.judge(result);
     }
 
     @Operation(summary = "执行任务一次")
     @PostMapping("/trigger")
     public Result<Void> triggerJob(@RequestBody JobInfoTriggerDto taskInfoTriggerDto) {
-        boolean result = taskInfoService.triggerJob(taskInfoTriggerDto);
+        boolean result = jobInfoService.triggerJob(taskInfoTriggerDto);
         return Result.judge(result);
     }
 
     @Operation(summary = "启动")
     @GetMapping("/startTask/{id}")
     public Result<Void> startTask(@PathVariable Long id) {
-        boolean result = taskInfoService.startTask(id);
+        boolean result = jobInfoService.startTask(id);
         return Result.judge(result);
     }
 
     @Operation(summary = "停止")
     @GetMapping("/stopTask/{id}")
     public Result<Void> stopTask(@PathVariable Long id) {
-        boolean result = taskInfoService.stopTask(id);
+        boolean result = jobInfoService.stopTask(id);
         return Result.judge(result);
     }
 
     @Operation(summary = "下一次的运行时间")
     @GetMapping("/nextTriggerTime")
     public Result<List<String>> nextTriggerTime(String scheduleType, String scheduleConf){
-      List<String> list = taskInfoService.nextTriggerTime(scheduleType, scheduleConf);
+      List<String> list = jobInfoService.nextTriggerTime(scheduleType, scheduleConf);
       return Result.success(list);
     }
 
@@ -127,7 +127,7 @@ public class JobInfoController {
     @PostMapping("saveTaskSet")
     public Result<Void>  saveTaskSet(@RequestBody @Valid JobInfoForm formData){
         // 实现任务运行集的保存
-        boolean result = taskInfoService.saveTaskSet(formData);
+        boolean result = jobInfoService.saveTaskSet(formData);
         return Result.judge(result);
     }
 
@@ -136,28 +136,28 @@ public class JobInfoController {
     public Result<Void>  updateTaskSet(@Parameter(description = "task_infoID") @PathVariable Long id,
                                        @RequestBody @Validated JobInfoForm formData){
         // 实现任务运行集的保存
-        boolean result = taskInfoService.updateTaskSet(id,formData);
+        boolean result = jobInfoService.updateTaskSet(id,formData);
         return Result.judge(result);
     }
 
     @Operation(summary = "停止任务集")
     @GetMapping("/stopTaskSet/{id}/{randomId}")
     public Result<Void> stopTaskSet(@PathVariable Long id,@PathVariable String randomId) {
-        boolean result = taskInfoService.stopTaskSet(id,randomId);
+        boolean result = jobInfoService.stopTaskSet(id,randomId);
         return Result.judge(result);
     }
 
     @Operation(summary = "保存GlueSource")
     @PostMapping("saveGlueSource")
     public Result<Void>  saveGlueSource(@RequestBody @Valid JobGlueForm formData){
-        boolean result = taskInfoService.saveGlueSource(formData);
+        boolean result = jobInfoService.saveGlueSource(formData);
         return Result.judge(result);
     }
 
 
     @GetMapping("getGlueList/{id}")
     public Result<List<JobLogglue>> getGlueList(@PathVariable Long id){
-        List<JobLogglue> list =  taskInfoService.getGlueList(id);
+        List<JobLogglue> list =  jobInfoService.getGlueList(id);
         return Result.success(list);
     }
 }

@@ -77,15 +77,15 @@ public class XxlJobAdminConfig implements InitializingBean, DisposableBean {
     // dao, service
 
     @Resource
-    private JobLogMapper taskLogMapper;
+    private JobLogMapper jobLogMapper;
     @Resource
-    private JobInfoMapper taskInfoMapper;
+    private JobInfoMapper jobInfoMapper;
     @Resource
-    private JobRegistryMapper taskRegistryMapper;
+    private JobRegistryMapper jobRegistryMapper;
     @Resource
-    private JobGroupMapper taskGroupMapper;
+    private JobGroupMapper jobGroupMapper;
     @Resource
-    private JobLogReportMapper taskLogReportMapper;
+    private JobLogReportMapper jobLogReportMapper;
     @Resource
     private JavaMailSender mailSender;
     @Resource
@@ -132,24 +132,24 @@ public class XxlJobAdminConfig implements InitializingBean, DisposableBean {
         return logretentiondays;
     }
 
-    public JobLogMapper getTaskLogMapper() {
-        return taskLogMapper;
+    public JobLogMapper getJobLogMapper() {
+        return jobLogMapper;
     }
 
-    public JobInfoMapper getTaskInfoMapper() {
-        return taskInfoMapper;
+    public JobInfoMapper getJobInfoMapper() {
+        return jobInfoMapper;
     }
 
-    public JobRegistryMapper getTaskRegistryMapper() {
-        return taskRegistryMapper;
+    public JobRegistryMapper getJobRegistryMapper() {
+        return jobRegistryMapper;
     }
 
-    public JobGroupMapper getTaskGroupMapper() {
-        return taskGroupMapper;
+    public JobGroupMapper getJobGroupMapper() {
+        return jobGroupMapper;
     }
 
-    public JobLogReportMapper getTaskLogReportMapper() {
-        return taskLogReportMapper;
+    public JobLogReportMapper getJobLogReportMapper() {
+        return jobLogReportMapper;
     }
 
     public JavaMailSender getMailSender() {

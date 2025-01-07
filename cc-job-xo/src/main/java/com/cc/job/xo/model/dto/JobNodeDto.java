@@ -9,9 +9,9 @@ public class JobNodeDto implements Serializable {
 
     private String id;
 
-    private Long taskId;
+    private Long jobId;
 
-    private Long taskParentId;
+    private Long jobParentId;
 
     private Double nodePositionX;
 

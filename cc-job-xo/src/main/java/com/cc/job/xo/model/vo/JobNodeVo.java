@@ -9,11 +9,11 @@ public class JobNodeVo implements Serializable {
 
     private Long id;
 
-    private Long taskId;
+    private Long jobId;
 
-    private String taskName;
+    private String jobName;
 
-    private Long taskParentId;
+    private Long jobParentId;
 
     private Double nodePositionX;
 

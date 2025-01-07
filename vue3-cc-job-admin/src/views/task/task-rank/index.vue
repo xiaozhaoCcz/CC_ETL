@@ -191,13 +191,12 @@ function handleCloseDialog() {
 }
 
 function generateNode(val: any) {
-  console.log(val);
   g_position.value[0] = g_position.value[0] + 10;
   g_position.value[1] = g_position.value[1] + 10;
   return {
     id: "node:" + Date.now().toString(),
     data: {
-      taskId: val.id,
+      jobId: val.id,
       label: val.label,
       randomId: "",
     },
@@ -288,7 +287,7 @@ onNodeDoubleClick(async (changes) => {
     return;
   }
   taskNodeVisible.value = true;
-  nodeTaskId.value = changes.node.data.taskId;
+  nodeTaskId.value = changes.node.data.jobId;
   nowDate.value = new Date();
 });
 
@@ -423,8 +422,8 @@ function selectTaskSetNode(node) {
       const nodeObj = {} as any;
       nodeObj.id = item.id + "";
       nodeObj.data = {
-        taskId: item.taskId,
-        label: item.taskName,
+        jobId: item.jobId,
+        label: item.jobName,
       };
       nodeObj.position = { x: item.nodePositionX, y: item.nodePositionY };
       //style: { border: "1px solid green", borderRadius: "8px", width: "140px" },
@@ -500,7 +499,7 @@ const connectWs = (id: string) => {
     console.log("接收到消息", _message);
 
     if (
-      _message.taskId == taskRankId.value &&
+      _message.jobId == taskRankId.value &&
       _message.randomId == randomId.value
     ) {
       // 关闭任务
@@ -513,7 +512,7 @@ const connectWs = (id: string) => {
     // 接收到消息后，需要做出相应的操作，比如更新节点或边
     const node = nodes.value.find(
       (node: any) =>
-        node.data.taskId == _message.taskId &&
+        node.data.jobId == _message.jobId &&
         node.data.randomId == _message.randomId
     );
     //

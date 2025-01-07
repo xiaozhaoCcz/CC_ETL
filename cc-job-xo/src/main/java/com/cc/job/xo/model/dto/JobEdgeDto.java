@@ -9,7 +9,7 @@ public class JobEdgeDto implements Serializable {
 
     private String id;
 
-    private Long taskParentId;
+    private Long jobParentId;
 
     private String fromNodeId;
 

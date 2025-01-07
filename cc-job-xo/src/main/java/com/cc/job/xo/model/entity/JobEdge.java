@@ -17,7 +17,7 @@ public class JobEdge implements Serializable {
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private Long taskParentId;
+    private Long jobParentId;
 
     private Long fromNodeId;
 

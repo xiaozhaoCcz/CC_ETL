@@ -9,7 +9,7 @@ public class JobEdgeVo implements Serializable {
 
     private Long id;
 
-    private Long taskParentId;
+    private Long jobParentId;
 
     private Long fromNodeId;
 
