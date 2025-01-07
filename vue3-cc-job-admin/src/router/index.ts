@@ -135,6 +135,17 @@ export const constantRoutes: RouteRecordRaw[] = [
           icon: "document",
         },
       },
+      {
+        path: "job-platform",
+        component: () => import("@/views/task/job-platform/index.vue"),
+        // 用于 keep-alive 功能，需要与 SFC 中自动推导或显式声明的组件名称一致
+        // 参考文档: https://cn.vuejs.org/guide/built-ins/keep-alive.html#include-exclude
+        name: "jobPlatform",
+        meta: {
+          title: "Logic-flow",
+          icon: "document",
+        },
+      },
     ],
   },
 ];
