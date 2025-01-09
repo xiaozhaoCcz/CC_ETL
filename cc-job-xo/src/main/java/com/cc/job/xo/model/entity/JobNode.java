@@ -26,6 +26,12 @@ public class JobNode extends BaseEntity {
 
     private Integer sort;
 
+    private String children;
+
+    private String properties;
+
+    private String nodeType;
+
     @Override
     public boolean equals(Object o) {
         if (o == null || getClass() != o.getClass()) return false;

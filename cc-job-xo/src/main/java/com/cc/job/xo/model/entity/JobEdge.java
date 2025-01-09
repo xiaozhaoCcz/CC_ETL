@@ -23,6 +23,14 @@ public class JobEdge implements Serializable {
 
     private Long endNodeId;
 
+    private String pointList;
+
+    private String properties;
+
+    private String startPoint;
+
+    private String endPoint;
+
     @TableField(fill = FieldFill.INSERT)
     @JsonInclude(value = JsonInclude.Include.NON_NULL)
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")

@@ -218,7 +218,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         return true;
     }
 
-    private void delNodes(Long jobId) {
+    @Override
+    public void delNodes(Long jobId) {
         JobInfo taskInfo = this.getById(jobId);
         if (taskInfo.getJobType() == 2) {
             List<JobInfo> taskInfos = this.list(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getParentId, jobId));
@@ -422,7 +423,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     }
 
 
-    private JobInfo baseSaveTaskInfo(JobInfoForm formData) {
+    @Override
+    public JobInfo baseSaveTaskInfo(JobInfoForm formData) {
         JobGroup taskGroup = jobGroupService.getById(formData.getJobGroup());
         if (taskGroup == null) {
             throw new BusinessException(I18nUtil.getString("system_please_choose") + I18nUtil.getString("jobinfo_field_jobgroup"));
@@ -650,7 +652,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         return jobLogglueMapper.selectList(new LambdaQueryWrapper<JobLogglue>().eq(JobLogglue::getJobId, id));
     }
 
-    private JobInfo baseUpdateTaskInfo(Long id, JobInfoForm formData) {
+    @Override
+    public JobInfo baseUpdateTaskInfo(Long id, JobInfoForm formData) {
         ScheduleTypeEnum scheduleTypeEnum = ScheduleTypeEnum.match(formData.getScheduleType(), null);
         if (scheduleTypeEnum == null) {
             throw new BusinessException(I18nUtil.getString("schedule_type") + I18nUtil.getString("system_unvalid"));

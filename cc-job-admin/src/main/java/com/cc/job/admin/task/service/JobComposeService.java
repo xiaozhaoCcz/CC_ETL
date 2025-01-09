@@ -5,4 +5,6 @@ import com.cc.job.xo.model.form.JobInfoForm;
 public interface JobComposeService {
 
     boolean saveJobCompose(JobInfoForm formData);
+
+    boolean updateJobCompose(Long id, JobInfoForm formData);
 }

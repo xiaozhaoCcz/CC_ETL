@@ -60,6 +60,8 @@ public interface JobInfoService extends IService<JobInfo> {
      */
     boolean deleteTaskInfos(String ids);
 
+    void delNodes(Long jobId);
+
     boolean triggerJob(JobInfoTriggerDto taskInfoTriggerDto);
 
     boolean startTask(Long id);
@@ -70,11 +72,15 @@ public interface JobInfoService extends IService<JobInfo> {
 
     boolean saveTaskSet(JobInfoForm formData);
 
+    JobInfo baseSaveTaskInfo(JobInfoForm formData);
+
     boolean updateTaskSet(Long id, JobInfoForm formData);
 
     boolean stopTaskSet(Long id,String randomId);
 
     boolean saveGlueSource(JobGlueForm formData);
+
+    JobInfo baseUpdateTaskInfo(Long id, JobInfoForm formData);
 
     List<JobLogglue> getGlueList(Long id);
 }
