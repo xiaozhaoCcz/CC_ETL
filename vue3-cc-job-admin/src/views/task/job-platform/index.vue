@@ -41,6 +41,10 @@ const patternItems = [
     label: "内置动态分组",
     text: "DynamicGroup",
     icon: "https://cdn.jsdelivr.net/gh/Logic-Flow/static@latest/docs/examples/extension/group/group.png",
+    properties: {
+      isRestrict: true,
+      autoResize: true,
+    },
   },
   {
     type: "circle",
@@ -65,58 +69,9 @@ const patternItems = [
     },
   },
 ];
-const nodes = ref([
-  {
-    id: "circle_2",
-    type: "circle",
-    x: 522,
-    y: 170,
-    text: {
-      value: "circle_2",
-      x: 522,
-      y: 170,
-      editable: false,
-      draggable: true,
-    },
-    properties: {
-      jobId: "123",
-    },
-  },
-  {
-    id: "dynamic-group_1",
-    type: "dynamic-group",
-    x: 382,
-    y: 189,
-    // children: ["rect_3"],
-    text: "dynamic-group_1",
-    resizable: true,
-    properties: {
-      // resizable: true,
-      collapsible: true,
-      width: 420,
-      height: 250,
-      radius: 5,
-      isCollapsed: true,
-    },
-  },
-  {
-    id: "dynamic-group_2",
-    type: "dynamic-group",
-    x: 382,
-    y: 393,
-    // children: ["rect_3"],
-    text: "dynamic-group_2",
-    resizable: true,
-    properties: {
-      width: 420,
-      height: 250,
-      radius: 5,
-      collapsible: false,
-      isCollapsed: false,
-    },
-  },
-]);
+const nodes = ref([]);
 const edges = ref([]);
+const jobInfoList = ref([]);
 const menuConfig = {
   nodeMenu: [
     {
@@ -126,9 +81,11 @@ const menuConfig = {
       },
     },
     {
-      text: "分享",
-      callback() {
-        alert("分享成功！");
+      text: "编辑",
+      callback(node: any) {
+        const _node = lf.value.getNodeModelById(node.id);
+        _node.setProperty("jobId", 33);
+        _node.updateText("demo01");
       },
     },
     {
@@ -177,16 +134,18 @@ const jobCompId = ref(null);
 /** 打开task_info弹窗 */
 function handleOpenDialog() {
   jobComposeVisible.visible = true;
+  const nodes = lf.value!.getGraphRawData().nodes;
+  const edges = lf.value!.getGraphRawData().edges;
   if (jobCompId.value) {
     jobComposeVisible.title = "修改任务组";
     JobInfoAPI.getFormData(jobCompId.value).then((data) => {
       Object.assign(formData, data);
-      formData.nodes = JSON.stringify(nodes.value);
-      formData.edges = JSON.stringify(edges.value);
+      formData.nodes = JSON.stringify(nodes);
+      formData.edges = JSON.stringify(edges);
     });
   } else {
-    formData.nodes = JSON.stringify(nodes.value);
-    formData.edges = JSON.stringify(edges.value);
+    formData.nodes = JSON.stringify(nodes);
+    formData.edges = JSON.stringify(edges);
     jobComposeVisible.title = "新增任务组";
   }
 }
@@ -201,7 +160,15 @@ function handleCloseDialog() {
   jobComposeVisible.visible = false;
 }
 
+function getJobInfoList() {
+  JobInfoAPI.getList().then((data: any) => {
+    jobInfoList.value = data;
+  });
+}
+
 onMounted(() => {
+  getJobInfoList();
+
   lf.value = new LogicFlow({
     container: lfRef.value,
     grid: true,
@@ -209,6 +176,9 @@ onMounted(() => {
     autoExpand: false,
     allowResize: true,
     allowRotate: true,
+    keyboard: {
+      enabled: true,
+    },
     plugins: [DynamicGroup, DndPanel, SelectionSelect, Menu],
   });
   lf.value.extension.dndPanel.setPatternItems(patternItems);

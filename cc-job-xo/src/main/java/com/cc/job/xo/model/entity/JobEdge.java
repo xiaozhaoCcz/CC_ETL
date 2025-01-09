@@ -23,7 +23,7 @@ public class JobEdge implements Serializable {
 
     private Long endNodeId;
 
-    private String pointList;
+    private String pointsList;
 
     private String properties;
 

@@ -76,13 +76,16 @@ public class JobComposeServiceImpl implements JobComposeService {
         Map<String, List<LfNode>> groupNodeMap = lfNodes.stream().collect(Collectors.groupingBy(LfNode::getType));
         List<LfNode> dynamicGroupNodes = groupNodeMap.get("dynamic-group");
         List<String> nodeIds = new ArrayList<>();
-        dynamicGroupNodes.forEach(node->{
-            List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
-            nodeIds.addAll(childIds);
-        });
+        if(dynamicGroupNodes!=null){
+            dynamicGroupNodes.forEach(node->{
+                List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
+                nodeIds.addAll(childIds);
+            });
+        }
 
         List<LfNode> nodeList = lfNodes.stream().filter(n->!nodeIds.contains(n.getId())).toList();
-        List<LfEdge> edgeList = lfEdges.stream().filter(e->nodeIds.contains(e.getSourceNodeId())||nodeIds.contains(e.targetNodeId)).toList();
+        List<String> firstNodes = nodeList.stream().map(LfNode::getId).toList();
+        List<LfEdge> edgeList = lfEdges.stream().filter(e->firstNodes.contains(e.getSourceNodeId())||firstNodes.contains(e.getTargetNodeId())).toList();
 
         operateToSaveJobCompose(jobInfo,nodeList,edgeList,lfNodes,lfEdges);
          return true;
@@ -134,7 +137,7 @@ public class JobComposeServiceImpl implements JobComposeService {
             jobEdge.setEndNodeId(targetJobId);
             jobEdge.setJobParentId(jobInfo.getId());
             jobEdge.setProperties(edge.properties);
-            jobEdge.setPointList(edge.pointsList);
+            jobEdge.setPointsList(edge.pointsList);
             jobEdge.setStartPoint(edge.startPoint);
             jobEdge.setEndPoint(edge.endPoint);
             jobEdgeList.add(jobEdge);
@@ -173,7 +176,7 @@ public class JobComposeServiceImpl implements JobComposeService {
         });
 
         List<LfNode> nodeList = lfNodes.stream().filter(n->!nodeIds.contains(n.getId())).toList();
-        List<LfEdge> edgeList = lfEdges.stream().filter(e->nodeIds.contains(e.getSourceNodeId())||nodeIds.contains(e.targetNodeId)).toList();
+        List<LfEdge> edgeList = lfEdges.stream().filter(e->!nodeIds.contains(e.getSourceNodeId())||!nodeIds.contains(e.getTargetNodeId())).toList();
 
         operateToUpdateJobCompose(jobInfo,nodeList,edgeList,lfNodes,lfEdges);
         return true;
@@ -241,7 +244,7 @@ public class JobComposeServiceImpl implements JobComposeService {
             jobEdge.setEndNodeId(targetJobId);
             jobEdge.setJobParentId(jobInfo.getId());
             jobEdge.setProperties(edge.properties);
-            jobEdge.setPointList(edge.pointsList);
+            jobEdge.setPointsList(edge.pointsList);
             jobEdge.setStartPoint(edge.startPoint);
             jobEdge.setEndPoint(edge.endPoint);
             jobEdgeList.add(jobEdge);

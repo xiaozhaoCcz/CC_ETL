@@ -1,6 +1,7 @@
 package com.cc.job.admin.task.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cc.job.admin.task.service.JobComposeService;
 import com.cc.job.xo.model.dto.JobInfoTriggerDto;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobLogglue;
@@ -37,6 +38,8 @@ import java.util.List;
 public class JobInfoController {
 
     private final JobInfoService jobInfoService;
+
+    private final JobComposeService jobComposeService;
 
     @Operation(summary = "task_info分页列表")
     @GetMapping("/page")
@@ -127,7 +130,7 @@ public class JobInfoController {
     @PostMapping("saveTaskSet")
     public Result<Void>  saveTaskSet(@RequestBody @Valid JobInfoForm formData){
         // 实现任务运行集的保存
-        boolean result = jobInfoService.saveTaskSet(formData);
+        boolean result = jobComposeService.saveJobCompose(formData);
         return Result.judge(result);
     }
 
@@ -136,7 +139,7 @@ public class JobInfoController {
     public Result<Void>  updateTaskSet(@Parameter(description = "task_infoID") @PathVariable Long id,
                                        @RequestBody @Validated JobInfoForm formData){
         // 实现任务运行集的保存
-        boolean result = jobInfoService.updateTaskSet(id,formData);
+        boolean result = jobComposeService.updateJobCompose(id,formData);
         return Result.judge(result);
     }
 
