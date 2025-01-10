@@ -13,6 +13,32 @@
       :formData="formData"
       @close="handleCloseDialog"
     />
+
+    <el-dialog v-model="jobDialog">
+      <el-radio-group v-model="jobRadio" @change="changeJobRadio">
+        <el-radio :value="0" size="large">单任务</el-radio>
+        <el-radio :value="1" size="large">任务组</el-radio>
+      </el-radio-group>
+      <el-select
+        v-model="jobSelectId"
+        placeholder="选择任务"
+        size="large"
+        style="width: 240px"
+      >
+        <el-option
+          v-for="item in selectJobInfoList"
+          :key="item.id"
+          :label="item.jobDesc"
+          :value="item.id"
+        />
+      </el-select>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="cancelDialog">取消</el-button>
+          <el-button type="primary" @click="confirmDialog">确认</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -72,6 +98,11 @@ const patternItems = [
 const nodes = ref([]);
 const edges = ref([]);
 const jobInfoList = ref([]);
+const selectJobInfoList = ref([]);
+const jobRadio = ref(0);
+const jobDialog = ref(false);
+const jobSelectId = ref(undefined);
+const jobNodeEditId = ref(undefined);
 const menuConfig = {
   nodeMenu: [
     {
@@ -83,9 +114,8 @@ const menuConfig = {
     {
       text: "编辑",
       callback(node: any) {
-        const _node = lf.value.getNodeModelById(node.id);
-        _node.setProperty("jobId", 33);
-        _node.updateText("demo01");
+        jobDialog.value = true;
+        jobNodeEditId.value = node.id;
       },
     },
     {
@@ -131,6 +161,29 @@ const formData = reactive<any>({
 });
 const jobCompId = ref(null);
 
+function cancelDialog() {
+  jobSelectId.value = undefined;
+  jobDialog.value = false;
+}
+function confirmDialog() {
+  const _node = lf.value!.getNodeModelById(jobNodeEditId.value);
+  const _jobInfo = jobInfoList.value.find((e) => e.id === jobSelectId.value);
+  console.log(_node);
+  if (_node.type === "dynamic-group") {
+    //新增任务组
+  } else {
+    _node.setProperty("jobId", jobSelectId);
+    _node.updateText(_jobInfo.jobDesc);
+  }
+  cancelDialog();
+}
+
+function changeJobRadio(val: number) {
+  selectJobInfoList.value = jobInfoList.value.filter((e) =>
+    val === 0 ? e.jobType === 0 : e.jobType !== 0
+  );
+}
+
 /** 打开task_info弹窗 */
 function handleOpenDialog() {
   jobComposeVisible.visible = true;
@@ -163,6 +216,7 @@ function handleCloseDialog() {
 function getJobInfoList() {
   JobInfoAPI.getList().then((data: any) => {
     jobInfoList.value = data;
+    selectJobInfoList.value = data.filter((e) => e.jobType === 0);
   });
 }
 
