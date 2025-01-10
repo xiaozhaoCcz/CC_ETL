@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * task_info前端控制层
@@ -162,5 +163,11 @@ public class JobInfoController {
     public Result<List<JobLogglue>> getGlueList(@PathVariable Long id){
         List<JobLogglue> list =  jobInfoService.getGlueList(id);
         return Result.success(list);
+    }
+
+    @GetMapping("getJobCompose/{id}")
+    public Result<Map<String,Object>> getJobCompose(@PathVariable Long id){
+        Map<String,Object> map =  jobComposeService.getJobCompose(id);
+        return Result.success(map);
     }
 }

@@ -68,6 +68,7 @@ const patternItems = [
     text: "DynamicGroup",
     icon: "https://cdn.jsdelivr.net/gh/Logic-Flow/static@latest/docs/examples/extension/group/group.png",
     properties: {
+      isCollapsed: false,
       isRestrict: true,
       autoResize: true,
     },
@@ -169,13 +170,59 @@ function confirmDialog() {
   const _node = lf.value!.getNodeModelById(jobNodeEditId.value);
   const _jobInfo = jobInfoList.value.find((e) => e.id === jobSelectId.value);
   console.log(_node);
-  if (_node.type === "dynamic-group") {
+  if (_jobInfo.jobType === 2) {
     //新增任务组
-  } else {
-    _node.setProperty("jobId", jobSelectId);
-    _node.updateText(_jobInfo.jobDesc);
+    JobInfoAPI.getJobCompose(jobSelectId.value).then((res: any) => {
+      console.log(res);
+      const jobNode = res.jobNode;
+      const newNodes = res.nodes;
+      const newEdges = res.edges;
+      newNodes.forEach((node: any) => {
+        lf.value.graphModel.addNode(generateNode(node));
+      });
+
+      newNodes.forEach((n: any) => {
+        const node = lf.value.getNodeModelById(n.id);
+        if (n.nodeType === "dynamic-group") {
+          JSON.parse(n.children).forEach((id: any) => node.addChild(id));
+        }
+      });
+
+      newEdges.forEach((e: any) => {
+        let generateEdge1 = generateEdge(e);
+        console.log(generateEdge1);
+        lf.value.graphModel.addEdge(generateEdge(e));
+      });
+
+      JSON.parse(jobNode.children).forEach((id: any) => {
+        _node.addChild(id);
+      });
+    });
   }
+  _node.setProperty("jobId", jobSelectId.value);
+  _node.updateText(_jobInfo.jobDesc);
+
   cancelDialog();
+}
+
+function generateNode(node: any) {
+  return {
+    id: node.id,
+    text: node.jobName,
+    type: node.nodeType,
+    x: node.nodePositionX,
+    y: node.nodePositionY,
+    properties: JSON.parse(node.properties),
+    children: node.children != null ? JSON.parse(node.children) : [],
+  };
+}
+
+function generateEdge(edge: any) {
+  return {
+    sourceNodeId: edge.fromNodeId,
+    targetNodeId: edge.endNodeId,
+    type: "polyline",
+  };
 }
 
 function changeJobRadio(val: number) {
@@ -189,6 +236,7 @@ function handleOpenDialog() {
   jobComposeVisible.visible = true;
   const nodes = lf.value!.getGraphRawData().nodes;
   const edges = lf.value!.getGraphRawData().edges;
+  console.log(111, nodes);
   if (jobCompId.value) {
     jobComposeVisible.title = "修改任务组";
     JobInfoAPI.getFormData(jobCompId.value).then((data) => {

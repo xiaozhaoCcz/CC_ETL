@@ -1,6 +1,7 @@
 package com.cc.job.admin.task.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.lang.UUID;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.admin.task.service.JobComposeService;
@@ -12,6 +13,8 @@ import com.cc.job.xo.model.entity.JobEdge;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobNode;
 import com.cc.job.xo.model.form.JobInfoForm;
+import com.cc.job.xo.model.vo.JobEdgeVo;
+import com.cc.job.xo.model.vo.JobNodeVo;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
@@ -108,6 +111,7 @@ public class JobComposeServiceImpl implements JobComposeService {
             jobNode.setJobParentId(jobInfo.getId());
             jobNode.setNodePositionX(node.x);
             jobNode.setNodePositionY(node.y);
+            jobNode.setNodeType(node.type);
             Map<String,Object> propertiesMap = JSONUtil.toBean(node.properties, Map.class);
             propertiesMap.put("jobId",copyJobInfo.getId());
 
@@ -124,7 +128,7 @@ public class JobComposeServiceImpl implements JobComposeService {
             }
             jobNode.setProperties(JSONUtil.toJsonStr(propertiesMap));
             jobNodeService.save(jobNode);
-            nodeIdMap.put(node.getId(),copyJobInfo.getId());
+            nodeIdMap.put(node.getId(),jobNode.getId());
         }
 
         // 添加任务组边
@@ -181,6 +185,7 @@ public class JobComposeServiceImpl implements JobComposeService {
         operateToUpdateJobCompose(jobInfo,nodeList,edgeList,lfNodes,lfEdges);
         return true;
     }
+
 
     private List<Long> operateToUpdateJobCompose(JobInfo jobInfo, List<LfNode> nodeList, List<LfEdge> edgeList,List<LfNode> lfNodes,List<LfEdge> lfEdges){
         Map<String,Long> nodeIdMap = new HashMap<>();
@@ -274,6 +279,78 @@ public class JobComposeServiceImpl implements JobComposeService {
         });
         jobNodeService.updateBatchById(nodeFromDbList2);
         return nodeIdMap.values().stream().toList();
+    }
+
+    @Override
+    public Map<String, Object> getJobCompose(Long id) {
+        Map<String, Object> res =new HashMap<>();
+        List<JobNodeVo> nodeVos = new ArrayList<>();
+        List<JobEdgeVo> edgeVos = new ArrayList<>();
+        String randomId = UUID.fastUUID().toString();
+        getJobCompose(id,nodeVos,edgeVos,randomId);
+        //创建一个父亲节点
+        Map<String, List<JobNodeVo>> groupNodeMap = nodeVos.stream().collect(Collectors.groupingBy(JobNodeVo::getNodeType));
+        List<JobNodeVo> dynamicGroupNodes = groupNodeMap.get("dynamic-group");
+        List<String> nodeIds = new ArrayList<>();
+        if(dynamicGroupNodes!=null){
+            dynamicGroupNodes.forEach(node->{
+                List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
+                nodeIds.addAll(childIds);
+            });
+        }
+        List<JobNodeVo> nodeList = nodeVos.stream().filter(n->!nodeIds.contains(n.getId())).toList();
+        List<String> firstNodes = nodeList.stream().map(JobNodeVo::getId).toList();
+
+        JobInfo jobInfo = jobInfoService.getById(id);
+        JobNodeVo jobNodeVo = new JobNodeVo();
+        jobNodeVo.setId(randomId+":"+randomId);
+        jobNodeVo.setJobId(jobInfo.getId());
+        jobNodeVo.setChildren(JSONUtil.toJsonStr(firstNodes));
+        jobNodeVo.setNodeType("dynamic-group");
+        jobNodeVo.setJobName(jobInfo.getJobDesc());
+        Map<String,String> properties = new HashMap<>();
+        properties.put("jobId",String.valueOf(jobInfo.getId()));
+        properties.put("children",JSONUtil.toJsonStr(firstNodes));
+        jobNodeVo.setProperties(JSONUtil.toJsonStr(properties));
+
+        res.put("jobNode",jobNodeVo);
+        res.put("nodes",nodeVos);
+        res.put("edges",edgeVos);
+        return res;
+    }
+
+    public void getJobCompose(Long id,List<JobNodeVo> nodeVos,List<JobEdgeVo> edgeVos,String randomId) {
+        List<JobNode> jobNodeList = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, id));
+        List<JobEdge> jobEdgeList = jobEdgeService.list(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getJobParentId, id));
+
+        List<Long> jobIds = jobNodeList.stream().map(JobNode::getJobId).toList();
+        List<JobInfo> jobInfos = jobInfoService.listByIds(jobIds);
+        Map<Long, String> jobInfoMap = jobInfos.stream().collect(Collectors.toMap(JobInfo::getId, JobInfo::getJobDesc));
+
+        jobNodeList.forEach(node -> {
+            JobNodeVo jobNodeVo = BeanUtil.copyProperties(node, JobNodeVo.class,"id");
+            String jobName = jobInfoMap.get(node.getJobId());
+            jobNodeVo.setJobName(jobName);
+            jobNodeVo.setId(randomId+":"+node.getId());
+            if ("dynamic-group".equalsIgnoreCase(node.getNodeType())) {
+                String children = node.getChildren();
+                List<String> childIds = JSONUtil.parseArray(children).toList(String.class);
+                List<String> newChildIds = new ArrayList<>();
+                for (String childId : childIds) {
+                    newChildIds.add( randomId+":"+childId);
+                }
+                jobNodeVo.setChildren(JSONUtil.toJsonStr(newChildIds));
+                getJobCompose(node.getJobId(),nodeVos,edgeVos,randomId);
+            }
+            nodeVos.add(jobNodeVo);
+        });
+        for (JobEdge jobEdge : jobEdgeList) {
+            JobEdgeVo jobEdgeVo = BeanUtil.copyProperties(jobEdge, JobEdgeVo.class,"id");
+            jobEdgeVo.setId(randomId+":"+jobEdge.getId());
+            jobEdgeVo.setFromNodeId(randomId+":"+jobEdge.getFromNodeId());
+            jobEdgeVo.setEndNodeId(randomId+":"+jobEdge.getEndNodeId());
+            edgeVos.add(jobEdgeVo);
+        }
     }
 }
 
