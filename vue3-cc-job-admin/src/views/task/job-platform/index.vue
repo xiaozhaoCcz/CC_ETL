@@ -1,10 +1,44 @@
 <template>
   <div class="app-container">
     <div class="tool-list">
-      <el-button type="info" :icon="Folder" circle @click="handleOpenDialog" />
+      <div>任务编排</div>
+      <span class="task_title">{{ taskTitle }}</span>
+      <div class="btn_right_list">
+        <el-button
+          v-if="triggerOneVisible"
+          type="warning"
+          :icon="Loading"
+          circle
+          @click="stopTrigger"
+        />
+        <el-button
+          v-else
+          type="success"
+          :icon="ArrowRight"
+          circle
+          @click="triggerOne"
+        />
+        <el-button
+          type="info"
+          :icon="Folder"
+          circle
+          @click="handleOpenDialog"
+        />
+      </div>
     </div>
     <div class="job-platform">
-      <div class="job-group-tree"></div>
+      <div class="job-group-tree">
+        <el-input v-model="filterJobCompText" placeholder="Filter keyword" />
+        <el-tree
+          ref="treeTaskSetRef"
+          class="filter-tree"
+          :data="jobCompList"
+          :props="defaultProps"
+          default-expand-all
+          :filter-node-method="filterJobCompNode"
+          @node-click="selectJobCompNode"
+        />
+      </div>
       <div class="logic-flow" ref="lfRef"></div>
     </div>
 
@@ -54,8 +88,10 @@ import {
 import "@logicflow/core/lib/style/index.css";
 import "@logicflow/extension/lib/style/index.css";
 import EditJobComp from "@/views/task/job-platform/operation/edit-job-compose.vue";
-import { Folder } from "@element-plus/icons-vue";
+import { ArrowRight, Folder, Loading } from "@element-plus/icons-vue";
 import JobInfoAPI from "@/api/task/job-info";
+import { ref } from "vue";
+import Snowflake from "@/utils/snowflake";
 LogicFlow.use(Control); // 控制面板
 LogicFlow.use(DndPanel); // 拖拽面板
 
@@ -102,6 +138,7 @@ const jobInfoList = ref([]);
 const selectJobInfoList = ref([]);
 const jobRadio = ref(0);
 const jobDialog = ref(false);
+const triggerOneVisible = ref(false);
 const jobSelectId = ref(undefined);
 const jobNodeEditId = ref(undefined);
 const menuConfig = {
@@ -161,6 +198,54 @@ const formData = reactive<any>({
   executorTimeout: 600000,
 });
 const jobCompId = ref(null);
+const filterJobCompText = ref("");
+const jobCompList = ref<any>([
+  {
+    id: 1,
+    label: "默认分组",
+    children: [],
+  },
+]);
+const defaultProps = {
+  children: "children",
+  label: "label",
+};
+const taskTitle = ref("");
+
+function filterJobCompNode(value: string, data: any) {
+  if (!value) return true;
+  return data.label.includes(value);
+}
+
+async function selectJobCompNode(node: any) {
+  if (triggerOneVisible.value) {
+    ElMessage.warning("有任务正在运行，请先停止任务～");
+    return;
+  }
+  lf.value.graphModel.clearData();
+
+  jobCompId.value = node.id;
+  await JobInfoAPI.getJobCompose(node.id).then((res) => {
+    const jobNode = res.jobNode;
+    taskTitle.value = jobNode.jobName;
+    const newNodes = res.nodes;
+    const newEdges = res.edges;
+    newNodes.forEach((node: any) => {
+      lf.value.graphModel.addNode(generateNode(node));
+    });
+    newNodes.forEach((n: any) => {
+      const node = lf.value.getNodeModelById(n.id);
+      if (n.nodeType === "dynamic-group") {
+        JSON.parse(n.children).forEach((id: any) => node.addChild(id));
+      }
+    });
+    newEdges.forEach((e: any) => {
+      let generateEdge1 = generateEdge(e);
+      console.log(generateEdge1);
+      lf.value.graphModel.addEdge(generateEdge(e));
+    });
+  });
+}
 
 function cancelDialog() {
   jobSelectId.value = undefined;
@@ -219,6 +304,7 @@ function generateNode(node: any) {
 
 function generateEdge(edge: any) {
   return {
+    id: edge.id,
     sourceNodeId: edge.fromNodeId,
     targetNodeId: edge.endNodeId,
     type: "polyline",
@@ -229,6 +315,53 @@ function changeJobRadio(val: number) {
   selectJobInfoList.value = jobInfoList.value.filter((e) =>
     val === 0 ? e.jobType === 0 : e.jobType !== 0
   );
+}
+
+const snowflake = new Snowflake(31, 31, true, new Date());
+const randomId = ref("");
+
+function triggerOne() {
+  if (jobCompId.value == null) {
+    ElMessage.warning("请选择任务组～");
+    return;
+  }
+
+  randomId.value = snowflake.nextId(1) as string;
+
+  const _nodes = lf.value!.getGraphRawData().nodes;
+
+  _nodes.forEach((node: any) => {
+    const _node = lf.value!.getNodeModelById(node.id);
+    _node.setProperty("randomId", randomId.value);
+  });
+
+  const jobId = jobCompId.value;
+  const jobInfoTriggerDto = {} as any;
+  jobInfoTriggerDto.id = jobId;
+  jobInfoTriggerDto.executorParam = jobId + ":" + randomId.value;
+  JobInfoAPI.triggerJob(jobInfoTriggerDto)
+    .then((data) => {
+      ElMessage.success("执行任务成功");
+      connectWs(jobId + ":" + randomId.value);
+      triggerOneVisible.value = true;
+      updateEdgeStyle();
+    })
+    .catch((e) => {
+      triggerOneVisible.value = true;
+      ElMessage.error(e);
+    })
+    .finally(() => {});
+}
+
+function stopTrigger() {
+  if (jobCompId.value == null) {
+    ElMessage.warning("请选择任务组～");
+    return;
+  }
+  JobInfoAPI.stopTaskSet(jobCompId.value, randomId.value).then(() => {
+    triggerOneVisible.value = false;
+    updateEdgeStyle();
+  });
 }
 
 /** 打开task_info弹窗 */
@@ -268,7 +401,101 @@ function getJobInfoList() {
   });
 }
 
+function getJobCompList() {
+  JobInfoAPI.getList(2).then((data: any) => {
+    data.forEach((item: any) => {
+      const obj = {} as any;
+      obj.id = item.id;
+      obj.label = item.jobDesc;
+      jobCompList.value[0].children.push(obj);
+    });
+  });
+}
+
+function updateEdgeStyle() {
+  const { edges } = lf.value.getGraphRawData() ?? {};
+  if (triggerOneVisible.value) {
+    edges?.forEach(({ id }) => {
+      lf.value.openEdgeAnimation(id);
+    });
+    return;
+  }
+  edges?.forEach(({ id }) => {
+    lf.value.closeEdgeAnimation(id);
+  });
+}
+
+//--------------------------------------------------ws------------------
+const ws = ref();
+const message = ref();
+const reconnectAttempts = ref(0);
+const maxReconnectAttempts = 3; // 自定义最大重试次数
+
+const connectWs = (id: string) => {
+  ws.value = new WebSocket("ws://localhost:8989/ws/" + id);
+  ws.value.onopen = () => {
+    reconnectAttempts.value = 0;
+    console.log("连接成功");
+  };
+  ws.value.onclose = () => {
+    console.log("连接断开");
+    reconnectAttempts.value++;
+    if (reconnectAttempts.value <= maxReconnectAttempts) {
+      console.log("进行重连");
+      connectWs(id);
+    } else {
+      console.log("连接关闭");
+    }
+  };
+  ws.value.onmessage = (e: any) => {
+    const _message = JSON.parse(e.data);
+    message.value = _message;
+    console.log("接收到消息", _message);
+
+    if (
+      _message.jobId == jobCompId.value &&
+      _message.randomId == randomId.value
+    ) {
+      // 关闭任务
+      setTimeout(() => {
+        triggerOneVisible.value = false;
+        updateEdgeStyle();
+      }, 1000);
+    }
+
+    // 接收到消息后，需要做出相应的操作，比如更新节点或边
+    const nodes = lf.value!.getGraphRawData().nodes;
+    const node = nodes.find(
+      (node: any) =>
+        node.properties.jobId == _message.jobId &&
+        node.properties.randomId == _message.randomId
+    );
+    //
+    const color = getNodeColor(_message.status);
+    if (node) {
+      const _node = lf.value!.getNodeModelById(node.id);
+      if (_node.type === "dynamic-group") {
+      }
+      _node.setStyle("fill", color);
+    }
+  };
+};
+
+const getNodeColor = (status: number) => {
+  switch (status) {
+    case 0:
+      return "#CC0000";
+    case 1:
+      return "#66FF99";
+    case 2:
+      return "#FFFF33";
+    default:
+      return "#000";
+  }
+};
+
 onMounted(() => {
+  getJobCompList();
   getJobInfoList();
 
   lf.value = new LogicFlow({
@@ -293,7 +520,41 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
+.tool-list {
+  margin-bottom: 2px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  .task_title {
+    font-weight: bold;
+    font-size: 18px;
+  }
+
+  .task_title:before {
+    content: "任务组：";
+    color: #5174fd;
+  }
+
+  .btn_right_list {
+    background: #fff;
+    padding: 5px 10px;
+    border-radius: 8px;
+  }
+}
+
 .job-platform {
+  width: 100%;
+  display: flex;
+  justify-content: left;
+
+  .job-group-tree {
+    width: 20%;
+    background: #fff;
+    padding: 10px;
+    overflow-y: auto;
+  }
+
   .logic-flow {
     width: 100%;
     height: 80vh;
