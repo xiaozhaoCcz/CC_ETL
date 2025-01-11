@@ -141,6 +141,13 @@ const JobInfoAPI = {
       method: "get",
     });
   },
+  validateJobComposeEdge(data: TaskInfoForm) {
+    return request({
+      url: `${TASKINFO_BASE_URL}/validateJobComposeEdge`,
+      method: "post",
+      data: data,
+    });
+  },
 };
 
 export default JobInfoAPI;

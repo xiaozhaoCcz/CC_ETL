@@ -245,6 +245,37 @@ function cancelDialog() {
   jobDialog.value = false;
 }
 
+function validateEdge() {
+  const nodes = lf.value!.getGraphRawData().nodes;
+  const nodesIds = [] as any;
+  nodes.forEach((node: any) => {
+    if (node.type === "dynamic-group") {
+      const children = [] as any;
+      children.push(...node.children);
+      nodesIds.push(children);
+    }
+  });
+  const edges = lf.value!.getGraphRawData().edges;
+  const errorEdges = [] as any;
+  edges.forEach((e: any) => {
+    nodesIds.forEach((children: any) => {
+      if (
+        (children.includes(e.sourceNodeId) &&
+          !children.includes(e.targetNodeId)) ||
+        (children.includes(e.targetNodeId) &&
+          !children.includes(e.sourceNodeId))
+      ) {
+        errorEdges.push(e);
+      }
+    });
+  });
+  errorEdges.forEach((e) => {
+    const _edge = lf.value!.getEdgeModelById(e.id);
+    _edge.style.stroke = "red";
+  });
+  return;
+}
+
 async function confirmDialog() {
   const _node = lf.value!.getNodeModelById(jobNodeEditId.value);
   const _jobInfo = jobInfoList.value.find((e) => e.id === jobSelectId.value);
@@ -378,10 +409,27 @@ function stopTrigger() {
 }
 
 /** 打开task_info弹窗 */
-function handleOpenDialog() {
-  jobComposeVisible.visible = true;
+async function handleOpenDialog() {
   const nodes = lf.value!.getGraphRawData().nodes;
   const edges = lf.value!.getGraphRawData().edges;
+
+  const valObj = {
+    nodes: JSON.stringify(nodes),
+    edges: JSON.stringify(edges),
+  };
+
+  let flag = true;
+  await JobInfoAPI.validateJobComposeEdge(valObj).then((data: any) => {
+    flag = data;
+  });
+
+  if (!flag) {
+    ElMessage.error("不同组的节点不能连接~");
+    return;
+  }
+
+  jobComposeVisible.visible = true;
+  // 对任务边进行校验
   if (jobCompId.value) {
     jobComposeVisible.title = "修改任务组";
     JobInfoAPI.getFormData(jobCompId.value).then((data) => {
@@ -529,6 +577,12 @@ onMounted(() => {
   lf.value.render({
     nodes: nodes.value,
     edges: edges.value,
+  });
+
+  const { eventCenter } = lf.value.graphModel;
+  eventCenter.on("graph:updated", (data) => {
+    console.log(333, data);
+    validateEdge();
   });
 });
 </script>

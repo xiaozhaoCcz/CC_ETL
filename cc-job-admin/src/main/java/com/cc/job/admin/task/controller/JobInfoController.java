@@ -170,4 +170,10 @@ public class JobInfoController {
         Map<String,Object> map =  jobComposeService.getJobCompose(id,type);
         return Result.success(map);
     }
+
+    @PostMapping("validateJobComposeEdge")
+    public Result<Boolean> validateJobComposeEdge(@RequestBody Map<String,String> formMap){
+        boolean result =  jobComposeService.validateJobComposeEdge(formMap.get("nodes"),formMap.get("edges"));
+        return Result.success(result);
+    }
 }

@@ -35,7 +35,7 @@ public class JobComposeServiceImpl implements JobComposeService {
     final JobEdgeService jobEdgeService;
 
     @Data
-    public static class LfNode{
+    public static class LfNode {
         private String id;
         private String text;
         private String type;
@@ -46,7 +46,7 @@ public class JobComposeServiceImpl implements JobComposeService {
     }
 
     @Data
-    public static class LfEdge{
+    public static class LfEdge {
         private String id;
         private String pointsList;
         private String properties;
@@ -62,6 +62,12 @@ public class JobComposeServiceImpl implements JobComposeService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean saveJobCompose(JobInfoForm formData) {
+
+        boolean b = validateJobComposeEdge(formData.getNodes(), formData.getEdges());
+        if(!b) {
+            throw new BusinessException("任务组边不合法");
+        }
+
         JobInfo jobInfo = jobInfoService.baseSaveTaskInfo(formData);
         if (StringUtils.isBlank(formData.getNodes())) {
             throw new BusinessException("任务节点不能为空");
@@ -79,27 +85,27 @@ public class JobComposeServiceImpl implements JobComposeService {
         Map<String, List<LfNode>> groupNodeMap = lfNodes.stream().collect(Collectors.groupingBy(LfNode::getType));
         List<LfNode> dynamicGroupNodes = groupNodeMap.get("dynamic-group");
         List<String> nodeIds = new ArrayList<>();
-        if(dynamicGroupNodes!=null){
-            dynamicGroupNodes.forEach(node->{
+        if (dynamicGroupNodes != null) {
+            dynamicGroupNodes.forEach(node -> {
                 List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
                 nodeIds.addAll(childIds);
             });
         }
 
-        List<LfNode> nodeList = lfNodes.stream().filter(n->!nodeIds.contains(n.getId())).toList();
+        List<LfNode> nodeList = lfNodes.stream().filter(n -> !nodeIds.contains(n.getId())).toList();
         List<String> firstNodes = nodeList.stream().map(LfNode::getId).toList();
-        List<LfEdge> edgeList = lfEdges.stream().filter(e->firstNodes.contains(e.getSourceNodeId())||firstNodes.contains(e.getTargetNodeId())).toList();
+        List<LfEdge> edgeList = lfEdges.stream().filter(e -> firstNodes.contains(e.getSourceNodeId()) || firstNodes.contains(e.getTargetNodeId())).toList();
 
-        operateToSaveJobCompose(jobInfo,nodeList,edgeList,lfNodes,lfEdges);
-         return true;
+        operateToSaveJobCompose(jobInfo, nodeList, edgeList, lfNodes, lfEdges);
+        return true;
     }
 
 
-    private List<Long> operateToSaveJobCompose(JobInfo jobInfo, List<LfNode> nodeList, List<LfEdge> edgeList,List<LfNode> lfNodes,List<LfEdge> lfEdges) {
-        Map<String,Long> nodeIdMap = new HashMap<>();
+    private List<Long> operateToSaveJobCompose(JobInfo jobInfo, List<LfNode> nodeList, List<LfEdge> edgeList, List<LfNode> lfNodes, List<LfEdge> lfEdges) {
+        Map<String, Long> nodeIdMap = new HashMap<>();
         for (LfNode node : nodeList) {
-            Map<String,Object> properties= JSONUtil.toBean(node.getProperties(), Map.class);
-            Long jobId = Long.parseLong(String.valueOf(properties.get("jobId"))) ;
+            Map<String, Object> properties = JSONUtil.toBean(node.getProperties(), Map.class);
+            Long jobId = Long.parseLong(String.valueOf(properties.get("jobId")));
             JobInfo jobInfo1 = jobInfoService.getById(jobId);
             JobInfo copyJobInfo = BeanUtil.copyProperties(jobInfo1, JobInfo.class, "id");
             copyJobInfo.setIsNode("Y");
@@ -112,15 +118,15 @@ public class JobComposeServiceImpl implements JobComposeService {
             jobNode.setNodePositionX(node.x);
             jobNode.setNodePositionY(node.y);
             jobNode.setNodeType(node.type);
-            Map<String,Object> propertiesMap = JSONUtil.toBean(node.properties, Map.class);
-            propertiesMap.put("jobId",copyJobInfo.getId());
+            Map<String, Object> propertiesMap = JSONUtil.toBean(node.properties, Map.class);
+            propertiesMap.put("jobId", copyJobInfo.getId());
 
-            if("dynamic-group".equalsIgnoreCase(node.getType())){
+            if ("dynamic-group".equalsIgnoreCase(node.getType())) {
                 List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
                 List<LfNode> childNodes = lfNodes.stream().filter(n -> childIds.contains(n.getId())).toList();
-                List<LfEdge> childEdges = lfEdges.stream().filter(e -> childIds.contains(e.getSourceNodeId())||childIds.contains(e.targetNodeId)).toList();
-                List<Long> childJobIds = operateToSaveJobCompose(copyJobInfo, childNodes, childEdges,lfNodes,lfEdges);
-                propertiesMap.put("children",JSONUtil.toJsonStr(childJobIds));
+                List<LfEdge> childEdges = lfEdges.stream().filter(e -> childIds.contains(e.getSourceNodeId()) || childIds.contains(e.targetNodeId)).toList();
+                List<Long> childJobIds = operateToSaveJobCompose(copyJobInfo, childNodes, childEdges, lfNodes, lfEdges);
+                propertiesMap.put("children", JSONUtil.toJsonStr(childJobIds));
                 jobNode.setChildren(JSONUtil.toJsonStr(childJobIds));
                 copyJobInfo.setJobType(2);
                 copyJobInfo.setExecutorParam(String.valueOf(copyJobInfo.getId()));
@@ -128,7 +134,7 @@ public class JobComposeServiceImpl implements JobComposeService {
             }
             jobNode.setProperties(JSONUtil.toJsonStr(propertiesMap));
             jobNodeService.save(jobNode);
-            nodeIdMap.put(node.getId(),jobNode.getId());
+            nodeIdMap.put(node.getId(), jobNode.getId());
         }
 
         // 添加任务组边
@@ -161,6 +167,10 @@ public class JobComposeServiceImpl implements JobComposeService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean updateJobCompose(Long id, JobInfoForm formData) {
+        boolean b = validateJobComposeEdge(formData.getNodes(), formData.getEdges());
+        if(!b) {
+            throw new BusinessException("任务组边不合法");
+        }
         JobInfo jobInfo = jobInfoService.baseUpdateTaskInfo(id, formData);
         if (StringUtils.isBlank(formData.getNodes())) {
             throw new BusinessException("任务节点不能为空");
@@ -174,23 +184,23 @@ public class JobComposeServiceImpl implements JobComposeService {
         Map<String, List<LfNode>> groupNodeMap = lfNodes.stream().collect(Collectors.groupingBy(LfNode::getType));
         List<LfNode> dynamicGroupNodes = groupNodeMap.get("dynamic-group");
         List<String> nodeIds = new ArrayList<>();
-        if(dynamicGroupNodes!=null) {
+        if (dynamicGroupNodes != null) {
             dynamicGroupNodes.forEach(node -> {
                 List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
                 nodeIds.addAll(childIds);
             });
         }
 
-        List<LfNode> nodeList = lfNodes.stream().filter(n->!nodeIds.contains(n.getId())).toList();
+        List<LfNode> nodeList = lfNodes.stream().filter(n -> !nodeIds.contains(n.getId())).toList();
         List<String> firstNodes = nodeList.stream().map(LfNode::getId).toList();
-        List<LfEdge> edgeList = lfEdges.stream().filter(e->firstNodes.contains(e.getSourceNodeId())||firstNodes.contains(e.getTargetNodeId())).toList();
-        operateToUpdateJobCompose(jobInfo,nodeList,edgeList,lfNodes,lfEdges);
+        List<LfEdge> edgeList = lfEdges.stream().filter(e -> firstNodes.contains(e.getSourceNodeId()) || firstNodes.contains(e.getTargetNodeId())).toList();
+        operateToUpdateJobCompose(jobInfo, nodeList, edgeList, lfNodes, lfEdges);
         return true;
     }
 
 
-    private List<Long> operateToUpdateJobCompose(JobInfo jobInfo, List<LfNode> nodeList, List<LfEdge> edgeList,List<LfNode> lfNodes,List<LfEdge> lfEdges){
-        Map<String,Long> nodeIdMap = new HashMap<>();
+    private List<Long> operateToUpdateJobCompose(JobInfo jobInfo, List<LfNode> nodeList, List<LfEdge> edgeList, List<LfNode> lfNodes, List<LfEdge> lfEdges) {
+        Map<String, Long> nodeIdMap = new HashMap<>();
         List<JobNode> nodeFromDb = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, jobInfo.getId()));
         List<JobNode> updateNodes = new ArrayList<>();
 
@@ -198,7 +208,7 @@ public class JobComposeServiceImpl implements JobComposeService {
             Map<String, Object> properties = JSONUtil.toBean(node.getProperties(), Map.class);
             Long jobId = Long.parseLong(String.valueOf(properties.get("jobId")));
             JobInfo jobInfo1 = jobInfoService.getById(jobId);
-            if(node.getId().contains("-")){
+            if (node.getId().contains("-")) {
                 JobInfo copyJobInfo = BeanUtil.copyProperties(jobInfo1, JobInfo.class, "id");
                 copyJobInfo.setIsNode("Y");
                 copyJobInfo.setParentId(jobInfo.getId());
@@ -210,15 +220,15 @@ public class JobComposeServiceImpl implements JobComposeService {
                 jobNode.setNodePositionX(node.x);
                 jobNode.setNodePositionY(node.y);
                 jobNode.setNodeType(node.type);
-                Map<String,Object> propertiesMap = JSONUtil.toBean(node.properties, Map.class);
-                propertiesMap.put("jobId",copyJobInfo.getId());
+                Map<String, Object> propertiesMap = JSONUtil.toBean(node.properties, Map.class);
+                propertiesMap.put("jobId", copyJobInfo.getId());
 
-                if("dynamic-group".equalsIgnoreCase(node.getType())){
+                if ("dynamic-group".equalsIgnoreCase(node.getType())) {
                     List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
                     List<LfNode> childNodes = lfNodes.stream().filter(n -> childIds.contains(n.getId())).toList();
-                    List<LfEdge> childEdges = lfEdges.stream().filter(e -> childIds.contains(e.getSourceNodeId())||childIds.contains(e.targetNodeId)).toList();
-                    List<Long> childJobIds = operateToSaveJobCompose(copyJobInfo, childNodes, childEdges,lfNodes,lfEdges);
-                    propertiesMap.put("children",JSONUtil.toJsonStr(childJobIds));
+                    List<LfEdge> childEdges = lfEdges.stream().filter(e -> childIds.contains(e.getSourceNodeId()) || childIds.contains(e.targetNodeId)).toList();
+                    List<Long> childJobIds = operateToSaveJobCompose(copyJobInfo, childNodes, childEdges, lfNodes, lfEdges);
+                    propertiesMap.put("children", JSONUtil.toJsonStr(childJobIds));
                     jobNode.setChildren(JSONUtil.toJsonStr(childJobIds));
                     copyJobInfo.setJobType(2);
                     copyJobInfo.setExecutorParam(String.valueOf(copyJobInfo.getId()));
@@ -226,18 +236,18 @@ public class JobComposeServiceImpl implements JobComposeService {
                 }
                 jobNode.setProperties(JSONUtil.toJsonStr(propertiesMap));
                 jobNodeService.save(jobNode);
-                nodeIdMap.put(node.getId(),jobNode.getId());
-            }else {
+                nodeIdMap.put(node.getId(), jobNode.getId());
+            } else {
                 JobNode jobNode = nodeFromDb.stream().filter(n -> n.getJobId().equals(jobId)).findFirst().orElse(null);
-                if("dynamic-group".equalsIgnoreCase(node.getType())){
+                if ("dynamic-group".equalsIgnoreCase(node.getType())) {
                     List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
                     List<LfNode> childNodes = lfNodes.stream().filter(n -> childIds.contains(n.getId())).toList();
-                    List<LfEdge> childEdges = lfEdges.stream().filter(e -> childIds.contains(e.getSourceNodeId())||childIds.contains(e.targetNodeId)).toList();
-                    List<Long> childJobIds = operateToUpdateJobCompose(jobInfo1, childNodes, childEdges,lfNodes,lfEdges);
+                    List<LfEdge> childEdges = lfEdges.stream().filter(e -> childIds.contains(e.getSourceNodeId()) || childIds.contains(e.targetNodeId)).toList();
+                    List<Long> childJobIds = operateToUpdateJobCompose(jobInfo1, childNodes, childEdges, lfNodes, lfEdges);
                     jobNode.setChildren(JSONUtil.toJsonStr(childJobIds));
                 }
                 updateNodes.add(jobNode);
-                nodeIdMap.put(node.getId(),jobNode.getId());
+                nodeIdMap.put(node.getId(), jobNode.getId());
             }
         }
 
@@ -265,7 +275,7 @@ public class JobComposeServiceImpl implements JobComposeService {
 
         if (!delNodeDbs.isEmpty()) {
             for (JobNode delNodeDb : delNodeDbs) {
-                if ( "dynamic-group".equalsIgnoreCase(delNodeDb.getNodeType())){
+                if ("dynamic-group".equalsIgnoreCase(delNodeDb.getNodeType())) {
                     jobInfoService.delNodes(delNodeDb.getJobId());
                 }
             }
@@ -285,49 +295,74 @@ public class JobComposeServiceImpl implements JobComposeService {
     }
 
     @Override
-    public Map<String, Object> getJobCompose(Long id,Integer type) {
-        Map<String, Object> res =new HashMap<>();
+    public Map<String, Object> getJobCompose(Long id, Integer type) {
+        Map<String, Object> res = new HashMap<>();
         List<JobNodeVo> nodeVos = new ArrayList<>();
         List<JobEdgeVo> edgeVos = new ArrayList<>();
-        String randomId = type==0?"":UUID.fastUUID()+":";
-        getJobCompose(id,nodeVos,edgeVos,randomId);
+        String randomId = type == 0 ? "" : UUID.fastUUID() + ":";
+        getJobCompose(id, nodeVos, edgeVos, randomId);
         //创建一个父亲节点
         Map<String, List<JobNodeVo>> groupNodeMap = nodeVos.stream().collect(Collectors.groupingBy(JobNodeVo::getNodeType));
         List<JobNodeVo> dynamicGroupNodes = groupNodeMap.get("dynamic-group");
         List<String> nodeIds = new ArrayList<>();
-        if(dynamicGroupNodes!=null){
-            dynamicGroupNodes.forEach(node->{
+        if (dynamicGroupNodes != null) {
+            dynamicGroupNodes.forEach(node -> {
                 List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
                 nodeIds.addAll(childIds);
             });
         }
-        List<JobNodeVo> nodeList = nodeVos.stream().filter(n->!nodeIds.contains(n.getId())).toList();
+        List<JobNodeVo> nodeList = nodeVos.stream().filter(n -> !nodeIds.contains(n.getId())).toList();
         List<String> firstNodes = nodeList.stream().map(JobNodeVo::getId).toList();
 
         JobInfo jobInfo = jobInfoService.getById(id);
         JobNodeVo jobNodeVo = new JobNodeVo();
-        jobNodeVo.setId(randomId+"dynamic-group");
+        jobNodeVo.setId(randomId + "dynamic-group");
         jobNodeVo.setJobId(jobInfo.getId());
         jobNodeVo.setChildren(JSONUtil.toJsonStr(firstNodes));
         jobNodeVo.setNodeType("dynamic-group");
         jobNodeVo.setJobName(jobInfo.getJobDesc());
-        Map<String,Object> properties = new HashMap<>();
-        properties.put("jobId",String.valueOf(jobInfo.getId()));
-        properties.put("children",JSONUtil.toJsonStr(firstNodes));
-        properties.put("isRestrict",true);
-        properties.put("autoResize",true);
+        Map<String, Object> properties = new HashMap<>();
+        properties.put("jobId", String.valueOf(jobInfo.getId()));
+        properties.put("children", JSONUtil.toJsonStr(firstNodes));
+        properties.put("isRestrict", true);
+        properties.put("autoResize", true);
         //计算最大高度和最大宽度
         double[] styleArr = getMaxWidthHeight(nodeVos);
-        jobNodeVo.setNodePositionX(styleArr[3]+(styleArr[1]-styleArr[3])/2);
-        jobNodeVo.setNodePositionY(styleArr[0]+(styleArr[2]-styleArr[0])/2);
-        properties.put("height",styleArr[2]-styleArr[0]);
-        properties.put("width",styleArr[1]-styleArr[3]);
+        jobNodeVo.setNodePositionX(styleArr[3] + (styleArr[1] - styleArr[3]) / 2);
+        jobNodeVo.setNodePositionY(styleArr[0] + (styleArr[2] - styleArr[0]) / 2);
+        properties.put("height", styleArr[2] - styleArr[0]);
+        properties.put("width", styleArr[1] - styleArr[3]);
         jobNodeVo.setProperties(JSONUtil.toJsonStr(properties));
 
-        res.put("jobNode",jobNodeVo);
-        res.put("nodes",nodeVos);
-        res.put("edges",edgeVos);
+        res.put("jobNode", jobNodeVo);
+        res.put("nodes", nodeVos);
+        res.put("edges", edgeVos);
         return res;
+    }
+
+    @Override
+    public boolean validateJobComposeEdge(String nodes, String edges) {
+        List<LfNode> lfNodes = JSONUtil.parseArray(nodes).toList(LfNode.class);
+        List<LfEdge> lfEdges = JSONUtil.parseArray(edges).toList(LfEdge.class);
+
+        Map<String, List<LfNode>> groupNodeMap = lfNodes.stream().collect(Collectors.groupingBy(LfNode::getType));
+        List<LfNode> dynamicGroupNodes = groupNodeMap.get("dynamic-group");
+        List<List<String>> nodeIds = new ArrayList<>();
+        if (dynamicGroupNodes != null) {
+            dynamicGroupNodes.forEach(node -> {
+                List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
+                nodeIds.add(childIds);
+            });
+        }
+
+        for (LfEdge edge : lfEdges) {
+            for (List<String> childIds : nodeIds) {
+                if ((childIds.contains(edge.sourceNodeId) && !childIds.contains(edge.targetNodeId)) || (childIds.contains(edge.targetNodeId) && !childIds.contains(edge.sourceNodeId))) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     private double[] getMaxWidthHeight(List<JobNodeVo> nodeVos) {
@@ -338,26 +373,26 @@ public class JobComposeServiceImpl implements JobComposeService {
 
         for (JobNodeVo nodeVo : nodeVos) {
             String properties = nodeVo.getProperties();
-            Map<String,Object> propertiesMap = JSONUtil.toBean(properties, Map.class);
+            Map<String, Object> propertiesMap = JSONUtil.toBean(properties, Map.class);
             double width = Double.parseDouble(String.valueOf(propertiesMap.get("width")));
             double height = Double.parseDouble(String.valueOf(propertiesMap.get("height")));
-            if (nodeVo.getNodePositionY()-height/2 < top) {
-                top = nodeVo.getNodePositionY()-height/2<0?0:nodeVo.getNodePositionY()-height/2;
+            if (nodeVo.getNodePositionY() - height / 2 < top) {
+                top = nodeVo.getNodePositionY() - height / 2 < 0 ? 0 : nodeVo.getNodePositionY() - height / 2;
             }
-            if (nodeVo.getNodePositionY()+height > bottom) {
-                bottom = nodeVo.getNodePositionY()+height;
+            if (nodeVo.getNodePositionY() + height > bottom) {
+                bottom = nodeVo.getNodePositionY() + height;
             }
-            if (nodeVo.getNodePositionX()-width/2 < left) {
-                left = nodeVo.getNodePositionX()-width/2<0?0:nodeVo.getNodePositionX()-width/2;
+            if (nodeVo.getNodePositionX() - width / 2 < left) {
+                left = nodeVo.getNodePositionX() - width / 2 < 0 ? 0 : nodeVo.getNodePositionX() - width / 2;
             }
-            if (nodeVo.getNodePositionX()+width > right) {
-                right = nodeVo.getNodePositionX()+width;
+            if (nodeVo.getNodePositionX() + width > right) {
+                right = nodeVo.getNodePositionX() + width;
             }
         }
-        return new double[]{top,right,bottom,left};
+        return new double[]{top, right, bottom, left};
     }
 
-    public void getJobCompose(Long id,List<JobNodeVo> nodeVos,List<JobEdgeVo> edgeVos,String randomId) {
+    public void getJobCompose(Long id, List<JobNodeVo> nodeVos, List<JobEdgeVo> edgeVos, String randomId) {
         List<JobNode> jobNodeList = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, id));
         List<JobEdge> jobEdgeList = jobEdgeService.list(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getJobParentId, id));
 
@@ -366,27 +401,27 @@ public class JobComposeServiceImpl implements JobComposeService {
         Map<Long, String> jobInfoMap = jobInfos.stream().collect(Collectors.toMap(JobInfo::getId, JobInfo::getJobDesc));
 
         jobNodeList.forEach(node -> {
-            JobNodeVo jobNodeVo = BeanUtil.copyProperties(node, JobNodeVo.class,"id");
+            JobNodeVo jobNodeVo = BeanUtil.copyProperties(node, JobNodeVo.class, "id");
             String jobName = jobInfoMap.get(node.getJobId());
             jobNodeVo.setJobName(jobName);
-            jobNodeVo.setId(randomId+node.getId());
+            jobNodeVo.setId(randomId + node.getId());
             if ("dynamic-group".equalsIgnoreCase(node.getNodeType())) {
                 String children = node.getChildren();
                 List<String> childIds = JSONUtil.parseArray(children).toList(String.class);
                 List<String> newChildIds = new ArrayList<>();
                 for (String childId : childIds) {
-                    newChildIds.add( randomId+childId);
+                    newChildIds.add(randomId + childId);
                 }
                 jobNodeVo.setChildren(JSONUtil.toJsonStr(newChildIds));
-                getJobCompose(node.getJobId(),nodeVos,edgeVos,randomId);
+                getJobCompose(node.getJobId(), nodeVos, edgeVos, randomId);
             }
             nodeVos.add(jobNodeVo);
         });
         for (JobEdge jobEdge : jobEdgeList) {
-            JobEdgeVo jobEdgeVo = BeanUtil.copyProperties(jobEdge, JobEdgeVo.class,"id");
-            jobEdgeVo.setId(randomId+jobEdge.getId());
-            jobEdgeVo.setFromNodeId(randomId+jobEdge.getFromNodeId());
-            jobEdgeVo.setEndNodeId(randomId+jobEdge.getEndNodeId());
+            JobEdgeVo jobEdgeVo = BeanUtil.copyProperties(jobEdge, JobEdgeVo.class, "id");
+            jobEdgeVo.setId(randomId + jobEdge.getId());
+            jobEdgeVo.setFromNodeId(randomId + jobEdge.getFromNodeId());
+            jobEdgeVo.setEndNodeId(randomId + jobEdge.getEndNodeId());
             edgeVos.add(jobEdgeVo);
         }
     }

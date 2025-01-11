@@ -11,4 +11,6 @@ public interface JobComposeService {
     boolean updateJobCompose(Long id, JobInfoForm formData);
 
     Map<String,Object> getJobCompose(Long id,Integer type);
+
+    boolean validateJobComposeEdge(String nodes,String edges);
 }
