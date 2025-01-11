@@ -92,6 +92,8 @@ import { ArrowRight, Folder, Loading } from "@element-plus/icons-vue";
 import JobInfoAPI from "@/api/task/job-info";
 import { ref } from "vue";
 import Snowflake from "@/utils/snowflake";
+import { onBeforeRouteLeave } from "vue-router";
+
 LogicFlow.use(Control); // 控制面板
 LogicFlow.use(DndPanel); // 拖拽面板
 
@@ -195,6 +197,14 @@ const defaultProps = {
 };
 const taskTitle = ref("");
 
+onBeforeRouteLeave((to, from, next) => {
+  if (triggerOneVisible.value) {
+    alert("有任务正在运行，请先停止任务～");
+  } else {
+    next();
+  }
+});
+
 function filterJobCompNode(value: string, data: any) {
   if (!value) return true;
   return data.label.includes(value);
@@ -208,7 +218,7 @@ async function selectJobCompNode(node: any) {
   lf.value.graphModel.clearData();
 
   jobCompId.value = node.id;
-  await JobInfoAPI.getJobCompose(node.id,0).then((res) => {
+  await JobInfoAPI.getJobCompose(node.id, 0).then((res) => {
     const jobNode = res.jobNode;
     taskTitle.value = jobNode.jobName;
     const newNodes = res.nodes;
