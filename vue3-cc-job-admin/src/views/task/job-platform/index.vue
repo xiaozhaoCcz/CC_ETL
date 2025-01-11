@@ -48,6 +48,13 @@
       @close="handleCloseDialog"
     />
 
+    <EditJobNode
+      :taskNodeVisible="jobNodeVisible"
+      :nodeTaskId="nodeJobId"
+      :nowDate="nowDate"
+      @close="closeDraw"
+    />
+
     <el-dialog v-model="jobDialog">
       <el-radio-group v-model="jobRadio" @change="changeJobRadio">
         <el-radio :value="0" size="large">单任务</el-radio>
@@ -88,11 +95,13 @@ import {
 import "@logicflow/core/lib/style/index.css";
 import "@logicflow/extension/lib/style/index.css";
 import EditJobComp from "@/views/task/job-platform/operation/edit-job-compose.vue";
+import EditJobNode from "@/views/task/job-platform/operation/edit-job-node.vue";
 import { ArrowRight, Folder, Loading } from "@element-plus/icons-vue";
 import JobInfoAPI from "@/api/task/job-info";
 import { ref } from "vue";
 import Snowflake from "@/utils/snowflake";
 import { onBeforeRouteLeave } from "vue-router";
+
 
 LogicFlow.use(Control); // 控制面板
 LogicFlow.use(DndPanel); // 拖拽面板
@@ -126,6 +135,9 @@ const jobDialog = ref(false);
 const triggerOneVisible = ref(false);
 const jobSelectId = ref(undefined);
 const jobNodeEditId = ref(undefined);
+const nodeJobId = ref(null);
+const jobNodeVisible = ref(false);
+const nowDate = ref(null);
 const menuConfig = {
   nodeMenu: [
     {
@@ -135,10 +147,23 @@ const menuConfig = {
       },
     },
     {
-      text: "编辑",
+      text: "选择任务",
       callback(node: any) {
         jobDialog.value = true;
         jobNodeEditId.value = node.id;
+      },
+    },
+    {
+      text: "编辑节点",
+      callback(node: any) {
+        if (triggerOneVisible.value) {
+          ElMessage.warning("任务正在运行，请先停止任务～");
+          return;
+        }
+        console.log('node.properties.jobId',node.properties.jobId)
+        jobNodeVisible.value = true;
+        nodeJobId.value = node.properties.jobId;
+        nowDate.value = new Date();
       },
     },
     {
@@ -204,6 +229,11 @@ onBeforeRouteLeave((to, from, next) => {
     next();
   }
 });
+
+function closeDraw() {
+  nodeJobId.value = null;
+  jobNodeVisible.value = false;
+}
 
 function filterJobCompNode(value: string, data: any) {
   if (!value) return true;
