@@ -175,6 +175,17 @@ const menuConfig = {
       },
     },
     {
+      text: "复制",
+      callback(node: any) {
+        if(node.type==='dynamic-group'){
+          alert("暂时还不支持任务组复制~")
+          return;
+        }else{
+          lf.value.graphModel.cloneNode(node.id);
+        }
+      },
+    },
+    {
       text: "属性",
       callback(node: any) {
         alert(`
@@ -186,14 +197,9 @@ const menuConfig = {
   ],
   edgeMenu: [
     {
-      text: "属性",
+      text: "删除",
       callback(edge: any) {
-        alert(`
-          边id：${edge.id}
-          边类型：${edge.type}
-          边坐标：(x: ${edge.x}, y: ${edge.y})
-          源节点id：${edge.sourceNodeId}
-          目标节点id：${edge.targetNodeId}`);
+        lf.value.graphModel.deleteEdgeById(edge.id);
       },
     },
   ],
@@ -205,7 +211,7 @@ const menuConfig = {
       },
     },
   ],
-  edgeMenu: false, // 删除默认的边右键菜单
+  // edgeMenu: false, // 删除默认的边右键菜单
   graphMenu: [], // 覆盖默认的边右键菜单，与false表现一样
 };
 const jobComposeVisible = reactive({
