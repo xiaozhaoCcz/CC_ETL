@@ -55,7 +55,7 @@
       @close="closeDraw"
     />
 
-    <el-dialog v-model="jobDialog">
+    <el-dialog v-model="jobDialog" style="width: 400px" title="选择任务">
       <el-radio-group v-model="jobRadio" @change="changeJobRadio">
         <el-radio :value="0" size="large">单任务</el-radio>
         <el-radio :value="1" size="large">任务组</el-radio>
@@ -73,6 +73,7 @@
           :value="item.id"
         />
       </el-select>
+
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="cancelDialog">取消</el-button>
@@ -91,6 +92,7 @@ import {
   DndPanel,
   DynamicGroup,
   SelectionSelect,
+  MiniMap,
 } from "@logicflow/extension";
 import "@logicflow/core/lib/style/index.css";
 import "@logicflow/extension/lib/style/index.css";
@@ -104,6 +106,7 @@ import { onBeforeRouteLeave } from "vue-router";
 
 LogicFlow.use(Control); // 控制面板
 LogicFlow.use(DndPanel); // 拖拽面板
+LogicFlow.use(MiniMap);
 
 const lf = ref(null);
 const lfRef = ref(null);
@@ -638,6 +641,8 @@ onMounted(() => {
     nodes: nodes.value,
     edges: edges.value,
   });
+  //！！一定要在render下面才能显示
+  lf.value.extension.miniMap.show();
 
   const { eventCenter } = lf.value.graphModel;
   eventCenter.on("graph:updated", (data) => {

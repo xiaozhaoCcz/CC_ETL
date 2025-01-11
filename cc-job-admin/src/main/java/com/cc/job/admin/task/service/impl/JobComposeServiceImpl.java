@@ -243,6 +243,8 @@ public class JobComposeServiceImpl implements JobComposeService {
                 nodeIdMap.put(node.getId(), jobNode.getId());
             } else {
                 JobNode jobNode = nodeFromDb.stream().filter(n -> n.getJobId().equals(jobId)).findFirst().orElse(null);
+                jobNode.setNodePositionX(node.x);
+                jobNode.setNodePositionY(node.y);
                 if (DYNAMIC_GROUP.equalsIgnoreCase(node.getType())) {
                     List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
                     List<LfNode> childNodes = lfNodes.stream().filter(n -> childIds.contains(n.getId())).toList();
