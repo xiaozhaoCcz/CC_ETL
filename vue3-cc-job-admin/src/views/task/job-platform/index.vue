@@ -159,7 +159,13 @@ const menuConfig = {
           ElMessage.warning("任务正在运行，请先停止任务～");
           return;
         }
-        console.log("node.properties.jobId", node.properties.jobId);
+        if (
+          node.properties.jobId === null ||
+          node.properties.jobId === undefined
+        ) {
+          ElMessage.warning("请选择任务或任务组");
+          return;
+        }
         jobNodeVisible.value = true;
         nodeJobId.value = node.properties.jobId;
         nowDate.value = new Date();
