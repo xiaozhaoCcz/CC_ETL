@@ -243,6 +243,7 @@ public class JobComposeServiceImpl implements JobComposeService {
                 nodeIdMap.put(node.getId(), jobNode.getId());
             } else {
                 JobNode jobNode = nodeFromDb.stream().filter(n -> n.getJobId().equals(jobId)).findFirst().orElse(null);
+                jobNode.setProperties(node.properties);
                 jobNode.setNodePositionX(node.x);
                 jobNode.setNodePositionY(node.y);
                 if (DYNAMIC_GROUP.equalsIgnoreCase(node.getType())) {
