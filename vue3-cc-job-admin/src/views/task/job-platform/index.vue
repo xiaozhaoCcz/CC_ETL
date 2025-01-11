@@ -208,7 +208,7 @@ async function selectJobCompNode(node: any) {
   lf.value.graphModel.clearData();
 
   jobCompId.value = node.id;
-  await JobInfoAPI.getJobCompose(node.id).then((res) => {
+  await JobInfoAPI.getJobCompose(node.id,0).then((res) => {
     const jobNode = res.jobNode;
     taskTitle.value = jobNode.jobName;
     const newNodes = res.nodes;
@@ -243,7 +243,7 @@ async function confirmDialog() {
   if (_jobInfo.jobType === 2) {
     //新增任务组
     let data = {} as any;
-    await JobInfoAPI.getJobCompose(jobSelectId.value).then(
+    await JobInfoAPI.getJobCompose(jobSelectId.value, 1).then(
       (res) => (data = res)
     );
     const jobNode = data.jobNode;

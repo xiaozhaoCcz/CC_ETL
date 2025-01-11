@@ -174,10 +174,12 @@ public class JobComposeServiceImpl implements JobComposeService {
         Map<String, List<LfNode>> groupNodeMap = lfNodes.stream().collect(Collectors.groupingBy(LfNode::getType));
         List<LfNode> dynamicGroupNodes = groupNodeMap.get("dynamic-group");
         List<String> nodeIds = new ArrayList<>();
-        dynamicGroupNodes.forEach(node->{
-            List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
-            nodeIds.addAll(childIds);
-        });
+        if(dynamicGroupNodes!=null) {
+            dynamicGroupNodes.forEach(node -> {
+                List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
+                nodeIds.addAll(childIds);
+            });
+        }
 
         List<LfNode> nodeList = lfNodes.stream().filter(n->!nodeIds.contains(n.getId())).toList();
         List<String> firstNodes = nodeList.stream().map(LfNode::getId).toList();
@@ -259,7 +261,7 @@ public class JobComposeServiceImpl implements JobComposeService {
         jobEdgeService.saveBatch(jobEdgeList);
 
         List<Long> updateNodeIds = updateNodes.stream().map(JobNode::getId).toList();
-        List<JobNode> delNodeDbs = nodeFromDb.stream().filter(n -> updateNodeIds.contains(n.getId())).toList();
+        List<JobNode> delNodeDbs = nodeFromDb.stream().filter(n -> !updateNodeIds.contains(n.getId())).toList();
 
         if (!delNodeDbs.isEmpty()) {
             for (JobNode delNodeDb : delNodeDbs) {
@@ -283,11 +285,11 @@ public class JobComposeServiceImpl implements JobComposeService {
     }
 
     @Override
-    public Map<String, Object> getJobCompose(Long id) {
+    public Map<String, Object> getJobCompose(Long id,Integer type) {
         Map<String, Object> res =new HashMap<>();
         List<JobNodeVo> nodeVos = new ArrayList<>();
         List<JobEdgeVo> edgeVos = new ArrayList<>();
-        String randomId = UUID.fastUUID().toString();
+        String randomId = type==0?"":UUID.fastUUID()+":";
         getJobCompose(id,nodeVos,edgeVos,randomId);
         //创建一个父亲节点
         Map<String, List<JobNodeVo>> groupNodeMap = nodeVos.stream().collect(Collectors.groupingBy(JobNodeVo::getNodeType));
@@ -304,7 +306,7 @@ public class JobComposeServiceImpl implements JobComposeService {
 
         JobInfo jobInfo = jobInfoService.getById(id);
         JobNodeVo jobNodeVo = new JobNodeVo();
-        jobNodeVo.setId(randomId+":"+"dynamic-group");
+        jobNodeVo.setId(randomId+"dynamic-group");
         jobNodeVo.setJobId(jobInfo.getId());
         jobNodeVo.setChildren(JSONUtil.toJsonStr(firstNodes));
         jobNodeVo.setNodeType("dynamic-group");
@@ -367,13 +369,13 @@ public class JobComposeServiceImpl implements JobComposeService {
             JobNodeVo jobNodeVo = BeanUtil.copyProperties(node, JobNodeVo.class,"id");
             String jobName = jobInfoMap.get(node.getJobId());
             jobNodeVo.setJobName(jobName);
-            jobNodeVo.setId(randomId+":"+node.getId());
+            jobNodeVo.setId(randomId+node.getId());
             if ("dynamic-group".equalsIgnoreCase(node.getNodeType())) {
                 String children = node.getChildren();
                 List<String> childIds = JSONUtil.parseArray(children).toList(String.class);
                 List<String> newChildIds = new ArrayList<>();
                 for (String childId : childIds) {
-                    newChildIds.add( randomId+":"+childId);
+                    newChildIds.add( randomId+childId);
                 }
                 jobNodeVo.setChildren(JSONUtil.toJsonStr(newChildIds));
                 getJobCompose(node.getJobId(),nodeVos,edgeVos,randomId);
@@ -382,9 +384,9 @@ public class JobComposeServiceImpl implements JobComposeService {
         });
         for (JobEdge jobEdge : jobEdgeList) {
             JobEdgeVo jobEdgeVo = BeanUtil.copyProperties(jobEdge, JobEdgeVo.class,"id");
-            jobEdgeVo.setId(randomId+":"+jobEdge.getId());
-            jobEdgeVo.setFromNodeId(randomId+":"+jobEdge.getFromNodeId());
-            jobEdgeVo.setEndNodeId(randomId+":"+jobEdge.getEndNodeId());
+            jobEdgeVo.setId(randomId+jobEdge.getId());
+            jobEdgeVo.setFromNodeId(randomId+jobEdge.getFromNodeId());
+            jobEdgeVo.setEndNodeId(randomId+jobEdge.getEndNodeId());
             edgeVos.add(jobEdgeVo);
         }
     }

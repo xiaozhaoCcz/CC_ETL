@@ -165,9 +165,9 @@ public class JobInfoController {
         return Result.success(list);
     }
 
-    @GetMapping("getJobCompose/{id}")
-    public Result<Map<String,Object>> getJobCompose(@PathVariable Long id){
-        Map<String,Object> map =  jobComposeService.getJobCompose(id);
+    @GetMapping("getJobCompose/{id}/{type}")
+    public Result<Map<String,Object>> getJobCompose(@PathVariable Long id,@PathVariable Integer type){
+        Map<String,Object> map =  jobComposeService.getJobCompose(id,type);
         return Result.success(map);
     }
 }
