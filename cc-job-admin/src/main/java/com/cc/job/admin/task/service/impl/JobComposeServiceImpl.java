@@ -59,12 +59,16 @@ public class JobComposeServiceImpl implements JobComposeService {
         private String targetAnchorId;
     }
 
+    private final String DYNAMIC_GROUP = "dynamic-group";
+
+    private final String JOB_ID = "jobId";
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean saveJobCompose(JobInfoForm formData) {
 
         boolean b = validateJobComposeEdge(formData.getNodes(), formData.getEdges());
-        if(!b) {
+        if (!b) {
             throw new BusinessException("任务组边不合法");
         }
 
@@ -83,7 +87,7 @@ public class JobComposeServiceImpl implements JobComposeService {
         List<LfEdge> lfEdges = JSONUtil.parseArray(formData.getEdges()).toList(LfEdge.class);
 
         Map<String, List<LfNode>> groupNodeMap = lfNodes.stream().collect(Collectors.groupingBy(LfNode::getType));
-        List<LfNode> dynamicGroupNodes = groupNodeMap.get("dynamic-group");
+        List<LfNode> dynamicGroupNodes = groupNodeMap.get(DYNAMIC_GROUP);
         List<String> nodeIds = new ArrayList<>();
         if (dynamicGroupNodes != null) {
             dynamicGroupNodes.forEach(node -> {
@@ -105,7 +109,7 @@ public class JobComposeServiceImpl implements JobComposeService {
         Map<String, Long> nodeIdMap = new HashMap<>();
         for (LfNode node : nodeList) {
             Map<String, Object> properties = JSONUtil.toBean(node.getProperties(), Map.class);
-            Long jobId = Long.parseLong(String.valueOf(properties.get("jobId")));
+            Long jobId = Long.parseLong(String.valueOf(properties.get(JOB_ID)));
             JobInfo jobInfo1 = jobInfoService.getById(jobId);
             JobInfo copyJobInfo = BeanUtil.copyProperties(jobInfo1, JobInfo.class, "id");
             copyJobInfo.setIsNode("Y");
@@ -119,9 +123,9 @@ public class JobComposeServiceImpl implements JobComposeService {
             jobNode.setNodePositionY(node.y);
             jobNode.setNodeType(node.type);
             Map<String, Object> propertiesMap = JSONUtil.toBean(node.properties, Map.class);
-            propertiesMap.put("jobId", copyJobInfo.getId());
+            propertiesMap.put(JOB_ID, copyJobInfo.getId());
 
-            if ("dynamic-group".equalsIgnoreCase(node.getType())) {
+            if (DYNAMIC_GROUP.equalsIgnoreCase(node.getType())) {
                 List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
                 List<LfNode> childNodes = lfNodes.stream().filter(n -> childIds.contains(n.getId())).toList();
                 List<LfEdge> childEdges = lfEdges.stream().filter(e -> childIds.contains(e.getSourceNodeId()) || childIds.contains(e.targetNodeId)).toList();
@@ -168,7 +172,7 @@ public class JobComposeServiceImpl implements JobComposeService {
     @Transactional(rollbackFor = Exception.class)
     public boolean updateJobCompose(Long id, JobInfoForm formData) {
         boolean b = validateJobComposeEdge(formData.getNodes(), formData.getEdges());
-        if(!b) {
+        if (!b) {
             throw new BusinessException("任务组边不合法");
         }
         JobInfo jobInfo = jobInfoService.baseUpdateTaskInfo(id, formData);
@@ -182,7 +186,7 @@ public class JobComposeServiceImpl implements JobComposeService {
         List<LfEdge> lfEdges = JSONUtil.parseArray(formData.getEdges()).toList(LfEdge.class);
 
         Map<String, List<LfNode>> groupNodeMap = lfNodes.stream().collect(Collectors.groupingBy(LfNode::getType));
-        List<LfNode> dynamicGroupNodes = groupNodeMap.get("dynamic-group");
+        List<LfNode> dynamicGroupNodes = groupNodeMap.get(DYNAMIC_GROUP);
         List<String> nodeIds = new ArrayList<>();
         if (dynamicGroupNodes != null) {
             dynamicGroupNodes.forEach(node -> {
@@ -206,7 +210,7 @@ public class JobComposeServiceImpl implements JobComposeService {
 
         for (LfNode node : nodeList) {
             Map<String, Object> properties = JSONUtil.toBean(node.getProperties(), Map.class);
-            Long jobId = Long.parseLong(String.valueOf(properties.get("jobId")));
+            Long jobId = Long.parseLong(String.valueOf(properties.get(JOB_ID)));
             JobInfo jobInfo1 = jobInfoService.getById(jobId);
             if (node.getId().contains("-")) {
                 JobInfo copyJobInfo = BeanUtil.copyProperties(jobInfo1, JobInfo.class, "id");
@@ -221,9 +225,9 @@ public class JobComposeServiceImpl implements JobComposeService {
                 jobNode.setNodePositionY(node.y);
                 jobNode.setNodeType(node.type);
                 Map<String, Object> propertiesMap = JSONUtil.toBean(node.properties, Map.class);
-                propertiesMap.put("jobId", copyJobInfo.getId());
+                propertiesMap.put(JOB_ID, copyJobInfo.getId());
 
-                if ("dynamic-group".equalsIgnoreCase(node.getType())) {
+                if (DYNAMIC_GROUP.equalsIgnoreCase(node.getType())) {
                     List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
                     List<LfNode> childNodes = lfNodes.stream().filter(n -> childIds.contains(n.getId())).toList();
                     List<LfEdge> childEdges = lfEdges.stream().filter(e -> childIds.contains(e.getSourceNodeId()) || childIds.contains(e.targetNodeId)).toList();
@@ -239,7 +243,7 @@ public class JobComposeServiceImpl implements JobComposeService {
                 nodeIdMap.put(node.getId(), jobNode.getId());
             } else {
                 JobNode jobNode = nodeFromDb.stream().filter(n -> n.getJobId().equals(jobId)).findFirst().orElse(null);
-                if ("dynamic-group".equalsIgnoreCase(node.getType())) {
+                if (DYNAMIC_GROUP.equalsIgnoreCase(node.getType())) {
                     List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
                     List<LfNode> childNodes = lfNodes.stream().filter(n -> childIds.contains(n.getId())).toList();
                     List<LfEdge> childEdges = lfEdges.stream().filter(e -> childIds.contains(e.getSourceNodeId()) || childIds.contains(e.targetNodeId)).toList();
@@ -275,7 +279,7 @@ public class JobComposeServiceImpl implements JobComposeService {
 
         if (!delNodeDbs.isEmpty()) {
             for (JobNode delNodeDb : delNodeDbs) {
-                if ("dynamic-group".equalsIgnoreCase(delNodeDb.getNodeType())) {
+                if (DYNAMIC_GROUP.equalsIgnoreCase(delNodeDb.getNodeType())) {
                     jobInfoService.delNodes(delNodeDb.getJobId());
                 }
             }
@@ -303,7 +307,7 @@ public class JobComposeServiceImpl implements JobComposeService {
         getJobCompose(id, nodeVos, edgeVos, randomId);
         //创建一个父亲节点
         Map<String, List<JobNodeVo>> groupNodeMap = nodeVos.stream().collect(Collectors.groupingBy(JobNodeVo::getNodeType));
-        List<JobNodeVo> dynamicGroupNodes = groupNodeMap.get("dynamic-group");
+        List<JobNodeVo> dynamicGroupNodes = groupNodeMap.get(DYNAMIC_GROUP);
         List<String> nodeIds = new ArrayList<>();
         if (dynamicGroupNodes != null) {
             dynamicGroupNodes.forEach(node -> {
@@ -316,18 +320,19 @@ public class JobComposeServiceImpl implements JobComposeService {
 
         JobInfo jobInfo = jobInfoService.getById(id);
         JobNodeVo jobNodeVo = new JobNodeVo();
-        jobNodeVo.setId(randomId + "dynamic-group");
+        jobNodeVo.setId(randomId + DYNAMIC_GROUP);
         jobNodeVo.setJobId(jobInfo.getId());
         jobNodeVo.setChildren(JSONUtil.toJsonStr(firstNodes));
-        jobNodeVo.setNodeType("dynamic-group");
+        jobNodeVo.setNodeType(DYNAMIC_GROUP);
         jobNodeVo.setJobName(jobInfo.getJobDesc());
         Map<String, Object> properties = new HashMap<>();
-        properties.put("jobId", String.valueOf(jobInfo.getId()));
+        properties.put(JOB_ID, String.valueOf(jobInfo.getId()));
         properties.put("children", JSONUtil.toJsonStr(firstNodes));
         properties.put("isRestrict", true);
         properties.put("autoResize", true);
         //计算最大高度和最大宽度
         double[] styleArr = getMaxWidthHeight(nodeVos);
+        //！！！设置节点的位置，一定要除2，前端真的巨难
         jobNodeVo.setNodePositionX(styleArr[3] + (styleArr[1] - styleArr[3]) / 2);
         jobNodeVo.setNodePositionY(styleArr[0] + (styleArr[2] - styleArr[0]) / 2);
         properties.put("height", styleArr[2] - styleArr[0]);
@@ -346,7 +351,7 @@ public class JobComposeServiceImpl implements JobComposeService {
         List<LfEdge> lfEdges = JSONUtil.parseArray(edges).toList(LfEdge.class);
 
         Map<String, List<LfNode>> groupNodeMap = lfNodes.stream().collect(Collectors.groupingBy(LfNode::getType));
-        List<LfNode> dynamicGroupNodes = groupNodeMap.get("dynamic-group");
+        List<LfNode> dynamicGroupNodes = groupNodeMap.get(DYNAMIC_GROUP);
         List<List<String>> nodeIds = new ArrayList<>();
         if (dynamicGroupNodes != null) {
             dynamicGroupNodes.forEach(node -> {
@@ -365,6 +370,12 @@ public class JobComposeServiceImpl implements JobComposeService {
         return true;
     }
 
+    /**
+     * !!!!重点:获取任务组的宽度和高度，并获取任务组起始位置
+     *
+     * @param nodeVos
+     * @return
+     */
     private double[] getMaxWidthHeight(List<JobNodeVo> nodeVos) {
         double top = Double.MAX_VALUE;
         double bottom = 0;
@@ -379,14 +390,14 @@ public class JobComposeServiceImpl implements JobComposeService {
             if (nodeVo.getNodePositionY() - height / 2 < top) {
                 top = nodeVo.getNodePositionY() - height / 2;
             }
-            if (nodeVo.getNodePositionY() + height/2 > bottom) {
-                bottom = nodeVo.getNodePositionY() + height/2;
+            if (nodeVo.getNodePositionY() + height / 2 > bottom) {
+                bottom = nodeVo.getNodePositionY() + height / 2;
             }
             if (nodeVo.getNodePositionX() - width / 2 < left) {
                 left = nodeVo.getNodePositionX() - width / 2;
             }
-            if (nodeVo.getNodePositionX() + width/2 > right) {
-                right = nodeVo.getNodePositionX() + width/2;
+            if (nodeVo.getNodePositionX() + width / 2 > right) {
+                right = nodeVo.getNodePositionX() + width / 2;
             }
         }
         return new double[]{top, right, bottom, left};
@@ -405,7 +416,7 @@ public class JobComposeServiceImpl implements JobComposeService {
             String jobName = jobInfoMap.get(node.getJobId());
             jobNodeVo.setJobName(jobName);
             jobNodeVo.setId(randomId + node.getId());
-            if ("dynamic-group".equalsIgnoreCase(node.getNodeType())) {
+            if (DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType())) {
                 String children = node.getChildren();
                 List<String> childIds = JSONUtil.parseArray(children).toList(String.class);
                 List<String> newChildIds = new ArrayList<>();
