@@ -180,8 +180,8 @@ public class JobComposeServiceImpl implements JobComposeService {
         });
 
         List<LfNode> nodeList = lfNodes.stream().filter(n->!nodeIds.contains(n.getId())).toList();
-        List<LfEdge> edgeList = lfEdges.stream().filter(e->!nodeIds.contains(e.getSourceNodeId())||!nodeIds.contains(e.getTargetNodeId())).toList();
-
+        List<String> firstNodes = nodeList.stream().map(LfNode::getId).toList();
+        List<LfEdge> edgeList = lfEdges.stream().filter(e->firstNodes.contains(e.getSourceNodeId())||firstNodes.contains(e.getTargetNodeId())).toList();
         operateToUpdateJobCompose(jobInfo,nodeList,edgeList,lfNodes,lfEdges);
         return true;
     }
@@ -207,6 +207,7 @@ public class JobComposeServiceImpl implements JobComposeService {
                 jobNode.setJobParentId(jobInfo.getId());
                 jobNode.setNodePositionX(node.x);
                 jobNode.setNodePositionY(node.y);
+                jobNode.setNodeType(node.type);
                 Map<String,Object> propertiesMap = JSONUtil.toBean(node.properties, Map.class);
                 propertiesMap.put("jobId",copyJobInfo.getId());
 
@@ -223,7 +224,7 @@ public class JobComposeServiceImpl implements JobComposeService {
                 }
                 jobNode.setProperties(JSONUtil.toJsonStr(propertiesMap));
                 jobNodeService.save(jobNode);
-                nodeIdMap.put(node.getId(),copyJobInfo.getId());
+                nodeIdMap.put(node.getId(),jobNode.getId());
             }else {
                 JobNode jobNode = nodeFromDb.stream().filter(n -> n.getJobId().equals(jobId)).findFirst().orElse(null);
                 if("dynamic-group".equalsIgnoreCase(node.getType())){
@@ -303,20 +304,55 @@ public class JobComposeServiceImpl implements JobComposeService {
 
         JobInfo jobInfo = jobInfoService.getById(id);
         JobNodeVo jobNodeVo = new JobNodeVo();
-        jobNodeVo.setId(randomId+":"+randomId);
+        jobNodeVo.setId(randomId+":"+"dynamic-group");
         jobNodeVo.setJobId(jobInfo.getId());
         jobNodeVo.setChildren(JSONUtil.toJsonStr(firstNodes));
         jobNodeVo.setNodeType("dynamic-group");
         jobNodeVo.setJobName(jobInfo.getJobDesc());
-        Map<String,String> properties = new HashMap<>();
+        Map<String,Object> properties = new HashMap<>();
         properties.put("jobId",String.valueOf(jobInfo.getId()));
         properties.put("children",JSONUtil.toJsonStr(firstNodes));
+        properties.put("isRestrict",true);
+        properties.put("autoResize",true);
+        //计算最大高度和最大宽度
+        double[] styleArr = getMaxWidthHeight(nodeVos);
+        jobNodeVo.setNodePositionX(styleArr[3]+(styleArr[1]-styleArr[3])/2);
+        jobNodeVo.setNodePositionY(styleArr[0]+(styleArr[2]-styleArr[0])/2);
+        properties.put("height",styleArr[2]-styleArr[0]);
+        properties.put("width",styleArr[1]-styleArr[3]);
         jobNodeVo.setProperties(JSONUtil.toJsonStr(properties));
 
         res.put("jobNode",jobNodeVo);
         res.put("nodes",nodeVos);
         res.put("edges",edgeVos);
         return res;
+    }
+
+    private double[] getMaxWidthHeight(List<JobNodeVo> nodeVos) {
+        double top = Double.MAX_VALUE;
+        double bottom = 0;
+        double left = Double.MAX_VALUE;
+        double right = 0;
+
+        for (JobNodeVo nodeVo : nodeVos) {
+            String properties = nodeVo.getProperties();
+            Map<String,Object> propertiesMap = JSONUtil.toBean(properties, Map.class);
+            double width = Double.parseDouble(String.valueOf(propertiesMap.get("width")));
+            double height = Double.parseDouble(String.valueOf(propertiesMap.get("height")));
+            if (nodeVo.getNodePositionY()-height/2 < top) {
+                top = nodeVo.getNodePositionY()-height/2<0?0:nodeVo.getNodePositionY()-height/2;
+            }
+            if (nodeVo.getNodePositionY()+height > bottom) {
+                bottom = nodeVo.getNodePositionY()+height;
+            }
+            if (nodeVo.getNodePositionX()-width/2 < left) {
+                left = nodeVo.getNodePositionX()-width/2<0?0:nodeVo.getNodePositionX()-width/2;
+            }
+            if (nodeVo.getNodePositionX()+width > right) {
+                right = nodeVo.getNodePositionX()+width;
+            }
+        }
+        return new double[]{top,right,bottom,left};
     }
 
     public void getJobCompose(Long id,List<JobNodeVo> nodeVos,List<JobEdgeVo> edgeVos,String randomId) {

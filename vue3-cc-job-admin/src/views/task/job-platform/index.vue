@@ -251,42 +251,48 @@ function cancelDialog() {
   jobSelectId.value = undefined;
   jobDialog.value = false;
 }
-function confirmDialog() {
+
+async function confirmDialog() {
   const _node = lf.value!.getNodeModelById(jobNodeEditId.value);
   const _jobInfo = jobInfoList.value.find((e) => e.id === jobSelectId.value);
-  console.log(_node);
+
+  const graphModel = lf.value.graphModel;
   if (_jobInfo.jobType === 2) {
+
     //新增任务组
-    JobInfoAPI.getJobCompose(jobSelectId.value).then((res: any) => {
-      console.log(res);
-      const jobNode = res.jobNode;
-      const newNodes = res.nodes;
-      const newEdges = res.edges;
-      newNodes.forEach((node: any) => {
-        lf.value.graphModel.addNode(generateNode(node));
-      });
-
-      newNodes.forEach((n: any) => {
-        const node = lf.value.getNodeModelById(n.id);
-        if (n.nodeType === "dynamic-group") {
-          JSON.parse(n.children).forEach((id: any) => node.addChild(id));
-        }
-      });
-
-      newEdges.forEach((e: any) => {
-        let generateEdge1 = generateEdge(e);
-        console.log(generateEdge1);
-        lf.value.graphModel.addEdge(generateEdge(e));
-      });
-
-      JSON.parse(jobNode.children).forEach((id: any) => {
-        _node.addChild(id);
-      });
+    let data = {} as any;
+    await JobInfoAPI.getJobCompose(jobSelectId.value).then(
+      (res) => (data = res)
+    );
+    const jobNode = data.jobNode;
+    const newNodes = data.nodes;
+    const newEdges = data.edges;
+    newNodes.push(jobNode);
+    newNodes.forEach((node: any) => {
+      graphModel.addNode(generateNode(node));
     });
+    newNodes.forEach((n: any) => {
+      const node = lf.value.getNodeModelById(n.id);
+      if (n.nodeType === "dynamic-group") {
+        JSON.parse(n.children).forEach((id: any) => node.addChild(id));
+      }
+    });
+    const oNodes = lf.value!.getGraphRawData().nodes;
+    lf.value.graphModel.clearData();
+    oNodes.forEach((n: any) => {
+      graphModel.addNode(n);
+    });
+    newEdges.forEach((e: any) => {
+      graphModel.addEdge(generateEdge(e));
+    });
+    // setTimeout(() => {
+    //   lf.value.graphModel.moveNodes([jobNode.id], 50, 50);
+    // }, 2000);
+    graphModel.deleteNode(_node.id);
+  }else{
+    _node.setProperty("jobId", jobSelectId.value);
+    _node.updateText(_jobInfo.jobDesc);
   }
-  _node.setProperty("jobId", jobSelectId.value);
-  _node.updateText(_jobInfo.jobDesc);
-
   cancelDialog();
 }
 
@@ -304,7 +310,6 @@ function generateNode(node: any) {
 
 function generateEdge(edge: any) {
   return {
-    id: edge.id,
     sourceNodeId: edge.fromNodeId,
     targetNodeId: edge.endNodeId,
     type: "polyline",
@@ -369,7 +374,6 @@ function handleOpenDialog() {
   jobComposeVisible.visible = true;
   const nodes = lf.value!.getGraphRawData().nodes;
   const edges = lf.value!.getGraphRawData().edges;
-  console.log(111, nodes);
   if (jobCompId.value) {
     jobComposeVisible.title = "修改任务组";
     JobInfoAPI.getFormData(jobCompId.value).then((data) => {
@@ -475,8 +479,10 @@ const connectWs = (id: string) => {
     if (node) {
       const _node = lf.value!.getNodeModelById(node.id);
       if (_node.type === "dynamic-group") {
+        _node.setStyle("stroke", color);
+      } else {
+        _node.setStyle("fill", color);
       }
-      _node.setStyle("fill", color);
     }
   };
 };
