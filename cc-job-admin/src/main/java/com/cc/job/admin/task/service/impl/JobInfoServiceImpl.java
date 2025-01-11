@@ -624,10 +624,9 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
                 log.info(">>>>>>>>> stop task:{}", workWrapper.getId());
                 Async.stopWork(workWrapper);
                 JobGroupXxlJob.removeWorkWrapper(id, randomId);
-                redisTemplate.delete(id + ":" + randomId);
             }
+            redisTemplate.delete(id + ":" + randomId);
         }
-
         return true;
     }
 
