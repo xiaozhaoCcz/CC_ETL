@@ -377,16 +377,16 @@ public class JobComposeServiceImpl implements JobComposeService {
             double width = Double.parseDouble(String.valueOf(propertiesMap.get("width")));
             double height = Double.parseDouble(String.valueOf(propertiesMap.get("height")));
             if (nodeVo.getNodePositionY() - height / 2 < top) {
-                top = nodeVo.getNodePositionY() - height / 2 < 0 ? 0 : nodeVo.getNodePositionY() - height / 2;
+                top = nodeVo.getNodePositionY() - height / 2;
             }
-            if (nodeVo.getNodePositionY() + height > bottom) {
-                bottom = nodeVo.getNodePositionY() + height;
+            if (nodeVo.getNodePositionY() + height/2 > bottom) {
+                bottom = nodeVo.getNodePositionY() + height/2;
             }
             if (nodeVo.getNodePositionX() - width / 2 < left) {
-                left = nodeVo.getNodePositionX() - width / 2 < 0 ? 0 : nodeVo.getNodePositionX() - width / 2;
+                left = nodeVo.getNodePositionX() - width / 2;
             }
-            if (nodeVo.getNodePositionX() + width > right) {
-                right = nodeVo.getNodePositionX() + width;
+            if (nodeVo.getNodePositionX() + width/2 > right) {
+                right = nodeVo.getNodePositionX() + width/2;
             }
         }
         return new double[]{top, right, bottom, left};

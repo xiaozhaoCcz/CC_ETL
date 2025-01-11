@@ -102,7 +102,6 @@ import { ref } from "vue";
 import Snowflake from "@/utils/snowflake";
 import { onBeforeRouteLeave } from "vue-router";
 
-
 LogicFlow.use(Control); // 控制面板
 LogicFlow.use(DndPanel); // 拖拽面板
 
@@ -160,7 +159,7 @@ const menuConfig = {
           ElMessage.warning("任务正在运行，请先停止任务～");
           return;
         }
-        console.log('node.properties.jobId',node.properties.jobId)
+        console.log("node.properties.jobId", node.properties.jobId);
         jobNodeVisible.value = true;
         nodeJobId.value = node.properties.jobId;
         nowDate.value = new Date();
@@ -248,25 +247,50 @@ async function selectJobCompNode(node: any) {
   lf.value.graphModel.clearData();
 
   jobCompId.value = node.id;
+
+  let data = {} as any;
   await JobInfoAPI.getJobCompose(node.id, 0).then((res) => {
-    const jobNode = res.jobNode;
-    taskTitle.value = jobNode.jobName;
-    const newNodes = res.nodes;
-    const newEdges = res.edges;
-    newNodes.forEach((node: any) => {
-      lf.value.graphModel.addNode(generateNode(node));
-    });
-    newNodes.forEach((n: any) => {
-      const node = lf.value.getNodeModelById(n.id);
-      if (n.nodeType === "dynamic-group") {
-        JSON.parse(n.children).forEach((id: any) => node.addChild(id));
-      }
-    });
-    newEdges.forEach((e: any) => {
-      let generateEdge1 = generateEdge(e);
-      console.log(generateEdge1);
-      lf.value.graphModel.addEdge(generateEdge(e));
-    });
+    data = res;
+  });
+
+  const graphModel = lf.value.graphModel;
+  const jobNode = data.jobNode;
+  taskTitle.value = jobNode.jobName;
+  const newNodes = data.nodes;
+  const newEdges = data.edges;
+
+  newNodes.forEach((node: any) => {
+    graphModel.addNode(generateNode(node));
+  });
+  newNodes.forEach((n: any) => {
+    const node = lf.value.getNodeModelById(n.id);
+    if (n.nodeType === "dynamic-group") {
+      JSON.parse(n.children).forEach((id: any) => node.addChild(id));
+    }
+  });
+
+  newEdges.forEach((e: any) => {
+    graphModel.addEdge(generateEdge(e));
+  });
+
+  const oNodes = lf.value!.getGraphRawData().nodes;
+  const oEdges = lf.value!.getGraphRawData().edges;
+  //删除之前的节点
+  const delNodes = lf.value!.getGraphRawData().nodes;
+  const delEdges = lf.value!.getGraphRawData().edges;
+
+  delNodes.forEach((n: any) => {
+    graphModel.deleteNode(n.id);
+  });
+  delEdges.forEach((e: any) => {
+    graphModel.deleteEdgeById(e.id);
+  });
+
+  oNodes.forEach((n: any) => {
+    graphModel.addNode(n);
+  });
+  oEdges.forEach((e: any) => {
+    graphModel.addEdge(e);
   });
 }
 
