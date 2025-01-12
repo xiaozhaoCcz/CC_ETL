@@ -257,9 +257,18 @@ public class JobGroupXxlJob {
                     List<Pair<String, Boolean>> callbackRes = StreamConsumer.getCallbackRes();
                     for (Pair<String, Boolean> pair : new ArrayList<>(callbackRes)) {
                         if (pair.getKey().equals(setExecuteJobId(taskId, randomId))) {
-                            int res = handleTaskCompletion(xxlJobContext, pair, node, taskInfo, count, randomId, logId);
-                            if (res == 1) {
-                                return String.valueOf(taskId);
+                            try {
+                                int res = handleTaskCompletion(xxlJobContext, pair, node, taskInfo, count, randomId, logId);
+                                if (res == 1) {
+                                    return String.valueOf(taskId);
+                                }
+                            } catch (Exception e) {
+                                throw new BusinessException(e);
+                            } finally {
+                                String recordId = StreamConsumer.messageMap.get(setExecuteJobId(taskId, randomId));
+                                if (recordId != null) {
+                                    redisTemplate.opsForStream().delete(StreamConsumer.TASK_SET_STREAM, recordId);
+                                }
                             }
                         }
                     }
@@ -271,11 +280,6 @@ public class JobGroupXxlJob {
         } catch (Exception e) {
             throw new BusinessException(e);
         } finally {
-            String recordId = StreamConsumer.messageMap.get(setExecuteJobId(taskId, randomId));
-            System.out.println("recordId:"+ recordId);
-            if (recordId != null) {
-                redisTemplate.opsForStream().delete(StreamConsumer.TASK_SET_STREAM, recordId);
-            }
             thread.interrupt();
         }
         return result;

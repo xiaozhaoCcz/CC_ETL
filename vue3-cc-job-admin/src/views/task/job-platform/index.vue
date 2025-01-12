@@ -284,6 +284,7 @@ onBeforeRouteLeave((to, from, next) => {
 });
 
 function clearGraph() {
+  jobSelectId.value = undefined;
   lf.value.graphModel.clearData();
 }
 
