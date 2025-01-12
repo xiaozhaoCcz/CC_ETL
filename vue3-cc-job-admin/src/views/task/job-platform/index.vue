@@ -4,26 +4,60 @@
       <div>任务编排</div>
       <span class="task_title">{{ taskTitle }}</span>
       <div class="btn_right_list">
-        <el-button
+        <el-tooltip
           v-if="triggerOneVisible"
-          type="warning"
-          :icon="Loading"
-          circle
-          @click="stopTrigger"
-        />
-        <el-button
+          class="box-item"
+          effect="dark"
+          content="停止运行"
+          placement="top"
+        >
+          <el-button
+            type="warning"
+            :icon="Loading"
+            circle
+            @click="stopTrigger"
+          />
+        </el-tooltip>
+        <el-tooltip
           v-else
-          type="success"
-          :icon="ArrowRight"
-          circle
-          @click="triggerOne"
-        />
-        <el-button
-          type="info"
-          :icon="Folder"
-          circle
-          @click="handleOpenDialog"
-        />
+          class="box-item"
+          effect="dark"
+          content="开始运行"
+          placement="top"
+        >
+          <el-button
+            type="success"
+            :icon="ArrowRight"
+            circle
+            @click="triggerOne"
+          />
+        </el-tooltip>
+        <el-tooltip
+          class="box-item"
+          effect="dark"
+          content="保存"
+          placement="top"
+        >
+          <el-button
+            type="info"
+            :icon="Folder"
+            circle
+            @click="handleOpenDialog"
+          />
+        </el-tooltip>
+        <el-tooltip
+          class="box-item"
+          effect="dark"
+          content="清除画布"
+          placement="top"
+        >
+          <el-button
+            type="danger"
+            :icon="CircleClose"
+            circle
+            @click="clearGraph"
+          />
+        </el-tooltip>
       </div>
     </div>
     <div class="job-platform">
@@ -98,7 +132,12 @@ import "@logicflow/core/lib/style/index.css";
 import "@logicflow/extension/lib/style/index.css";
 import EditJobComp from "@/views/task/job-platform/operation/edit-job-compose.vue";
 import EditJobNode from "@/views/task/job-platform/operation/edit-job-node.vue";
-import { ArrowRight, Folder, Loading } from "@element-plus/icons-vue";
+import {
+  ArrowRight,
+  CircleClose,
+  Folder,
+  Loading,
+} from "@element-plus/icons-vue";
 import JobInfoAPI from "@/api/task/job-info";
 import { ref } from "vue";
 import Snowflake from "@/utils/snowflake";
@@ -108,8 +147,8 @@ LogicFlow.use(Control); // 控制面板
 LogicFlow.use(DndPanel); // 拖拽面板
 LogicFlow.use(MiniMap);
 
-const lf = ref(null);
-const lfRef = ref(null);
+const lf = ref<any>(null);
+const lfRef = ref<any>(null);
 const patternItems = [
   {
     type: "circle",
@@ -135,7 +174,7 @@ const selectJobInfoList = ref([]);
 const jobRadio = ref(0);
 const jobDialog = ref(false);
 const triggerOneVisible = ref(false);
-const jobSelectId = ref(undefined);
+const jobSelectId = ref<any>(undefined);
 const jobNodeEditId = ref(undefined);
 const nodeJobId = ref(null);
 const jobNodeVisible = ref(false);
@@ -177,10 +216,10 @@ const menuConfig = {
     {
       text: "复制",
       callback(node: any) {
-        if(node.type==='dynamic-group'){
-          alert("暂时还不支持任务组复制~")
+        if (node.type === "dynamic-group") {
+          alert("暂时还不支持任务组复制~");
           return;
-        }else{
+        } else {
           lf.value.graphModel.cloneNode(node.id);
         }
       },
@@ -244,6 +283,10 @@ onBeforeRouteLeave((to, from, next) => {
   }
 });
 
+function clearGraph() {
+  lf.value.graphModel.clearData();
+}
+
 function closeDraw() {
   nodeJobId.value = null;
   jobNodeVisible.value = false;
@@ -273,7 +316,46 @@ async function selectJobCompNode(node: any) {
   taskTitle.value = jobNode.jobName;
   const newNodes = data.nodes;
   const newEdges = data.edges;
+  addJobNodes(newNodes, graphModel, newEdges);
+}
 
+function cancelDialog() {
+  jobSelectId.value = undefined;
+  jobDialog.value = false;
+}
+
+function validateEdge() {
+  const nodes = lf.value.getGraphRawData().nodes;
+  const nodesIds = [] as any;
+  nodes.forEach((node: any) => {
+    if (node.type === "dynamic-group") {
+      const children = [] as any;
+      children.push(...node.children);
+      nodesIds.push(children);
+    }
+  });
+  const edges = lf.value.getGraphRawData().edges;
+  const errorEdges = [] as any;
+  edges.forEach((e: any) => {
+    nodesIds.forEach((children: any) => {
+      if (
+        (children.includes(e.sourceNodeId) &&
+          !children.includes(e.targetNodeId)) ||
+        (children.includes(e.targetNodeId) &&
+          !children.includes(e.sourceNodeId))
+      ) {
+        errorEdges.push(e);
+      }
+    });
+  });
+  errorEdges.forEach((e: any) => {
+    const _edge = lf.value.getEdgeModelById(e.id);
+    _edge.style.stroke = "red";
+  });
+  return;
+}
+
+function addJobNodes(newNodes: any, graphModel: any, newEdges: any) {
   newNodes.forEach((node: any) => {
     graphModel.addNode(generateNode(node));
   });
@@ -288,11 +370,11 @@ async function selectJobCompNode(node: any) {
     graphModel.addEdge(generateEdge(e));
   });
 
-  const oNodes = lf.value!.getGraphRawData().nodes;
-  const oEdges = lf.value!.getGraphRawData().edges;
+  const oNodes = lf.value.getGraphRawData().nodes;
+  const oEdges = lf.value.getGraphRawData().edges;
   //删除之前的节点
-  const delNodes = lf.value!.getGraphRawData().nodes;
-  const delEdges = lf.value!.getGraphRawData().edges;
+  const delNodes = lf.value.getGraphRawData().nodes;
+  const delEdges = lf.value.getGraphRawData().edges;
 
   delNodes.forEach((n: any) => {
     graphModel.deleteNode(n.id);
@@ -309,45 +391,11 @@ async function selectJobCompNode(node: any) {
   });
 }
 
-function cancelDialog() {
-  jobSelectId.value = undefined;
-  jobDialog.value = false;
-}
-
-function validateEdge() {
-  const nodes = lf.value!.getGraphRawData().nodes;
-  const nodesIds = [] as any;
-  nodes.forEach((node: any) => {
-    if (node.type === "dynamic-group") {
-      const children = [] as any;
-      children.push(...node.children);
-      nodesIds.push(children);
-    }
-  });
-  const edges = lf.value!.getGraphRawData().edges;
-  const errorEdges = [] as any;
-  edges.forEach((e: any) => {
-    nodesIds.forEach((children: any) => {
-      if (
-        (children.includes(e.sourceNodeId) &&
-          !children.includes(e.targetNodeId)) ||
-        (children.includes(e.targetNodeId) &&
-          !children.includes(e.sourceNodeId))
-      ) {
-        errorEdges.push(e);
-      }
-    });
-  });
-  errorEdges.forEach((e) => {
-    const _edge = lf.value!.getEdgeModelById(e.id);
-    _edge.style.stroke = "red";
-  });
-  return;
-}
-
 async function confirmDialog() {
-  const _node = lf.value!.getNodeModelById(jobNodeEditId.value);
-  const _jobInfo = jobInfoList.value.find((e) => e.id === jobSelectId.value);
+  const _node = lf.value.getNodeModelById(jobNodeEditId.value);
+  const _jobInfo = jobInfoList.value.find(
+    (e: any) => e.id === jobSelectId.value
+  ) as any;
 
   const graphModel = lf.value.graphModel;
   if (_jobInfo.jobType === 2) {
@@ -360,39 +408,8 @@ async function confirmDialog() {
     const newNodes = data.nodes;
     const newEdges = data.edges;
     newNodes.push(jobNode);
-    newNodes.forEach((node: any) => {
-      graphModel.addNode(generateNode(node));
-    });
-    newNodes.forEach((n: any) => {
-      const node = lf.value.getNodeModelById(n.id);
-      if (n.nodeType === "dynamic-group") {
-        JSON.parse(n.children).forEach((id: any) => node.addChild(id));
-      }
-    });
 
-    newEdges.forEach((e: any) => {
-      graphModel.addEdge(generateEdge(e));
-    });
-
-    const oNodes = lf.value!.getGraphRawData().nodes;
-    const oEdges = lf.value!.getGraphRawData().edges;
-    //删除之前的节点
-    const delNodes = lf.value!.getGraphRawData().nodes;
-    const delEdges = lf.value!.getGraphRawData().edges;
-
-    delNodes.forEach((n: any) => {
-      graphModel.deleteNode(n.id);
-    });
-    delEdges.forEach((e: any) => {
-      graphModel.deleteEdgeById(e.id);
-    });
-
-    oNodes.forEach((n: any) => {
-      graphModel.addNode(n);
-    });
-    oEdges.forEach((e: any) => {
-      graphModel.addEdge(e);
-    });
+    addJobNodes(newNodes, graphModel, newEdges);
 
     graphModel.moveNodes([jobNode.id], _node.x - 500, _node.y - 230);
 
@@ -425,7 +442,7 @@ function generateEdge(edge: any) {
 }
 
 function changeJobRadio(val: number) {
-  selectJobInfoList.value = jobInfoList.value.filter((e) =>
+  selectJobInfoList.value = jobInfoList.value.filter((e: any) =>
     val === 0 ? e.jobType === 0 : e.jobType !== 0
   );
 }
@@ -447,13 +464,12 @@ function triggerOne() {
     const _node = lf.value!.getNodeModelById(node.id);
     _node.setProperty("randomId", randomId.value);
   });
-
   const jobId = jobCompId.value;
   const jobInfoTriggerDto = {} as any;
   jobInfoTriggerDto.id = jobId;
   jobInfoTriggerDto.executorParam = jobId + ":" + randomId.value;
   JobInfoAPI.triggerJob(jobInfoTriggerDto)
-    .then((data) => {
+    .then(() => {
       ElMessage.success("执行任务成功");
       connectWs(jobId + ":" + randomId.value);
       triggerOneVisible.value = true;
@@ -464,6 +480,11 @@ function triggerOne() {
       ElMessage.error(e);
     })
     .finally(() => {});
+}
+
+function selectElements() {
+  const elements = lf.value.graphModel.getSelectElements(true);
+  console.log(elements);
 }
 
 function stopTrigger() {
@@ -526,7 +547,7 @@ function handleCloseDialog() {
 function getJobInfoList() {
   JobInfoAPI.getList().then((data: any) => {
     jobInfoList.value = data;
-    selectJobInfoList.value = data.filter((e) => e.jobType === 0);
+    selectJobInfoList.value = data.filter((e: any) => e.jobType === 0);
   });
 }
 
@@ -603,11 +624,8 @@ const connectWs = (id: string) => {
     const color = getNodeColor(_message.status);
     if (node) {
       const _node = lf.value!.getNodeModelById(node.id);
-      if (_node.type === "dynamic-group") {
-        _node.setStyle("stroke", color);
-      } else {
-        _node.setStyle("fill", color);
-      }
+      const style = _node.type === "dynamic-group" ? "stroke" : "fill";
+      _node.setStyle(style, color);
     }
   };
 };
@@ -625,6 +643,15 @@ const getNodeColor = (status: number) => {
   }
 };
 
+function avg(array: any) {
+  var len = array.length;
+  var sum = 0;
+  for (var i = 0; i < len; i++) {
+    sum += array[i];
+  }
+  return sum / len;
+}
+
 onMounted(() => {
   getJobCompList();
   getJobInfoList();
@@ -641,6 +668,38 @@ onMounted(() => {
     },
     plugins: [DynamicGroup, DndPanel, SelectionSelect, Menu],
   });
+
+  lf.value.extension.control.addItem({
+    key: "horizontal-alignment",
+    iconClass: "Minus",
+    title: "横向对齐",
+    text: "横向对齐",
+    onClick: (lf, ev) => {
+      const elements = lf.graphModel.getSelectElements(true);
+      const arrY = elements.nodes.map((n: any) => n.y);
+      const avgY = avg(arrY);
+      elements.nodes.forEach((node: any) => {
+        const _node = lf.getNodeModelById(node.id);
+        _node.moveTo(node.x, avgY);
+      });
+    },
+  });
+  lf.value.extension.control.addItem({
+    key: "vertical-alignment",
+    iconClass: "XX",
+    title: "纵向对齐",
+    text: "纵向对齐",
+    onClick: (lf, ev) => {
+      const elements = lf.graphModel.getSelectElements(true);
+      const arrX = elements.nodes.map((n: any) => n.x);
+      const avgX = avg(arrX);
+      elements.nodes.forEach((node: any) => {
+        const _node = lf.getNodeModelById(node.id);
+        _node.moveTo(avgX, node.y);
+      });
+    },
+  });
+
   lf.value.extension.dndPanel.setPatternItems(patternItems);
   lf.value.extension.menu.setMenuConfig(menuConfig);
   lf.value.render({
@@ -651,9 +710,11 @@ onMounted(() => {
   lf.value.extension.miniMap.show();
 
   const { eventCenter } = lf.value.graphModel;
-  eventCenter.on("graph:updated", (data) => {
-    console.log(333, data);
+  eventCenter.on("graph:updated", () => {
     validateEdge();
+  });
+  eventCenter.on("selection:selected", () => {
+    selectElements();
   });
 });
 </script>

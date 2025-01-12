@@ -329,7 +329,11 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         return result;
     }
 
-
+    /**
+     * 旧的新增任务组方法，新方法在JobComposeService中
+     * @param formData
+     * @return
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean saveTaskSet(JobInfoForm formData) {
@@ -510,6 +514,12 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         return taskInfo;
     }
 
+    /**
+     * 旧的修改任务组方法，新方法在JobComposeService中
+     * @param id
+     * @param formData
+     * @return
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean updateTaskSet(Long id, JobInfoForm formData) {
