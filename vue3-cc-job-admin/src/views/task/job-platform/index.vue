@@ -467,7 +467,7 @@ function triggerOne() {
   const jobId = jobCompId.value;
   const jobInfoTriggerDto = {} as any;
   jobInfoTriggerDto.id = jobId;
-  jobInfoTriggerDto.executorParam = jobId + ":" + randomId.value;
+  jobInfoTriggerDto.executorParam = randomId.value;
   JobInfoAPI.triggerJob(jobInfoTriggerDto)
     .then(() => {
       ElMessage.success("执行任务成功");

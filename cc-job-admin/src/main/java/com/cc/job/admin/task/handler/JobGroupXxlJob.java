@@ -82,14 +82,12 @@ public class JobGroupXxlJob {
 
     @XxlJob("runJobGroupXxlJob")
     public void runTaskRankXxlJob() {
+        long jobId = XxlJobHelper.getJobId();
         String executeParam = XxlJobHelper.getJobParam();
         validateExecuteParam(executeParam);
-        long jobId = 0;
         String randomId = "";
         try {
-            String[] split = executeParam.split(":");
-            jobId = Long.parseLong(split[0]);
-            randomId = split.length == 1 ? UUID.randomUUID().toString() : split[1];
+            randomId = String.valueOf(jobId).equalsIgnoreCase(executeParam) ? UUID.randomUUID().toString() : executeParam;
             JobInfo taskInfo = getTaskInfoById(jobId);
             List<JobNode> nodes = getTaskNodesByJobId(jobId);
             List<JobEdge> edges = getTaskEdgesByJobId(jobId);
@@ -179,7 +177,13 @@ public class JobGroupXxlJob {
         sendCompletionMessage(jobId, randomId);
         TASK_ID_MAP.remove(setExecuteJobId(jobId, randomId));
         STOP_MAP.remove(setExecuteJobId(jobId, randomId));
+        redisTemplate.delete(setExecuteJobId(jobId, randomId));
+        String recordId = StreamConsumer.messageMap.get(setExecuteJobId(jobId, randomId));
+        if(StringUtils.isNotBlank(recordId)){
+            redisTemplate.opsForStream().delete(StreamConsumer.TASK_SET_STREAM, recordId);
+        }
         jobInfoMapper.stopTaskSet(jobId);
+
     }
 
     private static WorkerWrapper<Long, String> createStartWorkWrapper(long jobId, List<WorkerWrapper<Long, String>> startWrappers) {
@@ -267,6 +271,11 @@ public class JobGroupXxlJob {
         } catch (Exception e) {
             throw new BusinessException(e);
         } finally {
+            String recordId = StreamConsumer.messageMap.get(setExecuteJobId(taskId, randomId));
+            System.out.println("recordId:"+ recordId);
+            if (recordId != null) {
+                redisTemplate.opsForStream().delete(StreamConsumer.TASK_SET_STREAM, recordId);
+            }
             thread.interrupt();
         }
         return result;
@@ -285,14 +294,14 @@ public class JobGroupXxlJob {
         message.setRandomId(randomId);
         Long pValue = findParent(taskId, node.getJobParentId(), randomId);
 
+        StreamConsumer.removeCallbackRes(setExecuteJobId(taskId, randomId));
+//        redisTemplate.opsForStream().delete(StreamConsumer.TASK_SET_STREAM, key);
         int res = 1;
         if (success) {
             message.setStatus(1);
             webSocketServer.sendInfo(message);
-            StreamConsumer.removeCallbackRes(setExecuteJobId(taskId, randomId));
             updateTaskIdMap(node, pValue, randomId);
         } else {
-            StreamConsumer.removeCallbackRes(setExecuteJobId(taskId, randomId));
             if (count.incrementAndGet() <= taskInfo.getExecutorFailRetryCount()) {
                 logger.info("Retrying task: {}, attempt: {}", taskId, count.get());
                 XxlJobHelper.log(xxlJobContext, ">>>>>>>>>>>>>>>>>>>重试任务: {}, 重试次数: {}>>>>>>>>>>>>>>>", taskId, count);
