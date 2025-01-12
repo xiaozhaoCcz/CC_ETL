@@ -583,6 +583,7 @@ const reconnectAttempts = ref(0);
 const maxReconnectAttempts = 3; // 自定义最大重试次数
 
 const connectWs = (id: string) => {
+  // TODO 后端做多节点部署时，需要修改
   ws.value = new WebSocket("ws://localhost:8989/ws/" + id);
   ws.value.onopen = () => {
     reconnectAttempts.value = 0;
