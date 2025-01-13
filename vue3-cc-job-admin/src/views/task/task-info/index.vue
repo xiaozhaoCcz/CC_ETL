@@ -401,7 +401,6 @@ function closeNextTriggerTimeDialog() {
 }
 
 function executeOne(obj: any) {
-  console.log(obj);
   if (obj.jobType == 2) {
     const taskInfoTriggerDto = {};
     taskInfoTriggerDto.id = obj.id;
