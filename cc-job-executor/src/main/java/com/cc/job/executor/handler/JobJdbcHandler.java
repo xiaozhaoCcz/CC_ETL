@@ -27,7 +27,6 @@ public class JobJdbcHandler {
     @XxlJob("runJobJdbcXxlJob")
     public void runJobJdbcXxlJob() {
         long jobId = XxlJobHelper.getJobId();
-        System.out.println("runJobJdbcXxlJob");
         JobInfo jobInfo = Optional.ofNullable(jobInfoMapper.selectById(jobId))
                 .orElseThrow(() -> new BusinessException("TaskInfo not found for jobId: " + jobId));
 

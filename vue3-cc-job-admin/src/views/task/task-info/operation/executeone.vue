@@ -73,7 +73,6 @@ watch(
 
 const submitForm = () => {
   // TODO: submit form data
-  console.log(taskInfoTriggerDto);
   JobInfoAPI.triggerJob(taskInfoTriggerDto)
     .then((data) => {
       ElMessage.success("执行任务成功");

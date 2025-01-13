@@ -48,7 +48,6 @@ public class XxlJobAdminConfig implements InitializingBean, DisposableBean {
 
     @Override
     public void destroy() throws Exception {
-        System.out.println(">>>>>>>> destroy");
         xxlJobScheduler.destroy();
     }
 

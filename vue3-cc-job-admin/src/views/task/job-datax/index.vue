@@ -39,7 +39,6 @@ const finalJson = ref("");
 const fromData = ref({});
 
 function nextStep1(data: any) {
-  console.log(data);
   readerForm.value = data;
   active.value++;
 }
@@ -80,7 +79,6 @@ function getIpAndPort(url: string) {
 }
 
 async function buildJson() {
-  console.log(readerForm.value);
   const readerDataXParams = {
     columns: readerForm.value.columns,
     sourceType: readerForm.value.datasource.datasource,
@@ -122,7 +120,6 @@ async function buildJson() {
   };
   dataList.push(obj);
   finalJson.value = `{"job":{"content":[ ${getContent(dataList)} ],"setting":{"speed":{"channel":3,"byte":-1},"errorLimit":{"record":0,"percentage":0.02} } }}`;
-  console.log("finalJson: ", finalJson.value);
   fromData.value.incrType = readerForm.value.incrType;
   fromData.value.incrId = readerForm.value.incrId;
   fromData.value.incrTime = readerForm.value.incrTime;

@@ -485,7 +485,6 @@ function triggerOne() {
 
 function selectElements() {
   const elements = lf.value.graphModel.getSelectElements(true);
-  console.log(elements);
 }
 
 function stopTrigger() {
@@ -602,7 +601,6 @@ const connectWs = (id: string) => {
   ws.value.onmessage = (e: any) => {
     const _message = JSON.parse(e.data);
     message.value = _message;
-    console.log("接收到消息", _message);
 
     if (
       _message.jobId == jobCompId.value &&
