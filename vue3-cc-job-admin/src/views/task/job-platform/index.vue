@@ -311,7 +311,6 @@ async function selectJobCompNode(node: any) {
   await JobInfoAPI.getJobCompose(node.id, 0).then((res) => {
     data = res;
   });
-
   const graphModel = lf.value.graphModel;
   const jobNode = data.jobNode;
   taskTitle.value = jobNode.jobName;
@@ -577,7 +576,6 @@ function updateEdgeStyle() {
 
 //--------------------------------------------------ws------------------
 const ws = ref();
-const message = ref();
 const reconnectAttempts = ref(0);
 const maxReconnectAttempts = 3; // 自定义最大重试次数
 
@@ -600,11 +598,10 @@ const connectWs = (id: string) => {
   };
   ws.value.onmessage = (e: any) => {
     const _message = JSON.parse(e.data);
-    message.value = _message;
-
     if (
       _message.jobId == jobCompId.value &&
-      _message.randomId == randomId.value
+      _message.randomId == randomId.value &&
+      _message.status != 2
     ) {
       // 关闭任务
       setTimeout(() => {
