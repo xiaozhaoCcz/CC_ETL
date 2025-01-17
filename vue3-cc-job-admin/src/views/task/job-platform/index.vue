@@ -283,9 +283,9 @@ onBeforeRouteLeave((to, from, next) => {
   }
 });
 
-function clearGraph() {
+async function clearGraph() {
   jobSelectId.value = undefined;
-  lf.value.graphModel.clearData();
+  await clearData();
 }
 
 function closeDraw() {
@@ -298,25 +298,48 @@ function filterJobCompNode(value: string, data: any) {
   return data.label.includes(value);
 }
 
+/**
+ * ！！！！清除画布不能使用graphModel.clearData();，前端坑是真的多，坑死我了
+ */
+async function clearData() {
+  const nodes = lf.value.getGraphRawData().nodes;
+  const edges = lf.value.getGraphRawData().edges;
+  const graphModel = lf.value.graphModel;
+  nodes.forEach((node: any) => {
+    const _node = graphModel.getNodeModelById(node.id);
+    if (_node) {
+      graphModel.deleteNode(_node.id);
+    }
+  });
+
+  edges.forEach((edge: any) => {
+    const _edge = graphModel.getEdgeModelById(edge.id);
+    if (_edge) {
+      graphModel.deleteEdgeById(_edge.id);
+    }
+  });
+}
+
 async function selectJobCompNode(node: any) {
   if (triggerOneVisible.value) {
     ElMessage.warning("有任务正在运行，请先停止任务～");
     return;
   }
-  lf.value.graphModel.clearData();
-
+  const graphModel = lf.value.graphModel;
   jobCompId.value = node.id;
+
+  await clearData();
 
   let data = {} as any;
   await JobInfoAPI.getJobCompose(node.id, 0).then((res) => {
     data = res;
   });
-  const graphModel = lf.value.graphModel;
+
   const jobNode = data.jobNode;
   taskTitle.value = jobNode.jobName;
   const newNodes = data.nodes;
   const newEdges = data.edges;
-  addJobNodes(newNodes, graphModel, newEdges);
+  await addJobNodes(newNodes, graphModel, newEdges);
 }
 
 function cancelDialog() {
@@ -356,30 +379,51 @@ function validateEdge() {
 }
 
 function addJobNodes(newNodes: any, graphModel: any, newEdges: any) {
-  newNodes.forEach((node: any) => {
-    graphModel.addNode(generateNode(node));
-  });
-  newNodes.forEach((n: any) => {
-    const node = lf.value.getNodeModelById(n.id);
-    if (n.nodeType === "dynamic-group") {
-      JSON.parse(n.children).forEach((id: any) => node.addChild(id));
-    }
-  });
+  return new Promise((resolve) => {
+    newNodes.forEach((node: any) => {
+      lf.value.graphModel.addNode(generateNode(node));
+    });
+    newNodes.forEach((n: any) => {
+      const node = lf.value.getNodeModelById(n.id);
+      if (n.nodeType === "dynamic-group") {
+        JSON.parse(n.children).forEach((id: any) => node.addChild(id));
+      }
+    });
 
-  newEdges.forEach((e: any) => {
-    graphModel.addEdge(generateEdge(e));
-  });
+    newEdges.forEach((e: any) => {
+      graphModel.addEdge(generateEdge(e));
+    });
+    //!!!必须重新传graphModel，不知道为什么，不传会出大bug
+    resolve(graphModel);
+  }).then((_graphModel: any) => {
+    new Promise((resolve) => {
+      const g = lf.value.getGraphRawData();
+      //删除之前的节点;
+      const nodes = lf.value.getGraphRawData().nodes;
+      const edges = lf.value.getGraphRawData().edges;
 
-  const oNodes = lf.value.getGraphRawData().nodes;
-  const oEdges = lf.value.getGraphRawData().edges;
-  //删除之前的节点
-  graphModel.clearData();
+      nodes.forEach((node: any) => {
+        const _node = _graphModel.getNodeModelById(node.id);
+        if (_node) {
+          _graphModel.deleteNode(_node.id);
+        }
+      });
 
-  oNodes.forEach((n: any) => {
-    graphModel.addNode(n);
-  });
-  oEdges.forEach((e: any) => {
-    graphModel.addEdge(e);
+      edges.forEach((edge: any) => {
+        const _edge = _graphModel.getEdgeModelById(edge.id);
+        if (_edge) {
+          _graphModel.deleteEdgeById(_edge.id);
+        }
+      });
+      resolve(g);
+    }).then((g: any) => {
+      g.nodes.forEach((n: any) => {
+        graphModel.addNode(n);
+      });
+      g.edges.forEach((e: any) => {
+        graphModel.addEdge(e);
+      });
+    });
   });
 }
 
@@ -422,6 +466,18 @@ function generateNode(node: any) {
     y: node.nodePositionY,
     properties: JSON.parse(node.properties),
     children: node.children != null ? JSON.parse(node.children) : [],
+  };
+}
+
+function toNode(node: any) {
+  return {
+    id: node.id,
+    jobName: node.text,
+    nodeType: node.type,
+    nodePositionX: node.x,
+    nodePositionY: node.y,
+    properties: JSON.stringify(node.properties),
+    children: JSON.stringify(node.children),
   };
 }
 
