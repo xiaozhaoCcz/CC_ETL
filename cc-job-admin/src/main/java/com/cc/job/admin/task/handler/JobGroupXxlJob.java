@@ -92,14 +92,14 @@ public class JobGroupXxlJob {
             List<JobNode> nodes = getTaskNodesByJobId(jobId);
             List<JobEdge> edges = getTaskEdgesByJobId(jobId);
 
-            Map<Long,List<Long>> statusMap = new HashMap<>();
-            getJobStatusMap(jobId,statusMap);
+            Map<Long, List<Long>> statusMap = new HashMap<>();
+            getJobStatusMap(jobId, statusMap);
             buildGraph(jobId, nodes, edges);
             Map<Long, List<JobNode>> nextMap = buildNextNode(nodes, edges);
 
             int avgTime = getAvgTime(nodes, jobInfo);
             CONTEXT_HOLDER.set(XxlJobContext.getXxlJobContext());
-            List<WorkerWrapper<Long, String>> workerWrappers = buildWorkerWrappers(nodes, nextMap, randomId, avgTime,statusMap);
+            List<WorkerWrapper<Long, String>> workerWrappers = buildWorkerWrappers(nodes, nextMap, randomId, avgTime, statusMap);
             List<Long> startNodes = getStartNodes(nodes);
             List<WorkerWrapper<Long, String>> startWrappers = getStartWrappers(workerWrappers, startNodes);
 
@@ -121,7 +121,7 @@ public class JobGroupXxlJob {
         Integer executorTimeout = jobInfo.getExecutorTimeout();
         int size = nodes.size();
         for (JobInfo info : jobInfos) {
-            if(info.getExecutorTimeout()>0){
+            if (info.getExecutorTimeout() > 0) {
                 executorTimeout -= info.getExecutorTimeout();
                 size--;
             }
@@ -180,7 +180,7 @@ public class JobGroupXxlJob {
         STOP_MAP.remove(setExecuteJobId(jobId, randomId));
         redisTemplate.delete(setExecuteJobId(jobId, randomId));
         String recordId = StreamConsumer.messageMap.get(setExecuteJobId(jobId, randomId));
-        if(StringUtils.isNotBlank(recordId)){
+        if (StringUtils.isNotBlank(recordId)) {
             redisTemplate.opsForStream().delete(StreamConsumer.TASK_SET_STREAM, recordId);
         }
         jobInfoMapper.stopTaskSet(jobId);
@@ -222,16 +222,16 @@ public class JobGroupXxlJob {
                     .worker(new IWorker<>() {
                         @Override
                         public String action(Long jobId, Map<String, WorkerWrapper> allWrappers) {
-                            return executeTask(xxlJobContext, jobId, node, jobInfo, randomId, avgTime,statusMap);
+                            return executeTask(xxlJobContext, jobId, node, jobInfo, randomId, avgTime, statusMap);
                         }
 
                         @Override
                         public String defaultValue() {
-                            setNodeStatus(statusMap, node.getJobId(), 0,randomId,node.getJobParentId());
+                            setNodeStatus(statusMap, node.getJobId(), 0, randomId, node.getJobParentId());
                             return "任务运行超时异常";
                         }
                     })
-                    .callback(new TaskCallback(xxlJobContext, node, randomId,statusMap));
+                    .callback(new TaskCallback(xxlJobContext, node, randomId, statusMap));
             result.add(worker);
         }
 
@@ -248,7 +248,7 @@ public class JobGroupXxlJob {
         return result;
     }
 
-    private String executeTask(XxlJobContext xxlJobContext, Long jobId, JobNode node, JobInfo jobInfo, String randomId, int avgTime,Map<Long, List<Long>> statusMap) {
+    private String executeTask(XxlJobContext xxlJobContext, Long jobId, JobNode node, JobInfo jobInfo, String randomId, int avgTime, Map<Long, List<Long>> statusMap) {
         Long logId = XxlJobTrigger.trigger(jobId, TriggerTypeEnum.MANUAL, -1, null, randomId, "");
         String result;
         AtomicInteger count = new AtomicInteger(0);
@@ -260,7 +260,7 @@ public class JobGroupXxlJob {
                     for (Pair<String, Boolean> pair : new ArrayList<>(callbackRes)) {
                         if (pair.getKey().equals(setExecuteJobId(jobId, randomId))) {
                             try {
-                                int res = handleTaskCompletion(xxlJobContext, pair, node, jobInfo, count, randomId, logId,statusMap);
+                                int res = handleTaskCompletion(xxlJobContext, pair, node, jobInfo, count, randomId, logId, statusMap);
                                 if (res == 1) {
                                     return String.valueOf(jobId);
                                 }
@@ -288,7 +288,7 @@ public class JobGroupXxlJob {
         return result;
     }
 
-    private int handleTaskCompletion(XxlJobContext xxlJobContext, Pair<String, Boolean> pair, JobNode node, JobInfo jobInfo, AtomicInteger count, String randomId, Long jobLogId,Map<Long, List<Long>> statusMap) {
+    private int handleTaskCompletion(XxlJobContext xxlJobContext, Pair<String, Boolean> pair, JobNode node, JobInfo jobInfo, AtomicInteger count, String randomId, Long jobLogId, Map<Long, List<Long>> statusMap) {
         String key = pair.getKey();
         Long jobId = Long.valueOf(key.split(":")[0]);
         boolean success = pair.getValue();
@@ -296,17 +296,17 @@ public class JobGroupXxlJob {
         JobLog jobLog = jobLogMapper.selectById(jobLogId);
         XxlJobHelper.log(xxlJobContext, ">>>>>>>>>>>>>>>>任务运行日志jonId:{}, handleCode:{},handleMsg:{}", jobLogId, jobLog.getHandleCode(), jobLog.getHandleMsg());
 
-       StreamConsumer.removeCallbackRes(setExecuteJobId(jobId, randomId));
+        StreamConsumer.removeCallbackRes(setExecuteJobId(jobId, randomId));
         int res = 1;
         if (success) {
-            setNodeStatus(statusMap,jobId,1,randomId,node.getJobParentId());
+            setNodeStatus(statusMap, jobId, 1, randomId, node.getJobParentId());
         } else {
             if (count.incrementAndGet() <= jobInfo.getExecutorFailRetryCount()) {
                 logger.info("Retrying task: {}, attempt: {}", jobId, count.get());
                 XxlJobHelper.log(xxlJobContext, ">>>>>>>>>>>>>>>>>>>重试任务: {}, 重试次数: {}>>>>>>>>>>>>>>>", jobId, count);
                 res = 0;
             } else {
-                setNodeStatus(statusMap,jobId,0,randomId,node.getJobParentId());
+                setNodeStatus(statusMap, jobId, 0, randomId, node.getJobParentId());
             }
         }
         return res;
@@ -408,9 +408,9 @@ public class JobGroupXxlJob {
 
         private final XxlJobContext xxlJobContext;
 
-        private final Map<Long,List<Long>> statusMap;
+        private final Map<Long, List<Long>> statusMap;
 
-        public TaskCallback(XxlJobContext xxlJobContext, JobNode node, String randomId, Map<Long,List<Long>> statusMap) {
+        public TaskCallback(XxlJobContext xxlJobContext, JobNode node, String randomId, Map<Long, List<Long>> statusMap) {
             this.node = node;
             this.randomId = randomId;
             this.xxlJobContext = xxlJobContext;
@@ -421,7 +421,7 @@ public class JobGroupXxlJob {
         public void begin(Long jobId) {
             logger.info(">>>>>>>>>>>>>>>>>>>>>任务：{}开始运行>>>>>>>>>>>>>>>>>>>>>", jobId);
             XxlJobHelper.log(xxlJobContext, ">>>>>>>>>>>>>>>>>>>>>任务：{}开始运行>>>>>>>>>>>>>>>>>>>>>", jobId);
-            setNodeStatus(statusMap,jobId,2,randomId,node.getJobParentId());
+            setNodeStatus(statusMap, jobId, 2, randomId, node.getJobParentId());
         }
 
         @Override
@@ -430,19 +430,19 @@ public class JobGroupXxlJob {
         }
     }
 
-    private void getJobStatusMap(Long jobId,Map<Long,List<Long>> statusMap){
+    private void getJobStatusMap(Long jobId, Map<Long, List<Long>> statusMap) {
         JobInfo jobInfo = jobInfoService.getById(jobId);
-        if(jobInfo.getJobType()==2){
+        if (jobInfo.getJobType() == 2) {
             List<JobInfo> jobInfos = jobInfoService.list(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getParentId, jobId));
             for (JobInfo info : jobInfos) {
-                getJobStatusMap(info.getId(),statusMap);
+                getJobStatusMap(info.getId(), statusMap);
             }
-            statusMap.put(jobId,jobInfos.stream().map(JobInfo::getId).toList());
+            statusMap.put(jobId, jobInfos.stream().map(JobInfo::getId).toList());
 
         }
     }
 
-    private void setNodeStatus(Map<Long,List<Long>> statusMap,Long jobId,Integer status,String randomId,Long parentId) {
+    private void setNodeStatus(Map<Long, List<Long>> statusMap, Long jobId, Integer status, String randomId, Long parentId) {
         for (Map.Entry<Long, List<Long>> entry : statusMap.entrySet()) {
             if (entry.getValue().contains(jobId)) {
                 Message message = new Message();
@@ -453,7 +453,7 @@ public class JobGroupXxlJob {
                 webSocketServer.sendInfo(message);
 
                 if (status == 0) {
-                    JobInfo jobInfo =  jobInfoService.getById(jobId);
+                    JobInfo jobInfo = jobInfoService.getById(jobId);
                     if (!"DO_NOTHING".equalsIgnoreCase(jobInfo.getExecutorBlockStrategy())) {
                         statusMap.remove(entry.getKey());
                         setNodeStatus(statusMap, entry.getKey(), status, randomId, parentId);
@@ -462,7 +462,7 @@ public class JobGroupXxlJob {
                 } else if (status == 1) {
                     List<Long> value = new ArrayList<>(entry.getValue());
                     value.remove(jobId);
-                    statusMap.put(entry.getKey(),value);
+                    statusMap.put(entry.getKey(), value);
                     if (entry.getValue().isEmpty()) {
                         statusMap.remove(entry.getKey());
                         setNodeStatus(statusMap, entry.getKey(), status, randomId, parentId);

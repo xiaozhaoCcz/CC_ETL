@@ -373,15 +373,7 @@ function addJobNodes(newNodes: any, graphModel: any, newEdges: any) {
   const oNodes = lf.value.getGraphRawData().nodes;
   const oEdges = lf.value.getGraphRawData().edges;
   //删除之前的节点
-  const delNodes = lf.value.getGraphRawData().nodes;
-  const delEdges = lf.value.getGraphRawData().edges;
-
-  delNodes.forEach((n: any) => {
-    graphModel.deleteNode(n.id);
-  });
-  delEdges.forEach((e: any) => {
-    graphModel.deleteEdgeById(e.id);
-  });
+  graphModel.clearData();
 
   oNodes.forEach((n: any) => {
     graphModel.addNode(n);
