@@ -378,11 +378,20 @@ function validateEdge() {
   return;
 }
 
+/**
+ * ！！！！离谱一段逻辑，我也不知道为什么这样写才能成功。不然就出现各种奇怪的bug，折磨死我了，前端真的太难了！！！！
+ * @param newNodes
+ * @param graphModel
+ * @param newEdges
+ */
 function addJobNodes(newNodes: any, graphModel: any, newEdges: any) {
+  //！！不懂为什么要用promise
   return new Promise((resolve) => {
     newNodes.forEach((node: any) => {
+      // ！！！ 不能用graphModel，只能用lf.value.graphModel，不懂，反正这样写就对了
       lf.value.graphModel.addNode(generateNode(node));
     });
+    //！！！任务组必须重新设置，不然孩子节点都是空的，不懂
     newNodes.forEach((n: any) => {
       const node = lf.value.getNodeModelById(n.id);
       if (n.nodeType === "dynamic-group") {
@@ -403,6 +412,7 @@ function addJobNodes(newNodes: any, graphModel: any, newEdges: any) {
       const edges = lf.value.getGraphRawData().edges;
 
       nodes.forEach((node: any) => {
+        // ！！这里要重新查一遍，不知道为什么，反正这样写了才能运行成功
         const _node = _graphModel.getNodeModelById(node.id);
         if (_node) {
           _graphModel.deleteNode(_node.id);
@@ -445,7 +455,7 @@ async function confirmDialog() {
     const newEdges = data.edges;
     newNodes.push(jobNode);
 
-    addJobNodes(newNodes, graphModel, newEdges);
+    await addJobNodes(newNodes, graphModel, newEdges);
 
     graphModel.moveNodes([jobNode.id], _node.x - 500, _node.y - 230);
 
