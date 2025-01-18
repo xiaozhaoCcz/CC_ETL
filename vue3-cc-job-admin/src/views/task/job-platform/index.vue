@@ -285,6 +285,7 @@ onBeforeRouteLeave((to, from, next) => {
 
 async function clearGraph() {
   jobSelectId.value = undefined;
+  jobCompId.value = null;
   await clearData();
 }
 
@@ -388,8 +389,7 @@ function addJobNodes(newNodes: any, graphModel: any, newEdges: any) {
   //！！不懂为什么要用promise
   return new Promise((resolve) => {
     newNodes.forEach((node: any) => {
-      // ！！！ 不能用graphModel，只能用lf.value.graphModel，不懂，反正这样写就对了
-      lf.value.graphModel.addNode(generateNode(node));
+      graphModel.addNode(generateNode(node));
     });
     //！！！任务组必须重新设置，不然孩子节点都是空的，不懂
     newNodes.forEach((n: any) => {
