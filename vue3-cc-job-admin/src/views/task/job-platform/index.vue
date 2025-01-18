@@ -73,7 +73,7 @@
           @node-click="selectJobCompNode"
         />
       </div>
-      <div class="logic-flow" ref="lfRef"></div>
+      <div class="logic-flow" ref="lfRef" />
     </div>
 
     <EditJobComp
@@ -176,27 +176,27 @@ const jobDialog = ref(false);
 const triggerOneVisible = ref(false);
 const jobSelectId = ref<any>(undefined);
 const jobNodeEditId = ref(undefined);
-const nodeJobId = ref(null);
+const nodeJobId = ref<number | undefined>(undefined);
 const jobNodeVisible = ref(false);
-const nowDate = ref(null);
+const nowDate = ref<Date | undefined>(undefined);
 const menuConfig = {
   nodeMenu: [
     {
       text: "删除",
-      callback(node) {
+      callback(node: { id: string }) {
         lf.value.deleteNode(node.id);
       },
     },
     {
       text: "选择任务",
-      callback(node: any) {
+      callback(node: { id: string }) {
         jobDialog.value = true;
         jobNodeEditId.value = node.id;
       },
     },
     {
       text: "编辑节点",
-      callback(node: any) {
+      callback(node: { properties: { jobId: number | null } }) {
         if (triggerOneVisible.value) {
           ElMessage.warning("任务正在运行，请先停止任务～");
           return;
@@ -237,7 +237,7 @@ const menuConfig = {
   edgeMenu: [
     {
       text: "删除",
-      callback(edge: any) {
+      callback(edge: { id: string }) {
         lf.value.graphModel.deleteEdgeById(edge.id);
       },
     },
@@ -385,55 +385,35 @@ function validateEdge() {
  * @param graphModel
  * @param newEdges
  */
-function addJobNodes(newNodes: any, graphModel: any, newEdges: any) {
-  //！！不懂为什么要用promise
-  return new Promise((resolve) => {
-    newNodes.forEach((node: any) => {
-      graphModel.addNode(generateNode(node));
-    });
-    //！！！任务组必须重新设置，不然孩子节点都是空的，不懂
-    newNodes.forEach((n: any) => {
-      const node = lf.value.getNodeModelById(n.id);
-      if (n.nodeType === "dynamic-group") {
-        JSON.parse(n.children).forEach((id: any) => node.addChild(id));
-      }
-    });
+async function addJobNodes(newNodes: any[], graphModel: any, newEdges: any[]) {
+  // 添加新节点
+  newNodes.forEach((node) => {
+    graphModel.addNode(generateNode(node));
+  });
+  // 重新设置任务组的孩子节点
+  newNodes.forEach((n) => {
+    const node = lf.value.getNodeModelById(n.id);
+    if (n.nodeType === "dynamic-group") {
+      JSON.parse(n.children).forEach((id: any) => node.addChild(id));
+    }
+  });
+  // 添加新边
+  newEdges.forEach((e) => {
+    graphModel.addEdge(generateEdge(e));
+  });
 
-    newEdges.forEach((e: any) => {
-      graphModel.addEdge(generateEdge(e));
-    });
-    //!!!必须重新传graphModel，不知道为什么，不传会出大bug
-    resolve(graphModel);
-  }).then((_graphModel: any) => {
-    new Promise((resolve) => {
-      const g = lf.value.getGraphRawData();
-      //删除之前的节点;
-      const nodes = lf.value.getGraphRawData().nodes;
-      const edges = lf.value.getGraphRawData().edges;
+  // 获取当前图数据
+  const nodes = lf.value.getGraphRawData().nodes;
+  const edges = lf.value.getGraphRawData().edges;
 
-      nodes.forEach((node: any) => {
-        // ！！这里要重新查一遍，不知道为什么，反正这样写了才能运行成功
-        const _node = _graphModel.getNodeModelById(node.id);
-        if (_node) {
-          _graphModel.deleteNode(_node.id);
-        }
-      });
+  await clearData();
 
-      edges.forEach((edge: any) => {
-        const _edge = _graphModel.getEdgeModelById(edge.id);
-        if (_edge) {
-          _graphModel.deleteEdgeById(_edge.id);
-        }
-      });
-      resolve(g);
-    }).then((g: any) => {
-      g.nodes.forEach((n: any) => {
-        graphModel.addNode(n);
-      });
-      g.edges.forEach((e: any) => {
-        graphModel.addEdge(e);
-      });
-    });
+  // 重新添加节点和边
+  nodes.forEach((n: any) => {
+    graphModel.addNode(n);
+  });
+  edges.forEach((e: any) => {
+    graphModel.addEdge(e);
   });
 }
 
@@ -479,18 +459,6 @@ function generateNode(node: any) {
   };
 }
 
-function toNode(node: any) {
-  return {
-    id: node.id,
-    jobName: node.text,
-    nodeType: node.type,
-    nodePositionX: node.x,
-    nodePositionY: node.y,
-    properties: JSON.stringify(node.properties),
-    children: JSON.stringify(node.children),
-  };
-}
-
 function generateEdge(edge: any) {
   return {
     sourceNodeId: edge.fromNodeId,
@@ -499,7 +467,7 @@ function generateEdge(edge: any) {
   };
 }
 
-function changeJobRadio(val: number) {
+function changeJobRadio(val: string | number | boolean | undefined) {
   selectJobInfoList.value = jobInfoList.value.filter((e: any) =>
     val === 0 ? e.jobType === 0 : e.jobType !== 0
   );
@@ -729,7 +697,7 @@ onMounted(() => {
     iconClass: "Minus",
     title: "横向对齐",
     text: "横向对齐",
-    onClick: (lf, ev) => {
+    onClick: (lf: any, ev: any) => {
       const elements = lf.graphModel.getSelectElements(true);
       const arrY = elements.nodes.map((n: any) => n.y);
       const avgY = avg(arrY);
@@ -744,7 +712,7 @@ onMounted(() => {
     iconClass: "XX",
     title: "纵向对齐",
     text: "纵向对齐",
-    onClick: (lf, ev) => {
+    onClick: (lf: any, ev: any) => {
       const elements = lf.graphModel.getSelectElements(true);
       const arrX = elements.nodes.map((n: any) => n.x);
       const avgX = avg(arrX);
