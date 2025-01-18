@@ -102,18 +102,16 @@ public class JobGroupXxlJob {
             List<WorkerWrapper<Long, String>> workerWrappers = buildWorkerWrappers(nodes, nextMap, randomId, avgTime, statusMap);
             List<Long> startNodes = getStartNodes(nodes);
             List<WorkerWrapper<Long, String>> startWrappers = getStartWrappers(workerWrappers, startNodes);
-
             WorkerWrapper<Long, String> startWork = createStartWorkWrapper(jobId, startWrappers);
-            STOP_MAP.put(setExecuteJobId(jobId, randomId), startWork);
             redisTemplate.opsForValue().set(setExecuteJobId(jobId, randomId), "");
-
+            STOP_MAP.put(setExecuteJobId(jobId, randomId), startWork);
             Async.beginWork(jobInfo.getExecutorTimeout(), startWork);
+            removeWorkWrapper(jobId, randomId);
         } catch (ExecutionException | InterruptedException e) {
             handleExecutionException(jobId, e);
         } finally {
             completeJobExecution(jobId, randomId);
         }
-
     }
 
     private int getAvgTime(List<JobNode> nodes, JobInfo jobInfo) {
@@ -173,18 +171,11 @@ public class JobGroupXxlJob {
     }
 
     private void completeJobExecution(long jobId, String randomId) {
-        logger.info("{}任务运行完成", jobId);
         XxlJobHelper.log("{}任务运行完成", jobId);
         sendCompletionMessage(jobId, randomId);
         TASK_ID_MAP.remove(setExecuteJobId(jobId, randomId));
-        STOP_MAP.remove(setExecuteJobId(jobId, randomId));
         redisTemplate.delete(setExecuteJobId(jobId, randomId));
-        String recordId = StreamConsumer.messageMap.get(setExecuteJobId(jobId, randomId));
-        if (StringUtils.isNotBlank(recordId)) {
-            redisTemplate.opsForStream().delete(StreamConsumer.TASK_SET_STREAM, recordId);
-        }
         jobInfoMapper.stopTaskSet(jobId);
-
     }
 
     private static WorkerWrapper<Long, String> createStartWorkWrapper(long jobId, List<WorkerWrapper<Long, String>> startWrappers) {
@@ -227,7 +218,11 @@ public class JobGroupXxlJob {
 
                         @Override
                         public String defaultValue() {
-                            setNodeStatus(statusMap, node.getJobId(), 0, randomId, node.getJobParentId());
+                            try {
+                                setNodeStatus(statusMap, node.getJobId(), 0, randomId, node.getJobParentId());
+                            }catch (Exception e){
+                                logger.error(e.getMessage());
+                            }
                             return "任务运行超时异常";
                         }
                     })
@@ -252,17 +247,18 @@ public class JobGroupXxlJob {
         Long logId = XxlJobTrigger.trigger(jobId, TriggerTypeEnum.MANUAL, -1, null, randomId, "");
         String result;
         Thread thread = null;
-        JobThreadListener jobThreadListener = new JobThreadListener(xxlJobContext, jobInfo, node, randomId, logId, statusMap);
+        JobThreadListener jobThreadListener =null;
         try {
+            jobThreadListener = new JobThreadListener(xxlJobContext, jobInfo, node, randomId, logId, statusMap);
             FutureTask<String> futureTask = new FutureTask<>(jobThreadListener);
             thread = new Thread(futureTask);
             thread.start();
             result = jobInfo.getExecutorTimeout() > 0 ? futureTask.get(jobInfo.getExecutorTimeout(), TimeUnit.MILLISECONDS) : futureTask.get(avgTime, TimeUnit.MILLISECONDS);
         } catch (Exception e) {
-            throw new BusinessException(e);
+            logger.error(e.getMessage());
+            throw new RuntimeException(e);
         } finally {
             jobThreadListener.toStop();
-            assert thread != null;
             thread.interrupt();
         }
         return result;
@@ -286,7 +282,12 @@ public class JobGroupXxlJob {
                 XxlJobHelper.log(xxlJobContext, ">>>>>>>>>>>>>>>>>>>重试任务: {}, 重试次数: {}>>>>>>>>>>>>>>>", jobId, count);
                 res = 0;
             } else {
-                setNodeStatus(statusMap, jobId, 0, randomId, node.getJobParentId());
+                try {
+                    setNodeStatus(statusMap, jobId, 0, randomId, node.getJobParentId());
+                }catch (Exception e){
+                    logger.error(e.getMessage());
+                    throw new RuntimeException(e);
+                }
             }
         }
         return res;
@@ -407,7 +408,7 @@ public class JobGroupXxlJob {
                     if (!"DO_NOTHING".equalsIgnoreCase(jobInfo.getExecutorBlockStrategy())) {
                         statusMap.remove(entry.getKey());
                         setNodeStatus(statusMap, entry.getKey(), status, randomId, parentId);
-                        throw new RuntimeException();
+                        throw new RuntimeException("任务运行失败");
                     }
                 } else if (status == 1) {
                     List<Long> value = new ArrayList<>(entry.getValue());
@@ -470,7 +471,7 @@ public class JobGroupXxlJob {
                             }
                         } catch (Exception e) {
                             logger.error(e.getMessage());
-                            throw new BusinessException(e);
+                            throw new RuntimeException(e);
                         } finally {
                             String recordId = StreamConsumer.messageMap.get(setExecuteJobId(jobInfo.getId(), randomId));
                             if (recordId != null) {

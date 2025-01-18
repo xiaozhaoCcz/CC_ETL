@@ -126,6 +126,7 @@
                   filterable
                   placeholder="选择运行模式"
                   style="width: 210px"
+                  :disabled="formData.jobType == 2"
                   @change="handleChangeGlueType"
                 >
                   <el-option
@@ -144,6 +145,7 @@
                   v-model="formData.executorHandler"
                   type="text"
                   autocomplete="off"
+                  :disabled="formData.jobType == 2"
                 />
               </div>
               <div class="c_cont" v-if="formData.glueType == 'API'">
@@ -241,6 +243,7 @@
                   v-model="formData.executorParam"
                   type="textarea"
                   autocomplete="off"
+                  :disabled="formData.jobType == 2"
                 />
               </div>
             </div>
@@ -341,10 +344,10 @@
                 <span>默认自增数据</span>
                 <IncrEditTable
                   :list="
-                  formData.incrContent == null
-                    ? []
-                    : JSON.parse(formData.incrContent)
-                "
+                    formData.incrContent == null
+                      ? []
+                      : JSON.parse(formData.incrContent)
+                  "
                   @handleTableData="handleTableData2"
                 ></IncrEditTable>
               </div>
@@ -552,7 +555,8 @@ function handleTableData2(val) {
 watch(
   () => props.formData,
   (data) => {
-    if (data.id && data.glueType == "DATAX") {
+    console.log(data);
+    if (data.id && data.glueType === "DATAX") {
       jsonData.value = JSON.parse(data.executorParam);
     }
   },

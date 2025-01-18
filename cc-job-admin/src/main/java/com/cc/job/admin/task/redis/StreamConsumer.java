@@ -2,6 +2,7 @@ package com.cc.job.admin.task.redis;
 
 import cn.hutool.core.lang.Pair;
 import jakarta.annotation.PostConstruct;
+import lombok.Getter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.ReadOffset;
@@ -25,12 +26,10 @@ public class StreamConsumer {
 
     public static final String TASK_SET_STREAM = "TASK_SET_STREAM";
 
+    @Getter
     private static final List<Pair<String,Boolean>> callbackRes = Collections.synchronizedList(new ArrayList<>());
-    public  static final Map<String,String> messageMap = new ConcurrentHashMap<>();
 
-    public  static  List<Pair<String,Boolean>> getCallbackRes() {
-        return callbackRes;
-    }
+    public  static final Map<String,String> messageMap = new ConcurrentHashMap<>();
 
     public static void removeCallbackRes(String jobId) {
         if (jobId != null) {

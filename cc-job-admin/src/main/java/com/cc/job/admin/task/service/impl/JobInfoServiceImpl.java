@@ -627,7 +627,6 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     public boolean stopTaskSet(Long id, String randomId) {
         int flag = jobInfoMapper.stopTaskSet(id);
         XxlJobExecutor.removeJobThread(id.intValue(), "stop task" + id);
-
         if (redisTemplate.hasKey(id + ":" + randomId)) {
             WorkerWrapper<Long, String> workWrapper = JobGroupXxlJob.getWorkWrapper(id, randomId);
             if (workWrapper != null) {

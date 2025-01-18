@@ -100,7 +100,7 @@ public class JobLogServiceImpl extends ServiceImpl<JobLogMapper, JobLog> impleme
         LambdaQueryWrapper<JobLog> wrapper = new LambdaQueryWrapper<>();
         // 逻辑删除
         baseWrapper(queryParams, wrapper);
-        return  this.remove(wrapper);
+        return this.remove(wrapper);
     }
 
     @Override

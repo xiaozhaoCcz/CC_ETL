@@ -23,6 +23,7 @@
         <el-form-item label="机器地址" prop="addressList">
           <el-input
             v-model="formData.addressList"
+            type="textarea"
             placeholder="执行器地址列表，多地址逗号分隔"
           />
         </el-form-item>

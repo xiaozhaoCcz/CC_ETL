@@ -52,7 +52,7 @@
             <template #icon><Refresh /></template>
             重置
           </el-button>
-          <el-button type="danger" @click="handleDelete">
+          <el-button type="danger" @click="timeVisible = true">
             <template #icon><Delete /></template>
             清理
           </el-button>
@@ -85,7 +85,9 @@
           align="center"
         >
           <template #default="{ row }">
-            <span>{{ dayjs(row.triggerTime).format("YYYY-MM-DD HH:mm:ss") }}</span>
+            <span>
+              {{ dayjs(row.triggerTime).format("YYYY-MM-DD HH:mm:ss") }}
+            </span>
           </template>
         </el-table-column>
         <el-table-column
@@ -116,7 +118,9 @@
           align="center"
         >
           <template #default="{ row }">
-            <span>{{ dayjs(row.handleTime).format("YYYY-MM-DD HH:mm:ss") }}</span>
+            <span>
+              {{ dayjs(row.handleTime).format("YYYY-MM-DD HH:mm:ss") }}
+            </span>
           </template>
         </el-table-column>
         <el-table-column
@@ -142,9 +146,13 @@
         >
           <template #default="{ row }">
             <span v-if="row.handleMsg == null || row.handleMsg == ''">无</span>
-            <el-link v-else type="primary" @click="lookHandleMsg(row.handleMsg)"
-              >查看</el-link
+            <el-link
+              v-else
+              type="primary"
+              @click="lookHandleMsg(row.handleMsg)"
             >
+              查看
+            </el-link>
           </template>
         </el-table-column>
 
@@ -169,8 +177,12 @@
           align="center"
         >
           <template #default="{ row }">
-            <el-tag type="warning" effect="dark" v-if="row.jobType == 2">任务组</el-tag>
-            <el-tag type="primary"  effect="dark" v-if="row.jobType == 0">任务</el-tag>
+            <el-tag type="warning" effect="dark" v-if="row.jobType == 2">
+              任务组
+            </el-tag>
+            <el-tag type="primary" effect="dark" v-if="row.jobType == 0">
+              任务
+            </el-tag>
           </template>
         </el-table-column>
       </el-table>
@@ -198,6 +210,36 @@
 
     <el-dialog v-model="handleMsgVisable" title="调度备注" width="500">
       {{ handleMsg }}
+    </el-dialog>
+
+    <el-dialog title="删除数据" v-model="timeVisible" width="600">
+      <el-form style="max-width: 600px" :model="timeForm" label-width="auto">
+        <el-form-item label="删除数据">
+          <el-radio-group v-model="timeForm.dateTime">
+            <el-radio border :value="0">上一个小时</el-radio>
+            <el-radio border :value="1">上一天</el-radio>
+            <el-radio border :value="2">上一周</el-radio>
+            <el-radio border :value="3">一个月</el-radio>
+          </el-radio-group>
+        </el-form-item>
+
+        <el-form-item label="自定义时间">
+          <el-date-picker
+            v-model="timeForm.dateTimerange"
+            type="datetimerange"
+            range-separator="To"
+            start-placeholder="Start date"
+            end-placeholder="End date"
+            value-format="YYYY-MM-DDTHH:mm:ss.000Z"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="timeVisible = false">取消</el-button>
+          <el-button type="primary" @click="handleDelete">确认</el-button>
+        </div>
+      </template>
     </el-dialog>
   </div>
 </template>
@@ -238,6 +280,11 @@ const taskLogId = ref();
 const executeLogVisable = ref(false);
 const handleMsgVisable = ref(false);
 const handleMsg = ref("");
+const timeForm = reactive({
+  dateTime: 0,
+  dateTimerange: "",
+});
+const timeVisible = ref(false);
 
 function lookTriggerLog(o: any) {
   triggerLogVisable.value = true;
@@ -259,41 +306,44 @@ function lookHandleMsg(msg: string) {
   handleMsg.value = msg;
 }
 
+function getTime(index: number) {
+  const end = new Date();
+  const start = new Date();
+  if (index == 0) {
+    start.setHours(start.getHours() - 1);
+  } else if (index == 1) {
+    start.setDate(start.getDate() - 1);
+  } else if (index == 2) {
+    start.setDate(start.getDate() - 7);
+  } else if (index == 3) {
+    start.setMonth(start.getMonth() - 1);
+  }
+  return [start, end];
+}
+
 const shortcuts = [
   {
     text: "上一个小时",
     value: () => {
-      const end = new Date();
-      const start = new Date();
-      start.setHours(start.getHours() - 1);
-      return [start, end];
+      return getTime(0);
     },
   },
   {
     text: "上一天",
     value: () => {
-      const end = new Date();
-      const start = new Date();
-      start.setDate(start.getDate() - 1);
-      return [start, end];
+      return getTime(1);
     },
   },
   {
     text: "上周",
     value: () => {
-      const end = new Date();
-      const start = new Date();
-      start.setDate(start.getDate() - 7);
-      return [start, end];
+      return getTime(2);
     },
   },
   {
     text: "上个月",
     value: () => {
-      const end = new Date();
-      const start = new Date();
-      start.setMonth(start.getMonth() - 1);
-      return [start, end];
+      return getTime(3);
     },
   },
 ];
@@ -331,24 +381,22 @@ function handleOpenDialog(id?: number) {
 
 /** 删除task_log */
 function handleDelete() {
-  ElMessageBox.confirm("确认删除已选中的数据项?", "警告", {
-    confirmButtonText: "确定",
-    cancelButtonText: "取消",
-    type: "warning",
-  }).then(
-    () => {
-      loading.value = true;
-      JobLogAPI.deleteTaskLogs(queryParams)
-        .then(() => {
-          ElMessage.success("删除成功");
-          handleResetQuery();
-        })
-        .finally(() => (loading.value = false));
-    },
-    () => {
-      ElMessage.info("已取消删除");
-    }
-  );
+  const obj = {} as any;
+  if (timeForm.dateTimerange !== "") {
+    obj.filterTime = timeForm.dateTimerange;
+  } else {
+    obj.filterTime = getTime(timeForm.dateTime);
+  }
+  loading.value = true;
+  JobLogAPI.deleteTaskLogs(obj)
+    .then(() => {
+      ElMessage.success("删除成功");
+      handleResetQuery();
+    })
+    .finally(() => {
+      loading.value = false;
+      timeForm.dateTimerange = "";
+    });
 }
 
 async function fetchTaskGroupList() {
