@@ -423,6 +423,16 @@ async function confirmDialog() {
     (e: any) => e.id === jobSelectId.value
   ) as any;
 
+  // const position =
+  const nodeInfo = {
+    width: _node.width,
+    height: _node.height,
+    x: _node.x,
+    y: _node.y,
+  };
+
+  console.log(nodeInfo);
+
   const graphModel = lf.value.graphModel;
   if (_jobInfo.jobType === 2) {
     //新增任务组
@@ -437,8 +447,13 @@ async function confirmDialog() {
 
     await addJobNodes(newNodes, graphModel, newEdges);
 
-    graphModel.moveNodes([jobNode.id], _node.x - 500, _node.y - 230);
-
+    //TODO 根源
+    const pNode = lf.value.getNodeModelById(jobNode.id);
+    graphModel.moveNode2Coordinate(
+      [jobNode.id],
+      nodeInfo.x - nodeInfo.width / 2 + pNode.width / 2,
+      nodeInfo.y - nodeInfo.height / 2 + pNode.height / 2
+    );
     graphModel.deleteNode(_node.id);
   } else {
     _node.setProperty("jobId", jobSelectId.value);
