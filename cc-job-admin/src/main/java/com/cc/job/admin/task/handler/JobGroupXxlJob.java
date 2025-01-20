@@ -102,7 +102,7 @@ public class JobGroupXxlJob {
             Async.beginWork(jobInfo.getExecutorTimeout(), startWork);
             removeWorkWrapper(jobId, randomId);
         } catch (ExecutionException | InterruptedException e) {
-            handleExecutionException(jobId, e);
+            handleExecutionException(jobId, randomId, e);
         } finally {
             completeJobExecution(jobId, randomId);
         }
@@ -159,8 +159,9 @@ public class JobGroupXxlJob {
         return workerWrappers.stream().filter(v -> startNodes.contains(Long.valueOf(v.getId()))).toList();
     }
 
-    private void handleExecutionException(long jobId, Exception e) {
+    private void handleExecutionException(long jobId,String randomId,Exception e) {
         XxlJobHelper.log("{}任务运行异常,message:{}", jobId, e.getMessage());
+        removeWorkWrapper(jobId, randomId);
         throw new BusinessException(e.getMessage());
     }
 

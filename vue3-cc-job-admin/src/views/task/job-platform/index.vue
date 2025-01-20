@@ -447,7 +447,6 @@ async function confirmDialog() {
 
     await addJobNodes(newNodes, graphModel, newEdges);
 
-    //TODO 根源
     const pNode = lf.value.getNodeModelById(jobNode.id);
     graphModel.moveNode2Coordinate(
       [jobNode.id],
