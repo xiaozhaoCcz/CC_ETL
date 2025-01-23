@@ -59,7 +59,7 @@ public class JobComposeServiceImpl implements JobComposeService {
         private String targetAnchorId;
     }
 
-    private final String DYNAMIC_GROUP = "dynamic-group";
+    private final String DYNAMIC_GROUP = "CustomGroup";
 
     private final String JOB_ID = "jobId";
 

@@ -135,7 +135,7 @@ const JobInfoAPI = {
       method: "get",
     });
   },
-  getJobCompose(id: number,type:number) {
+  getJobCompose(id: number, type: number) {
     return request({
       url: `${TASKINFO_BASE_URL}/getJobCompose/${id}/${type}`,
       method: "get",

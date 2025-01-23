@@ -23,6 +23,7 @@ import com.cc.tasktool.callback.IWorker;
 import com.cc.tasktool.executor.Async;
 import com.cc.tasktool.worker.WorkResult;
 import com.cc.tasktool.wrapper.WorkerWrapper;
+import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.context.XxlJobContext;
 import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.handler.annotation.XxlJob;
@@ -239,12 +240,15 @@ public class JobGroupXxlJob {
     }
 
     private String executeJob(XxlJobContext xxlJobContext, Long jobId, JobNode node, JobInfo jobInfo, String randomId, int avgTime, Map<Long, List<Long>> statusMap) {
-        Long logId = XxlJobTrigger.trigger(jobId, TriggerTypeEnum.MANUAL, -1, null, randomId, "");
+        Pair<Long, Integer> trigger = XxlJobTrigger.trigger(jobId, TriggerTypeEnum.MANUAL, -1, null, randomId, "");
+        if (trigger == null || trigger.getValue() == ReturnT.FAIL_CODE) {
+            throw new RuntimeException("任务运行失败");
+        }
         String result;
         Thread thread = null;
-        JobThreadListener jobThreadListener =null;
+        JobThreadListener jobThreadListener = null;
         try {
-            jobThreadListener = new JobThreadListener(xxlJobContext, jobInfo, node, randomId, logId, statusMap);
+            jobThreadListener = new JobThreadListener(xxlJobContext, jobInfo, node, randomId, trigger.getKey(), statusMap);
             FutureTask<String> futureTask = new FutureTask<>(jobThreadListener);
             thread = new Thread(futureTask);
             thread.start();

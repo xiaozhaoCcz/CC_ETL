@@ -142,6 +142,7 @@ import JobInfoAPI from "@/api/task/job-info";
 import { ref } from "vue";
 import Snowflake from "@/utils/snowflake";
 import { onBeforeRouteLeave } from "vue-router";
+import CustomGroup from "@/components/CustomGroup/CustomGroup";
 
 LogicFlow.use(Control); // 控制面板
 LogicFlow.use(DndPanel); // 拖拽面板
@@ -352,7 +353,7 @@ function validateEdge() {
   const nodes = lf.value.getGraphRawData().nodes;
   const nodesIds = [] as any;
   nodes.forEach((node: any) => {
-    if (node.type === "dynamic-group") {
+    if (node.type === "CustomGroup") {
       const children = [] as any;
       children.push(...node.children);
       nodesIds.push(children);
@@ -379,12 +380,6 @@ function validateEdge() {
   return;
 }
 
-/**
- * ！！！！离谱一段逻辑，我也不知道为什么这样写才能成功。不然就出现各种奇怪的bug，折磨死我了，前端真的太难了！！！！
- * @param newNodes
- * @param graphModel
- * @param newEdges
- */
 async function addJobNodes(newNodes: any[], graphModel: any, newEdges: any[]) {
   // 添加新节点
   newNodes.forEach((node) => {
@@ -393,7 +388,7 @@ async function addJobNodes(newNodes: any[], graphModel: any, newEdges: any[]) {
   // 重新设置任务组的孩子节点
   newNodes.forEach((n) => {
     const node = lf.value.getNodeModelById(n.id);
-    if (n.nodeType === "dynamic-group") {
+    if (n.nodeType === "CustomGroup") {
       JSON.parse(n.children).forEach((id: any) => node.addChild(id));
     }
   });
@@ -430,8 +425,6 @@ async function confirmDialog() {
     x: _node.x,
     y: _node.y,
   };
-
-  console.log(nodeInfo);
 
   const graphModel = lf.value.graphModel;
   if (_jobInfo.jobType === 2) {
@@ -661,7 +654,7 @@ const connectWs = (id: string) => {
     const color = getNodeColor(_message.status);
     if (node) {
       const _node = lf.value!.getNodeModelById(node.id);
-      const style = _node.type === "dynamic-group" ? "stroke" : "fill";
+      const style = _node.type === "CustomGroup" ? "stroke" : "fill";
       _node.setStyle(style, color);
     }
   };
@@ -739,6 +732,7 @@ onMounted(() => {
 
   lf.value.extension.dndPanel.setPatternItems(patternItems);
   lf.value.extension.menu.setMenuConfig(menuConfig);
+  lf.value.register(CustomGroup);
   lf.value.render({
     nodes: nodes.value,
     edges: edges.value,
