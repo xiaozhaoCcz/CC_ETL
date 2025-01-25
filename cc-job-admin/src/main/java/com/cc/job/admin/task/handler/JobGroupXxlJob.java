@@ -241,7 +241,7 @@ public class JobGroupXxlJob {
 
     private String executeJob(XxlJobContext xxlJobContext, Long jobId, JobNode node, JobInfo jobInfo, String randomId, int avgTime, Map<Long, List<Long>> statusMap) {
         Pair<Long, Integer> trigger = XxlJobTrigger.trigger(jobId, TriggerTypeEnum.MANUAL, -1, null, randomId, "");
-        if (trigger == null || trigger.getValue() == ReturnT.FAIL_CODE) {
+        if (trigger == null || trigger.getValue() != ReturnT.SUCCESS_CODE) {
             throw new RuntimeException("任务运行失败");
         }
         String result;
@@ -408,20 +408,26 @@ public class JobGroupXxlJob {
                         statusMap.remove(entry.getKey());
                         setNodeStatus(statusMap, entry.getKey(), status, randomId, parentId);
                         throw new RuntimeException("任务运行失败");
+                    } else{
+                        executeSuccessOrFailJob(statusMap, jobId, 1, randomId, parentId, entry);
                     }
                 } else if (status == 1) {
-                    List<Long> value = new ArrayList<>(entry.getValue());
-                    value.remove(jobId);
-                    statusMap.put(entry.getKey(), value);
-                    if (entry.getValue().isEmpty()) {
-                        statusMap.remove(entry.getKey());
-                        setNodeStatus(statusMap, entry.getKey(), status, randomId, parentId);
-                    }
+                    executeSuccessOrFailJob(statusMap, jobId, status, randomId, parentId, entry);
                 } else {
                     setNodeStatus(statusMap, entry.getKey(), status, randomId, parentId);
                 }
                 return;
             }
+        }
+    }
+
+    private void executeSuccessOrFailJob(Map<Long, List<Long>> statusMap, Long jobId, Integer status, String randomId, Long parentId, Map.Entry<Long, List<Long>> entry) {
+        List<Long> value = new ArrayList<>(entry.getValue());
+        value.remove(jobId);
+        statusMap.put(entry.getKey(), value);
+        if (entry.getValue().isEmpty()) {
+            statusMap.remove(entry.getKey());
+            setNodeStatus(statusMap, entry.getKey(), status, randomId, parentId);
         }
     }
 
