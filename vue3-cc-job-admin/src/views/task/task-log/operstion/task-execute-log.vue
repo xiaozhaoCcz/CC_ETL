@@ -122,7 +122,7 @@ function getExecuteTaskLog(id: number) {
 
       pullFailCount.value = 0;
     } else {
-      console.log("pullLog fail:" + data.msg);
+      ElMessage.error("pullLog fail:" + data.msg);
     }
   });
 }
