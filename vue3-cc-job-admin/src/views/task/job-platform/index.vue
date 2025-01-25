@@ -275,6 +275,7 @@ const defaultProps = {
   label: "label",
 };
 const taskTitle = ref("");
+const DynamicCustomGroup = "CustomGroup";
 
 onBeforeRouteLeave((to, from, next) => {
   if (triggerOneVisible.value) {
@@ -333,7 +334,14 @@ async function selectJobCompNode(node: any) {
   await clearData();
 
   let data = {} as any;
-  await JobInfoAPI.getJobCompose(node.id, 0).then((res) => {
+  const formMap = {
+    id: node.id,
+    type: 0,
+    x: 0,
+    y: 0,
+  };
+
+  await JobInfoAPI.getJobCompose(formMap).then((res) => {
     data = res;
   });
 
@@ -341,7 +349,7 @@ async function selectJobCompNode(node: any) {
   taskTitle.value = jobNode.jobName;
   const newNodes = data.nodes;
   const newEdges = data.edges;
-  await addJobNodes(newNodes, graphModel, newEdges);
+  addJobNodes(newNodes, graphModel, newEdges);
 }
 
 function cancelDialog() {
@@ -353,7 +361,7 @@ function validateEdge() {
   const nodes = lf.value.getGraphRawData().nodes;
   const nodesIds = [] as any;
   nodes.forEach((node: any) => {
-    if (node.type === "CustomGroup") {
+    if (node.type === DynamicCustomGroup) {
       const children = [] as any;
       children.push(...node.children);
       nodesIds.push(children);
@@ -380,7 +388,7 @@ function validateEdge() {
   return;
 }
 
-async function addJobNodes(newNodes: any[], graphModel: any, newEdges: any[]) {
+function addJobNodes(newNodes: any[], graphModel: any, newEdges: any[]) {
   // 添加新节点
   newNodes.forEach((node) => {
     graphModel.addNode(generateNode(node));
@@ -388,27 +396,13 @@ async function addJobNodes(newNodes: any[], graphModel: any, newEdges: any[]) {
   // 重新设置任务组的孩子节点
   newNodes.forEach((n) => {
     const node = lf.value.getNodeModelById(n.id);
-    if (n.nodeType === "CustomGroup") {
+    if (n.nodeType === DynamicCustomGroup) {
       JSON.parse(n.children).forEach((id: any) => node.addChild(id));
     }
   });
   // 添加新边
   newEdges.forEach((e) => {
     graphModel.addEdge(generateEdge(e));
-  });
-
-  // 获取当前图数据
-  const nodes = lf.value.getGraphRawData().nodes;
-  const edges = lf.value.getGraphRawData().edges;
-
-  await clearData();
-
-  // 重新添加节点和边
-  nodes.forEach((n: any) => {
-    graphModel.addNode(n);
-  });
-  edges.forEach((e: any) => {
-    graphModel.addEdge(e);
   });
 }
 
@@ -418,35 +412,23 @@ async function confirmDialog() {
     (e: any) => e.id === jobSelectId.value
   ) as any;
 
-  // const position =
-  const nodeInfo = {
-    width: _node.width,
-    height: _node.height,
-    x: _node.x,
-    y: _node.y,
-  };
-
   const graphModel = lf.value.graphModel;
   if (_jobInfo.jobType === 2) {
+    graphModel.deleteNode(_node.id);
     //新增任务组
     let data = {} as any;
-    await JobInfoAPI.getJobCompose(jobSelectId.value, 1).then(
-      (res) => (data = res)
-    );
-    const jobNode = data.jobNode;
+
+    const formMap = {
+      id: jobSelectId.value,
+      type: 1,
+      x: _node.x,
+      y: _node.y,
+    };
+    await JobInfoAPI.getJobCompose(formMap).then((res) => (data = res));
     const newNodes = data.nodes;
     const newEdges = data.edges;
-    newNodes.push(jobNode);
 
-    await addJobNodes(newNodes, graphModel, newEdges);
-
-    const pNode = lf.value.getNodeModelById(jobNode.id);
-    graphModel.moveNode2Coordinate(
-      [jobNode.id],
-      nodeInfo.x - nodeInfo.width / 2 + pNode.width / 2,
-      nodeInfo.y - nodeInfo.height / 2 + pNode.height / 2
-    );
-    graphModel.deleteNode(_node.id);
+    addJobNodes(newNodes, graphModel, newEdges);
   } else {
     _node.setProperty("jobId", jobSelectId.value);
     _node.updateText(_jobInfo.jobDesc);
@@ -455,14 +437,18 @@ async function confirmDialog() {
 }
 
 function generateNode(node: any) {
+  const properties = JSON.parse(node.properties);
+  if (node.nodeType === DynamicCustomGroup) {
+    properties.children = JSON.parse(properties.children);
+  }
   return {
     id: node.id,
     text: node.jobName,
     type: node.nodeType,
     x: node.nodePositionX,
     y: node.nodePositionY,
-    properties: JSON.parse(node.properties),
-    children: node.children != null ? JSON.parse(node.children) : [],
+    properties: properties,
+    children: node.children != null ? JSON.parse(node.children) : node.children,
   };
 }
 
@@ -654,7 +640,7 @@ const connectWs = (id: string) => {
     const color = getNodeColor(_message.status);
     if (node) {
       const _node = lf.value!.getNodeModelById(node.id);
-      const style = _node.type === "CustomGroup" ? "stroke" : "fill";
+      const style = _node.type === DynamicCustomGroup ? "stroke" : "fill";
       _node.setStyle(style, color);
     }
   };

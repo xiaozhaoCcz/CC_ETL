@@ -302,10 +302,12 @@ public class JobComposeServiceImpl implements JobComposeService {
     }
 
     @Override
-    public Map<String, Object> getJobCompose(Long id, Integer type) {
+    public Map<String, Object> getJobCompose(Map<String,Object> formMap) {
         Map<String, Object> res = new HashMap<>();
         List<JobNodeVo> nodeVos = new ArrayList<>();
         List<JobEdgeVo> edgeVos = new ArrayList<>();
+        Long id = Long.parseLong(String.valueOf(formMap.get("id")));
+        int type = Integer.parseInt(String.valueOf(formMap.get("type")));
         String randomId = type == 0 ? "" : UUID.fastUUID() + ":";
         getJobCompose(id, nodeVos, edgeVos, randomId);
         //创建一个父亲节点
@@ -342,6 +344,13 @@ public class JobComposeServiceImpl implements JobComposeService {
         properties.put("width", styleArr[1] - styleArr[3]);
         jobNodeVo.setProperties(JSONUtil.toJsonStr(properties));
 
+        if(type==1){
+            nodeVos.add(jobNodeVo);
+        }
+        double x = Double.parseDouble(String.valueOf(formMap.get("x")));
+        double y = Double.parseDouble(String.valueOf(formMap.get("y")));
+        double[] nodeXY = new double[]{x,y};
+        updateNodeXY(nodeVos,nodeXY,new double[]{jobNodeVo.getNodePositionX(),jobNodeVo.getNodePositionY()});
         res.put("jobNode", jobNodeVo);
         res.put("nodes", nodeVos);
         res.put("edges", edgeVos);
@@ -404,6 +413,19 @@ public class JobComposeServiceImpl implements JobComposeService {
             }
         }
         return new double[]{top, right, bottom, left};
+    }
+
+    private void updateNodeXY(List<JobNodeVo> nodeVoList,double[] nodeXY,double[] sourceNodeXY){
+        double sourceX = sourceNodeXY[0];
+        double sourceY = sourceNodeXY[1];
+        double x = nodeXY[0];
+        double y = nodeXY[1];
+        for (JobNodeVo jobNodeVo : nodeVoList) {
+            Double nodePositionX = jobNodeVo.getNodePositionX();
+            Double nodePositionY = jobNodeVo.getNodePositionY();
+            jobNodeVo.setNodePositionX(nodePositionX-sourceX+x);
+            jobNodeVo.setNodePositionY(nodePositionY-sourceY+y);
+        }
     }
 
     public void getJobCompose(Long id, List<JobNodeVo> nodeVos, List<JobEdgeVo> edgeVos, String randomId) {

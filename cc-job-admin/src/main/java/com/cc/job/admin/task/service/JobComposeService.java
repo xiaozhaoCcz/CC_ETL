@@ -10,7 +10,7 @@ public interface JobComposeService {
 
     boolean updateJobCompose(Long id, JobInfoForm formData);
 
-    Map<String,Object> getJobCompose(Long id,Integer type);
+    Map<String,Object> getJobCompose(Map<String,Object> formMap);
 
     boolean validateJobComposeEdge(String nodes,String edges);
 }

@@ -165,9 +165,9 @@ public class JobInfoController {
         return Result.success(list);
     }
 
-    @GetMapping("getJobCompose/{id}/{type}")
-    public Result<Map<String,Object>> getJobCompose(@PathVariable Long id,@PathVariable Integer type){
-        Map<String,Object> map =  jobComposeService.getJobCompose(id,type);
+    @PostMapping("getJobCompose")
+    public Result<Map<String,Object>> getJobCompose(@RequestBody Map<String,Object> formMap){
+        Map<String,Object> map =  jobComposeService.getJobCompose(formMap);
         return Result.success(map);
     }
 
