@@ -171,7 +171,9 @@ public class JobGroupXxlJob {
         XxlJobHelper.log("{}任务运行完成", jobId);
         sendCompletionMessage(jobId, randomId);
         jobInfoMapper.stopTaskSet(jobId);
+        TASK_ID_MAP.remove(setExecuteJobId(jobId, randomId));
         JobGroupThread jobGroupThread = new JobGroupThread(jobId, randomId);
+        redisTemplate.delete(setExecuteJobId(jobId, randomId));
         jobGroupThread.start();
         THREAD_MAP.put(jobGroupThread.id, jobGroupThread);
     }
@@ -555,9 +557,7 @@ public class JobGroupXxlJob {
                 }
                 String recordId = StreamConsumer.messageMap.get(id);
                 if (recordId != null) {
-                    TASK_ID_MAP.remove(setExecuteJobId(jobId, randomId));
                     removeWorkWrapper(jobId, randomId);
-                    redisTemplate.delete(setExecuteJobId(jobId, randomId));
                     redisTemplate.opsForStream().delete(StreamConsumer.TASK_SET_STREAM, recordId);
                     removeJobGroupThread(id);
                 }else{
