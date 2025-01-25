@@ -101,9 +101,8 @@ public class JobGroupXxlJob {
             redisTemplate.opsForValue().set(setExecuteJobId(jobId, randomId), "");
             STOP_MAP.put(setExecuteJobId(jobId, randomId), startWork);
             Async.beginWork(jobInfo.getExecutorTimeout(), startWork);
-            removeWorkWrapper(jobId, randomId);
         } catch (ExecutionException | InterruptedException e) {
-            handleExecutionException(jobId, randomId, e);
+            handleExecutionException(jobId, e);
         } finally {
             completeJobExecution(jobId, randomId);
         }
@@ -160,9 +159,8 @@ public class JobGroupXxlJob {
         return workerWrappers.stream().filter(v -> startNodes.contains(Long.valueOf(v.getId()))).toList();
     }
 
-    private void handleExecutionException(long jobId,String randomId,Exception e) {
+    private void handleExecutionException(long jobId,Exception e) {
         XxlJobHelper.log("{}任务运行异常,message:{}", jobId, e.getMessage());
-        removeWorkWrapper(jobId, randomId);
         throw new BusinessException(e.getMessage());
     }
 
@@ -170,6 +168,7 @@ public class JobGroupXxlJob {
         XxlJobHelper.log("{}任务运行完成", jobId);
         sendCompletionMessage(jobId, randomId);
         TASK_ID_MAP.remove(setExecuteJobId(jobId, randomId));
+        removeWorkWrapper(jobId, randomId);
         redisTemplate.delete(setExecuteJobId(jobId, randomId));
         jobInfoMapper.stopTaskSet(jobId);
     }
