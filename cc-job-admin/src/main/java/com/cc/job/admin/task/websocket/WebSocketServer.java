@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * @author xiaozhao
  */
-@ServerEndpoint(value = "/ws/{id}",encoders = { ServerEncoder.class })
+@ServerEndpoint(value = "/ccJobWs/{id}",encoders = { ServerEncoder.class })
 @Component
 @Slf4j
 public class WebSocketServer {
@@ -42,7 +42,7 @@ public class WebSocketServer {
 
     //给指定用户发送信息
     public void sendInfo(Message message) {
-        Session session = SESSION_POOLS.get(message.getParentTaskId()+":"+message.getRandomId());
+        Session session = SESSION_POOLS.get(message.getParentJobId()+":"+message.getRandomId());
         try {
             sendMessage(session, message);
         } catch (Exception e) {

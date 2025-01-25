@@ -42,7 +42,7 @@ public class JobGroupServiceImpl extends ServiceImpl<JobGroupMapper, JobGroup> i
     * @return {@link IPage< JobGroupVO >} task_group分页列表
     */
     @Override
-    public IPage<JobGroupVO> getTaskGroupPage(JobGroupQuery queryParams) {
+    public IPage<JobGroupVO> getJobGroupPage(JobGroupQuery queryParams) {
         Page<JobGroupVO> pageVO = new Page<>();
         LambdaQueryWrapper<JobGroup> wrapper= new LambdaQueryWrapper<>();
         if(StringUtils.isNotBlank(queryParams.getAppName())){
@@ -66,7 +66,7 @@ public class JobGroupServiceImpl extends ServiceImpl<JobGroupMapper, JobGroup> i
      * @return
      */
     @Override
-    public JobGroupForm getTaskGroupFormData(Long id) {
+    public JobGroupForm getJobGroupFormData(Long id) {
         JobGroup entity = this.getById(id);
         return taskGroupConverter.toForm(entity);
     }
@@ -78,7 +78,7 @@ public class JobGroupServiceImpl extends ServiceImpl<JobGroupMapper, JobGroup> i
      * @return
      */
     @Override
-    public boolean saveTaskGroup(JobGroupForm formData) {
+    public boolean saveJobGroup(JobGroupForm formData) {
         JobGroup entity = taskGroupConverter.toEntity(formData);
         return this.save(entity);
     }
@@ -91,7 +91,7 @@ public class JobGroupServiceImpl extends ServiceImpl<JobGroupMapper, JobGroup> i
      * @return
      */
     @Override
-    public boolean updateTaskGroup(Long id, JobGroupForm formData) {
+    public boolean updateJobGroup(Long id, JobGroupForm formData) {
         JobGroup entity = taskGroupConverter.toEntity(formData);
         return this.updateById(entity);
     }
@@ -103,7 +103,7 @@ public class JobGroupServiceImpl extends ServiceImpl<JobGroupMapper, JobGroup> i
      * @return
      */
     @Override
-    public boolean deleteTaskGroups(String ids) {
+    public boolean deleteJobGroups(String ids) {
         Assert.isTrue(StrUtil.isNotBlank(ids), "删除的task_group数据为空");
         // 逻辑删除
         List<Long> idList = Arrays.stream(ids.split(","))

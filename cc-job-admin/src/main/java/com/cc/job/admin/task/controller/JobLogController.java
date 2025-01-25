@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @Tag(name = "task_log接口")
 @RestController
-@RequestMapping("/api/v1/taskLogs")
+@RequestMapping("/api/v1/jobLogs")
 @RequiredArgsConstructor
 public class JobLogController {
 

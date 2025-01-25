@@ -44,7 +44,7 @@ public class SampleXxlJob {
         for (int i = 0; i < 10; i++) {
             XxlJobHelper.log("demoJobHandler1 beat at:" + i);
             System.out.println("demoJobHandler1 beat at:" + i);
-            TimeUnit.SECONDS.sleep(1);
+            TimeUnit.MILLISECONDS.sleep(500);
         }
          //default success
         XxlJobHelper.log(">>>>>>>> demoJobHandler1 end");
@@ -60,7 +60,7 @@ public class SampleXxlJob {
         for (int i = 0; i < 10; i++) {
             XxlJobHelper.log("demoJobHandler2 beat at:" + i);
             System.out.println("demoJobHandler2 beat at:" + i);
-            TimeUnit.SECONDS.sleep(1);
+            TimeUnit.MILLISECONDS.sleep(500);
         }
         //throw  new RuntimeException();
         //default success
@@ -79,7 +79,7 @@ public class SampleXxlJob {
         for (int i = 0; i < 10; i++) {
             XxlJobHelper.log("demoJobHandler3 beat at:" + i);
             System.out.println("demoJobHandler3 beat at:" + i);
-            TimeUnit.SECONDS.sleep(1);
+            TimeUnit.MILLISECONDS.sleep(500);
         }
 
 //        if(count.incrementAndGet()<=2){
@@ -101,7 +101,7 @@ public class SampleXxlJob {
         for (int i = 0; i < 10; i++) {
             XxlJobHelper.log("demoJobHandler1 beat at:" + i);
             System.out.println("demoJobHandler4 beat at:" + i);
-            TimeUnit.SECONDS.sleep(1);
+            TimeUnit.MILLISECONDS.sleep(500);
         }
         //default success
         XxlJobHelper.log(">>>>>>>> demoJobHandler4 end");
@@ -116,7 +116,7 @@ public class SampleXxlJob {
         for (int i = 0; i < 10; i++) {
             XxlJobHelper.log("demoJobHandler5 beat at:" + i);
             System.out.println("demoJobHandler5 beat at:" + i);
-            TimeUnit.SECONDS.sleep(1);
+            TimeUnit.MILLISECONDS.sleep(500);
         }
         //default success
 //        if(count.incrementAndGet()<=2){
@@ -124,7 +124,7 @@ public class SampleXxlJob {
 //            throw  new RuntimeException();
 //        }
         XxlJobHelper.log(">>>>>>>> demoJobHandler5 end");
-        //throw  new RuntimeException();
+       // throw  new RuntimeException();
     }
 
     @XxlJob("demoJobHandler6")
@@ -136,7 +136,7 @@ public class SampleXxlJob {
         for (int i = 0; i < 10; i++) {
             XxlJobHelper.log("demoJobHandler6 beat at:" + i);
             System.out.println("demoJobHandler6 beat at:" + i);
-            TimeUnit.SECONDS.sleep(1);
+            TimeUnit.MILLISECONDS.sleep(500);
         }
         //default success
         XxlJobHelper.log(">>>>>>>> demoJobHandler6 end");
@@ -152,7 +152,7 @@ public class SampleXxlJob {
         for (int i = 0; i < 10; i++) {
             XxlJobHelper.log("demoJobHandler7 beat at:" + i);
             System.out.println("demoJobHandler7 beat at:" + i);
-            TimeUnit.SECONDS.sleep(1);
+            TimeUnit.MILLISECONDS.sleep(500);
         }
         //default success
         XxlJobHelper.log(">>>>>>>> demoJobHandler7 end");
@@ -168,7 +168,7 @@ public class SampleXxlJob {
         for (int i = 0; i < 10; i++) {
             XxlJobHelper.log("demoJobHandler8 beat at:" + i);
             System.out.println("demoJobHandler8 beat at:" + i);
-            TimeUnit.SECONDS.sleep(1);
+            TimeUnit.MILLISECONDS.sleep(500);
         }
         //default success
         XxlJobHelper.log(">>>>>>>> demoJobHandler8 end");
@@ -184,7 +184,7 @@ public class SampleXxlJob {
         for (int i = 0; i < 10; i++) {
             XxlJobHelper.log("demoJobHandler9 beat at:" + i);
             System.out.println("demoJobHandler9 beat at:" + i);
-            TimeUnit.SECONDS.sleep(1);
+            TimeUnit.MILLISECONDS.sleep(500);
         }
         //default success
         XxlJobHelper.log(">>>>>>>> demoJobHandler9 end");
@@ -200,7 +200,7 @@ public class SampleXxlJob {
         for (int i = 0; i < 10; i++) {
             XxlJobHelper.log("demoJobHandler10 beat at:" + i);
             System.out.println("demoJobHandler10 beat at:" + i);
-            TimeUnit.SECONDS.sleep(1);
+            TimeUnit.MILLISECONDS.sleep(500);
         }
         //default success
         XxlJobHelper.log(">>>>>>>> demoJobHandler10 end");
@@ -215,7 +215,7 @@ public class SampleXxlJob {
         for (int i = 0; i < 10; i++) {
             XxlJobHelper.log("demoJobHandler11 beat at:" + i);
             System.out.println("demoJobHandler11 beat at:" + i);
-            TimeUnit.SECONDS.sleep(1);
+            TimeUnit.MILLISECONDS.sleep(500);
         }
         //default success
         XxlJobHelper.log(">>>>>>>> demoJobHandler11 end");
@@ -231,11 +231,16 @@ public class SampleXxlJob {
         for (int i = 0; i < 10; i++) {
             XxlJobHelper.log("demoJobHandler12 beat at:" + i);
             System.out.println("demoJobHandler12 beat at:" + i);
-            TimeUnit.SECONDS.sleep(1);
+            TimeUnit.MILLISECONDS.sleep(500);
         }
         //default success
-        XxlJobHelper.log(">>>>>>>> demoJobHandler12 end");
-        System.out.println(">>>>>>>> demoJobHandler12 end");
+//        XxlJobHelper.log(">>>>>>>> demoJobHandler12 end");
+//        System.out.println(">>>>>>>> demoJobHandler12 end");
+        if(count.incrementAndGet()<=2){
+            System.out.println(">>>>>>>>count"+count.get());
+            throw  new RuntimeException();
+        }
+        //throw  new RuntimeException("节点12运行失败");
     }
 
     @XxlJob("demoJobHandler13")
@@ -247,7 +252,7 @@ public class SampleXxlJob {
         for (int i = 0; i < 10; i++) {
             XxlJobHelper.log("demoJobHandler13 beat at:" + i);
             System.out.println("demoJobHandler13 beat at:" + i);
-            TimeUnit.SECONDS.sleep(1);
+            TimeUnit.MILLISECONDS.sleep(500);
         }
         //default success
         XxlJobHelper.log(">>>>>>>> demoJobHandler13 end");
@@ -263,7 +268,7 @@ public class SampleXxlJob {
         for (int i = 0; i < 10; i++) {
             XxlJobHelper.log("demoJobHandler14 beat at:" + i);
             System.out.println("demoJobHandler14 beat at:" + i);
-            TimeUnit.SECONDS.sleep(1);
+            TimeUnit.MILLISECONDS.sleep(500);
         }
         //default success
         XxlJobHelper.log(">>>>>>>> demoJobHandler14 end");
@@ -279,7 +284,7 @@ public class SampleXxlJob {
         for (int i = 0; i < 10; i++) {
             XxlJobHelper.log("demoJobHandler15 beat at:" + i);
             System.out.println("demoJobHandler15 beat at:" + i);
-            TimeUnit.SECONDS.sleep(1);
+            TimeUnit.MILLISECONDS.sleep(500);
         }
         //default success
         XxlJobHelper.log(">>>>>>>> demoJobHandler15 end");
@@ -295,7 +300,7 @@ public class SampleXxlJob {
         for (int i = 0; i < 10; i++) {
             XxlJobHelper.log("demoJobHandler16 beat at:" + i);
             System.out.println("demoJobHandler16beat at:" + i);
-            TimeUnit.SECONDS.sleep(1);
+            TimeUnit.MILLISECONDS.sleep(500);
         }
         //default success
         XxlJobHelper.log(">>>>>>>> demoJobHandler16 end");
@@ -311,7 +316,7 @@ public class SampleXxlJob {
         for (int i = 0; i < 10; i++) {
             XxlJobHelper.log("demoJobHandler17 beat at:" + i);
             System.out.println("demoJobHandler17 beat at:" + i);
-            TimeUnit.SECONDS.sleep(1);
+            TimeUnit.MILLISECONDS.sleep(500);
         }
         //default success
         XxlJobHelper.log(">>>>>>>> demoJobHandler17 end");
@@ -327,7 +332,7 @@ public class SampleXxlJob {
         for (int i = 0; i < 10; i++) {
             XxlJobHelper.log("demoJobHandler18 beat at:" + i);
             System.out.println("demoJobHandler18 beat at:" + i);
-            TimeUnit.SECONDS.sleep(1);
+            TimeUnit.MILLISECONDS.sleep(500);
         }
         //default success
         XxlJobHelper.log(">>>>>>>> demoJobHandler18 end");
@@ -343,7 +348,7 @@ public class SampleXxlJob {
         for (int i = 0; i < 10; i++) {
             XxlJobHelper.log("demoJobHandler19 beat at:" + i);
             System.out.println("demoJobHandler19 beat at:" + i);
-            TimeUnit.SECONDS.sleep(1);
+            TimeUnit.MILLISECONDS.sleep(500);
         }
         //default success
         XxlJobHelper.log(">>>>>>>> demoJobHandler19 end");
@@ -359,7 +364,7 @@ public class SampleXxlJob {
         for (int i = 0; i < 10; i++) {
             XxlJobHelper.log("demoJobHandler20 beat at:" + i);
             System.out.println("demoJobHandler20 beat at:" + i);
-            TimeUnit.SECONDS.sleep(1);
+            TimeUnit.MILLISECONDS.sleep(500);
         }
         //default success
         XxlJobHelper.log(">>>>>>>> demoJobHandler20 end");

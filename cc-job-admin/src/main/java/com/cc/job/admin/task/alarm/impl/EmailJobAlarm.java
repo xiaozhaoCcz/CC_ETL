@@ -50,7 +50,7 @@ public class EmailJobAlarm implements JobAlarm {
             }
 
             // email info
-            JobGroup group = XxlJobAdminConfig.getAdminConfig().getTaskGroupMapper().selectById(info.getJobGroup());
+            JobGroup group = XxlJobAdminConfig.getAdminConfig().getJobGroupMapper().selectById(info.getJobGroup());
             String personal = I18nUtil.getString("admin_name_full");
             String title = I18nUtil.getString("jobconf_monitor");
             String content = MessageFormat.format(loadEmailJobAlarmTemplate(),

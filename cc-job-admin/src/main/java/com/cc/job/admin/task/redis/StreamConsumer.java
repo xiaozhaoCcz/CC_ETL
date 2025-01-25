@@ -2,6 +2,7 @@ package com.cc.job.admin.task.redis;
 
 import cn.hutool.core.lang.Pair;
 import jakarta.annotation.PostConstruct;
+import lombok.Getter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.ReadOffset;
@@ -15,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 如果条件允许可以换成mq队列
@@ -24,11 +26,10 @@ public class StreamConsumer {
 
     public static final String TASK_SET_STREAM = "TASK_SET_STREAM";
 
+    @Getter
     private static final List<Pair<String,Boolean>> callbackRes = Collections.synchronizedList(new ArrayList<>());
 
-    public  static  List<Pair<String,Boolean>> getCallbackRes() {
-        return callbackRes;
-    }
+    public  static final Map<String,String> messageMap = new ConcurrentHashMap<>();
 
     public static void removeCallbackRes(String jobId) {
         if (jobId != null) {
@@ -51,7 +52,9 @@ public class StreamConsumer {
 
         listenerContainer.receive(StreamOffset.create(TASK_SET_STREAM, ReadOffset.lastConsumed()), message -> {
             Map<String, String> value = message.getValue();
-            value.forEach((k,v)->{
+
+            value.forEach((k,v)-> {
+                messageMap.put(k,message.getId().getValue());
                 callbackRes.add(new Pair<>(k,Boolean.valueOf(v)));
             });
         });

@@ -12,9 +12,9 @@ import java.util.Objects;
 @ToString
 public class JobNode extends BaseEntity {
 
-    private Long taskId;
+    private Long jobId;
 
-    private Long taskParentId;
+    private Long jobParentId;
 
     private Double nodePositionX;
 
@@ -26,16 +26,22 @@ public class JobNode extends BaseEntity {
 
     private Integer sort;
 
+    private String children;
+
+    private String properties;
+
+    private String nodeType;
+
     @Override
     public boolean equals(Object o) {
         if (o == null || getClass() != o.getClass()) return false;
         if (!super.equals(o)) return false;
         JobNode taskNode = (JobNode) o;
-        return Objects.equals(taskId, taskNode.taskId) && Objects.equals(taskParentId, taskNode.taskParentId) && Objects.equals(nodePositionX, taskNode.nodePositionX) && Objects.equals(nodePositionY, taskNode.nodePositionY) && Objects.equals(nodeInDegree, taskNode.nodeInDegree) && Objects.equals(nodeOutDegree, taskNode.nodeOutDegree) && Objects.equals(sort, taskNode.sort);
+        return Objects.equals(jobId, taskNode.jobId) && Objects.equals(jobParentId, taskNode.jobParentId) && Objects.equals(nodePositionX, taskNode.nodePositionX) && Objects.equals(nodePositionY, taskNode.nodePositionY) && Objects.equals(nodeInDegree, taskNode.nodeInDegree) && Objects.equals(nodeOutDegree, taskNode.nodeOutDegree) && Objects.equals(sort, taskNode.sort);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), taskId, taskParentId, nodePositionX, nodePositionY, nodeInDegree, nodeOutDegree, sort);
+        return Objects.hash(super.hashCode(), jobId, jobParentId, nodePositionX, nodePositionY, nodeInDegree, nodeOutDegree, sort);
     }
 }

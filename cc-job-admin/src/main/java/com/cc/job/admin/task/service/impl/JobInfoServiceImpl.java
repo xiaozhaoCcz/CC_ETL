@@ -6,7 +6,6 @@ import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.cc.job.admin.task.utils.DateUtils;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.admin.cron.CronExpression;
 import com.cc.job.admin.task.enums.*;
@@ -47,8 +46,6 @@ import com.cc.job.xo.model.vo.JobInfoVO;
 import java.text.MessageFormat;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import cn.hutool.core.lang.Assert;
@@ -67,15 +64,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> implements JobInfoService {
 
-    private final JobGroupService taskGroupService;
+    private final JobGroupService jobGroupService;
 
-    private final JobNodeService taskNodeService;
+    private final JobNodeService jobNodeService;
 
-    private final JobEdgeService taskEdgeService;
+    private final JobEdgeService jobEdgeService;
 
-    private final JobLogglueMapper taskLogglueMapper;
+    private final JobLogglueMapper jobLogglueMapper;
 
-    private final JobInfoMapper taskInfoMapper;
+    private final JobInfoMapper jobInfoMapper;
 
     private final RedisTemplate redisTemplate;
 
@@ -132,15 +129,15 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         JobInfo entity = this.getById(id);
         JobInfoForm taskInfoForm = BeanUtil.copyProperties(entity, JobInfoForm.class);
         if (entity.getJobType() == 2) {
-            List<JobNode> taskNodeList = taskNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getTaskParentId, id));
-            List<JobEdge> taskEdgeList = taskEdgeService.list(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getTaskParentId, id));
+            List<JobNode> taskNodeList = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, id));
+            List<JobEdge> taskEdgeList = jobEdgeService.list(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getJobParentId, id));
             List<JobNodeVo> taskNodeVoList = new ArrayList<>();
-            List<Long> taskIds = taskNodeList.stream().map(JobNode::getTaskId).toList();
+            List<Long> taskIds = taskNodeList.stream().map(JobNode::getJobId).toList();
             List<JobInfo> taskInfos = this.listByIds(taskIds);
             Map<Long, String> taskMap = taskInfos.stream().collect(Collectors.toMap(JobInfo::getId, JobInfo::getJobDesc));
             for (JobNode node : taskNodeList) {
                 JobNodeVo taskNodeVo = BeanUtil.copyProperties(node, JobNodeVo.class);
-                taskNodeVo.setTaskName(taskMap.get(node.getTaskId()));
+                taskNodeVo.setJobName(taskMap.get(node.getJobId()));
                 taskNodeVoList.add(taskNodeVo);
             }
             taskInfoForm.setNodes(JSONUtil.toJsonStr(taskNodeVoList));
@@ -221,7 +218,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         return true;
     }
 
-    private void delNodes(Long jobId) {
+    @Override
+    public void delNodes(Long jobId) {
         JobInfo taskInfo = this.getById(jobId);
         if (taskInfo.getJobType() == 2) {
             List<JobInfo> taskInfos = this.list(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getParentId, jobId));
@@ -230,8 +228,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
             }
             List<Long> childTaskIds = taskInfos.stream().map(JobInfo::getId).toList();
 
-            taskNodeService.remove(new LambdaQueryWrapper<JobNode>().eq(JobNode::getTaskParentId, taskInfo.getId()));
-            taskEdgeService.remove(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getTaskParentId, taskInfo.getId()));
+            jobNodeService.remove(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, taskInfo.getId()));
+            jobEdgeService.remove(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getJobParentId, taskInfo.getId()));
 
             for (Long childTaskId : childTaskIds) {
                 delNodes(childTaskId);
@@ -331,7 +329,11 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         return result;
     }
 
-
+    /**
+     * 旧的新增任务组方法，新方法在JobComposeService中
+     * @param formData
+     * @return
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean saveTaskSet(JobInfoForm formData) {
@@ -355,19 +357,19 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
             JobNodeDto node = new JobNodeDto();
             String nodeId = (String) item.get("id");
             node.setId(nodeId);
-            node.setTaskParentId(taskInfo.getId());
+            node.setJobParentId(taskInfo.getId());
             Map<String, Object> data = (Map<String, Object>) item.get("data");
             Map<String, Object> position = (Map<String, Object>) item.get("position");
             node.setNodePositionX(Double.valueOf(String.valueOf(position.get("x"))));
             node.setNodePositionY(Double.valueOf(String.valueOf(position.get("y"))));
-            long taskId = Long.parseLong(String.valueOf(data.get("taskId")));
-            node.setTaskId(taskId);
+            long taskId = Long.parseLong(String.valueOf(data.get("jobId")));
+            node.setJobId(taskId);
             taskNodeDtoList.add(node);
         });
 
         edgeList.forEach(item -> {
             JobEdgeDto edge = new JobEdgeDto();
-            edge.setTaskParentId(taskInfo.getId());
+            edge.setJobParentId(taskInfo.getId());
             edge.setFromNodeId((String) item.get("source"));
             edge.setEndNodeId((String) item.get("target"));
             taskEdgeDtoList.add(edge);
@@ -388,7 +390,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         Map<String, Long> nodeMap = new HashMap<>();
 
         for (JobNodeDto taskNode : nodeList) {
-            JobInfo taskInfo = this.getById(taskNode.getTaskId());
+            JobInfo taskInfo = this.getById(taskNode.getJobId());
 
             JobInfo copyTaskInfo = BeanUtil.copyProperties(taskInfo, JobInfo.class);
             copyTaskInfo.setId(null);
@@ -397,8 +399,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
             this.save(copyTaskInfo);
 
             if (taskInfo.getJobType() == 2) {
-                List<JobNode> childNodes = taskNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getTaskParentId, taskInfo.getId()));
-                List<JobEdge> childEdges = taskEdgeService.list(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getTaskParentId, taskInfo.getId()));
+                List<JobNode> childNodes = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, taskInfo.getId()));
+                List<JobEdge> childEdges = jobEdgeService.list(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getJobParentId, taskInfo.getId()));
 
                 List<JobNodeDto> taskNodeDtos = BeanUtil.copyToList(childNodes, JobNodeDto.class, CopyOptions.create());
                 List<JobEdgeDto> taskEdgeDtos = BeanUtil.copyToList(childEdges, JobEdgeDto.class, CopyOptions.create());
@@ -409,24 +411,25 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
             JobNode copyTaskNode = BeanUtil.copyProperties(taskNode, JobNode.class, "id");
             copyTaskNode.setId(null);
-            copyTaskNode.setTaskId(copyTaskInfo.getId());
-            copyTaskNode.setTaskParentId(parentTask.getId());
-            taskNodeService.save(copyTaskNode);
+            copyTaskNode.setJobId(copyTaskInfo.getId());
+            copyTaskNode.setJobParentId(parentTask.getId());
+            jobNodeService.save(copyTaskNode);
             nodeMap.put(String.valueOf(taskNode.getId()), copyTaskNode.getId());
         }
 
         for (JobEdgeDto taskEdge : edgeList) {
             JobEdge edge = new JobEdge();
-            edge.setTaskParentId(parentTask.getId());
+            edge.setJobParentId(parentTask.getId());
             edge.setFromNodeId(nodeMap.get(String.valueOf(taskEdge.getFromNodeId())));
             edge.setEndNodeId(nodeMap.get(String.valueOf(taskEdge.getEndNodeId())));
-            taskEdgeService.save(edge);
+            jobEdgeService.save(edge);
         }
     }
 
 
-    private JobInfo baseSaveTaskInfo(JobInfoForm formData) {
-        JobGroup taskGroup = taskGroupService.getById(formData.getJobGroup());
+    @Override
+    public JobInfo baseSaveTaskInfo(JobInfoForm formData) {
+        JobGroup taskGroup = jobGroupService.getById(formData.getJobGroup());
         if (taskGroup == null) {
             throw new BusinessException(I18nUtil.getString("system_please_choose") + I18nUtil.getString("jobinfo_field_jobgroup"));
         }
@@ -511,6 +514,12 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         return taskInfo;
     }
 
+    /**
+     * 旧的修改任务组方法，新方法在JobComposeService中
+     * @param id
+     * @param formData
+     * @return
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean updateTaskSet(Long id, JobInfoForm formData) {
@@ -525,7 +534,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         List<Map> edgeList = JSONUtil.parseArray(formData.getEdges()).toList(Map.class);
 
         // 得到数据库中的节点
-        List<JobNode> nodeFromDbList = taskNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getTaskParentId, id));
+        List<JobNode> nodeFromDbList = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, id));
 
         List<JobNode> taskUpdateNodeList = new ArrayList<>();
         List<JobEdge> taskAddEdgeList = new ArrayList<>();
@@ -535,24 +544,24 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         nodeList.forEach(item -> {
             JobNode node = new JobNode();
             String nodeId = String.valueOf(item.get("id"));
-            node.setTaskParentId(id);
+            node.setJobParentId(id);
             Map<String, Object> position = (Map<String, Object>) item.get("position");
             node.setNodePositionX(Double.valueOf(String.valueOf(position.get("x"))));
             node.setNodePositionY(Double.valueOf(String.valueOf(position.get("y"))));
             Map<String, Object> data = (Map<String, Object>) item.get("data");
-            //node.setTaskId(Long.parseLong(String.valueOf(data.get("taskId"))));
-            long taskId = Long.parseLong(String.valueOf(data.get("taskId")));
+            //node.setJobId(Long.parseLong(String.valueOf(data.get("taskId"))));
+            long taskId = Long.parseLong(String.valueOf(data.get("jobId")));
             if (nodeId.startsWith("node:")) {
                 JobInfo copyTaskInfo = this.getById(taskId);
                 copyTaskInfo.setId(null);
                 copyTaskInfo.setParentId(id);
                 copyTaskInfo.setIsNode("Y");
                 this.save(copyTaskInfo);
-                node.setTaskId(copyTaskInfo.getId());
+                node.setJobId(copyTaskInfo.getId());
 
                 if (copyTaskInfo.getJobType() == 2) {
-                    List<JobNode> taskNodeList = taskNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getTaskParentId, taskId));
-                    List<JobEdge> taskEdgeList = taskEdgeService.list(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getTaskParentId, taskId));
+                    List<JobNode> taskNodeList = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, taskId));
+                    List<JobEdge> taskEdgeList = jobEdgeService.list(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getJobParentId, taskId));
                     List<JobNodeDto> taskNodeDtos = BeanUtil.copyToList(taskNodeList, JobNodeDto.class);
                     List<JobEdgeDto> taskEdgeDtos = BeanUtil.copyToList(taskEdgeList, JobEdgeDto.class);
                     addNode(taskNodeDtos, taskEdgeDtos, copyTaskInfo);
@@ -560,10 +569,10 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
                     this.updateById(copyTaskInfo);
                 }
 
-                taskNodeService.save(node);
+                jobNodeService.save(node);
                 nodeMap.put(nodeId, node.getId());
             } else {
-                node.setTaskId(taskId);
+                node.setJobId(taskId);
                 node.setId(Long.parseLong(nodeId));
                 taskUpdateNodeList.add(node);
             }
@@ -571,7 +580,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
         edgeList.forEach(item -> {
             JobEdge edge = new JobEdge();
-            edge.setTaskParentId(id);
+            edge.setJobParentId(id);
             String sourceId = (String) item.get("source");
             if (sourceId.startsWith("node:")) {
                 edge.setFromNodeId(nodeMap.get(sourceId));
@@ -588,47 +597,45 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         });
 
         // 得到数据库中的边
-        taskEdgeService.remove(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getTaskParentId, id));
-        taskEdgeService.saveBatch(taskAddEdgeList);
+        jobEdgeService.remove(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getJobParentId, id));
+        jobEdgeService.saveBatch(taskAddEdgeList);
 
         List<Long> nodeIds = taskUpdateNodeList.stream().map(JobNode::getId).toList();
         List<JobNode> delNodeDbs = nodeFromDbList.stream().filter(v -> !nodeIds.contains(v.getId())).toList();
         if (!delNodeDbs.isEmpty()) {
             for (JobNode delNodeDb : delNodeDbs) {
-                JobInfo delTaskInfo = this.getById(delNodeDb.getTaskId());
+                JobInfo delTaskInfo = this.getById(delNodeDb.getJobId());
                 if (delTaskInfo.getJobType() == 2) {
                     delNodes(delTaskInfo.getId());
                 }
             }
-            this.removeBatchByIds(delNodeDbs.stream().map(JobNode::getTaskId).toList());
-            taskNodeService.removeBatchByIds(delNodeDbs.stream().map(JobNode::getId).toList());
+            this.removeBatchByIds(delNodeDbs.stream().map(JobNode::getJobId).toList());
+            jobNodeService.removeBatchByIds(delNodeDbs.stream().map(JobNode::getId).toList());
         }
-        taskNodeService.updateBatchById(taskUpdateNodeList);
+        jobNodeService.updateBatchById(taskUpdateNodeList);
 
         // 处理边
-        List<JobNode> nodeFromDbList2 = taskNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getTaskParentId, id));
+        List<JobNode> nodeFromDbList2 = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, id));
         nodeFromDbList2.forEach(item -> {
             item.setNodeInDegree(taskAddEdgeList.stream().filter(v -> v.getEndNodeId().equals(item.getId())).count());
             item.setNodeOutDegree(taskAddEdgeList.stream().filter(v -> v.getFromNodeId().equals(item.getId())).count());
         });
-        return taskNodeService.updateBatchById(nodeFromDbList2);
+        return jobNodeService.updateBatchById(nodeFromDbList2);
     }
 
     @Override
     public boolean stopTaskSet(Long id, String randomId) {
-        int flag = taskInfoMapper.stopTaskSet(id);
+        int flag = jobInfoMapper.stopTaskSet(id);
         XxlJobExecutor.removeJobThread(id.intValue(), "stop task" + id);
-
         if (redisTemplate.hasKey(id + ":" + randomId)) {
             WorkerWrapper<Long, String> workWrapper = JobGroupXxlJob.getWorkWrapper(id, randomId);
             if (workWrapper != null) {
                 log.info(">>>>>>>>> stop task:{}", workWrapper.getId());
                 Async.stopWork(workWrapper);
                 JobGroupXxlJob.removeWorkWrapper(id, randomId);
-                redisTemplate.delete(id + ":" + randomId);
             }
+            redisTemplate.delete(id + ":" + randomId);
         }
-
         return true;
     }
 
@@ -644,16 +651,17 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         taskLogglue.setGlueRemark(formData.getGlueRemark());
         taskLogglue.setJobId(formData.getTaskId());
         taskLogglue.setGlueType(taskInfo.getGlueType());
-        taskLogglueMapper.insert(taskLogglue);
+        jobLogglueMapper.insert(taskLogglue);
         return true;
     }
 
     @Override
     public List<JobLogglue> getGlueList(Long id) {
-        return taskLogglueMapper.selectList(new LambdaQueryWrapper<JobLogglue>().eq(JobLogglue::getJobId, id));
+        return jobLogglueMapper.selectList(new LambdaQueryWrapper<JobLogglue>().eq(JobLogglue::getJobId, id));
     }
 
-    private JobInfo baseUpdateTaskInfo(Long id, JobInfoForm formData) {
+    @Override
+    public JobInfo baseUpdateTaskInfo(Long id, JobInfoForm formData) {
         ScheduleTypeEnum scheduleTypeEnum = ScheduleTypeEnum.match(formData.getScheduleType(), null);
         if (scheduleTypeEnum == null) {
             throw new BusinessException(I18nUtil.getString("schedule_type") + I18nUtil.getString("system_unvalid"));
@@ -729,7 +737,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         }
 
         // group valid
-        JobGroup jobGroup = taskGroupService.getById(formData.getJobGroup());
+        JobGroup jobGroup = jobGroupService.getById(formData.getJobGroup());
         if (jobGroup == null) {
             throw new BusinessException(I18nUtil.getString("jobinfo_field_jobgroup") + I18nUtil.getString("system_unvalid"));
         }
@@ -761,39 +769,5 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         existsJobInfo.setGlueUpdatetime(LocalDateTime.now());
         existsJobInfo.setTriggerNextTime(nextTriggerTime);
         return existsJobInfo;
-    }
-
-
-    private String finalJson(String jsonStr, String oldParam, String newParam, String columnName) {
-        JSONObject jsonObject = new JSONObject(jsonStr);
-        JSONObject job = jsonObject.getJSONObject("job");
-        JSONArray content = job.getJSONArray("content");
-        JSONObject writer = ((JSONObject) content.get(0)).getJSONObject("reader");
-        JSONObject parameter = writer.getJSONObject("parameter");
-        String where = parameter.getStr("where");
-        if(StringUtils.isBlank(where)){
-            return jsonStr;
-        }
-        String[] split = where.split(" ");
-        int index = 0;
-        for (; index < split.length; index++) {
-            if (split[index].equals("${" + oldParam + "}")) {
-                split[index] = "${" + newParam + "}";
-                break;
-            }
-        }
-
-        int columIndex = index - 2;
-        split[columIndex] = columnName;
-
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < split.length; i++) {
-            sb.append(split[i]);
-            if (i != split.length - 1) {
-                sb.append(" ");
-            }
-        }
-        parameter.replace("where", sb.toString());
-        return jsonObject.toString();
     }
 }

@@ -16,7 +16,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import TaskLogAPI from "@/api/task/task-log";
+import JobLogAPI from "@/api/task/job-log";
 
 const emit = defineEmits(["close"]);
 const props = defineProps({
@@ -94,7 +94,7 @@ function getExecuteTaskLog(id: number) {
     return;
   }
 
-  TaskLogAPI.logDetailCat(id, fromLineNum.value).then((data: any) => {
+  JobLogAPI.logDetailCat(id, fromLineNum.value).then((data: any) => {
     if (data.code == 200) {
       if (!data.content) {
         console.log("pullLog fail");

@@ -7,11 +7,11 @@ import java.io.Serializable;
 @Data
 public class JobEdgeVo implements Serializable {
 
-    private Long id;
+    private String id;
 
-    private Long taskParentId;
+    private Long jobParentId;
 
-    private Long fromNodeId;
+    private String fromNodeId;
 
-    private Long endNodeId;
+    private String endNodeId;
 }

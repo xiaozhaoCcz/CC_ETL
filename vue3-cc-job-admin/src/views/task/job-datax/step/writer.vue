@@ -123,7 +123,6 @@ const writeModeList = ["insert", "update", "replace"];
 watch(
   () => writerForm.value.ds,
   (val) => {
-    console.log(val);
     fetchJdbcDatasource(val);
   }
 );
@@ -144,7 +143,6 @@ watch(
 watch(
   () => writerForm.value.jdbcDatasourceId,
   (val) => {
-    console.log(val);
     getTables(val);
   }
 );
@@ -197,7 +195,6 @@ async function getColumns(id: number) {
   }
   await JobDataXAPI.getColumns(id, params).then((data) => {
     columnList.value = data;
-    console.log(data);
   });
 }
 

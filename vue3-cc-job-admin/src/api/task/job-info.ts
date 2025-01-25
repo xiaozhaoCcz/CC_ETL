@@ -1,8 +1,8 @@
 import request from "@/utils/request";
 
-const TASKINFO_BASE_URL = "/api/v1/taskInfos";
+const TASKINFO_BASE_URL = "/api/v1/jobInfos";
 
-const TaskInfoAPI = {
+const JobInfoAPI = {
   /** 获取task_info分页数据 */
   getPage(queryParams?: TaskInfoPageQuery) {
     return request<any, PageResult<TaskInfoPageVO[]>>({
@@ -135,9 +135,23 @@ const TaskInfoAPI = {
       method: "get",
     });
   },
+  getJobCompose(data: any) {
+    return request({
+      url: `${TASKINFO_BASE_URL}/getJobCompose`,
+      method: "post",
+      data: data,
+    });
+  },
+  validateJobComposeEdge(data: TaskInfoForm) {
+    return request({
+      url: `${TASKINFO_BASE_URL}/validateJobComposeEdge`,
+      method: "post",
+      data: data,
+    });
+  },
 };
 
-export default TaskInfoAPI;
+export default JobInfoAPI;
 
 /** task_info分页查询参数 */
 export interface TaskInfoPageQuery extends PageQuery {}

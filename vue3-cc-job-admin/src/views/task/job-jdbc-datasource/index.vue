@@ -195,7 +195,11 @@
           <el-input v-model="formData.jdbcUsername" placeholder="用户名" />
         </el-form-item>
         <el-form-item label="密码" prop="jdbcPassword">
-          <el-input type="password" v-model="formData.jdbcPassword" placeholder="密码" />
+          <el-input
+            type="password"
+            v-model="formData.jdbcPassword"
+            placeholder="密码"
+          />
         </el-form-item>
         <el-form-item label="address" prop="address">
           <el-input v-model="formData.ip" placeholder="address" />
@@ -204,9 +208,13 @@
           <el-input v-model="formData.port" placeholder="port" />
         </el-form-item>
         <el-form-item label="备注" prop="comments">
-          <el-input v-model="formData.comments" placeholder="备注" />
+          <el-input
+            v-model="formData.comments"
+            type="textarea"
+            placeholder="备注"
+          />
         </el-form-item>
-        <el-form-item >
+        <el-form-item>
           <el-button type="success" @click="isConnect">测试连接</el-button>
         </el-form-item>
       </el-form>

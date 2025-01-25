@@ -327,14 +327,14 @@ defineOptions({
   inheritAttrs: false,
 });
 
-import TaskInfoAPI, {
+import JobInfoAPI, {
   TaskInfoPageVO,
   TaskInfoForm,
   TaskInfoPageQuery,
-} from "@/api/task/task-info";
+} from "@/api/task/job-info";
 import ExecuteOne from "./operation/executeone.vue";
 import EditTaskInfo from "./operation/edit-task-info.vue";
-import TaskGroupAPI from "@/api/task/task-group";
+import JobGroupAPI from "@/api/task/job-group";
 import router from "@/router";
 import CodeEditor from "@/components/CodeEdit/index.vue";
 
@@ -378,7 +378,7 @@ function closeGlue() {
 function glueClick(id: number) {
   glueVisible.value = true;
   glueTaskId.value = id;
-  TaskInfoAPI.getFormData(id).then((data) => {
+  JobInfoAPI.getFormData(id).then((data) => {
     const glueType = data.glueType;
     if (data.glueSource == null || data.glueSource.length <= 0) {
       code.value = getThemeCode(glueType);
@@ -401,12 +401,11 @@ function closeNextTriggerTimeDialog() {
 }
 
 function executeOne(obj: any) {
-  console.log(obj);
   if (obj.jobType == 2) {
     const taskInfoTriggerDto = {};
     taskInfoTriggerDto.id = obj.id;
     taskInfoTriggerDto.executorParam = obj.id;
-    TaskInfoAPI.triggerJob(taskInfoTriggerDto)
+    JobInfoAPI.triggerJob(taskInfoTriggerDto)
       .then((data) => {
         ElMessage.success("执行任务成功");
       })
@@ -427,21 +426,21 @@ function closeExecuteOne() {
 
 function startTask(id: number) {
   const taskObj = pageData.value.filter((v) => v.id == id)[0];
-  TaskInfoAPI.startTask(id).then(() => {
+  JobInfoAPI.startTask(id).then(() => {
     taskObj.triggerStatus = 1;
   });
 }
 
 function stopTask(id: number) {
   const taskObj = pageData.value.filter((v) => v.id == id)[0];
-  TaskInfoAPI.stopTask(id).then(() => {
+  JobInfoAPI.stopTask(id).then(() => {
     taskObj.triggerStatus = 0;
   });
 }
 
 function nextTriggerTime(scheduleType: string, scheduleConf: string) {
   nextTriggerTimeVisible.value = true;
-  TaskInfoAPI.nextTriggerTime(scheduleType, scheduleConf).then((data: any) => {
+  JobInfoAPI.nextTriggerTime(scheduleType, scheduleConf).then((data: any) => {
     nextTriggerTimeList.value = data;
   });
 }
@@ -449,7 +448,7 @@ function nextTriggerTime(scheduleType: string, scheduleConf: string) {
 /** 查询task_info */
 function handleQuery() {
   loading.value = true;
-  TaskInfoAPI.getPage(queryParams)
+  JobInfoAPI.getPage(queryParams)
     .then((data) => {
       pageData.value = data.list;
       total.value = data.total;
@@ -486,7 +485,7 @@ function handleOpenDialog(id?: number) {
   taskInfoVisible.visible = true;
   if (id) {
     taskInfoVisible.title = "修改任务";
-    TaskInfoAPI.getFormData(id).then((data) => {
+    JobInfoAPI.getFormData(id).then((data) => {
       Object.assign(formData, data);
     });
   } else {
@@ -496,7 +495,7 @@ function handleOpenDialog(id?: number) {
 
 function handleCopy(id: number) {
   taskInfoVisible.visible = true;
-  TaskInfoAPI.getFormData(id).then((data) => {
+  JobInfoAPI.getFormData(id).then((data) => {
     Object.assign(formData, data);
   });
   taskInfoVisible.title = "复制taskInfo";
@@ -518,7 +517,7 @@ function handleDelete(id?: number) {
   }).then(
     () => {
       loading.value = true;
-      TaskInfoAPI.deleteByIds(ids)
+      JobInfoAPI.deleteByIds(ids)
         .then(() => {
           ElMessage.success("删除成功");
           handleResetQuery();
@@ -532,7 +531,7 @@ function handleDelete(id?: number) {
 }
 
 async function fetchTaskGroupList() {
-  const data = await TaskGroupAPI.getAllTaskGroupList();
+  const data = await JobGroupAPI.getAllJobGroupList();
   taskGroupList.value = data as any;
 }
 
