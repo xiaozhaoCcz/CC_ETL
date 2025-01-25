@@ -554,12 +554,16 @@ public class JobGroupXxlJob {
                     throw new RuntimeException(e);
                 }
                 String recordId = StreamConsumer.messageMap.get(id);
-                if (recordId != null || idleTimes > 10) {
+                if (recordId != null) {
                     TASK_ID_MAP.remove(setExecuteJobId(jobId, randomId));
                     removeWorkWrapper(jobId, randomId);
                     redisTemplate.delete(setExecuteJobId(jobId, randomId));
                     redisTemplate.opsForStream().delete(StreamConsumer.TASK_SET_STREAM, recordId);
                     removeJobGroupThread(id);
+                }else{
+                    if(idleTimes>10){
+                        removeJobGroupThread(id);
+                    }
                 }
             }
         }
