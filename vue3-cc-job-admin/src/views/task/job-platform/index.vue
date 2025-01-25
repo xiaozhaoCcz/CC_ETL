@@ -157,6 +157,7 @@ import { ref } from "vue";
 import Snowflake from "@/utils/snowflake";
 import { onBeforeRouteLeave } from "vue-router";
 import CustomGroup from "@/components/CustomGroup/CustomGroup";
+import router from "@/router";
 
 LogicFlow.use(Control); // 控制面板
 LogicFlow.use(DndPanel); // 拖拽面板

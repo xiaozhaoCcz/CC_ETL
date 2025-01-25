@@ -26,6 +26,8 @@ public class JobLogVO implements Serializable {
     private Integer jobGroup;
     @Schema(description = "任务，主键ID")
     private Integer jobId;
+    @Schema(description = "任务名称")
+    private String jobDesc;
     @Schema(description = "执行器地址，本次执行的地址")
     private String executorAddress;
     @Schema(description = "执行器任务handler")

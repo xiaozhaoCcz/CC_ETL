@@ -72,9 +72,16 @@
         <el-table-column type="index" width="120" label="序号" align="center" />
         <el-table-column
           key="jobId"
-          label="任务"
+          label="任务id"
           prop="jobId"
           min-width="150"
+          align="center"
+        />
+        <el-table-column
+          key="jobDesc"
+          label="任务名称"
+          prop="jobDesc"
+          min-width="200"
           align="center"
         />
         <el-table-column
