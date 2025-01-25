@@ -243,7 +243,7 @@ public class JobComposeServiceImpl implements JobComposeService {
                 nodeIdMap.put(node.getId(), jobNode.getId());
             } else {
                 JobNode jobNode = nodeFromDb.stream().filter(n -> n.getJobId().equals(jobId)).findFirst().orElse(null);
-                jobNode.setProperties(node.properties);
+                Map<String, Object> propertiesMap = JSONUtil.toBean(node.properties, Map.class);
                 jobNode.setNodePositionX(node.x);
                 jobNode.setNodePositionY(node.y);
                 if (DYNAMIC_GROUP.equalsIgnoreCase(node.getType())) {
@@ -252,7 +252,9 @@ public class JobComposeServiceImpl implements JobComposeService {
                     List<LfEdge> childEdges = lfEdges.stream().filter(e -> childIds.contains(e.getSourceNodeId()) || childIds.contains(e.targetNodeId)).toList();
                     List<Long> childJobIds = operateToUpdateJobCompose(jobInfo1, childNodes, childEdges, lfNodes, lfEdges);
                     jobNode.setChildren(JSONUtil.toJsonStr(childJobIds));
+                    propertiesMap.put("children",JSONUtil.toJsonStr(childJobIds));
                 }
+                jobNode.setProperties(JSONUtil.toJsonStr(propertiesMap));
                 updateNodes.add(jobNode);
                 nodeIdMap.put(node.getId(), jobNode.getId());
             }
