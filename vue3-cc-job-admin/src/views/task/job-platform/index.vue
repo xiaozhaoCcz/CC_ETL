@@ -39,7 +39,7 @@
           placement="top"
         >
           <el-button
-            type="info"
+            type="primary"
             :icon="Folder"
             circle
             @click="handleOpenDialog"
@@ -56,6 +56,19 @@
             :icon="CircleClose"
             circle
             @click="clearGraph"
+          />
+        </el-tooltip>
+        <el-tooltip
+          class="box-item"
+          effect="dark"
+          content="运行日志"
+          placement="top"
+        >
+          <el-button
+            type="info"
+            :icon="Document"
+            circle
+            @click="getTaskTriggerLog"
           />
         </el-tooltip>
       </div>
@@ -137,6 +150,7 @@ import {
   CircleClose,
   Folder,
   Loading,
+  Document,
 } from "@element-plus/icons-vue";
 import JobInfoAPI from "@/api/task/job-info";
 import { ref } from "vue";
@@ -320,6 +334,22 @@ async function clearData() {
     if (_edge) {
       graphModel.deleteEdgeById(_edge.id);
     }
+  });
+}
+
+function getTaskTriggerLog() {
+  if (triggerOneVisible.value) {
+    ElMessage.warning("有任务正在运行，请先停止任务～");
+    return;
+  }
+  if (jobCompId.value === null) {
+    ElMessage.warning("请选择任务~");
+    return;
+  }
+  console.log(jobCompId.value);
+  router.push({
+    path: "/task/task-log",
+    query: { id: jobCompId.value },
   });
 }
 
