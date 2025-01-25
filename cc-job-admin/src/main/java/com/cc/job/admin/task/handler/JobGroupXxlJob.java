@@ -62,6 +62,7 @@ public class JobGroupXxlJob {
 
     static final ConcurrentHashMap<String, WorkerWrapper<Long, String>> STOP_MAP = new ConcurrentHashMap<>();
 
+
     public static void removeWorkWrapper(Long parentId, String randomId) {
         STOP_MAP.remove(setExecuteJobId(parentId, randomId));
     }
@@ -69,6 +70,8 @@ public class JobGroupXxlJob {
     public static WorkerWrapper<Long, String> getWorkWrapper(Long parentId, String randomId) {
         return STOP_MAP.get(setExecuteJobId(parentId, randomId));
     }
+
+    static final ConcurrentHashMap<String, JobGroupThread> THREAD_MAP = new ConcurrentHashMap<>();
 
     static final Map<String, Map<Long, Set<Long>>> TASK_ID_MAP = new ConcurrentHashMap<>();
 
@@ -104,7 +107,7 @@ public class JobGroupXxlJob {
         } catch (ExecutionException | InterruptedException e) {
             handleExecutionException(jobId, e);
         } finally {
-            completeJobExecution(jobId, randomId);
+            completeJob(jobId, randomId);
         }
     }
 
@@ -159,18 +162,20 @@ public class JobGroupXxlJob {
         return workerWrappers.stream().filter(v -> startNodes.contains(Long.valueOf(v.getId()))).toList();
     }
 
-    private void handleExecutionException(long jobId,Exception e) {
+    private void handleExecutionException(long jobId, Exception e) {
         XxlJobHelper.log("{}任务运行异常,message:{}", jobId, e.getMessage());
         throw new BusinessException(e.getMessage());
     }
 
-    private void completeJobExecution(long jobId, String randomId) {
+    private void completeJob(long jobId, String randomId) {
         XxlJobHelper.log("{}任务运行完成", jobId);
         sendCompletionMessage(jobId, randomId);
-        TASK_ID_MAP.remove(setExecuteJobId(jobId, randomId));
-        removeWorkWrapper(jobId, randomId);
-        redisTemplate.delete(setExecuteJobId(jobId, randomId));
         jobInfoMapper.stopTaskSet(jobId);
+        TASK_ID_MAP.remove(setExecuteJobId(jobId, randomId));
+        JobGroupThread jobGroupThread = new JobGroupThread(jobId, randomId);
+        redisTemplate.delete(setExecuteJobId(jobId, randomId));
+        jobGroupThread.start();
+        THREAD_MAP.put(jobGroupThread.id, jobGroupThread);
     }
 
     private static WorkerWrapper<Long, String> createStartWorkWrapper(long jobId, List<WorkerWrapper<Long, String>> startWrappers) {
@@ -215,7 +220,7 @@ public class JobGroupXxlJob {
                         public String defaultValue() {
                             try {
                                 setNodeStatus(statusMap, node.getJobId(), 0, randomId, node.getJobParentId());
-                            }catch (Exception e){
+                            } catch (Exception e) {
                                 logger.error(e.getMessage());
                             }
                             return "任务运行超时异常";
@@ -282,7 +287,7 @@ public class JobGroupXxlJob {
             } else {
                 try {
                     setNodeStatus(statusMap, jobId, 0, randomId, node.getJobParentId());
-                }catch (Exception e){
+                } catch (Exception e) {
                     logger.error(e.getMessage());
                     throw new RuntimeException(e);
                 }
@@ -407,7 +412,7 @@ public class JobGroupXxlJob {
                         statusMap.remove(entry.getKey());
                         setNodeStatus(statusMap, entry.getKey(), status, randomId, parentId);
                         throw new RuntimeException("任务运行失败");
-                    } else{
+                    } else {
                         executeSuccessOrFailJob(statusMap, jobId, 1, randomId, parentId, entry);
                     }
                 } else if (status == 1) {
@@ -430,7 +435,7 @@ public class JobGroupXxlJob {
         }
     }
 
-    private class JobThreadListener implements Callable<String>{
+    private class JobThreadListener implements Callable<String> {
 
         private final XxlJobContext xxlJobContext;
 
@@ -457,12 +462,12 @@ public class JobGroupXxlJob {
             this.statusMap = statusMap;
         }
 
-        public void toStop(){
+        public void toStop() {
             this.stop = true;
         }
 
         @Override
-        public String call(){
+        public String call() {
             while (!stop) {
                 List<Pair<String, Boolean>> callbackRes = StreamConsumer.getCallbackRes();
                 for (Pair<String, Boolean> pair : new ArrayList<>(callbackRes)) {
@@ -518,6 +523,56 @@ public class JobGroupXxlJob {
         }
     }
 
+    public static void removeJobGroupThread(String id) {
+        JobGroupThread jobGroupThread = THREAD_MAP.get(id);
+        if (jobGroupThread != null) {
+            jobGroupThread.toStop();
+            jobGroupThread.interrupt();
+        }
+    }
+
+    private class JobGroupThread extends Thread {
+
+        private final String id;
+        private final Long jobId;
+        private final String randomId;
+        private int idleTimes = 0;
+
+        private JobGroupThread(Long jobId, String randomId) {
+            this.id = setExecuteJobId(jobId, randomId);
+            this.jobId = jobId;
+            this.randomId = randomId;
+        }
+
+        private volatile boolean stop = false;
+
+        @Override
+        public void run() {
+            while (!stop) {
+                idleTimes++;
+                try {
+                    TimeUnit.MILLISECONDS.sleep(10);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                String recordId = StreamConsumer.messageMap.get(id);
+                if (recordId != null) {
+                    removeWorkWrapper(jobId, randomId);
+                    redisTemplate.opsForStream().delete(StreamConsumer.TASK_SET_STREAM, recordId);
+                    removeJobGroupThread(id);
+                }else{
+                    if(idleTimes>10){
+                        removeJobGroupThread(id);
+                    }
+                }
+            }
+        }
+
+        public void toStop() {
+            stop = true;
+        }
+    }
+
     // 停止所有任务
     public static void stopJobGroup() {
         Set<String> keySet = TASK_ID_MAP.keySet();
@@ -525,6 +580,14 @@ public class JobGroupXxlJob {
             String[] split = key.split(":");
             Long jobId = Long.parseLong(split[0]);
             XxlJobAdminConfig.getAdminConfig().getJobInfoMapper().stopTaskSet(jobId);
+            removeJobGroupThread(key);
+        }
+        Set<String> messageSet = StreamConsumer.messageMap.keySet();
+        for (String id : messageSet) {
+            String recordId = StreamConsumer.messageMap.get(id);
+            if (recordId != null) {
+                XxlJobAdminConfig.getAdminConfig().getRedisTemplate().opsForStream().delete(StreamConsumer.TASK_SET_STREAM, recordId);
+            }
         }
     }
 
