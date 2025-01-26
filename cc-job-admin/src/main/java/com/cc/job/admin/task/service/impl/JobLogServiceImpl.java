@@ -79,6 +79,7 @@ public class JobLogServiceImpl extends ServiceImpl<JobLogMapper, JobLog> impleme
             JobLogVO taskLogVO = BeanUtil.copyProperties(taskLog, JobLogVO.class);
             JobInfo taskInfo = taskInfoMap.get(taskLog.getJobId());
             if(taskInfo!=null){
+                taskLogVO.setJobDesc(taskInfo.getJobDesc());
                 taskLogVO.setJobType(taskInfo.getJobType());
             }
             voList.add(taskLogVO);
