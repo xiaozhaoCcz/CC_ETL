@@ -450,6 +450,9 @@ public class JobComposeServiceImpl implements JobComposeService {
                 for (String childId : childIds) {
                     newChildIds.add(randomId + childId);
                 }
+                Map<String, Object> propertiesMap = JSONUtil.toBean(node.getProperties(), Map.class);
+                propertiesMap.put("children",JSONUtil.toJsonStr(newChildIds));
+                jobNodeVo.setProperties(JSONUtil.toJsonStr(propertiesMap));
                 jobNodeVo.setChildren(JSONUtil.toJsonStr(newChildIds));
                 getJobCompose(node.getJobId(), nodeVos, edgeVos, randomId);
             }

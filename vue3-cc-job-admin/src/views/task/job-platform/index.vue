@@ -469,14 +469,8 @@ async function confirmDialog() {
 
 function generateNode(node: any) {
   const properties = JSON.parse(node.properties);
-  console.log(properties);
   if (node.nodeType === DynamicCustomGroup) {
-    //properties.children = JSON.parse();
-    const strChildren = [] as any;
-    JSON.parse(properties.children).forEach((c: any) => {
-      strChildren.push(c + "");
-    });
-    properties.children = strChildren;
+    properties.children = JSON.parse(properties.children);
   }
   return {
     id: node.id,
