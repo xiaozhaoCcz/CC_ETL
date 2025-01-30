@@ -749,7 +749,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
         // next trigger time (5s后生效，避开预读周期)
         long nextTriggerTime = existsJobInfo.getTriggerNextTime();
-        boolean scheduleDataNotChanged = formData.getScheduleType().equals(existsJobInfo.getScheduleType()) && formData.getScheduleConf().equals(existsJobInfo.getScheduleConf());
+        boolean scheduleDataNotChanged = formData.getScheduleType().equals(existsJobInfo.getScheduleType()) &&existsJobInfo.getScheduleConf()!=null&&formData.getScheduleConf().equals(existsJobInfo.getScheduleConf());
         if (existsJobInfo.getTriggerStatus() == 1 && !scheduleDataNotChanged) {
             try {
                 existsJobInfo.setScheduleConf(formData.getScheduleConf());
