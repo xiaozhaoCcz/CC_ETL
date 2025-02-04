@@ -2,7 +2,7 @@
   <div class="app-container">
     <div class="search-container">
       <el-form ref="queryFormRef" :model="queryParams" :inline="true">
-        <el-form-item label="执行器" prop="status">
+        <el-form-item label="执行器" prop="jobGroup">
           <el-select
             v-model="queryParams.jobGroup"
             placeholder="全部"
@@ -16,7 +16,7 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="任务状态" prop="status">
+        <el-form-item label="任务状态" prop="triggerStatus">
           <el-select
             v-model="queryParams.triggerStatus"
             placeholder="全部"
@@ -27,7 +27,7 @@
             <el-option label="停止" :value="0" />
           </el-select>
         </el-form-item>
-        <el-form-item label="任务描述" prop="keywords">
+        <el-form-item label="任务描述" prop="jobDesc">
           <el-input
             v-model="queryParams.jobDesc"
             placeholder="请输入任务描述"
@@ -35,7 +35,7 @@
             @keyup.enter="handleQuery"
           />
         </el-form-item>
-        <el-form-item label="JobHandler" prop="keywords">
+        <el-form-item label="JobHandler" prop="executorHandler">
           <el-input
             v-model="queryParams.executorHandler"
             placeholder="请输入JobHandler"
@@ -43,7 +43,7 @@
             @keyup.enter="handleQuery"
           />
         </el-form-item>
-        <el-form-item label="责任人" prop="keywords" style="width: 200px">
+        <el-form-item label="责任人" prop="author" style="width: 200px">
           <el-input
             v-model="queryParams.author"
             placeholder="请输入责任人"
@@ -338,7 +338,7 @@ import JobGroupAPI from "@/api/task/job-group";
 import router from "@/router";
 import CodeEditor from "@/components/CodeEdit/index.vue";
 
-const queryFormRef = ref();
+const queryFormRef = ref(ElForm);
 
 const loading = ref(false);
 const removeIds = ref<number[]>([]);
@@ -470,9 +470,9 @@ function handleCloseDialog() {
 
 /** 重置task_info查询 */
 function handleResetQuery() {
-  resetData();
+  console.log(111)
+  queryFormRef.value!.resetFields();
   queryParams.pageNum = 1;
-  queryParams.pageSize = 10;
   handleQuery();
 }
 
