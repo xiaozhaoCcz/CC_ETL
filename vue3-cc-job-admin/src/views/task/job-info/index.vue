@@ -390,7 +390,7 @@ function glueClick(id: number) {
 
 function getTaskTriggerLog(id: number) {
   router.push({
-    path: "/task/task-log",
+    path: "/job/job-log",
     query: { id },
   });
 }

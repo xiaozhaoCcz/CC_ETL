@@ -349,7 +349,7 @@ function getTaskTriggerLog() {
   }
   console.log(jobCompId.value);
   router.push({
-    path: "/task/task-log",
+    path: "/job/job-log",
     query: { id: jobCompId.value },
   });
 }
