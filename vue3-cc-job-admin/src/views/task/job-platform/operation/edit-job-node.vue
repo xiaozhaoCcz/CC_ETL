@@ -220,7 +220,7 @@ const props = defineProps({
 });
 const emit = defineEmits(["close"]);
 const drawVisible = ref(false);
-const formData = reactive({});
+const formData = reactive<any>({});
 const taskGroupList = ref([]);
 const rules = reactive({
   jobGroup: [{ required: true }],
@@ -337,7 +337,7 @@ function closeGlue() {
   glueVisible.value = false;
 }
 
-function handleTableData(val) {
+function handleTableData(val:any) {
   formData.reqHeader = JSON.stringify(val);
 }
 

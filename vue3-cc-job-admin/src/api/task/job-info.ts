@@ -1,12 +1,12 @@
 import request from "@/utils/request";
 
-const TASKINFO_BASE_URL = "/api/v1/jobInfos";
+const JOB_INFO_BASE_URL = "/api/v1/jobInfos";
 
 const JobInfoAPI = {
   /** 获取task_info分页数据 */
   getPage(queryParams?: JobInfoPageQuery) {
     return request<any, PageResult<TaskInfoPageVO[]>>({
-      url: `${TASKINFO_BASE_URL}/page`,
+      url: `${JOB_INFO_BASE_URL}/page`,
       method: "get",
       params: queryParams,
     });
@@ -14,7 +14,7 @@ const JobInfoAPI = {
 
   getList(jobType?: number) {
     return request({
-      url: `${TASKINFO_BASE_URL}/list`,
+      url: `${JOB_INFO_BASE_URL}/list`,
       method: "get",
       params: { jobType },
     });
@@ -27,7 +27,7 @@ const JobInfoAPI = {
    */
   getFormData(id: number) {
     return request<any, JobInfoForm>({
-      url: `${TASKINFO_BASE_URL}/${id}/form`,
+      url: `${JOB_INFO_BASE_URL}/${id}/form`,
       method: "get",
     });
   },
@@ -35,7 +35,7 @@ const JobInfoAPI = {
   /** 添加task_info*/
   add(data: JobInfoForm) {
     return request({
-      url: `${TASKINFO_BASE_URL}`,
+      url: `${JOB_INFO_BASE_URL}`,
       method: "post",
       data: data,
     });
@@ -49,7 +49,7 @@ const JobInfoAPI = {
    */
   update(id: number, data: JobInfoForm) {
     return request({
-      url: `${TASKINFO_BASE_URL}/${id}`,
+      url: `${JOB_INFO_BASE_URL}/${id}`,
       method: "put",
       data: data,
     });
@@ -62,14 +62,14 @@ const JobInfoAPI = {
    */
   deleteByIds(ids: string) {
     return request({
-      url: `${TASKINFO_BASE_URL}/${ids}`,
+      url: `${JOB_INFO_BASE_URL}/${ids}`,
       method: "delete",
     });
   },
 
   triggerJob(data: any) {
     return request({
-      url: `${TASKINFO_BASE_URL}/trigger`,
+      url: `${JOB_INFO_BASE_URL}/trigger`,
       method: "post",
       data: data,
     });
@@ -77,28 +77,28 @@ const JobInfoAPI = {
 
   startJob(id: number) {
     return request({
-      url: `${TASKINFO_BASE_URL}/startJob/${id}`,
+      url: `${JOB_INFO_BASE_URL}/startJob/${id}`,
       method: "get",
     });
   },
 
   stopJob(id: number) {
     return request({
-      url: `${TASKINFO_BASE_URL}/stopJob/${id}`,
+      url: `${JOB_INFO_BASE_URL}/stopJob/${id}`,
       method: "get",
     });
   },
 
   stopJobCompose(id: number, randomId: string) {
     return request({
-      url: `${TASKINFO_BASE_URL}/stopJobCompose/${id}/${randomId}`,
+      url: `${JOB_INFO_BASE_URL}/stopJobCompose/${id}/${randomId}`,
       method: "get",
     });
   },
 
   nextTriggerTime(scheduleType: string, scheduleConf: string) {
     return request({
-      url: `${TASKINFO_BASE_URL}/nextTriggerTime`,
+      url: `${JOB_INFO_BASE_URL}/nextTriggerTime`,
       method: "get",
       params: { scheduleType, scheduleConf },
     });
@@ -107,7 +107,7 @@ const JobInfoAPI = {
   /** 添加task_info*/
   saveJobCompose(data: JobInfoForm) {
     return request({
-      url: `${TASKINFO_BASE_URL}/saveJobCompose`,
+      url: `${JOB_INFO_BASE_URL}/saveJobCompose`,
       method: "post",
       data: data,
     });
@@ -115,7 +115,7 @@ const JobInfoAPI = {
 
   updateJobCompose(id: number, data: JobInfoForm) {
     return request({
-      url: `${TASKINFO_BASE_URL}/updateJobCompose/${id}`,
+      url: `${JOB_INFO_BASE_URL}/updateJobCompose/${id}`,
       method: "put",
       data: data,
     });
@@ -123,7 +123,7 @@ const JobInfoAPI = {
 
   saveGlueSource(data: any) {
     return request({
-      url: `${TASKINFO_BASE_URL}/saveGlueSource`,
+      url: `${JOB_INFO_BASE_URL}/saveGlueSource`,
       method: "post",
       data: data,
     });
@@ -131,20 +131,20 @@ const JobInfoAPI = {
 
   getGlueList(id: number) {
     return request({
-      url: `${TASKINFO_BASE_URL}/getGlueList/${id}`,
+      url: `${JOB_INFO_BASE_URL}/getGlueList/${id}`,
       method: "get",
     });
   },
   getJobCompose(data: any) {
     return request({
-      url: `${TASKINFO_BASE_URL}/getJobCompose`,
+      url: `${JOB_INFO_BASE_URL}/getJobCompose`,
       method: "post",
       data: data,
     });
   },
   validateJobComposeEdge(data: JobInfoForm) {
     return request({
-      url: `${TASKINFO_BASE_URL}/validateJobComposeEdge`,
+      url: `${JOB_INFO_BASE_URL}/validateJobComposeEdge`,
       method: "post",
       data: data,
     });
