@@ -4,7 +4,7 @@ const TASKINFO_BASE_URL = "/api/v1/jobInfos";
 
 const JobInfoAPI = {
   /** 获取task_info分页数据 */
-  getPage(queryParams?: TaskInfoPageQuery) {
+  getPage(queryParams?: JobInfoPageQuery) {
     return request<any, PageResult<TaskInfoPageVO[]>>({
       url: `${TASKINFO_BASE_URL}/page`,
       method: "get",
@@ -26,14 +26,14 @@ const JobInfoAPI = {
    * @returns TaskInfo表单数据
    */
   getFormData(id: number) {
-    return request<any, TaskInfoForm>({
+    return request<any, JobInfoForm>({
       url: `${TASKINFO_BASE_URL}/${id}/form`,
       method: "get",
     });
   },
 
   /** 添加task_info*/
-  add(data: TaskInfoForm) {
+  add(data: JobInfoForm) {
     return request({
       url: `${TASKINFO_BASE_URL}`,
       method: "post",
@@ -47,7 +47,7 @@ const JobInfoAPI = {
    * @param id TaskInfoID
    * @param data TaskInfo表单数据
    */
-  update(id: number, data: TaskInfoForm) {
+  update(id: number, data: JobInfoForm) {
     return request({
       url: `${TASKINFO_BASE_URL}/${id}`,
       method: "put",
@@ -75,23 +75,23 @@ const JobInfoAPI = {
     });
   },
 
-  startTask(id: number) {
+  startJob(id: number) {
     return request({
-      url: `${TASKINFO_BASE_URL}/startTask/${id}`,
+      url: `${TASKINFO_BASE_URL}/startJob/${id}`,
       method: "get",
     });
   },
 
-  stopTask(id: number) {
+  stopJob(id: number) {
     return request({
-      url: `${TASKINFO_BASE_URL}/stopTask/${id}`,
+      url: `${TASKINFO_BASE_URL}/stopJob/${id}`,
       method: "get",
     });
   },
 
-  stopTaskSet(id: number, randomId: string) {
+  stopJobCompose(id: number, randomId: string) {
     return request({
-      url: `${TASKINFO_BASE_URL}/stopTaskSet/${id}/${randomId}`,
+      url: `${TASKINFO_BASE_URL}/stopJobCompose/${id}/${randomId}`,
       method: "get",
     });
   },
@@ -105,17 +105,17 @@ const JobInfoAPI = {
   },
 
   /** 添加task_info*/
-  saveTaskSet(data: TaskInfoForm) {
+  saveJobCompose(data: JobInfoForm) {
     return request({
-      url: `${TASKINFO_BASE_URL}/saveTaskSet`,
+      url: `${TASKINFO_BASE_URL}/saveJobCompose`,
       method: "post",
       data: data,
     });
   },
 
-  updateTaskSet(id: number, data: TaskInfoForm) {
+  updateJobCompose(id: number, data: JobInfoForm) {
     return request({
-      url: `${TASKINFO_BASE_URL}/updateTaskSet/${id}`,
+      url: `${TASKINFO_BASE_URL}/updateJobCompose/${id}`,
       method: "put",
       data: data,
     });
@@ -142,7 +142,7 @@ const JobInfoAPI = {
       data: data,
     });
   },
-  validateJobComposeEdge(data: TaskInfoForm) {
+  validateJobComposeEdge(data: JobInfoForm) {
     return request({
       url: `${TASKINFO_BASE_URL}/validateJobComposeEdge`,
       method: "post",
@@ -154,10 +154,10 @@ const JobInfoAPI = {
 export default JobInfoAPI;
 
 /** task_info分页查询参数 */
-export interface TaskInfoPageQuery extends PageQuery {}
+export interface JobInfoPageQuery extends PageQuery {}
 
 /** task_info表单对象 */
-export interface TaskInfoForm {
+export interface JobInfoForm {
   id?: number;
   /** 执行器主键ID */
   jobGroup?: number;

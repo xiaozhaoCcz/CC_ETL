@@ -541,7 +541,7 @@ function stopTrigger() {
     ElMessage.warning("请选择任务组～");
     return;
   }
-  JobInfoAPI.stopTaskSet(jobCompId.value, randomId.value).then(() => {
+  JobInfoAPI.stopJobCompose(jobCompId.value, randomId.value).then(() => {
     triggerOneVisible.value = false;
     updateEdgeStyle();
   });

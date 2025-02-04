@@ -170,7 +170,7 @@ public class JobGroupXxlJob {
     private void completeJob(long jobId, String randomId) {
         XxlJobHelper.log("{}任务运行完成", jobId);
         sendCompletionMessage(jobId, randomId);
-        jobInfoMapper.stopTaskSet(jobId);
+        jobInfoMapper.stopJobCompose(jobId);
         TASK_ID_MAP.remove(setExecuteJobId(jobId, randomId));
         JobGroupThread jobGroupThread = new JobGroupThread(jobId, randomId);
         redisTemplate.delete(setExecuteJobId(jobId, randomId));
@@ -579,7 +579,7 @@ public class JobGroupXxlJob {
         for (String key : keySet) {
             String[] split = key.split(":");
             Long jobId = Long.parseLong(split[0]);
-            XxlJobAdminConfig.getAdminConfig().getJobInfoMapper().stopTaskSet(jobId);
+            XxlJobAdminConfig.getAdminConfig().getJobInfoMapper().stopJobCompose(jobId);
             removeJobGroupThread(key);
         }
         Set<String> messageSet = StreamConsumer.messageMap.keySet();

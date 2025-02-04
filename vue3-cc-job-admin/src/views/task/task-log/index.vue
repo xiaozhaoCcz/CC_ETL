@@ -395,7 +395,7 @@ function handleDelete() {
     obj.filterTime = getTime(timeForm.dateTime);
   }
   loading.value = true;
-  JobLogAPI.deleteTaskLogs(obj)
+  JobLogAPI.deleteJobLogs(obj)
     .then(() => {
       ElMessage.success("删除成功");
       handleResetQuery();

@@ -316,14 +316,14 @@ function submitForm() {
   props.formData.glueType = "BEAN";
   props.formData.executorHandler = "runJobGroupXxlJob";
   if (id) {
-    JobInfoAPI.updateTaskSet(id, props.formData)
+    JobInfoAPI.updateJobCompose(id, props.formData)
       .then(() => {
         ElMessage.success("修改成功");
         handleCloseDialog();
       })
       .finally(() => {});
   } else {
-    JobInfoAPI.saveTaskSet(props.formData)
+    JobInfoAPI.saveJobCompose(props.formData)
       .then(() => {
         ElMessage.success("新增成功");
         handleCloseDialog();

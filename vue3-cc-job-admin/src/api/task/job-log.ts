@@ -24,7 +24,7 @@ const JobLogAPI = {
     });
   },
 
-  deleteTaskLogs(queryParams?: TaskLogPageQuery) {
+  deleteJobLogs(queryParams?: TaskLogPageQuery) {
     return request({
       url: `${TASKLOG_BASE_URL}`,
       method: "delete",

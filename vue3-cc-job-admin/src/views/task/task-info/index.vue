@@ -236,14 +236,14 @@
                   </el-dropdown-item>
                   <el-dropdown-item
                     divided
-                    @click="startTask(scope.row.id)"
+                    @click="startJob(scope.row.id)"
                     v-if="scope.row.triggerStatus === 0"
                   >
                     启动
                   </el-dropdown-item>
                   <el-dropdown-item
                     divided
-                    @click="stopTask(scope.row.id)"
+                    @click="stopJob(scope.row.id)"
                     v-else
                   >
                     停止
@@ -329,8 +329,8 @@ defineOptions({
 
 import JobInfoAPI, {
   TaskInfoPageVO,
-  TaskInfoForm,
-  TaskInfoPageQuery,
+  JobInfoForm,
+  JobInfoPageQuery,
 } from "@/api/task/job-info";
 import ExecuteOne from "./operation/executeone.vue";
 import EditTaskInfo from "./operation/edit-task-info.vue";
@@ -338,13 +338,13 @@ import JobGroupAPI from "@/api/task/job-group";
 import router from "@/router";
 import CodeEditor from "@/components/CodeEdit/index.vue";
 
-const queryFormRef = ref(ElForm);
+const queryFormRef = ref();
 
 const loading = ref(false);
 const removeIds = ref<number[]>([]);
 const total = ref(0);
 
-const queryParams = reactive<TaskInfoPageQuery>({
+const queryParams = reactive<JobInfoPageQuery>({
   pageNum: 1,
   pageSize: 10,
 });
@@ -359,7 +359,7 @@ const taskInfoVisible = reactive({
 });
 
 // task_info表单数据
-const formData = reactive<TaskInfoForm>({
+const formData = reactive<JobInfoForm>({
   incrType: 0,
 });
 const executeOneVal = ref(false);
@@ -424,16 +424,16 @@ function closeExecuteOne() {
   executeOneVal.value = false;
 }
 
-function startTask(id: number) {
+function startJob(id: number) {
   const taskObj = pageData.value.filter((v) => v.id == id)[0];
-  JobInfoAPI.startTask(id).then(() => {
+  JobInfoAPI.startJob(id).then(() => {
     taskObj.triggerStatus = 1;
   });
 }
 
-function stopTask(id: number) {
+function stopJob(id: number) {
   const taskObj = pageData.value.filter((v) => v.id == id)[0];
-  JobInfoAPI.stopTask(id).then(() => {
+  JobInfoAPI.stopJob(id).then(() => {
     taskObj.triggerStatus = 0;
   });
 }
@@ -470,9 +470,19 @@ function handleCloseDialog() {
 
 /** 重置task_info查询 */
 function handleResetQuery() {
-  queryFormRef.value!.resetFields();
+  resetData();
   queryParams.pageNum = 1;
+  queryParams.pageSize = 10;
   handleQuery();
+}
+
+function resetData(){
+  const keys = Object.keys(queryParams);
+  let obj: { [name: string]: string } = {};
+  keys.forEach((item) => {
+    obj[item] = "";
+  })
+  Object.assign(formData, obj);
 }
 
 /** 行复选框选中记录选中ID集合 */

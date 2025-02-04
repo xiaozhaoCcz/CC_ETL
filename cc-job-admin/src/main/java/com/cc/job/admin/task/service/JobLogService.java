@@ -21,7 +21,7 @@ public interface JobLogService extends IService<JobLog> {
      *
      * @return
      */
-    IPage<JobLogVO> getTaskLogPage(JobLogQuery queryParams);
+    IPage<JobLogVO> getJobLogPage(JobLogQuery queryParams);
 
 
     /**
@@ -30,7 +30,7 @@ public interface JobLogService extends IService<JobLog> {
      * @param ids task_logID，多个以英文逗号(,)分割
      * @return
      */
-    boolean deleteTaskLogs(JobLogQuery queryParams);
+    boolean deleteJobLogs(JobLogQuery queryParams);
 
     ReturnT<LogResult> getLogDetailCat(Long logId, int fromLineNum);
 }

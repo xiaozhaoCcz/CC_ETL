@@ -72,7 +72,7 @@ public class JobComposeServiceImpl implements JobComposeService {
             throw new BusinessException("任务组边不合法");
         }
 
-        JobInfo jobInfo = jobInfoService.baseSaveTaskInfo(formData);
+        JobInfo jobInfo = jobInfoService.baseSaveJobInfo(formData);
         if (StringUtils.isBlank(formData.getNodes())) {
             throw new BusinessException("任务节点不能为空");
         }
@@ -175,7 +175,7 @@ public class JobComposeServiceImpl implements JobComposeService {
         if (!b) {
             throw new BusinessException("任务组边不合法");
         }
-        JobInfo jobInfo = jobInfoService.baseUpdateTaskInfo(id, formData);
+        JobInfo jobInfo = jobInfoService.baseUpdateJobInfo(id, formData);
         if (StringUtils.isBlank(formData.getNodes())) {
             throw new BusinessException("任务节点不能为空");
         }
