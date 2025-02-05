@@ -560,8 +560,8 @@ public class JobGroupXxlJob {
                     removeWorkWrapper(jobId, randomId);
                     redisTemplate.opsForStream().delete(StreamConsumer.TASK_SET_STREAM, recordId);
                     removeJobGroupThread(id);
-                }else{
-                    if(idleTimes>10){
+                } else {
+                    if (idleTimes > 10) {
                         removeJobGroupThread(id);
                     }
                 }
