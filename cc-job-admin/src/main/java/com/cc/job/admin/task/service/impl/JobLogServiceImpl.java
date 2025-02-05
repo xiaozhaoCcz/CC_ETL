@@ -53,7 +53,7 @@ public class JobLogServiceImpl extends ServiceImpl<JobLogMapper, JobLog> impleme
     * @return {@link IPage< JobLogVO >} task_log分页列表
     */
     @Override
-    public IPage<JobLogVO> getTaskLogPage(JobLogQuery queryParams) {
+    public IPage<JobLogVO> getJobLogPage(JobLogQuery queryParams) {
         IPage<JobLogVO> pageVO = new Page<>();
         LambdaQueryWrapper<JobLog> wrapper = new LambdaQueryWrapper<>();
 
@@ -79,6 +79,7 @@ public class JobLogServiceImpl extends ServiceImpl<JobLogMapper, JobLog> impleme
             JobLogVO taskLogVO = BeanUtil.copyProperties(taskLog, JobLogVO.class);
             JobInfo taskInfo = taskInfoMap.get(taskLog.getJobId());
             if(taskInfo!=null){
+                taskLogVO.setJobDesc(taskInfo.getJobDesc());
                 taskLogVO.setJobType(taskInfo.getJobType());
             }
             voList.add(taskLogVO);
@@ -96,11 +97,11 @@ public class JobLogServiceImpl extends ServiceImpl<JobLogMapper, JobLog> impleme
      * @return
      */
     @Override
-    public boolean deleteTaskLogs(JobLogQuery queryParams) {
+    public boolean deleteJobLogs(JobLogQuery queryParams) {
         LambdaQueryWrapper<JobLog> wrapper = new LambdaQueryWrapper<>();
         // 逻辑删除
         baseWrapper(queryParams, wrapper);
-        return  this.remove(wrapper);
+        return this.remove(wrapper);
     }
 
     @Override

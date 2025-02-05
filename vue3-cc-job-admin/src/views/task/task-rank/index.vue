@@ -119,7 +119,7 @@ import { VueFlow, useVueFlow, MarkerType } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { MiniMap } from "@vue-flow/minimap";
 import { Folder, ArrowRight, Loading } from "@element-plus/icons-vue";
-import TaskInfoAPI, { TaskInfoForm } from "@/api/task/task-info";
+import JobInfoAPI, { JobInfoForm } from "@/api/task/job-info";
 import Snowflake from "@/utils/snowflake";
 const {
   updateEdge,
@@ -138,7 +138,7 @@ const taskRankVisible = reactive({
 });
 const triggerOneVisible = ref(false);
 const taskRankId = ref(null);
-const formData = reactive<TaskInfoForm>({
+const formData = reactive<JobInfoForm>({
   executorTimeout: 600000,
 });
 const g_position = ref([140, 140]);
@@ -168,7 +168,7 @@ function handleOpenDialog() {
   taskRankVisible.visible = true;
   if (taskRankId.value) {
     taskRankVisible.title = "修改任务组";
-    TaskInfoAPI.getFormData(taskRankId.value).then((data) => {
+    JobInfoAPI.getFormData(taskRankId.value).then((data) => {
       Object.assign(formData, data);
       formData.nodes = JSON.stringify(nodes.value);
       formData.edges = JSON.stringify(edges.value);
@@ -191,13 +191,12 @@ function handleCloseDialog() {
 }
 
 function generateNode(val: any) {
-  console.log(val);
   g_position.value[0] = g_position.value[0] + 10;
   g_position.value[1] = g_position.value[1] + 10;
   return {
     id: "node:" + Date.now().toString(),
     data: {
-      taskId: val.id,
+      jobId: val.id,
       label: val.label,
       randomId: "",
     },
@@ -288,7 +287,7 @@ onNodeDoubleClick(async (changes) => {
     return;
   }
   taskNodeVisible.value = true;
-  nodeTaskId.value = changes.node.data.taskId;
+  nodeTaskId.value = changes.node.data.jobId;
   nowDate.value = new Date();
 });
 
@@ -342,7 +341,7 @@ function triggerOne() {
   const taskInfoTriggerDto = {};
   taskInfoTriggerDto.id = taskId;
   taskInfoTriggerDto.executorParam = taskId + ":" + randomId.value;
-  TaskInfoAPI.triggerJob(taskInfoTriggerDto)
+  JobInfoAPI.triggerJob(taskInfoTriggerDto)
     .then((data) => {
       ElMessage.success("执行任务成功");
       connectWs(taskId + ":" + randomId.value);
@@ -361,7 +360,7 @@ function stopTrigger() {
     ElMessage.warning("请选择任务组～");
     return;
   }
-  TaskInfoAPI.stopTaskSet(taskRankId.value, randomId.value).then(() => {
+  JobInfoAPI.stopJobCompose(taskRankId.value, randomId.value).then(() => {
     triggerOneVisible.value = false;
     updateEdgeStyle();
   });
@@ -413,7 +412,7 @@ function selectTaskSetNode(node) {
   nodes.value = [];
   edges.value = [];
   taskRankId.value = node.id;
-  TaskInfoAPI.getFormData(node.id).then((data) => {
+  JobInfoAPI.getFormData(node.id).then((data) => {
     Object.assign(formData, data);
     taskTitle.value = data.jobDesc;
     const _nodes = JSON.parse(data.nodes);
@@ -423,8 +422,8 @@ function selectTaskSetNode(node) {
       const nodeObj = {} as any;
       nodeObj.id = item.id + "";
       nodeObj.data = {
-        taskId: item.taskId,
-        label: item.taskName,
+        jobId: item.jobId,
+        label: item.jobName,
       };
       nodeObj.position = { x: item.nodePositionX, y: item.nodePositionY };
       //style: { border: "1px solid green", borderRadius: "8px", width: "140px" },
@@ -449,7 +448,7 @@ function selectTaskSetNode(node) {
 }
 
 function getTaskInfoList() {
-  TaskInfoAPI.getList().then((data) => {
+  JobInfoAPI.getList().then((data) => {
     data.forEach((item) => {
       const obj = {};
       obj.id = item.id;
@@ -462,7 +461,7 @@ function getTaskInfoList() {
 }
 
 function getTaskSetList() {
-  TaskInfoAPI.getList(2).then((data) => {
+  JobInfoAPI.getList(2).then((data) => {
     data.forEach((item) => {
       const obj = {};
       obj.id = item.id;
@@ -500,7 +499,7 @@ const connectWs = (id: string) => {
     console.log("接收到消息", _message);
 
     if (
-      _message.taskId == taskRankId.value &&
+      _message.jobId == taskRankId.value &&
       _message.randomId == randomId.value
     ) {
       // 关闭任务
@@ -513,7 +512,7 @@ const connectWs = (id: string) => {
     // 接收到消息后，需要做出相应的操作，比如更新节点或边
     const node = nodes.value.find(
       (node: any) =>
-        node.data.taskId == _message.taskId &&
+        node.data.jobId == _message.jobId &&
         node.data.randomId == _message.randomId
     );
     //

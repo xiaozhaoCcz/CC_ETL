@@ -126,6 +126,7 @@
                   filterable
                   placeholder="选择运行模式"
                   style="width: 210px"
+                  :disabled="formData.jobType == 2"
                   @change="handleChangeGlueType"
                 >
                   <el-option
@@ -144,6 +145,7 @@
                   v-model="formData.executorHandler"
                   type="text"
                   autocomplete="off"
+                  :disabled="formData.jobType == 2"
                 />
               </div>
               <div class="c_cont" v-if="formData.glueType == 'API'">
@@ -241,6 +243,7 @@
                   v-model="formData.executorParam"
                   type="textarea"
                   autocomplete="off"
+                  :disabled="formData.jobType == 2"
                 />
               </div>
             </div>
@@ -341,10 +344,10 @@
                 <span>默认自增数据</span>
                 <IncrEditTable
                   :list="
-                  formData.incrContent == null
-                    ? []
-                    : JSON.parse(formData.incrContent)
-                "
+                    formData.incrContent == null
+                      ? []
+                      : JSON.parse(formData.incrContent)
+                  "
                   @handleTableData="handleTableData2"
                 ></IncrEditTable>
               </div>
@@ -379,8 +382,8 @@
   </div>
 </template>
 <script setup lang="ts">
-import TaskGroupAPI from "@/api/task/task-group";
-import TaskInfoAPI from "@/api/task/task-info";
+import JobGroupAPI from "@/api/task/job-group";
+import JobInfoAPI from "@/api/task/job-info";
 //当前使用的页面引入
 import NoVue3Cron from "@/components/NoVue3Cron/index.vue";
 import EditTable from "@/components/EditTable/EditTable.vue";
@@ -552,7 +555,8 @@ function handleTableData2(val) {
 watch(
   () => props.formData,
   (data) => {
-    if (data.id && data.glueType == "DATAX") {
+    console.log(data);
+    if (data.id && data.glueType === "DATAX") {
       jsonData.value = JSON.parse(data.executorParam);
     }
   },
@@ -581,7 +585,7 @@ function handleChangeGlueType() {
 }
 
 async function fetchTaskGroupList() {
-  const data = await TaskGroupAPI.getAllTaskGroupList();
+  const data = await JobGroupAPI.getAllJobGroupList();
   taskGroupList.value = data as any;
 }
 
@@ -609,7 +613,7 @@ function submitForm() {
   if (id) {
     if (props.taskInfoVisible.isCopy) {
       props.formData.id = undefined;
-      TaskInfoAPI.add(props.formData)
+      JobInfoAPI.add(props.formData)
         .then(() => {
           ElMessage.success("新增成功");
           handleCloseDialog();
@@ -617,7 +621,7 @@ function submitForm() {
         })
         .finally(() => {});
     } else {
-      TaskInfoAPI.update(id, props.formData)
+      JobInfoAPI.update(id, props.formData)
         .then(() => {
           ElMessage.success("修改成功");
           handleCloseDialog();
@@ -626,7 +630,7 @@ function submitForm() {
         .finally(() => {});
     }
   } else {
-    TaskInfoAPI.add(props.formData)
+    JobInfoAPI.add(props.formData)
       .then(() => {
         ElMessage.success("新增成功");
         handleCloseDialog();

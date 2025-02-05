@@ -2,7 +2,7 @@
   <div class="app-container">
     <div class="search-container">
       <el-form ref="queryFormRef" :model="queryParams" :inline="true">
-        <el-form-item label="执行器" prop="status">
+        <el-form-item label="执行器" prop="jobGroup">
           <el-select
             v-model="queryParams.jobGroup"
             placeholder="全部"
@@ -16,7 +16,7 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="任务状态" prop="status">
+        <el-form-item label="任务状态" prop="triggerStatus">
           <el-select
             v-model="queryParams.triggerStatus"
             placeholder="全部"
@@ -27,7 +27,7 @@
             <el-option label="停止" :value="0" />
           </el-select>
         </el-form-item>
-        <el-form-item label="任务描述" prop="keywords">
+        <el-form-item label="任务描述" prop="jobDesc">
           <el-input
             v-model="queryParams.jobDesc"
             placeholder="请输入任务描述"
@@ -35,7 +35,7 @@
             @keyup.enter="handleQuery"
           />
         </el-form-item>
-        <el-form-item label="JobHandler" prop="keywords">
+        <el-form-item label="JobHandler" prop="executorHandler">
           <el-input
             v-model="queryParams.executorHandler"
             placeholder="请输入JobHandler"
@@ -43,7 +43,7 @@
             @keyup.enter="handleQuery"
           />
         </el-form-item>
-        <el-form-item label="责任人" prop="keywords" style="width: 200px">
+        <el-form-item label="责任人" prop="author" style="width: 200px">
           <el-input
             v-model="queryParams.author"
             placeholder="请输入责任人"
@@ -236,14 +236,14 @@
                   </el-dropdown-item>
                   <el-dropdown-item
                     divided
-                    @click="startTask(scope.row.id)"
+                    @click="startJob(scope.row.id)"
                     v-if="scope.row.triggerStatus === 0"
                   >
                     启动
                   </el-dropdown-item>
                   <el-dropdown-item
                     divided
-                    @click="stopTask(scope.row.id)"
+                    @click="stopJob(scope.row.id)"
                     v-else
                   >
                     停止
@@ -327,14 +327,14 @@ defineOptions({
   inheritAttrs: false,
 });
 
-import TaskInfoAPI, {
+import JobInfoAPI, {
   TaskInfoPageVO,
-  TaskInfoForm,
-  TaskInfoPageQuery,
-} from "@/api/task/task-info";
+  JobInfoForm,
+  JobInfoPageQuery,
+} from "@/api/task/job-info";
 import ExecuteOne from "./operation/executeone.vue";
 import EditTaskInfo from "./operation/edit-task-info.vue";
-import TaskGroupAPI from "@/api/task/task-group";
+import JobGroupAPI from "@/api/task/job-group";
 import router from "@/router";
 import CodeEditor from "@/components/CodeEdit/index.vue";
 
@@ -344,7 +344,7 @@ const loading = ref(false);
 const removeIds = ref<number[]>([]);
 const total = ref(0);
 
-const queryParams = reactive<TaskInfoPageQuery>({
+const queryParams = reactive<JobInfoPageQuery>({
   pageNum: 1,
   pageSize: 10,
 });
@@ -359,7 +359,7 @@ const taskInfoVisible = reactive({
 });
 
 // task_info表单数据
-const formData = reactive<TaskInfoForm>({
+const formData = reactive<JobInfoForm>({
   incrType: 0,
 });
 const executeOneVal = ref(false);
@@ -378,7 +378,7 @@ function closeGlue() {
 function glueClick(id: number) {
   glueVisible.value = true;
   glueTaskId.value = id;
-  TaskInfoAPI.getFormData(id).then((data) => {
+  JobInfoAPI.getFormData(id).then((data) => {
     const glueType = data.glueType;
     if (data.glueSource == null || data.glueSource.length <= 0) {
       code.value = getThemeCode(glueType);
@@ -390,7 +390,7 @@ function glueClick(id: number) {
 
 function getTaskTriggerLog(id: number) {
   router.push({
-    path: "/task/task-log",
+    path: "/job/job-log",
     query: { id },
   });
 }
@@ -401,12 +401,11 @@ function closeNextTriggerTimeDialog() {
 }
 
 function executeOne(obj: any) {
-  console.log(obj);
   if (obj.jobType == 2) {
     const taskInfoTriggerDto = {};
     taskInfoTriggerDto.id = obj.id;
     taskInfoTriggerDto.executorParam = obj.id;
-    TaskInfoAPI.triggerJob(taskInfoTriggerDto)
+    JobInfoAPI.triggerJob(taskInfoTriggerDto)
       .then((data) => {
         ElMessage.success("执行任务成功");
       })
@@ -425,23 +424,23 @@ function closeExecuteOne() {
   executeOneVal.value = false;
 }
 
-function startTask(id: number) {
+function startJob(id: number) {
   const taskObj = pageData.value.filter((v) => v.id == id)[0];
-  TaskInfoAPI.startTask(id).then(() => {
+  JobInfoAPI.startJob(id).then(() => {
     taskObj.triggerStatus = 1;
   });
 }
 
-function stopTask(id: number) {
+function stopJob(id: number) {
   const taskObj = pageData.value.filter((v) => v.id == id)[0];
-  TaskInfoAPI.stopTask(id).then(() => {
+  JobInfoAPI.stopJob(id).then(() => {
     taskObj.triggerStatus = 0;
   });
 }
 
 function nextTriggerTime(scheduleType: string, scheduleConf: string) {
   nextTriggerTimeVisible.value = true;
-  TaskInfoAPI.nextTriggerTime(scheduleType, scheduleConf).then((data: any) => {
+  JobInfoAPI.nextTriggerTime(scheduleType, scheduleConf).then((data: any) => {
     nextTriggerTimeList.value = data;
   });
 }
@@ -449,7 +448,7 @@ function nextTriggerTime(scheduleType: string, scheduleConf: string) {
 /** 查询task_info */
 function handleQuery() {
   loading.value = true;
-  TaskInfoAPI.getPage(queryParams)
+  JobInfoAPI.getPage(queryParams)
     .then((data) => {
       pageData.value = data.list;
       total.value = data.total;
@@ -471,9 +470,19 @@ function handleCloseDialog() {
 
 /** 重置task_info查询 */
 function handleResetQuery() {
+  console.log(111)
   queryFormRef.value!.resetFields();
   queryParams.pageNum = 1;
   handleQuery();
+}
+
+function resetData(){
+  const keys = Object.keys(queryParams);
+  let obj: { [name: string]: string } = {};
+  keys.forEach((item) => {
+    obj[item] = "";
+  })
+  Object.assign(formData, obj);
 }
 
 /** 行复选框选中记录选中ID集合 */
@@ -486,7 +495,7 @@ function handleOpenDialog(id?: number) {
   taskInfoVisible.visible = true;
   if (id) {
     taskInfoVisible.title = "修改任务";
-    TaskInfoAPI.getFormData(id).then((data) => {
+    JobInfoAPI.getFormData(id).then((data) => {
       Object.assign(formData, data);
     });
   } else {
@@ -496,7 +505,7 @@ function handleOpenDialog(id?: number) {
 
 function handleCopy(id: number) {
   taskInfoVisible.visible = true;
-  TaskInfoAPI.getFormData(id).then((data) => {
+  JobInfoAPI.getFormData(id).then((data) => {
     Object.assign(formData, data);
   });
   taskInfoVisible.title = "复制taskInfo";
@@ -518,7 +527,7 @@ function handleDelete(id?: number) {
   }).then(
     () => {
       loading.value = true;
-      TaskInfoAPI.deleteByIds(ids)
+      JobInfoAPI.deleteByIds(ids)
         .then(() => {
           ElMessage.success("删除成功");
           handleResetQuery();
@@ -532,7 +541,7 @@ function handleDelete(id?: number) {
 }
 
 async function fetchTaskGroupList() {
-  const data = await TaskGroupAPI.getAllTaskGroupList();
+  const data = await JobGroupAPI.getAllJobGroupList();
   taskGroupList.value = data as any;
 }
 

@@ -79,7 +79,7 @@ public class JobCompleteHelper {
 					try {
 						// 任务结果丢失处理：调度记录停留在 "运行中" 状态超过10min，且对应执行器心跳注册失败不在线，则将本地调度主动标记失败；
 						Date losedTime = DateUtil.addMinutes(new Date(), -10);
-						List<Long> losedJobIds = XxlJobAdminConfig.getAdminConfig().getTaskLogMapper().findLostJobIds(losedTime);
+						List<Long> losedJobIds = XxlJobAdminConfig.getAdminConfig().getJobLogMapper().findLostJobIds(losedTime);
 
 						if (losedJobIds != null && losedJobIds.size() > 0) {
 							for (Long logId : losedJobIds) {
@@ -157,7 +157,7 @@ public class JobCompleteHelper {
 
 	private ReturnT<String> callback(HandleCallbackParam handleCallbackParam) {
 		// valid log item
-		JobLog log = XxlJobAdminConfig.getAdminConfig().getTaskLogMapper().selectById(handleCallbackParam.getLogId());
+		JobLog log = XxlJobAdminConfig.getAdminConfig().getJobLogMapper().selectById(handleCallbackParam.getLogId());
 		String randomId = "";
 		if (log != null && StringUtils.isNotBlank(log.getExecutorParam())) {
 			logger.info(">>>>>>>executorParam:{}", log.getExecutorParam());
@@ -166,13 +166,17 @@ public class JobCompleteHelper {
 		if (log == null) {
 			Map<String, Boolean> result = new HashMap<>();
 			result.put(handleCallbackParam.getJobId() + randomId, false);
-			XxlJobAdminConfig.getAdminConfig().getRedisTemplate().opsForStream().add(StreamConsumer.TASK_SET_STREAM, result);
+			if(!String.valueOf(handleCallbackParam.getJobId()).equalsIgnoreCase(log.getExecutorParam())){
+				XxlJobAdminConfig.getAdminConfig().getRedisTemplate().opsForStream().add(StreamConsumer.TASK_SET_STREAM, result);
+			}
 			return new ReturnT<>(ReturnT.FAIL_CODE, "log item not found.");
 		}
 		if (log.getHandleCode() > 0) {
 			Map<String, Boolean> result = new HashMap<>();
 			result.put(handleCallbackParam.getJobId() + randomId, false);
-			XxlJobAdminConfig.getAdminConfig().getRedisTemplate().opsForStream().add(StreamConsumer.TASK_SET_STREAM, result);
+			if(!String.valueOf(handleCallbackParam.getJobId()).equalsIgnoreCase(log.getExecutorParam())){
+				XxlJobAdminConfig.getAdminConfig().getRedisTemplate().opsForStream().add(StreamConsumer.TASK_SET_STREAM, result);
+			}
 			return new ReturnT<>(ReturnT.FAIL_CODE, "log repeate callback.");
 		}
 
@@ -194,8 +198,9 @@ public class JobCompleteHelper {
 		// 处理结果
 		Map<String, Boolean> result = new HashMap<>();
 		result.put(handleCallbackParam.getJobId() + randomId, handleCallbackParam.getHandleCode() == ReturnT.SUCCESS_CODE);
-		XxlJobAdminConfig.getAdminConfig().getRedisTemplate().opsForStream().add(StreamConsumer.TASK_SET_STREAM, result);
-
+		if(!String.valueOf(handleCallbackParam.getJobId()).equalsIgnoreCase(log.getExecutorParam())){
+			XxlJobAdminConfig.getAdminConfig().getRedisTemplate().opsForStream().add(StreamConsumer.TASK_SET_STREAM, result);
+		}
 		return ReturnT.SUCCESS;
 	}
 

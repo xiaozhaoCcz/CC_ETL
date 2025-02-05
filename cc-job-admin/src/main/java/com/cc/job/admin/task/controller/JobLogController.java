@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @Tag(name = "task_log接口")
 @RestController
-@RequestMapping("/api/v1/taskLogs")
+@RequestMapping("/api/v1/jobLogs")
 @RequiredArgsConstructor
 public class JobLogController {
 
@@ -31,17 +31,17 @@ public class JobLogController {
 
     @Operation(summary = "task_log分页列表")
     @GetMapping("/page")
-    public PageResult<JobLogVO> getTaskLogPage(JobLogQuery queryParams ) {
-        IPage<JobLogVO> result = taskLogService.getTaskLogPage(queryParams);
+    public PageResult<JobLogVO> getJobLogPage(JobLogQuery queryParams ) {
+        IPage<JobLogVO> result = taskLogService.getJobLogPage(queryParams);
         return PageResult.success(result);
     }
 
     @Operation(summary = "删除task_log")
     @DeleteMapping
-    public Result<Void> deleteTaskLogs(
+    public Result<Void> deleteJobLogs(
             JobLogQuery queryParams
     ) {
-        boolean result = taskLogService.deleteTaskLogs(queryParams);
+        boolean result = taskLogService.deleteJobLogs(queryParams);
         return Result.judge(result);
     }
 

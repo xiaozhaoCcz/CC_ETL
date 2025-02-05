@@ -38,7 +38,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import TaskInfoAPI from "@/api/task/task-info";
+import JobInfoAPI from "@/api/task/job-info";
 
 const props = defineProps({
   taskId: {
@@ -73,8 +73,7 @@ watch(
 
 const submitForm = () => {
   // TODO: submit form data
-  console.log(taskInfoTriggerDto);
-  TaskInfoAPI.triggerJob(taskInfoTriggerDto)
+  JobInfoAPI.triggerJob(taskInfoTriggerDto)
     .then((data) => {
       ElMessage.success("执行任务成功");
     })

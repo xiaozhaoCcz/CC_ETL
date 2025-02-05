@@ -1,6 +1,7 @@
 package com.cc.job.admin.task.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cc.job.admin.task.service.JobComposeService;
 import com.cc.job.xo.model.dto.JobInfoTriggerDto;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobLogglue;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * task_info前端控制层
@@ -32,22 +34,24 @@ import java.util.List;
  */
 @Tag(name = "task_info接口")
 @RestController
-@RequestMapping("/api/v1/taskInfos")
+@RequestMapping("/api/v1/jobInfos")
 @RequiredArgsConstructor
 public class JobInfoController {
 
-    private final JobInfoService taskInfoService;
+    private final JobInfoService jobInfoService;
+
+    private final JobComposeService jobComposeService;
 
     @Operation(summary = "task_info分页列表")
     @GetMapping("/page")
-    public PageResult<JobInfoVO> getTaskInfoPage(JobInfoQuery queryParams) {
-        IPage<JobInfoVO> result = taskInfoService.getTaskInfoPage(queryParams);
+    public PageResult<JobInfoVO> getJobInfoPage(JobInfoQuery queryParams) {
+        IPage<JobInfoVO> result = jobInfoService.getJobInfoPage(queryParams);
         return PageResult.success(result);
     }
 
     @Operation(summary = "task_info分页列表")
     @GetMapping("/list")
-    public Result<List<JobInfo>> getTaskInfoList(Integer jobType) {
+    public Result<List<JobInfo>> getJobInfoList(Integer jobType) {
         LambdaQueryWrapper<JobInfo> wrapper = new LambdaQueryWrapper<>();
         if(jobType!=null){
             wrapper.eq(JobInfo::getJobType, jobType);
@@ -55,109 +59,121 @@ public class JobInfoController {
             wrapper.in(JobInfo::getJobType,0,2);
         }
         wrapper.eq(JobInfo::getIsNode,"N");
-        List<JobInfo> list = taskInfoService.list(wrapper);
+        List<JobInfo> list = jobInfoService.list(wrapper);
         return Result.success(list);
     }
 
     @Operation(summary = "新增task_info")
     @PostMapping
-    public Result<Void> saveTaskInfo(@RequestBody @Valid JobInfoForm formData) {
-        boolean result = taskInfoService.saveTaskInfo(formData);
+    public Result<Void> saveJobInfo(@RequestBody @Valid JobInfoForm formData) {
+        boolean result = jobInfoService.saveJobInfo(formData);
         return Result.judge(result);
     }
 
     @Operation(summary = "获取task_info表单数据")
     @GetMapping("/{id}/form")
-    public Result<JobInfoForm> getTaskInfoForm(
+    public Result<JobInfoForm> getJobInfoForm(
             @Parameter(description = "task_infoID") @PathVariable Long id
     ) {
-        JobInfoForm formData = taskInfoService.getTaskInfoFormData(id);
+        JobInfoForm formData = jobInfoService.getJobInfoForm(id);
         return Result.success(formData);
     }
 
     @Operation(summary = "修改task_info")
     @PutMapping(value = "/{id}")
-    public Result<Void> updateTaskInfo(
+    public Result<Void> updateJobInfo(
             @Parameter(description = "task_infoID") @PathVariable Long id,
             @RequestBody @Validated JobInfoForm formData
     ) {
-        boolean result = taskInfoService.updateTaskInfo(id, formData);
+        boolean result = jobInfoService.updateJobInfo(id, formData);
         return Result.judge(result);
     }
 
     @Operation(summary = "删除task_info")
     @DeleteMapping("/{ids}")
-    public Result<Void> deleteTaskInfos(
+    public Result<Void> deleteJobInfos(
             @Parameter(description = "task_infoID，多个以英文逗号(,)分割") @PathVariable String ids
     ) {
-        boolean result = taskInfoService.deleteTaskInfos(ids);
+        boolean result = jobInfoService.deleteJobInfos(ids);
         return Result.judge(result);
     }
 
     @Operation(summary = "执行任务一次")
     @PostMapping("/trigger")
     public Result<Void> triggerJob(@RequestBody JobInfoTriggerDto taskInfoTriggerDto) {
-        boolean result = taskInfoService.triggerJob(taskInfoTriggerDto);
+        boolean result = jobInfoService.triggerJob(taskInfoTriggerDto);
         return Result.judge(result);
     }
 
     @Operation(summary = "启动")
-    @GetMapping("/startTask/{id}")
-    public Result<Void> startTask(@PathVariable Long id) {
-        boolean result = taskInfoService.startTask(id);
+    @GetMapping("/startJob/{id}")
+    public Result<Void> startJob(@PathVariable Long id) {
+        boolean result = jobInfoService.startJob(id);
         return Result.judge(result);
     }
 
     @Operation(summary = "停止")
-    @GetMapping("/stopTask/{id}")
-    public Result<Void> stopTask(@PathVariable Long id) {
-        boolean result = taskInfoService.stopTask(id);
+    @GetMapping("/stopJob/{id}")
+    public Result<Void> stopJob(@PathVariable Long id) {
+        boolean result = jobInfoService.stopJob(id);
         return Result.judge(result);
     }
 
     @Operation(summary = "下一次的运行时间")
     @GetMapping("/nextTriggerTime")
     public Result<List<String>> nextTriggerTime(String scheduleType, String scheduleConf){
-      List<String> list = taskInfoService.nextTriggerTime(scheduleType, scheduleConf);
+      List<String> list = jobInfoService.nextTriggerTime(scheduleType, scheduleConf);
       return Result.success(list);
     }
 
 
     @Operation(summary = "保存任务运行集")
-    @PostMapping("saveTaskSet")
-    public Result<Void>  saveTaskSet(@RequestBody @Valid JobInfoForm formData){
+    @PostMapping("saveJobCompose")
+    public Result<Void>  saveJobCompose(@RequestBody @Valid JobInfoForm formData){
         // 实现任务运行集的保存
-        boolean result = taskInfoService.saveTaskSet(formData);
+        boolean result = jobComposeService.saveJobCompose(formData);
         return Result.judge(result);
     }
 
     @Operation(summary = "修改任务运行集")
-    @PutMapping("updateTaskSet/{id}")
-    public Result<Void>  updateTaskSet(@Parameter(description = "task_infoID") @PathVariable Long id,
+    @PutMapping("updateJobCompose/{id}")
+    public Result<Void>  updateJobCompose(@Parameter(description = "task_infoID") @PathVariable Long id,
                                        @RequestBody @Validated JobInfoForm formData){
         // 实现任务运行集的保存
-        boolean result = taskInfoService.updateTaskSet(id,formData);
+        boolean result = jobComposeService.updateJobCompose(id,formData);
         return Result.judge(result);
     }
 
     @Operation(summary = "停止任务集")
-    @GetMapping("/stopTaskSet/{id}/{randomId}")
-    public Result<Void> stopTaskSet(@PathVariable Long id,@PathVariable String randomId) {
-        boolean result = taskInfoService.stopTaskSet(id,randomId);
+    @GetMapping("/stopJobCompose/{id}/{randomId}")
+    public Result<Void> stopJobCompose(@PathVariable Long id,@PathVariable String randomId) {
+        boolean result = jobInfoService.stopJobCompose(id,randomId);
         return Result.judge(result);
     }
 
     @Operation(summary = "保存GlueSource")
     @PostMapping("saveGlueSource")
     public Result<Void>  saveGlueSource(@RequestBody @Valid JobGlueForm formData){
-        boolean result = taskInfoService.saveGlueSource(formData);
+        boolean result = jobInfoService.saveGlueSource(formData);
         return Result.judge(result);
     }
 
 
     @GetMapping("getGlueList/{id}")
     public Result<List<JobLogglue>> getGlueList(@PathVariable Long id){
-        List<JobLogglue> list =  taskInfoService.getGlueList(id);
+        List<JobLogglue> list =  jobInfoService.getGlueList(id);
         return Result.success(list);
+    }
+
+    @PostMapping("getJobCompose")
+    public Result<Map<String,Object>> getJobCompose(@RequestBody Map<String,Object> formMap){
+        Map<String,Object> map =  jobComposeService.getJobCompose(formMap);
+        return Result.success(map);
+    }
+
+    @PostMapping("validateJobComposeEdge")
+    public Result<Boolean> validateJobComposeEdge(@RequestBody Map<String,String> formMap){
+        boolean result =  jobComposeService.validateJobComposeEdge(formMap.get("nodes"),formMap.get("edges"));
+        return Result.success(result);
     }
 }

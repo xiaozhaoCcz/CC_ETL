@@ -17,11 +17,19 @@ public class JobEdge implements Serializable {
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private Long taskParentId;
+    private Long jobParentId;
 
     private Long fromNodeId;
 
     private Long endNodeId;
+
+    private String pointsList;
+
+    private String properties;
+
+    private String startPoint;
+
+    private String endPoint;
 
     @TableField(fill = FieldFill.INSERT)
     @JsonInclude(value = JsonInclude.Include.NON_NULL)

@@ -7,13 +7,13 @@ import java.io.Serializable;
 @Data
 public class JobNodeVo implements Serializable {
 
-    private Long id;
+    private String id;
 
-    private Long taskId;
+    private Long jobId;
 
-    private String taskName;
+    private String jobName;
 
-    private Long taskParentId;
+    private Long jobParentId;
 
     private Double nodePositionX;
 
@@ -26,5 +26,11 @@ public class JobNodeVo implements Serializable {
     private Integer sort;
 
     private String nodePatentId;
+
+    private String properties;
+
+    private String children;
+
+    private String nodeType;
 
 }

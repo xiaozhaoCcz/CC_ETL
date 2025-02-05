@@ -22,7 +22,7 @@ public interface JobGroupService extends IService<JobGroup> {
      *
      * @return
      */
-    IPage<JobGroupVO> getTaskGroupPage(JobGroupQuery queryParams);
+    IPage<JobGroupVO> getJobGroupPage(JobGroupQuery queryParams);
 
     /**
      * 获取task_group表单数据
@@ -30,7 +30,7 @@ public interface JobGroupService extends IService<JobGroup> {
      * @param id task_groupID
      * @return
      */
-     JobGroupForm getTaskGroupFormData(Long id);
+     JobGroupForm getJobGroupFormData(Long id);
 
     /**
      * 新增task_group
@@ -38,7 +38,7 @@ public interface JobGroupService extends IService<JobGroup> {
      * @param formData task_group表单对象
      * @return
      */
-    boolean saveTaskGroup(JobGroupForm formData);
+    boolean saveJobGroup(JobGroupForm formData);
 
     /**
      * 修改task_group
@@ -47,7 +47,7 @@ public interface JobGroupService extends IService<JobGroup> {
      * @param formData task_group表单对象
      * @return
      */
-    boolean updateTaskGroup(Long id, JobGroupForm formData);
+    boolean updateJobGroup(Long id, JobGroupForm formData);
 
     /**
      * 删除task_group
@@ -55,7 +55,7 @@ public interface JobGroupService extends IService<JobGroup> {
      * @param ids task_groupID，多个以英文逗号(,)分割
      * @return
      */
-    boolean deleteTaskGroups(String ids);
+    boolean deleteJobGroups(String ids);
 
     List<String> findAddressList(Long id);
 }

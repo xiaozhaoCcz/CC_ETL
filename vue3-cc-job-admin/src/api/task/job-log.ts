@@ -1,12 +1,12 @@
 import request from "@/utils/request";
 
-const TASKLOG_BASE_URL = "/api/v1/taskLogs";
+const JOBLOG_BASE_URL = "/api/v1/jobLogs";
 
-const TaskLogAPI = {
+const JobLogAPI = {
   /** 获取task_log分页数据 */
   getPage(queryParams?: TaskLogPageQuery) {
     return request<any, PageResult<TaskLogPageVO[]>>({
-      url: `${TASKLOG_BASE_URL}/page`,
+      url: `${JOBLOG_BASE_URL}/page`,
       method: "get",
       params: queryParams,
     });
@@ -19,14 +19,14 @@ const TaskLogAPI = {
    */
   getFormData(id: number) {
     return request<any, TaskLogForm>({
-      url: `${TASKLOG_BASE_URL}/${id}/form`,
+      url: `${JOBLOG_BASE_URL}/${id}/form`,
       method: "get",
     });
   },
 
-  deleteTaskLogs(queryParams?: TaskLogPageQuery) {
+  deleteJobLogs(queryParams?: TaskLogPageQuery) {
     return request({
-      url: `${TASKLOG_BASE_URL}`,
+      url: `${JOBLOG_BASE_URL}`,
       method: "delete",
       params: queryParams,
     });
@@ -34,14 +34,14 @@ const TaskLogAPI = {
 
   logDetailCat(logId: number, fromLineNum: number) {
     return request({
-      url: `${TASKLOG_BASE_URL}/logDetailCat`,
+      url: `${JOBLOG_BASE_URL}/logDetailCat`,
       method: "get",
       params: { logId, fromLineNum },
     });
   }
 }
 
-export default TaskLogAPI;
+export default JobLogAPI;
 
 /** task_log分页查询参数 */
 export interface TaskLogPageQuery extends PageQuery {

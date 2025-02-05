@@ -25,7 +25,7 @@ public interface JobInfoService extends IService<JobInfo> {
      *
      * @return
      */
-    IPage<JobInfoVO> getTaskInfoPage(JobInfoQuery queryParams);
+    IPage<JobInfoVO> getJobInfoPage(JobInfoQuery queryParams);
 
     /**
      * 获取task_info表单数据
@@ -33,7 +33,7 @@ public interface JobInfoService extends IService<JobInfo> {
      * @param id task_infoID
      * @return
      */
-     JobInfoForm getTaskInfoFormData(Long id);
+     JobInfoForm getJobInfoForm(Long id);
 
     /**
      * 新增task_info
@@ -41,7 +41,7 @@ public interface JobInfoService extends IService<JobInfo> {
      * @param formData task_info表单对象
      * @return
      */
-    boolean saveTaskInfo(JobInfoForm formData);
+    boolean saveJobInfo(JobInfoForm formData);
 
     /**
      * 修改task_info
@@ -50,7 +50,7 @@ public interface JobInfoService extends IService<JobInfo> {
      * @param formData task_info表单对象
      * @return
      */
-    boolean updateTaskInfo(Long id, JobInfoForm formData);
+    boolean updateJobInfo(Long id, JobInfoForm formData);
 
     /**
      * 删除task_info
@@ -58,23 +58,29 @@ public interface JobInfoService extends IService<JobInfo> {
      * @param ids task_infoID，多个以英文逗号(,)分割
      * @return
      */
-    boolean deleteTaskInfos(String ids);
+    boolean deleteJobInfos(String ids);
 
-    boolean triggerJob(JobInfoTriggerDto taskInfoTriggerDto);
+    void delNodes(Long jobId);
 
-    boolean startTask(Long id);
+    boolean triggerJob(JobInfoTriggerDto JobInfoTriggerDto);
 
-    boolean stopTask(Long id);
+    boolean startJob(Long id);
+
+    boolean stopJob(Long id);
 
     List<String> nextTriggerTime(String scheduleType, String scheduleConf);
 
-    boolean saveTaskSet(JobInfoForm formData);
+    boolean saveJobCompose(JobInfoForm formData);
 
-    boolean updateTaskSet(Long id, JobInfoForm formData);
+    JobInfo baseSaveJobInfo(JobInfoForm formData);
 
-    boolean stopTaskSet(Long id,String randomId);
+    boolean updateJobCompose(Long id, JobInfoForm formData);
+
+    boolean stopJobCompose(Long id,String randomId);
 
     boolean saveGlueSource(JobGlueForm formData);
+
+    JobInfo baseUpdateJobInfo(Long id, JobInfoForm formData);
 
     List<JobLogglue> getGlueList(Long id);
 }

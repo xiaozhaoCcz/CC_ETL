@@ -23,6 +23,7 @@
         <el-form-item label="机器地址" prop="addressList">
           <el-input
             v-model="formData.addressList"
+            type="textarea"
             placeholder="执行器地址列表，多地址逗号分隔"
           />
         </el-form-item>
@@ -37,7 +38,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import TaskGroupAPI from "@/api/task/task-group";
+import JobGroupAPI from "@/api/task/job-group";
 
 const emit = defineEmits(["close", "handleResetQuery"]);
 
@@ -75,7 +76,7 @@ function handleSubmit() {
     if (valid) {
       const id = props.formData.id;
       if (id) {
-        TaskGroupAPI.update(id, props.formData)
+        JobGroupAPI.update(id, props.formData)
           .then(() => {
             ElMessage.success("修改成功");
             handleCloseDialog();
@@ -83,7 +84,7 @@ function handleSubmit() {
           })
           .finally(() => {});
       } else {
-        TaskGroupAPI.add(props.formData)
+        JobGroupAPI.add(props.formData)
           .then(() => {
             ElMessage.success("新增成功");
             handleCloseDialog();

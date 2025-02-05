@@ -1,12 +1,12 @@
 import request from "@/utils/request";
 
-const TASKGROUP_BASE_URL = "/api/v1/taskGroups";
+const JOB_GROUP_BASE_URL = "/api/v1/jobGroups";
 
-const TaskGroupAPI = {
+const JobGroupAPI = {
   /** 获取task_group分页数据 */
-  getPage(queryParams?: TaskGroupPageQuery) {
-    return request<any, PageResult<TaskGroupPageVO[]>>({
-      url: `${TASKGROUP_BASE_URL}/page`,
+  getPage(queryParams?: JobGroupPageQuery) {
+    return request<any, PageResult<JobGroupPageVO[]>>({
+      url: `${JOB_GROUP_BASE_URL}/page`,
       method: "get",
       params: queryParams,
     });
@@ -18,16 +18,16 @@ const TaskGroupAPI = {
    * @returns TaskGroup表单数据
    */
   getFormData(id: number) {
-    return request<any, TaskGroupForm>({
-      url: `${TASKGROUP_BASE_URL}/${id}/form`,
+    return request<any, JobGroupForm>({
+      url: `${JOB_GROUP_BASE_URL}/${id}/form`,
       method: "get",
     });
   },
 
   /** 添加task_group*/
-  add(data: TaskGroupForm) {
+  add(data: JobGroupForm) {
     return request({
-      url: `${TASKGROUP_BASE_URL}`,
+      url: `${JOB_GROUP_BASE_URL}`,
       method: "post",
       data: data,
     });
@@ -39,9 +39,9 @@ const TaskGroupAPI = {
    * @param id TaskGroupID
    * @param data TaskGroup表单数据
    */
-  update(id: number, data: TaskGroupForm) {
+  update(id: number, data: JobGroupForm) {
     return request({
-      url: `${TASKGROUP_BASE_URL}/${id}`,
+      url: `${JOB_GROUP_BASE_URL}/${id}`,
       method: "put",
       data: data,
     });
@@ -54,33 +54,33 @@ const TaskGroupAPI = {
    */
   deleteByIds(ids: string) {
     return request({
-      url: `${TASKGROUP_BASE_URL}/${ids}`,
+      url: `${JOB_GROUP_BASE_URL}/${ids}`,
       method: "delete",
     });
   },
 
   findAddressList(id: number) {
     return request({
-      url: `${TASKGROUP_BASE_URL}/findAddressList/${id}`,
+      url: `${JOB_GROUP_BASE_URL}/findAddressList/${id}`,
       method: "get",
     });
   },
 
-  getAllTaskGroupList() {
+  getAllJobGroupList() {
     return request({
-      url: `${TASKGROUP_BASE_URL}/getAllTaskGroupList`,
+      url: `${JOB_GROUP_BASE_URL}/getAllJobGroupList`,
       method: "get",
     });
   },
 };
 
-export default TaskGroupAPI;
+export default JobGroupAPI;
 
 /** task_group分页查询参数 */
-export interface TaskGroupPageQuery extends PageQuery { }
+export interface JobGroupPageQuery extends PageQuery { }
 
 /** task_group表单对象 */
-export interface TaskGroupForm {
+export interface JobGroupForm {
   id?: number;
   /** 执行器AppName */
   appName?: string;
@@ -94,7 +94,7 @@ export interface TaskGroupForm {
 }
 
 /** task_group分页对象 */
-export interface TaskGroupPageVO {
+export interface JobGroupPageVO {
   id?: number;
   /** 执行器AppName */
   appName?: string;
