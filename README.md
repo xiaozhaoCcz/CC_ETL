@@ -43,9 +43,10 @@
 | ![image text](./doc/cc-job/images/04img/11.png) | ![image text](./doc/cc-job/images/04img/12.png) |
 
 
-## 项目介绍
-https://www.yuque.com/xiaozhao-igpfn/kb/six39vboy38eaq87?singleDoc# 《vue3-xxl-job-admin》
 ## 项目文档
+http://175.178.249.190/blog/post/298
+
+## 本地文档
 `/doc/cc-job`
 
 [01项目介绍.md](doc/cc-job/01%E9%A1%B9%E7%9B%AE%E4%BB%8B%E7%BB%8D.md)
