@@ -1,7 +1,9 @@
 package com.xxl.job.core.biz.impl;
 
+import cn.hutool.core.lang.Pair;
 import com.xxl.job.core.biz.ExecutorBiz;
 import com.xxl.job.core.biz.model.*;
+import com.xxl.job.core.context.XxlJobContext;
 import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
 import com.xxl.job.core.executor.XxlJobExecutor;
 import com.xxl.job.core.glue.GlueFactory;
@@ -11,6 +13,7 @@ import com.xxl.job.core.handler.impl.GlueJobHandler;
 import com.xxl.job.core.handler.impl.ScriptJobHandler;
 import com.xxl.job.core.log.XxlJobFileAppender;
 import com.xxl.job.core.thread.JobThread;
+import com.xxl.job.core.util.GsonTool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -136,6 +139,18 @@ public class ExecutorBizImpl implements ExecutorBiz {
                 // just queue trigger
             }
         }
+
+//        if("JOB_GROUP".equalsIgnoreCase(triggerParam.getJobType())){
+//            String result = triggerParam.getJobId() + ":" + triggerParam.getExecutorParams();
+//            XxlJobContext.setXxlJobContext(triggerParam.getXxlJobContext());
+//            try {
+//                jobHandler.execute();
+//                return new ReturnT<>(result);
+//            } catch (Exception e) {
+//                return new ReturnT<>(ReturnT.FAIL_CODE, result);
+//            }
+//        }
+
 
         // replace thread (new or exists invalid)
         if (jobThread == null) {

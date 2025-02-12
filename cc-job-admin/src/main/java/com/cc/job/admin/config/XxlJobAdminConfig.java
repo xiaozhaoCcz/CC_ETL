@@ -91,8 +91,6 @@ public class XxlJobAdminConfig implements InitializingBean, DisposableBean {
     private DataSource dataSource;
     @Resource
     private JobAlarmer jobAlarmer;
-    @Resource
-    private RedisTemplate redisTemplate;
 
 
     public String getI18n() {
@@ -163,9 +161,6 @@ public class XxlJobAdminConfig implements InitializingBean, DisposableBean {
         return jobAlarmer;
     }
 
-    public RedisTemplate getRedisTemplate() {
-        return redisTemplate;
-    }
 
     @Value("${xxl.job.logpath}")
     private String logPath;

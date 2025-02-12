@@ -2,8 +2,8 @@ package com.cc.job.admin.task.thread;
 
 import com.cc.job.admin.task.complete.XxlJobCompleter;
 import com.cc.job.admin.config.XxlJobAdminConfig;
+import com.cc.job.admin.task.handler.JobGroupXxlJob;
 import com.cc.job.xo.model.entity.JobLog;
-import com.cc.job.admin.task.redis.StreamConsumer;
 import com.cc.job.admin.task.utils.I18nUtil;
 import com.xxl.job.core.biz.model.HandleCallbackParam;
 import com.xxl.job.core.biz.model.ReturnT;
@@ -167,15 +167,13 @@ public class JobCompleteHelper {
 			Map<String, Boolean> result = new HashMap<>();
 			result.put(handleCallbackParam.getJobId() + randomId, false);
 			if(!String.valueOf(handleCallbackParam.getJobId()).equalsIgnoreCase(log.getExecutorParam())){
-				XxlJobAdminConfig.getAdminConfig().getRedisTemplate().opsForStream().add(StreamConsumer.TASK_SET_STREAM, result);
+				JobGroupXxlJob.addJobMap(handleCallbackParam.getJobId() + randomId, false);
 			}
 			return new ReturnT<>(ReturnT.FAIL_CODE, "log item not found.");
 		}
 		if (log.getHandleCode() > 0) {
-			Map<String, Boolean> result = new HashMap<>();
-			result.put(handleCallbackParam.getJobId() + randomId, false);
 			if(!String.valueOf(handleCallbackParam.getJobId()).equalsIgnoreCase(log.getExecutorParam())){
-				XxlJobAdminConfig.getAdminConfig().getRedisTemplate().opsForStream().add(StreamConsumer.TASK_SET_STREAM, result);
+				JobGroupXxlJob.addJobMap(handleCallbackParam.getJobId() + randomId, false);
 			}
 			return new ReturnT<>(ReturnT.FAIL_CODE, "log repeate callback.");
 		}
@@ -196,10 +194,11 @@ public class JobCompleteHelper {
 		XxlJobCompleter.updateHandleInfoAndFinish(log);
 
 		// 处理结果
-		Map<String, Boolean> result = new HashMap<>();
-		result.put(handleCallbackParam.getJobId() + randomId, handleCallbackParam.getHandleCode() == ReturnT.SUCCESS_CODE);
+//		Map<String, Boolean> result = new HashMap<>();
+//		result.put(handleCallbackParam.getJobId() + randomId, handleCallbackParam.getHandleCode() == ReturnT.SUCCESS_CODE);
 		if(!String.valueOf(handleCallbackParam.getJobId()).equalsIgnoreCase(log.getExecutorParam())){
-			XxlJobAdminConfig.getAdminConfig().getRedisTemplate().opsForStream().add(StreamConsumer.TASK_SET_STREAM, result);
+			//XxlJobAdminConfig.getAdminConfig().getRedisTemplate().opsForStream().add(StreamConsumer.TASK_SET_STREAM, result);
+			JobGroupXxlJob.addJobMap(handleCallbackParam.getJobId() + randomId, handleCallbackParam.getHandleCode() == ReturnT.SUCCESS_CODE);
 		}
 		return ReturnT.SUCCESS;
 	}
