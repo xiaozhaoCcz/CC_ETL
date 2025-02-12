@@ -140,18 +140,6 @@ public class ExecutorBizImpl implements ExecutorBiz {
             }
         }
 
-//        if("JOB_GROUP".equalsIgnoreCase(triggerParam.getJobType())){
-//            String result = triggerParam.getJobId() + ":" + triggerParam.getExecutorParams();
-//            XxlJobContext.setXxlJobContext(triggerParam.getXxlJobContext());
-//            try {
-//                jobHandler.execute();
-//                return new ReturnT<>(result);
-//            } catch (Exception e) {
-//                return new ReturnT<>(ReturnT.FAIL_CODE, result);
-//            }
-//        }
-
-
         // replace thread (new or exists invalid)
         if (jobThread == null) {
             jobThread = XxlJobExecutor.registJobThread(triggerParam.getJobId(), jobHandler, removeOldReason);

@@ -3,6 +3,7 @@ package com.cc.job.admin.task.thread;
 import com.cc.job.admin.task.complete.XxlJobCompleter;
 import com.cc.job.admin.config.XxlJobAdminConfig;
 import com.cc.job.admin.task.handler.JobGroupXxlJob;
+import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobLog;
 import com.cc.job.admin.task.utils.I18nUtil;
 import com.xxl.job.core.biz.model.HandleCallbackParam;
@@ -157,6 +158,10 @@ public class JobCompleteHelper {
 
 	private ReturnT<String> callback(HandleCallbackParam handleCallbackParam) {
 		// valid log item
+		if(handleCallbackParam.getLogId()==-1){
+			JobGroupXxlJob.addJobMap(handleCallbackParam.getJobId() +":"+handleCallbackParam.getRandomId(), handleCallbackParam.getHandleCode() == ReturnT.SUCCESS_CODE);
+			return ReturnT.SUCCESS;
+		}
 		JobLog log = XxlJobAdminConfig.getAdminConfig().getJobLogMapper().selectById(handleCallbackParam.getLogId());
 		String randomId = "";
 		if (log != null && StringUtils.isNotBlank(log.getExecutorParam())) {
@@ -193,13 +198,6 @@ public class JobCompleteHelper {
 		log.setHandleMsg(handleMsg.toString());
 		XxlJobCompleter.updateHandleInfoAndFinish(log);
 
-		// 处理结果
-//		Map<String, Boolean> result = new HashMap<>();
-//		result.put(handleCallbackParam.getJobId() + randomId, handleCallbackParam.getHandleCode() == ReturnT.SUCCESS_CODE);
-		if(!String.valueOf(handleCallbackParam.getJobId()).equalsIgnoreCase(log.getExecutorParam())){
-			//XxlJobAdminConfig.getAdminConfig().getRedisTemplate().opsForStream().add(StreamConsumer.TASK_SET_STREAM, result);
-			JobGroupXxlJob.addJobMap(handleCallbackParam.getJobId() + randomId, handleCallbackParam.getHandleCode() == ReturnT.SUCCESS_CODE);
-		}
 		return ReturnT.SUCCESS;
 	}
 

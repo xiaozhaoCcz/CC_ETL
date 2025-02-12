@@ -35,7 +35,6 @@ public class TriggerParam implements Serializable{
 
     private String reqBody;
 
-    private String jobType;
 
     private XxlJobContext xxlJobContext;
 
@@ -47,13 +46,6 @@ public class TriggerParam implements Serializable{
         this.xxlJobContext = xxlJobContext;
     }
 
-    public String getJobType() {
-        return jobType;
-    }
-
-    public void setJobType(String jobType) {
-        this.jobType = jobType;
-    }
 
     public String getReqType() {
         return reqType;

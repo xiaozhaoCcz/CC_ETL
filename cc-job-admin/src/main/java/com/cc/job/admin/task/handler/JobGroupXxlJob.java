@@ -252,20 +252,6 @@ public class JobGroupXxlJob {
 
         JobGroup group = XxlJobAdminConfig.getAdminConfig().getJobGroupMapper().selectById(jobInfo.getJobGroup());
 
-        ExecutorBlockStrategyEnum blockStrategy = ExecutorBlockStrategyEnum.match(jobInfo.getExecutorBlockStrategy(), ExecutorBlockStrategyEnum.SERIAL_EXECUTION);  // block strategy
-        ExecutorRouteStrategyEnum executorRouteStrategyEnum = ExecutorRouteStrategyEnum.match(jobInfo.getExecutorRouteStrategy(), null);    // route strategy
-        String shardingParam = (ExecutorRouteStrategyEnum.SHARDING_BROADCAST == executorRouteStrategyEnum) ? String.valueOf(0).concat("/").concat(String.valueOf(1)) : null;
-
-        // 1、save log-id
-        JobLog jobLog = new JobLog();
-        jobLog.setJobGroup(jobInfo.getJobGroup());
-        jobLog.setJobId(jobInfo.getId());
-        jobLog.setTriggerTime(LocalDateTime.now());
-        jobLog.setExecutorParam(randomId);
-        jobLog.setTriggerCode(0);
-        jobLog.setHandleCode(0);
-        XxlJobAdminConfig.getAdminConfig().getJobLogMapper().insert(jobLog);
-        logger.debug(">>>>>>>>>>> xxl-job trigger start, jobId:{}", jobLog.getId());
         // 2、init trigger-param
         TriggerParam triggerParam = new TriggerParam();
         triggerParam.setJobId(jobInfo.getId().intValue());
@@ -273,8 +259,7 @@ public class JobGroupXxlJob {
         triggerParam.setExecutorParams(randomId);
         triggerParam.setExecutorBlockStrategy(jobInfo.getExecutorBlockStrategy());
         triggerParam.setExecutorTimeout(jobInfo.getExecutorTimeout());
-        triggerParam.setLogId(jobLog.getId());
-        triggerParam.setLogDateTime(jobLog.getTriggerTime().toInstant(ZoneOffset.of("+8")).toEpochMilli());
+        triggerParam.setLogId(-1);
         triggerParam.setGlueType(jobInfo.getGlueType());
         triggerParam.setGlueSource(jobInfo.getGlueSource());
         triggerParam.setGlueUpdatetime(jobInfo.getGlueUpdatetime().toInstant(ZoneOffset.of("+8")).toEpochMilli());
@@ -285,7 +270,6 @@ public class JobGroupXxlJob {
         triggerParam.setReqHeader(jobInfo.getReqHeader());
         triggerParam.setReqType(jobInfo.getReqType());
         triggerParam.setReqUrl(jobInfo.getReqUrl());
-        triggerParam.setJobType("JOB_GROUP");
         triggerParam.setXxlJobContext(xxlJobContext);
 
 

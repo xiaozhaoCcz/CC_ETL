@@ -120,13 +120,17 @@ public class JobThread extends Thread{
 
 					// log filename, like "logPath/yyyy-MM-dd/9999.log"
 					String logFileName = XxlJobFileAppender.makeLogFileName(new Date(triggerParam.getLogDateTime()), triggerParam.getLogId());
-					XxlJobContext xxlJobContext = new XxlJobContext(
-							triggerParam.getJobId(),
-							triggerParam.getExecutorParams(),
-							logFileName,
-							triggerParam.getBroadcastIndex(),
-							triggerParam.getBroadcastTotal());
-
+					XxlJobContext xxlJobContext = null;
+					if(triggerParam.getXxlJobContext()!=null){
+						xxlJobContext = triggerParam.getXxlJobContext();
+					}else{
+						xxlJobContext = new XxlJobContext(
+								triggerParam.getJobId(),
+								triggerParam.getExecutorParams(),
+								logFileName,
+								triggerParam.getBroadcastIndex(),
+								triggerParam.getBroadcastTotal());
+					}
 					// init job context
 					XxlJobContext.setXxlJobContext(xxlJobContext);
 
@@ -137,12 +141,13 @@ public class JobThread extends Thread{
 						// limit timeout
 						Thread futureThread = null;
 						try {
+							XxlJobContext finalXxlJobContext = xxlJobContext;
 							FutureTask<Boolean> futureTask = new FutureTask<Boolean>(new Callable<Boolean>() {
 								@Override
 								public Boolean call() throws Exception {
 
 									// init job context
-									XxlJobContext.setXxlJobContext(xxlJobContext);
+									XxlJobContext.setXxlJobContext(finalXxlJobContext);
 
 									handler.execute();
 									return true;
@@ -213,7 +218,8 @@ public class JobThread extends Thread{
 								triggerParam.getLogId(),
 								triggerParam.getLogDateTime(),
 								XxlJobContext.getXxlJobContext().getHandleCode(),
-								XxlJobContext.getXxlJobContext().getHandleMsg() )
+								XxlJobContext.getXxlJobContext().getHandleMsg(),
+								triggerParam.getExecutorParams())
 						);
                     } else {
                         // is killed
@@ -222,7 +228,8 @@ public class JobThread extends Thread{
 								triggerParam.getLogId(),
 								triggerParam.getLogDateTime(),
 								XxlJobContext.HANDLE_CODE_FAIL,
-								stopReason + " [job running, killed]" )
+								stopReason + " [job running, killed]",
+								triggerParam.getExecutorParams())
 						);
                     }
                 }
@@ -238,7 +245,8 @@ public class JobThread extends Thread{
 						triggerParam.getLogId(),
 						triggerParam.getLogDateTime(),
 						XxlJobContext.HANDLE_CODE_FAIL,
-						stopReason + " [job not executed, in the job queue, killed.]")
+						stopReason + " [job not executed, in the job queue, killed.]"
+						)
 				);
 			}
 		}
