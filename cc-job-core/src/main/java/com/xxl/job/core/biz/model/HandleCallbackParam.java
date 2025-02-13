@@ -19,6 +19,8 @@ public class HandleCallbackParam implements Serializable {
 
     private String randomId;
 
+    private String address;
+
     public HandleCallbackParam(){}
     public HandleCallbackParam(long logId, long logDateTim, int handleCode, String handleMsg) {
         this.logId = logId;
@@ -35,13 +37,18 @@ public class HandleCallbackParam implements Serializable {
         this.handleMsg = handleMsg;
     }
 
-    public HandleCallbackParam(long jobId, long logId, long logDateTim, int handleCode, String handleMsg, String randomId) {
+    public HandleCallbackParam(long jobId, long logId, long logDateTim, int handleCode, String handleMsg, String randomId,String address) {
         this.jobId = jobId;
         this.logId = logId;
         this.logDateTim = logDateTim;
         this.handleCode = handleCode;
         this.handleMsg = handleMsg;
         this.randomId = randomId;
+        this.address = address;
+    }
+
+    public String getAddress() {
+        return address;
     }
 
     public long getJobId() {

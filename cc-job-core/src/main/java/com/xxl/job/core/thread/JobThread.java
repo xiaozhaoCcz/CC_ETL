@@ -219,7 +219,8 @@ public class JobThread extends Thread{
 								triggerParam.getLogDateTime(),
 								XxlJobContext.getXxlJobContext().getHandleCode(),
 								XxlJobContext.getXxlJobContext().getHandleMsg(),
-								triggerParam.getExecutorParams())
+								triggerParam.getExecutorParams(),
+								triggerParam.getAddress())
 						);
                     } else {
                         // is killed
@@ -229,7 +230,8 @@ public class JobThread extends Thread{
 								triggerParam.getLogDateTime(),
 								XxlJobContext.HANDLE_CODE_FAIL,
 								stopReason + " [job running, killed]",
-								triggerParam.getExecutorParams())
+								triggerParam.getExecutorParams(),
+								triggerParam.getAddress())
 						);
                     }
                 }

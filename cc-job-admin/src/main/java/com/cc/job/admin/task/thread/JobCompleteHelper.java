@@ -1,5 +1,6 @@
 package com.cc.job.admin.task.thread;
 
+import cn.hutool.core.lang.Pair;
 import com.cc.job.admin.task.complete.XxlJobCompleter;
 import com.cc.job.admin.config.XxlJobAdminConfig;
 import com.cc.job.admin.task.handler.JobGroupXxlJob;
@@ -9,6 +10,7 @@ import com.cc.job.admin.task.utils.I18nUtil;
 import com.xxl.job.core.biz.model.HandleCallbackParam;
 import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.util.DateUtil;
+import com.xxl.job.core.util.XxlJobRemotingUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -159,7 +161,9 @@ public class JobCompleteHelper {
 	private ReturnT<String> callback(HandleCallbackParam handleCallbackParam) {
 		// valid log item
 		if(handleCallbackParam.getLogId()==-1){
-			JobGroupXxlJob.addJobMap(handleCallbackParam.getJobId() +":"+handleCallbackParam.getRandomId(), handleCallbackParam.getHandleCode() == ReturnT.SUCCESS_CODE);
+			Pair<String,Boolean> pair = new Pair<>(handleCallbackParam.getJobId() + ":" + handleCallbackParam.getRandomId(),handleCallbackParam.getHandleCode() == ReturnT.SUCCESS_CODE);
+			XxlJobRemotingUtil.postBody(handleCallbackParam.getAddress() + "api/addJobGroupData", "", 10, pair, String.class);
+			//JobGroupXxlJob.addJobMap(handleCallbackParam.getJobId() +":"+handleCallbackParam.getRandomId(), handleCallbackParam.getHandleCode() == ReturnT.SUCCESS_CODE);
 			return ReturnT.SUCCESS;
 		}
 		JobLog log = XxlJobAdminConfig.getAdminConfig().getJobLogMapper().selectById(handleCallbackParam.getLogId());

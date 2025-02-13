@@ -2,10 +2,7 @@ package com.cc.job.admin.task.handler;
 
 import cn.hutool.core.lang.Pair;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.cc.job.admin.task.enums.ExecutorRouteStrategyEnum;
-import com.cc.job.admin.task.netty.NettyClient;
 import com.cc.job.admin.task.trigger.XxlJobTrigger;
-import com.cc.job.admin.task.utils.I18nUtil;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.admin.config.XxlJobAdminConfig;
 import com.cc.job.xo.mapper.JobInfoMapper;
@@ -20,20 +17,18 @@ import com.cc.tasktool.callback.IWorker;
 import com.cc.tasktool.executor.Async;
 import com.cc.tasktool.worker.WorkResult;
 import com.cc.tasktool.wrapper.WorkerWrapper;
-import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.biz.model.TriggerParam;
 import com.xxl.job.core.context.XxlJobContext;
 import com.xxl.job.core.context.XxlJobHelper;
-import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
 import com.xxl.job.core.handler.annotation.XxlJob;
-import lombok.AllArgsConstructor;
+import com.xxl.job.core.util.IpUtil;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
 import java.util.List;
@@ -44,8 +39,11 @@ import java.util.stream.Collectors;
  * @author xiaozhao
  */
 @Component
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class JobGroupXxlJob {
+
+    @Value("${server.port}")
+    private int port;
 
     final JobInfoService jobInfoService;
 
@@ -250,9 +248,7 @@ public class JobGroupXxlJob {
     }
 
     private String executeJob(XxlJobContext xxlJobContext, JobNode node, JobInfo jobInfo, String randomId, int avgTime, Map<Long, List<Long>> statusMap, int count) {
-
         JobGroup group = XxlJobAdminConfig.getAdminConfig().getJobGroupMapper().selectById(jobInfo.getJobGroup());
-
         // 2、init trigger-param
         TriggerParam triggerParam = new TriggerParam();
         triggerParam.setJobId(jobInfo.getId().intValue());
@@ -272,17 +268,13 @@ public class JobGroupXxlJob {
         triggerParam.setReqType(jobInfo.getReqType());
         triggerParam.setReqUrl(jobInfo.getReqUrl());
         triggerParam.setXxlJobContext(xxlJobContext);
-
+        //得到本地的ip和host
+        String ip = IpUtil.getIp();
+        String adminAddress = "http://"+ip+":"+port+"/xxl-job-admin/";
+        triggerParam.setAddress(adminAddress);
 
         String address = group.getRegistryList().get(0);
-
-        NettyClient nettyClient = new NettyClient();
-        try {
-            nettyClient.init(address + "run");
-            nettyClient.send(triggerParam);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        XxlJobTrigger.runExecutor(triggerParam, address);
 
         String result;
         Thread thread = null;

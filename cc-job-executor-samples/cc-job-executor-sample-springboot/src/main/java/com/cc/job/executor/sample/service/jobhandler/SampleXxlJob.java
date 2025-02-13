@@ -236,10 +236,10 @@ public class SampleXxlJob {
         //default success
         XxlJobHelper.log(">>>>>>>> demoJobHandler12 end");
         System.out.println(">>>>>>>> demoJobHandler12 end");
-        if(count.incrementAndGet()<=3){
-            System.out.println(">>>>>>>>count"+count.get());
-            throw  new RuntimeException();
-        }
+//        if(count.incrementAndGet()<=3){
+//            System.out.println(">>>>>>>>count"+count.get());
+//            throw  new RuntimeException();
+//        }
         //throw  new RuntimeException("节点12运行失败");
     }
 
