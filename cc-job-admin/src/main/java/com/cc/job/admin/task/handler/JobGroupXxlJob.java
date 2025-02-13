@@ -59,7 +59,7 @@ public class JobGroupXxlJob {
 
     static final ConcurrentHashMap<String, WorkerWrapper<Long, String>> STOP_MAP = new ConcurrentHashMap<>();
 
-    static final List<Pair<String,Boolean>> JOB_LIST = Collections.synchronizedList(new ArrayList<>());
+    static final List<Pair<String, Boolean>> JOB_LIST = Collections.synchronizedList(new ArrayList<>());
 
     public static void removeJobMap(String jobId) {
         if (jobId != null) {
@@ -84,7 +84,6 @@ public class JobGroupXxlJob {
 
     //需要重新获取XxlJobContext解决线程问题，不然会出现日志文件错误添加的问题
     private static final InheritableThreadLocal<XxlJobContext> CONTEXT_HOLDER = new InheritableThreadLocal<XxlJobContext>();
-
 
 
     @XxlJob("runJobGroupXxlJob")
@@ -215,10 +214,12 @@ public class JobGroupXxlJob {
                     .id(String.valueOf(node.getId()))
                     .param(node.getJobId())
                     .timeout(jobInfo.getExecutorTimeout())
+                    .retryCount(jobInfo.getExecutorFailRetryCount())
                     .worker(new IWorker<>() {
                         @Override
                         public String action(Long jobId, Map<String, WorkerWrapper> allWrappers) {
-                            return executeJob(xxlJobContext,node, jobInfo, randomId, avgTime, statusMap);
+                            int count = allWrappers.get(String.valueOf(node.getId())).getCount();
+                            return executeJob(xxlJobContext, node, jobInfo, randomId, avgTime, statusMap, count);
                         }
 
                         @Override
@@ -248,7 +249,7 @@ public class JobGroupXxlJob {
         return result;
     }
 
-    private String executeJob(XxlJobContext xxlJobContext, JobNode node, JobInfo jobInfo, String randomId, int avgTime, Map<Long, List<Long>> statusMap) {
+    private String executeJob(XxlJobContext xxlJobContext, JobNode node, JobInfo jobInfo, String randomId, int avgTime, Map<Long, List<Long>> statusMap, int count) {
 
         JobGroup group = XxlJobAdminConfig.getAdminConfig().getJobGroupMapper().selectById(jobInfo.getJobGroup());
 
@@ -277,7 +278,7 @@ public class JobGroupXxlJob {
 
         NettyClient nettyClient = new NettyClient();
         try {
-            nettyClient.init(address+"run");
+            nettyClient.init(address + "run");
             nettyClient.send(triggerParam);
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -287,7 +288,7 @@ public class JobGroupXxlJob {
         Thread thread = null;
         JobThreadListener jobThreadListener = null;
         try {
-            jobThreadListener = new JobThreadListener(xxlJobContext, jobInfo, node, randomId,  statusMap);
+            jobThreadListener = new JobThreadListener(jobInfo, node, randomId, statusMap, count);
             FutureTask<String> futureTask = new FutureTask<>(jobThreadListener);
             thread = new Thread(futureTask);
             thread.start();
@@ -303,27 +304,21 @@ public class JobGroupXxlJob {
         return result;
     }
 
-    private int handleJobCompletion(XxlJobContext xxlJobContext, Pair<String, Boolean> pair, JobNode node, JobInfo jobInfo, int count, String randomId,Map<Long, List<Long>> statusMap) {
+    private String handleJobCompletion(Pair<String, Boolean> pair, JobInfo jobInfo, JobNode node, String randomId, Map<Long, List<Long>> statusMap, int count) {
         String key = pair.getKey();
         Long jobId = Long.valueOf(key.split(":")[0]);
         boolean success = pair.getValue();
         removeJobMap(setExecuteJobId(jobId, randomId));
-        int res = 1;
+        String res = "";
         if (success) {
             setNodeStatus(statusMap, jobId, 1, randomId, node.getJobParentId());
         } else {
-            if (count <= jobInfo.getExecutorFailRetryCount()) {
-                logger.info("Retrying task: {}, attempt: {}", jobId, count);
-                XxlJobHelper.log(xxlJobContext, ">>>>>>>>>>>>>>>>>>>重试任务: {}, 重试次数: {}>>>>>>>>>>>>>>>", jobId, count);
-                res = 0;
-            } else {
-                try {
-                    setNodeStatus(statusMap, jobId, 0, randomId, node.getJobParentId());
-                } catch (Exception e) {
-                    logger.error(e.getMessage());
-                    throw new RuntimeException(e);
-                }
+            if (count < jobInfo.getExecutorFailRetryCount()) {
+                logger.info(">>>>>>>>>>>>>>>>>任务组：{}，任务：{}，第{}次重试>>>>>>>>>>>>>>>>", jobId, node.getJobId(), count);
+                return "FAIL_RETRY";
             }
+            setNodeStatus(statusMap, jobId, 0, randomId, node.getJobParentId());
+            throw new RuntimeException();
         }
         return res;
     }
@@ -469,8 +464,6 @@ public class JobGroupXxlJob {
 
     private class JobThreadListener implements Callable<String> {
 
-        private final XxlJobContext xxlJobContext;
-
         private final JobInfo jobInfo;
 
         private final JobNode node;
@@ -482,14 +475,14 @@ public class JobGroupXxlJob {
 
         private volatile boolean stop = false;
 
-        private int count = 0;
+        private final int count;
 
-        public JobThreadListener(XxlJobContext xxlJobContext, JobInfo jobInfo, JobNode node, String randomId, Map<Long, List<Long>> statusMap) {
-            this.xxlJobContext = xxlJobContext;
+        public JobThreadListener(JobInfo jobInfo, JobNode node, String randomId, Map<Long, List<Long>> statusMap, int count) {
             this.jobInfo = jobInfo;
             this.node = node;
             this.randomId = randomId;
             this.statusMap = statusMap;
+            this.count = count;
         }
 
         public void toStop() {
@@ -502,11 +495,7 @@ public class JobGroupXxlJob {
                 for (Pair<String, Boolean> pair : new ArrayList<>(JOB_LIST)) {
                     if (pair.getKey().equals(setExecuteJobId(jobInfo.getId(), randomId))) {
                         try {
-                            ++count;
-                            int res = handleJobCompletion(xxlJobContext, pair, node, jobInfo, count, randomId, statusMap);
-                            if (res == 1) {
-                                return String.valueOf(jobInfo.getId());
-                            }
+                            return handleJobCompletion(pair, jobInfo, node, randomId, statusMap, count);
                         } catch (Exception e) {
                             logger.error(e.getMessage());
                             throw new RuntimeException(e);

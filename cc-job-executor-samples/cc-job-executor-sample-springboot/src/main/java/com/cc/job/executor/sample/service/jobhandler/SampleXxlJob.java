@@ -236,7 +236,7 @@ public class SampleXxlJob {
         //default success
         XxlJobHelper.log(">>>>>>>> demoJobHandler12 end");
         System.out.println(">>>>>>>> demoJobHandler12 end");
-        if(count.incrementAndGet()<=2){
+        if(count.incrementAndGet()<=3){
             System.out.println(">>>>>>>>count"+count.get());
             throw  new RuntimeException();
         }
