@@ -2,11 +2,11 @@ package com.cc.job.admin.task.thread;
 
 
 import com.cc.job.admin.config.XxlJobAdminConfig;
+import com.cc.job.admin.cron.CronExpression;
 import com.cc.job.admin.task.enums.MisfireStrategyEnum;
 import com.cc.job.admin.task.enums.ScheduleTypeEnum;
 import com.cc.job.admin.task.enums.TriggerTypeEnum;
 import com.cc.job.xo.model.entity.JobInfo;
-import org.redisson.executor.CronExpression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

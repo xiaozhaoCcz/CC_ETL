@@ -2,8 +2,6 @@ package com.cc.job.admin.task.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
-import cn.hutool.json.JSONArray;
-import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.xo.common.exception.BusinessException;
@@ -32,7 +30,6 @@ import com.xxl.job.core.util.DateUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -74,7 +71,6 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
     private final JobInfoMapper jobInfoMapper;
 
-    private final RedisTemplate redisTemplate;
 
     /**
      * 获取task_info分页列表
@@ -623,13 +619,10 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     public boolean stopJobCompose(Long id, String randomId) {
         int flag = jobInfoMapper.stopJobCompose(id);
         XxlJobExecutor.removeJobThread(id.intValue(), "stop task" + id);
-        if (redisTemplate.hasKey(id + ":" + randomId)) {
-            WorkerWrapper<Long, String> workWrapper = JobGroupXxlJob.getWorkWrapper(id, randomId);
-            if (workWrapper != null) {
-                log.info(">>>>>>>>> stop task:{}", workWrapper.getId());
-                Async.stopWork(workWrapper);
-            }
-            redisTemplate.delete(id + ":" + randomId);
+        WorkerWrapper<Long, String> workWrapper = JobGroupXxlJob.getWorkWrapper(id, randomId);
+        if (workWrapper != null) {
+            log.info(">>>>>>>>> stop task:{}", workWrapper.getId());
+            Async.stopWork(workWrapper);
         }
         return true;
     }

@@ -659,7 +659,6 @@ const connectWs = (id: string) => {
         updateEdgeStyle();
       }, 1000);
     }
-
     // 接收到消息后，需要做出相应的操作，比如更新节点或边
     const nodes = lf.value!.getGraphRawData().nodes;
     const node = nodes.find(

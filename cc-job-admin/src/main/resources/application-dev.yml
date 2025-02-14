@@ -13,33 +13,6 @@ spring:
     url: jdbc:mysql://localhost:3307/cc_job_admin?zeroDateTimeBehavior=convertToNull&useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&autoReconnect=true&allowMultiQueries=true
     username: root
     password: root
-  data:
-    redis:
-      database: 0
-      host: localhost
-      port: 6379
-      # 如果Redis 服务未设置密码，需要将password删掉或注释，而不是设置为空字符串
-      #password:
-      timeout: 10s
-      lettuce:
-        pool:
-          # 连接池最大连接数 默认8 ，负数表示没有限制
-          max-active: 8
-          # 连接池最大阻塞等待时间（使用负值表示没有限制） 默认-1
-          max-wait: -1
-          # 连接池中的最大空闲连接 默认8
-          max-idle: 8
-          # 连接池中的最小空闲连接 默认0
-          min-idle: 0
-  cache:
-    enabled: false
-    # 缓存类型 redis、none(不使用缓存)
-    type: redis
-    # 缓存时间(单位：ms)
-    redis:
-      time-to-live: 3600000
-      # 缓存null值，防止缓存穿透
-      cache-null-values: true
   # 邮件配置
   mail:
     host: smtp.youlai.tech

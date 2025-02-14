@@ -25,7 +25,7 @@
         <el-option
           v-for="item in jdbcDatasourceList"
           :key="item.id"
-          :label="item.databaseName"
+          :label="`${item.datasourceName}:${item.databaseName}`"
           :value="item.id"
         />
       </el-select>

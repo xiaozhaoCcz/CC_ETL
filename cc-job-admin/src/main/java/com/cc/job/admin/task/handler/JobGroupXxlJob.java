@@ -5,14 +5,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.admin.task.trigger.XxlJobTrigger;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.admin.config.XxlJobAdminConfig;
-import com.cc.job.admin.task.enums.TriggerTypeEnum;
 import com.cc.job.xo.mapper.JobInfoMapper;
-import com.cc.job.xo.mapper.JobLogMapper;
-import com.cc.job.xo.model.entity.JobEdge;
-import com.cc.job.xo.model.entity.JobInfo;
-import com.cc.job.xo.model.entity.JobLog;
-import com.cc.job.xo.model.entity.JobNode;
-import com.cc.job.admin.task.redis.StreamConsumer;
+import com.cc.job.xo.model.entity.*;
 import com.cc.job.admin.task.service.JobEdgeService;
 import com.cc.job.admin.task.service.JobInfoService;
 import com.cc.job.admin.task.service.JobNodeService;
@@ -23,17 +17,19 @@ import com.cc.tasktool.callback.IWorker;
 import com.cc.tasktool.executor.Async;
 import com.cc.tasktool.worker.WorkResult;
 import com.cc.tasktool.wrapper.WorkerWrapper;
-import com.xxl.job.core.biz.model.ReturnT;
+import com.xxl.job.core.biz.model.TriggerParam;
 import com.xxl.job.core.context.XxlJobContext;
 import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.handler.annotation.XxlJob;
-import lombok.AllArgsConstructor;
+import com.xxl.job.core.util.IpUtil;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.*;
@@ -43,10 +39,11 @@ import java.util.stream.Collectors;
  * @author xiaozhao
  */
 @Component
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class JobGroupXxlJob {
 
-    final RedisTemplate redisTemplate;
+    @Value("${server.port}")
+    private int port;
 
     final JobInfoService jobInfoService;
 
@@ -58,10 +55,19 @@ public class JobGroupXxlJob {
 
     final JobInfoMapper jobInfoMapper;
 
-    final JobLogMapper jobLogMapper;
-
     static final ConcurrentHashMap<String, WorkerWrapper<Long, String>> STOP_MAP = new ConcurrentHashMap<>();
 
+    static final List<Pair<String, Boolean>> JOB_LIST = Collections.synchronizedList(new ArrayList<>());
+
+    public static void removeJobData(String jobId) {
+        if (jobId != null) {
+            JOB_LIST.removeIf(pair -> jobId.equals(pair.getKey()));
+        }
+    }
+
+    public static void addJobData(String jobId, Boolean isRunning) {
+        JOB_LIST.add(Pair.of(jobId, isRunning));
+    }
 
     public static void removeWorkWrapper(Long parentId, String randomId) {
         STOP_MAP.remove(setExecuteJobId(parentId, randomId));
@@ -71,12 +77,12 @@ public class JobGroupXxlJob {
         return STOP_MAP.get(setExecuteJobId(parentId, randomId));
     }
 
-    static final ConcurrentHashMap<String, JobGroupThread> THREAD_MAP = new ConcurrentHashMap<>();
 
     static final Map<String, Map<Long, Set<Long>>> TASK_ID_MAP = new ConcurrentHashMap<>();
 
     //需要重新获取XxlJobContext解决线程问题，不然会出现日志文件错误添加的问题
     private static final InheritableThreadLocal<XxlJobContext> CONTEXT_HOLDER = new InheritableThreadLocal<XxlJobContext>();
+
 
     @XxlJob("runJobGroupXxlJob")
     public void JobGroupXxlJob() {
@@ -101,7 +107,6 @@ public class JobGroupXxlJob {
             List<Long> startNodes = getStartNodes(nodes);
             List<WorkerWrapper<Long, String>> startWrappers = getStartWrappers(workerWrappers, startNodes);
             WorkerWrapper<Long, String> startWork = createStartWorkWrapper(jobId, startWrappers);
-            redisTemplate.opsForValue().set(setExecuteJobId(jobId, randomId), "");
             STOP_MAP.put(setExecuteJobId(jobId, randomId), startWork);
             Async.beginWork(jobInfo.getExecutorTimeout(), startWork);
         } catch (ExecutionException | InterruptedException e) {
@@ -172,10 +177,7 @@ public class JobGroupXxlJob {
         sendCompletionMessage(jobId, randomId);
         jobInfoMapper.stopJobCompose(jobId);
         TASK_ID_MAP.remove(setExecuteJobId(jobId, randomId));
-        JobGroupThread jobGroupThread = new JobGroupThread(jobId, randomId);
-        redisTemplate.delete(setExecuteJobId(jobId, randomId));
-        jobGroupThread.start();
-        THREAD_MAP.put(jobGroupThread.id, jobGroupThread);
+        removeWorkWrapper(jobId, randomId);
     }
 
     private static WorkerWrapper<Long, String> createStartWorkWrapper(long jobId, List<WorkerWrapper<Long, String>> startWrappers) {
@@ -210,10 +212,12 @@ public class JobGroupXxlJob {
                     .id(String.valueOf(node.getId()))
                     .param(node.getJobId())
                     .timeout(jobInfo.getExecutorTimeout())
+                    .retryCount(jobInfo.getExecutorFailRetryCount())
                     .worker(new IWorker<>() {
                         @Override
                         public String action(Long jobId, Map<String, WorkerWrapper> allWrappers) {
-                            return executeJob(xxlJobContext, jobId, node, jobInfo, randomId, avgTime, statusMap);
+                            int count = allWrappers.get(String.valueOf(node.getId())).getCount();
+                            return executeJob(xxlJobContext, node, jobInfo, randomId, avgTime, statusMap, count);
                         }
 
                         @Override
@@ -243,16 +247,40 @@ public class JobGroupXxlJob {
         return result;
     }
 
-    private String executeJob(XxlJobContext xxlJobContext, Long jobId, JobNode node, JobInfo jobInfo, String randomId, int avgTime, Map<Long, List<Long>> statusMap) {
-        Pair<Long, Integer> trigger = XxlJobTrigger.trigger(jobId, TriggerTypeEnum.MANUAL, -1, null, randomId, "");
-        if (trigger == null || trigger.getValue() != ReturnT.SUCCESS_CODE) {
-            throw new RuntimeException("任务运行失败");
-        }
+    private String executeJob(XxlJobContext xxlJobContext, JobNode node, JobInfo jobInfo, String randomId, int avgTime, Map<Long, List<Long>> statusMap, int count) {
+        JobGroup group = XxlJobAdminConfig.getAdminConfig().getJobGroupMapper().selectById(jobInfo.getJobGroup());
+        // 2、init trigger-param
+        TriggerParam triggerParam = new TriggerParam();
+        triggerParam.setJobId(jobInfo.getId().intValue());
+        triggerParam.setExecutorHandler(jobInfo.getExecutorHandler());
+        triggerParam.setExecutorParams(randomId);
+        triggerParam.setExecutorBlockStrategy(jobInfo.getExecutorBlockStrategy());
+        triggerParam.setExecutorTimeout(jobInfo.getExecutorTimeout());
+        triggerParam.setLogId(-1);
+        triggerParam.setGlueType(jobInfo.getGlueType());
+        triggerParam.setGlueSource(jobInfo.getGlueSource());
+        triggerParam.setGlueUpdatetime(jobInfo.getGlueUpdatetime().toInstant(ZoneOffset.of("+8")).toEpochMilli());
+        triggerParam.setBroadcastIndex(0);
+        triggerParam.setBroadcastTotal(1);
+        //设置请求信息
+        triggerParam.setReqBody(jobInfo.getReqBody());
+        triggerParam.setReqHeader(jobInfo.getReqHeader());
+        triggerParam.setReqType(jobInfo.getReqType());
+        triggerParam.setReqUrl(jobInfo.getReqUrl());
+        triggerParam.setXxlJobContext(xxlJobContext);
+        //得到本地的ip和host
+        String ip = IpUtil.getIp();
+        String adminAddress = "http://"+ip+":"+port+"/xxl-job-admin/";
+        triggerParam.setAddress(adminAddress);
+
+        String address = group.getRegistryList().get(0);
+        XxlJobTrigger.runExecutor(triggerParam, address);
+
         String result;
         Thread thread = null;
         JobThreadListener jobThreadListener = null;
         try {
-            jobThreadListener = new JobThreadListener(xxlJobContext, jobInfo, node, randomId, trigger.getKey(), statusMap);
+            jobThreadListener = new JobThreadListener(jobInfo, node, randomId, statusMap, count);
             FutureTask<String> futureTask = new FutureTask<>(jobThreadListener);
             thread = new Thread(futureTask);
             thread.start();
@@ -264,34 +292,25 @@ public class JobGroupXxlJob {
             jobThreadListener.toStop();
             thread.interrupt();
         }
+
         return result;
     }
 
-    private int handleJobCompletion(XxlJobContext xxlJobContext, Pair<String, Boolean> pair, JobNode node, JobInfo jobInfo, int count, String randomId, Long jobLogId, Map<Long, List<Long>> statusMap) {
+    private String handleJobCompletion(Pair<String, Boolean> pair, JobInfo jobInfo, JobNode node, String randomId, Map<Long, List<Long>> statusMap, int count) {
         String key = pair.getKey();
         Long jobId = Long.valueOf(key.split(":")[0]);
         boolean success = pair.getValue();
-        //得到任务运行的日志结果
-        JobLog jobLog = jobLogMapper.selectById(jobLogId);
-        XxlJobHelper.log(xxlJobContext, ">>>>>>>>>>>>>>>>任务运行日志jonId:{}, handleCode:{},handleMsg:{}", jobLogId, jobLog.getHandleCode(), jobLog.getHandleMsg());
-
-        StreamConsumer.removeCallbackRes(setExecuteJobId(jobId, randomId));
-        int res = 1;
+        removeJobData(setExecuteJobId(jobId, randomId));
+        String res = "";
         if (success) {
             setNodeStatus(statusMap, jobId, 1, randomId, node.getJobParentId());
         } else {
-            if (count <= jobInfo.getExecutorFailRetryCount()) {
-                logger.info("Retrying task: {}, attempt: {}", jobId, count);
-                XxlJobHelper.log(xxlJobContext, ">>>>>>>>>>>>>>>>>>>重试任务: {}, 重试次数: {}>>>>>>>>>>>>>>>", jobId, count);
-                res = 0;
-            } else {
-                try {
-                    setNodeStatus(statusMap, jobId, 0, randomId, node.getJobParentId());
-                } catch (Exception e) {
-                    logger.error(e.getMessage());
-                    throw new RuntimeException(e);
-                }
+            if (count < jobInfo.getExecutorFailRetryCount()) {
+                logger.info(">>>>>>>>>>>>>>>>>任务组：{}，任务：{}，第{}次重试>>>>>>>>>>>>>>>>", jobId, node.getJobId(), count);
+                return "FAIL_RETRY";
             }
+            setNodeStatus(statusMap, jobId, 0, randomId, node.getJobParentId());
+            throw new RuntimeException();
         }
         return res;
     }
@@ -437,29 +456,25 @@ public class JobGroupXxlJob {
 
     private class JobThreadListener implements Callable<String> {
 
-        private final XxlJobContext xxlJobContext;
-
         private final JobInfo jobInfo;
 
         private final JobNode node;
 
         private final String randomId;
 
-        private final Long jobLogId;
 
         private final Map<Long, List<Long>> statusMap;
 
         private volatile boolean stop = false;
 
-        private int count = 0;
+        private final int count;
 
-        public JobThreadListener(XxlJobContext xxlJobContext, JobInfo jobInfo, JobNode node, String randomId, Long jobLogId, Map<Long, List<Long>> statusMap) {
-            this.xxlJobContext = xxlJobContext;
+        public JobThreadListener(JobInfo jobInfo, JobNode node, String randomId, Map<Long, List<Long>> statusMap, int count) {
             this.jobInfo = jobInfo;
             this.node = node;
             this.randomId = randomId;
-            this.jobLogId = jobLogId;
             this.statusMap = statusMap;
+            this.count = count;
         }
 
         public void toStop() {
@@ -469,23 +484,13 @@ public class JobGroupXxlJob {
         @Override
         public String call() {
             while (!stop) {
-                List<Pair<String, Boolean>> callbackRes = StreamConsumer.getCallbackRes();
-                for (Pair<String, Boolean> pair : new ArrayList<>(callbackRes)) {
+                for (Pair<String, Boolean> pair : new ArrayList<>(JOB_LIST)) {
                     if (pair.getKey().equals(setExecuteJobId(jobInfo.getId(), randomId))) {
                         try {
-                            ++count;
-                            int res = handleJobCompletion(xxlJobContext, pair, node, jobInfo, count, randomId, jobLogId, statusMap);
-                            if (res == 1) {
-                                return String.valueOf(jobInfo.getId());
-                            }
+                            return handleJobCompletion(pair, jobInfo, node, randomId, statusMap, count);
                         } catch (Exception e) {
                             logger.error(e.getMessage());
                             throw new RuntimeException(e);
-                        } finally {
-                            String recordId = StreamConsumer.messageMap.get(setExecuteJobId(jobInfo.getId(), randomId));
-                            if (recordId != null) {
-                                redisTemplate.opsForStream().delete(StreamConsumer.TASK_SET_STREAM, recordId);
-                            }
                         }
                     }
                 }
@@ -523,56 +528,6 @@ public class JobGroupXxlJob {
         }
     }
 
-    public static void removeJobGroupThread(String id) {
-        JobGroupThread jobGroupThread = THREAD_MAP.get(id);
-        if (jobGroupThread != null) {
-            jobGroupThread.toStop();
-            jobGroupThread.interrupt();
-        }
-    }
-
-    private class JobGroupThread extends Thread {
-
-        private final String id;
-        private final Long jobId;
-        private final String randomId;
-        private int idleTimes = 0;
-
-        private JobGroupThread(Long jobId, String randomId) {
-            this.id = setExecuteJobId(jobId, randomId);
-            this.jobId = jobId;
-            this.randomId = randomId;
-        }
-
-        private volatile boolean stop = false;
-
-        @Override
-        public void run() {
-            while (!stop) {
-                idleTimes++;
-                try {
-                    TimeUnit.MILLISECONDS.sleep(10);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
-                String recordId = StreamConsumer.messageMap.get(id);
-                if (recordId != null) {
-                    removeWorkWrapper(jobId, randomId);
-                    redisTemplate.opsForStream().delete(StreamConsumer.TASK_SET_STREAM, recordId);
-                    removeJobGroupThread(id);
-                } else {
-                    if (idleTimes > 10) {
-                        removeJobGroupThread(id);
-                    }
-                }
-            }
-        }
-
-        public void toStop() {
-            stop = true;
-        }
-    }
-
     // 停止所有任务
     public static void stopJobGroup() {
         Set<String> keySet = TASK_ID_MAP.keySet();
@@ -580,14 +535,6 @@ public class JobGroupXxlJob {
             String[] split = key.split(":");
             Long jobId = Long.parseLong(split[0]);
             XxlJobAdminConfig.getAdminConfig().getJobInfoMapper().stopJobCompose(jobId);
-            removeJobGroupThread(key);
-        }
-        Set<String> messageSet = StreamConsumer.messageMap.keySet();
-        for (String id : messageSet) {
-            String recordId = StreamConsumer.messageMap.get(id);
-            if (recordId != null) {
-                XxlJobAdminConfig.getAdminConfig().getRedisTemplate().opsForStream().delete(StreamConsumer.TASK_SET_STREAM, recordId);
-            }
         }
     }
 
