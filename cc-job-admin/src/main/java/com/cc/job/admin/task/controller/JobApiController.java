@@ -60,7 +60,7 @@ public class JobApiController {
             return adminBiz.registryRemove(registryParam);
         } else if("addJobGroupData".equals(uri)){
             Pair<String,Boolean> pair = GsonTool.fromJson(data, Pair.class);
-            JobGroupXxlJob.addJobMap(pair.getKey(), pair.getValue());
+            JobGroupXxlJob.addJobData(pair.getKey(), pair.getValue());
             return new ReturnT<>(ReturnT.SUCCESS_CODE, "success");
         }else {
             return new ReturnT<>(ReturnT.FAIL_CODE, "invalid request, uri-mapping("+ uri +") not found.");

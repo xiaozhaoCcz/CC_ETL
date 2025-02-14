@@ -3,8 +3,6 @@ package com.cc.job.admin.task.thread;
 import cn.hutool.core.lang.Pair;
 import com.cc.job.admin.task.complete.XxlJobCompleter;
 import com.cc.job.admin.config.XxlJobAdminConfig;
-import com.cc.job.admin.task.handler.JobGroupXxlJob;
-import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobLog;
 import com.cc.job.admin.task.utils.I18nUtil;
 import com.xxl.job.core.biz.model.HandleCallbackParam;
@@ -160,30 +158,19 @@ public class JobCompleteHelper {
 
 	private ReturnT<String> callback(HandleCallbackParam handleCallbackParam) {
 		// valid log item
-		if(handleCallbackParam.getLogId()==-1){
-			Pair<String,Boolean> pair = new Pair<>(handleCallbackParam.getJobId() + ":" + handleCallbackParam.getRandomId(),handleCallbackParam.getHandleCode() == ReturnT.SUCCESS_CODE);
+		if (handleCallbackParam.getLogId() == -1) {
+			Pair<String, Boolean> pair = new Pair<>(handleCallbackParam.getJobId() + ":" + handleCallbackParam.getRandomId(), handleCallbackParam.getHandleCode() == ReturnT.SUCCESS_CODE);
 			XxlJobRemotingUtil.postBody(handleCallbackParam.getAddress() + "api/addJobGroupData", "", 10, pair, String.class);
-			//JobGroupXxlJob.addJobMap(handleCallbackParam.getJobId() +":"+handleCallbackParam.getRandomId(), handleCallbackParam.getHandleCode() == ReturnT.SUCCESS_CODE);
 			return ReturnT.SUCCESS;
 		}
 		JobLog log = XxlJobAdminConfig.getAdminConfig().getJobLogMapper().selectById(handleCallbackParam.getLogId());
-		String randomId = "";
 		if (log != null && StringUtils.isNotBlank(log.getExecutorParam())) {
 			logger.info(">>>>>>>executorParam:{}", log.getExecutorParam());
-			randomId = ":" + log.getExecutorParam();
 		}
 		if (log == null) {
-			Map<String, Boolean> result = new HashMap<>();
-			result.put(handleCallbackParam.getJobId() + randomId, false);
-			if(!String.valueOf(handleCallbackParam.getJobId()).equalsIgnoreCase(log.getExecutorParam())){
-				JobGroupXxlJob.addJobMap(handleCallbackParam.getJobId() + randomId, false);
-			}
 			return new ReturnT<>(ReturnT.FAIL_CODE, "log item not found.");
 		}
 		if (log.getHandleCode() > 0) {
-			if(!String.valueOf(handleCallbackParam.getJobId()).equalsIgnoreCase(log.getExecutorParam())){
-				JobGroupXxlJob.addJobMap(handleCallbackParam.getJobId() + randomId, false);
-			}
 			return new ReturnT<>(ReturnT.FAIL_CODE, "log repeate callback.");
 		}
 

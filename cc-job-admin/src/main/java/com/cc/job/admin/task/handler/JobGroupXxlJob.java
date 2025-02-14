@@ -59,13 +59,13 @@ public class JobGroupXxlJob {
 
     static final List<Pair<String, Boolean>> JOB_LIST = Collections.synchronizedList(new ArrayList<>());
 
-    public static void removeJobMap(String jobId) {
+    public static void removeJobData(String jobId) {
         if (jobId != null) {
             JOB_LIST.removeIf(pair -> jobId.equals(pair.getKey()));
         }
     }
 
-    public static void addJobMap(String jobId, Boolean isRunning) {
+    public static void addJobData(String jobId, Boolean isRunning) {
         JOB_LIST.add(Pair.of(jobId, isRunning));
     }
 
@@ -300,7 +300,7 @@ public class JobGroupXxlJob {
         String key = pair.getKey();
         Long jobId = Long.valueOf(key.split(":")[0]);
         boolean success = pair.getValue();
-        removeJobMap(setExecuteJobId(jobId, randomId));
+        removeJobData(setExecuteJobId(jobId, randomId));
         String res = "";
         if (success) {
             setNodeStatus(statusMap, jobId, 1, randomId, node.getJobParentId());
