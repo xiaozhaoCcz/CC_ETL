@@ -25,6 +25,14 @@ const JobDataXAPI = {
       data: data,
     });
   },
+
+  batchBuildJson(data: any) {
+    return request({
+      url: `${JOB_DATAX_BASE_URL}/batchBuildJson`,
+      method: "post",
+      data: data,
+    });
+  },
 };
 
 export default JobDataXAPI;

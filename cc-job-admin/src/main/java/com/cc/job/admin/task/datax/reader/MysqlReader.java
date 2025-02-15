@@ -27,8 +27,11 @@ public class MysqlReader implements BaseRW {
         parameter.putOnce(USERNAME, dataXParams.getUsername());
         parameter.putOnce(PASSWORD, dataXParams.getPassword());
         JSONObject connection = new JSONObject();
-        connection.append(JDBC_URL, String.format(MYSQL_JDBC_URL, dataXParams.getIp(), dataXParams.getPort(), dataXParams.getDbName()));
-
+        if(StringUtils.isNoneBlank(dataXParams.getJdbcUrl())){
+            connection.append(JDBC_URL, dataXParams.getJdbcUrl());
+        }else{
+            connection.append(JDBC_URL, String.format(MYSQL_JDBC_URL, dataXParams.getIp(), dataXParams.getPort(), dataXParams.getDbName()));
+        }
         if (dataXParams.getColumns() != null && !dataXParams.getColumns().isEmpty()) {
             connection.append(TABLE, dataXParams.getTableName());
             parameter.putOnce(COLUMN, dataXParams.getColumns());
