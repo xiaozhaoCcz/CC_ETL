@@ -69,6 +69,7 @@ public class DataxServiceImpl implements DataxService {
                     dataXParamsR.setPassword(jdbcDatasourceFormDataR.getJdbcPassword());
                     dataXParamsR.setDbName(jdbcDatasourceFormDataR.getDatabaseName());
                     dataXParamsR.setJdbcUrl(jdbcDatasourceFormDataR.getJdbcUrl());
+                    dataXParamsR.setSchemaName(jdbcDatasourceFormDataR.getSchemaName());
                     List<String> tableNames = jobJdbcDatasourceService.getColumns(jdbcDatasourceFormDataR.getId(), new HashMap<>() {{
                         put("tableName", readerTableName);
                     }});
@@ -84,6 +85,7 @@ public class DataxServiceImpl implements DataxService {
                     dataXParamsW.setPassword(jdbcDatasourceFormDataW.getJdbcPassword());
                     dataXParamsW.setDbName(jdbcDatasourceFormDataW.getDatabaseName());
                     dataXParamsW.setJdbcUrl(jdbcDatasourceFormDataW.getJdbcUrl());
+                    dataXParamsW.setSchemaName(jdbcDatasourceFormDataW.getSchemaName());
                     List<String> tableNamesW = jobJdbcDatasourceService.getColumns(jdbcDatasourceFormDataW.getId(), new HashMap<>() {{
                         put("tableName", writerTableName);
                     }});
