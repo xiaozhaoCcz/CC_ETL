@@ -3,7 +3,6 @@
     <el-dialog
       v-model="props.triggerLogVisable"
       title="调度备注"
-      width="500"
       :before-close="handleClose"
     >
       <div v-html="triggerMsg"></div>
@@ -22,6 +21,8 @@ const props = defineProps({
     default: false,
   },
 });
+
+
 
 watch(
   () => props.triggerLogVisable,

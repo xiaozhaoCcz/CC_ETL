@@ -15,8 +15,8 @@ spring:
     password: root
   # 邮件配置
   mail:
-    host: smtp.youlai.tech
-    port: 587
+    host: smtp.qq.com
+    port: 465
     username: your-email@example.com
     password: 123456
     properties:

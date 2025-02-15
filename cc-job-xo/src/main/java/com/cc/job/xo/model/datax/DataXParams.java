@@ -23,6 +23,8 @@ public class DataXParams implements Serializable {
 
     private String tableName;
 
+    private String jdbcUrl;
+
     private String ip;
 
     private Integer port;

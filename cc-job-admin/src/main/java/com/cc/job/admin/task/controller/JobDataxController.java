@@ -44,5 +44,10 @@ public class JobDataxController {
         return Result.success(json);
     }
 
-
+    @Operation(summary = "执行")
+    @PostMapping("/batchBuildJson")
+    public Result<List<String> > batchBuildJson(@RequestBody Map<String,Object> params) {
+        List<String> res = dataxService.batchBuildJson(params);
+        return Result.success(res);
+    }
 }

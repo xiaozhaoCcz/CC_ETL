@@ -77,12 +77,10 @@ public class JobGroupXxlJob {
         return STOP_MAP.get(setExecuteJobId(parentId, randomId));
     }
 
-
     static final Map<String, Map<Long, Set<Long>>> TASK_ID_MAP = new ConcurrentHashMap<>();
 
-    //需要重新获取XxlJobContext解决线程问题，不然会出现日志文件错误添加的问题
+    // 需要重新获取XxlJobContext解决线程问题，不然会出现日志文件错误添加的问题
     private static final InheritableThreadLocal<XxlJobContext> CONTEXT_HOLDER = new InheritableThreadLocal<XxlJobContext>();
-
 
     @XxlJob("runJobGroupXxlJob")
     public void JobGroupXxlJob() {
@@ -91,7 +89,8 @@ public class JobGroupXxlJob {
         validateExecuteParam(executeParam);
         String randomId = "";
         try {
-            randomId = String.valueOf(jobId).equalsIgnoreCase(executeParam) ? UUID.randomUUID().toString() : executeParam;
+            randomId = String.valueOf(jobId).equalsIgnoreCase(executeParam) ? UUID.randomUUID().toString()
+                    : executeParam;
             JobInfo jobInfo = getJobInfoById(jobId);
             List<JobNode> nodes = getJobNodesByJobId(jobId);
             List<JobEdge> edges = getJobEdgesByJobId(jobId);
@@ -103,7 +102,8 @@ public class JobGroupXxlJob {
 
             int avgTime = getAvgTime(nodes, jobInfo);
             CONTEXT_HOLDER.set(XxlJobContext.getXxlJobContext());
-            List<WorkerWrapper<Long, String>> workerWrappers = buildWorkerWrappers(nodes, nextMap, randomId, avgTime, statusMap);
+            List<WorkerWrapper<Long, String>> workerWrappers = buildWorkerWrappers(nodes, nextMap, randomId, avgTime,
+                    statusMap);
             List<Long> startNodes = getStartNodes(nodes);
             List<WorkerWrapper<Long, String>> startWrappers = getStartWrappers(workerWrappers, startNodes);
             WorkerWrapper<Long, String> startWork = createStartWorkWrapper(jobId, startWrappers);
@@ -163,7 +163,8 @@ public class JobGroupXxlJob {
         return nodes.stream().filter(v -> v.getNodeInDegree().equals(0L)).map(JobNode::getId).toList();
     }
 
-    private List<WorkerWrapper<Long, String>> getStartWrappers(List<WorkerWrapper<Long, String>> workerWrappers, List<Long> startNodes) {
+    private List<WorkerWrapper<Long, String>> getStartWrappers(List<WorkerWrapper<Long, String>> workerWrappers,
+                                                               List<Long> startNodes) {
         return workerWrappers.stream().filter(v -> startNodes.contains(Long.valueOf(v.getId()))).toList();
     }
 
@@ -180,7 +181,8 @@ public class JobGroupXxlJob {
         removeWorkWrapper(jobId, randomId);
     }
 
-    private static WorkerWrapper<Long, String> createStartWorkWrapper(long jobId, List<WorkerWrapper<Long, String>> startWrappers) {
+    private static WorkerWrapper<Long, String> createStartWorkWrapper(long jobId,
+                                                                      List<WorkerWrapper<Long, String>> startWrappers) {
         XxlJobContext xxlJobContext = CONTEXT_HOLDER.get();
         return new WorkerWrapper<Long, String>()
                 .id(String.valueOf(jobId))
@@ -201,7 +203,8 @@ public class JobGroupXxlJob {
         webSocketServer.sendInfo(message);
     }
 
-    private List<WorkerWrapper<Long, String>> buildWorkerWrappers(List<JobNode> nodes, Map<Long, List<JobNode>> nextMap, String randomId, int avgTime, Map<Long, List<Long>> statusMap) {
+    private List<WorkerWrapper<Long, String>> buildWorkerWrappers(List<JobNode> nodes, Map<Long, List<JobNode>> nextMap,
+                                                                  String randomId, int avgTime, Map<Long, List<Long>> statusMap) {
         List<WorkerWrapper<Long, String>> result = new ArrayList<>();
         List<JobInfo> jobInfos = getJobInfos(nodes);
         final Map<Long, JobInfo> jobInfoMap = jobInfos.stream().collect(Collectors.toMap(JobInfo::getId, t -> t));
@@ -241,13 +244,15 @@ public class JobGroupXxlJob {
                 continue;
             }
             List<Long> cNodeIds = taskNodes.stream().map(JobNode::getId).toList();
-            List<WorkerWrapper<Long, String>> nextWorkers = result.stream().filter(v -> cNodeIds.contains(Long.valueOf(v.getId()))).toList();
+            List<WorkerWrapper<Long, String>> nextWorkers = result.stream()
+                    .filter(v -> cNodeIds.contains(Long.valueOf(v.getId()))).toList();
             workerWrapper.next(nextWorkers.toArray(new WorkerWrapper[0]));
         }
         return result;
     }
 
-    private String executeJob(XxlJobContext xxlJobContext, JobNode node, JobInfo jobInfo, String randomId, int avgTime, Map<Long, List<Long>> statusMap, int count) {
+    private String executeJob(XxlJobContext xxlJobContext, JobNode node, JobInfo jobInfo, String randomId, int avgTime,
+                              Map<Long, List<Long>> statusMap, int count) {
         JobGroup group = XxlJobAdminConfig.getAdminConfig().getJobGroupMapper().selectById(jobInfo.getJobGroup());
         // 2、init trigger-param
         TriggerParam triggerParam = new TriggerParam();
@@ -262,15 +267,15 @@ public class JobGroupXxlJob {
         triggerParam.setGlueUpdatetime(jobInfo.getGlueUpdatetime().toInstant(ZoneOffset.of("+8")).toEpochMilli());
         triggerParam.setBroadcastIndex(0);
         triggerParam.setBroadcastTotal(1);
-        //设置请求信息
+        // 设置请求信息
         triggerParam.setReqBody(jobInfo.getReqBody());
         triggerParam.setReqHeader(jobInfo.getReqHeader());
         triggerParam.setReqType(jobInfo.getReqType());
         triggerParam.setReqUrl(jobInfo.getReqUrl());
         triggerParam.setXxlJobContext(xxlJobContext);
-        //得到本地的ip和host
+        // 得到本地的ip和host
         String ip = IpUtil.getIp();
-        String adminAddress = "http://"+ip+":"+port+"/xxl-job-admin/";
+        String adminAddress = "http://" + ip + ":" + port + "/xxl-job-admin/";
         triggerParam.setAddress(adminAddress);
 
         String address = group.getRegistryList().get(0);
@@ -284,7 +289,9 @@ public class JobGroupXxlJob {
             FutureTask<String> futureTask = new FutureTask<>(jobThreadListener);
             thread = new Thread(futureTask);
             thread.start();
-            result = jobInfo.getExecutorTimeout() > 0 ? futureTask.get(jobInfo.getExecutorTimeout(), TimeUnit.MILLISECONDS) : futureTask.get(avgTime, TimeUnit.MILLISECONDS);
+            result = jobInfo.getExecutorTimeout() > 0
+                    ? futureTask.get(jobInfo.getExecutorTimeout(), TimeUnit.MILLISECONDS)
+                    : futureTask.get(avgTime, TimeUnit.MILLISECONDS);
         } catch (Exception e) {
             logger.error(e.getMessage());
             throw new RuntimeException(e);
@@ -296,7 +303,8 @@ public class JobGroupXxlJob {
         return result;
     }
 
-    private String handleJobCompletion(Pair<String, Boolean> pair, JobInfo jobInfo, JobNode node, String randomId, Map<Long, List<Long>> statusMap, int count) {
+    private String handleJobCompletion(Pair<String, Boolean> pair, JobInfo jobInfo, JobNode node, String randomId,
+                                       Map<Long, List<Long>> statusMap, int count) {
         String key = pair.getKey();
         Long jobId = Long.valueOf(key.split(":")[0]);
         boolean success = pair.getValue();
@@ -318,7 +326,8 @@ public class JobGroupXxlJob {
     private Map<Long, List<JobNode>> buildNextNode(List<JobNode> nodes, List<JobEdge> edges) {
         Map<Long, List<JobNode>> result = new HashMap<>();
         for (JobNode node : nodes) {
-            List<Long> nodeIds = edges.stream().filter(v -> v.getFromNodeId().equals(node.getId())).map(JobEdge::getEndNodeId).toList();
+            List<Long> nodeIds = edges.stream().filter(v -> v.getFromNodeId().equals(node.getId()))
+                    .map(JobEdge::getEndNodeId).toList();
             List<JobNode> cNodes = nodes.stream().filter(v -> nodeIds.contains(v.getId())).toList();
             result.put(node.getId(), cNodes);
         }
@@ -339,16 +348,19 @@ public class JobGroupXxlJob {
 
                 if (jobInfo.getJobType() == 2 && Objects.equals(currentNode.getJobParentId(), jobId)) {
                     stop = true;
-                    List<JobEdge> collectEdges = jobEdgeService.list(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getJobParentId, jobInfo.getId()));
+                    List<JobEdge> collectEdges = jobEdgeService
+                            .list(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getJobParentId, jobInfo.getId()));
                     for (JobEdge edge : collectEdges) {
                         edge.setJobParentId(jobId);
                         edgeList.add(edge);
                     }
 
-                    //得到当前节点的所有开始节点
-                    List<Long> fromIds = edgeList.stream().filter(v -> v.getEndNodeId().equals(currentNode.getId())).map(JobEdge::getFromNodeId).toList();
-                    //得到当前节点的所有孩子节点
-                    List<JobNode> childrenNode = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, jobInfo.getId()));
+                    // 得到当前节点的所有开始节点
+                    List<Long> fromIds = edgeList.stream().filter(v -> v.getEndNodeId().equals(currentNode.getId()))
+                            .map(JobEdge::getFromNodeId).toList();
+                    // 得到当前节点的所有孩子节点
+                    List<JobNode> childrenNode = jobNodeService
+                            .list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, jobInfo.getId()));
                     // 得到孩子节点的开始节点
                     List<JobNode> startNodes = childrenNode.stream().filter(v -> v.getNodeInDegree() == 0).toList();
                     if (!fromIds.isEmpty()) {
@@ -363,7 +375,8 @@ public class JobGroupXxlJob {
                         }
                     }
 
-                    List<Long> endIds = edgeList.stream().filter(v -> v.getFromNodeId().equals(currentNode.getId())).map(JobEdge::getEndNodeId).toList();
+                    List<Long> endIds = edgeList.stream().filter(v -> v.getFromNodeId().equals(currentNode.getId()))
+                            .map(JobEdge::getEndNodeId).toList();
 
                     List<JobNode> childEndNodes = childrenNode.stream().filter(v -> v.getNodeOutDegree() == 0).toList();
                     if (!childEndNodes.isEmpty()) {
@@ -383,7 +396,9 @@ public class JobGroupXxlJob {
                         resNodeList.add(taskNode);
                     }
 
-                    edgeList.removeIf(v -> (fromIds.contains(v.getFromNodeId()) && v.getEndNodeId().equals(currentNode.getId())) || (v.getFromNodeId().equals(currentNode.getId()) && endIds.contains(v.getEndNodeId())));
+                    edgeList.removeIf(v -> (fromIds.contains(v.getFromNodeId())
+                            && v.getEndNodeId().equals(currentNode.getId()))
+                            || (v.getFromNodeId().equals(currentNode.getId()) && endIds.contains(v.getEndNodeId())));
                 }
             }
             nodes.clear();
@@ -398,7 +413,6 @@ public class JobGroupXxlJob {
         }
     }
 
-
     private static String setExecuteJobId(Long jobId, String randomId) {
         return jobId + ":" + randomId;
     }
@@ -406,7 +420,8 @@ public class JobGroupXxlJob {
     private void getJobStatusMap(Long jobId, Map<Long, List<Long>> statusMap) {
         JobInfo jobInfo = jobInfoService.getById(jobId);
         if (jobInfo.getJobType() == 2) {
-            List<JobInfo> jobInfos = jobInfoService.list(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getParentId, jobId));
+            List<JobInfo> jobInfos = jobInfoService
+                    .list(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getParentId, jobId));
             for (JobInfo info : jobInfos) {
                 getJobStatusMap(info.getId(), statusMap);
             }
@@ -415,7 +430,8 @@ public class JobGroupXxlJob {
         }
     }
 
-    private void setNodeStatus(Map<Long, List<Long>> statusMap, Long jobId, Integer status, String randomId, Long parentId) {
+    private void setNodeStatus(Map<Long, List<Long>> statusMap, Long jobId, Integer status, String randomId,
+                               Long parentId) {
         for (Map.Entry<Long, List<Long>> entry : statusMap.entrySet()) {
             if (entry.getValue().contains(jobId)) {
                 Message message = new Message();
@@ -444,7 +460,8 @@ public class JobGroupXxlJob {
         }
     }
 
-    private void executeSuccessOrFailJob(Map<Long, List<Long>> statusMap, Long jobId, Integer status, String randomId, Long parentId, Map.Entry<Long, List<Long>> entry) {
+    private void executeSuccessOrFailJob(Map<Long, List<Long>> statusMap, Long jobId, Integer status, String randomId,
+                                         Long parentId, Map.Entry<Long, List<Long>> entry) {
         List<Long> value = new ArrayList<>(entry.getValue());
         value.remove(jobId);
         statusMap.put(entry.getKey(), value);
@@ -462,14 +479,14 @@ public class JobGroupXxlJob {
 
         private final String randomId;
 
-
         private final Map<Long, List<Long>> statusMap;
 
         private volatile boolean stop = false;
 
         private final int count;
 
-        public JobThreadListener(JobInfo jobInfo, JobNode node, String randomId, Map<Long, List<Long>> statusMap, int count) {
+        public JobThreadListener(JobInfo jobInfo, JobNode node, String randomId, Map<Long, List<Long>> statusMap,
+                                 int count) {
             this.jobInfo = jobInfo;
             this.node = node;
             this.randomId = randomId;
@@ -508,7 +525,8 @@ public class JobGroupXxlJob {
 
         private final Map<Long, List<Long>> statusMap;
 
-        public JobCallback(XxlJobContext xxlJobContext, JobNode node, String randomId, Map<Long, List<Long>> statusMap) {
+        public JobCallback(XxlJobContext xxlJobContext, JobNode node, String randomId,
+                           Map<Long, List<Long>> statusMap) {
             this.node = node;
             this.randomId = randomId;
             this.xxlJobContext = xxlJobContext;
@@ -524,7 +542,8 @@ public class JobGroupXxlJob {
 
         @Override
         public void result(boolean success, Long param, WorkResult<String> workResult) {
-            XxlJobHelper.log(xxlJobContext, ">>>>>>>>>>>>>>>>>>>>>任务运行完成:{}, 任务运行状态:{},运行结果:{}", param, success, workResult.getResult());
+            XxlJobHelper.log(xxlJobContext, ">>>>>>>>>>>>>>>>>>>>>任务运行完成:{}, 任务运行状态:{},运行结果:{}", param, success,
+                    workResult.getResult());
         }
     }
 

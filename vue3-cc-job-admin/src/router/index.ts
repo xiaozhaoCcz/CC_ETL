@@ -4,6 +4,7 @@ import {
   createWebHashHistory,
   type RouteRecordRaw,
 } from "vue-router";
+import { useDataxStore } from "@/store";
 
 export const Layout = () => import("@/layout/index.vue");
 
@@ -114,6 +115,17 @@ export const constantRoutes: RouteRecordRaw[] = [
         },
       },
       {
+        path: "job-datax-groups",
+        component: () => import("@/views/task/job-datax-groups/index.vue"),
+        // 用于 keep-alive 功能，需要与 SFC 中自动推导或显式声明的组件名称一致
+        // 参考文档: https://cn.vuejs.org/guide/built-ins/keep-alive.html#include-exclude
+        name: "jobDataxGroups",
+        meta: {
+          title: "多数据源同步",
+          icon: "close_other",
+        },
+      },
+      {
         path: "job-platform",
         component: () => import("@/views/task/job-platform/index.vue"),
         // 用于 keep-alive 功能，需要与 SFC 中自动推导或显式声明的组件名称一致
@@ -146,7 +158,6 @@ export const constantRoutes: RouteRecordRaw[] = [
           icon: "document",
         },
       },
-
     ],
   },
 ];
@@ -159,6 +170,12 @@ const router = createRouter({
   routes: constantRoutes,
   // 刷新时，滚动条位置还原
   scrollBehavior: () => ({ left: 0, top: 0 }),
+});
+
+router.beforeEach((to, from, next) => {
+  const useDatax = useDataxStore();
+  useDatax.clearDataxGroups();
+  next();
 });
 
 // 全局注册 router
