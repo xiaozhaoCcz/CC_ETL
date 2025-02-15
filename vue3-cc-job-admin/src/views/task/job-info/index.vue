@@ -470,7 +470,6 @@ function handleCloseDialog() {
 
 /** 重置task_info查询 */
 function handleResetQuery() {
-  console.log(111)
   queryFormRef.value!.resetFields();
   queryParams.pageNum = 1;
   handleQuery();

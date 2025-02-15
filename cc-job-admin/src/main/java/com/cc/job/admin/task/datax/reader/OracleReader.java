@@ -28,11 +28,11 @@ public class OracleReader implements BaseRW {
             connection.append(JDBC_URL, dataXParams.getJdbcUrl());
         }else{
             connection.append(JDBC_URL, String.format(ORACLE_JDBC_URL, dataXParams.getIp(), dataXParams.getPort(), dataXParams.getDbName()));
-
         }
 
         if (dataXParams.getColumns() != null && !dataXParams.getColumns().isEmpty()) {
-            connection.append(TABLE, dataXParams.getTableName());
+            String tableName = dataXParams.getSchemaName()+"."+dataXParams.getTableName();
+            connection.append(TABLE, tableName);
             parameter.putOnce(COLUMN, dataXParams.getColumns());
             if (dataXParams.getIncrType() == 1) {
                 // 增量同步

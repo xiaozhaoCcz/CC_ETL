@@ -32,4 +32,6 @@ public class JobJdbcDatasource extends BaseEntity {
    private Integer status;
 
    private String comments;
+
+   private String schemaName;
 }

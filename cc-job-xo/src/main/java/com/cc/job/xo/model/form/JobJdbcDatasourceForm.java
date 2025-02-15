@@ -65,5 +65,6 @@ public class JobJdbcDatasourceForm implements Serializable {
     @Size(max=1000, message="备注长度不能超过1000个字符")
     private String comments;
 
-
+    @Schema(description = "备注")
+    private String schemaName;
 }

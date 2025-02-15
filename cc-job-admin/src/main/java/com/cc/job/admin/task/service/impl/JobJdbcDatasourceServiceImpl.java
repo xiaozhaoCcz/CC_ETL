@@ -4,6 +4,7 @@ package com.cc.job.admin.task.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cc.job.admin.task.enums.DatasourceEnum;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.admin.task.command.JdbcCommand;
 import com.cc.job.xo.mapper.JobJdbcDatasourceMapper;
@@ -135,9 +136,10 @@ public class JobJdbcDatasourceServiceImpl extends ServiceImpl<JobJdbcDatasourceM
         JdbcCommand jdbcCommand = new JdbcCommand(jobJdbcDatasource.getJdbcDriverClass(), jobJdbcDatasource.getJdbcUrl(), jobJdbcDatasource.getJdbcUsername(), jobJdbcDatasource.getJdbcPassword());
         Connection con = jdbcCommand.getConnection();
         String tableName = params.get("tableName");
-        String sql  = params.get("querySql");
-        if(StringUtils.isBlank(sql)){
-            sql = "select * from "+tableName + " t";
+        String sql = params.get("querySql");
+        if (StringUtils.isBlank(sql)) {
+            String schemaName = StringUtils.isBlank(jobJdbcDatasource.getSchemaName()) ? "" : jobJdbcDatasource.getSchemaName() + ".";
+            sql = "select * from " + schemaName + tableName + " t";
         }
         PreparedStatement ps = null;
         ResultSet rs = null;
@@ -145,13 +147,13 @@ public class JobJdbcDatasourceServiceImpl extends ServiceImpl<JobJdbcDatasourceM
             ps = con.prepareStatement(sql);
             rs = ps.executeQuery();
             ResultSetMetaData metaData = rs.getMetaData();
-            for (int i = 1; i <= metaData.getColumnCount();i++) {
+            for (int i = 1; i <= metaData.getColumnCount(); i++) {
                 String columnName = metaData.getColumnName(i);
                 columns.add(columnName);
             }
         } catch (SQLException e) {
             throw new RuntimeException(e);
-        }finally {
+        } finally {
             JdbcCommand.close(rs);
             JdbcCommand.close(ps);
         }
@@ -162,11 +164,24 @@ public class JobJdbcDatasourceServiceImpl extends ServiceImpl<JobJdbcDatasourceM
     public List<String> getTables(Long id) {
         List<String> tables = new ArrayList<>();
         JobJdbcDatasource jobJdbcDatasource = this.getById(id);
-        JdbcCommand jdbcCommand = new JdbcCommand(jobJdbcDatasource.getJdbcDriverClass(), jobJdbcDatasource.getJdbcUrl(), jobJdbcDatasource.getJdbcUsername(), jobJdbcDatasource.getJdbcPassword());
-        Connection con = jdbcCommand.getConnection();
+        JdbcCommand jdbcCommand = null;
+        Connection con = null;
         Statement stmt = null;
         ResultSet rs = null;
         try {
+            if(DatasourceEnum.ORACLE.getTitle().equalsIgnoreCase(jobJdbcDatasource.getDatasource())){
+                jdbcCommand = new JdbcCommand(jobJdbcDatasource.getJdbcDriverClass(), jobJdbcDatasource.getJdbcUrl(), jobJdbcDatasource.getJdbcUsername(), jobJdbcDatasource.getJdbcPassword(),jobJdbcDatasource.getSchemaName());
+                 con = jdbcCommand.getConnection();
+                 stmt = con.createStatement();
+                 rs = stmt.executeQuery("SELECT TABLE_NAME FROM ALL_TABLES WHERE OWNER = '"+jobJdbcDatasource.getSchemaName()+"'");
+                 while (rs.next()) {
+                     String tableName = rs.getString("TABLE_NAME");
+                     tables.add(tableName);
+                 }
+                 return tables;
+            }
+            jdbcCommand = new JdbcCommand(jobJdbcDatasource.getJdbcDriverClass(), jobJdbcDatasource.getJdbcUrl(), jobJdbcDatasource.getJdbcUsername(), jobJdbcDatasource.getJdbcPassword());
+            con = jdbcCommand.getConnection();
             DatabaseMetaData metaData = con.getMetaData();
             rs = metaData.getTables(con.getCatalog(), null, null, new String[]{"TABLE"});
             // 遍历结果集并打印表名
@@ -186,7 +201,7 @@ public class JobJdbcDatasourceServiceImpl extends ServiceImpl<JobJdbcDatasourceM
 
     @Override
     public boolean isConnect(JobJdbcDatasourceForm formData) {
-        JdbcCommand jdbcCommand = new JdbcCommand(formData.getJdbcDriverClass(), formData.getJdbcUrl(), formData.getJdbcUsername(), formData.getJdbcPassword());
+        JdbcCommand jdbcCommand = new JdbcCommand(formData.getJdbcDriverClass(), formData.getJdbcUrl(), formData.getJdbcUsername(), formData.getJdbcPassword(),formData.getSchemaName());
         Connection con = null;
         try {
             con = jdbcCommand.getConnection();

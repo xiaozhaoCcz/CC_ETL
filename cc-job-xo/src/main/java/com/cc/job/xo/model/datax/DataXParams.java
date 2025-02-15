@@ -40,4 +40,6 @@ public class DataXParams implements Serializable {
 
     // 增量字段，json
     private String incrContent;
+
+    private String schemaName;
 }
