@@ -36,7 +36,6 @@ public class WebSocketServer {
                 } catch (Exception e) {
                     log.error(e.getMessage());
                 }
-
             }
         }
     }
