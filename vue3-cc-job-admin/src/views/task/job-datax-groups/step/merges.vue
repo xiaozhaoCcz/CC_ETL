@@ -225,10 +225,7 @@
             >
               <template #default="{ row, column }">
                 <el-input
-                  v-if="
-                    tableRowEditId === row.id &&
-                    tableColumnEditIndex === column.id
-                  "
+                  v-if="tableRowEditId === row.reader"
                   v-model="row.jobDesc"
                   @blur="blurValueInput(row, column)"
                   @keyup.enter="blurValueInput(row, column)"
@@ -236,10 +233,7 @@
                 <span v-else>{{ row.jobDesc }}</span>
               </template>
             </el-table-column>
-            <el-table-column
-              label="操作"
-              width="120"
-            >
+            <el-table-column label="操作" width="120">
               <template #default="scope">
                 <el-button
                   size="small"
@@ -265,9 +259,7 @@ import { ref } from "vue";
 const userStore = useDataxStore();
 
 const taskGroupList = ref([]);
-const tableList = ref([]);
 let tableRowEditId = ref(null); // 控制可编辑的每一行
-let tableColumnEditIndex = ref(null); //控制可编辑的每一列
 
 const scheduleTypeList = [
   {
@@ -360,20 +352,17 @@ function changeCron(cron: string) {
 
 const showUnitInput = (row, column) => {
   //赋值给定义的变量
-  tableRowEditId.value = row.id; //确定点击的单元格在哪行 如果数据中有ID可以用ID判断，没有可以使用其他值判断，只要能确定是哪一行即可
-  tableColumnEditIndex.value = column.id; //确定点击的单元格在哪列
+  tableRowEditId.value = row.reader; //确定点击的单元格在哪行 如果数据中有ID可以用ID判断，没有可以使用其他值判断，只要能确定是哪一行即可
 };
 
 const blurValueInput = (row, column) => {
   // tableRowEditId.value = null
   // tableColumnEditIndex.value = null
-  //在此处调接口传数据
-  console.log(row, column);
 };
 
 const handleDelete = (index: number, row: any) => {
   userStore.dataxGroups.tableList.splice(index, 1);
-}
+};
 
 function setTableList() {
   const readers = userStore.dataxGroups.readers.tableList;
@@ -407,7 +396,7 @@ onMounted(() => {
 }
 
 .info_form {
-  width: 50%;
+  width: 900px;
   margin: 0 auto;
 
   .child_form {
