@@ -33,13 +33,14 @@
           </div>
           <div class="m_right">
             <div class="c_cont">
-              <span class="m_title">任务描述</span>
-              <el-input
-                v-model="userStore.dataxGroups.formData.jobDesc"
-                type="text"
-                autocomplete="off"
-                placeholder="任务描述"
-              />
+              &nbsp;
+              <!--              <span class="m_title">任务描述</span>-->
+              <!--              <el-input-->
+              <!--                v-model="userStore.dataxGroups.formData.jobDesc"-->
+              <!--                type="text"-->
+              <!--                autocomplete="off"-->
+              <!--                placeholder="任务描述"-->
+              <!--              />-->
             </div>
             <div class="c_cont">
               <span>报警邮件</span>
@@ -199,18 +200,57 @@
         <div style="color: #8e8e8e; font-size: 14px">数据表</div>
         <el-divider style="margin: 8px" />
         <div class="child_main" style="margin-left: 6px">
-          <div class="m_left">
-            <div class="c_cont">
-              <span class="m_title">Json</span>
-              <json-editor-vue
-                @update:modelValue="updateModel"
-                @validationError="editError"
-                class="editor"
-                v-model="userStore.dataxGroups.formData.executorParam"
-                style="height: 800px; width: 800px"
-              />
-            </div>
-          </div>
+          <el-table
+            :data="userStore.dataxGroups.tableList"
+            style="height: 830px; overflow-y: hidden"
+            @cell-click="showUnitInput"
+          >
+            <el-table-column
+              label="reader名称"
+              width="240"
+              align="center"
+              prop="reader"
+            />
+            <el-table-column
+              label="writer名称"
+              width="240"
+              align="center"
+              prop="writer"
+            />
+            <el-table-column
+              label="任务名称"
+              width="240"
+              align="center"
+              prop="jobDesc"
+            >
+              <template #default="{ row, column }">
+                <el-input
+                  v-if="
+                    tableRowEditId === row.id &&
+                    tableColumnEditIndex === column.id
+                  "
+                  v-model="row.jobDesc"
+                  @blur="blurValueInput(row, column)"
+                  @keyup.enter="blurValueInput(row, column)"
+                />
+                <span v-else>{{ row.jobDesc }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column
+              label="操作"
+              width="120"
+            >
+              <template #default="scope">
+                <el-button
+                  size="small"
+                  type="danger"
+                  @click="handleDelete(scope.$index, scope.row)"
+                >
+                  删除
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
         </div>
       </div>
     </div>
@@ -221,10 +261,13 @@ import JobGroupAPI from "@/api/task/job-group";
 //当前使用的页面引入
 import NoVue3Cron from "@/components/NoVue3Cron/index.vue";
 import { useDataxStore } from "@/store";
-import JobDataXAPI from "@/api/task/job-datax";
+import { ref } from "vue";
 const userStore = useDataxStore();
 
 const taskGroupList = ref([]);
+const tableList = ref([]);
+let tableRowEditId = ref(null); // 控制可编辑的每一行
+let tableColumnEditIndex = ref(null); //控制可编辑的每一列
 
 const scheduleTypeList = [
   {
@@ -315,36 +358,38 @@ function changeCron(cron: string) {
   userStore.dataxGroups.formData.scheduleConf = cron;
 }
 
-function updateModel(val: any) {
-  userStore.dataxGroups.formData.executorParam = val;
+const showUnitInput = (row, column) => {
+  //赋值给定义的变量
+  tableRowEditId.value = row.id; //确定点击的单元格在哪行 如果数据中有ID可以用ID判断，没有可以使用其他值判断，只要能确定是哪一行即可
+  tableColumnEditIndex.value = column.id; //确定点击的单元格在哪列
+};
+
+const blurValueInput = (row, column) => {
+  // tableRowEditId.value = null
+  // tableColumnEditIndex.value = null
+  //在此处调接口传数据
+  console.log(row, column);
+};
+
+const handleDelete = (index: number, row: any) => {
+  userStore.dataxGroups.tableList.splice(index, 1);
 }
 
-const errors = ref(0);
-// 错误行数
-const line = ref();
-
-function editError(a: any, e: any) {
-  errors.value = e.length;
-  if (e[0]) {
-    line.value = e[0].line;
+function setTableList() {
+  const readers = userStore.dataxGroups.readers.tableList;
+  const writers = userStore.dataxGroups.writers.tableList;
+  const size = readers.length;
+  for (let i = 0; i < size; i++) {
+    const obj = {};
+    obj.reader = readers[i];
+    obj.writer = writers[i];
+    userStore.dataxGroups.tableList.push(obj);
   }
-}
-
-function getJson() {
-  const readers = userStore.dataxGroups.readers;
-  const writers = userStore.dataxGroups.writers;
-  const obj = {
-    readers: readers,
-    writers: writers,
-  };
-  JobDataXAPI.batchBuildJson(obj).then((res) => {
-    userStore.dataxGroups.formData.executorParam = JSON.parse(res);
-  });
 }
 
 onMounted(() => {
   fetchTaskGroupList();
-  getJson();
+  setTableList();
 });
 </script>
 <style lang="scss" scoped>

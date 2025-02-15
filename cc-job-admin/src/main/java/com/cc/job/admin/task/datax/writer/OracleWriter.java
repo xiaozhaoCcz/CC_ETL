@@ -18,13 +18,14 @@ public class OracleWriter implements BaseRW {
         JSONObject parameter = new JSONObject();
         parameter.putOnce(USERNAME, dataXParams.getUsername());
         parameter.putOnce(PASSWORD, dataXParams.getPassword());
-        parameter.append(CONNECTION,new JSONObject());
+        JSONObject connection = new JSONObject();
         if(StringUtils.isNoneBlank(dataXParams.getJdbcUrl())){
-            parameter.putOnce(JDBC_URL, dataXParams.getJdbcUrl());
+            connection.putOnce(JDBC_URL, dataXParams.getJdbcUrl());
         }else{
-            parameter.putOnce(JDBC_URL,  String.format(ORACLE_JDBC_URL,dataXParams.getIp(),dataXParams.getPort(),dataXParams.getDbName()));
+            connection.putOnce(JDBC_URL,  String.format(ORACLE_JDBC_URL,dataXParams.getIp(),dataXParams.getPort(),dataXParams.getDbName()));
         }
-        parameter.append(TABLE, dataXParams.getTableName());
+        connection.append(TABLE, dataXParams.getTableName());
+        parameter.append(CONNECTION,connection);
         parameter.putOnce(COLUMN, dataXParams.getColumns());
         readerConfig.putOnce(PARAMETER, parameter);
         return readerConfig;

@@ -58,18 +58,11 @@ function next() {
 }
 
 async function submitForm() {
-  console.log(userStore.dataxGroups);
-  const formData = userStore.dataxGroups.formData;
-  formData.glueType = "DATAX";
-  formData.executorHandler = "runDataxHandler";
-  formData.executorParam = JSON.stringify(formData.executorParam);
-  JobInfoAPI.add(formData)
-    .then(() => {
-      ElMessage.success("新增成功");
-      userStore.clearDataxGroups();
-      active.value = 0;
-    })
-    .finally(() => {});
+  JobDataXAPI.batchBuildJson(userStore.dataxGroups).then(() => {
+    ElMessage.success("新增成功");
+    userStore.clearDataxGroups();
+    active.value = 0;
+  });
 }
 </script>
 <style scoped lang="scss">
