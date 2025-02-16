@@ -3,6 +3,9 @@
     <div style="margin: 5px">
       <el-button type="primary" @click="handleAdd(0)">新增</el-button>
       <el-button type="warning" @click="handleAdd(1)">新增时间增量</el-button>
+      <span style="margin-left: 5px; font-size: 12px; color: #888888">
+        如果选择sql执行需要手动在sql语句中添加增量参数！！！
+      </span>
     </div>
     <el-table
       :data="tableData"
@@ -104,8 +107,14 @@
             filterable
             style="width: 210px"
           >
-            <el-option label="YYYY/MM/DD hh:mm:ss" value="YYYY/MM/DD hh:mm:ss" />
-            <el-option label="YYYY-MM-DD hh:mm:ss" value="YYYY-MM-DD hh:mm:ss" />
+            <el-option
+              label="YYYY/MM/DD hh:mm:ss"
+              value="YYYY/MM/DD hh:mm:ss"
+            />
+            <el-option
+              label="YYYY-MM-DD hh:mm:ss"
+              value="YYYY-MM-DD hh:mm:ss"
+            />
             <el-option label="YYYY/MM/DD" value="YYYY/MM/DD" />
             <el-option label="YYYY-MM-DD" value="YYYY-MM-DD" />
             <el-option label="timestamp" value="x" />

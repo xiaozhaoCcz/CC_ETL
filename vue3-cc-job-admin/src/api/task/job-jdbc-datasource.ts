@@ -117,6 +117,8 @@ export interface JobJdbcDatasourceForm {
   ip?: string;
 
   port?: string;
+
+  schemaName?: string;
 }
 
 /** jdbc数据源配置分页对象 */

@@ -6,13 +6,13 @@
       <el-step title="Step 3" />
     </el-steps>
 
-    <Readers v-if="active === 0"></Readers>
-    <Writers v-if="active === 1"></Writers>
-    <Merges v-if="active === 2"></Merges>
-    <el-button style="margin-top: 12px" @click="pre" v-if="active > 0">
+    <Readers v-if="active === 0" />
+    <Writers v-if="active === 1" />
+    <Merges v-if="active === 2" />
+    <el-button v-if="active > 0" style="margin-top: 12px" @click="pre">
       上一步
     </el-button>
-    <el-button style="margin-top: 12px" @click="next" v-if="active <= 2">
+    <el-button v-if="active <= 2" style="margin-top: 12px" @click="next">
       下一步
     </el-button>
   </div>

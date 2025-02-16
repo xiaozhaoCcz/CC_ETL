@@ -426,7 +426,6 @@ public class JobGroupXxlJob {
                 getJobStatusMap(info.getId(), statusMap);
             }
             statusMap.put(jobId, jobInfos.stream().map(JobInfo::getId).toList());
-
         }
     }
 
