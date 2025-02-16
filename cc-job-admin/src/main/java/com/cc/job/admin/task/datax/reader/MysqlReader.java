@@ -18,6 +18,7 @@ import static com.cc.job.xo.constant.DataxConstant.*;
 
 
 public class MysqlReader implements BaseRW {
+
     @Override
     public JSONObject buildJson(DataXParams dataXParams) {
         // 生成 MySQL reader 配置
@@ -27,9 +28,9 @@ public class MysqlReader implements BaseRW {
         parameter.putOnce(USERNAME, dataXParams.getUsername());
         parameter.putOnce(PASSWORD, dataXParams.getPassword());
         JSONObject connection = new JSONObject();
-        if(StringUtils.isNoneBlank(dataXParams.getJdbcUrl())){
+        if (StringUtils.isNoneBlank(dataXParams.getJdbcUrl())) {
             connection.append(JDBC_URL, dataXParams.getJdbcUrl());
-        }else{
+        } else {
             connection.append(JDBC_URL, String.format(MYSQL_JDBC_URL, dataXParams.getIp(), dataXParams.getPort(), dataXParams.getDbName()));
         }
         if (dataXParams.getColumns() != null && !dataXParams.getColumns().isEmpty()) {
@@ -59,7 +60,7 @@ public class MysqlReader implements BaseRW {
                                 .append(RIGHT_CURLY_BRACKET)
                                 .append(SPLIT)
                                 .append(SINGLE_QUOTE)
-                                .append(DataxUtils.getDateFormat(DatasourceEnum.MYSQL,dataxColumn.getColumnTimeFormat()))
+                                .append(DataxUtils.getDateFormat(DatasourceEnum.MYSQL, dataxColumn.getColumnTimeFormat()))
                                 .append(SINGLE_QUOTE)
                                 .append(RIGHT_PARENTHESIS);
                     } else {

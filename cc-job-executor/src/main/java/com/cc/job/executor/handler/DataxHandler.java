@@ -65,7 +65,7 @@ public class DataxHandler {
 
         JobInfo jobInfo = jobInfoMapper.selectById(jobId);
 
-        if (jobInfo==null){
+        if (jobInfo == null) {
             throw new BusinessException("任务不存在");
         }
 
@@ -75,7 +75,7 @@ public class DataxHandler {
         cmdList.add(dataxPy);
         cmdList.add(temJsonFile);
 
-        if(jobInfo.getIncrType()==1){
+        if (jobInfo.getIncrType() == 1) {
             buildParam(cmdList, jobInfo);
         }
         String[] command = cmdList.toArray(new String[0]);
@@ -83,10 +83,10 @@ public class DataxHandler {
 
         try {
             Process process = processBuilder.start();
-            Thread startThread = getThread(process,0);
+            Thread startThread = getThread(process, 0);
             startThread.start();
 
-            Thread errorThread = getThread(process,1);
+            Thread errorThread = getThread(process, 1);
             errorThread.start();
             int exitValue = process.waitFor();
             startThread.join();
@@ -94,7 +94,7 @@ public class DataxHandler {
 
             //更改数据库字段
             if (exitValue == 0) {
-                if(jobInfo.getIncrType()==1){
+                if (jobInfo.getIncrType() == 1) {
                     refreshJobInfo(jobInfo);
                 }
                 XxlJobHelper.log("Datax job completed successfully.");
@@ -119,9 +119,10 @@ public class DataxHandler {
                     .append(dataxColumn.getColumnParam())
                     .append(EQUALS)
                     .append(SINGLE_QUOTE);
-            if(dataxColumn.getColumnType()==1){
-                sb.append(Long.parseLong(dataxColumn.getColumnValue())/1000);;
-            }else {
+            if (dataxColumn.getColumnType() == 1) {
+                sb.append(Long.parseLong(dataxColumn.getColumnValue()) / 1000);
+                ;
+            } else {
                 sb.append(dataxColumn.getColumnValue());
             }
             sb.append(SINGLE_QUOTE);
@@ -130,16 +131,16 @@ public class DataxHandler {
         cmdList.add(sb.toString());
     }
 
-    private static Thread getThread(Process process,int type) {
+    private static Thread getThread(Process process, int type) {
         FutureTask<Boolean> futureTask = new FutureTask<>(() -> {
-            InputStream inputStream = type==0?process.getInputStream():process.getErrorStream();
+            InputStream inputStream = type == 0 ? process.getInputStream() : process.getErrorStream();
             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    // 处理每行输出
-                    logger.info(line);
-                    XxlJobHelper.log(line);
-                }
+            String line;
+            while ((line = reader.readLine()) != null) {
+                // 处理每行输出
+                logger.info(line);
+                XxlJobHelper.log(line);
+            }
             return true;
         });
         return new Thread(futureTask);
@@ -157,13 +158,13 @@ public class DataxHandler {
         jobJdbcDatasource.setJdbcUrl(jdbcUrl);
         jobJdbcDatasource.setJdbcUsername(username);
         jobJdbcDatasource.setJdbcPassword(password);
-        if(MYSQL_READER.equalsIgnoreCase(name)){
+        if (MYSQL_READER.equalsIgnoreCase(name)) {
             jobJdbcDatasource.setJdbcDriverClass(MYSQL_DRIVER);
-        }else if(ORACLE_READER.equalsIgnoreCase(name)){
+        } else if (ORACLE_READER.equalsIgnoreCase(name)) {
             jobJdbcDatasource.setJdbcDriverClass(ORACLE_DRIVER);
         }
         try (Connection con = getJdbcConnection(jobJdbcDatasource)) {
-            updateJobInfo(con,querySql,tableName,jobInfo,jobJdbcDatasource);
+            updateJobInfo(con, querySql, tableName, jobInfo, jobJdbcDatasource);
         } catch (Exception e) {
             throw new BusinessException(e.getMessage());
         }
@@ -179,11 +180,11 @@ public class DataxHandler {
         return jdbcCommand.getConnection();
     }
 
-    private Map<String,String> getTableName(String jsonStr){
-        Map<String,String> result =  new HashMap<>();
+    private Map<String, String> getTableName(String jsonStr) {
+        Map<String, String> result = new HashMap<>();
         JSONObject jsonObject = new JSONObject(jsonStr);
         JSONObject job = jsonObject.getJSONObject(DataxConstant.JOB);
-        JSONArray content= job.getJSONArray(DataxConstant.CONTENT);
+        JSONArray content = job.getJSONArray(DataxConstant.CONTENT);
         JSONObject reader = ((JSONObject) content.get(0)).getJSONObject(DataxConstant.READER);
         JSONObject parameter = reader.getJSONObject(DataxConstant.PARAMETER);
         JSONArray connection = parameter.getJSONArray(DataxConstant.CONNECTION);
@@ -195,27 +196,27 @@ public class DataxHandler {
         String username = parameter.getStr(USERNAME);
         String password = parameter.getStr(PASSWORD);
         String name = reader.getStr(NAME);
-        result.put(TABLE,tables!=null?tables.getStr(0):"");
-        result.put(QUERY_SQL,querySqls!=null?querySqls.getStr(0):"");
-        result.put(JDBC_URL,jdbcUrl.getStr(0));
-        result.put(USERNAME,username);
-        result.put(PASSWORD,password);
-        result.put(NAME,name);
+        result.put(TABLE, tables != null ? tables.getStr(0) : "");
+        result.put(QUERY_SQL, querySqls != null ? querySqls.getStr(0) : "");
+        result.put(JDBC_URL, jdbcUrl.getStr(0));
+        result.put(USERNAME, username);
+        result.put(PASSWORD, password);
+        result.put(NAME, name);
         return result;
     }
 
 
-    private void updateJobInfo(Connection con,String querySql,String tableName,JobInfo jobInfo,JobJdbcDatasource jobJdbcDatasource) {
+    private void updateJobInfo(Connection con, String querySql, String tableName, JobInfo jobInfo, JobJdbcDatasource jobJdbcDatasource) {
         JSONArray jsonArray = JSONUtil.parseArray(jobInfo.getIncrContent());
         List<DataxColumn> columnList = jsonArray.toList(DataxColumn.class);
         if (StringUtils.isNotBlank(querySql)) {
             updateTableByQuerySql(con, querySql, jobInfo, columnList);
         } else {
-            updateTableByTableName(con, tableName, jobInfo, columnList,jobJdbcDatasource);
+            updateTableByTableName(con, tableName, jobInfo, columnList, jobJdbcDatasource);
         }
     }
 
-    private void updateTableByTableName(Connection con, String tableName, JobInfo jobInfo, List<DataxColumn> columnList,JobJdbcDatasource jobJdbcDatasource) {
+    private void updateTableByTableName(Connection con, String tableName, JobInfo jobInfo, List<DataxColumn> columnList, JobJdbcDatasource jobJdbcDatasource) {
         StringBuilder sb = new StringBuilder();
         sb.append(SELECT);
         sb.append(SPACE);
@@ -235,25 +236,25 @@ public class DataxHandler {
         StringBuilder whereSql = new StringBuilder();
         for (DataxColumn dataxColumn : columnList) {
             whereSql.append(T_SIGN).append(DOT).append(dataxColumn.getColumnKey()).append(GREATER);
-            if(dataxColumn.getColumnType()==1&&MYSQL_DRIVER.equalsIgnoreCase(jobJdbcDatasource.getJdbcDriverClass())){
+            if (dataxColumn.getColumnType() == 1 && MYSQL_DRIVER.equalsIgnoreCase(jobJdbcDatasource.getJdbcDriverClass())) {
                 whereSql.append(FROM_UNIXTIME)
                         .append(LEFT_PARENTHESIS)
-                        .append(Long.parseLong(dataxColumn.getColumnValue())/1000)
+                        .append(Long.parseLong(dataxColumn.getColumnValue()) / 1000)
                         .append(SPLIT)
                         .append(SINGLE_QUOTE)
                         .append(dataxColumn.getColumnTimeFormat())
                         .append(SINGLE_QUOTE)
                         .append(RIGHT_PARENTHESIS);
-            } else if(dataxColumn.getColumnType()==1&&ORACLE_DRIVER.equalsIgnoreCase(jobJdbcDatasource.getJdbcDriverClass())){
+            } else if (dataxColumn.getColumnType() == 1 && ORACLE_DRIVER.equalsIgnoreCase(jobJdbcDatasource.getJdbcDriverClass())) {
                 whereSql.append(TO_DATE)
                         .append(LEFT_PARENTHESIS)
                         .append(TO_CHAR)
                         .append(LEFT_PARENTHESIS)
-                        .append(Long.parseLong(dataxColumn.getColumnValue())/1000)
+                        .append(Long.parseLong(dataxColumn.getColumnValue()) / 1000)
                         .append(SPACE)
                         .append(OBLIQUE)
                         .append(LEFT_PARENTHESIS)
-                        .append(60*60*24)
+                        .append(60 * 60 * 24)
                         .append(RIGHT_PARENTHESIS)
                         .append(ORACLE_DATE)
                         .append(RIGHT_PARENTHESIS)
@@ -264,10 +265,10 @@ public class DataxHandler {
                         .append(RIGHT_PARENTHESIS)
                         .append(SPLIT)
                         .append(SINGLE_QUOTE)
-                        .append(getTimeFormat(ORACLE_DRIVER,dataxColumn.getColumnTimeFormat()))
+                        .append(getTimeFormat(ORACLE_DRIVER, dataxColumn.getColumnTimeFormat()))
                         .append(SINGLE_QUOTE)
                         .append(RIGHT_PARENTHESIS);
-            } else{
+            } else {
                 whereSql.append(SINGLE_QUOTE).append(dataxColumn.getColumnValue()).append(SINGLE_QUOTE);
             }
             whereSql.append(SPACE).append(AND).append(SPACE);
@@ -284,7 +285,7 @@ public class DataxHandler {
                 for (int i = 0; i < size; i++) {
                     Object val = rs.getObject(i + 1);
                     //判断是否是时间类型
-                    if(val!=null){
+                    if (val != null) {
                         long time = isDate(String.valueOf(val));
                         if (time > 0) {
                             columnList.get(i).setColumnValue(String.valueOf(time));
@@ -313,7 +314,7 @@ public class DataxHandler {
         StringBuilder sb = new StringBuilder();
         while (matcher.find()) {
             String group = matcher.group();
-            String str = columnList.stream().filter(v -> group.equalsIgnoreCase(DOLLAR_SIGN+LEFT_CURLY_BRACKET + v.getColumnParam() + RIGHT_CURLY_BRACKET)).map(DataxColumn::getColumnValue).findFirst().orElse("");
+            String str = columnList.stream().filter(v -> group.equalsIgnoreCase(DOLLAR_SIGN + LEFT_CURLY_BRACKET + v.getColumnParam() + RIGHT_CURLY_BRACKET)).map(DataxColumn::getColumnValue).findFirst().orElse("");
             matcher.appendReplacement(sb, str);
         }
         matcher.appendTail(sb);
@@ -331,13 +332,13 @@ public class DataxHandler {
                     return;
                 }
             }
-            String sql = sb + " limit "+(count-1)+",1";
+            String sql = sb + " limit " + (count - 1) + ",1";
             ps = con.prepareStatement(sql);
             rs = ps.executeQuery();
             if (rs.next()) {
                 for (DataxColumn dataxColumn : columnList) {
                     Object val = rs.getObject(dataxColumn.getColumnKey());
-                    if(val!=null){
+                    if (val != null) {
                         //判断是否是时间类型
                         long time = isDate(String.valueOf(val));
                         if (time > 0) {
@@ -360,21 +361,21 @@ public class DataxHandler {
         }
     }
 
-    public final static Map<String,String> oracleTimeFormatMap = Map.of(
-            "YYYY-MM-DD hh:mm:ss","YYYY-MM-DD HH24:MI:SS",
-            "YYYY/MM/DD hh:mm:ss","YYYY/MM/DD HH24:MI:SS",
-            "YYYY-MM-DD","YYYY-MM-DD",
-            "YYYY/MM/DD","YYYY/MM/DD"
+    public final static Map<String, String> oracleTimeFormatMap = Map.of(
+            "YYYY-MM-DD hh:mm:ss", "YYYY-MM-DD HH24:MI:SS",
+            "YYYY/MM/DD hh:mm:ss", "YYYY/MM/DD HH24:MI:SS",
+            "YYYY-MM-DD", "YYYY-MM-DD",
+            "YYYY/MM/DD", "YYYY/MM/DD"
     );
 
-    public String getTimeFormat(String dataSourceType,String column) {
-        if(ORACLE_DRIVER.equalsIgnoreCase(dataSourceType)){
+    public String getTimeFormat(String dataSourceType, String column) {
+        if (ORACLE_DRIVER.equalsIgnoreCase(dataSourceType)) {
             return oracleTimeFormatMap.get(column);
         }
         return "";
     }
 
-    private long isDate(String time){
+    private long isDate(String time) {
         long res = -1;
         final SimpleDateFormat dateFormat1 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         final SimpleDateFormat dateFormat2 = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
@@ -399,11 +400,10 @@ public class DataxHandler {
                         try {
                             Date date4 = dateFormat4.parse(time);
                             res = date4.getTime();
-                        }
-                        catch (ParseException exx) {
+                        } catch (ParseException exx) {
                             try {
                                 res = Long.parseLong(time);
-                            }catch (NumberFormatException exxx ){
+                            } catch (NumberFormatException exxx) {
                             }
                         }
                     }

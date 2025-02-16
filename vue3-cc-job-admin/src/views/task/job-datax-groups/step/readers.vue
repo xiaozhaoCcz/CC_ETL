@@ -58,7 +58,6 @@ import { useDataxStore } from "@/store/modules/datax";
 
 const userStore = useDataxStore();
 
-// const readerForm = ref({});
 const jdbcDatasourceList = ref([]);
 const datasourceList = ["MYSQL", "ORACLE"];
 const tableList = ref([]);

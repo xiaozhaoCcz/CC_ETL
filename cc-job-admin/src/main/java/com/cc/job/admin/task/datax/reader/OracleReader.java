@@ -17,6 +17,7 @@ import java.util.List;
 import static com.cc.job.xo.constant.DataxConstant.*;
 
 public class OracleReader implements BaseRW {
+
     @Override
     public JSONObject buildJson(DataXParams dataXParams) {
         JSONObject readerConfig = new JSONObject();
@@ -26,14 +27,14 @@ public class OracleReader implements BaseRW {
         parameter.putOnce(PASSWORD, dataXParams.getPassword());
         JSONObject connection = new JSONObject();
 
-        if(StringUtils.isNoneBlank(dataXParams.getJdbcUrl())){
+        if (StringUtils.isNoneBlank(dataXParams.getJdbcUrl())) {
             connection.append(JDBC_URL, dataXParams.getJdbcUrl());
-        }else{
+        } else {
             connection.append(JDBC_URL, String.format(ORACLE_JDBC_URL, dataXParams.getIp(), dataXParams.getPort(), dataXParams.getDbName()));
         }
 
         if (dataXParams.getColumns() != null && !dataXParams.getColumns().isEmpty()) {
-            String tableName = dataXParams.getSchemaName()+"."+dataXParams.getTableName();
+            String tableName = dataXParams.getSchemaName() + "." + dataXParams.getTableName();
             connection.append(TABLE, tableName);
             parameter.putOnce(COLUMN, dataXParams.getColumns());
             if (dataXParams.getIncrType() == 1) {
@@ -63,7 +64,7 @@ public class OracleReader implements BaseRW {
                                 .append(SPACE)
                                 .append(OBLIQUE)
                                 .append(LEFT_PARENTHESIS)
-                                .append(60*60*24)
+                                .append(60 * 60 * 24)
                                 .append(RIGHT_PARENTHESIS)
                                 .append(ORACLE_DATE)
                                 .append(RIGHT_PARENTHESIS)
@@ -74,7 +75,7 @@ public class OracleReader implements BaseRW {
                                 .append(RIGHT_PARENTHESIS)
                                 .append(SPLIT)
                                 .append(SINGLE_QUOTE)
-                                .append(DataxUtils.getDateFormat(DatasourceEnum.ORACLE,dataxColumn.getColumnTimeFormat()))
+                                .append(DataxUtils.getDateFormat(DatasourceEnum.ORACLE, dataxColumn.getColumnTimeFormat()))
                                 .append(SINGLE_QUOTE)
                                 .append(RIGHT_PARENTHESIS);
                     } else {
@@ -102,6 +103,4 @@ public class OracleReader implements BaseRW {
         readerConfig.putOnce(PARAMETER, parameter);
         return readerConfig;
     }
-
-
 }
