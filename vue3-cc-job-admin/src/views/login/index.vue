@@ -233,7 +233,6 @@ async function handleLoginSubmit() {
           //await dictStore.loadDictionaries();
           // 跳转到登录前的页面
           const { path, queryParams } = parseRedirect();
-          console.log(path, queryParams);
           router.push({ path: path, query: queryParams });
         })
         .catch(() => {})

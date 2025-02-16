@@ -175,6 +175,7 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const useDatax = useDataxStore();
   useDatax.clearDataxGroups();
+  console.log(from.path, to.path);
   next();
 });
 

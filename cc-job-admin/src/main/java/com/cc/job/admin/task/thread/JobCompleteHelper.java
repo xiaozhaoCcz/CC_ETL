@@ -145,7 +145,6 @@ public class JobCompleteHelper {
 			@Override
 			public void run() {
 				for (HandleCallbackParam handleCallbackParam : callbackParamList) {
-					System.out.println("callbackParam: " + handleCallbackParam);
 					ReturnT<String> callbackResult = callback(handleCallbackParam);
 					logger.debug(">>>>>>>>> JobApiController.callback {}, handleCallbackParam={}, callbackResult={}",
 							(callbackResult.getCode() == ReturnT.SUCCESS_CODE ? "success" : "fail"), handleCallbackParam, callbackResult);
