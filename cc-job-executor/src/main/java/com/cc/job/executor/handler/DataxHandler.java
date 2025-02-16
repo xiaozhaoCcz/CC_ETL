@@ -244,7 +244,30 @@ public class DataxHandler {
                         .append(dataxColumn.getColumnTimeFormat())
                         .append(SINGLE_QUOTE)
                         .append(RIGHT_PARENTHESIS);
-            }else{
+            } else if(dataxColumn.getColumnType()==1&&ORACLE_DRIVER.equalsIgnoreCase(jobJdbcDatasource.getJdbcDriverClass())){
+                whereSql.append(TO_DATE)
+                        .append(LEFT_PARENTHESIS)
+                        .append(TO_CHAR)
+                        .append(LEFT_PARENTHESIS)
+                        .append(Long.parseLong(dataxColumn.getColumnValue())/1000)
+                        .append(SPACE)
+                        .append(OBLIQUE)
+                        .append(LEFT_PARENTHESIS)
+                        .append(60*60*24)
+                        .append(RIGHT_PARENTHESIS)
+                        .append(ORACLE_DATE)
+                        .append(RIGHT_PARENTHESIS)
+                        .append(SPLIT)
+                        .append(SINGLE_QUOTE)
+                        .append(TIME_FORMAT1)
+                        .append(SINGLE_QUOTE)
+                        .append(RIGHT_PARENTHESIS)
+                        .append(SPLIT)
+                        .append(SINGLE_QUOTE)
+                        .append(getTimeFormat(ORACLE_DRIVER,dataxColumn.getColumnTimeFormat()))
+                        .append(SINGLE_QUOTE)
+                        .append(RIGHT_PARENTHESIS);
+            } else{
                 whereSql.append(SINGLE_QUOTE).append(dataxColumn.getColumnValue()).append(SINGLE_QUOTE);
             }
             whereSql.append(SPACE).append(AND).append(SPACE);
@@ -335,6 +358,20 @@ public class DataxHandler {
             JdbcCommand.close(rs);
             JdbcCommand.close(con);
         }
+    }
+
+    public final static Map<String,String> oracleTimeFormatMap = Map.of(
+            "YYYY-MM-DD hh:mm:ss","YYYY-MM-DD HH24:MI:SS",
+            "YYYY/MM/DD hh:mm:ss","YYYY/MM/DD HH24:MI:SS",
+            "YYYY-MM-DD","YYYY-MM-DD",
+            "YYYY/MM/DD","YYYY/MM/DD"
+    );
+
+    public String getTimeFormat(String dataSourceType,String column) {
+        if(ORACLE_DRIVER.equalsIgnoreCase(dataSourceType)){
+            return oracleTimeFormatMap.get(column);
+        }
+        return "";
     }
 
     private long isDate(String time){

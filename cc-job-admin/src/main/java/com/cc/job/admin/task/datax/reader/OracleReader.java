@@ -4,6 +4,8 @@ import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.cc.job.admin.task.datax.BaseRW;
+import com.cc.job.admin.task.enums.DatasourceEnum;
+import com.cc.job.admin.task.utils.DataxUtils;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.xo.constant.DataxConstant;
 import com.cc.job.xo.model.datax.DataXParams;
@@ -47,12 +49,43 @@ public class OracleReader implements BaseRW {
                     sb.append(dataxColumn.getColumnKey())
                             .append(SPACE)
                             .append(GREATER)
-                            .append(SPACE)
-                            .append(DOLLAR_SIGN)
-                            .append(LEFT_CURLY_BRACKET)
-                            .append(dataxColumn.getColumnParam())
-                            .append(RIGHT_CURLY_BRACKET)
-                            .append(SPACE)
+                            .append(SPACE);
+
+                    if (dataxColumn.getColumnType() == 1 && !"x".equalsIgnoreCase(dataxColumn.getColumnTimeFormat())) {
+                        sb.append(TO_DATE)
+                                .append(LEFT_PARENTHESIS)
+                                .append(TO_CHAR)
+                                .append(LEFT_PARENTHESIS)
+                                .append(DOLLAR_SIGN)
+                                .append(LEFT_CURLY_BRACKET)
+                                .append(dataxColumn.getColumnParam())
+                                .append(RIGHT_CURLY_BRACKET)
+                                .append(SPACE)
+                                .append(OBLIQUE)
+                                .append(LEFT_PARENTHESIS)
+                                .append(60*60*24)
+                                .append(RIGHT_PARENTHESIS)
+                                .append(ORACLE_DATE)
+                                .append(RIGHT_PARENTHESIS)
+                                .append(SPLIT)
+                                .append(SINGLE_QUOTE)
+                                .append(TIME_FORMAT1)
+                                .append(SINGLE_QUOTE)
+                                .append(RIGHT_PARENTHESIS)
+                                .append(SPLIT)
+                                .append(SINGLE_QUOTE)
+                                .append(DataxUtils.getDateFormat(DatasourceEnum.ORACLE,dataxColumn.getColumnTimeFormat()))
+                                .append(SINGLE_QUOTE)
+                                .append(RIGHT_PARENTHESIS);
+                    } else {
+                        // 非字符串类型
+                        sb.append(DOLLAR_SIGN)
+                                .append(LEFT_CURLY_BRACKET)
+                                .append(dataxColumn.getColumnParam())
+                                .append(RIGHT_CURLY_BRACKET);
+                    }
+
+                    sb.append(SPACE)
                             .append(AND)
                             .append(SPACE);
                 }
@@ -69,4 +102,6 @@ public class OracleReader implements BaseRW {
         readerConfig.putOnce(PARAMETER, parameter);
         return readerConfig;
     }
+
+
 }
