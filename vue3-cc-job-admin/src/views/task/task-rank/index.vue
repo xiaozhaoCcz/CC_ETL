@@ -223,10 +223,8 @@ const handleDblClick = (node) => {
   }
   // 在这里处理双击事件
   if (node.data != undefined && node.data) {
-    console.log("双击了节点:", node.data);
     // 往nodes添加节点
     nodes.value.push(generateNode(node.data));
-    console.log(nodes.value);
   }
 };
 

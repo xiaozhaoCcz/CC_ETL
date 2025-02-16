@@ -556,5 +556,5 @@ public class JobGroupXxlJob {
         }
     }
 
-    private static Logger logger = LoggerFactory.getLogger(JobGroupXxlJob.class);
+    private static final Logger logger = LoggerFactory.getLogger(JobGroupXxlJob.class);
 }

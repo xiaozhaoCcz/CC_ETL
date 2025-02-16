@@ -64,7 +64,6 @@ watch(
 watch(
   () => tableData.value,
   async (val) => {
-    console.log(val);
     emit("handleTableData", val);
   },
   {

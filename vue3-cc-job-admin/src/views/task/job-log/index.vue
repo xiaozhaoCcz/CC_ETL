@@ -252,11 +252,6 @@
 </template>
 
 <script setup lang="ts">
-defineOptions({
-  name: "TaskLog",
-  inheritAttrs: false,
-});
-
 import JobLogAPI, { TaskLogPageVO } from "@/api/task/job-log";
 import TaskTriggerLog from "./operstion/task-trigger-log.vue";
 import TaskExecuteLog from "./operstion/task-execute-log.vue";

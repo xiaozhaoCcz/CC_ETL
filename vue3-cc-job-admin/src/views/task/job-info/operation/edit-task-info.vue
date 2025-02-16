@@ -558,7 +558,6 @@ function handleTableData2(val) {
 watch(
   () => props.formData,
   (data) => {
-    console.log(data);
     if (data.id && data.glueType === "DATAX") {
       jsonData.value = JSON.parse(data.executorParam);
     }

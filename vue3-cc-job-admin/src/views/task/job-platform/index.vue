@@ -347,7 +347,6 @@ function getTaskTriggerLog() {
     ElMessage.warning("请选择任务~");
     return;
   }
-  console.log(jobCompId.value);
   router.push({
     path: "/job/job-log",
     query: { id: jobCompId.value },
