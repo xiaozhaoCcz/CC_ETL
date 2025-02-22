@@ -1,6 +1,5 @@
 package com.cc.job.admin.task.service.impl;
 
-import cn.hutool.core.lang.Pair;
 import cn.hutool.json.JSONObject;
 import com.cc.job.admin.task.datax.reader.MysqlReader;
 import com.cc.job.admin.task.datax.reader.OracleReader;
