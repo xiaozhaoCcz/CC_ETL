@@ -263,7 +263,6 @@
                   </el-dropdown-item>
                   <el-dropdown-item
                     @click="handleCopy(scope.row.id)"
-                    :disabled="scope.row.triggerStatus == 1"
                   >
                     复制
                   </el-dropdown-item>
