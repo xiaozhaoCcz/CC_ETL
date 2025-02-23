@@ -3,8 +3,10 @@ package com.cc.job.admin.task.service.impl;
 import cn.hutool.json.JSONObject;
 import com.cc.job.admin.task.datax.reader.MysqlReader;
 import com.cc.job.admin.task.datax.reader.OracleReader;
+import com.cc.job.admin.task.datax.reader.PostgreSqlReader;
 import com.cc.job.admin.task.datax.writer.MysqlWriter;
 import com.cc.job.admin.task.datax.writer.OracleWriter;
+import com.cc.job.admin.task.datax.writer.PostgreSqlWriter;
 import com.cc.job.admin.task.enums.DatasourceEnum;
 import com.cc.job.xo.model.datax.DataXParams;
 import com.cc.job.admin.task.service.DataxService;
@@ -23,6 +25,8 @@ public class DataxServiceImpl implements DataxService {
                     dataXParams.getType() == 0 ? new MysqlReader().buildJson(dataXParams) : new MysqlWriter().buildJson(dataXParams);
             case ORACLE ->
                     dataXParams.getType() == 0 ? new OracleReader().buildJson(dataXParams) : new OracleWriter().buildJson(dataXParams);
+            case POSTGRESQL ->
+                    dataXParams.getType() == 0 ? new PostgreSqlReader().buildJson(dataXParams) : new PostgreSqlWriter().buildJson(dataXParams);
         };
         return jsonObject.toString();
     }

@@ -3,7 +3,8 @@ package com.cc.job.admin.task.enums;
 public enum DatasourceEnum {
 
     MYSQL("mysql"),
-    ORACLE("oracle");
+    ORACLE("oracle"),
+    POSTGRESQL("postgresql");
 
     private final String datasourceName;
 

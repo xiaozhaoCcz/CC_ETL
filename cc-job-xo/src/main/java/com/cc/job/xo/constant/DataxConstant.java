@@ -12,6 +12,10 @@ public interface DataxConstant {
 
     String ORACLE_WRITER = "oraclewriter";
 
+    String POSTGRESQL_READER = "postgresqlreader";
+
+    String POSTGRESQL_WRITER = "postgresqlwriter";
+
     String USERNAME = "username";
 
     String PASSWORD = "password";
@@ -21,6 +25,8 @@ public interface DataxConstant {
     String MYSQL_JDBC_URL = "jdbc:mysql://%s:%s/%s";
 
     String ORACLE_JDBC_URL = "jdbc:oracle:thin:@%s:%s/%s";
+
+    String POSTGRESQL_JDBC_URL = "jdbc:postgresql://%s:%s/%s";
 
     String MYSQL_DRIVER = "com.mysql.cj.jdbc.Driver";
 
