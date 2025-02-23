@@ -44,5 +44,4 @@ public interface AdminBiz {
 
     // ---------------------- biz (custome) ----------------------
     // group、job ... manage
-
 }

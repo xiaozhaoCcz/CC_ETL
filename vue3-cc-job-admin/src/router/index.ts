@@ -4,6 +4,7 @@ import {
   createWebHashHistory,
   type RouteRecordRaw,
 } from "vue-router";
+import { useDataxStore } from "@/store";
 
 export const Layout = () => import("@/layout/index.vue");
 
@@ -59,32 +60,32 @@ export const constantRoutes: RouteRecordRaw[] = [
     ],
   },
   {
-    path: "/task",
-    name: "task",
+    path: "/job",
+    name: "job",
     component: Layout,
-    redirect: "/task-info",
+    redirect: "/job-info",
     meta: {
       title: "任务管理",
       icon: "system",
     },
     children: [
       {
-        path: "task-info",
-        component: () => import("@/views/task/task-info/index.vue"),
+        path: "job-info",
+        component: () => import("@/views/task/job-info/index.vue"),
         // 用于 keep-alive 功能，需要与 SFC 中自动推导或显式声明的组件名称一致
         // 参考文档: https://cn.vuejs.org/guide/built-ins/keep-alive.html#include-exclude
-        name: "taskInfo",
+        name: "jobInfo",
         meta: {
           title: "任务管理",
           icon: "menu",
         },
       },
       {
-        path: "task-group",
-        component: () => import("@/views/task/task-group/index.vue"),
+        path: "job-group",
+        component: () => import("@/views/task/job-group/index.vue"),
         // 用于 keep-alive 功能，需要与 SFC 中自动推导或显式声明的组件名称一致
         // 参考文档: https://cn.vuejs.org/guide/built-ins/keep-alive.html#include-exclude
-        name: "taskGroup",
+        name: "jobGroup",
         meta: {
           title: "执行器管理",
           icon: "fullscreen",
@@ -114,6 +115,17 @@ export const constantRoutes: RouteRecordRaw[] = [
         },
       },
       {
+        path: "job-datax-groups",
+        component: () => import("@/views/task/job-datax-groups/index.vue"),
+        // 用于 keep-alive 功能，需要与 SFC 中自动推导或显式声明的组件名称一致
+        // 参考文档: https://cn.vuejs.org/guide/built-ins/keep-alive.html#include-exclude
+        name: "jobDataxGroups",
+        meta: {
+          title: "多数据源同步",
+          icon: "close_other",
+        },
+      },
+      {
         path: "job-platform",
         component: () => import("@/views/task/job-platform/index.vue"),
         // 用于 keep-alive 功能，需要与 SFC 中自动推导或显式声明的组件名称一致
@@ -136,17 +148,16 @@ export const constantRoutes: RouteRecordRaw[] = [
       //   },
       // },
       {
-        path: "task-log",
-        component: () => import("@/views/task/task-log/index.vue"),
+        path: "job-log",
+        component: () => import("@/views/task/job-log/index.vue"),
         // 用于 keep-alive 功能，需要与 SFC 中自动推导或显式声明的组件名称一致
         // 参考文档: https://cn.vuejs.org/guide/built-ins/keep-alive.html#include-exclude
-        name: "taskLog",
+        name: "jobLog",
         meta: {
           title: "任务日志",
           icon: "document",
         },
       },
-
     ],
   },
 ];
@@ -159,6 +170,13 @@ const router = createRouter({
   routes: constantRoutes,
   // 刷新时，滚动条位置还原
   scrollBehavior: () => ({ left: 0, top: 0 }),
+});
+
+router.beforeEach((to, from, next) => {
+  const useDatax = useDataxStore();
+  useDatax.clearDataxGroups();
+  console.log(from.path, to.path);
+  next();
 });
 
 // 全局注册 router

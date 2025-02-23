@@ -2,7 +2,7 @@
   <div class="app-container">
     <div class="search-container">
       <el-form ref="queryFormRef" :model="queryParams" :inline="true">
-        <el-form-item label="执行器" prop="status">
+        <el-form-item label="执行器" prop="jobGroup">
           <el-select
             v-model="queryParams.jobGroup"
             placeholder="全部"
@@ -17,7 +17,7 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item label="任务状态" prop="status">
+        <el-form-item label="任务状态" prop="logStatus">
           <el-select
             v-model="queryParams.logStatus"
             placeholder="全部"
@@ -31,7 +31,7 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item label="调度时间">
+        <el-form-item label="调度时间" prop="filterTime">
           <el-date-picker
             v-model="queryParams.filterTime"
             type="datetimerange"
@@ -252,11 +252,6 @@
 </template>
 
 <script setup lang="ts">
-defineOptions({
-  name: "TaskLog",
-  inheritAttrs: false,
-});
-
 import JobLogAPI, { TaskLogPageVO } from "@/api/task/job-log";
 import TaskTriggerLog from "./operstion/task-trigger-log.vue";
 import TaskExecuteLog from "./operstion/task-execute-log.vue";
@@ -395,7 +390,7 @@ function handleDelete() {
     obj.filterTime = getTime(timeForm.dateTime);
   }
   loading.value = true;
-  JobLogAPI.deleteTaskLogs(obj)
+  JobLogAPI.deleteJobLogs(obj)
     .then(() => {
       ElMessage.success("删除成功");
       handleResetQuery();

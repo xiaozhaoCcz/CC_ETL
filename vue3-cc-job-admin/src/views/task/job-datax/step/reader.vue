@@ -25,12 +25,12 @@
         <el-option
           v-for="item in jdbcDatasourceList"
           :key="item.id"
-          :label="item.databaseName"
+          :label="`${item.datasourceName}:${item.databaseName}`"
           :value="item.id"
         />
       </el-select>
     </el-form-item>
-    <el-form-item label="数据表" v-if="readerForm.jdbcDatasourceId&&readerForm.ds!=='ORACLE'">
+    <el-form-item label="数据表" v-if="readerForm.jdbcDatasourceId">
       <el-radio-group v-model="readerForm.tableName">
         <el-radio
           v-for="item in tableList"

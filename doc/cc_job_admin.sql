@@ -369,6 +369,7 @@ CREATE TABLE `job_jdbc_datasource` (
   `comments` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '备注',
   `datasource` varchar(100) COLLATE utf8mb4_general_ci DEFAULT NULL,
   `database_name` varchar(100) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `schema_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL,
   PRIMARY KEY (`id`) USING BTREE
 ) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci ROW_FORMAT=DYNAMIC COMMENT='jdbc数据源配置';
 
@@ -376,10 +377,10 @@ CREATE TABLE `job_jdbc_datasource` (
 -- Records of job_jdbc_datasource
 -- ----------------------------
 BEGIN;
-INSERT INTO `job_jdbc_datasource` (`id`, `datasource_name`, `datasource_group`, `jdbc_username`, `jdbc_password`, `jdbc_url`, `jdbc_driver_class`, `status`, `create_time`, `update_time`, `comments`, `datasource`, `database_name`) VALUES (6, '同步stu1', 'Default', 'root', 'root', 'jdbc:mysql://localhost:3306/test1', 'com.mysql.cj.jdbc.Driver', 1, '2024-12-16 21:44:18', '2024-12-16 21:44:18', '同步stu1', 'MYSQL', 'test1');
-INSERT INTO `job_jdbc_datasource` (`id`, `datasource_name`, `datasource_group`, `jdbc_username`, `jdbc_password`, `jdbc_url`, `jdbc_driver_class`, `status`, `create_time`, `update_time`, `comments`, `datasource`, `database_name`) VALUES (7, '同步stu2', 'Default', 'root', 'root', 'jdbc:mysql://localhost:3306/test2', 'com.mysql.cj.jdbc.Driver', 1, '2024-12-16 21:44:18', '2024-12-18 20:23:53', '同步stu1', 'MYSQL', 'test2');
-INSERT INTO `job_jdbc_datasource` (`id`, `datasource_name`, `datasource_group`, `jdbc_username`, `jdbc_password`, `jdbc_url`, `jdbc_driver_class`, `status`, `create_time`, `update_time`, `comments`, `datasource`, `database_name`) VALUES (8, 'yanhuo', 'Default', 'root', 'root', 'jdbc:mysql://localhost:3306/yanhuo', 'com.mysql.cj.jdbc.Driver', 1, '2024-12-22 13:57:46', '2024-12-22 13:57:46', '正式烟火', 'MYSQL', 'yanhuo');
-INSERT INTO `job_jdbc_datasource` (`id`, `datasource_name`, `datasource_group`, `jdbc_username`, `jdbc_password`, `jdbc_url`, `jdbc_driver_class`, `status`, `create_time`, `update_time`, `comments`, `datasource`, `database_name`) VALUES (9, 'yanhuo-test', 'Default', 'root', 'root', 'jdbc:mysql://localhost:3306/yanhuo-test', 'com.mysql.cj.jdbc.Driver', 1, '2024-12-22 13:58:15', '2024-12-22 13:58:15', '测试烟火', 'MYSQL', 'yanhuo-test');
+INSERT INTO `job_jdbc_datasource` (`id`, `datasource_name`, `datasource_group`, `jdbc_username`, `jdbc_password`, `jdbc_url`, `jdbc_driver_class`, `status`, `create_time`, `update_time`, `comments`, `datasource`, `database_name`, `schema_name`) VALUES (6, '同步stu1', 'Default', 'root', 'root', 'jdbc:mysql://localhost:3306/test1', 'com.mysql.cj.jdbc.Driver', 1, '2024-12-16 21:44:18', '2024-12-16 21:44:18', '同步stu1', 'MYSQL', 'test1', '');
+INSERT INTO `job_jdbc_datasource` (`id`, `datasource_name`, `datasource_group`, `jdbc_username`, `jdbc_password`, `jdbc_url`, `jdbc_driver_class`, `status`, `create_time`, `update_time`, `comments`, `datasource`, `database_name`, `schema_name`) VALUES (7, '同步stu2', 'Default', 'root', 'root', 'jdbc:mysql://localhost:3306/test2', 'com.mysql.cj.jdbc.Driver', 1, '2024-12-16 21:44:18', '2024-12-18 20:23:53', '同步stu1', 'MYSQL', 'test2', '');
+INSERT INTO `job_jdbc_datasource` (`id`, `datasource_name`, `datasource_group`, `jdbc_username`, `jdbc_password`, `jdbc_url`, `jdbc_driver_class`, `status`, `create_time`, `update_time`, `comments`, `datasource`, `database_name`, `schema_name`) VALUES (8, 'yanhuo', 'Default', 'root', 'root', 'jdbc:mysql://localhost:3306/yanhuo', 'com.mysql.cj.jdbc.Driver', 1, '2024-12-22 13:57:46', '2024-12-22 13:57:46', '正式烟火', 'MYSQL', 'yanhuo', '');
+INSERT INTO `job_jdbc_datasource` (`id`, `datasource_name`, `datasource_group`, `jdbc_username`, `jdbc_password`, `jdbc_url`, `jdbc_driver_class`, `status`, `create_time`, `update_time`, `comments`, `datasource`, `database_name`, `schema_name`) VALUES (9, 'yanhuo-test', 'Default', 'root', 'root', 'jdbc:mysql://localhost:3306/yanhuo-test', 'com.mysql.cj.jdbc.Driver', 1, '2024-12-22 13:58:15', '2024-12-22 13:58:15', '测试烟火', 'MYSQL', 'yanhuo-test', '');
 COMMIT;
 
 -- ----------------------------

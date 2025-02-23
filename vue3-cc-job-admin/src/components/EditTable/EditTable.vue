@@ -64,7 +64,6 @@ watch(
 watch(
   () => tableData.value,
   async (val) => {
-    console.log(val);
     emit("handleTableData", val);
   },
   {
@@ -85,7 +84,6 @@ const blurValueInput = (row, column) => {
   // tableRowEditId.value = null
   // tableColumnEditIndex.value = null
   //在此处调接口传数据
-  console.log(row, column);
 };
 
 const handleDelete = (row) => {

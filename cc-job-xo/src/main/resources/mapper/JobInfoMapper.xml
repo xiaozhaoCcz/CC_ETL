@@ -30,7 +30,7 @@
 		t.trigger_next_time
     </sql>
 
-    <update id="stopTaskSet">
+    <update id="stopJobCompose">
 		update job_info set rank_trigger_status = 0 where id = #{id} and rank_trigger_status = 1;
 	</update>
 

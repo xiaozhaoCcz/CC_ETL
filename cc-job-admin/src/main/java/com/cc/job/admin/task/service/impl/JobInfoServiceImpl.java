@@ -2,8 +2,6 @@ package com.cc.job.admin.task.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
-import cn.hutool.json.JSONArray;
-import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.xo.common.exception.BusinessException;
@@ -32,7 +30,6 @@ import com.xxl.job.core.util.DateUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -74,7 +71,6 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
     private final JobInfoMapper jobInfoMapper;
 
-    private final RedisTemplate redisTemplate;
 
     /**
      * 获取task_info分页列表
@@ -83,11 +79,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
      * @return {@link IPage< JobInfoVO >} task_info分页列表
      */
     @Override
-    public IPage<JobInfoVO> getTaskInfoPage(JobInfoQuery queryParams) {
-//        Page<TaskInfoVO> pageVO = this.baseMapper.getTaskInfoPage(
-//                new Page<>(queryParams.getPageNum(), queryParams.getPageSize()),
-//                queryParams
-//        );
+    public IPage<JobInfoVO> getJobInfoPage(JobInfoQuery queryParams) {
         Page<JobInfoVO> pageVO = new Page<>();
         LambdaQueryWrapper<JobInfo> wrapper = new LambdaQueryWrapper<>();
         if (queryParams.getJobGroup() != null) {
@@ -125,7 +117,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
      * @return
      */
     @Override
-    public JobInfoForm getTaskInfoFormData(Long id) {
+    public JobInfoForm getJobInfoForm(Long id) {
         JobInfo entity = this.getById(id);
         JobInfoForm taskInfoForm = BeanUtil.copyProperties(entity, JobInfoForm.class);
         if (entity.getJobType() == 2) {
@@ -153,8 +145,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
      * @return
      */
     @Override
-    public boolean saveTaskInfo(JobInfoForm formData) {
-        JobInfo taskInfo = baseSaveTaskInfo(formData);
+    public boolean saveJobInfo(JobInfoForm formData) {
+        JobInfo taskInfo = baseSaveJobInfo(formData);
         return this.save(taskInfo);
     }
 
@@ -176,9 +168,9 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean updateTaskInfo(Long id, JobInfoForm formData) {
+    public boolean updateJobInfo(Long id, JobInfoForm formData) {
         // valid trigger
-        JobInfo existsJobInfo = baseUpdateTaskInfo(id, formData);
+        JobInfo existsJobInfo = baseUpdateJobInfo(id, formData);
         updateChild(existsJobInfo);
         return true;
     }
@@ -206,7 +198,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean deleteTaskInfos(String ids) {
+    public boolean deleteJobInfos(String ids) {
         Assert.isTrue(StrUtil.isNotBlank(ids), "删除的task_info数据为空");
         // 逻辑删除
         List<Long> idList = Arrays.stream(ids.split(","))
@@ -268,7 +260,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     }
 
     @Override
-    public boolean startTask(Long id) {
+    public boolean startJob(Long id) {
         JobInfo xxlJobInfo = this.getById(id);
 
         // valid
@@ -298,7 +290,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean stopTask(Long id) {
+    public boolean stopJob(Long id) {
         JobInfo xxlJobInfo = this.getById(id);
         xxlJobInfo.setTriggerStatus(0);
         xxlJobInfo.setTriggerLastTime(0L);
@@ -336,8 +328,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean saveTaskSet(JobInfoForm formData) {
-        JobInfo taskInfo = baseSaveTaskInfo(formData);
+    public boolean saveJobCompose(JobInfoForm formData) {
+        JobInfo taskInfo = baseSaveJobInfo(formData);
         if (StringUtils.isBlank(formData.getNodes())) {
             throw new BusinessException("任务节点不能为空");
         }
@@ -428,7 +420,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
 
     @Override
-    public JobInfo baseSaveTaskInfo(JobInfoForm formData) {
+    public JobInfo baseSaveJobInfo(JobInfoForm formData) {
         JobGroup taskGroup = jobGroupService.getById(formData.getJobGroup());
         if (taskGroup == null) {
             throw new BusinessException(I18nUtil.getString("system_please_choose") + I18nUtil.getString("jobinfo_field_jobgroup"));
@@ -522,9 +514,9 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean updateTaskSet(Long id, JobInfoForm formData) {
+    public boolean updateJobCompose(Long id, JobInfoForm formData) {
         // valid trigger
-        JobInfo existsJobInfo = baseUpdateTaskInfo(id, formData);
+        JobInfo existsJobInfo = baseUpdateJobInfo(id, formData);
         if (StringUtils.isBlank(formData.getNodes())) {
             throw new BusinessException("任务节点不能为空");
         }
@@ -624,16 +616,13 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     }
 
     @Override
-    public boolean stopTaskSet(Long id, String randomId) {
-        int flag = jobInfoMapper.stopTaskSet(id);
+    public boolean stopJobCompose(Long id, String randomId) {
+        int flag = jobInfoMapper.stopJobCompose(id);
         XxlJobExecutor.removeJobThread(id.intValue(), "stop task" + id);
-        if (redisTemplate.hasKey(id + ":" + randomId)) {
-            WorkerWrapper<Long, String> workWrapper = JobGroupXxlJob.getWorkWrapper(id, randomId);
-            if (workWrapper != null) {
-                log.info(">>>>>>>>> stop task:{}", workWrapper.getId());
-                Async.stopWork(workWrapper);
-            }
-            redisTemplate.delete(id + ":" + randomId);
+        WorkerWrapper<Long, String> workWrapper = JobGroupXxlJob.getWorkWrapper(id, randomId);
+        if (workWrapper != null) {
+            log.info(">>>>>>>>> stop task:{}", workWrapper.getId());
+            Async.stopWork(workWrapper);
         }
         return true;
     }
@@ -660,7 +649,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     }
 
     @Override
-    public JobInfo baseUpdateTaskInfo(Long id, JobInfoForm formData) {
+    public JobInfo baseUpdateJobInfo(Long id, JobInfoForm formData) {
         ScheduleTypeEnum scheduleTypeEnum = ScheduleTypeEnum.match(formData.getScheduleType(), null);
         if (scheduleTypeEnum == null) {
             throw new BusinessException(I18nUtil.getString("schedule_type") + I18nUtil.getString("system_unvalid"));
@@ -749,7 +738,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
         // next trigger time (5s后生效，避开预读周期)
         long nextTriggerTime = existsJobInfo.getTriggerNextTime();
-        boolean scheduleDataNotChanged = formData.getScheduleType().equals(existsJobInfo.getScheduleType()) && formData.getScheduleConf().equals(existsJobInfo.getScheduleConf());
+        boolean scheduleDataNotChanged = formData.getScheduleType().equals(existsJobInfo.getScheduleType()) &&existsJobInfo.getScheduleConf()!=null&&formData.getScheduleConf().equals(existsJobInfo.getScheduleConf());
         if (existsJobInfo.getTriggerStatus() == 1 && !scheduleDataNotChanged) {
             try {
                 existsJobInfo.setScheduleConf(formData.getScheduleConf());

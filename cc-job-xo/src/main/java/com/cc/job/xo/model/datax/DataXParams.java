@@ -23,6 +23,8 @@ public class DataXParams implements Serializable {
 
     private String tableName;
 
+    private String jdbcUrl;
+
     private String ip;
 
     private Integer port;
@@ -38,4 +40,6 @@ public class DataXParams implements Serializable {
 
     // 增量字段，json
     private String incrContent;
+
+    private String schemaName;
 }

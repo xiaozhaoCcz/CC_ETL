@@ -2,7 +2,7 @@
   <div class="app-container">
     <div class="search-container">
       <el-form ref="queryFormRef" :model="queryParams" :inline="true">
-        <el-form-item label="执行器" prop="status">
+        <el-form-item label="执行器" prop="jobGroup">
           <el-select
             v-model="queryParams.jobGroup"
             placeholder="全部"
@@ -16,7 +16,7 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="任务状态" prop="status">
+        <el-form-item label="任务状态" prop="triggerStatus">
           <el-select
             v-model="queryParams.triggerStatus"
             placeholder="全部"
@@ -27,7 +27,7 @@
             <el-option label="停止" :value="0" />
           </el-select>
         </el-form-item>
-        <el-form-item label="任务描述" prop="keywords">
+        <el-form-item label="任务描述" prop="jobDesc">
           <el-input
             v-model="queryParams.jobDesc"
             placeholder="请输入任务描述"
@@ -35,7 +35,7 @@
             @keyup.enter="handleQuery"
           />
         </el-form-item>
-        <el-form-item label="JobHandler" prop="keywords">
+        <el-form-item label="JobHandler" prop="executorHandler">
           <el-input
             v-model="queryParams.executorHandler"
             placeholder="请输入JobHandler"
@@ -43,7 +43,7 @@
             @keyup.enter="handleQuery"
           />
         </el-form-item>
-        <el-form-item label="责任人" prop="keywords" style="width: 200px">
+        <el-form-item label="责任人" prop="author" style="width: 200px">
           <el-input
             v-model="queryParams.author"
             placeholder="请输入责任人"
@@ -236,14 +236,14 @@
                   </el-dropdown-item>
                   <el-dropdown-item
                     divided
-                    @click="startTask(scope.row.id)"
+                    @click="startJob(scope.row.id)"
                     v-if="scope.row.triggerStatus === 0"
                   >
                     启动
                   </el-dropdown-item>
                   <el-dropdown-item
                     divided
-                    @click="stopTask(scope.row.id)"
+                    @click="stopJob(scope.row.id)"
                     v-else
                   >
                     停止
@@ -263,7 +263,6 @@
                   </el-dropdown-item>
                   <el-dropdown-item
                     @click="handleCopy(scope.row.id)"
-                    :disabled="scope.row.triggerStatus == 1"
                   >
                     复制
                   </el-dropdown-item>
@@ -329,8 +328,8 @@ defineOptions({
 
 import JobInfoAPI, {
   TaskInfoPageVO,
-  TaskInfoForm,
-  TaskInfoPageQuery,
+  JobInfoForm,
+  JobInfoPageQuery,
 } from "@/api/task/job-info";
 import ExecuteOne from "./operation/executeone.vue";
 import EditTaskInfo from "./operation/edit-task-info.vue";
@@ -344,7 +343,7 @@ const loading = ref(false);
 const removeIds = ref<number[]>([]);
 const total = ref(0);
 
-const queryParams = reactive<TaskInfoPageQuery>({
+const queryParams = reactive<JobInfoPageQuery>({
   pageNum: 1,
   pageSize: 10,
 });
@@ -359,7 +358,7 @@ const taskInfoVisible = reactive({
 });
 
 // task_info表单数据
-const formData = reactive<TaskInfoForm>({
+const formData = reactive<JobInfoForm>({
   incrType: 0,
 });
 const executeOneVal = ref(false);
@@ -390,7 +389,7 @@ function glueClick(id: number) {
 
 function getTaskTriggerLog(id: number) {
   router.push({
-    path: "/task/task-log",
+    path: "/job/job-log",
     query: { id },
   });
 }
@@ -424,16 +423,16 @@ function closeExecuteOne() {
   executeOneVal.value = false;
 }
 
-function startTask(id: number) {
+function startJob(id: number) {
   const taskObj = pageData.value.filter((v) => v.id == id)[0];
-  JobInfoAPI.startTask(id).then(() => {
+  JobInfoAPI.startJob(id).then(() => {
     taskObj.triggerStatus = 1;
   });
 }
 
-function stopTask(id: number) {
+function stopJob(id: number) {
   const taskObj = pageData.value.filter((v) => v.id == id)[0];
-  JobInfoAPI.stopTask(id).then(() => {
+  JobInfoAPI.stopJob(id).then(() => {
     taskObj.triggerStatus = 0;
   });
 }
@@ -473,6 +472,15 @@ function handleResetQuery() {
   queryFormRef.value!.resetFields();
   queryParams.pageNum = 1;
   handleQuery();
+}
+
+function resetData(){
+  const keys = Object.keys(queryParams);
+  let obj: { [name: string]: string } = {};
+  keys.forEach((item) => {
+    obj[item] = "";
+  })
+  Object.assign(formData, obj);
 }
 
 /** 行复选框选中记录选中ID集合 */

@@ -1,5 +1,6 @@
 package com.cc.job.admin.task.command;
 
+import com.alibaba.excel.util.StringUtils;
 import com.cc.job.xo.common.exception.BusinessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,11 +21,21 @@ public class JdbcCommand {
 
     private Connection con;
 
+    private String schemaName;
+
     public JdbcCommand(String driverClassName, String url, String username, String password) {
         this.driverClassName = driverClassName;
         this.url = url;
         this.username = username;
         this.password = password;
+    }
+
+    public JdbcCommand(String driverClassName, String url, String username, String password,String schemaName) {
+        this.driverClassName = driverClassName;
+        this.url = url;
+        this.username = username;
+        this.password = password;
+        this.schemaName = schemaName;
     }
 
     public  Connection getConnection() {
@@ -33,7 +44,12 @@ public class JdbcCommand {
         }
         try {
             Class.forName(driverClassName);
-            con = DriverManager.getConnection(url, username, password);
+            if(StringUtils.isNotBlank(schemaName)){
+                url = url + "?user="+username+"&password="+password+"&currentSchema="+schemaName;
+                con = DriverManager.getConnection(url);
+            }else{
+                con = DriverManager.getConnection(url, username, password);
+            }
         } catch (Exception e) {
             throw new BusinessException(e);
         }

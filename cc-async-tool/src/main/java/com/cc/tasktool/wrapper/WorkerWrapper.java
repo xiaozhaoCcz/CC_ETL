@@ -431,24 +431,30 @@ public class WorkerWrapper<T, V> {
 
             V resultValue;
 
-            if(timeout>0){
-                Thread thread =null;
+            if (timeout > 0) {
+                Thread thread = null;
                 try {
                     FutureTask<V> futureTask = new FutureTask<>(() -> worker.action(param, forParamUseWrappers));
                     thread = new Thread(futureTask);
                     thread.start();
                     resultValue = futureTask.get(timeout, TimeUnit.MILLISECONDS);
-                }catch (Exception e){
+                } catch (Exception e) {
                     throw new RuntimeException(e);
-                }finally {
+                } finally {
                     thread.interrupt();
                 }
-            }else {
+            } else {
                 resultValue = worker.action(param, forParamUseWrappers);
             }
 
             //如果状态不是在working,说明别的地方已经修改了
             if (!compareAndSetState(WORKING, FINISH)) {
+                return workResult;
+            }
+
+            if ("FAIL_RETRY".equals(resultValue) && retryCount != null && ++count <= retryCount) {
+                this.state.set(INIT);
+                workerDoJob();
                 return workResult;
             }
 
@@ -459,10 +465,7 @@ public class WorkerWrapper<T, V> {
 
             return workResult;
         } catch (Exception e) {
-            if(retryCount!=null&&++count<=retryCount){
-                this.state.set(INIT);
-                workerDoJob();
-            }
+
             //避免重复回调
             if (!checkIsNullResult()) {
                 return workResult;
@@ -556,6 +559,10 @@ public class WorkerWrapper<T, V> {
 
     public String getId() {
         return id;
+    }
+
+    public int getCount() {
+        return count;
     }
 
     public T getParam() {

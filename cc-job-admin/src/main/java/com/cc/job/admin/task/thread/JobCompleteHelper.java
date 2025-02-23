@@ -1,13 +1,14 @@
 package com.cc.job.admin.task.thread;
 
+import cn.hutool.core.lang.Pair;
 import com.cc.job.admin.task.complete.XxlJobCompleter;
 import com.cc.job.admin.config.XxlJobAdminConfig;
 import com.cc.job.xo.model.entity.JobLog;
-import com.cc.job.admin.task.redis.StreamConsumer;
 import com.cc.job.admin.task.utils.I18nUtil;
 import com.xxl.job.core.biz.model.HandleCallbackParam;
 import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.util.DateUtil;
+import com.xxl.job.core.util.XxlJobRemotingUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -144,7 +145,6 @@ public class JobCompleteHelper {
 			@Override
 			public void run() {
 				for (HandleCallbackParam handleCallbackParam : callbackParamList) {
-					System.out.println("callbackParam: " + handleCallbackParam);
 					ReturnT<String> callbackResult = callback(handleCallbackParam);
 					logger.debug(">>>>>>>>> JobApiController.callback {}, handleCallbackParam={}, callbackResult={}",
 							(callbackResult.getCode() == ReturnT.SUCCESS_CODE ? "success" : "fail"), handleCallbackParam, callbackResult);
@@ -157,26 +157,19 @@ public class JobCompleteHelper {
 
 	private ReturnT<String> callback(HandleCallbackParam handleCallbackParam) {
 		// valid log item
+		if (handleCallbackParam.getLogId() == -1) {
+			Pair<String, Boolean> pair = new Pair<>(handleCallbackParam.getJobId() + ":" + handleCallbackParam.getRandomId(), handleCallbackParam.getHandleCode() == ReturnT.SUCCESS_CODE);
+			XxlJobRemotingUtil.postBody(handleCallbackParam.getAddress() + "api/addJobGroupData", "", 10, pair, String.class);
+			return ReturnT.SUCCESS;
+		}
 		JobLog log = XxlJobAdminConfig.getAdminConfig().getJobLogMapper().selectById(handleCallbackParam.getLogId());
-		String randomId = "";
 		if (log != null && StringUtils.isNotBlank(log.getExecutorParam())) {
 			logger.info(">>>>>>>executorParam:{}", log.getExecutorParam());
-			randomId = ":" + log.getExecutorParam();
 		}
 		if (log == null) {
-			Map<String, Boolean> result = new HashMap<>();
-			result.put(handleCallbackParam.getJobId() + randomId, false);
-			if(!String.valueOf(handleCallbackParam.getJobId()).equalsIgnoreCase(log.getExecutorParam())){
-				XxlJobAdminConfig.getAdminConfig().getRedisTemplate().opsForStream().add(StreamConsumer.TASK_SET_STREAM, result);
-			}
 			return new ReturnT<>(ReturnT.FAIL_CODE, "log item not found.");
 		}
 		if (log.getHandleCode() > 0) {
-			Map<String, Boolean> result = new HashMap<>();
-			result.put(handleCallbackParam.getJobId() + randomId, false);
-			if(!String.valueOf(handleCallbackParam.getJobId()).equalsIgnoreCase(log.getExecutorParam())){
-				XxlJobAdminConfig.getAdminConfig().getRedisTemplate().opsForStream().add(StreamConsumer.TASK_SET_STREAM, result);
-			}
 			return new ReturnT<>(ReturnT.FAIL_CODE, "log repeate callback.");
 		}
 
@@ -195,12 +188,6 @@ public class JobCompleteHelper {
 		log.setHandleMsg(handleMsg.toString());
 		XxlJobCompleter.updateHandleInfoAndFinish(log);
 
-		// 处理结果
-		Map<String, Boolean> result = new HashMap<>();
-		result.put(handleCallbackParam.getJobId() + randomId, handleCallbackParam.getHandleCode() == ReturnT.SUCCESS_CODE);
-		if(!String.valueOf(handleCallbackParam.getJobId()).equalsIgnoreCase(log.getExecutorParam())){
-			XxlJobAdminConfig.getAdminConfig().getRedisTemplate().opsForStream().add(StreamConsumer.TASK_SET_STREAM, result);
-		}
 		return ReturnT.SUCCESS;
 	}
 

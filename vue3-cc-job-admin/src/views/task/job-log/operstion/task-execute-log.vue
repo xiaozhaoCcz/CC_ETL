@@ -2,21 +2,31 @@
   <div class="app-container">
     <el-dialog
       v-model="props.executeLogVisable"
-      title="调度备注"
       :before-close="handleClose"
       width="850px"
+      :fullscreen="fullscreen"
     >
+      <template #header>
+        <div class="header">
+          <span>执行日志</span>
+          <el-icon style="margin-left: 5px">
+            <FullScreen @click="handleFullScreen" />
+          </el-icon>
+        </div>
+      </template>
       <Codemirror
         v-model:value="execLog"
         :options="cmOptions"
-        height="800"
+        :height="logHeight"
         :KeepCursorInEnd="true"
+        @change="change"
       ></Codemirror>
     </el-dialog>
   </div>
 </template>
 <script setup lang="ts">
 import JobLogAPI from "@/api/task/job-log";
+import { FullScreen } from "@element-plus/icons-vue";
 
 const emit = defineEmits(["close"]);
 const props = defineProps({
@@ -34,7 +44,8 @@ const fromLineNum = ref(0);
 const execLog = ref("");
 const pullFailCount = ref(0);
 let logRun: any = null;
-const logContainer = ref();
+const fullscreen = ref(false);
+const logHeight = ref("800px");
 
 const cmOptions = {
   mode: "log",
@@ -52,26 +63,30 @@ watch(
     if (id) {
       run(id);
     }
+  },
+  {
+    immediate: true,
   }
 );
 
-watch(
-  () => execLog,
-  () => {
-    // 使用nextTick确保DOM更新完成
-    nextTick(() => {
-      logContainer.value.scrollTop = logContainer.value.scrollHeight;
-    });
-  }
-);
+const change = (msg: any, cm: any) => {
+  const scrollInfo = cm.getScrollInfo();
+  cm.scrollTo(scrollInfo.left, scrollInfo.height);
+};
+
+function handleFullScreen() {
+  fullscreen.value = !fullscreen.value;
+  logHeight.value = fullscreen.value ? window.innerHeight + "px" : "800px";
+}
 
 function convertContent(str: string) {
-  return str.replace( /&amp;/g,'&')
-    .replace(/&lt;/g,'<')
-    .replace( /&gt;/g,'>')
-    .replace( /&quot;/g,"'")
-    .replace(/&#39;/g,"'")
-    .replace(/&quot;/g, '"')
+  return str
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"');
 }
 
 function run(id: number) {
@@ -135,3 +150,10 @@ function handleClose() {
   emit("close");
 }
 </script>
+<style lang="scss" scoped>
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: left;
+}
+</style>

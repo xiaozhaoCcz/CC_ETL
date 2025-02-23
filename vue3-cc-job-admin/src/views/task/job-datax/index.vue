@@ -92,6 +92,7 @@ async function buildJson() {
     type: 0,
     incrType: readerForm.value.incrType,
     incrContent: readerForm.value.incrContent,
+    schemaName: readerForm.value.datasource.schemaName,
   };
   const writerDataXParams = {
     columns: writerForm.value.columns,
@@ -102,6 +103,7 @@ async function buildJson() {
     tableName: writerForm.value.tableName,
     ip: getIpAndPort(writerForm.value.datasource.jdbcUrl).ip,
     port: getIpAndPort(writerForm.value.datasource.jdbcUrl).port,
+    schemaName: writerForm.value.datasource.schemaName,
     type: 1,
     writeMode: writerForm.value.writeMode,
   };

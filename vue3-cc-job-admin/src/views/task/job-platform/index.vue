@@ -347,9 +347,8 @@ function getTaskTriggerLog() {
     ElMessage.warning("请选择任务~");
     return;
   }
-  console.log(jobCompId.value);
   router.push({
-    path: "/task/task-log",
+    path: "/job/job-log",
     query: { id: jobCompId.value },
   });
 }
@@ -541,7 +540,7 @@ function stopTrigger() {
     ElMessage.warning("请选择任务组～");
     return;
   }
-  JobInfoAPI.stopTaskSet(jobCompId.value, randomId.value).then(() => {
+  JobInfoAPI.stopJobCompose(jobCompId.value, randomId.value).then(() => {
     triggerOneVisible.value = false;
     updateEdgeStyle();
   });
@@ -659,7 +658,6 @@ const connectWs = (id: string) => {
         updateEdgeStyle();
       }, 1000);
     }
-
     // 接收到消息后，需要做出相应的操作，比如更新节点或边
     const nodes = lf.value!.getGraphRawData().nodes;
     const node = nodes.find(

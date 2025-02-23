@@ -191,6 +191,9 @@
         <el-form-item label="数据库名" prop="databaseName">
           <el-input v-model="formData.databaseName" placeholder="数据库名" />
         </el-form-item>
+        <el-form-item label="SchemaName" prop="schemaName" v-if="formData.datasource==='ORACLE'">
+          <el-input v-model="formData.schemaName" placeholder="SchemaName" />
+        </el-form-item>
         <el-form-item label="用户名" prop="jdbcUsername">
           <el-input v-model="formData.jdbcUsername" placeholder="用户名" />
         </el-form-item>

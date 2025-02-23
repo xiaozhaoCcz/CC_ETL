@@ -328,7 +328,10 @@
           </div>
         </div>
 
-        <div class="child_form" v-if="formData.glueType == 'DATAX'">
+        <div
+          class="child_form"
+          v-if="formData.glueType == 'DATAX'"
+        >
           <div style="color: #8e8e8e; font-size: 14px">JSON</div>
           <el-divider style="margin: 8px" />
           <div class="child_main" style="margin-left: 6px">
@@ -555,7 +558,6 @@ function handleTableData2(val) {
 watch(
   () => props.formData,
   (data) => {
-    console.log(data);
     if (data.id && data.glueType === "DATAX") {
       jsonData.value = JSON.parse(data.executorParam);
     }

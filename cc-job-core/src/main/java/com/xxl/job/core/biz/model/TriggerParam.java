@@ -1,5 +1,7 @@
 package com.xxl.job.core.biz.model;
 
+import com.xxl.job.core.context.XxlJobContext;
+
 import java.io.Serializable;
 
 /**
@@ -32,6 +34,28 @@ public class TriggerParam implements Serializable{
     private String reqHeader;
 
     private String reqBody;
+
+
+    private XxlJobContext xxlJobContext;
+
+    private String address;
+
+    public String getAddress() {
+        return address;
+    }
+
+    public void setAddress(String address) {
+        this.address = address;
+    }
+
+    public XxlJobContext getXxlJobContext() {
+        return xxlJobContext;
+    }
+
+    public void setXxlJobContext(XxlJobContext xxlJobContext) {
+        this.xxlJobContext = xxlJobContext;
+    }
+
 
     public String getReqType() {
         return reqType;

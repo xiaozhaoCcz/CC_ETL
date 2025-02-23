@@ -119,7 +119,7 @@ import { VueFlow, useVueFlow, MarkerType } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { MiniMap } from "@vue-flow/minimap";
 import { Folder, ArrowRight, Loading } from "@element-plus/icons-vue";
-import JobInfoAPI, { TaskInfoForm } from "@/api/task/job-info";
+import JobInfoAPI, { JobInfoForm } from "@/api/task/job-info";
 import Snowflake from "@/utils/snowflake";
 const {
   updateEdge,
@@ -138,7 +138,7 @@ const taskRankVisible = reactive({
 });
 const triggerOneVisible = ref(false);
 const taskRankId = ref(null);
-const formData = reactive<TaskInfoForm>({
+const formData = reactive<JobInfoForm>({
   executorTimeout: 600000,
 });
 const g_position = ref([140, 140]);
@@ -223,10 +223,8 @@ const handleDblClick = (node) => {
   }
   // 在这里处理双击事件
   if (node.data != undefined && node.data) {
-    console.log("双击了节点:", node.data);
     // 往nodes添加节点
     nodes.value.push(generateNode(node.data));
-    console.log(nodes.value);
   }
 };
 
@@ -360,7 +358,7 @@ function stopTrigger() {
     ElMessage.warning("请选择任务组～");
     return;
   }
-  JobInfoAPI.stopTaskSet(taskRankId.value, randomId.value).then(() => {
+  JobInfoAPI.stopJobCompose(taskRankId.value, randomId.value).then(() => {
     triggerOneVisible.value = false;
     updateEdgeStyle();
   });
