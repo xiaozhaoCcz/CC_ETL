@@ -116,7 +116,7 @@ const props = defineProps({
   preFormData: Object,
 });
 
-const datasourceList = ["MYSQL", "ORACLE"];
+const datasourceList = ["MYSQL", "ORACLE", "POSTGRESQL"];
 
 const writeModeList = ["insert", "update", "replace"];
 
@@ -154,7 +154,6 @@ watch(
     getColumns(writerForm.value.jdbcDatasourceId);
   }
 );
-
 
 function handleCheckAllChange(val: boolean) {
   writerForm.value.columns = val ? columnList.value : [];
