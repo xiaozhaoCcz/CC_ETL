@@ -50,32 +50,10 @@
               <el-icon><component :is="item.icon" /></el-icon>
             </div>
             <div class="data-wrapper">
-              <div class="card-value">20</div>
+              <div class="card-value">{{ item.value }}</div>
               <div class="card-title">{{ item.title }}</div>
             </div>
           </div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <!-- 图表区域 -->
-    <el-row :gutter="20" class="chart-row">
-      <el-col :span="16">
-        <el-card shadow="hover" class="chart-card">
-          <template #header>
-            <span>访问趋势</span>
-          </template>
-          <div ref="lineChartRef" class="chart"></div>
-        </el-card>
-      </el-col>
-      <el-col :span="8">
-        <el-card shadow="hover" class="chart-card">
-          <template #header>
-            <div class="card-header">
-              <span>分类统计</span>
-            </div>
-          </template>
-          <div ref="pieChartRef" class="chart"></div>
         </el-card>
       </el-col>
     </el-row>
@@ -83,15 +61,12 @@
 </template>
 
 <script setup lang="ts">
-import { EChartsOption } from "echarts";
+import JobInfoAPI from "@/api/task/job-info";
 
 defineOptions({
   name: "Dashboard",
   inheritAttrs: false,
 });
-
-import router from "@/router";
-
 import { useUserStore } from "@/store/modules/user";
 import {
   CaretTop,
@@ -172,140 +147,12 @@ const statistics = ref([
   },
 ]);
 
-// 图表相关
-const lineChartRef = ref<HTMLElement>();
-const pieChartRef = ref<HTMLElement>();
-const lineChart = shallowRef<echarts.ECharts | null>(null);
-const pieChart = shallowRef<echarts.ECharts | null>(null);
-
-// 折线图配置
-const getLineChartOption = (): EChartsOption => ({
-  tooltip: {
-    trigger: "axis",
-  },
-  grid: {
-    left: "3%",
-    right: "4%",
-    bottom: "3%",
-    containLabel: true,
-  },
-  xAxis: {
-    type: "category",
-    boundaryGap: false,
-    data: ["周一", "周二", "周三", "周四", "周五", "周六", "周日"],
-  },
-  yAxis: {
-    type: "value",
-  },
-  series: [
-    {
-      name: "访问量",
-      type: "line",
-      smooth: true,
-      data: [820, 932, 901, 934, 1290, 1330, 1320],
-      areaStyle: {
-        opacity: 0.3,
-      },
-      itemStyle: {
-        color: "#409EFF",
-      },
-    },
-    {
-      name: "浏览量",
-      type: "line",
-      smooth: true,
-      data: [620, 732, 701, 734, 1090, 1130, 1120],
-      areaStyle: {
-        opacity: 0.3,
-      },
-      itemStyle: {
-        color: "#67C23A",
-      },
-    },
-  ],
-});
-
-// 饼图配置
-const getPieChartOption = (): EChartsOption => ({
-  tooltip: {
-    trigger: "item",
-  },
-  legend: {
-    orient: "vertical",
-    left: "left",
-  },
-  series: [
-    {
-      name: "分类统计",
-      type: "pie",
-      radius: ["40%", "70%"],
-      avoidLabelOverlap: false,
-      itemStyle: {
-        borderRadius: 10,
-        borderColor: "#fff",
-        borderWidth: 2,
-      },
-      label: {
-        show: false,
-        position: "center",
-      },
-      emphasis: {
-        label: {
-          show: true,
-          fontSize: 20,
-          fontWeight: "bold",
-        },
-      },
-      labelLine: {
-        show: false,
-      },
-      data: [] as any[],
-    },
-  ],
-});
-
-// 初始化图表
-const initCharts = () => {
-  //getBottomDataApi().then((res) => {
-  //   if (lineChartRef.value) {
-  //     lineChart.value = echarts.init(lineChartRef.value);
-  //     lineChart.value.setOption(getLineChartOption());
-  //   }
-  //
-  //   if (pieChartRef.value) {
-  //     pieChart.value = echarts.init(pieChartRef.value);
-  //     const option = getPieChartOption();
-  //     if (option.series && Array.isArray(option.series)) {
-  //       option.series[0].data = res.data;
-  //     }
-  //     pieChart.value?.setOption(option);
-  //   }
-  // });
-};
-
-// 处理窗口大小变化
-const handleResize = () => {
-  lineChart.value?.resize();
-  pieChart.value?.resize();
-};
-
 onMounted(() => {
-  // getDashboardDataApi().then((res) => {
-  //   statistics.value[0].value = res.data.articleCount;
-  //   statistics.value[1].value = res.data.userCount;
-  //   statistics.value[2].value = res.data.messageCount;
-  //   statistics.value[3].value = res.data.visitCount;
-  //   contributionData.value = res.data.contributionData;
-  //   initCharts();
-  // });
-  initCharts();
-  window.addEventListener("resize", handleResize);
-});
-
-onUnmounted(() => {
-  window.removeEventListener("resize", handleResize);
-  lineChart.value?.dispose();
-  pieChart.value?.dispose();
+  JobInfoAPI.initData().then((data) => {
+    statistics.value[0].value = data[0];
+    statistics.value[1].value = data[1];
+    statistics.value[2].value = data[2];
+  });
 });
 </script>
 

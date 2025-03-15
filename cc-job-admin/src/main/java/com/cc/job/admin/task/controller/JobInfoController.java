@@ -42,6 +42,13 @@ public class JobInfoController {
 
     private final JobComposeService jobComposeService;
 
+    @Operation(summary = "initData")
+    @GetMapping("initData")
+    public Result< List<Long>> initData() {
+        List<Long> list = jobInfoService.initData();
+        return Result.success(list);
+    }
+
     @Operation(summary = "task_info分页列表")
     @GetMapping("/page")
     public PageResult<JobInfoVO> getJobInfoPage(JobInfoQuery queryParams) {

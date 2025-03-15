@@ -11,6 +11,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * task_info服务类
@@ -83,4 +84,6 @@ public interface JobInfoService extends IService<JobInfo> {
     JobInfo baseUpdateJobInfo(Long id, JobInfoForm formData);
 
     List<JobLogglue> getGlueList(Long id);
+
+    List<Long> initData();
 }

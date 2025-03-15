@@ -4,10 +4,12 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cc.job.admin.task.service.*;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.admin.cron.CronExpression;
 import com.cc.job.admin.task.enums.*;
 import com.cc.job.admin.task.handler.JobGroupXxlJob;
+import com.cc.job.xo.mapper.JobLogMapper;
 import com.cc.job.xo.mapper.JobLogglueMapper;
 import com.cc.job.xo.model.dto.JobEdgeDto;
 import com.cc.job.xo.model.dto.JobInfoTriggerDto;
@@ -15,14 +17,12 @@ import com.cc.job.xo.model.dto.JobNodeDto;
 import com.cc.job.xo.model.entity.*;
 import com.cc.job.xo.model.form.JobGlueForm;
 import com.cc.job.xo.model.vo.JobNodeVo;
-import com.cc.job.admin.task.service.JobEdgeService;
-import com.cc.job.admin.task.service.JobGroupService;
-import com.cc.job.admin.task.service.JobNodeService;
 import com.cc.job.admin.task.thread.JobScheduleHelper;
 import com.cc.job.admin.task.thread.JobTriggerPoolHelper;
 import com.cc.job.admin.task.utils.I18nUtil;
 import com.cc.tasktool.executor.Async;
 import com.cc.tasktool.wrapper.WorkerWrapper;
+import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
 import com.xxl.job.core.executor.XxlJobExecutor;
 import com.xxl.job.core.glue.GlueTypeEnum;
@@ -30,12 +30,12 @@ import com.xxl.job.core.util.DateUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.cc.job.xo.mapper.JobInfoMapper;
-import com.cc.job.admin.task.service.JobInfoService;
 import com.cc.job.xo.model.form.JobInfoForm;
 import com.cc.job.xo.model.query.JobInfoQuery;
 import com.cc.job.xo.model.vo.JobInfoVO;
@@ -70,6 +70,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     private final JobLogglueMapper jobLogglueMapper;
 
     private final JobInfoMapper jobInfoMapper;
+
+    private final JobLogMapper jobLogMapper;
 
 
     /**
@@ -646,6 +648,16 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     @Override
     public List<JobLogglue> getGlueList(Long id) {
         return jobLogglueMapper.selectList(new LambdaQueryWrapper<JobLogglue>().eq(JobLogglue::getJobId, id));
+    }
+
+    @Override
+    public List<Long> initData() {
+        //获取初始化的数据
+        long triggerIng = this.count(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getTriggerStatus, 1));
+        List<JobLog> jobLogs = jobLogMapper.selectList(null);
+        long successCount = jobLogs.stream().filter(v -> v.getHandleCode().equals(ReturnT.SUCCESS_CODE)).count();
+        long failCount = jobLogs.stream().filter(v -> v.getHandleCode().equals(ReturnT.FAIL_CODE)).count();
+        return List.of(successCount,failCount,triggerIng);
     }
 
     @Override
