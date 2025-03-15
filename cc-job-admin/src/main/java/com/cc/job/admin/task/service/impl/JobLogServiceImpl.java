@@ -46,7 +46,6 @@ public class JobLogServiceImpl extends ServiceImpl<JobLogMapper, JobLog> impleme
 
     /**
     * 获取task_log分页列表
-    *
     * @param queryParams 查询参数
     * @return {@link IPage< JobLogVO >} task_log分页列表
     */
