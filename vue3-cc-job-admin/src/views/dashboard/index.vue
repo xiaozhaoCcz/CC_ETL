@@ -37,19 +37,54 @@
         </el-col>
       </el-row>
     </el-card>
+    <el-row :gutter="20">
+      <el-col :key="item.title" :span="6" v-for="(item, index) in statistics">
+        <el-card
+          shadow="hover"
+          :body-style="{ padding: '20px' }"
+          class="data-card"
+          :style="{ animationDelay: `${index * 0.1}s` }"
+        >
+          <div class="card-content">
+            <div class="icon-wrapper" :class="item.type">
+              <el-icon><component :is="item.icon" /></el-icon>
+            </div>
+            <div class="data-wrapper">
+              <div class="card-value">{{ item.value }}</div>
+              <div class="card-title">{{ item.title }}</div>
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
   </div>
 </template>
 
 <script setup lang="ts">
+import JobInfoAPI from "@/api/task/job-info";
+
 defineOptions({
   name: "Dashboard",
   inheritAttrs: false,
 });
-
-
-import router from "@/router";
-
 import { useUserStore } from "@/store/modules/user";
+import {
+  CaretTop,
+  CaretBottom,
+  Document,
+  Collection,
+  ChatLineRound,
+  View,
+} from "@element-plus/icons-vue";
+
+const icons = {
+  Document: markRaw(Document),
+  Collection: markRaw(Collection),
+  ChatLineRound: markRaw(ChatLineRound),
+  View: markRaw(View),
+  CaretTop: markRaw(CaretTop),
+  CaretBottom: markRaw(CaretBottom),
+};
 
 const userStore = useUserStore();
 const date: Date = new Date();
@@ -91,65 +126,34 @@ const statisticData = ref([
   },
 ]);
 
-const onlineUserCount = ref(0);
+const statistics = ref([
+  {
+    title: "成功的任务",
+    value: 0,
+    type: "primary",
+    icon: icons.Document,
+  },
+  {
+    title: "失败的任务",
+    value: 0,
+    type: "success",
+    icon: icons.Collection,
+  },
+  {
+    title: "运行中的任务",
+    value: 0,
+    type: "warning",
+    icon: icons.ChatLineRound,
+  },
+]);
 
-const visitStatsLoading = ref(true);
-const visitStatsList = ref<VisitStats[] | null>(Array(3).fill({}));
-interface VisitStats {
-  title: string;
-  icon: string;
-  tagType: "primary" | "success" | "warning";
-  growthRate: number;
-  // 粒度
-  granularity: string;
-  // 今日数量
-  todayCount: number;
-  totalCount: number;
-}
-
-
-/** 格式化增长率 */
-const formatGrowthRate = (growthRate: number): string => {
-  if (growthRate === 0) {
-    return "-";
-  }
-
-  const formattedRate = Math.abs(growthRate * 100)
-    .toFixed(2)
-    .replace(/\.?0+$/, "");
-  return formattedRate + "%";
-};
-
-/** 获取增长率文本颜色类 */
-const getGrowthRateClass = (growthRate: number): string => {
-  if (growthRate > 0) {
-    return "color-[--el-color-danger]";
-  } else if (growthRate < 0) {
-    return "color-[--el-color-success]";
-  } else {
-    return "color-[--el-color-info]";
-  }
-};
-
-/** 获取访问统计图标 */
-const getVisitStatsIcon = (type: string) => {
-  switch (type) {
-    case "pv":
-      return "pv";
-    case "uv":
-      return "uv";
-    case "ip":
-      return "ip";
-    default:
-      return "pv";
-  }
-};
-
-// 查看更多
-function viewMoreNotice() {
-  router.push({ path: "/myNotice" });
-}
-
+onMounted(() => {
+  JobInfoAPI.initData().then((data) => {
+    statistics.value[0].value = data[0];
+    statistics.value[1].value = data[1];
+    statistics.value[2].value = data[2];
+  });
+});
 </script>
 
 <style lang="scss" scoped>
@@ -163,6 +167,72 @@ function viewMoreNotice() {
     right: 0;
     z-index: 1;
     border: 0;
+  }
+
+  /* 数据卡片样式 */
+  //.data-card {
+  //  animation: slideUp 0.5s ease-out forwards;
+  //  opacity: 0;
+  //  transform: translateY(20px);
+  //}
+
+  .card-content {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .icon-wrapper {
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s;
+  }
+
+  .icon-wrapper:hover {
+    transform: scale(1.1);
+  }
+
+  .icon-wrapper .el-icon {
+    font-size: 30px;
+    color: #fff;
+  }
+
+  .icon-wrapper.primary {
+    background: linear-gradient(135deg, #1890ff, #36a9ff);
+  }
+
+  .icon-wrapper.success {
+    background: linear-gradient(135deg, #52c41a, #73d13d);
+  }
+
+  .icon-wrapper.warning {
+    background: linear-gradient(135deg, #faad14, #ffc53d);
+  }
+
+  .icon-wrapper.info {
+    background: linear-gradient(135deg, #13c2c2, #36cfc9);
+  }
+
+  .data-wrapper {
+    flex: 1;
+  }
+
+  .card-value {
+    font-size: 28px;
+    font-weight: bold;
+    color: #303133;
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  .card-title {
+    font-size: 14px;
+    color: #909399;
+    margin-bottom: 12px;
   }
 }
 </style>

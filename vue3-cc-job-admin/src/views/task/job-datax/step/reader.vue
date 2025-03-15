@@ -118,7 +118,7 @@ const props = defineProps({
   preData: Object,
 });
 
-const datasourceList = ["MYSQL", "ORACLE"];
+const datasourceList = ["MYSQL", "ORACLE", "POSTGRESQL"];
 const checkAll = ref(false);
 const isIndeterminate = ref(true);
 

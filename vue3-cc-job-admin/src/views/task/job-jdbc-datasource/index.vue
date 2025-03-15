@@ -191,7 +191,7 @@
         <el-form-item label="数据库名" prop="databaseName">
           <el-input v-model="formData.databaseName" placeholder="数据库名" />
         </el-form-item>
-        <el-form-item label="SchemaName" prop="schemaName">
+        <el-form-item label="SchemaName" prop="schemaName" v-if="formData.datasource==='ORACLE'">
           <el-input v-model="formData.schemaName" placeholder="SchemaName" />
         </el-form-item>
         <el-form-item label="用户名" prop="jdbcUsername">
@@ -270,6 +270,7 @@ const datasourceList = [
     title: "MYSQL",
   },
   { type: "ORACLE", title: "ORACLE" },
+  { type: "POSTGRESQL", title: "POSTGRESQL" },
 ];
 
 // jdbc数据源配置表单数据
@@ -334,6 +335,8 @@ function getDriver(datasource?: string) {
     jdbcDriverClass = "com.mysql.cj.jdbc.Driver";
   } else if (datasource == "ORACLE") {
     jdbcDriverClass = "oracle.jdbc.OracleDriver";
+  } else if (datasource == "POSTGRESQL") {
+    jdbcDriverClass = "org.postgresql.Driver";
   }
   return jdbcDriverClass;
 }
@@ -346,6 +349,9 @@ function getJdbcUrl(datasource?: string, ip?: string, port?: string) {
   } else if (datasource == "ORACLE") {
     port = port == null || port.trim() == "" ? 1521 : port;
     jdbcUrl = `jdbc:oracle:thin:@//${ip}:${port}/${formData.databaseName}`;
+  }else if (datasource == "POSTGRESQL") {
+    port = port == null || port.trim() == "" ? 5432 : port;
+    jdbcUrl = `jdbc:postgresql://${ip}:${port}/${formData.databaseName}`;
   }
   return jdbcUrl;
 }

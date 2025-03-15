@@ -12,6 +12,7 @@ import com.xxl.job.core.biz.model.LogParam;
 import com.xxl.job.core.biz.model.LogResult;
 import com.xxl.job.core.biz.model.ReturnT;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -41,14 +42,10 @@ import org.springframework.web.util.HtmlUtils;
 @Service
 @RequiredArgsConstructor
 public class JobLogServiceImpl extends ServiceImpl<JobLogMapper, JobLog> implements JobLogService {
-
-    private final TaskLogConverter taskLogConverter;
-
     private final JobInfoService taskInfoService;
 
     /**
     * 获取task_log分页列表
-    *
     * @param queryParams 查询参数
     * @return {@link IPage< JobLogVO >} task_log分页列表
     */

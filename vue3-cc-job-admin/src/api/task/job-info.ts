@@ -3,6 +3,12 @@ import request from "@/utils/request";
 const JOB_INFO_BASE_URL = "/api/v1/jobInfos";
 
 const JobInfoAPI = {
+  initData() {
+    return request({
+      url: `${JOB_INFO_BASE_URL}/initData`,
+      method: "get",
+    });
+  },
   /** 获取task_info分页数据 */
   getPage(queryParams?: JobInfoPageQuery) {
     return request<any, PageResult<TaskInfoPageVO[]>>({
