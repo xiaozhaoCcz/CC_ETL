@@ -93,8 +93,7 @@ public class JobGroupXxlJob {
         validateExecuteParam(executeParam);
         String randomId = "";
         try {
-            randomId = String.valueOf(jobId).equalsIgnoreCase(executeParam) ? UUID.randomUUID().toString()
-                    : executeParam;
+            randomId = String.valueOf(jobId).equalsIgnoreCase(executeParam) ? UUID.randomUUID().toString() : executeParam;
             JobInfo jobInfo = getJobInfoById(jobId);
             List<JobNode> nodes = getJobNodesByJobId(jobId);
             List<JobEdge> edges = getJobEdgesByJobId(jobId);
@@ -106,9 +105,8 @@ public class JobGroupXxlJob {
 
             int avgTime = getAvgTime(nodes, jobInfo);
             CONTEXT_HOLDER.set(XxlJobContext.getXxlJobContext());
-            List<WorkerWrapper<Long, String>> workerWrappers = buildWorkerWrappers(nodes, nextMap, randomId, avgTime,
-                    statusMap);
-            getRuntime(workerWrappers,nodes,jobInfo.getExecutorTimeout(),jobId,randomId);
+            List<WorkerWrapper<Long, String>> workerWrappers = buildWorkerWrappers(nodes, nextMap, randomId, avgTime, statusMap);
+            getRuntime(workerWrappers, nodes, jobInfo.getExecutorTimeout(), jobId, randomId);
             List<Long> startNodes = getStartNodes(nodes);
             List<WorkerWrapper<Long, String>> startWrappers = getStartWrappers(workerWrappers, startNodes);
             WorkerWrapper<Long, String> startWork = createStartWorkWrapper(jobId, startWrappers);
@@ -121,7 +119,7 @@ public class JobGroupXxlJob {
         }
     }
 
-    private void getRuntime(List<WorkerWrapper<Long, String>> workerWrappers,List<JobNode> nodes,long timeout,Long jobId,String randomId) {
+    private void getRuntime(List<WorkerWrapper<Long, String>> workerWrappers, List<JobNode> nodes, long timeout, Long jobId, String randomId) {
         List<JobInfo> jobInfos = getJobInfos(nodes);
         Map<Long, JobInfo> jobInfoMap = new HashMap<>();
         final Map<Long, JobInfo> jobInfoDbMap = jobInfos.stream().collect(Collectors.toMap(JobInfo::getId, t -> t));
@@ -568,9 +566,9 @@ public class JobGroupXxlJob {
         public void result(boolean success, Long param, WorkResult<String> workResult) {
             XxlJobHelper.log(xxlJobContext, ">>>>>>>>>>>>>>>>>>>>>任务运行完成:{}, 任务运行状态:{},运行结果:{}", param, success,
                     workResult.getResult());
-            runtime  = System.currentTimeMillis() - runtime;
+            runtime = System.currentTimeMillis() - runtime;
             //更新数据库
-            if(success){
+            if (success) {
                 Long jobId = this.node.getJobId();
                 JobInfo jobInfo = jobInfoMapper.selectById(jobId);
                 jobInfo.setRunTime(runtime);

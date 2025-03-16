@@ -21,16 +21,15 @@ import java.util.concurrent.atomic.AtomicReference;
 public class JobGroupUtils {
 
     /**
-     *
      * @param workerWrappers
-     * @param jobInfoMap   id:jobNodeId
+     * @param jobInfoMap     id:jobNodeId
      * @return
      */
-    public String[][] getNextRunTime(List<WorkerWrapper<Long, String>> workerWrappers,Map<Long, JobInfo> jobInfoMap,long timeout,List<Long> startNodes,Long jobId) {
+    public String[][] getNextRunTime(List<WorkerWrapper<Long, String>> workerWrappers, Map<Long, JobInfo> jobInfoMap, long timeout, List<Long> startNodes, Long jobId) {
         Long currentTime = System.currentTimeMillis();
         final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         List<WorkerWrapper<Long, Long[]>> timeWorkerWrappers = new ArrayList<>();
-        Map<String,List<String>> nextMap = new HashMap<>();
+        Map<String, List<String>> nextMap = new HashMap<>();
         for (WorkerWrapper<Long, String> workerWrapper : workerWrappers) {
             WorkerWrapper<Long, Long[]> worker = new WorkerWrapper<Long, Long[]>()
                     .id(workerWrapper.getId())
@@ -46,7 +45,7 @@ public class JobGroupUtils {
                         public Long[] action(Long id, Map<String, WorkerWrapper> allWrappers) {
                             List<DependWrapper> dependWrappers = workerWrapper.getDependWrappers();
                             JobInfo jobInfo = jobInfoMap.get(id);
-                            if (dependWrappers==null||dependWrappers.isEmpty()) {
+                            if (dependWrappers == null || dependWrappers.isEmpty()) {
                                 //开始节点,运行完成时间和开始时间
                                 return new Long[]{currentTime, currentTime + jobInfo.getRunTime()};
                             }
@@ -56,11 +55,11 @@ public class JobGroupUtils {
                             List<String> removeIds = new ArrayList<>();
                             jobInfoMap.entrySet().stream().filter(v -> nodeIds.contains(String.valueOf(v.getKey()))).forEach(entry -> {
                                 JobInfo jobInfo1 = entry.getValue();
-                                if(jobInfo1!=null&&"DO_NOTHING".equalsIgnoreCase(jobInfo1.getExecutorBlockStrategy())){
+                                if (jobInfo1 != null && "DO_NOTHING".equalsIgnoreCase(jobInfo1.getExecutorBlockStrategy())) {
                                     removeIds.add(entry.getKey().toString());
                                 }
                                 if (jobInfo1 != null && jobInfo1.getExecutorFailRetryCount() > 0) {
-                                    jobInfo1.setRunTime(jobInfo1.getRunTime()*jobInfo1.getExecutorFailRetryCount());
+                                    jobInfo1.setRunTime(jobInfo1.getRunTime() * jobInfo1.getExecutorFailRetryCount());
                                     jobInfoMap.put(entry.getKey(), jobInfo1);
                                 }
                             });
@@ -71,32 +70,31 @@ public class JobGroupUtils {
                                 WorkerWrapper worker = entry.getValue();
                                 WorkResult workResult = worker.getWorkResult();
                                 Long[] times = (Long[]) workResult.getResult();
-                                if(times[1]> maxTime[0]){
+                                if (times[1] > maxTime[0]) {
                                     maxTime[0] = times[1];
                                 }
                             });
 
-                            return new Long[]{maxTime[0], maxTime[0]+jobInfo.getRunTime()};
+                            return new Long[]{maxTime[0], maxTime[0] + jobInfo.getRunTime()};
                         }
 
                         @Override
                         public Long[] defaultValue() {
-                            System.out.println(".....执行时间运行异常");
-                            return new Long[]{0L,0L};
+                            return new Long[]{0L, 0L};
                         }
                     });
             timeWorkerWrappers.add(worker);
             List<WorkerWrapper<?, ?>> nextWrappers = workerWrapper.getNextWrappers();
             if (nextWrappers != null) {
                 List<String> nextIds = nextWrappers.stream().map(WorkerWrapper::getId).toList();
-                nextMap.put(workerWrapper.getId(),nextIds);
+                nextMap.put(workerWrapper.getId(), nextIds);
             }
         }
 
         for (WorkerWrapper<Long, Long[]> timeWorkerWrapper : timeWorkerWrappers) {
             List<String> nextIds = nextMap.get(timeWorkerWrapper.getId());
-            if(nextIds!=null){
-                List<WorkerWrapper<Long, Long[]>> nextWorkers =  timeWorkerWrappers.stream().filter(workerWrapper -> nextIds.contains(workerWrapper.getId())).toList();
+            if (nextIds != null) {
+                List<WorkerWrapper<Long, Long[]>> nextWorkers = timeWorkerWrappers.stream().filter(workerWrapper -> nextIds.contains(workerWrapper.getId())).toList();
                 timeWorkerWrapper.next(nextWorkers.toArray(new WorkerWrapper[0]));
             }
         }
@@ -110,13 +108,13 @@ public class JobGroupUtils {
                 .next(startWorkers.toArray(new WorkerWrapper[0]));
 
         try {
-            Async.beginWork(timeout,next);
+            Async.beginWork(timeout, next);
         } catch (ExecutionException | InterruptedException e) {
             throw new RuntimeException(e);
         }
         List<String[]> resList = new ArrayList<>();
         for (WorkerWrapper<Long, Long[]> timeWorkerWrapper : timeWorkerWrappers) {
-            resList.add(new String[]{timeWorkerWrapper.getId(),sdf.format(timeWorkerWrapper.getWorkResult().getResult()[0]),sdf.format(timeWorkerWrapper.getWorkResult().getResult()[1])});
+            resList.add(new String[]{timeWorkerWrapper.getId(), sdf.format(timeWorkerWrapper.getWorkResult().getResult()[0]), sdf.format(timeWorkerWrapper.getWorkResult().getResult()[1])});
         }
         return resList.toArray(new String[0][0]);
     }
