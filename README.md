@@ -58,7 +58,7 @@ http://175.178.249.190/blog/post/298
 [02快速开始.md](doc/cc-job/02%E5%BF%AB%E9%80%9F%E5%BC%80%E5%A7%8B.md)
 ![image-20241219212046125](./doc/cc-job/images/02-ccjob.png)
 
-[03功能介绍.md](doc/cc-job/03%E5%8A%9F%E8%83%BD%E4%BB%8B%E7%BB%8D.md)（进行中...）
+[03功能介绍.md](doc/cc-job/03%E5%8A%9F%E8%83%BD%E4%BB%8B%E7%BB%8D.md)
 ![image-20241219212046125](./doc/cc-job/images/03-ccjob.png)
 ### 修改配置
 与xxl-job后端的配置一样，只不过`admin.addresses`地址要换成`8989`，并且执行器端口不能为`9999`
