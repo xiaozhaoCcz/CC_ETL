@@ -124,4 +124,6 @@ public class JobInfo extends BaseEntity {
     private Integer incrType;
 
     private String incrContent;
+
+    private Long runTime;
 }

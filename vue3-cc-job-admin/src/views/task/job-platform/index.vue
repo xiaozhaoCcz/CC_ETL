@@ -195,6 +195,7 @@ const jobNodeEditId = ref(undefined);
 const nodeJobId = ref<number | undefined>(undefined);
 const jobNodeVisible = ref(false);
 const nowDate = ref<Date | undefined>(undefined);
+const runTime = ref([]);
 const menuConfig = {
   nodeMenu: [
     {
@@ -243,8 +244,18 @@ const menuConfig = {
     {
       text: "属性",
       callback(node: any) {
+        let startTime = "";
+        let endTime = "";
+
+        if (runTime.value.length > 0) {
+          const n = runTime.value.find((v) => v[0] == node.id) as any;
+          startTime = n[1];
+          endTime = n[2];
+        }
         alert(`
           节点id：${node.id}
+          节点任务开始时间：${startTime}
+          节点任务结束时间：${endTime}
           节点类型：${node.type}
           节点坐标：(x: ${node.x}, y: ${node.y})`);
       },
@@ -650,13 +661,19 @@ const connectWs = (id: string) => {
     if (
       _message.jobId == jobCompId.value &&
       _message.randomId == randomId.value &&
-      _message.status != 2
+      _message.status == 5
     ) {
       // 关闭任务
       setTimeout(() => {
         triggerOneVisible.value = false;
         updateEdgeStyle();
       }, 1000);
+    } else if (
+      _message.jobId == jobCompId.value &&
+      _message.randomId == randomId.value &&
+      _message.status == 9
+    ) {
+      runTime.value = JSON.parse(_message.result);
     }
     // 接收到消息后，需要做出相应的操作，比如更新节点或边
     const nodes = lf.value!.getGraphRawData().nodes;
@@ -689,9 +706,9 @@ const getNodeColor = (status: number) => {
 };
 
 function avg(array: any) {
-  var len = array.length;
-  var sum = 0;
-  for (var i = 0; i < len; i++) {
+  let len = array.length;
+  let sum = 0;
+  for (let i = 0; i < len; i++) {
     sum += array[i];
   }
   return sum / len;
