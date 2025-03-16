@@ -28,10 +28,10 @@ public class JobJdbcHandler {
     public void runJobJdbcXxlJob() {
         long jobId = XxlJobHelper.getJobId();
         JobInfo jobInfo = Optional.ofNullable(jobInfoMapper.selectById(jobId))
-                .orElseThrow(() -> new BusinessException("TaskInfo not found for jobId: " + jobId));
+                .orElseThrow(() -> new BusinessException("jobInfo not found for jobId: " + jobId));
 
         JobJdbcDatasource jobJdbcDatasource = Optional.ofNullable(jobJdbcDatasourceMapper.selectById(jobInfo.getJdbcDatasourceId()))
-                .orElseThrow(() -> new BusinessException("TaskInfo not found for jobId: " + jobId));
+                .orElseThrow(() -> new BusinessException("jobJdbcDatasource not found"));
 
         JdbcCommand jdbcCommand = new JdbcCommand(jobJdbcDatasource.getJdbcDriverClass(), jobJdbcDatasource.getJdbcUrl(), jobJdbcDatasource.getJdbcUsername(), jobJdbcDatasource.getJdbcPassword());
         Connection con = jdbcCommand.getConnection();

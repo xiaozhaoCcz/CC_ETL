@@ -17,7 +17,7 @@ public class XxlJobContext {
     /**
      * job id
      */
-    private final long jobId;
+    private long jobId;
 
     /**
      * job param
@@ -73,6 +73,10 @@ public class XxlJobContext {
 
     public long getJobId() {
         return jobId;
+    }
+
+    public void setJobId(long jobId) {
+        this.jobId = jobId;
     }
 
     public String getJobParam() {

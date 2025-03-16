@@ -68,8 +68,6 @@ public class SampleXxlJob {
         System.out.println(">>>>>>>> demoJobHandler2 end");
     }
 
-    AtomicInteger count = new AtomicInteger(0); //模拟任务重试2次后，任务成功运行
-
     @XxlJob("demoJobHandler3")
     public void demoJobHandler3() throws Exception {
 
@@ -81,13 +79,6 @@ public class SampleXxlJob {
             System.out.println("demoJobHandler3 beat at:" + i);
             TimeUnit.MILLISECONDS.sleep(500);
         }
-
-//        if(count.incrementAndGet()<=2){
-//            System.out.println(">>>>>>>>count"+count.get());
-//            throw  new RuntimeException();
-//        }
-        //default success
-//        throw  new RuntimeException();
         XxlJobHelper.log(">>>>>>>> demoJobHandler3 end");
         System.out.println(">>>>>>>> demoJobHandler3 end");
     }
@@ -119,10 +110,6 @@ public class SampleXxlJob {
             TimeUnit.MILLISECONDS.sleep(500);
         }
         //default success
-        if(count.incrementAndGet()<=2){
-            System.out.println(">>>>>>>>count"+count.get());
-            throw  new RuntimeException();
-        }
         XxlJobHelper.log(">>>>>>>> demoJobHandler5 end");
         //throw new RuntimeException();
     }

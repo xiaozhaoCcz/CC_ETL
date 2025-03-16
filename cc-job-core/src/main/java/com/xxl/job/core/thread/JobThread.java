@@ -122,7 +122,10 @@ public class JobThread extends Thread{
 					String logFileName = XxlJobFileAppender.makeLogFileName(new Date(triggerParam.getLogDateTime()), triggerParam.getLogId());
 					XxlJobContext xxlJobContext = null;
 					if(triggerParam.getXxlJobContext()!=null){
+						//任务组
 						xxlJobContext = triggerParam.getXxlJobContext();
+						int childJobId = triggerParam.getJobId();
+						xxlJobContext.setJobId(childJobId);
 					}else{
 						xxlJobContext = new XxlJobContext(
 								triggerParam.getJobId(),
