@@ -18,4 +18,6 @@ public class Message implements Serializable {
     private Integer status;
 
     private String randomId;
+
+    private String result;
 }

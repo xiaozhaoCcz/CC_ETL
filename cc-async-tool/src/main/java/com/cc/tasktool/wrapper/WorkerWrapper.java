@@ -87,6 +87,10 @@ public class WorkerWrapper<T, V> {
 
     }
 
+    public List<DependWrapper> getDependWrappers() {
+        return dependWrappers;
+    }
+
     /**
      * 存储强依赖于自己的wrapper集合
      */

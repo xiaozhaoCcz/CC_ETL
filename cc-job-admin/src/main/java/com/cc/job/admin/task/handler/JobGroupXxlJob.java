@@ -1,6 +1,8 @@
 package com.cc.job.admin.task.handler;
 
 import cn.hutool.core.lang.Pair;
+import cn.hutool.json.JSON;
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.admin.task.trigger.XxlJobTrigger;
 import com.cc.job.xo.common.exception.BusinessException;
@@ -55,6 +57,8 @@ public class JobGroupXxlJob {
 
     final JobInfoMapper jobInfoMapper;
 
+    final JobGroupUtils jobGroupUtils;
+
     static final ConcurrentHashMap<String, WorkerWrapper<Long, String>> STOP_MAP = new ConcurrentHashMap<>();
 
     static final List<Pair<String, Boolean>> JOB_LIST = Collections.synchronizedList(new ArrayList<>());
@@ -104,6 +108,7 @@ public class JobGroupXxlJob {
             CONTEXT_HOLDER.set(XxlJobContext.getXxlJobContext());
             List<WorkerWrapper<Long, String>> workerWrappers = buildWorkerWrappers(nodes, nextMap, randomId, avgTime,
                     statusMap);
+            getRuntime(workerWrappers,nodes,jobInfo.getExecutorTimeout(),jobId,randomId);
             List<Long> startNodes = getStartNodes(nodes);
             List<WorkerWrapper<Long, String>> startWrappers = getStartWrappers(workerWrappers, startNodes);
             WorkerWrapper<Long, String> startWork = createStartWorkWrapper(jobId, startWrappers);
@@ -114,6 +119,23 @@ public class JobGroupXxlJob {
         } finally {
             completeJob(jobId, randomId);
         }
+    }
+
+    private void getRuntime(List<WorkerWrapper<Long, String>> workerWrappers,List<JobNode> nodes,long timeout,Long jobId,String randomId) {
+        List<JobInfo> jobInfos = getJobInfos(nodes);
+        Map<Long, JobInfo> jobInfoMap = new HashMap<>();
+        final Map<Long, JobInfo> jobInfoDbMap = jobInfos.stream().collect(Collectors.toMap(JobInfo::getId, t -> t));
+        for (JobNode jobNode : nodes) {
+            jobInfoMap.put(jobNode.getId(), jobInfoDbMap.get(jobNode.getJobId()));
+        }
+        String[][] nextRunTime = jobGroupUtils.getNextRunTime(workerWrappers, jobInfoMap, timeout, getStartNodes(nodes), jobId);
+        Message message = new Message();
+        message.setJobId(jobId);
+        message.setParentJobId(jobId);
+        message.setStatus(9);
+        message.setRandomId(randomId);
+        message.setResult(JSONUtil.toJsonStr(nextRunTime));
+        webSocketServer.sendInfo(message);
     }
 
     private int getAvgTime(List<JobNode> nodes, JobInfo jobInfo) {
@@ -170,6 +192,7 @@ public class JobGroupXxlJob {
 
     private void handleExecutionException(long jobId, Exception e) {
         XxlJobHelper.log("{}任务运行异常,message:{}", jobId, e.getMessage());
+        logger.error(e.getMessage());
         throw new BusinessException(e.getMessage());
     }
 
@@ -198,7 +221,7 @@ public class JobGroupXxlJob {
         Message message = new Message();
         message.setJobId(jobId);
         message.setParentJobId(jobId);
-        message.setStatus(1);
+        message.setStatus(5);
         message.setRandomId(randomId);
         webSocketServer.sendInfo(message);
     }
@@ -230,7 +253,7 @@ public class JobGroupXxlJob {
                             } catch (Exception e) {
                                 logger.error(e.getMessage());
                             }
-                            return "任务运行超时异常";
+                            return "FAIL_COMPLETE";
                         }
                     })
                     .callback(new JobCallback(xxlJobContext, node, randomId, statusMap));
@@ -523,6 +546,8 @@ public class JobGroupXxlJob {
 
         private final Map<Long, List<Long>> statusMap;
 
+        private long runtime;
+
         public JobCallback(XxlJobContext xxlJobContext, JobNode node, String randomId,
                            Map<Long, List<Long>> statusMap) {
             this.node = node;
@@ -536,12 +561,21 @@ public class JobGroupXxlJob {
             logger.info(">>>>>>>>>>>>>>>>>>>>>任务：{}开始运行>>>>>>>>>>>>>>>>>>>>>", jobId);
             XxlJobHelper.log(xxlJobContext, ">>>>>>>>>>>>>>>>>>>>>任务：{}开始运行>>>>>>>>>>>>>>>>>>>>>", jobId);
             setNodeStatus(statusMap, jobId, 2, randomId, node.getJobParentId());
+            this.runtime = System.currentTimeMillis();
         }
 
         @Override
         public void result(boolean success, Long param, WorkResult<String> workResult) {
             XxlJobHelper.log(xxlJobContext, ">>>>>>>>>>>>>>>>>>>>>任务运行完成:{}, 任务运行状态:{},运行结果:{}", param, success,
                     workResult.getResult());
+            runtime  = System.currentTimeMillis() - runtime;
+            //更新数据库
+            if(success){
+                Long jobId = this.node.getJobId();
+                JobInfo jobInfo = jobInfoMapper.selectById(jobId);
+                jobInfo.setRunTime(runtime);
+                jobInfoMapper.updateById(jobInfo);
+            }
         }
     }
 

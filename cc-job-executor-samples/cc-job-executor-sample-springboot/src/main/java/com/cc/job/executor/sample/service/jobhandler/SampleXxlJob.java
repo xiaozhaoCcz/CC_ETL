@@ -119,12 +119,12 @@ public class SampleXxlJob {
             TimeUnit.MILLISECONDS.sleep(500);
         }
         //default success
-//        if(count.incrementAndGet()<=2){
-//            System.out.println(">>>>>>>>count"+count.get());
-//            throw  new RuntimeException();
-//        }
+        if(count.incrementAndGet()<=2){
+            System.out.println(">>>>>>>>count"+count.get());
+            throw  new RuntimeException();
+        }
         XxlJobHelper.log(">>>>>>>> demoJobHandler5 end");
-       // throw  new RuntimeException();
+        //throw new RuntimeException();
     }
 
     @XxlJob("demoJobHandler6")
