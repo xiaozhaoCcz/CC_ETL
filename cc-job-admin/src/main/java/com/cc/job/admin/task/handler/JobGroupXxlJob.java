@@ -318,7 +318,6 @@ public class JobGroupXxlJob {
                 return "FAIL_RETRY";
             }
             setNodeStatus(statusMap, jobId, 0, randomId, node.getJobParentId());
-            throw new RuntimeException();
         }
         return res;
     }
