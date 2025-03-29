@@ -6,7 +6,6 @@ import com.cc.tasktool.executor.Async;
 import com.cc.tasktool.worker.DependWrapper;
 import com.cc.tasktool.worker.WorkResult;
 import com.cc.tasktool.wrapper.WorkerWrapper;
-import com.xxl.job.core.context.XxlJobHelper;
 import org.springframework.stereotype.Component;
 
 import java.text.SimpleDateFormat;
@@ -15,7 +14,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
 
 @Component
 public class JobGroupUtils {
@@ -25,7 +25,7 @@ public class JobGroupUtils {
      * @param jobInfoMap     id:jobNodeId
      * @return
      */
-    public String[][] getNextRunTime(List<WorkerWrapper<Long, String>> workerWrappers, Map<Long, JobInfo> jobInfoMap, long timeout, List<Long> startNodes, Long jobId) {
+    public String[][] getNextRunTime(ThreadPoolExecutor threadPoolExecutor, List<WorkerWrapper<Long, String>> workerWrappers, Map<Long, JobInfo> jobInfoMap, long timeout, List<Long> startNodes, Long jobId) {
         Long currentTime = System.currentTimeMillis();
         final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         List<WorkerWrapper<Long, Long[]>> timeWorkerWrappers = new ArrayList<>();
@@ -108,13 +108,13 @@ public class JobGroupUtils {
                 .next(startWorkers.toArray(new WorkerWrapper[0]));
 
         try {
-            Async.beginWork(timeout, next);
+            Async.beginWork(timeout, threadPoolExecutor ,next);
         } catch (ExecutionException | InterruptedException e) {
             throw new RuntimeException(e);
         }
         List<String[]> resList = new ArrayList<>();
         for (WorkerWrapper<Long, Long[]> timeWorkerWrapper : timeWorkerWrappers) {
-            resList.add(new String[]{timeWorkerWrapper.getId(), sdf.format(timeWorkerWrapper.getWorkResult().getResult()[0]), sdf.format(timeWorkerWrapper.getWorkResult().getResult()[1])});
+            resList.add(new String []{timeWorkerWrapper.getId(), sdf.format(timeWorkerWrapper.getWorkResult().getResult()[0]), sdf.format(timeWorkerWrapper.getWorkResult().getResult()[1])});
         }
         return resList.toArray(new String[0][0]);
     }
