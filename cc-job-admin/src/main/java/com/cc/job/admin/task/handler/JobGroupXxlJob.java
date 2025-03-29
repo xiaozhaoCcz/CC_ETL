@@ -91,6 +91,7 @@ public class JobGroupXxlJob {
         String executeParam = XxlJobHelper.getJobParam();
         validateExecuteParam(executeParam);
         String randomId = "";
+        ThreadPoolExecutor threadPoolExecutor = null;
         try {
             randomId = String.valueOf(jobId).equalsIgnoreCase(executeParam) ? UUID.randomUUID().toString() : executeParam;
             JobInfo jobInfo = getJobInfoById(jobId);
@@ -110,11 +111,28 @@ public class JobGroupXxlJob {
             List<WorkerWrapper<Long, String>> startWrappers = getStartWrappers(workerWrappers, startNodes);
             WorkerWrapper<Long, String> startWork = createStartWorkWrapper(jobId, startWrappers);
             STOP_MAP.put(setExecuteJobId(jobId, randomId), startWork);
-            Async.beginWork(jobInfo.getExecutorTimeout(), startWork);
+
+            threadPoolExecutor = new ThreadPoolExecutor(
+                    10,
+                    nodes.size() + 10,
+                    60L,
+                    TimeUnit.SECONDS,
+                    new LinkedBlockingQueue<Runnable>(1000),
+                    new ThreadFactory() {
+                        @Override
+                        public Thread newThread(Runnable r) {
+                            return new Thread(r, "jobGroup Thread-" + r.hashCode());
+                        }
+                    });
+
+            Async.beginWork(jobInfo.getExecutorTimeout(), threadPoolExecutor, startWork);
         } catch (ExecutionException | InterruptedException e) {
             handleExecutionException(jobId, e);
         } finally {
             completeJob(jobId, randomId);
+            if (threadPoolExecutor != null) {
+                threadPoolExecutor.shutdown();
+            }
         }
     }
 
@@ -125,7 +143,30 @@ public class JobGroupXxlJob {
         for (JobNode jobNode : nodes) {
             jobInfoMap.put(jobNode.getId(), jobInfoDbMap.get(jobNode.getJobId()));
         }
-        String[][] nextRunTime = jobGroupUtils.getNextRunTime(workerWrappers, jobInfoMap, timeout, getStartNodes(nodes), jobId);
+        ThreadPoolExecutor threadPoolExecutor = null;
+        String[][] nextRunTime = null;
+        try{
+            threadPoolExecutor =  new ThreadPoolExecutor(
+                    10,
+                    nodes.size()+10,
+                    60L,
+                    TimeUnit.SECONDS,
+                    new LinkedBlockingQueue<Runnable>(1000),
+                    new ThreadFactory() {
+                        @Override
+                        public Thread newThread(Runnable r) {
+                            return new Thread(r, "jobGroupRunTime Thread-" + r.hashCode());
+                        }
+                    });
+            nextRunTime  = jobGroupUtils.getNextRunTime(threadPoolExecutor,workerWrappers, jobInfoMap, timeout, getStartNodes(nodes), jobId);
+        }catch (Exception e){
+            throw new RuntimeException(e);
+        } finally {
+            if (threadPoolExecutor != null) {
+                threadPoolExecutor.shutdown();
+            }
+        }
+
         Message message = new Message();
         message.setJobId(jobId);
         message.setParentJobId(jobId);

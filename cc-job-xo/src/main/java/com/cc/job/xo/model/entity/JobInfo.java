@@ -1,6 +1,7 @@
 package com.cc.job.xo.model.entity;
 
 import com.cc.job.xo.common.BaseEntity;
+import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -13,8 +14,7 @@ import java.time.LocalDateTime;
  * @author ccjob
  * @since 2024-11-03 08:21
  */
-@Getter
-@Setter
+@Data
 @TableName("job_info")
 public class JobInfo extends BaseEntity {
 
