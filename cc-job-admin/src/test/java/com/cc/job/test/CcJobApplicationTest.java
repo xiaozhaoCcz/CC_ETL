@@ -13,6 +13,7 @@ import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.xo.model.entity.JobEdge;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobNode;
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,7 +38,7 @@ public class CcJobApplicationTest {
     @Autowired
     private JobEdgeService jobEdgeService;
 
-    @Autowired
+    @Resource
     private JobNodeService jobNodeService;
 
     @Test

@@ -99,6 +99,8 @@ public class SampleXxlJob {
         System.out.println(">>>>>>>> demoJobHandler4 end");
     }
 
+    static  int retryCount = 0;
+
     @XxlJob("demoJobHandler5")
     public void demoJobHandler5() throws Exception {
 
@@ -110,8 +112,11 @@ public class SampleXxlJob {
             TimeUnit.MILLISECONDS.sleep(500);
         }
         //default success
+//        if(retryCount<2){
+//            retryCount++;
+//            throw new RuntimeException();
+//        }
         XxlJobHelper.log(">>>>>>>> demoJobHandler5 end");
-        //throw new RuntimeException();
     }
 
     @XxlJob("demoJobHandler6")

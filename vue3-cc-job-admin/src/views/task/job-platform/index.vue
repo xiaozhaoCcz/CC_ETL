@@ -83,6 +83,7 @@
           :props="defaultProps"
           default-expand-all
           :filter-node-method="filterJobCompNode"
+          style="height: 800px;overflow-y: scroll"
           @node-click="selectJobCompNode"
         />
       </div>
@@ -815,7 +816,6 @@ onMounted(() => {
     width: 20%;
     background: #fff;
     padding: 10px;
-    overflow-y: auto;
   }
 
   .logic-flow {
