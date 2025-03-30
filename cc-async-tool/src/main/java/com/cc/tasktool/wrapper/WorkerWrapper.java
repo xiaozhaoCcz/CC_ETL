@@ -81,7 +81,10 @@ public class WorkerWrapper<T, V> {
     private static final int FINISH = 1;
     private static final int ERROR = 2;
     private static final int WORKING = 3;
+    //暂停任务
     private static final int INIT = 0;
+
+    private volatile boolean pause = false;
 
     public WorkerWrapper(){
 
@@ -426,6 +429,19 @@ public class WorkerWrapper<T, V> {
             return workResult;
         }
         try {
+            //暂停任务
+            synchronized (this) {
+                long timeout = 5*10*1000;
+                long startTime = System.currentTimeMillis();
+                while (pause) {
+                    long elapsed = System.currentTimeMillis() - startTime;
+                    if (elapsed >= timeout) {
+                        break;
+                    }
+                    this.wait(timeout - elapsed);
+                }
+            }
+
             //如果已经不是init状态了，说明正在被执行或已执行完毕。这一步很重要，可以保证任务不被重复执行
             if (!compareAndSetState(INIT, WORKING)) {
                 return workResult;
@@ -445,7 +461,9 @@ public class WorkerWrapper<T, V> {
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 } finally {
-                    thread.interrupt();
+                    if (thread != null) {
+                        thread.interrupt();
+                    }
                 }
             } else {
                 resultValue = worker.action(param, forParamUseWrappers);
@@ -457,6 +475,12 @@ public class WorkerWrapper<T, V> {
             }
 
             if ("FAIL_RETRY".equals(resultValue) && retryCount != null && ++count <= retryCount) {
+                // 睡眠5秒重试任务
+                try {
+                    TimeUnit.MILLISECONDS.sleep(5000);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
                 this.state.set(INIT);
                 workerDoJob();
                 return workResult;
@@ -476,6 +500,16 @@ public class WorkerWrapper<T, V> {
             }
             fastFail(WORKING, e);
             return workResult;
+        }
+    }
+
+
+    public void setPause(boolean pause) {
+        synchronized (this) {
+            this.pause = pause;
+            if(!pause){
+                this.notifyAll();
+            }
         }
     }
 

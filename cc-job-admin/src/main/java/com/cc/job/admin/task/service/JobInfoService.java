@@ -86,4 +86,6 @@ public interface JobInfoService extends IService<JobInfo> {
     List<JobLogglue> getGlueList(Long id);
 
     List<Long> initData();
+
+    boolean pauseJob(Long id, Integer isPause);
 }

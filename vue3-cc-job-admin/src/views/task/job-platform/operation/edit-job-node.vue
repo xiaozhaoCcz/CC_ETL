@@ -178,6 +178,14 @@
             autocomplete="off"
           />
         </el-form-item>
+        <el-form-item label="暂停任务">
+          <el-switch
+            v-model="formData.isPause"
+            @change="changePause"
+            active-value="1"
+            inactive-value="0"
+          />
+        </el-form-item>
       </el-form>
     </template>
     <template #footer>
@@ -313,6 +321,11 @@ watch(
 const glueVisible = ref(false);
 const code = ref("");
 
+function changePause(isPause: number) {
+  console.log(isPause);
+  JobInfoAPI.pauseJob(props.nodeTaskId, isPause).then();
+}
+
 function glueClick() {
   glueVisible.value = true;
   const glueType = formData.glueType;
@@ -337,7 +350,7 @@ function closeGlue() {
   glueVisible.value = false;
 }
 
-function handleTableData(val:any) {
+function handleTableData(val: any) {
   formData.reqHeader = JSON.stringify(val);
 }
 
@@ -377,6 +390,7 @@ async function fetchTaskGroupList() {
 async function getTaskInfo() {
   if (props.nodeTaskId) {
     JobInfoAPI.getFormData(props.nodeTaskId).then((data) => {
+      console.log(data);
       Object.assign(formData, data);
     });
   }

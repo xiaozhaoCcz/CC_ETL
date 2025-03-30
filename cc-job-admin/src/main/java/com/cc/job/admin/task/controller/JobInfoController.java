@@ -183,4 +183,11 @@ public class JobInfoController {
         boolean result =  jobComposeService.validateJobComposeEdge(formMap.get("nodes"),formMap.get("edges"));
         return Result.success(result);
     }
+
+    @Operation(summary = "暂停任务")
+    @GetMapping("pauseJob/{id}")
+    public Result<Void>  pauseJob(@PathVariable Long id,Integer isPause){
+        boolean result = jobInfoService.pauseJob(id,isPause);
+        return Result.judge(result);
+    }
 }

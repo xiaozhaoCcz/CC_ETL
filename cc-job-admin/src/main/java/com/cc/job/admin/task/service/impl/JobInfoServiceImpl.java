@@ -4,6 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.cc.job.admin.task.service.*;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.admin.cron.CronExpression;
@@ -658,6 +659,12 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         long successCount = jobLogs.stream().filter(v -> v.getHandleCode().equals(ReturnT.SUCCESS_CODE)).count();
         long failCount = jobLogs.stream().filter(v -> v.getHandleCode().equals(ReturnT.FAIL_CODE)).count();
         return List.of(successCount,failCount,triggerIng);
+    }
+
+    @Override
+    public boolean pauseJob(Long id, Integer isPause) {
+        int i = jobInfoMapper.pauseJob(id,isPause);
+        return i>0;
     }
 
     @Override

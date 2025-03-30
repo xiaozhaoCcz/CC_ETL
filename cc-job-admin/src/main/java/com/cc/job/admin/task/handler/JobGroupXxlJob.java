@@ -85,7 +85,7 @@ public class JobGroupXxlJob {
     static final Map<String, Map<Long, Set<Long>>> TASK_ID_MAP = new ConcurrentHashMap<>();
 
     // 需要重新获取XxlJobContext解决线程问题，不然会出现日志文件错误添加的问题
-    private static final InheritableThreadLocal<XxlJobContext> CONTEXT_HOLDER = new InheritableThreadLocal<XxlJobContext>();
+    private static final InheritableThreadLocal<XxlJobContext> CONTEXT_HOLDER = new InheritableThreadLocal<>();
 
     @XxlJob("runJobGroupXxlJob")
     public void JobGroupXxlJob() {
@@ -105,9 +105,9 @@ public class JobGroupXxlJob {
             buildGraph(jobId, nodes, edges);
             Map<Long, List<JobNode>> nextMap = buildNextNode(nodes, edges);
 
-            int avgTime = getAvgTime(nodes, jobInfo);
+            //int avgTime = getAvgTime(nodes, jobInfo);
             CONTEXT_HOLDER.set(XxlJobContext.getXxlJobContext());
-            List<WorkerWrapper<Long, String>> workerWrappers = buildWorkerWrappers(nodes, nextMap, randomId, avgTime, statusMap);
+            List<WorkerWrapper<Long, String>> workerWrappers = buildWorkerWrappers(nodes, nextMap, randomId, statusMap);
             getRuntime(workerWrappers, nodes, jobInfo.getExecutorTimeout(), jobId, randomId);
             List<Long> startNodes = getStartNodes(nodes);
             List<WorkerWrapper<Long, String>> startWrappers = getStartWrappers(workerWrappers, startNodes);
@@ -267,7 +267,7 @@ public class JobGroupXxlJob {
     }
 
     private List<WorkerWrapper<Long, String>> buildWorkerWrappers(List<JobNode> nodes, Map<Long, List<JobNode>> nextMap,
-                                                                  String randomId, int avgTime, Map<Long, List<Long>> statusMap) {
+                                                                  String randomId, Map<Long, List<Long>> statusMap) {
         List<WorkerWrapper<Long, String>> result = new ArrayList<>();
         List<JobInfo> jobInfos = getJobInfos(nodes);
         final Map<Long, JobInfo> jobInfoMap = jobInfos.stream().collect(Collectors.toMap(JobInfo::getId, t -> t));
@@ -282,8 +282,13 @@ public class JobGroupXxlJob {
                     .worker(new IWorker<>() {
                         @Override
                         public String action(Long jobId, Map<String, WorkerWrapper> allWrappers) {
-                            int count = allWrappers.get(String.valueOf(node.getId())).getCount();
-                            return executeJob(xxlJobContext, node, jobInfo, randomId, avgTime, statusMap, count);
+                            //当前wrapper
+                            WorkerWrapper workerWrapper = allWrappers.get(String.valueOf(node.getId()));
+                            int count = workerWrapper.getCount();
+                            //重新获取jobInfo
+                            JobInfo jobInfoModel = jobInfoService.getById(jobId);
+                            workerWrapper.setPause(jobInfoModel.getIsPause()==1);
+                            return executeJob(xxlJobContext, node, jobInfoModel, randomId, statusMap, count);
                         }
 
                         @Override
@@ -314,7 +319,7 @@ public class JobGroupXxlJob {
         return result;
     }
 
-    private String executeJob(XxlJobContext xxlJobContext, JobNode node, JobInfo jobInfo, String randomId, int avgTime,
+    private String executeJob(XxlJobContext xxlJobContext, JobNode node, JobInfo jobInfo, String randomId,
                               Map<Long, List<Long>> statusMap, int count) {
         JobGroup group = XxlJobAdminConfig.getAdminConfig().getJobGroupMapper().selectById(jobInfo.getJobGroup());
         // 2、init trigger-param
@@ -352,9 +357,7 @@ public class JobGroupXxlJob {
             FutureTask<String> futureTask = new FutureTask<>(jobThreadListener);
             thread = new Thread(futureTask);
             thread.start();
-            result = jobInfo.getExecutorTimeout() > 0
-                    ? futureTask.get(jobInfo.getExecutorTimeout(), TimeUnit.MILLISECONDS)
-                    : futureTask.get(avgTime, TimeUnit.MILLISECONDS);
+            result = jobInfo.getExecutorTimeout() > 0 ? futureTask.get(jobInfo.getExecutorTimeout(), TimeUnit.MILLISECONDS) : futureTask.get();
         } catch (Exception e) {
             logger.error(e.getMessage());
             throw new RuntimeException(e);
