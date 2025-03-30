@@ -107,4 +107,6 @@ public class JobInfoForm implements Serializable {
     private Integer incrType;
 
     private String incrContent;
+
+    private Integer isPause;
 }

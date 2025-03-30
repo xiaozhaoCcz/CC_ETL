@@ -178,6 +178,13 @@
             autocomplete="off"
           />
         </el-form-item>
+        <el-form-item label="暂停任务">
+          <el-switch
+            v-model="formData.isPause"
+            :active-value="1"
+            :inactive-value="0"
+          />
+        </el-form-item>
       </el-form>
     </template>
     <template #footer>
@@ -337,7 +344,7 @@ function closeGlue() {
   glueVisible.value = false;
 }
 
-function handleTableData(val:any) {
+function handleTableData(val: any) {
   formData.reqHeader = JSON.stringify(val);
 }
 
@@ -347,7 +354,7 @@ async function fetchJdbcDatasource() {
 }
 
 function cancelClick() {
-  emit("close");
+  emit("close", props.nodeTaskId, formData.isPause);
 }
 function confirmClick() {
   if (!props.nodeTaskId) {
@@ -377,6 +384,7 @@ async function fetchTaskGroupList() {
 async function getTaskInfo() {
   if (props.nodeTaskId) {
     JobInfoAPI.getFormData(props.nodeTaskId).then((data) => {
+      console.log(data);
       Object.assign(formData, data);
     });
   }

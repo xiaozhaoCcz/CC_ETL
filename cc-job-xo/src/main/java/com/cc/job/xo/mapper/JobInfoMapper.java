@@ -19,4 +19,6 @@ public interface JobInfoMapper extends BaseMapper<JobInfo> {
     List<JobInfo> scheduleJobQuery(@Param("maxNextTime") long maxNextTime, @Param("pagesize") int pagesize );
 
     int stopJobCompose(@Param("id") Long id);
+
+    int pauseJob(@Param("id")Long id, @Param("isPause")Integer isPause);
 }

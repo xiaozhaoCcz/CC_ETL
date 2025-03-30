@@ -436,13 +436,14 @@ public class JobComposeServiceImpl implements JobComposeService {
 
         List<Long> jobIds = jobNodeList.stream().map(JobNode::getJobId).toList();
         List<JobInfo> jobInfos = jobInfoService.listByIds(jobIds);
-        Map<Long, String> jobInfoMap = jobInfos.stream().collect(Collectors.toMap(JobInfo::getId, JobInfo::getJobDesc));
+        Map<Long, JobInfo> jobInfoMap = jobInfos.stream().collect(Collectors.toMap(JobInfo::getId, n->n));
 
         jobNodeList.forEach(node -> {
             JobNodeVo jobNodeVo = BeanUtil.copyProperties(node, JobNodeVo.class, "id");
-            String jobName = jobInfoMap.get(node.getJobId());
-            jobNodeVo.setJobName(jobName);
+            JobInfo jobInfo = jobInfoMap.get(node.getJobId());
+            jobNodeVo.setJobName(jobInfo.getJobDesc());
             jobNodeVo.setId(randomId + node.getId());
+            jobNodeVo.setIsPause(jobInfo.getIsPause());
             if (DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType())) {
                 String children = node.getChildren();
                 List<String> childIds = JSONUtil.parseArray(children).toList(String.class);

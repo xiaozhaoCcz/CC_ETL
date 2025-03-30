@@ -36,6 +36,8 @@ import java.util.List;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
+import static com.cc.job.admin.task.handler.JobConstant.*;
+
 /**
  * @author xiaozhao
  */
@@ -83,7 +85,7 @@ public class JobGroupXxlJob {
     static final Map<String, Map<Long, Set<Long>>> TASK_ID_MAP = new ConcurrentHashMap<>();
 
     // 需要重新获取XxlJobContext解决线程问题，不然会出现日志文件错误添加的问题
-    private static final InheritableThreadLocal<XxlJobContext> CONTEXT_HOLDER = new InheritableThreadLocal<XxlJobContext>();
+    private static final InheritableThreadLocal<XxlJobContext> CONTEXT_HOLDER = new InheritableThreadLocal<>();
 
     @XxlJob("runJobGroupXxlJob")
     public void JobGroupXxlJob() {
@@ -91,7 +93,7 @@ public class JobGroupXxlJob {
         String executeParam = XxlJobHelper.getJobParam();
         validateExecuteParam(executeParam);
         String randomId = "";
-        ThreadPoolExecutor threadPoolExecutor = null;
+        ExecutorService executorService = null;
         try {
             randomId = String.valueOf(jobId).equalsIgnoreCase(executeParam) ? UUID.randomUUID().toString() : executeParam;
             JobInfo jobInfo = getJobInfoById(jobId);
@@ -103,36 +105,23 @@ public class JobGroupXxlJob {
             buildGraph(jobId, nodes, edges);
             Map<Long, List<JobNode>> nextMap = buildNextNode(nodes, edges);
 
-            int avgTime = getAvgTime(nodes, jobInfo);
+            //int avgTime = getAvgTime(nodes, jobInfo);
             CONTEXT_HOLDER.set(XxlJobContext.getXxlJobContext());
-            List<WorkerWrapper<Long, String>> workerWrappers = buildWorkerWrappers(nodes, nextMap, randomId, avgTime, statusMap);
+            List<WorkerWrapper<Long, String>> workerWrappers = buildWorkerWrappers(nodes, nextMap, randomId, statusMap);
             getRuntime(workerWrappers, nodes, jobInfo.getExecutorTimeout(), jobId, randomId);
             List<Long> startNodes = getStartNodes(nodes);
             List<WorkerWrapper<Long, String>> startWrappers = getStartWrappers(workerWrappers, startNodes);
             WorkerWrapper<Long, String> startWork = createStartWorkWrapper(jobId, startWrappers);
             STOP_MAP.put(setExecuteJobId(jobId, randomId), startWork);
-
-            threadPoolExecutor = new ThreadPoolExecutor(
-                    10,
-                    nodes.size() + 10,
-                    60L,
-                    TimeUnit.SECONDS,
-                    new LinkedBlockingQueue<Runnable>(1000),
-                    new ThreadFactory() {
-                        @Override
-                        public Thread newThread(Runnable r) {
-                            return new Thread(r, "jobGroup Thread-" + r.hashCode());
-                        }
-                    });
-
-            Async.beginWork(jobInfo.getExecutorTimeout(), threadPoolExecutor, startWork);
+            executorService = Executors.newFixedThreadPool(nodes.size()+1);
+            Async.beginWork(jobInfo.getExecutorTimeout(),executorService,startWork);
         } catch (ExecutionException | InterruptedException e) {
             handleExecutionException(jobId, e);
         } finally {
-            completeJob(jobId, randomId);
-            if (threadPoolExecutor != null) {
-                threadPoolExecutor.shutdown();
+            if (executorService != null) {
+                executorService.shutdown();
             }
+            completeJob(jobId, randomId);
         }
     }
 
@@ -143,30 +132,7 @@ public class JobGroupXxlJob {
         for (JobNode jobNode : nodes) {
             jobInfoMap.put(jobNode.getId(), jobInfoDbMap.get(jobNode.getJobId()));
         }
-        ThreadPoolExecutor threadPoolExecutor = null;
-        String[][] nextRunTime = null;
-        try{
-            threadPoolExecutor =  new ThreadPoolExecutor(
-                    10,
-                    nodes.size()+10,
-                    60L,
-                    TimeUnit.SECONDS,
-                    new LinkedBlockingQueue<Runnable>(1000),
-                    new ThreadFactory() {
-                        @Override
-                        public Thread newThread(Runnable r) {
-                            return new Thread(r, "jobGroupRunTime Thread-" + r.hashCode());
-                        }
-                    });
-            nextRunTime  = jobGroupUtils.getNextRunTime(threadPoolExecutor,workerWrappers, jobInfoMap, timeout, getStartNodes(nodes), jobId);
-        }catch (Exception e){
-            throw new RuntimeException(e);
-        } finally {
-            if (threadPoolExecutor != null) {
-                threadPoolExecutor.shutdown();
-            }
-        }
-
+        String[][] nextRunTime = jobGroupUtils.getNextRunTime(workerWrappers, jobInfoMap, timeout, getStartNodes(nodes), jobId);
         Message message = new Message();
         message.setJobId(jobId);
         message.setParentJobId(jobId);
@@ -176,24 +142,25 @@ public class JobGroupXxlJob {
         webSocketServer.sendInfo(message);
     }
 
-    private int getAvgTime(List<JobNode> nodes, JobInfo jobInfo) {
-        List<JobInfo> jobInfos = getJobInfos(nodes);
-        Integer executorTimeout = jobInfo.getExecutorTimeout();
-        int size = nodes.size();
-        for (JobInfo info : jobInfos) {
-            if (info.getExecutorTimeout() > 0) {
-                executorTimeout -= info.getExecutorTimeout();
-                size--;
-            }
-            if (executorTimeout < 0) {
-                throw new BusinessException("子任务运行时长超过任务组");
-            }
-        }
-        if (size == 0) {
-            size = 1;
-        }
-        return executorTimeout / size;
-    }
+
+//    private int getAvgTime(List<JobNode> nodes, JobInfo jobInfo) {
+//        List<JobInfo> jobInfos = getJobInfos(nodes);
+//        Integer executorTimeout = jobInfo.getExecutorTimeout();
+//        int size = nodes.size();
+//        for (JobInfo info : jobInfos) {
+//            if (info.getExecutorTimeout() > 0) {
+//                executorTimeout -= info.getExecutorTimeout();
+//                size--;
+//            }
+//            if (executorTimeout < 0) {
+//                throw new BusinessException("子任务运行时长超过任务组");
+//            }
+//        }
+//        if (size == 0) {
+//            size = 1;
+//        }
+//        return executorTimeout / size;
+//    }
 
     private List<JobInfo> getJobInfos(List<JobNode> nodes) {
         List<Long> jobIds = nodes.stream().map(JobNode::getJobId).toList();
@@ -265,7 +232,7 @@ public class JobGroupXxlJob {
     }
 
     private List<WorkerWrapper<Long, String>> buildWorkerWrappers(List<JobNode> nodes, Map<Long, List<JobNode>> nextMap,
-                                                                  String randomId, int avgTime, Map<Long, List<Long>> statusMap) {
+                                                                  String randomId, Map<Long, List<Long>> statusMap) {
         List<WorkerWrapper<Long, String>> result = new ArrayList<>();
         List<JobInfo> jobInfos = getJobInfos(nodes);
         final Map<Long, JobInfo> jobInfoMap = jobInfos.stream().collect(Collectors.toMap(JobInfo::getId, t -> t));
@@ -280,8 +247,10 @@ public class JobGroupXxlJob {
                     .worker(new IWorker<>() {
                         @Override
                         public String action(Long jobId, Map<String, WorkerWrapper> allWrappers) {
-                            int count = allWrappers.get(String.valueOf(node.getId())).getCount();
-                            return executeJob(xxlJobContext, node, jobInfo, randomId, avgTime, statusMap, count);
+                            //当前wrapper
+                            WorkerWrapper workerWrapper = allWrappers.get(String.valueOf(node.getId()));
+                            int count = workerWrapper.getCount();
+                            return executeJob(xxlJobContext, node, jobInfo, randomId, statusMap, count);
                         }
 
                         @Override
@@ -291,7 +260,7 @@ public class JobGroupXxlJob {
                             } catch (Exception e) {
                                 logger.error(e.getMessage());
                             }
-                            return "FAIL_COMPLETE";
+                            return FAIL_COMPLETE;
                         }
                     })
                     .callback(new JobCallback(xxlJobContext, node, randomId, statusMap));
@@ -312,8 +281,56 @@ public class JobGroupXxlJob {
         return result;
     }
 
-    private String executeJob(XxlJobContext xxlJobContext, JobNode node, JobInfo jobInfo, String randomId, int avgTime,
+    private String executeJob(XxlJobContext xxlJobContext, JobNode node, JobInfo jobInfo, String randomId,
                               Map<Long, List<Long>> statusMap, int count) {
+        //暂停任务执行
+        pauseJob(jobInfo);
+
+        //触发任务
+        triggerJob(xxlJobContext, jobInfo, randomId);
+
+        String result;
+        Thread thread = null;
+        JobThreadListener jobThreadListener = null;
+        try {
+            jobThreadListener = new JobThreadListener(jobInfo, node, randomId, statusMap, count);
+            FutureTask<String> futureTask = new FutureTask<>(jobThreadListener);
+            thread = new Thread(futureTask);
+            thread.start();
+            result = jobInfo.getExecutorTimeout() > 0 ? futureTask.get(jobInfo.getExecutorTimeout(), TimeUnit.MILLISECONDS) : futureTask.get();
+        } catch (Exception e) {
+            logger.error(e.getMessage());
+            throw new RuntimeException(e);
+        } finally {
+            jobThreadListener.toStop();
+            thread.interrupt();
+        }
+
+        return result;
+    }
+
+    private void pauseJob(JobInfo jobInfo) {
+        //重新获取jobInfo
+        boolean isPause = jobInfo.getIsPause() == 1;
+        //暂停任务
+        long timeout = jobInfo.getExecutorTimeout() > 0 ? jobInfo.getExecutorTimeout() : 5 * 60 * 1000;
+        long startTime = System.currentTimeMillis();
+        while (isPause) {
+            long elapsed = System.currentTimeMillis() - startTime;
+            if (elapsed >= timeout) {
+                break;
+            }
+            try {
+                TimeUnit.MILLISECONDS.sleep(5000);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            JobInfo jobInfoModel = jobInfoService.getById(jobInfo.getId());
+            isPause = jobInfoModel.getIsPause() == 1;
+        }
+    }
+
+    private void triggerJob(XxlJobContext xxlJobContext, JobInfo jobInfo, String randomId) {
         JobGroup group = XxlJobAdminConfig.getAdminConfig().getJobGroupMapper().selectById(jobInfo.getJobGroup());
         // 2、init trigger-param
         TriggerParam triggerParam = new TriggerParam();
@@ -336,32 +353,11 @@ public class JobGroupXxlJob {
         triggerParam.setXxlJobContext(xxlJobContext);
         // 得到本地的ip和host
         String ip = IpUtil.getIp();
-        String adminAddress = "http://" + ip + ":" + port + "/xxl-job-admin/";
+        String adminAddress = String.format(ADMIN_ADDRESS, ip, port);
         triggerParam.setAddress(adminAddress);
 
         String address = group.getRegistryList().get(0);
         XxlJobTrigger.runExecutor(triggerParam, address);
-
-        String result;
-        Thread thread = null;
-        JobThreadListener jobThreadListener = null;
-        try {
-            jobThreadListener = new JobThreadListener(jobInfo, node, randomId, statusMap, count);
-            FutureTask<String> futureTask = new FutureTask<>(jobThreadListener);
-            thread = new Thread(futureTask);
-            thread.start();
-            result = jobInfo.getExecutorTimeout() > 0
-                    ? futureTask.get(jobInfo.getExecutorTimeout(), TimeUnit.MILLISECONDS)
-                    : futureTask.get(avgTime, TimeUnit.MILLISECONDS);
-        } catch (Exception e) {
-            logger.error(e.getMessage());
-            throw new RuntimeException(e);
-        } finally {
-            jobThreadListener.toStop();
-            thread.interrupt();
-        }
-
-        return result;
     }
 
     private String handleJobCompletion(Pair<String, Boolean> pair, JobInfo jobInfo, JobNode node, String randomId,
@@ -376,7 +372,7 @@ public class JobGroupXxlJob {
         } else {
             if (count < jobInfo.getExecutorFailRetryCount()) {
                 logger.info(">>>>>>>>>>>>>>>>>任务组：{}，任务：{}，第{}次重试>>>>>>>>>>>>>>>>", jobId, node.getJobId(), count);
-                return "FAIL_RETRY";
+                return FAIL_RETRY;
             }
             setNodeStatus(statusMap, jobId, 0, randomId, node.getJobParentId());
         }
@@ -502,7 +498,7 @@ public class JobGroupXxlJob {
 
                 if (status == 0) {
                     JobInfo jobInfo = jobInfoService.getById(jobId);
-                    if (!"DO_NOTHING".equalsIgnoreCase(jobInfo.getExecutorBlockStrategy())) {
+                    if (!DO_NOTHING.equalsIgnoreCase(jobInfo.getExecutorBlockStrategy())) {
                         statusMap.remove(entry.getKey());
                         setNodeStatus(statusMap, entry.getKey(), status, randomId, parentId);
                         throw new RuntimeException("任务运行失败");

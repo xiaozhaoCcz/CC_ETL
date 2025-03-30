@@ -34,6 +34,10 @@
 		update job_info set rank_trigger_status = 0 where id = #{id} and rank_trigger_status = 1;
 	</update>
 
+	<update id="pauseJob">
+		update job_info set is_pause = #{isPause} where id = #{id};
+	</update>
+
 
     <select id="scheduleJobQuery" parameterType="java.util.HashMap" resultType="com.cc.job.xo.model.entity.JobInfo">
         SELECT <include refid="Base_Column_List" />

@@ -155,6 +155,13 @@ const JobInfoAPI = {
       data: data,
     });
   },
+  pauseJob(id: number, isPause: number) {
+    return request({
+      url: `${JOB_INFO_BASE_URL}/pauseJob/${id}`,
+      method: "get",
+      params: { isPause },
+    });
+  },
 };
 
 export default JobInfoAPI;

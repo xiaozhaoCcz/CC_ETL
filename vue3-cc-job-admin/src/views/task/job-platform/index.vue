@@ -83,11 +83,11 @@
           :props="defaultProps"
           default-expand-all
           :filter-node-method="filterJobCompNode"
-          style="height: 800px;overflow-y: scroll"
+          style="height: 800px; overflow-y: scroll"
           @node-click="selectJobCompNode"
         />
       </div>
-      <div class="logic-flow" ref="lfRef" />
+      <div ref="lfRef" class="logic-flow" />
     </div>
 
     <EditJobComp
@@ -215,10 +215,6 @@ const menuConfig = {
     {
       text: "编辑节点",
       callback(node: { properties: { jobId: number | null } }) {
-        if (triggerOneVisible.value) {
-          ElMessage.warning("任务正在运行，请先停止任务～");
-          return;
-        }
         if (
           node.properties.jobId === null ||
           node.properties.jobId === undefined
@@ -318,7 +314,12 @@ async function clearGraph() {
   await clearData();
 }
 
-function closeDraw() {
+function closeDraw(jobId: number, isPause: number) {
+  const nodes = lf.value.getGraphRawData().nodes;
+  const _node = nodes.find((v) => v.properties.jobId === jobId);
+  const nodeModelById = lf.value!.getNodeModelById(_node.id);
+  nodeModelById.setStyle("stroke", isPause == 1 ? "#0031ff" : "#000");
+
   nodeJobId.value = null;
   jobNodeVisible.value = false;
 }
@@ -438,6 +439,7 @@ function addJobNodes(newNodes: any[], graphModel: any, newEdges: any[]) {
   // 重新设置任务组的孩子节点
   newNodes.forEach((n) => {
     const node = lf.value.getNodeModelById(n.id);
+    node.setStyle("stroke", n.isPause == 1 ? "#0031ff" : "#000");
     if (n.nodeType === DynamicCustomGroup) {
       JSON.parse(n.children).forEach((id: any) => node.addChild(id));
     }
