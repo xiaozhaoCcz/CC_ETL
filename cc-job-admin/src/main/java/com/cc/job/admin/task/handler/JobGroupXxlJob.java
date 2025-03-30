@@ -147,10 +147,10 @@ public class JobGroupXxlJob {
         }
         ThreadPoolExecutor threadPoolExecutor = null;
         String[][] nextRunTime = null;
-        try{
-            threadPoolExecutor =  new ThreadPoolExecutor(
+        try {
+            threadPoolExecutor = new ThreadPoolExecutor(
                     10,
-                    nodes.size()+10,
+                    nodes.size() + 10,
                     60L,
                     TimeUnit.SECONDS,
                     new LinkedBlockingQueue<Runnable>(1000),
@@ -160,8 +160,8 @@ public class JobGroupXxlJob {
                             return new Thread(r, "jobGroupRunTime Thread-" + r.hashCode());
                         }
                     });
-            nextRunTime  = jobGroupUtils.getNextRunTime(threadPoolExecutor,workerWrappers, jobInfoMap, timeout, getStartNodes(nodes), jobId);
-        }catch (Exception e){
+            nextRunTime = jobGroupUtils.getNextRunTime(threadPoolExecutor, workerWrappers, jobInfoMap, timeout, getStartNodes(nodes), jobId);
+        } catch (Exception e) {
             throw new RuntimeException(e);
         } finally {
             if (threadPoolExecutor != null) {
@@ -178,24 +178,24 @@ public class JobGroupXxlJob {
         webSocketServer.sendInfo(message);
     }
 
-    private int getAvgTime(List<JobNode> nodes, JobInfo jobInfo) {
-        List<JobInfo> jobInfos = getJobInfos(nodes);
-        Integer executorTimeout = jobInfo.getExecutorTimeout();
-        int size = nodes.size();
-        for (JobInfo info : jobInfos) {
-            if (info.getExecutorTimeout() > 0) {
-                executorTimeout -= info.getExecutorTimeout();
-                size--;
-            }
-            if (executorTimeout < 0) {
-                throw new BusinessException("子任务运行时长超过任务组");
-            }
-        }
-        if (size == 0) {
-            size = 1;
-        }
-        return executorTimeout / size;
-    }
+//    private int getAvgTime(List<JobNode> nodes, JobInfo jobInfo) {
+//        List<JobInfo> jobInfos = getJobInfos(nodes);
+//        Integer executorTimeout = jobInfo.getExecutorTimeout();
+//        int size = nodes.size();
+//        for (JobInfo info : jobInfos) {
+//            if (info.getExecutorTimeout() > 0) {
+//                executorTimeout -= info.getExecutorTimeout();
+//                size--;
+//            }
+//            if (executorTimeout < 0) {
+//                throw new BusinessException("子任务运行时长超过任务组");
+//            }
+//        }
+//        if (size == 0) {
+//            size = 1;
+//        }
+//        return executorTimeout / size;
+//    }
 
     private List<JobInfo> getJobInfos(List<JobNode> nodes) {
         List<Long> jobIds = nodes.stream().map(JobNode::getJobId).toList();
@@ -285,10 +285,7 @@ public class JobGroupXxlJob {
                             //当前wrapper
                             WorkerWrapper workerWrapper = allWrappers.get(String.valueOf(node.getId()));
                             int count = workerWrapper.getCount();
-                            //重新获取jobInfo
-                            JobInfo jobInfoModel = jobInfoService.getById(jobId);
-                            workerWrapper.setPause(jobInfoModel.getIsPause()==1);
-                            return executeJob(xxlJobContext, node, jobInfoModel, randomId, statusMap, count);
+                            return executeJob(xxlJobContext, node, jobInfo, randomId, statusMap, count);
                         }
 
                         @Override
@@ -321,6 +318,54 @@ public class JobGroupXxlJob {
 
     private String executeJob(XxlJobContext xxlJobContext, JobNode node, JobInfo jobInfo, String randomId,
                               Map<Long, List<Long>> statusMap, int count) {
+        //暂停任务执行
+        pauseJob(jobInfo);
+
+        //触发任务
+        triggerJob(xxlJobContext, jobInfo, randomId);
+
+        String result;
+        Thread thread = null;
+        JobThreadListener jobThreadListener = null;
+        try {
+            jobThreadListener = new JobThreadListener(jobInfo, node, randomId, statusMap, count);
+            FutureTask<String> futureTask = new FutureTask<>(jobThreadListener);
+            thread = new Thread(futureTask);
+            thread.start();
+            result = jobInfo.getExecutorTimeout() > 0 ? futureTask.get(jobInfo.getExecutorTimeout(), TimeUnit.MILLISECONDS) : futureTask.get();
+        } catch (Exception e) {
+            logger.error(e.getMessage());
+            throw new RuntimeException(e);
+        } finally {
+            jobThreadListener.toStop();
+            thread.interrupt();
+        }
+
+        return result;
+    }
+
+    private void pauseJob(JobInfo jobInfo) {
+        //重新获取jobInfo
+        boolean isPause = jobInfo.getIsPause() == 1;
+        //暂停任务
+        long timeout = jobInfo.getExecutorTimeout() > 0 ? jobInfo.getExecutorTimeout() : 5 * 60 * 1000;
+        long startTime = System.currentTimeMillis();
+        while (isPause) {
+            long elapsed = System.currentTimeMillis() - startTime;
+            if (elapsed >= timeout) {
+                break;
+            }
+            try {
+                TimeUnit.MILLISECONDS.sleep(5000);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            JobInfo jobInfoModel = jobInfoService.getById(jobInfo.getId());
+            isPause = jobInfoModel.getIsPause() == 1;
+        }
+    }
+
+    private void triggerJob(XxlJobContext xxlJobContext, JobInfo jobInfo, String randomId) {
         JobGroup group = XxlJobAdminConfig.getAdminConfig().getJobGroupMapper().selectById(jobInfo.getJobGroup());
         // 2、init trigger-param
         TriggerParam triggerParam = new TriggerParam();
@@ -343,30 +388,11 @@ public class JobGroupXxlJob {
         triggerParam.setXxlJobContext(xxlJobContext);
         // 得到本地的ip和host
         String ip = IpUtil.getIp();
-        String adminAddress = String.format(ADMIN_ADDRESS,ip,port);
+        String adminAddress = String.format(ADMIN_ADDRESS, ip, port);
         triggerParam.setAddress(adminAddress);
 
         String address = group.getRegistryList().get(0);
         XxlJobTrigger.runExecutor(triggerParam, address);
-
-        String result;
-        Thread thread = null;
-        JobThreadListener jobThreadListener = null;
-        try {
-            jobThreadListener = new JobThreadListener(jobInfo, node, randomId, statusMap, count);
-            FutureTask<String> futureTask = new FutureTask<>(jobThreadListener);
-            thread = new Thread(futureTask);
-            thread.start();
-            result = jobInfo.getExecutorTimeout() > 0 ? futureTask.get(jobInfo.getExecutorTimeout(), TimeUnit.MILLISECONDS) : futureTask.get();
-        } catch (Exception e) {
-            logger.error(e.getMessage());
-            throw new RuntimeException(e);
-        } finally {
-            jobThreadListener.toStop();
-            thread.interrupt();
-        }
-
-        return result;
     }
 
     private String handleJobCompletion(Pair<String, Boolean> pair, JobInfo jobInfo, JobNode node, String randomId,

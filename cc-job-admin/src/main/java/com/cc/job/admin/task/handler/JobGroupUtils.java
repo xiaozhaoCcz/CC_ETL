@@ -14,13 +14,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 
+/**
+ * @author xiaozhao
+ */
 @Component
 public class JobGroupUtils {
 
     /**
+     * 预测任务的执行时间
      * @param workerWrappers
      * @param jobInfoMap     id:jobNodeId
      * @return

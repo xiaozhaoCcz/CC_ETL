@@ -33,4 +33,5 @@ public class JobNodeVo implements Serializable {
 
     private String nodeType;
 
+    private Integer isPause;
 }

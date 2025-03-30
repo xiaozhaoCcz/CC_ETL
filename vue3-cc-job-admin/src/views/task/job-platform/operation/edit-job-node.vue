@@ -181,9 +181,8 @@
         <el-form-item label="暂停任务">
           <el-switch
             v-model="formData.isPause"
-            @change="changePause"
-            active-value="1"
-            inactive-value="0"
+            :active-value="1"
+            :inactive-value="0"
           />
         </el-form-item>
       </el-form>
@@ -321,11 +320,6 @@ watch(
 const glueVisible = ref(false);
 const code = ref("");
 
-function changePause(isPause: number) {
-  console.log(isPause);
-  JobInfoAPI.pauseJob(props.nodeTaskId, isPause).then();
-}
-
 function glueClick() {
   glueVisible.value = true;
   const glueType = formData.glueType;
@@ -360,7 +354,7 @@ async function fetchJdbcDatasource() {
 }
 
 function cancelClick() {
-  emit("close");
+  emit("close", props.nodeTaskId, formData.isPause);
 }
 function confirmClick() {
   if (!props.nodeTaskId) {

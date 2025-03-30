@@ -84,8 +84,6 @@ public class WorkerWrapper<T, V> {
     //暂停任务
     private static final int INIT = 0;
 
-    private volatile boolean pause = false;
-
     public WorkerWrapper(){
 
     }
@@ -429,19 +427,6 @@ public class WorkerWrapper<T, V> {
             return workResult;
         }
         try {
-            //暂停任务
-            synchronized (this) {
-                long timeout = 5*10*1000;
-                long startTime = System.currentTimeMillis();
-                while (pause) {
-                    long elapsed = System.currentTimeMillis() - startTime;
-                    if (elapsed >= timeout) {
-                        break;
-                    }
-                    this.wait(timeout - elapsed);
-                }
-            }
-
             //如果已经不是init状态了，说明正在被执行或已执行完毕。这一步很重要，可以保证任务不被重复执行
             if (!compareAndSetState(INIT, WORKING)) {
                 return workResult;
@@ -504,14 +489,14 @@ public class WorkerWrapper<T, V> {
     }
 
 
-    public void setPause(boolean pause) {
-        synchronized (this) {
-            this.pause = pause;
-            if(!pause){
-                this.notifyAll();
-            }
-        }
-    }
+//    public void setPause(boolean pause) {
+//        synchronized (this) {
+//            this.pause = pause;
+//            if(!pause){
+//                this.notifyAll();
+//            }
+//        }
+//    }
 
     public WorkResult<V> getWorkResult() {
         return workResult;
