@@ -28,7 +28,7 @@ public class JobGroupUtils {
      * @param jobInfoMap     id:jobNodeId
      * @return
      */
-    public String[][] getNextRunTime(ThreadPoolExecutor threadPoolExecutor, List<WorkerWrapper<Long, String>> workerWrappers, Map<Long, JobInfo> jobInfoMap, long timeout, List<Long> startNodes, Long jobId) {
+    public String[][] getNextRunTime(List<WorkerWrapper<Long, String>> workerWrappers, Map<Long, JobInfo> jobInfoMap, long timeout, List<Long> startNodes, Long jobId) {
         Long currentTime = System.currentTimeMillis();
         final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         List<WorkerWrapper<Long, Long[]>> timeWorkerWrappers = new ArrayList<>();
@@ -111,7 +111,7 @@ public class JobGroupUtils {
                 .next(startWorkers.toArray(new WorkerWrapper[0]));
 
         try {
-            Async.beginWork(timeout, threadPoolExecutor ,next);
+            Async.beginWork(timeout,next);
         } catch (ExecutionException | InterruptedException e) {
             throw new RuntimeException(e);
         }

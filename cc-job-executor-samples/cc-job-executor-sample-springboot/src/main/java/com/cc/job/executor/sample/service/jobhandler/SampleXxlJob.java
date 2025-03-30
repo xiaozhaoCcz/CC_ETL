@@ -90,7 +90,7 @@ public class SampleXxlJob {
         System.out.println(">>>>>>>> demoJobHandler1 start");
 
         for (int i = 0; i < 10; i++) {
-            XxlJobHelper.log("demoJobHandler1 beat at:" + i);
+            XxlJobHelper.log("demoJobHandler4 beat at:" + i);
             System.out.println("demoJobHandler4 beat at:" + i);
             TimeUnit.MILLISECONDS.sleep(500);
         }
