@@ -36,6 +36,8 @@ import java.util.List;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
+import static com.cc.job.admin.task.handler.JobConstant.*;
+
 /**
  * @author xiaozhao
  */
@@ -291,7 +293,7 @@ public class JobGroupXxlJob {
                             } catch (Exception e) {
                                 logger.error(e.getMessage());
                             }
-                            return "FAIL_COMPLETE";
+                            return FAIL_COMPLETE;
                         }
                     })
                     .callback(new JobCallback(xxlJobContext, node, randomId, statusMap));
@@ -336,7 +338,7 @@ public class JobGroupXxlJob {
         triggerParam.setXxlJobContext(xxlJobContext);
         // 得到本地的ip和host
         String ip = IpUtil.getIp();
-        String adminAddress = "http://" + ip + ":" + port + "/xxl-job-admin/";
+        String adminAddress = String.format(ADMIN_ADDRESS,ip,port);
         triggerParam.setAddress(adminAddress);
 
         String address = group.getRegistryList().get(0);
@@ -376,7 +378,7 @@ public class JobGroupXxlJob {
         } else {
             if (count < jobInfo.getExecutorFailRetryCount()) {
                 logger.info(">>>>>>>>>>>>>>>>>任务组：{}，任务：{}，第{}次重试>>>>>>>>>>>>>>>>", jobId, node.getJobId(), count);
-                return "FAIL_RETRY";
+                return FAIL_RETRY;
             }
             setNodeStatus(statusMap, jobId, 0, randomId, node.getJobParentId());
         }
@@ -502,7 +504,7 @@ public class JobGroupXxlJob {
 
                 if (status == 0) {
                     JobInfo jobInfo = jobInfoService.getById(jobId);
-                    if (!"DO_NOTHING".equalsIgnoreCase(jobInfo.getExecutorBlockStrategy())) {
+                    if (!DO_NOTHING.equalsIgnoreCase(jobInfo.getExecutorBlockStrategy())) {
                         statusMap.remove(entry.getKey());
                         setNodeStatus(statusMap, entry.getKey(), status, randomId, parentId);
                         throw new RuntimeException("任务运行失败");
