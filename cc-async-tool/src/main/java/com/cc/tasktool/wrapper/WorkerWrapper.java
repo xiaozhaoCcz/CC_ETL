@@ -454,11 +454,6 @@ public class WorkerWrapper<T, V> {
                 resultValue = worker.action(param, forParamUseWrappers);
             }
 
-            //如果状态不是在working,说明别的地方已经修改了
-            if (!compareAndSetState(WORKING, FINISH)) {
-                return workResult;
-            }
-
             if ("FAIL_RETRY".equals(resultValue) && retryCount != null && ++count <= retryCount) {
                 // 睡眠5秒重试任务
                 try {
@@ -468,6 +463,10 @@ public class WorkerWrapper<T, V> {
                 }
                 this.state.set(INIT);
                 workerDoJob();
+            }
+
+            //如果状态不是在working,说明别的地方已经修改了
+            if (!compareAndSetState(WORKING, FINISH)) {
                 return workResult;
             }
 
