@@ -500,7 +500,7 @@ function generateEdge(edge: any) {
   return {
     sourceNodeId: edge.fromNodeId,
     targetNodeId: edge.endNodeId,
-    type: "polyline",
+    type: "bezier",
   };
 }
 
@@ -768,6 +768,7 @@ onMounted(() => {
   lf.value.extension.dndPanel.setPatternItems(patternItems);
   lf.value.extension.menu.setMenuConfig(menuConfig);
   lf.value.register(CustomGroup);
+  lf.value.setDefaultEdgeType("bezier");
   lf.value.render({
     nodes: nodes.value,
     edges: edges.value,

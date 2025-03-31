@@ -68,6 +68,8 @@ public class SampleXxlJob {
         System.out.println(">>>>>>>> demoJobHandler2 end");
     }
 
+    static  int retryCount = 0;
+
     @XxlJob("demoJobHandler3")
     public void demoJobHandler3() throws Exception {
 
@@ -79,6 +81,10 @@ public class SampleXxlJob {
             System.out.println("demoJobHandler3 beat at:" + i);
             TimeUnit.MILLISECONDS.sleep(500);
         }
+//        if(retryCount<2){
+//            retryCount++;
+//            throw new RuntimeException();
+//        }
         XxlJobHelper.log(">>>>>>>> demoJobHandler3 end");
         System.out.println(">>>>>>>> demoJobHandler3 end");
     }
@@ -99,7 +105,7 @@ public class SampleXxlJob {
         System.out.println(">>>>>>>> demoJobHandler4 end");
     }
 
-    static  int retryCount = 0;
+
 
     @XxlJob("demoJobHandler5")
     public void demoJobHandler5() throws Exception {
@@ -112,10 +118,6 @@ public class SampleXxlJob {
             TimeUnit.MILLISECONDS.sleep(500);
         }
         //default success
-//        if(retryCount<2){
-//            retryCount++;
-//            throw new RuntimeException();
-//        }
         XxlJobHelper.log(">>>>>>>> demoJobHandler5 end");
     }
 

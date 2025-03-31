@@ -210,7 +210,11 @@ public class JobComposeServiceImpl implements JobComposeService {
 
         for (LfNode node : nodeList) {
             Map<String, Object> properties = JSONUtil.toBean(node.getProperties(), Map.class);
-            Long jobId = Long.parseLong(String.valueOf(properties.get(JOB_ID)));
+            Object jobIdObj = properties.get(JOB_ID);
+            if(jobIdObj == null) {
+                throw new BusinessException("存在未选择任务的节点");
+            }
+            Long jobId = Long.parseLong(String.valueOf(jobIdObj));
             JobInfo jobInfo1 = jobInfoService.getById(jobId);
             if (node.getId().contains("-")) {
                 JobInfo copyJobInfo = BeanUtil.copyProperties(jobInfo1, JobInfo.class, "id");
