@@ -233,14 +233,18 @@ public class WorkerWrapper<T, V> {
         一种是前面有多个wrapper。A C D ->   B。需要A、C、D都完成了才能轮到B。但是无论是A执行完，还是C执行完，都会去唤醒B。
         所以需要B来做判断，必须A、C、D都完成，自己才能执行 */
 
+        /**
+         * 多个任务依赖一个任务时，会出现异常
+         * 这里有bug，要么不用只有一个依赖的方法，要么修改doDependsOneJob方法
+         */
         //只有一个依赖
-        if (dependWrappers.size() == 1) {
-            doDependsOneJob(fromWrapper);
-            beginNext(executorService, now, remainTime);
-        } else {
-            //有多个依赖时
-            doDependsJobs(executorService, dependWrappers, fromWrapper, now, remainTime);
-        }
+//        if (dependWrappers.size() == 1) {
+//            doDependsOneJob(fromWrapper);
+//            beginNext(executorService, now, remainTime);
+//        } else {
+        //有多个依赖时
+        doDependsJobs(executorService, dependWrappers, fromWrapper, now, remainTime);
+        //}
 
     }
 
@@ -486,16 +490,6 @@ public class WorkerWrapper<T, V> {
             return workResult;
         }
     }
-
-
-//    public void setPause(boolean pause) {
-//        synchronized (this) {
-//            this.pause = pause;
-//            if(!pause){
-//                this.notifyAll();
-//            }
-//        }
-//    }
 
     public WorkResult<V> getWorkResult() {
         return workResult;
