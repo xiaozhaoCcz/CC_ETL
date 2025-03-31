@@ -39,6 +39,8 @@ import java.util.stream.Collectors;
 import static com.cc.job.admin.task.handler.JobConstant.*;
 
 /**
+ * 任务组核心代码
+ * TODO 可以考虑优化线程
  * @author xiaozhao
  */
 @Component
@@ -60,8 +62,10 @@ public class JobGroupXxlJob {
 
     final JobGroupUtils jobGroupUtils;
 
+    // 存储第一个WorkerWrapper，后续暂停任务需要
     static final ConcurrentHashMap<String, WorkerWrapper<Long, String>> STOP_MAP = new ConcurrentHashMap<>();
 
+    // 所有的子任务集合
     static final List<Pair<String, Boolean>> JOB_LIST = Collections.synchronizedList(new ArrayList<>());
 
     public static void removeJobData(String jobId) {
@@ -74,47 +78,50 @@ public class JobGroupXxlJob {
         JOB_LIST.add(Pair.of(jobId, isRunning));
     }
 
-    public static void removeWorkWrapper(Long parentId, String randomId) {
-        STOP_MAP.remove(setExecuteJobId(parentId, randomId));
-    }
-
     public static WorkerWrapper<Long, String> getWorkWrapper(Long parentId, String randomId) {
         return STOP_MAP.get(setExecuteJobId(parentId, randomId));
     }
-
-    static final Map<String, Map<Long, Set<Long>>> TASK_ID_MAP = new ConcurrentHashMap<>();
 
     // 需要重新获取XxlJobContext解决线程问题，不然会出现日志文件错误添加的问题
     private static final InheritableThreadLocal<XxlJobContext> CONTEXT_HOLDER = new InheritableThreadLocal<>();
 
     @XxlJob("runJobGroupXxlJob")
-    public void JobGroupXxlJob() {
+    public void jobGroupXxlJob() {
         long jobId = XxlJobHelper.getJobId();
         String executeParam = XxlJobHelper.getJobParam();
+        // 验证执行参数
         validateExecuteParam(executeParam);
         String randomId = "";
         ExecutorService executorService = null;
         try {
+            // 如果jobId和执行参数一致，则需要匹配一个uuid，如果不匹配则代表是platform页面执行，会携带一个随机id
             randomId = String.valueOf(jobId).equalsIgnoreCase(executeParam) ? UUID.randomUUID().toString() : executeParam;
             JobInfo jobInfo = getJobInfoById(jobId);
             List<JobNode> nodes = getJobNodesByJobId(jobId);
             List<JobEdge> edges = getJobEdgesByJobId(jobId);
 
             Map<Long, List<Long>> statusMap = new HashMap<>();
+            // 设置初始状态，页面颜色提示
             getJobStatusMap(jobId, statusMap);
+            // 将多节点任务或任务组构图
             buildGraph(jobId, nodes, edges);
+            // 找到当前节点的next节点
             Map<Long, List<JobNode>> nextMap = buildNextNode(nodes, edges);
 
+            // 设置任务的平均执行时间
             //int avgTime = getAvgTime(nodes, jobInfo);
             CONTEXT_HOLDER.set(XxlJobContext.getXxlJobContext());
+            // 构造WorkerWrapper，实现任务的串并行执行
             List<WorkerWrapper<Long, String>> workerWrappers = buildWorkerWrappers(nodes, nextMap, randomId, statusMap);
+            // 预测任务的运行时间
             getRuntime(workerWrappers, nodes, jobInfo.getExecutorTimeout(), jobId, randomId);
+            //构造一个开始节点
             List<Long> startNodes = getStartNodes(nodes);
             List<WorkerWrapper<Long, String>> startWrappers = getStartWrappers(workerWrappers, startNodes);
             WorkerWrapper<Long, String> startWork = createStartWorkWrapper(jobId, startWrappers);
             STOP_MAP.put(setExecuteJobId(jobId, randomId), startWork);
-            executorService = Executors.newFixedThreadPool(nodes.size()+1);
-            Async.beginWork(jobInfo.getExecutorTimeout(),executorService,startWork);
+            executorService = Executors.newFixedThreadPool(nodes.size() + 1);
+            Async.beginWork(jobInfo.getExecutorTimeout(), executorService, startWork);
         } catch (ExecutionException | InterruptedException e) {
             handleExecutionException(jobId, e);
         } finally {
@@ -205,8 +212,7 @@ public class JobGroupXxlJob {
         XxlJobHelper.log("{}任务运行完成", jobId);
         sendCompletionMessage(jobId, randomId);
         jobInfoMapper.stopJobCompose(jobId);
-        TASK_ID_MAP.remove(setExecuteJobId(jobId, randomId));
-        removeWorkWrapper(jobId, randomId);
+        STOP_MAP.remove(setExecuteJobId(jobId, randomId));
     }
 
     private static WorkerWrapper<Long, String> createStartWorkWrapper(long jobId,
@@ -231,6 +237,15 @@ public class JobGroupXxlJob {
         webSocketServer.sendInfo(message);
     }
 
+    /**
+     * 构造WorkerWrapper，详情代码请看async tool
+     *
+     * @param nodes     当前节点
+     * @param nextMap   节点的next节点
+     * @param randomId  随机id，前端页面运行传递
+     * @param statusMap 状态map
+     * @return
+     */
     private List<WorkerWrapper<Long, String>> buildWorkerWrappers(List<JobNode> nodes, Map<Long, List<JobNode>> nextMap,
                                                                   String randomId, Map<Long, List<Long>> statusMap) {
         List<WorkerWrapper<Long, String>> result = new ArrayList<>();
@@ -250,6 +265,7 @@ public class JobGroupXxlJob {
                             //当前wrapper
                             WorkerWrapper workerWrapper = allWrappers.get(String.valueOf(node.getId()));
                             int count = workerWrapper.getCount();
+                            // 执行任务
                             return executeJob(xxlJobContext, node, jobInfo, randomId, statusMap, count);
                         }
 
@@ -281,6 +297,17 @@ public class JobGroupXxlJob {
         return result;
     }
 
+    /**
+     * 执行任务的核心代码
+     *
+     * @param xxlJobContext jobContext，主要是将子任务日志写到主任务中
+     * @param node          当前节点
+     * @param jobInfo       当前节点对应的jobInfo
+     * @param randomId      随机id，随机id非常重要，保证多页面运行时节点状态运行正常
+     * @param statusMap     状态map
+     * @param count         失败重试次数
+     * @return 运行结果
+     */
     private String executeJob(XxlJobContext xxlJobContext, JobNode node, JobInfo jobInfo, String randomId,
                               Map<Long, List<Long>> statusMap, int count) {
         //暂停任务执行
@@ -289,6 +316,14 @@ public class JobGroupXxlJob {
         //触发任务
         triggerJob(xxlJobContext, jobInfo, randomId);
 
+        // 核心代码，创建一个线程用来监听任务是否运行完成
+        return listenerJob(node, jobInfo, randomId, statusMap, count);
+    }
+
+    /**
+     * 监听任务是否运行完成
+     */
+    private String listenerJob(JobNode node, JobInfo jobInfo, String randomId, Map<Long, List<Long>> statusMap, int count) {
         String result;
         Thread thread = null;
         JobThreadListener jobThreadListener = null;
@@ -305,14 +340,13 @@ public class JobGroupXxlJob {
             jobThreadListener.toStop();
             thread.interrupt();
         }
-
         return result;
     }
 
     private void pauseJob(JobInfo jobInfo) {
         //重新获取jobInfo
         boolean isPause = jobInfo.getIsPause() == 1;
-        //暂停任务
+        //暂停任务，默认暂停任务5分钟
         long timeout = jobInfo.getExecutorTimeout() > 0 ? jobInfo.getExecutorTimeout() : 5 * 60 * 1000;
         long startTime = System.currentTimeMillis();
         while (isPause) {
@@ -365,6 +399,7 @@ public class JobGroupXxlJob {
         String key = pair.getKey();
         Long jobId = Long.valueOf(key.split(":")[0]);
         boolean success = pair.getValue();
+        // 每次运行完需要重集合中删除节点
         removeJobData(setExecuteJobId(jobId, randomId));
         String res = "";
         if (success) {
@@ -473,6 +508,9 @@ public class JobGroupXxlJob {
         return jobId + ":" + randomId;
     }
 
+    /**
+     * 更新任务运行状态
+     */
     private void getJobStatusMap(Long jobId, Map<Long, List<Long>> statusMap) {
         JobInfo jobInfo = jobInfoService.getById(jobId);
         if (jobInfo.getJobType() == 2) {
@@ -498,6 +536,7 @@ public class JobGroupXxlJob {
 
                 if (status == 0) {
                     JobInfo jobInfo = jobInfoService.getById(jobId);
+                    // 忽略任务失败
                     if (!DO_NOTHING.equalsIgnoreCase(jobInfo.getExecutorBlockStrategy())) {
                         statusMap.remove(entry.getKey());
                         setNodeStatus(statusMap, entry.getKey(), status, randomId, parentId);
@@ -526,6 +565,9 @@ public class JobGroupXxlJob {
         }
     }
 
+    /**
+     * 任务运行监听器
+     */
     private class JobThreadListener implements Callable<String> {
 
         private final JobInfo jobInfo;
@@ -556,6 +598,7 @@ public class JobGroupXxlJob {
         @Override
         public String call() {
             while (!stop) {
+                // 从任务集合中遍历
                 for (Pair<String, Boolean> pair : new ArrayList<>(JOB_LIST)) {
                     if (pair.getKey().equals(setExecuteJobId(jobInfo.getId(), randomId))) {
                         try {
@@ -571,6 +614,9 @@ public class JobGroupXxlJob {
         }
     }
 
+    /**
+     * 任务回滚触发器
+     */
     private class JobCallback implements ICallback<Long, String> {
         private final JobNode node;
 
@@ -615,12 +661,12 @@ public class JobGroupXxlJob {
 
     // 停止所有任务
     public static void stopJobGroup() {
-        Set<String> keySet = TASK_ID_MAP.keySet();
-        for (String key : keySet) {
-            String[] split = key.split(":");
+        STOP_MAP.forEach((k, v) -> {
+            String[] split = k.split(":");
             Long jobId = Long.parseLong(split[0]);
             XxlJobAdminConfig.getAdminConfig().getJobInfoMapper().stopJobCompose(jobId);
-        }
+            logger.info(">>>>>>>>>停止任务{}", k);
+        });
     }
 
     private static final Logger logger = LoggerFactory.getLogger(JobGroupXxlJob.class);
