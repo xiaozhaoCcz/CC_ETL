@@ -14,7 +14,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ThreadPoolExecutor;
+
+import static com.cc.job.admin.task.handler.JobConstant.DO_NOTHING;
 
 /**
  * @author xiaozhao
@@ -58,7 +59,7 @@ public class JobGroupUtils {
                             List<String> removeIds = new ArrayList<>();
                             jobInfoMap.entrySet().stream().filter(v -> nodeIds.contains(String.valueOf(v.getKey()))).forEach(entry -> {
                                 JobInfo jobInfo1 = entry.getValue();
-                                if (jobInfo1 != null && "DO_NOTHING".equalsIgnoreCase(jobInfo1.getExecutorBlockStrategy())) {
+                                if (jobInfo1 != null && DO_NOTHING.equalsIgnoreCase(jobInfo1.getExecutorBlockStrategy())) {
                                     removeIds.add(entry.getKey().toString());
                                 }
                                 if (jobInfo1 != null && jobInfo1.getExecutorFailRetryCount() > 0) {
