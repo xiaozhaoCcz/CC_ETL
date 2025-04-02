@@ -4,6 +4,7 @@ import cn.hutool.core.lang.Pair;
 import com.cc.job.admin.config.XxlJobAdminConfig;
 import com.cc.job.admin.task.enums.ExecutorRouteStrategyEnum;
 import com.cc.job.admin.task.enums.TriggerTypeEnum;
+import com.cc.job.admin.task.handler.JobGroupXxlJob;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobLog;
@@ -15,6 +16,7 @@ import com.xxl.job.core.biz.model.TriggerParam;
 import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
 import com.xxl.job.core.util.IpUtil;
 import com.xxl.job.core.util.ThrowableUtil;
+import com.xxl.job.core.util.XxlJobRemotingUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,7 +51,9 @@ public class XxlJobTrigger {
                                              int failRetryCount,
                                              String executorShardingParam,
                                              String executorParam,
-                                             String addressList) {
+                                             String addressList,
+                                             int triggerOne,
+                                             String adminAddress) {
 
         // load data
         JobInfo jobInfo = XxlJobAdminConfig.getAdminConfig().getJobInfoMapper().selectById(jobId);
@@ -83,13 +87,13 @@ public class XxlJobTrigger {
                 && group.getRegistryList()!=null && !group.getRegistryList().isEmpty()
                 && shardingParam==null) {
             for (int i = 0; i < group.getRegistryList().size(); i++) {
-                processTrigger(group, jobInfo, finalFailRetryCount, triggerType, i, group.getRegistryList().size());
+                processTrigger(group, jobInfo, finalFailRetryCount, triggerType, i, group.getRegistryList().size(),triggerOne, adminAddress);
             }
         } else {
             if (shardingParam == null) {
                 shardingParam = new int[]{0, 1};
             }
-           return processTrigger(group, jobInfo, finalFailRetryCount, triggerType, shardingParam[0], shardingParam[1]);
+           return processTrigger(group, jobInfo, finalFailRetryCount, triggerType, shardingParam[0], shardingParam[1],triggerOne, adminAddress);
         }
 
         return null;
@@ -112,7 +116,7 @@ public class XxlJobTrigger {
      * @param index                     sharding index
      * @param total                     sharding index
      */
-    private static Pair<Long,Integer> processTrigger(JobGroup group, JobInfo jobInfo, int finalFailRetryCount, TriggerTypeEnum triggerType, int index, int total) {
+    private static Pair<Long,Integer> processTrigger(JobGroup group, JobInfo jobInfo, int finalFailRetryCount, TriggerTypeEnum triggerType, int index, int total,int triggerOne,String adminAddress) {
 
         // param
         ExecutorBlockStrategyEnum blockStrategy = ExecutorBlockStrategyEnum.match(jobInfo.getExecutorBlockStrategy(), ExecutorBlockStrategyEnum.SERIAL_EXECUTION);  // block strategy
@@ -176,6 +180,13 @@ public class XxlJobTrigger {
             triggerResult = runExecutor(triggerParam, address);
         } else {
             triggerResult = new ReturnT<String>(ReturnT.FAIL_CODE, null);
+        }
+
+        // 返回jobId
+        if(triggerOne==1&&jobInfo.getJobType()==2&&"N".equalsIgnoreCase(jobInfo.getIsNode())) {
+            String key = JobGroupXxlJob.setExecuteJobId(jobInfo.getId(), jobInfo.getExecutorParam());
+            String value = String.valueOf(jobLog.getId());
+            XxlJobRemotingUtil.postBody( adminAddress+"/api/jobLogId", "", 10, new Pair<>(key,value), Pair.class);
         }
 
         // 5、collection trigger info

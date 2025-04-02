@@ -63,7 +63,7 @@ public interface JobInfoService extends IService<JobInfo> {
 
     void delNodes(Long jobId);
 
-    boolean triggerJob(JobInfoTriggerDto JobInfoTriggerDto);
+    String triggerJob(JobInfoTriggerDto JobInfoTriggerDto);
 
     boolean startJob(Long id);
 

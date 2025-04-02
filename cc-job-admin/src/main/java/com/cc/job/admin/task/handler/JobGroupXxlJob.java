@@ -504,7 +504,7 @@ public class JobGroupXxlJob {
         }
     }
 
-    private static String setExecuteJobId(Long jobId, String randomId) {
+    public static String setExecuteJobId(Long jobId, String randomId) {
         return jobId + ":" + randomId;
     }
 

@@ -532,11 +532,12 @@ function triggerOne() {
   jobInfoTriggerDto.id = jobId;
   jobInfoTriggerDto.executorParam = randomId.value;
   JobInfoAPI.triggerJob(jobInfoTriggerDto)
-    .then(() => {
+    .then((data) => {
       ElMessage.success("执行任务成功");
       connectWs(jobId + ":" + randomId.value);
       triggerOneVisible.value = true;
       updateEdgeStyle();
+      console.log(">>>>>>>",data)
     })
     .catch((e) => {
       triggerOneVisible.value = true;

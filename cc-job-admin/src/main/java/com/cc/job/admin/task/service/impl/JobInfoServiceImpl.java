@@ -6,6 +6,8 @@ import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.cc.job.admin.task.service.*;
+import com.cc.job.admin.task.thread.JobLogHelper;
+import com.cc.job.admin.task.thread.JobLogThreadListener;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.admin.cron.CronExpression;
 import com.cc.job.admin.task.enums.*;
@@ -44,6 +46,8 @@ import com.cc.job.xo.model.vo.JobInfoVO;
 import java.text.MessageFormat;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import cn.hutool.core.lang.Assert;
@@ -235,11 +239,11 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     }
 
     @Override
-    public boolean triggerJob(JobInfoTriggerDto taskInfoTriggerDto) {
+    public String triggerJob(JobInfoTriggerDto taskInfoTriggerDto) {
 
         JobInfo taskInfo = this.getById(taskInfoTriggerDto.getId());
         if (taskInfo == null) {
-            return false;
+            return "";
         }
 
         if (taskInfo.getJobType() == 2 && taskInfo.getRankTriggerStatus() == 1) {
@@ -255,12 +259,36 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
             taskInfoTriggerDto.setExecutorParam(taskInfo.getExecutorParam());
         }
 
-        JobTriggerPoolHelper.trigger(taskInfoTriggerDto.getId().intValue(), TriggerTypeEnum.MANUAL, -1, null, taskInfoTriggerDto.getExecutorParam(), taskInfoTriggerDto.getAddressList());
+        String adminAddress = "";
+        JobTriggerPoolHelper.trigger(taskInfoTriggerDto.getId().intValue(), TriggerTypeEnum.MANUAL, -1, null, taskInfoTriggerDto.getExecutorParam(), taskInfoTriggerDto.getAddressList(),1,adminAddress);
 
         taskInfo.setRankTriggerStatus(1);
         this.updateById(taskInfo);
-        return true;
+
+        String result = "";
+        if(taskInfo.getJobType()==2&&"N".equalsIgnoreCase(taskInfo.getIsNode())){
+            // 使用线程监听jobId
+            JobLogThreadListener listener = null;
+            Thread thread = null;
+            String key = JobGroupXxlJob.setExecuteJobId(taskInfoTriggerDto.getId(), taskInfoTriggerDto.getExecutorParam());
+            try {
+                listener = new JobLogThreadListener(key);
+                FutureTask<String> futureTask = new FutureTask<>(listener);
+                thread = new Thread(futureTask);
+                JobLogHelper.addJobLogThread(key,thread);
+                thread.start();
+                result =  futureTask.get(1,TimeUnit.MINUTES);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            } finally {
+                listener.toStop();
+                JobLogHelper.removeJobLogThread(key);
+            }
+        }
+        return result;
     }
+
+
 
     @Override
     public boolean startJob(Long id) {

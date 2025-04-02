@@ -107,9 +107,9 @@ public class JobInfoController {
 
     @Operation(summary = "执行任务一次")
     @PostMapping("/trigger")
-    public Result<Void> triggerJob(@RequestBody JobInfoTriggerDto taskInfoTriggerDto) {
-        boolean result = jobInfoService.triggerJob(taskInfoTriggerDto);
-        return Result.judge(result);
+    public Result<String> triggerJob(@RequestBody JobInfoTriggerDto taskInfoTriggerDto) {
+        String result = jobInfoService.triggerJob(taskInfoTriggerDto);
+        return Result.success(result);
     }
 
     @Operation(summary = "启动")
