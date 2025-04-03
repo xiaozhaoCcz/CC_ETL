@@ -71,6 +71,8 @@ public class XxlJobScheduler  {
 
         // stop job set
         JobGroupXxlJob.stopJobGroup();
+
+        JobLogHelper.stop();
     }
 
     // ---------------------- I18n ----------------------

@@ -4,6 +4,7 @@ import cn.hutool.core.lang.Pair;
 import com.cc.job.admin.config.XxlJobAdminConfig;
 import com.cc.job.admin.task.enums.ExecutorRouteStrategyEnum;
 import com.cc.job.admin.task.enums.TriggerTypeEnum;
+import com.cc.job.admin.task.handler.JobGroupXxlJob;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobLog;
@@ -15,6 +16,7 @@ import com.xxl.job.core.biz.model.TriggerParam;
 import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
 import com.xxl.job.core.util.IpUtil;
 import com.xxl.job.core.util.ThrowableUtil;
+import com.xxl.job.core.util.XxlJobRemotingUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,23 +35,22 @@ public class XxlJobTrigger {
      *
      * @param jobId
      * @param triggerType
-     * @param failRetryCount
-     * 			>=0: use this param
-     * 			<0: use param from job info config
+     * @param failRetryCount        >=0: use this param
+     *                              <0: use param from job info config
      * @param executorShardingParam
-     * @param executorParam
-     *          null: use job param
-     *          not null: cover job param
-     * @param addressList
-     *          null: use executor addressList
-     *          not null: cover
+     * @param executorParam         null: use job param
+     *                              not null: cover job param
+     * @param addressList           null: use executor addressList
+     *                              not null: cover
      */
-    public static Pair<Long,Integer> trigger(Long jobId,
-                                             TriggerTypeEnum triggerType,
-                                             int failRetryCount,
-                                             String executorShardingParam,
-                                             String executorParam,
-                                             String addressList) {
+    public static Pair<Long, Integer> trigger(Long jobId,
+                                              TriggerTypeEnum triggerType,
+                                              int failRetryCount,
+                                              String executorShardingParam,
+                                              String executorParam,
+                                              String addressList,
+                                              int triggerOne,
+                                              String adminAddress) {
 
         // load data
         JobInfo jobInfo = XxlJobAdminConfig.getAdminConfig().getJobInfoMapper().selectById(jobId);
@@ -60,42 +61,42 @@ public class XxlJobTrigger {
         if (executorParam != null) {
             jobInfo.setExecutorParam(executorParam);
         }
-        int finalFailRetryCount = failRetryCount>=0?failRetryCount:jobInfo.getExecutorFailRetryCount();
+        int finalFailRetryCount = failRetryCount >= 0 ? failRetryCount : jobInfo.getExecutorFailRetryCount();
         JobGroup group = XxlJobAdminConfig.getAdminConfig().getJobGroupMapper().selectById(jobInfo.getJobGroup());
 
         // cover addressList
-        if (addressList!=null && addressList.trim().length()>0) {
+        if (addressList != null && addressList.trim().length() > 0) {
             group.setAddressType(1);
             group.setAddressList(addressList.trim());
         }
 
         // sharding param
         int[] shardingParam = null;
-        if (executorShardingParam!=null){
+        if (executorShardingParam != null) {
             String[] shardingArr = executorShardingParam.split("/");
-            if (shardingArr.length==2 && isNumeric(shardingArr[0]) && isNumeric(shardingArr[1])) {
+            if (shardingArr.length == 2 && isNumeric(shardingArr[0]) && isNumeric(shardingArr[1])) {
                 shardingParam = new int[2];
                 shardingParam[0] = Integer.valueOf(shardingArr[0]);
                 shardingParam[1] = Integer.valueOf(shardingArr[1]);
             }
         }
-        if (ExecutorRouteStrategyEnum.SHARDING_BROADCAST==ExecutorRouteStrategyEnum.match(jobInfo.getExecutorRouteStrategy(), null)
-                && group.getRegistryList()!=null && !group.getRegistryList().isEmpty()
-                && shardingParam==null) {
+        if (ExecutorRouteStrategyEnum.SHARDING_BROADCAST == ExecutorRouteStrategyEnum.match(jobInfo.getExecutorRouteStrategy(), null)
+                && group.getRegistryList() != null && !group.getRegistryList().isEmpty()
+                && shardingParam == null) {
             for (int i = 0; i < group.getRegistryList().size(); i++) {
-                processTrigger(group, jobInfo, finalFailRetryCount, triggerType, i, group.getRegistryList().size());
+                processTrigger(group, jobInfo, finalFailRetryCount, triggerType, i, group.getRegistryList().size(), triggerOne, adminAddress);
             }
         } else {
             if (shardingParam == null) {
                 shardingParam = new int[]{0, 1};
             }
-           return processTrigger(group, jobInfo, finalFailRetryCount, triggerType, shardingParam[0], shardingParam[1]);
+            return processTrigger(group, jobInfo, finalFailRetryCount, triggerType, shardingParam[0], shardingParam[1], triggerOne, adminAddress);
         }
 
         return null;
     }
 
-    private static boolean isNumeric(String str){
+    private static boolean isNumeric(String str) {
         try {
             int result = Integer.valueOf(str);
             return true;
@@ -105,14 +106,14 @@ public class XxlJobTrigger {
     }
 
     /**
-     * @param group                     job group, registry list may be empty
+     * @param group               job group, registry list may be empty
      * @param jobInfo
      * @param finalFailRetryCount
      * @param triggerType
-     * @param index                     sharding index
-     * @param total                     sharding index
+     * @param index               sharding index
+     * @param total               sharding index
      */
-    private static Pair<Long,Integer> processTrigger(JobGroup group, JobInfo jobInfo, int finalFailRetryCount, TriggerTypeEnum triggerType, int index, int total) {
+    private static Pair<Long, Integer> processTrigger(JobGroup group, JobInfo jobInfo, int finalFailRetryCount, TriggerTypeEnum triggerType, int index, int total, int triggerOne, String adminAddress) {
 
         // param
         ExecutorBlockStrategyEnum blockStrategy = ExecutorBlockStrategyEnum.match(jobInfo.getExecutorBlockStrategy(), ExecutorBlockStrategyEnum.SERIAL_EXECUTION);  // block strategy
@@ -178,6 +179,13 @@ public class XxlJobTrigger {
             triggerResult = new ReturnT<String>(ReturnT.FAIL_CODE, null);
         }
 
+        // 返回jobId
+        if (triggerOne == 1 && jobInfo.getJobType() == 2 && "N".equalsIgnoreCase(jobInfo.getIsNode())) {
+            String key = JobGroupXxlJob.setExecuteJobId(jobInfo.getId(), jobInfo.getExecutorParam());
+            String value = String.valueOf(jobLog.getId());
+            XxlJobRemotingUtil.postBody(adminAddress + "api/jobLogId", "", 10, new Pair<>(key, value), Pair.class);
+        }
+
         // 5、collection trigger info
         StringBuffer triggerMsgSb = new StringBuffer();
         triggerMsgSb.append(I18nUtil.getString("jobconf_trigger_type")).append("：").append(triggerType.getTitle());
@@ -213,11 +221,12 @@ public class XxlJobTrigger {
 
     /**
      * run executor
+     *
      * @param triggerParam
      * @param address
      * @return
      */
-    public static ReturnT<String> runExecutor(TriggerParam triggerParam, String address){
+    public static ReturnT<String> runExecutor(TriggerParam triggerParam, String address) {
         ReturnT<String> runResult = null;
         try {
             ExecutorBiz executorBiz = XxlJobScheduler.getExecutorBiz(address);

@@ -6,6 +6,8 @@ import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.cc.job.admin.task.service.*;
+import com.cc.job.admin.task.thread.JobLogHelper;
+import com.cc.job.admin.task.thread.JobLogThreadListener;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.admin.cron.CronExpression;
 import com.cc.job.admin.task.enums.*;
@@ -28,9 +30,11 @@ import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
 import com.xxl.job.core.executor.XxlJobExecutor;
 import com.xxl.job.core.glue.GlueTypeEnum;
 import com.xxl.job.core.util.DateUtil;
+import com.xxl.job.core.util.IpUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -44,11 +48,15 @@ import com.cc.job.xo.model.vo.JobInfoVO;
 import java.text.MessageFormat;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
 import org.springframework.transaction.annotation.Transactional;
+
+import static com.cc.job.admin.task.handler.JobConstant.ADMIN_ADDRESS;
 
 
 /**
@@ -73,6 +81,9 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     private final JobInfoMapper jobInfoMapper;
 
     private final JobLogMapper jobLogMapper;
+
+    @Value("${server.port}")
+    private int port;
 
 
     /**
@@ -235,11 +246,11 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     }
 
     @Override
-    public boolean triggerJob(JobInfoTriggerDto taskInfoTriggerDto) {
+    public String triggerJob(JobInfoTriggerDto taskInfoTriggerDto) {
 
         JobInfo taskInfo = this.getById(taskInfoTriggerDto.getId());
         if (taskInfo == null) {
-            return false;
+            return "";
         }
 
         if (taskInfo.getJobType() == 2 && taskInfo.getRankTriggerStatus() == 1) {
@@ -255,12 +266,38 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
             taskInfoTriggerDto.setExecutorParam(taskInfo.getExecutorParam());
         }
 
-        JobTriggerPoolHelper.trigger(taskInfoTriggerDto.getId().intValue(), TriggerTypeEnum.MANUAL, -1, null, taskInfoTriggerDto.getExecutorParam(), taskInfoTriggerDto.getAddressList());
+        String ip = IpUtil.getIp();
+        String adminAddress = String.format(ADMIN_ADDRESS, ip, port);
+        JobTriggerPoolHelper.trigger(taskInfoTriggerDto.getId().intValue(), TriggerTypeEnum.MANUAL, -1, null, taskInfoTriggerDto.getExecutorParam(), taskInfoTriggerDto.getAddressList(), 1, adminAddress);
 
         taskInfo.setRankTriggerStatus(1);
         this.updateById(taskInfo);
-        return true;
+
+        // 监听任务运行
+        String result = "";
+        if (taskInfo.getJobType() == 2 && "N".equalsIgnoreCase(taskInfo.getIsNode())) {
+            // 使用线程监听jobId
+            JobLogThreadListener listener = null;
+            Thread thread = null;
+            String key = JobGroupXxlJob.setExecuteJobId(taskInfoTriggerDto.getId(), taskInfoTriggerDto.getExecutorParam());
+            try {
+                listener = new JobLogThreadListener(key);
+                FutureTask<String> futureTask = new FutureTask<>(listener);
+                thread = new Thread(futureTask);
+                JobLogHelper.addJobLogThread(key, thread);
+                thread.start();
+                result = futureTask.get(1, TimeUnit.MINUTES);
+            } catch (Exception e) {
+                throw new BusinessException(e);
+            } finally {
+                listener.toStop();
+                JobLogHelper.removeJobLogThread(key);
+            }
+        }
+
+        return result;
     }
+
 
     @Override
     public boolean startJob(Long id) {
@@ -326,6 +363,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
     /**
      * 旧的新增任务组方法，新方法在JobComposeService中
+     *
      * @param formData
      * @return
      */
@@ -511,6 +549,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
     /**
      * 旧的修改任务组方法，新方法在JobComposeService中
+     *
      * @param id
      * @param formData
      * @return
@@ -658,13 +697,13 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         List<JobLog> jobLogs = jobLogMapper.selectList(null);
         long successCount = jobLogs.stream().filter(v -> v.getHandleCode().equals(ReturnT.SUCCESS_CODE)).count();
         long failCount = jobLogs.stream().filter(v -> v.getHandleCode().equals(ReturnT.FAIL_CODE)).count();
-        return List.of(successCount,failCount,triggerIng);
+        return List.of(successCount, failCount, triggerIng);
     }
 
     @Override
     public boolean pauseJob(Long id, Integer isPause) {
-        int i = jobInfoMapper.pauseJob(id,isPause);
-        return i>0;
+        int i = jobInfoMapper.pauseJob(id, isPause);
+        return i > 0;
     }
 
     @Override
@@ -757,7 +796,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
         // next trigger time (5s后生效，避开预读周期)
         long nextTriggerTime = existsJobInfo.getTriggerNextTime();
-        boolean scheduleDataNotChanged = formData.getScheduleType().equals(existsJobInfo.getScheduleType()) &&existsJobInfo.getScheduleConf()!=null&&formData.getScheduleConf().equals(existsJobInfo.getScheduleConf());
+        boolean scheduleDataNotChanged = formData.getScheduleType().equals(existsJobInfo.getScheduleType()) && existsJobInfo.getScheduleConf() != null && formData.getScheduleConf().equals(existsJobInfo.getScheduleConf());
         if (existsJobInfo.getTriggerStatus() == 1 && !scheduleDataNotChanged) {
             try {
                 existsJobInfo.setScheduleConf(formData.getScheduleConf());
