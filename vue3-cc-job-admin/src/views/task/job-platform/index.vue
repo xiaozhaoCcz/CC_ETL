@@ -129,10 +129,24 @@
         </div>
       </template>
     </el-dialog>
+
+    <Dialog v-if="diaLogVisible" @close="closeDiaLog" :z-index="1001">
+      <template #header>运行日志</template>
+      <div>
+        <Codemirror
+          v-model:value="execLog"
+          :options="cmOptions"
+          :height="logHeight"
+          :KeepCursorInEnd="true"
+          @change="change"
+        ></Codemirror>
+      </div>
+    </Dialog>
   </div>
 </template>
 
 <script setup lang="ts">
+// TODO 需要优化代码结构
 import LogicFlow from "@logicflow/core";
 import {
   Control,
@@ -159,6 +173,8 @@ import Snowflake from "@/utils/snowflake";
 import { onBeforeRouteLeave } from "vue-router";
 import CustomGroup from "@/components/CustomGroup/CustomGroup";
 import router from "@/router";
+import Dialog from "@/components/Dialog/Dialog.vue";
+import JobLogAPI from "@/api/task/job-log";
 
 LogicFlow.use(Control); // 控制面板
 LogicFlow.use(DndPanel); // 拖拽面板
@@ -299,6 +315,16 @@ const defaultProps = {
 };
 const taskTitle = ref("");
 const DynamicCustomGroup = "CustomGroup";
+const diaLogVisible = ref(false);
+const execLog = ref("");
+const cmOptions = {
+  mode: "log",
+  theme: "default",
+};
+const logHeight = ref("100vh");
+const fromLineNum = ref(0);
+let logRun: any = null;
+const pullFailCount = ref(0);
 
 onBeforeRouteLeave((to, from, next) => {
   if (triggerOneVisible.value) {
@@ -307,6 +333,82 @@ onBeforeRouteLeave((to, from, next) => {
     next();
   }
 });
+
+function change(msg: any, cm: any) {
+  const scrollInfo = cm.getScrollInfo();
+  cm.scrollTo(scrollInfo.left, scrollInfo.height);
+}
+
+function closeDiaLog() {
+  diaLogVisible.value = false;
+  fromLineNum.value = 0;
+  execLog.value = "";
+  pullFailCount.value = 0;
+  logRunStop(logRun);
+}
+
+function convertContent(str: string) {
+  return str
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"');
+}
+
+function run(id: number) {
+  logRun = setInterval(() => {
+    getExecuteTaskLog(id);
+  }, 2000);
+}
+
+function logRunStop(content: string) {
+  if (logRun != null) {
+    window.clearInterval(logRun);
+    logRun = null;
+    execLog.value += convertContent(content);
+  }
+}
+
+function getExecuteTaskLog(id: number) {
+  if (pullFailCount.value++ > 20) {
+    logRunStop("日志加载完成.....");
+    return;
+  }
+
+  JobLogAPI.logDetailCat(id, fromLineNum.value).then((data: any) => {
+    if (data.code == 200) {
+      if (!data.content) {
+        console.log("pullLog fail");
+        return;
+      }
+      if (fromLineNum.value != data.content.fromLineNum) {
+        console.log("pullLog fromLineNum not match");
+        return;
+      }
+      if (fromLineNum.value > data.content.toLineNum) {
+        console.log("pullLog already line-end");
+
+        // valid end
+        if (data.content.end) {
+          logRunStop("[Rolling Log Finish]");
+          return;
+        }
+        return;
+      }
+
+      // append content
+      fromLineNum.value = data.content.toLineNum + 1;
+
+      execLog.value += convertContent(data.content.logContent);
+
+      pullFailCount.value = 0;
+    } else {
+      ElMessage.error("pullLog fail:" + data.msg);
+    }
+  });
+}
 
 async function clearGraph() {
   jobSelectId.value = undefined;
@@ -533,17 +635,22 @@ function triggerOne() {
   jobInfoTriggerDto.executorParam = randomId.value;
   JobInfoAPI.triggerJob(jobInfoTriggerDto)
     .then((data) => {
-      ElMessage.success("执行任务成功");
-      connectWs(jobId + ":" + randomId.value);
-      triggerOneVisible.value = true;
-      updateEdgeStyle();
-      console.log(">>>>>>>",data)
+      console.log(">>>>>>>", data);
+      if (data) {
+        diaLogVisible.value = true;
+        run(data);
+      }
     })
     .catch((e) => {
-      triggerOneVisible.value = true;
+      triggerOneVisible.value = false;
       ElMessage.error(e);
+      execLog.value += "读取任务日志失败...";
     })
     .finally(() => {});
+  ElMessage.success("执行任务成功");
+  connectWs(jobId + ":" + randomId.value);
+  triggerOneVisible.value = true;
+  updateEdgeStyle();
 }
 
 function selectElements() {

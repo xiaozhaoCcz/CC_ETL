@@ -32,6 +32,7 @@ public class JobLogHelper {
     }
 
     public static void removeJobLogThread(String key){
+        JOB_LOG_LIST.removeIf(pair -> pair.getKey().equals(key));
         Thread thread = threadMap.get(key);
         if(thread != null){
            thread.interrupt();
