@@ -224,6 +224,10 @@ const menuConfig = {
     {
       text: "选择任务",
       callback(node: { id: string }) {
+        if (DynamicCustomGroup == node.type) {
+          ElMessage.warning("暂不支持任务组选择");
+          return;
+        }
         jobDialog.value = true;
         jobNodeEditId.value = node.id;
       },
@@ -238,6 +242,10 @@ const menuConfig = {
           ElMessage.warning("请选择任务或任务组");
           return;
         }
+        if (DynamicCustomGroup == node.type) {
+          ElMessage.warning("暂不支持任务组编辑");
+          return;
+        }
         jobNodeVisible.value = true;
         nodeJobId.value = node.properties.jobId;
         nowDate.value = new Date();
@@ -246,6 +254,10 @@ const menuConfig = {
     {
       text: "复制",
       callback(node: any) {
+        if (DynamicCustomGroup == node.type) {
+          ElMessage.warning("暂不支持任务组复制");
+          return;
+        }
         lf.value.graphModel.cloneNode(node.id);
       },
     },
