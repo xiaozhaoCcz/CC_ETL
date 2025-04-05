@@ -129,7 +129,10 @@
             autocomplete="off"
           />
         </el-form-item>
-        <el-form-item label="任务参数" v-if="formData.glueType !== 'API'">
+        <el-form-item
+          :label="formData.glueType == 'SQL' ? 'SQL' : '任务参数'"
+          v-if="formData.glueType !== 'API'"
+        >
           <el-input
             v-model="formData.executorParam"
             type="textarea"
@@ -153,7 +156,7 @@
         <el-form-item label="任务超时时间">
           <el-input
             v-model="formData.executorTimeout"
-            type="textarea"
+            type="text"
             autocomplete="off"
           />
         </el-form-item>
@@ -172,11 +175,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="任务重试次数">
-          <el-input
-            v-model="formData.executorFailRetryCount"
-            type="text"
-            autocomplete="off"
-          />
+          <el-input-number v-model="formData.executorFailRetryCount" :min="0" />
         </el-form-item>
         <el-form-item label="暂停任务">
           <el-switch

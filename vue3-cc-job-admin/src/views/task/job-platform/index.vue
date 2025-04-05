@@ -68,7 +68,7 @@
             type="info"
             :icon="Document"
             circle
-            @click="getTaskTriggerLog"
+            @click="getJobTriggerLog"
           />
         </el-tooltip>
       </div>
@@ -246,12 +246,7 @@ const menuConfig = {
     {
       text: "复制",
       callback(node: any) {
-        if (node.type === "dynamic-group") {
-          alert("暂时还不支持任务组复制~");
-          return;
-        } else {
-          lf.value.graphModel.cloneNode(node.id);
-        }
+        lf.value.graphModel.cloneNode(node.id);
       },
     },
     {
@@ -363,6 +358,10 @@ function run(id: number) {
   }, 2000);
 }
 
+/**
+ * 任务日志停止运行
+ * @param content
+ */
 function logRunStop(content: string) {
   if (logRun != null) {
     window.clearInterval(logRun);
@@ -371,6 +370,10 @@ function logRunStop(content: string) {
   }
 }
 
+/**
+ * 获取任务日志
+ * @param id
+ */
 function getExecuteTaskLog(id: number) {
   if (pullFailCount.value++ > 20) {
     logRunStop("日志加载完成.....");
@@ -409,13 +412,20 @@ function getExecuteTaskLog(id: number) {
     }
   });
 }
+//-------------------------------------------------------log------------------------------
 
+/**
+ * 清除画布
+ */
 async function clearGraph() {
   jobSelectId.value = undefined;
   jobCompId.value = null;
   await clearData();
 }
 
+/**
+ * 关闭节点编辑
+ */
 function closeDraw(jobId: number, isPause: number) {
   const nodes = lf.value.getGraphRawData().nodes;
   const _node = nodes.find((v) => v.properties.jobId === jobId);
@@ -453,7 +463,10 @@ async function clearData() {
   });
 }
 
-function getTaskTriggerLog() {
+/**
+ * 运行日志
+ */
+function getJobTriggerLog() {
   if (triggerOneVisible.value) {
     ElMessage.warning("有任务正在运行，请先停止任务～");
     return;
@@ -468,6 +481,10 @@ function getTaskTriggerLog() {
   });
 }
 
+/**
+ * 选择任务组
+ * @param node
+ */
 async function selectJobCompNode(node: any) {
   if (triggerOneVisible.value) {
     ElMessage.warning("有任务正在运行，请先停止任务～");
@@ -502,6 +519,9 @@ function cancelDialog() {
   jobDialog.value = false;
 }
 
+/**
+ * 校验边
+ */
 function validateEdge() {
   const nodes = lf.value.getGraphRawData().nodes;
   const nodesIds = [] as any;
@@ -533,6 +553,12 @@ function validateEdge() {
   return;
 }
 
+/**
+ * 增加节点
+ * @param newNodes 新的节点
+ * @param graphModel 画布模型
+ * @param newEdges 新的边
+ */
 function addJobNodes(newNodes: any[], graphModel: any, newEdges: any[]) {
   // 添加新节点
   newNodes.forEach((node) => {
@@ -552,6 +578,9 @@ function addJobNodes(newNodes: any[], graphModel: any, newEdges: any[]) {
   });
 }
 
+/**
+ * 确认选择任务
+ */
 async function confirmDialog() {
   const _node = lf.value.getNodeModelById(jobNodeEditId.value);
   const _jobInfo = jobInfoList.value.find(
@@ -582,6 +611,10 @@ async function confirmDialog() {
   cancelDialog();
 }
 
+/**
+ * 产生节点
+ * @param node
+ */
 function generateNode(node: any) {
   const properties = JSON.parse(node.properties);
   if (node.nodeType === DynamicCustomGroup) {
@@ -598,6 +631,10 @@ function generateNode(node: any) {
   };
 }
 
+/**
+ * 产生边
+ * @param edge
+ */
 function generateEdge(edge: any) {
   return {
     sourceNodeId: edge.fromNodeId,
@@ -615,6 +652,9 @@ function changeJobRadio(val: string | number | boolean | undefined) {
 const snowflake = new Snowflake(31, 31, true, new Date());
 const randomId = ref("");
 
+/**
+ * 任务执行一次
+ */
 function triggerOne() {
   if (jobCompId.value == null) {
     ElMessage.warning("请选择任务组～");
@@ -634,8 +674,7 @@ function triggerOne() {
   jobInfoTriggerDto.id = jobId;
   jobInfoTriggerDto.executorParam = randomId.value;
   JobInfoAPI.triggerJob(jobInfoTriggerDto)
-    .then((data) => {
-      console.log(">>>>>>>", data);
+    .then((data: any) => {
       if (data) {
         diaLogVisible.value = true;
         run(data);
@@ -657,6 +696,9 @@ function selectElements() {
   const elements = lf.value.graphModel.getSelectElements(true);
 }
 
+/**
+ * 停止任务
+ */
 function stopTrigger() {
   if (jobCompId.value == null) {
     ElMessage.warning("请选择任务组～");
@@ -732,6 +774,9 @@ function getJobCompList() {
   });
 }
 
+/**
+ * 更新边的状态
+ */
 function updateEdgeStyle() {
   const { edges } = lf.value.getGraphRawData() ?? {};
   if (triggerOneVisible.value) {
