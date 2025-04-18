@@ -354,7 +354,7 @@ async function fetchJdbcDatasource() {
 }
 
 function cancelClick() {
-  emit("close", props.nodeTaskId, formData.isPause);
+  emit("close", props.nodeTaskId, formData.isPause, formData.glueType);
 }
 function confirmClick() {
   if (!props.nodeTaskId) {
@@ -366,12 +366,20 @@ function confirmClick() {
   if (formData.glueType == "API") {
     formData.executorHandler = "runApiHandler";
   }
-
   formData.misfireStrategy = "DO_NOTHING";
   formData.scheduleType = "NONE";
+  // 将glueType保存到properties中
+    formData.properties = {
+    ...formData.properties,
+    glueType: formData.glueType 
+  };
   JobInfoAPI.update(props.nodeTaskId, formData)
     .then(() => {
       ElMessage.success("修改成功");
+      emit("close", props.nodeTaskId, formData.isPause, formData.glueType); // 传递新参数
+      console.log('emit close事件后，props.taskNodeVisible:', props.taskNodeVisible); // 验证父组件状态
+
+      drawVisible.value = false;
     })
     .finally(() => {});
 }

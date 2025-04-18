@@ -167,6 +167,16 @@ import {
   Loading,
   Document,
 } from "@element-plus/icons-vue";
+import CustomJava from "./node/CustomJava"; 
+import CustomPython from "./node/CustomPython";
+import CustomShell from "./node/CustomShell"; 
+import CustomPhp from "./node/CustomPhp"; 
+import CustomNodejs from "./node/CustomNodejs"; 
+import CustomApi from "./node/CustomAPI"; 
+import CustomBean from "./node/CustomBean"; 
+import CustomSql from "./node/CustomSql"; 
+import CustomPowerShell from "./node/CustomPowerShell";
+
 import JobInfoAPI from "@/api/task/job-info";
 import { ref } from "vue";
 import Snowflake from "@/utils/snowflake";
@@ -184,9 +194,9 @@ const lf = ref<any>(null);
 const lfRef = ref<any>(null);
 const patternItems = [
   {
-    type: "circle",
+    type: "rect",
     label: "添加任务",
-    text: "Circle",
+    text: "普通任务",
     icon: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAAH6ji2bAAAABGdBTUEAALGPC/xhBQAAAnBJREFUOBGdVL1rU1EcPfdGBddmaZLiEhdx1MHZQXApraCzQ7GKLgoRBxMfcRELuihWKcXFRcEWF8HBf0DdDCKYRZpnl7p0svLe9Zzbd29eQhTbC8nv+9zf130AT63jvooOGS8Vf9Nt5zxba7sXQwODfkWpkbjTQfCGUd9gIp3uuPP8bZ946g56dYQvnBg+b1HB8VIQmMFrazKcKSvFW2dQTxJnJdQ77urmXWOMBCmXM2Rke4S7UAW+/8ywwFoewmBps2tu7mbTdp8VMOkIRAkKfrVawalJTtIliclFbaOBqa0M2xImHeVIfd/nKAfVq/LGnPss5Kh00VEdSzfwnBXPUpmykNss4lUI9C1ga+8PNrBD5YeqRY2Zz8PhjooIbfJXjowvQJBqkmEkVnktWhwu2SM7SMx7Cj0N9IC0oQXRo8xwAGzQms+xrB/nNSUWVveI48ayrFGyC2+E2C+aWrZHXvOuz+CiV6iycWe1Rd1Q6+QUG07nb5SbPrL4426d+9E1axKjY3AoRrlEeSQo2Eu0T6BWAAr6COhTcWjRaYfKG5csnvytvUr/WY4rrPMB53Uo7jZRjXaG6/CFfNMaXEu75nG47X+oepU7PKJvvzGDY1YLSKHJrK7vFUwXKkaxwhCW3u+sDFMVrIju54RYYbFKpALZAo7sB6wcKyyrd+aBMryMT2gPyD6GsQoRFkGHr14TthZni9ck0z+Pnmee460mHXbRAypKNy3nuMdrWgVKj8YVV8E7PSzp1BZ9SJnJAsXdryw/h5ctboUVi4AFiCd+lQaYMw5z3LGTBKjLQOeUF35k89f58Vv/tGh+l+PE/wG0rgfIUbZK5AAAAABJRU5ErkJggg==",
   },
   {
@@ -257,6 +267,7 @@ const menuConfig = {
     {
       text: "属性",
       callback(node: any) {
+        console.log(node);
         let startTime = "";
         let endTime = "";
 
@@ -416,14 +427,40 @@ async function clearGraph() {
   await clearData();
 }
 
-function closeDraw(jobId: number, isPause: number) {
+const GLUE_NODE_TYPE_MAP: Record<string, string> = {
+  'SQL': "custom-sql",
+  'API': "custom-api",
+  'BEAN': "custom-bean",
+  'GLUE_GROOVY': 'custom-java',
+  'GLUE_SHELL': 'custom-shell',
+  'GLUE_PYTHON': 'custom-python',
+  'GLUE_PHP': 'custom-php',
+  'GLUE_NODEJS': 'custom-nodejs',
+  'GLUE_POWERSHELL': 'custom-powershell'
+};
+
+function closeDraw(jobId: number, isPause: number, glueType: string) {
   const nodes = lf.value.getGraphRawData().nodes;
   const _node = nodes.find((v) => v.properties.jobId === jobId);
-  const nodeModelById = lf.value!.getNodeModelById(_node.id);
-  nodeModelById.setStyle("stroke", isPause == 1 ? "#0031ff" : "#000");
+  if (_node) {
+    const nodeType = GLUE_NODE_TYPE_MAP[glueType] 
+  || (_node.nodeType === DynamicCustomGroup ? DynamicCustomGroup : 'rect');
+    const graphModel = lf.value.graphModel;
+    // 创建新的节点对象，并指定新的 type
+    const newNode = {
+      ..._node, // 保留原有节点的属性
+    };
+    newNode.type = nodeType;
+    // 删除节点
+    graphModel.deleteNode(_node.id);
 
-  nodeJobId.value = null;
-  jobNodeVisible.value = false;
+    console.log(newNode);
+    // 重新添加节点
+    lf.value.addNode(newNode);
+
+  }
+
+  jobNodeVisible.value = false; // 这行是控制编辑弹窗的关闭
 }
 
 function filterJobCompNode(value: string, data: any) {
@@ -584,13 +621,16 @@ async function confirmDialog() {
 
 function generateNode(node: any) {
   const properties = JSON.parse(node.properties);
+  // 类型判断逻辑
+  const nodeType = GLUE_NODE_TYPE_MAP[properties.glueType] || (node.nodeType === DynamicCustomGroup ? DynamicCustomGroup : 'rect');
   if (node.nodeType === DynamicCustomGroup) {
     properties.children = JSON.parse(properties.children);
   }
+
   return {
     id: node.id,
     text: node.jobName,
-    type: node.nodeType,
+    type: nodeType,
     x: node.nodePositionX,
     y: node.nodePositionY,
     properties: properties,
@@ -875,6 +915,17 @@ onMounted(() => {
 
   lf.value.extension.dndPanel.setPatternItems(patternItems);
   lf.value.extension.menu.setMenuConfig(menuConfig);
+  //注册自定义矩形节点
+  lf.value.register(CustomJava);
+  lf.value.register(CustomPython);
+  lf.value.register(CustomShell);
+  lf.value.register(CustomPhp);
+  lf.value.register(CustomNodejs);
+  lf.value.register(CustomApi);
+  lf.value.register(CustomBean);
+  lf.value.register(CustomSql);
+  lf.value.register(CustomPowerShell);
+
   lf.value.register(CustomGroup);
   lf.value.setDefaultEdgeType("bezier");
   lf.value.render({
