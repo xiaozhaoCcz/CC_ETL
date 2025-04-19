@@ -461,7 +461,7 @@ const GLUE_NODE_TYPE_MAP: Record<string, string> = {
  */
 function closeDraw(jobId: number, isPause: number, glueType: string) {
   const nodes = lf.value.getGraphRawData().nodes;
-  const _node = nodes.find((v) => v.properties.jobId === jobId);
+  const _node = nodes.find((v: any) => v.properties.jobId === jobId);
   if (_node) {
     const nodeType =
       GLUE_NODE_TYPE_MAP[glueType] ||
@@ -475,7 +475,6 @@ function closeDraw(jobId: number, isPause: number, glueType: string) {
     // 删除节点
     graphModel.deleteNode(_node.id);
 
-    console.log(newNode);
     // 重新添加节点
     lf.value.addNode(newNode);
   }
