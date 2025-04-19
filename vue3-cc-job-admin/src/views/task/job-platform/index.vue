@@ -68,7 +68,7 @@
             type="info"
             :icon="Document"
             circle
-            @click="getTaskTriggerLog"
+            @click="getJobTriggerLog"
           />
         </el-tooltip>
       </div>
@@ -167,14 +167,14 @@ import {
   Loading,
   Document,
 } from "@element-plus/icons-vue";
-import CustomJava from "./node/CustomJava"; 
+import CustomJava from "./node/CustomJava";
 import CustomPython from "./node/CustomPython";
-import CustomShell from "./node/CustomShell"; 
-import CustomPhp from "./node/CustomPhp"; 
-import CustomNodejs from "./node/CustomNodejs"; 
-import CustomApi from "./node/CustomAPI"; 
-import CustomBean from "./node/CustomBean"; 
-import CustomSql from "./node/CustomSql"; 
+import CustomShell from "./node/CustomShell";
+import CustomPhp from "./node/CustomPhp";
+import CustomNodejs from "./node/CustomNodejs";
+import CustomApi from "./node/CustomAPI";
+import CustomBean from "./node/CustomBean";
+import CustomSql from "./node/CustomSql";
 import CustomPowerShell from "./node/CustomPowerShell";
 
 import JobInfoAPI from "@/api/task/job-info";
@@ -234,6 +234,10 @@ const menuConfig = {
     {
       text: "选择任务",
       callback(node: { id: string }) {
+        if (DynamicCustomGroup == node.type) {
+          ElMessage.warning("暂不支持任务组选择");
+          return;
+        }
         jobDialog.value = true;
         jobNodeEditId.value = node.id;
       },
@@ -248,6 +252,10 @@ const menuConfig = {
           ElMessage.warning("请选择任务或任务组");
           return;
         }
+        if (DynamicCustomGroup == node.type) {
+          ElMessage.warning("暂不支持任务组编辑");
+          return;
+        }
         jobNodeVisible.value = true;
         nodeJobId.value = node.properties.jobId;
         nowDate.value = new Date();
@@ -256,18 +264,16 @@ const menuConfig = {
     {
       text: "复制",
       callback(node: any) {
-        if (node.type === "dynamic-group") {
-          alert("暂时还不支持任务组复制~");
+        if (DynamicCustomGroup == node.type) {
+          ElMessage.warning("暂不支持任务组复制");
           return;
-        } else {
-          lf.value.graphModel.cloneNode(node.id);
         }
+        lf.value.graphModel.cloneNode(node.id);
       },
     },
     {
       text: "属性",
       callback(node: any) {
-        console.log(node);
         let startTime = "";
         let endTime = "";
 
@@ -374,6 +380,10 @@ function run(id: number) {
   }, 2000);
 }
 
+/**
+ * 任务日志停止运行
+ * @param content
+ */
 function logRunStop(content: string) {
   if (logRun != null) {
     window.clearInterval(logRun);
@@ -382,6 +392,10 @@ function logRunStop(content: string) {
   }
 }
 
+/**
+ * 获取任务日志
+ * @param id
+ */
 function getExecuteTaskLog(id: number) {
   if (pullFailCount.value++ > 20) {
     logRunStop("日志加载完成.....");
@@ -420,13 +434,21 @@ function getExecuteTaskLog(id: number) {
     }
   });
 }
+//-------------------------------------------------------log------------------------------
 
+/**
+ * 清除画布
+ */
 async function clearGraph() {
   jobSelectId.value = undefined;
   jobCompId.value = null;
   await clearData();
 }
 
+/**
+ * 关闭节点编辑
+ */
+function closeDraw(jobId: number, isPause: number) {
 const GLUE_NODE_TYPE_MAP: Record<string, string> = {
   'SQL': "custom-sql",
   'API': "custom-api",
@@ -443,7 +465,7 @@ function closeDraw(jobId: number, isPause: number, glueType: string) {
   const nodes = lf.value.getGraphRawData().nodes;
   const _node = nodes.find((v) => v.properties.jobId === jobId);
   if (_node) {
-    const nodeType = GLUE_NODE_TYPE_MAP[glueType] 
+    const nodeType = GLUE_NODE_TYPE_MAP[glueType]
   || (_node.nodeType === DynamicCustomGroup ? DynamicCustomGroup : 'rect');
     const graphModel = lf.value.graphModel;
     // 创建新的节点对象，并指定新的 type
@@ -490,7 +512,10 @@ async function clearData() {
   });
 }
 
-function getTaskTriggerLog() {
+/**
+ * 运行日志
+ */
+function getJobTriggerLog() {
   if (triggerOneVisible.value) {
     ElMessage.warning("有任务正在运行，请先停止任务～");
     return;
@@ -505,6 +530,10 @@ function getTaskTriggerLog() {
   });
 }
 
+/**
+ * 选择任务组
+ * @param node
+ */
 async function selectJobCompNode(node: any) {
   if (triggerOneVisible.value) {
     ElMessage.warning("有任务正在运行，请先停止任务～");
@@ -539,6 +568,9 @@ function cancelDialog() {
   jobDialog.value = false;
 }
 
+/**
+ * 校验边
+ */
 function validateEdge() {
   const nodes = lf.value.getGraphRawData().nodes;
   const nodesIds = [] as any;
@@ -570,6 +602,12 @@ function validateEdge() {
   return;
 }
 
+/**
+ * 增加节点
+ * @param newNodes 新的节点
+ * @param graphModel 画布模型
+ * @param newEdges 新的边
+ */
 function addJobNodes(newNodes: any[], graphModel: any, newEdges: any[]) {
   // 添加新节点
   newNodes.forEach((node) => {
@@ -589,6 +627,9 @@ function addJobNodes(newNodes: any[], graphModel: any, newEdges: any[]) {
   });
 }
 
+/**
+ * 确认选择任务
+ */
 async function confirmDialog() {
   const _node = lf.value.getNodeModelById(jobNodeEditId.value);
   const _jobInfo = jobInfoList.value.find(
@@ -619,6 +660,10 @@ async function confirmDialog() {
   cancelDialog();
 }
 
+/**
+ * 产生节点
+ * @param node
+ */
 function generateNode(node: any) {
   const properties = JSON.parse(node.properties);
   // 类型判断逻辑
@@ -638,6 +683,10 @@ function generateNode(node: any) {
   };
 }
 
+/**
+ * 产生边
+ * @param edge
+ */
 function generateEdge(edge: any) {
   return {
     sourceNodeId: edge.fromNodeId,
@@ -655,6 +704,9 @@ function changeJobRadio(val: string | number | boolean | undefined) {
 const snowflake = new Snowflake(31, 31, true, new Date());
 const randomId = ref("");
 
+/**
+ * 任务执行一次
+ */
 function triggerOne() {
   if (jobCompId.value == null) {
     ElMessage.warning("请选择任务组～");
@@ -674,8 +726,7 @@ function triggerOne() {
   jobInfoTriggerDto.id = jobId;
   jobInfoTriggerDto.executorParam = randomId.value;
   JobInfoAPI.triggerJob(jobInfoTriggerDto)
-    .then((data) => {
-      console.log(">>>>>>>", data);
+    .then((data: any) => {
       if (data) {
         diaLogVisible.value = true;
         run(data);
@@ -697,6 +748,9 @@ function selectElements() {
   const elements = lf.value.graphModel.getSelectElements(true);
 }
 
+/**
+ * 停止任务
+ */
 function stopTrigger() {
   if (jobCompId.value == null) {
     ElMessage.warning("请选择任务组～");
@@ -772,6 +826,9 @@ function getJobCompList() {
   });
 }
 
+/**
+ * 更新边的状态
+ */
 function updateEdgeStyle() {
   const { edges } = lf.value.getGraphRawData() ?? {};
   if (triggerOneVisible.value) {
