@@ -445,28 +445,27 @@ async function clearGraph() {
   await clearData();
 }
 
+const GLUE_NODE_TYPE_MAP: Record<string, string> = {
+  SQL: "custom-sql",
+  API: "custom-api",
+  BEAN: "custom-bean",
+  GLUE_GROOVY: "custom-java",
+  GLUE_SHELL: "custom-shell",
+  GLUE_PYTHON: "custom-python",
+  GLUE_PHP: "custom-php",
+  GLUE_NODEJS: "custom-nodejs",
+  GLUE_POWERSHELL: "custom-powershell",
+};
 /**
  * 关闭节点编辑
  */
-function closeDraw(jobId: number, isPause: number) {
-const GLUE_NODE_TYPE_MAP: Record<string, string> = {
-  'SQL': "custom-sql",
-  'API': "custom-api",
-  'BEAN': "custom-bean",
-  'GLUE_GROOVY': 'custom-java',
-  'GLUE_SHELL': 'custom-shell',
-  'GLUE_PYTHON': 'custom-python',
-  'GLUE_PHP': 'custom-php',
-  'GLUE_NODEJS': 'custom-nodejs',
-  'GLUE_POWERSHELL': 'custom-powershell'
-};
-
 function closeDraw(jobId: number, isPause: number, glueType: string) {
   const nodes = lf.value.getGraphRawData().nodes;
   const _node = nodes.find((v) => v.properties.jobId === jobId);
   if (_node) {
-    const nodeType = GLUE_NODE_TYPE_MAP[glueType]
-  || (_node.nodeType === DynamicCustomGroup ? DynamicCustomGroup : 'rect');
+    const nodeType =
+      GLUE_NODE_TYPE_MAP[glueType] ||
+      (_node.nodeType === DynamicCustomGroup ? DynamicCustomGroup : "rect");
     const graphModel = lf.value.graphModel;
     // 创建新的节点对象，并指定新的 type
     const newNode = {
@@ -479,7 +478,6 @@ function closeDraw(jobId: number, isPause: number, glueType: string) {
     console.log(newNode);
     // 重新添加节点
     lf.value.addNode(newNode);
-
   }
 
   jobNodeVisible.value = false; // 这行是控制编辑弹窗的关闭
@@ -667,7 +665,9 @@ async function confirmDialog() {
 function generateNode(node: any) {
   const properties = JSON.parse(node.properties);
   // 类型判断逻辑
-  const nodeType = GLUE_NODE_TYPE_MAP[properties.glueType] || (node.nodeType === DynamicCustomGroup ? DynamicCustomGroup : 'rect');
+  const nodeType =
+    GLUE_NODE_TYPE_MAP[properties.glueType] ||
+    (node.nodeType === DynamicCustomGroup ? DynamicCustomGroup : "rect");
   if (node.nodeType === DynamicCustomGroup) {
     properties.children = JSON.parse(properties.children);
   }
