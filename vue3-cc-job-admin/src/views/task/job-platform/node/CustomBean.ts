@@ -8,8 +8,8 @@ class CustomBeanModel extends BaseButtonNodeModel {
   }
   getTextStyle() {
     const style = super.getTextStyle();
-    style.stroke = "black";
-
+    style.stroke ='black';
+    
     return style;
   }
 }

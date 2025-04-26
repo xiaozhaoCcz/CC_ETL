@@ -62,7 +62,8 @@ class CustomShellView extends BaseButtonNodeView {
 }
 
 export default {
-  type: "custom-shell",
-  view: CustomShellView,
-  model: CustomShellModel,
-};
+
+    type: 'custom-shell',
+    view: CustomShellView,
+    model: CustomShellModel,
+}
