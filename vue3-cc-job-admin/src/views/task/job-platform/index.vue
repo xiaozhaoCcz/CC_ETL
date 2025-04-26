@@ -274,6 +274,7 @@ const menuConfig = {
     {
       text: "属性",
       callback(node: any) {
+        console.log(node);
         let startTime = "";
         let endTime = "";
 
@@ -459,7 +460,7 @@ const GLUE_NODE_TYPE_MAP: Record<string, string> = {
 /**
  * 关闭节点编辑
  */
-function closeDraw(jobId: number, isPause: number, glueType: string) {
+function updateNodeTypeByGlueType(jobId: number, isPause: number, glueType: string) {
   const nodes = lf.value.getGraphRawData().nodes;
   const _node = nodes.find((v: any) => v.properties.jobId === jobId);
   if (_node) {
@@ -475,10 +476,15 @@ function closeDraw(jobId: number, isPause: number, glueType: string) {
     // 删除节点
     graphModel.deleteNode(_node.id);
 
+    console.log(newNode);
     // 重新添加节点
     lf.value.addNode(newNode);
-  }
 
+  }
+}
+
+function closeDraw(jobId: number, isPause: number, glueType: string) {
+  updateNodeTypeByGlueType(jobId, glueType);
   jobNodeVisible.value = false; // 这行是控制编辑弹窗的关闭
 }
 
@@ -653,6 +659,10 @@ async function confirmDialog() {
   } else {
     _node.setProperty("jobId", jobSelectId.value);
     _node.updateText(_jobInfo.jobDesc);
+    updateNodeTypeByGlueType(
+      jobSelectId.value,
+      _jobInfo.glueType
+    );
   }
   cancelDialog();
 }
@@ -987,6 +997,42 @@ onMounted(() => {
   lf.value.render({
     nodes: nodes.value,
     edges: edges.value,
+  });
+
+
+  lf.value.on("node:mouseenter", ({ data }) => {
+    const node = lf.value.getNodeModelById(data.id);
+    node.buttonGroupOpacity = 1;
+    lf.value.graphModel.updateNode(node); // 触发视图更新
+  });
+
+  lf.value.on("node:mouseleave", ({ data }) => {
+    const node = lf.value.getNodeModelById(data.id);
+    node.buttonGroupOpacity = 0;
+    lf.value.graphModel.updateNode(node);
+  });
+
+  //编辑节点事件
+  lf.value.on("custom:node-edit", ({ nodeId }) => {
+    const node = lf.value.getNodeModelById(nodeId);
+    if (node.properties.jobId === null || node.properties.jobId === undefined) {
+      ElMessage.warning("请选择任务或任务组");
+      return;
+    }
+    jobNodeVisible.value = true;
+    nodeJobId.value = node.properties.jobId;
+    nowDate.value = new Date();
+  });
+
+  //选择任务事件
+  lf.value.on("custom:node-task-edit", ({ nodeId }) => {
+    jobDialog.value = true;
+    jobNodeEditId.value = nodeId;
+  });
+
+  lf.value.on("custom:node-delete", ({ nodeId }) => {
+    lf.value.deleteNode(nodeId);
+
   });
   //！！一定要在render下面才能显示
   lf.value.extension.miniMap.show();
