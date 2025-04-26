@@ -1,7 +1,8 @@
 import { RectResize } from "@logicflow/extension";
 import { h } from "@logicflow/core";
-
-class CustomShellModel extends RectResize.model {
+import { BaseButtonNodeModel } from "./BaseNodeWithButtons";
+import { BaseButtonNodeView } from "./BaseNodeWithButtons";
+class CustomShellModel extends BaseButtonNodeModel {
 
   getNodeStyle() {
     const style = super.getNodeStyle();
@@ -16,7 +17,7 @@ class CustomShellModel extends RectResize.model {
   }
 }
 
-class CustomShellView extends RectResize.view {
+class CustomShellView extends BaseButtonNodeView {
 
 
     // 创建SVG图标
@@ -48,26 +49,14 @@ class CustomShellView extends RectResize.view {
    // 组合矩形主体和头像图标
   getResizeShape() {
     const { model } = this.props;
-    const { x, y, width, height, radius } = model;
-    const style = model.getNodeStyle();
     return h('g', {}, [
-      h('rect', {
-        ...style,
-        x: x - width / 2, // 矩形默认x，y代表左上角顶点坐标，切换为中心点
-        y: y - height / 2,
-        rx: radius,
-        ry: radius,
-        width,
-        height,
-      }),
+      super.getResizeShape(),
       this.getLabelShape(),
-      // 图标右侧文本
       h('text', {
-        x: x - width/2 + 30,
-        y: y - height/2 + 25.5, 
+        x: model.x - model.width/2 + 30,
+        y: model.y - model.height/2 + 25.5,
         fontSize: 12,
-        fill: 'black',
-        className: 'node-label'
+        fill: 'black'
       }, 'PowerShell')
     ]);
   }
