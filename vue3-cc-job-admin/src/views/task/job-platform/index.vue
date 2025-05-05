@@ -460,7 +460,7 @@ const GLUE_NODE_TYPE_MAP: Record<string, string> = {
 /**
  * 关闭节点编辑
  */
-function updateNodeTypeByGlueType(jobId: number, isPause: number, glueType: string) {
+function updateNodeTypeByGlueType(jobId: number, glueType: string) {
   const nodes = lf.value.getGraphRawData().nodes;
   const _node = nodes.find((v: any) => v.properties.jobId === jobId);
   if (_node) {
