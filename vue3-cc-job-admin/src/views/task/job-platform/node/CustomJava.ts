@@ -3,6 +3,7 @@ import { h } from "@logicflow/core";
 import { BaseButtonNodeModel, BaseButtonNodeView } from "./BaseNodeWithButtons";
 class CustomJavaModel extends BaseButtonNodeModel {
 
+
   getNodeStyle() {
     return { ...super.getNodeStyle(), stroke: 'black' };
   }
