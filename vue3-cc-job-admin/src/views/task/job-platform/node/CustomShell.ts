@@ -45,7 +45,7 @@ class CustomShellView extends BaseButtonNodeView {
 
 
 
-   // 组合矩形主体和头像图标
+  // 组合矩形主体和头像图标
   getResizeShape() {
     const { model } = this.props;
     return h('g', {}, [

@@ -68,7 +68,7 @@
             type="info"
             :icon="Document"
             circle
-            @click="getTaskTriggerLog"
+            @click="getJobTriggerLog"
           />
         </el-tooltip>
       </div>
@@ -167,14 +167,14 @@ import {
   Loading,
   Document,
 } from "@element-plus/icons-vue";
-import CustomJava from "./node/CustomJava"; 
+import CustomJava from "./node/CustomJava";
 import CustomPython from "./node/CustomPython";
-import CustomShell from "./node/CustomShell"; 
-import CustomPhp from "./node/CustomPhp"; 
-import CustomNodejs from "./node/CustomNodejs"; 
-import CustomApi from "./node/CustomAPI"; 
-import CustomBean from "./node/CustomBean"; 
-import CustomSql from "./node/CustomSql"; 
+import CustomShell from "./node/CustomShell";
+import CustomPhp from "./node/CustomPhp";
+import CustomNodejs from "./node/CustomNodejs";
+import CustomApi from "./node/CustomAPI";
+import CustomBean from "./node/CustomBean";
+import CustomSql from "./node/CustomSql";
 import CustomPowerShell from "./node/CustomPowerShell";
 
 import JobInfoAPI from "@/api/task/job-info";
@@ -185,6 +185,7 @@ import CustomGroup from "@/components/CustomGroup/CustomGroup";
 import router from "@/router";
 import Dialog from "@/components/Dialog/Dialog.vue";
 import JobLogAPI from "@/api/task/job-log";
+import CustomRect, { CustomRectModel, CustomRectView } from "./node/CustomRect";
 
 LogicFlow.use(Control); // 控制面板
 LogicFlow.use(DndPanel); // 拖拽面板
@@ -194,9 +195,8 @@ const lf = ref<any>(null);
 const lfRef = ref<any>(null);
 const patternItems = [
   {
-    type: "rect",
+    type: "custom-rect",
     label: "添加任务",
-    text: "普通任务",
     icon: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAAH6ji2bAAAABGdBTUEAALGPC/xhBQAAAnBJREFUOBGdVL1rU1EcPfdGBddmaZLiEhdx1MHZQXApraCzQ7GKLgoRBxMfcRELuihWKcXFRcEWF8HBf0DdDCKYRZpnl7p0svLe9Zzbd29eQhTbC8nv+9zf130AT63jvooOGS8Vf9Nt5zxba7sXQwODfkWpkbjTQfCGUd9gIp3uuPP8bZ946g56dYQvnBg+b1HB8VIQmMFrazKcKSvFW2dQTxJnJdQ77urmXWOMBCmXM2Rke4S7UAW+/8ywwFoewmBps2tu7mbTdp8VMOkIRAkKfrVawalJTtIliclFbaOBqa0M2xImHeVIfd/nKAfVq/LGnPss5Kh00VEdSzfwnBXPUpmykNss4lUI9C1ga+8PNrBD5YeqRY2Zz8PhjooIbfJXjowvQJBqkmEkVnktWhwu2SM7SMx7Cj0N9IC0oQXRo8xwAGzQms+xrB/nNSUWVveI48ayrFGyC2+E2C+aWrZHXvOuz+CiV6iycWe1Rd1Q6+QUG07nb5SbPrL4426d+9E1axKjY3AoRrlEeSQo2Eu0T6BWAAr6COhTcWjRaYfKG5csnvytvUr/WY4rrPMB53Uo7jZRjXaG6/CFfNMaXEu75nG47X+oepU7PKJvvzGDY1YLSKHJrK7vFUwXKkaxwhCW3u+sDFMVrIju54RYYbFKpALZAo7sB6wcKyyrd+aBMryMT2gPyD6GsQoRFkGHr14TthZni9ck0z+Pnmee460mHXbRAypKNy3nuMdrWgVKj8YVV8E7PSzp1BZ9SJnJAsXdryw/h5ctboUVi4AFiCd+lQaYMw5z3LGTBKjLQOeUF35k89f58Vv/tGh+l+PE/wG0rgfIUbZK5AAAAABJRU5ErkJggg==",
   },
   {
@@ -227,13 +227,17 @@ const menuConfig = {
   nodeMenu: [
     {
       text: "删除",
-      callback(node: { id: string }) {
+      callback(node:any ) {
         lf.value.deleteNode(node.id);
       },
     },
     {
       text: "选择任务",
-      callback(node: { id: string }) {
+      callback(node: any) {
+        if (DynamicCustomGroup == node.type) {
+          ElMessage.warning("暂不支持任务组选择");
+          return;
+        }
         jobDialog.value = true;
         jobNodeEditId.value = node.id;
       },
@@ -248,6 +252,10 @@ const menuConfig = {
           ElMessage.warning("请选择任务或任务组");
           return;
         }
+        if (DynamicCustomGroup == node.type) {
+          ElMessage.warning("暂不支持任务组编辑");
+          return;
+        }
         jobNodeVisible.value = true;
         nodeJobId.value = node.properties.jobId;
         nowDate.value = new Date();
@@ -256,12 +264,11 @@ const menuConfig = {
     {
       text: "复制",
       callback(node: any) {
-        if (node.type === "dynamic-group") {
-          alert("暂时还不支持任务组复制~");
+        if (DynamicCustomGroup == node.type) {
+          ElMessage.warning("暂不支持任务组复制");
           return;
-        } else {
-          lf.value.graphModel.cloneNode(node.id);
         }
+        lf.value.graphModel.cloneNode(node.id);
       },
     },
     {
@@ -374,6 +381,10 @@ function run(id: number) {
   }, 2000);
 }
 
+/**
+ * 任务日志停止运行
+ * @param content
+ */
 function logRunStop(content: string) {
   if (logRun != null) {
     window.clearInterval(logRun);
@@ -382,6 +393,10 @@ function logRunStop(content: string) {
   }
 }
 
+/**
+ * 获取任务日志
+ * @param id
+ */
 function getExecuteTaskLog(id: number) {
   if (pullFailCount.value++ > 20) {
     logRunStop("日志加载完成.....");
@@ -420,7 +435,11 @@ function getExecuteTaskLog(id: number) {
     }
   });
 }
+//-------------------------------------------------------log------------------------------
 
+/**
+ * 清除画布
+ */
 async function clearGraph() {
   jobSelectId.value = undefined;
   jobCompId.value = null;
@@ -428,42 +447,46 @@ async function clearGraph() {
 }
 
 const GLUE_NODE_TYPE_MAP: Record<string, string> = {
-  'SQL': "custom-sql",
-  'API': "custom-api",
-  'BEAN': "custom-bean",
-  'GLUE_GROOVY': 'custom-java',
-  'GLUE_SHELL': 'custom-shell',
-  'GLUE_PYTHON': 'custom-python',
-  'GLUE_PHP': 'custom-php',
-  'GLUE_NODEJS': 'custom-nodejs',
-  'GLUE_POWERSHELL': 'custom-powershell'
+  SQL: "custom-sql",
+  API: "custom-api",
+  BEAN: "custom-bean",
+  GLUE_GROOVY: "custom-java",
+  GLUE_SHELL: "custom-shell",
+  GLUE_PYTHON: "custom-python",
+  GLUE_PHP: "custom-php",
+  GLUE_NODEJS: "custom-nodejs",
+  GLUE_POWERSHELL: "custom-powershell",
 };
-
-// 用于更新节点类型的公共函数
-function updateNodeTypeByGlueType(jobId, glueType) {
-  const nodes = lf.value.getGraphRawData().nodes;
-  const _node = nodes.find((v) => v.properties.jobId === jobId);
+/**
+ * 关闭节点编辑
+ */
+function updateNodeTypeByGlueType(jobId: number, glueType: string, isPause: number) {
+  const _node = lf.value.getNodeModelById(jobNodeEditId.value);
   if (_node) {
-    const nodeType = GLUE_NODE_TYPE_MAP[glueType] 
-  || (_node.nodeType === DynamicCustomGroup ? DynamicCustomGroup : 'rect');
+    const nodeType =
+      GLUE_NODE_TYPE_MAP[glueType] ||
+      (_node.nodeType === DynamicCustomGroup ? DynamicCustomGroup : "rect");
     const graphModel = lf.value.graphModel;
     // 创建新的节点对象，并指定新的 type
     const newNode = {
       ..._node, // 保留原有节点的属性
     };
     newNode.type = nodeType;
+    newNode.isPause = isPause;
     // 删除节点
     graphModel.deleteNode(_node.id);
-
-    console.log(newNode);
     // 重新添加节点
     lf.value.addNode(newNode);
-
+    // 更新节点属性
+    const node = lf.value.getNodeModelById(jobNodeEditId.value);
+    // 更新节点样式
+  const styleKey = node.type === DynamicCustomGroup ? 'stroke' : 'fill';
+  node.setStyle(styleKey, node.isPause ? '#CCCCCC' : '#FFFFFF');
   }
 }
 
 function closeDraw(jobId: number, isPause: number, glueType: string) {
-  updateNodeTypeByGlueType(jobId, glueType);
+  updateNodeTypeByGlueType(jobId, glueType, isPause);
   jobNodeVisible.value = false; // 这行是控制编辑弹窗的关闭
 }
 
@@ -494,7 +517,10 @@ async function clearData() {
   });
 }
 
-function getTaskTriggerLog() {
+/**
+ * 运行日志
+ */
+function getJobTriggerLog() {
   if (triggerOneVisible.value) {
     ElMessage.warning("有任务正在运行，请先停止任务～");
     return;
@@ -509,6 +535,10 @@ function getTaskTriggerLog() {
   });
 }
 
+/**
+ * 选择任务组
+ * @param node
+ */
 async function selectJobCompNode(node: any) {
   if (triggerOneVisible.value) {
     ElMessage.warning("有任务正在运行，请先停止任务～");
@@ -543,6 +573,9 @@ function cancelDialog() {
   jobDialog.value = false;
 }
 
+/**
+ * 校验边
+ */
 function validateEdge() {
   const nodes = lf.value.getGraphRawData().nodes;
   const nodesIds = [] as any;
@@ -574,6 +607,12 @@ function validateEdge() {
   return;
 }
 
+/**
+ * 增加节点
+ * @param newNodes 新的节点
+ * @param graphModel 画布模型
+ * @param newEdges 新的边
+ */
 function addJobNodes(newNodes: any[], graphModel: any, newEdges: any[]) {
   // 添加新节点
   newNodes.forEach((node) => {
@@ -593,8 +632,12 @@ function addJobNodes(newNodes: any[], graphModel: any, newEdges: any[]) {
   });
 }
 
+/**
+ * 确认选择任务
+ */
 async function confirmDialog() {
   const _node = lf.value.getNodeModelById(jobNodeEditId.value);
+ 
   const _jobInfo = jobInfoList.value.find(
     (e: any) => e.id === jobSelectId.value
   ) as any;
@@ -621,16 +664,24 @@ async function confirmDialog() {
     _node.updateText(_jobInfo.jobDesc);
     updateNodeTypeByGlueType(
       jobSelectId.value,
-      _jobInfo.glueType
+      _jobInfo.glueType,
+      _jobInfo.isPause
     );
   }
   cancelDialog();
 }
 
+/**
+ * 产生节点
+ * @param node
+ */
 function generateNode(node: any) {
+  console.log("generateNode", node);
   const properties = JSON.parse(node.properties);
   // 类型判断逻辑
-  const nodeType = GLUE_NODE_TYPE_MAP[properties.glueType] || (node.nodeType === DynamicCustomGroup ? DynamicCustomGroup : 'rect');
+  const nodeType =
+    GLUE_NODE_TYPE_MAP[properties.glueType] ||
+    (node.nodeType === DynamicCustomGroup ? DynamicCustomGroup : "rect");
   if (node.nodeType === DynamicCustomGroup) {
     properties.children = JSON.parse(properties.children);
   }
@@ -646,6 +697,10 @@ function generateNode(node: any) {
   };
 }
 
+/**
+ * 产生边
+ * @param edge
+ */
 function generateEdge(edge: any) {
   return {
     sourceNodeId: edge.fromNodeId,
@@ -663,6 +718,9 @@ function changeJobRadio(val: string | number | boolean | undefined) {
 const snowflake = new Snowflake(31, 31, true, new Date());
 const randomId = ref("");
 
+/**
+ * 任务执行一次
+ */
 function triggerOne() {
   if (jobCompId.value == null) {
     ElMessage.warning("请选择任务组～");
@@ -682,8 +740,7 @@ function triggerOne() {
   jobInfoTriggerDto.id = jobId;
   jobInfoTriggerDto.executorParam = randomId.value;
   JobInfoAPI.triggerJob(jobInfoTriggerDto)
-    .then((data) => {
-      console.log(">>>>>>>", data);
+    .then((data: any) => {
       if (data) {
         diaLogVisible.value = true;
         run(data);
@@ -705,6 +762,9 @@ function selectElements() {
   const elements = lf.value.graphModel.getSelectElements(true);
 }
 
+/**
+ * 停止任务
+ */
 function stopTrigger() {
   if (jobCompId.value == null) {
     ElMessage.warning("请选择任务组～");
@@ -780,6 +840,9 @@ function getJobCompList() {
   });
 }
 
+/**
+ * 更新边的状态
+ */
 function updateEdgeStyle() {
   const { edges } = lf.value.getGraphRawData() ?? {};
   if (triggerOneVisible.value) {
@@ -933,6 +996,7 @@ onMounted(() => {
   lf.value.register(CustomBean);
   lf.value.register(CustomSql);
   lf.value.register(CustomPowerShell);
+  lf.value.register(CustomRect);
 
   lf.value.register(CustomGroup);
   lf.value.setDefaultEdgeType("bezier");
@@ -945,14 +1009,34 @@ onMounted(() => {
   lf.value.on("node:mouseenter", ({ data }) => {
     const node = lf.value.getNodeModelById(data.id);
     node.buttonGroupOpacity = 1;
-    lf.value.graphModel.updateNode(node); // 触发视图更新
   });
 
   lf.value.on("node:mouseleave", ({ data }) => {
     const node = lf.value.getNodeModelById(data.id);
     node.buttonGroupOpacity = 0;
-    lf.value.graphModel.updateNode(node);
   });
+
+
+// 状态切换事件
+lf.value.on("custom:node-toggle-status", ({ nodeId }) => {
+  const node = lf.value.getNodeModelById(nodeId);
+  node.isPause = !node.isPause;
+  
+  // 更新节点样式
+  const styleKey = node.type === DynamicCustomGroup ? 'stroke' : 'fill';
+  node.setStyle(styleKey, node.isPause ? '#CCCCCC' : '#FFFFFF');
+});
+
+
+  //复制节点事件
+  lf.value.on("custom:node-copy", ({ nodeId }) => {
+    const node = lf.value.getNodeModelById(nodeId);
+    if (DynamicCustomGroup ==node.type) {
+          ElMessage.warning("暂不支持任务组复制");
+          return;
+        }
+        lf.value.graphModel.cloneNode(nodeId);
+  })
 
   //编辑节点事件
   lf.value.on("custom:node-edit", ({ nodeId }) => {
@@ -974,7 +1058,7 @@ onMounted(() => {
 
   lf.value.on("custom:node-delete", ({ nodeId }) => {
     lf.value.deleteNode(nodeId);
-  
+
   });
   //！！一定要在render下面才能显示
   lf.value.extension.miniMap.show();
