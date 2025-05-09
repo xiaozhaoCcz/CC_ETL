@@ -465,11 +465,10 @@ function updateNodeTypeByGlueType(
   jobDesc: string,
   glueType: string
 ) {
-  console.log("updateNodeTypeByGlueType", jobId, glueType, jobNodeEditId.value);
+  console.log("updateNodeTypeByGlueType", jobId, glueType);
   const nodes = lf.value.getGraphRawData().nodes;
   const edges = lf.value.getGraphRawData().edges;
   const _node = nodes.find((n) => n.properties.jobId === jobId);
-  console.log(_node);
   if (_node) {
     const nodeType =
       GLUE_NODE_TYPE_MAP[glueType] ||

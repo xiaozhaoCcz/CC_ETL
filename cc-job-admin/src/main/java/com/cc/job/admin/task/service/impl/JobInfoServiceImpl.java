@@ -85,6 +85,18 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     @Value("${server.port}")
     private int port;
 
+    private static final Map<String,String> NODE_TYPE_MAP = new HashMap<>(){{
+        put("SQL","custom-sql");
+        put("API","custom-api");
+        put("BEAN","custom-bean");
+        put("GLUE_GROOVY","custom-java");
+        put("GLUE_SHELL","custom-shell");
+        put("GLUE_PYTHON","custom-python");
+        put("GLUE_PHP","custom-php");
+        put("GLUE_NODEJS","custom-nodejs");
+        put("GLUE_POWERSHELL","custom-powershell");
+    }};
+
 
     /**
      * 获取task_info分页列表
@@ -186,6 +198,12 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         // valid trigger
         JobInfo existsJobInfo = baseUpdateJobInfo(id, formData);
         updateChild(existsJobInfo);
+        JobNode node = jobNodeService.getOne(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobId, id));
+        if(node!=null){
+            //需要更新节点类型
+            node.setNodeType(NODE_TYPE_MAP.get(formData.getGlueType()));
+            jobNodeService.updateById(node);
+        }
         return true;
     }
 
@@ -705,6 +723,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         int i = jobInfoMapper.pauseJob(id, isPause);
         return i > 0;
     }
+
 
     @Override
     public JobInfo baseUpdateJobInfo(Long id, JobInfoForm formData) {
