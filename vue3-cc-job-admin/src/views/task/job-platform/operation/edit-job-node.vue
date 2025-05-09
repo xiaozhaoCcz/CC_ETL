@@ -177,13 +177,13 @@
         <el-form-item label="任务重试次数">
           <el-input-number v-model="formData.executorFailRetryCount" :min="0" />
         </el-form-item>
-        <el-form-item label="暂停任务">
-          <el-switch
-            v-model="formData.isPause"
-            :active-value="1"
-            :inactive-value="0"
-          />
-        </el-form-item>
+        <!--        <el-form-item label="暂停任务">-->
+        <!--          <el-switch-->
+        <!--            v-model="formData.isPause"-->
+        <!--            :active-value="1"-->
+        <!--            :inactive-value="0"-->
+        <!--          />-->
+        <!--        </el-form-item>-->
       </el-form>
     </template>
     <template #footer>
@@ -353,7 +353,7 @@ async function fetchJdbcDatasource() {
 }
 
 function cancelClick() {
-  emit("close", props.nodeTaskId, formData.isPause, formData.glueType);
+  emit("close", props.nodeTaskId, formData.jobDesc, formData.glueType);
 }
 function confirmClick() {
   if (!props.nodeTaskId) {
@@ -368,15 +368,18 @@ function confirmClick() {
   formData.misfireStrategy = "DO_NOTHING";
   formData.scheduleType = "NONE";
   // 将glueType保存到properties中
-    formData.properties = {
+  formData.properties = {
     ...formData.properties,
-    glueType: formData.glueType 
+    glueType: formData.glueType,
   };
   JobInfoAPI.update(props.nodeTaskId, formData)
     .then(() => {
       ElMessage.success("修改成功");
       emit("close", props.nodeTaskId, formData.isPause, formData.glueType); // 传递新参数
-      console.log('emit close事件后，props.taskNodeVisible:', props.taskNodeVisible); // 验证父组件状态
+      console.log(
+        "emit close事件后，props.taskNodeVisible:",
+        props.taskNodeVisible
+      ); // 验证父组件状态
 
       drawVisible.value = false;
     })

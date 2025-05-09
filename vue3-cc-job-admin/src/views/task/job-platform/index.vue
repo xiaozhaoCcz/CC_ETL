@@ -130,7 +130,7 @@
       </template>
     </el-dialog>
 
-    <Dialog v-if="diaLogVisible" @close="closeDiaLog" :z-index="1001">
+    <Dialog v-if="diaLogVisible" :z-index="1001" @close="closeDiaLog">
       <template #header>运行日志</template>
       <div>
         <Codemirror
@@ -139,7 +139,7 @@
           :height="logHeight"
           :KeepCursorInEnd="true"
           @change="change"
-        ></Codemirror>
+        />
       </div>
     </Dialog>
   </div>
@@ -460,8 +460,16 @@ const GLUE_NODE_TYPE_MAP: Record<string, string> = {
 /**
  * 关闭节点编辑
  */
-function updateNodeTypeByGlueType(jobId: number, glueType: string,isPause: number) {
-  const _node = lf.value.getNodeModelById(jobNodeEditId.value);
+function updateNodeTypeByGlueType(
+  jobId: number,
+  jobDesc: string,
+  glueType: string
+) {
+  console.log("updateNodeTypeByGlueType", jobId, glueType, jobNodeEditId.value);
+  const nodes = lf.value.getGraphRawData().nodes;
+  const edges = lf.value.getGraphRawData().edges;
+  const _node = nodes.find((n) => n.properties.jobId === jobId);
+  console.log(_node);
   if (_node) {
     const nodeType =
       GLUE_NODE_TYPE_MAP[glueType] ||
@@ -472,21 +480,32 @@ function updateNodeTypeByGlueType(jobId: number, glueType: string,isPause: numbe
       ..._node, // 保留原有节点的属性
     };
     newNode.type = nodeType;
-    newNode.isPause = isPause;
+    //newNode.isPause = isPause;
+    //保留原来的线
+    const _edges = edges.filter(
+      (e) => e.sourceNodeId === _node.id || e.targetNodeId === _node.id
+    );
+    console.log(">>>>", _edges);
     // 删除节点
     graphModel.deleteNode(_node.id);
     // 重新添加节点
     lf.value.addNode(newNode);
+    if (_edges.length > 0) {
+      _edges.forEach((edge) => {
+        lf.value.addEdge(edge);
+      });
+    }
     // 更新节点属性
-    const node = lf.value.getNodeModelById(jobNodeEditId.value);
+    const node = lf.value.getNodeModelById(newNode.id);
+    node.updateText(jobDesc);
     // 更新节点样式
-  const styleKey = node.type === DynamicCustomGroup ? 'stroke' : 'fill';
-  node.setStyle(styleKey, node.isPause ? '#CCCCCC' : '#FFFFFF');
+    //const styleKey = node.type === DynamicCustomGroup ? "stroke" : "fill";
+    // node.setStyle(styleKey, node.isPause ? "#CCCCCC" : "#FFFFFF");
   }
 }
 
-function closeDraw(jobId: number, isPause: number, glueType: string) {
-  updateNodeTypeByGlueType(jobId, glueType, isPause);
+function closeDraw(jobId: number, jobDesc: string, glueType: string) {
+  updateNodeTypeByGlueType(jobId, jobDesc, glueType);
   jobNodeVisible.value = false; // 这行是控制编辑弹窗的关闭
 }
 
@@ -662,10 +681,11 @@ async function confirmDialog() {
   } else {
     _node.setProperty("jobId", jobSelectId.value);
     _node.updateText(_jobInfo.jobDesc);
+    console.log(_jobInfo.glueType);
     updateNodeTypeByGlueType(
       jobSelectId.value,
-      _jobInfo.glueType,
-      _jobInfo.isPause
+      _jobInfo.jobDesc,
+      _jobInfo.glueType
     );
   }
   cancelDialog();
@@ -676,11 +696,11 @@ async function confirmDialog() {
  * @param node
  */
 function generateNode(node: any) {
-  console.log("generateNode", node);
+  console.log("generateNode", node, node.nodeType);
   const properties = JSON.parse(node.properties);
   // 类型判断逻辑
   const nodeType =
-    GLUE_NODE_TYPE_MAP[properties.glueType] ||
+    node.nodeType ||
     (node.nodeType === DynamicCustomGroup ? DynamicCustomGroup : "rect");
   if (node.nodeType === DynamicCustomGroup) {
     properties.children = JSON.parse(properties.children);
@@ -1005,7 +1025,6 @@ onMounted(() => {
     edges: edges.value,
   });
 
-
   lf.value.on("node:mouseenter", ({ data }) => {
     const node = lf.value.getNodeModelById(data.id);
     node.buttonGroupOpacity = 1;
@@ -1016,27 +1035,32 @@ onMounted(() => {
     node.buttonGroupOpacity = 0;
   });
 
+  // 状态切换事件
+  lf.value.on("custom:node-toggle-status", ({ nodeId }) => {
+    const node = lf.value.getNodeModelById(nodeId);
+    node.isPause = !node.isPause;
 
-// 状态切换事件
-lf.value.on("custom:node-toggle-status", ({ nodeId }) => {
-  const node = lf.value.getNodeModelById(nodeId);
-  node.isPause = !node.isPause;
+    if (node.properties.jobId == null) {
+      ElMessage.warning("请选择任务～");
+      return;
+    }
 
-  // 更新节点样式
-  const styleKey = node.type === DynamicCustomGroup ? 'stroke' : 'fill';
-  node.setStyle(styleKey, node.isPause ? '#CCCCCC' : '#FFFFFF');
-});
+    JobInfoAPI.pauseJob(node.properties.jobId, node.isPause ? 1 : 0);
 
+    // 更新节点样式
+    const styleKey = node.type === DynamicCustomGroup ? "stroke" : "fill";
+    node.setStyle(styleKey, node.isPause ? "#f0f0f0" : "#FFFFFF");
+  });
 
   //复制节点事件
   lf.value.on("custom:node-copy", ({ nodeId }) => {
     const node = lf.value.getNodeModelById(nodeId);
-    if (DynamicCustomGroup ==node.type) {
-          ElMessage.warning("暂不支持任务组复制");
-          return;
-        }
-        lf.value.graphModel.cloneNode(nodeId);
-  })
+    if (DynamicCustomGroup == node.type) {
+      ElMessage.warning("暂不支持任务组复制");
+      return;
+    }
+    lf.value.graphModel.cloneNode(nodeId);
+  });
 
   //编辑节点事件
   lf.value.on("custom:node-edit", ({ nodeId }) => {
@@ -1058,7 +1082,6 @@ lf.value.on("custom:node-toggle-status", ({ nodeId }) => {
 
   lf.value.on("custom:node-delete", ({ nodeId }) => {
     lf.value.deleteNode(nodeId);
-
   });
   //！！一定要在render下面才能显示
   lf.value.extension.miniMap.show();
