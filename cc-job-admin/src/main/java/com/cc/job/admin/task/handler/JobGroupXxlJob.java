@@ -97,13 +97,17 @@ public class JobGroupXxlJob {
             // 如果jobId和执行参数一致，则需要匹配一个uuid，如果不匹配则代表是platform页面执行，会携带一个随机id
             randomId = String.valueOf(jobId).equalsIgnoreCase(executeParam) ? UUID.randomUUID().toString() : executeParam;
             JobInfo jobInfo = getJobInfoById(jobId);
-            List<JobNode> nodes = getJobNodesByJobId(jobId);
-            List<JobEdge> edges = getJobEdgesByJobId(jobId);
+//            List<JobNode> nodes = getJobNodesByJobId(jobId);
+//            List<JobEdge> edges = getJobEdgesByJobId(jobId);
 
             Map<Long, List<Long>> statusMap = new HashMap<>();
             // 设置初始状态，页面颜色提示
             getJobStatusMap(jobId, statusMap);
             // 将多节点任务或任务组构图
+            List<JobNode> nodes = new ArrayList<>();
+            List<JobEdge> edges = new ArrayList<>();
+            getAllNodesAndEdges(jobId,nodes,edges);
+            //构图
             buildGraph(jobId, nodes, edges);
             // 找到当前节点的next节点
             Map<Long, List<JobNode>> nextMap = buildNextNode(nodes, edges);
@@ -183,14 +187,6 @@ public class JobGroupXxlJob {
     private JobInfo getJobInfoById(long jobId) {
         return Optional.ofNullable(jobInfoService.getById(jobId))
                 .orElseThrow(() -> new BusinessException("TaskInfo not found for jobId: " + jobId));
-    }
-
-    private List<JobNode> getJobNodesByJobId(long jobId) {
-        return jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, jobId));
-    }
-
-    private List<JobEdge> getJobEdgesByJobId(long jobId) {
-        return jobEdgeService.list(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getJobParentId, jobId));
     }
 
     private List<Long> getStartNodes(List<JobNode> nodes) {
@@ -425,82 +421,84 @@ public class JobGroupXxlJob {
         return result;
     }
 
-    private void buildGraph(Long jobId, List<JobNode> nodes, List<JobEdge> edgeList) {
-        boolean stop = true;
-        Set<JobNode> resNodeList = new HashSet<>();
-        while (stop) {
-            stop = false;
-            for (JobNode currentNode : nodes) {
-                JobInfo jobInfo = jobInfoService.getById(currentNode.getJobId());
-                if (jobInfo.getJobType() != 2 && Objects.equals(currentNode.getJobParentId(), jobId)) {
-                    resNodeList.add(currentNode);
-                    continue;
-                }
+    private void getAllNodesAndEdges(Long jobId,List<JobNode> nodes, List<JobEdge> edges){
+        List<JobNode> jobNodes = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, jobId));
+        List<JobEdge> jobEdges = jobEdgeService.list(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getJobParentId, jobId));
 
-                if (jobInfo.getJobType() == 2 && Objects.equals(currentNode.getJobParentId(), jobId)) {
-                    stop = true;
-                    List<JobEdge> collectEdges = jobEdgeService
-                            .list(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getJobParentId, jobInfo.getId()));
-                    for (JobEdge edge : collectEdges) {
-                        edge.setJobParentId(jobId);
-                        edgeList.add(edge);
-                    }
+        nodes.addAll(jobNodes);
+        edges.addAll(jobEdges);
 
-                    // 得到当前节点的所有开始节点
-                    List<Long> fromIds = edgeList.stream().filter(v -> v.getEndNodeId().equals(currentNode.getId()))
-                            .map(JobEdge::getFromNodeId).toList();
-                    // 得到当前节点的所有孩子节点
-                    List<JobNode> childrenNode = jobNodeService
-                            .list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, jobInfo.getId()));
-                    // 得到孩子节点的开始节点
-                    List<JobNode> startNodes = childrenNode.stream().filter(v -> v.getNodeInDegree() == 0).toList();
-                    if (!fromIds.isEmpty()) {
-                        for (JobNode taskNode : startNodes) {
-                            for (Long fromId : fromIds) {
-                                JobEdge taskEdge = new JobEdge();
-                                taskEdge.setFromNodeId(fromId);
-                                taskEdge.setEndNodeId(taskNode.getId());
-                                taskEdge.setJobParentId(jobId);
-                                edgeList.add(taskEdge);
-                            }
-                        }
-                    }
+        List<JobInfo> childJobInfos = jobInfoService.list(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getParentId, jobId));
+        for (JobInfo childJobInfo : childJobInfos) {
+            if(childJobInfo.getJobType() == 2){
+                getAllNodesAndEdges(childJobInfo.getId(), nodes, edges);
+            }
+        }
+    }
 
-                    List<Long> endIds = edgeList.stream().filter(v -> v.getFromNodeId().equals(currentNode.getId()))
-                            .map(JobEdge::getEndNodeId).toList();
+    private void buildGraph(Long jobId,List<JobNode> nodes, List<JobEdge> edges) {
+        List<JobNode> nodeList = nodes.stream().filter(v -> v.getJobParentId().equals(jobId)).toList();
+        getNodeList(jobId, nodes, edges, nodeList);
 
-                    List<JobNode> childEndNodes = childrenNode.stream().filter(v -> v.getNodeOutDegree() == 0).toList();
-                    if (!childEndNodes.isEmpty()) {
-                        for (JobNode endNode : childEndNodes) {
-                            for (Long endId : endIds) {
-                                JobEdge edge = new JobEdge();
-                                edge.setFromNodeId(endNode.getId());
-                                edge.setEndNodeId(endId);
-                                edge.setJobParentId(jobId);
-                                edgeList.add(edge);
-                            }
-                        }
-                    }
+        nodes.forEach(node -> {node.setJobParentId(jobId);});
+        edges.forEach(edge -> {edge.setJobParentId(jobId);});
+    }
 
-                    for (JobNode taskNode : childrenNode) {
-                        taskNode.setJobParentId(jobId);
-                        resNodeList.add(taskNode);
-                    }
+    private void getNodeList(Long jobId, List<JobNode> nodes, List<JobEdge> edges, List<JobNode> nodeList) {
+        for (JobNode node : nodeList) {
+            List<Long> preNodeIds = edges.stream().filter(v -> v.getEndNodeId().equals(node.getId())).map(JobEdge::getFromNodeId).toList();
+            List<Long> nextNodeIds = edges.stream().filter(v -> v.getFromNodeId().equals(node.getId())).map(JobEdge::getEndNodeId).toList();
+            concatNode(jobId,node,preNodeIds,nextNodeIds,nodes,edges);
+        }
+    }
 
-                    edgeList.removeIf(v -> (fromIds.contains(v.getFromNodeId())
-                            && v.getEndNodeId().equals(currentNode.getId()))
-                            || (v.getFromNodeId().equals(currentNode.getId()) && endIds.contains(v.getEndNodeId())));
+    /**
+     * 将多维图像降唯
+     * @param jobId
+     * @param currentNode
+     * @param preNodeIds
+     * @param nextNodeIds
+     * @param nodes
+     * @param edges
+     */
+    private void concatNode(Long jobId,JobNode currentNode,List<Long> preNodeIds,List<Long> nextNodeIds,List<JobNode> nodes, List<JobEdge> edges) {
+        JobInfo jobInfo = jobInfoService.getById(currentNode.getJobId());
+        if(jobInfo.getJobType() ==2){
+            edges.removeIf(v -> preNodeIds.contains(v.getFromNodeId())&&v.getEndNodeId().equals(currentNode.getId()));
+            edges.removeIf(v -> nextNodeIds.contains(v.getEndNodeId())&&v.getFromNodeId().equals(currentNode.getId()));
+
+            //得到开始节点
+            //得到当前节点的所有孩子节点
+            List<JobNode> childrenNode = nodes.stream().filter(v->v.getJobParentId().equals(jobInfo.getId())).toList();
+            // 得到孩子节点的开始节点
+            List<JobNode> startNodes = childrenNode.stream().filter(v -> v.getNodeInDegree() == 0).toList();
+            List<JobNode> endNodes = childrenNode.stream().filter(v -> v.getNodeOutDegree() == 0).toList();
+
+            for (JobNode startNode : startNodes) {
+                for (Long preNodeId : preNodeIds) {
+                    JobEdge edge = new JobEdge();
+                    edge.setFromNodeId(preNodeId);
+                    edge.setEndNodeId(startNode.getId());
+                    edge.setJobParentId(jobId);
+                    edges.add(edge);
                 }
             }
-            nodes.clear();
-            nodes.addAll(resNodeList);
-            resNodeList.clear();
-        }
 
-        // 计算节点的出度和入度
-        for (JobNode node : nodes) {
-            node.setNodeInDegree(edgeList.stream().filter(v -> v.getEndNodeId().equals(node.getId())).count());
-            node.setNodeOutDegree(edgeList.stream().filter(v -> v.getFromNodeId().equals(node.getId())).count());
+            getNodeList(jobId, nodes, edges, startNodes);
+
+            for (JobNode endNode : endNodes) {
+                for (Long nextNodeId : nextNodeIds) {
+                    JobEdge edge = new JobEdge();
+                    edge.setFromNodeId(endNode.getId());
+                    edge.setEndNodeId(nextNodeId);
+                    edge.setJobParentId(jobId);
+                    edges.add(edge);
+                }
+            }
+
+            getNodeList(jobId, nodes, edges, endNodes);
+
+            nodes.removeIf(v->v.getId().equals(currentNode.getId()));
         }
     }
 
