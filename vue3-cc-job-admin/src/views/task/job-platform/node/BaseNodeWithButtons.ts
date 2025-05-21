@@ -85,7 +85,7 @@ createButtonWithTooltip(posX, posY, action, tooltipText) {
   const tooltipWidth = tooltipText.length * 8 + 10;
   const tooltipX = 7.5 - tooltipWidth / 2; // 居中对齐图标
   
-  // 创建按钮和提示组件
+  // 创建按钮和提示组件，使用相对引用而非全局ID
   return h(
     "g",
     {
@@ -101,17 +101,18 @@ createButtonWithTooltip(posX, posY, action, tooltipText) {
         width: 15,
         height: 15,
         fill: "transparent", // 透明填充
-        onMouseenter: () => {
-          // 显示当前图标的提示
-          const tooltipBg = document.querySelector(`#tooltip-bg-${action}`);
-          const tooltipText = document.querySelector(`#tooltip-text-${action}`);
+        onMouseenter: (e) => {
+          //通过e.target获取当前元素
+          const parent = e.target.parentElement;
+          const tooltipBg = parent.querySelector(".tooltip-bg");
+          const tooltipText = parent.querySelector(".tooltip-text");
           if (tooltipBg) tooltipBg.style.opacity = "1";
           if (tooltipText) tooltipText.style.opacity = "1";
         },
-        onMouseleave: () => {
-          // 隐藏当前图标的提示
-          const tooltipBg = document.querySelector(`#tooltip-bg-${action}`);
-          const tooltipText = document.querySelector(`#tooltip-text-${action}`);
+        onMouseleave: (e) => {
+          const parent = e.target.parentElement;
+          const tooltipBg = parent.querySelector(".tooltip-bg");
+          const tooltipText = parent.querySelector(".tooltip-text");
           if (tooltipBg) tooltipBg.style.opacity = "0";
           if (tooltipText) tooltipText.style.opacity = "0";
         }
@@ -136,7 +137,7 @@ createButtonWithTooltip(posX, posY, action, tooltipText) {
       
       // 提示背景
       h("rect", {
-        id: `tooltip-bg-${action}`,
+        class: "tooltip-bg", 
         x: tooltipX,
         y: -25, // 显示在图标上方
         rx: 3,
@@ -153,7 +154,7 @@ createButtonWithTooltip(posX, posY, action, tooltipText) {
       
       // 提示文本
       h("text", {
-        id: `tooltip-text-${action}`,
+        class: "tooltip-text",
         x: 7.5, // 水平居中
         y: -14, // 垂直居中
         "text-anchor": "middle",
