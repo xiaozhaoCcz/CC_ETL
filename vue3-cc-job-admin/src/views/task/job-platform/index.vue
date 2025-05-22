@@ -503,8 +503,15 @@ function updateNodeTypeByGlueType(
   }
 }
 
-function closeDraw(jobId: number, jobDesc: string, glueType: string) {
-  updateNodeTypeByGlueType(jobId, jobDesc, glueType);
+function closeDraw(
+  jobId: number,
+  jobDesc: string,
+  glueType: string,
+  type: number
+) {
+  if (type == 1) {
+    updateNodeTypeByGlueType(jobId, jobDesc, glueType);
+  }
   jobNodeVisible.value = false; // 这行是控制编辑弹窗的关闭
 }
 
@@ -1077,6 +1084,24 @@ onMounted(() => {
   lf.value.on("custom:node-task-edit", ({ nodeId }) => {
     jobDialog.value = true;
     jobNodeEditId.value = nodeId;
+  });
+
+  lf.value.on("custom:node-prop", ({ nodeId }) => {
+    const node = lf.value.getNodeModelById(nodeId);
+    let startTime = "";
+    let endTime = "";
+
+    if (runTime.value.length > 0) {
+      const n = runTime.value.find((v) => v[0] == node.id) as any;
+      startTime = n[1];
+      endTime = n[2];
+    }
+    alert(`
+          节点id：${node.id}
+          节点任务开始时间：${startTime}
+          节点任务结束时间：${endTime}
+          节点类型：${node.type}
+          节点坐标：(x: ${node.x}, y: ${node.y})`);
   });
 
   lf.value.on("custom:node-delete", ({ nodeId }) => {

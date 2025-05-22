@@ -106,7 +106,7 @@ public class JobGroupXxlJob {
             // 将多节点任务或任务组构图
             List<JobNode> nodes = new ArrayList<>();
             List<JobEdge> edges = new ArrayList<>();
-            getAllNodesAndEdges(jobId,nodes,edges);
+            getAllNodesAndEdges(jobId, nodes, edges);
             //构图
             buildGraph(jobId, nodes, edges);
             // 找到当前节点的next节点
@@ -421,7 +421,7 @@ public class JobGroupXxlJob {
         return result;
     }
 
-    private void getAllNodesAndEdges(Long jobId,List<JobNode> nodes, List<JobEdge> edges){
+    private void getAllNodesAndEdges(Long jobId, List<JobNode> nodes, List<JobEdge> edges) {
         List<JobNode> jobNodes = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, jobId));
         List<JobEdge> jobEdges = jobEdgeService.list(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getJobParentId, jobId));
 
@@ -430,30 +430,35 @@ public class JobGroupXxlJob {
 
         List<JobInfo> childJobInfos = jobInfoService.list(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getParentId, jobId));
         for (JobInfo childJobInfo : childJobInfos) {
-            if(childJobInfo.getJobType() == 2){
+            if (childJobInfo.getJobType() == 2) {
                 getAllNodesAndEdges(childJobInfo.getId(), nodes, edges);
             }
         }
     }
 
-    private void buildGraph(Long jobId,List<JobNode> nodes, List<JobEdge> edges) {
+    private void buildGraph(Long jobId, List<JobNode> nodes, List<JobEdge> edges) {
         List<JobNode> nodeList = nodes.stream().filter(v -> v.getJobParentId().equals(jobId)).toList();
         getNodeList(jobId, nodes, edges, nodeList);
 
-        nodes.forEach(node -> {node.setJobParentId(jobId);});
-        edges.forEach(edge -> {edge.setJobParentId(jobId);});
+        nodes.forEach(node -> {
+            node.setNodeInDegree(edges.stream().filter(v -> v.getEndNodeId().equals(node.getId())).count());
+            node.setNodeOutDegree(edges.stream().filter(v -> v.getFromNodeId().equals(node.getId())).count());
+            node.setJobParentId(jobId);
+        });
+        edges.forEach(edge -> edge.setJobParentId(jobId));
     }
 
     private void getNodeList(Long jobId, List<JobNode> nodes, List<JobEdge> edges, List<JobNode> nodeList) {
         for (JobNode node : nodeList) {
             List<Long> preNodeIds = edges.stream().filter(v -> v.getEndNodeId().equals(node.getId())).map(JobEdge::getFromNodeId).toList();
             List<Long> nextNodeIds = edges.stream().filter(v -> v.getFromNodeId().equals(node.getId())).map(JobEdge::getEndNodeId).toList();
-            concatNode(jobId,node,preNodeIds,nextNodeIds,nodes,edges);
+            concatNode(jobId, node, preNodeIds, nextNodeIds, nodes, edges);
         }
     }
 
     /**
      * 将多维图像降唯
+     *
      * @param jobId
      * @param currentNode
      * @param preNodeIds
@@ -461,18 +466,18 @@ public class JobGroupXxlJob {
      * @param nodes
      * @param edges
      */
-    private void concatNode(Long jobId,JobNode currentNode,List<Long> preNodeIds,List<Long> nextNodeIds,List<JobNode> nodes, List<JobEdge> edges) {
+    private void concatNode(Long jobId, JobNode currentNode, List<Long> preNodeIds, List<Long> nextNodeIds, List<JobNode> nodes, List<JobEdge> edges) {
         JobInfo jobInfo = jobInfoService.getById(currentNode.getJobId());
-        if(jobInfo.getJobType() ==2){
-            edges.removeIf(v -> preNodeIds.contains(v.getFromNodeId())&&v.getEndNodeId().equals(currentNode.getId()));
-            edges.removeIf(v -> nextNodeIds.contains(v.getEndNodeId())&&v.getFromNodeId().equals(currentNode.getId()));
+        if (jobInfo.getJobType() == 2) {
+            edges.removeIf(v -> preNodeIds.contains(v.getFromNodeId()) && v.getEndNodeId().equals(currentNode.getId()));
+            edges.removeIf(v -> nextNodeIds.contains(v.getEndNodeId()) && v.getFromNodeId().equals(currentNode.getId()));
 
             //得到开始节点
             //得到当前节点的所有孩子节点
-            List<JobNode> childrenNode = nodes.stream().filter(v->v.getJobParentId().equals(jobInfo.getId())).toList();
+            List<JobNode> childrenNodes = nodes.stream().filter(v -> v.getJobParentId().equals(jobInfo.getId())).toList();
             // 得到孩子节点的开始节点
-            List<JobNode> startNodes = childrenNode.stream().filter(v -> v.getNodeInDegree() == 0).toList();
-            List<JobNode> endNodes = childrenNode.stream().filter(v -> v.getNodeOutDegree() == 0).toList();
+            List<JobNode> startNodes = childrenNodes.stream().filter(v -> v.getNodeInDegree() == 0).toList();
+            List<JobNode> endNodes = childrenNodes.stream().filter(v -> v.getNodeOutDegree() == 0).toList();
 
             for (JobNode startNode : startNodes) {
                 for (Long preNodeId : preNodeIds) {
@@ -484,8 +489,6 @@ public class JobGroupXxlJob {
                 }
             }
 
-            getNodeList(jobId, nodes, edges, startNodes);
-
             for (JobNode endNode : endNodes) {
                 for (Long nextNodeId : nextNodeIds) {
                     JobEdge edge = new JobEdge();
@@ -496,9 +499,9 @@ public class JobGroupXxlJob {
                 }
             }
 
-            getNodeList(jobId, nodes, edges, endNodes);
+            getNodeList(jobId, nodes, edges, childrenNodes);
 
-            nodes.removeIf(v->v.getId().equals(currentNode.getId()));
+            nodes.removeIf(v -> v.getId().equals(currentNode.getId()));
         }
     }
 

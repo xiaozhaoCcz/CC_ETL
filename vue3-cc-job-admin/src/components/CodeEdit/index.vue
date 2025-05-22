@@ -87,7 +87,7 @@ watch(
 );
 
 function handleCloseDialog() {
-  emit("close");
+  emit("close", "");
 }
 
 function handleGlueChange(val: any) {
@@ -112,10 +112,14 @@ function submitForm() {
     glueRemark: _input.value,
     glueSource: _code.value,
   };
-  JobInfoAPI.saveGlueSource(obj).then((data) => {
-    _input.value = "";
-    ElMessage.success("保存成功");
-  });
+  JobInfoAPI.saveGlueSource(obj)
+    .then((data) => {
+      _input.value = "";
+      ElMessage.success("保存成功");
+    })
+    .finally(() => {
+      emit("close", _code.value);
+    });
 }
 </script>
 <style lang="scss" scoped>

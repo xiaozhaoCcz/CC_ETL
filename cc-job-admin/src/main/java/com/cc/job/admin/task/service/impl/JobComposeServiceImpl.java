@@ -211,7 +211,7 @@ public class JobComposeServiceImpl implements JobComposeService {
         for (LfNode node : nodeList) {
             Map<String, Object> properties = JSONUtil.toBean(node.getProperties(), Map.class);
             Object jobIdObj = properties.get(JOB_ID);
-            if(jobIdObj == null) {
+            if (jobIdObj == null) {
                 throw new BusinessException("存在未选择任务的节点");
             }
             Long jobId = Long.parseLong(String.valueOf(jobIdObj));
@@ -257,7 +257,7 @@ public class JobComposeServiceImpl implements JobComposeService {
                     List<LfEdge> childEdges = lfEdges.stream().filter(e -> childIds.contains(e.getSourceNodeId()) || childIds.contains(e.targetNodeId)).toList();
                     List<Long> childJobIds = operateToUpdateJobCompose(jobInfo1, childNodes, childEdges, lfNodes, lfEdges);
                     jobNode.setChildren(JSONUtil.toJsonStr(childJobIds));
-                    propertiesMap.put("children",JSONUtil.toJsonStr(childJobIds));
+                    propertiesMap.put("children", JSONUtil.toJsonStr(childJobIds));
                 }
                 jobNode.setProperties(JSONUtil.toJsonStr(propertiesMap));
                 updateNodes.add(jobNode);
@@ -309,7 +309,7 @@ public class JobComposeServiceImpl implements JobComposeService {
     }
 
     @Override
-    public Map<String, Object> getJobCompose(Map<String,Object> formMap) {
+    public Map<String, Object> getJobCompose(Map<String, Object> formMap) {
         Map<String, Object> res = new HashMap<>();
         List<JobNodeVo> nodeVos = new ArrayList<>();
         List<JobEdgeVo> edgeVos = new ArrayList<>();
@@ -347,17 +347,17 @@ public class JobComposeServiceImpl implements JobComposeService {
         //！！！设置节点的位置，一定要除2，前端真的巨难
         jobNodeVo.setNodePositionX(styleArr[3] + (styleArr[1] - styleArr[3]) / 2);
         jobNodeVo.setNodePositionY(styleArr[0] + (styleArr[2] - styleArr[0]) / 2);
-        properties.put("height", styleArr[2] - styleArr[0]);
-        properties.put("width", styleArr[1] - styleArr[3]);
+        properties.put("height", styleArr[2] - styleArr[0] + 10);
+        properties.put("width", styleArr[1] - styleArr[3] + 10);
         jobNodeVo.setProperties(JSONUtil.toJsonStr(properties));
 
-        if(type==1){
+        if (type == 1) {
             nodeVos.add(jobNodeVo);
         }
         double x = Double.parseDouble(String.valueOf(formMap.get("x")));
         double y = Double.parseDouble(String.valueOf(formMap.get("y")));
-        double[] nodeXY = new double[]{x,y};
-        updateNodeXY(nodeVos,nodeXY,new double[]{jobNodeVo.getNodePositionX(),jobNodeVo.getNodePositionY()});
+        double[] nodeXY = new double[]{x, y};
+        updateNodeXY(nodeVos, nodeXY, new double[]{jobNodeVo.getNodePositionX(), jobNodeVo.getNodePositionY()});
         res.put("jobNode", jobNodeVo);
         res.put("nodes", nodeVos);
         res.put("edges", edgeVos);
@@ -422,7 +422,7 @@ public class JobComposeServiceImpl implements JobComposeService {
         return new double[]{top, right, bottom, left};
     }
 
-    private void updateNodeXY(List<JobNodeVo> nodeVoList,double[] nodeXY,double[] sourceNodeXY){
+    private void updateNodeXY(List<JobNodeVo> nodeVoList, double[] nodeXY, double[] sourceNodeXY) {
         double sourceX = sourceNodeXY[0];
         double sourceY = sourceNodeXY[1];
         double x = nodeXY[0];
@@ -430,8 +430,8 @@ public class JobComposeServiceImpl implements JobComposeService {
         for (JobNodeVo jobNodeVo : nodeVoList) {
             Double nodePositionX = jobNodeVo.getNodePositionX();
             Double nodePositionY = jobNodeVo.getNodePositionY();
-            jobNodeVo.setNodePositionX(nodePositionX-sourceX+x);
-            jobNodeVo.setNodePositionY(nodePositionY-sourceY+y);
+            jobNodeVo.setNodePositionX(nodePositionX - sourceX + x);
+            jobNodeVo.setNodePositionY(nodePositionY - sourceY + y);
         }
     }
 
@@ -441,7 +441,7 @@ public class JobComposeServiceImpl implements JobComposeService {
 
         List<Long> jobIds = jobNodeList.stream().map(JobNode::getJobId).toList();
         List<JobInfo> jobInfos = jobInfoService.listByIds(jobIds);
-        Map<Long, JobInfo> jobInfoMap = jobInfos.stream().collect(Collectors.toMap(JobInfo::getId, n->n));
+        Map<Long, JobInfo> jobInfoMap = jobInfos.stream().collect(Collectors.toMap(JobInfo::getId, n -> n));
 
         jobNodeList.forEach(node -> {
             JobNodeVo jobNodeVo = BeanUtil.copyProperties(node, JobNodeVo.class, "id");
@@ -457,7 +457,7 @@ public class JobComposeServiceImpl implements JobComposeService {
                     newChildIds.add(randomId + childId);
                 }
                 Map<String, Object> propertiesMap = JSONUtil.toBean(node.getProperties(), Map.class);
-                propertiesMap.put("children",JSONUtil.toJsonStr(newChildIds));
+                propertiesMap.put("children", JSONUtil.toJsonStr(newChildIds));
                 jobNodeVo.setProperties(JSONUtil.toJsonStr(propertiesMap));
                 jobNodeVo.setChildren(JSONUtil.toJsonStr(newChildIds));
                 getJobCompose(node.getJobId(), nodeVos, edgeVos, randomId);
