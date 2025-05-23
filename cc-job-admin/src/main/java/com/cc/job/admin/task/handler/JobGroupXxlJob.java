@@ -18,6 +18,7 @@ import com.cc.tasktool.callback.IWorker;
 import com.cc.tasktool.executor.Async;
 import com.cc.tasktool.worker.WorkResult;
 import com.cc.tasktool.wrapper.WorkerWrapper;
+import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.biz.model.TriggerParam;
 import com.xxl.job.core.context.XxlJobContext;
 import com.xxl.job.core.context.XxlJobHelper;
@@ -387,7 +388,11 @@ public class JobGroupXxlJob {
         triggerParam.setAddress(adminAddress);
 
         String address = group.getRegistryList().get(0);
-        XxlJobTrigger.runExecutor(triggerParam, address);
+        ReturnT<String> returnT = XxlJobTrigger.runExecutor(triggerParam, address);
+        if(returnT.getCode()!=ReturnT.SUCCESS_CODE){
+            XxlJobHelper.log(xxlJobContext,returnT.getMsg());
+            throw new BusinessException(returnT.getMsg());
+        }
     }
 
     private String handleJobCompletion(Pair<String, Boolean> pair, JobInfo jobInfo, JobNode node, String randomId,

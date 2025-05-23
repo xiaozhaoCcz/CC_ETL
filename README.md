@@ -1,12 +1,14 @@
-# cc-job
+# Cc-ETL
 
 <p align=center>
-    基于xxl-job,datax设计的一个可视化任务编排工具和数据同步工具
+    基于xxl-job设计的可视化任务调度工具
 </p>
 <p align="center">
 
+
 ## 项目介绍
-使用vue3对xxl-job-admin模块进行重构，并集成datax工具实现不同数据源的数据同步，支持glue模式，并新增api任务调度和可视化任务编排，支持单任务-单任务串并联，单任务-任务集串并联和单任务-任务集-任务集串并联
+基于xxl-job改造的可视化定时任务调度工具，支持任务可视化拖拽，支持任务失败重试，任务暂停和预测任务到达时间，设定超时时间等。支持单任务多任务串并联运行，可视化观察每一个任务运行的状况，并集成datax工具实现不同数据源的数据同步。
+
 ## 数据库地址
 /doc/cc_job_admin.sql
 
@@ -26,32 +28,49 @@
   5. 支持失败任务忽略运行
   6. 任务节点运行状态可视化展示
   7. 支持任务组节点串并联运行
-  8
 
-## 新的任务编排功能
-- 新建任务或任务组，支持拖拽的形式创建任务和任务组，**选择节点后要点击编辑选择任务或任务组**
-  - 支持任意编排改变大小
+## 任务调度
+1. 新建任务或任务组，支持拖拽的形式创建任务和任务组，**选择节点后要点击编辑选择任务或任务组**
 
-|                                                 |                                                 |
-|:-----------------------------------------------:|:-----------------------------------------------:|
-| ![image text](./doc/cc-job/images/04img/01.png) | ![image text](./doc/cc-job/images/04img/02.png) |
-| ![image text](./doc/cc-job/images/04img/03.png) | ![image text](./doc/cc-job/images/04img/04.png) |
-- 点击运行
-  - 运行中的任务背景颜色会变成**黄色**，运行成功的任务背景颜色会变成**绿色**，运行失败的任务背景颜色会变成**红色**
+   | ![image-20241219212046125](./doc/img2/main/1.png) | ![image-20241219212046125](./doc/img2/main/2.png) |
+   | ------------------------------------------------- | ------------------------------------------------- |
+   | ![image-20241219212046125](./doc/img2/main/3.png) | ![image-20241219212046125](./doc/img2/main/4.png) |
 
-|                                                 |                                                 |
-|:-----------------------------------------------:|:-----------------------------------------------:|
-| ![image text](./doc/cc-job/images/04img/05.png) | ![image text](./doc/cc-job/images/04img/06.png) |
-- 任务组运行
-   - 预测到达每一个任务节点的时间
-   - 选择任务组运行，任务组支持展开和缩放
-   - 运行中的任务组边框颜色会发生改变
+2. 保存任务组
 
-|                                                 |                                                 |
-|:-----------------------------------------------:|:-----------------------------------------------:|
-| ![image text](./doc/cc-job/images/04img/07.png) | ![image text](./doc/cc-job/images/04img/08.png) |
-| ![image text](./doc/cc-job/images/04img/09.png) | ![image text](./doc/cc-job/images/04img/10.png) |
-| ![image text](./doc/cc-job/images/04img/11.png) | ![image text](./doc/cc-job/images/04img/12.png) |
+   | ![image-20241219212046125](./doc/img2/main/5.png) | ![image-20241219212046125](./doc/img2/main/6.png) |
+   | ------------------------------------------------- | ------------------------------------------------- |
+   | ![image-20241219212046125](./doc/img2/main/7.png) | ![image-20241219212046125](./doc/img2/main/8.png) |
+
+3. 运行任务组
+
+   **测试任务组3**，支持任务组中串联任务组，运行过程中状态也会发生改变
+
+   - 运行成功的任务状态会变成绿色
+   - 运行失败的任务状态会变成红色
+   - 运行中的任务状态会变成黄色
+   - 运作中任务组节点的边框也会发生改变
+
+   | ![image-20241219212046125](./doc/img2/main/9.png)  | ![image-20241219212046125](./doc/img2/main/10.png) |
+   | -------------------------------------------------- | -------------------------------------------------- |
+   | ![image-20241219212046125](./doc/img2/main/11.png) | ![image-20241219212046125](./doc/img2/main/12.png) |
+
+4. 修改任务
+
+   将任务4修改成sql任务
+
+   | ![image-20241219212046125](./doc/img2/main/13.png) | ![image-20241219212046125](./doc/img2/main/14.png) |
+   | -------------------------------------------------- | -------------------------------------------------- |
+   | ![image-20241219212046125](./doc/img2/main/15.png) | ![image-20241219212046125](./doc/img2/main/16.png) |
+
+5. 查看日志
+
+   也可以在任务日志中查看当前运行的日志信息
+
+   | ![image-20241219212046125](./doc/img2/main/17.png) | ![image-20241219212046125](./doc/img2/main/18.png) |
+   | -------------------------------------------------- | -------------------------------------------------- |
+
+   
 
 
 ## 项目文档
@@ -108,11 +127,6 @@ xxl:
     logretentiondays: 30
     logpath:  #日志路径
 ```
-## 开发中
-- 写文档...
-- datax增量数据同步功能
-- 代码优化和页面优化
-
 ## 项目模块
 
 ![image-20241219212046125](./doc/img/01img/image-20241219212046125.png)
@@ -158,143 +172,6 @@ xxl:
 - 观察数据库中的数据是否同步成功
 
   <img src="./doc/img/01img/08.png" alt="image-20241221223750176" style="zoom:50%;" />
-
-### 可视化任务编排工具
-
-- 创建一个任务组
-
-  <img src="./doc/img/01img/09.png" alt="image-20241221224038716" style="zoom:25%;" />
-
-- 点击运行，观察实验日志
-
-  运行中的任务会显示**黄色**，成功的任务会显示**绿色**，失败的任务会显示红色
-
-  <img src="./doc/img/01img/10.png" alt="image-20241221225642183" style="zoom: 25%;" />
-
-<img src="./doc/img/01img/11.png" alt="image-20241221225816765" style="zoom:25%;" />
-
-**demoJobHandler7**模拟任务运行失败
-
-```java
-@XxlJob("demoJobHandler7")
-    public void demoJobHandler7() throws Exception {
-
-        XxlJobHelper.log(">>>>>>>> demoJobHandler7 start");
-        System.out.println(">>>>>>>> demoJobHandler7 start");
-
-        for (int i = 0; i < 10; i++) {
-            XxlJobHelper.log("demoJobHandler7 beat at:" + i);
-            System.out.println("demoJobHandler7 beat at:" + i);
-            TimeUnit.SECONDS.sleep(1);
-        }
-        //default success
-//        XxlJobHelper.log(">>>>>>>> demoJobHandler7 end");
-//        System.out.println(">>>>>>>> demoJobHandler7 end");
-        throw new RuntimeException();
-    }
-```
-
-任务运行日志
-
-```properties
->>>>>>>> demoJobHandler1 start
-demoJobHandler1 beat at:0
-demoJobHandler1 beat at:1
-demoJobHandler1 beat at:2
-demoJobHandler1 beat at:3
-demoJobHandler1 beat at:4
-demoJobHandler1 beat at:5
-demoJobHandler1 beat at:6
-demoJobHandler1 beat at:7
-demoJobHandler1 beat at:8
-demoJobHandler1 beat at:9
->>>>>>>> demoJobHandler1 end
-22:56:25.681 logback [xxl-job, EmbedServer bizThreadPool-2001027085] INFO  c.x.job.core.executor.XxlJobExecutor - >>>>>>>>>>> xxl-job register JobThread success, jobId:286, handler:com.xxl.job.core.handler.impl.MethodJobHandler@2d5a1588[class com.cc.job.executor.sample.service.jobhandler.SampleXxlJob#demoJobHandler2]
->>>>>>>> demoJobHandler2 start
-demoJobHandler2 beat at:0
-22:56:25.684 logback [xxl-job, EmbedServer bizThreadPool-2001027085] INFO  c.x.job.core.executor.XxlJobExecutor - >>>>>>>>>>> xxl-job register JobThread success, jobId:287, handler:com.xxl.job.core.handler.impl.MethodJobHandler@4f116ca2[class com.cc.job.executor.sample.service.jobhandler.SampleXxlJob#demoJobHandler3]
->>>>>>>> demoJobHandler3 start
-demoJobHandler3 beat at:0
-22:56:25.688 logback [xxl-job, EmbedServer bizThreadPool-2001027085] INFO  c.x.job.core.executor.XxlJobExecutor - >>>>>>>>>>> xxl-job register JobThread success, jobId:288, handler:com.xxl.job.core.handler.impl.MethodJobHandler@125d47c4[class com.cc.job.executor.sample.service.jobhandler.SampleXxlJob#demoJobHandler4]
->>>>>>>> demoJobHandler1 start
-demoJobHandler4 beat at:0
-demoJobHandler2 beat at:1
-demoJobHandler3 beat at:1
-demoJobHandler4 beat at:1
-demoJobHandler2 beat at:2
-demoJobHandler3 beat at:2
-demoJobHandler4 beat at:2
-demoJobHandler2 beat at:3
-demoJobHandler3 beat at:3
-demoJobHandler4 beat at:3
-demoJobHandler4 beat at:4
-demoJobHandler3 beat at:4
-demoJobHandler2 beat at:4
-demoJobHandler2 beat at:5
-demoJobHandler4 beat at:5
-demoJobHandler3 beat at:5
-demoJobHandler2 beat at:6
-demoJobHandler3 beat at:6
-demoJobHandler4 beat at:6
-demoJobHandler2 beat at:7
-demoJobHandler3 beat at:7
-demoJobHandler4 beat at:7
-demoJobHandler2 beat at:8
-demoJobHandler3 beat at:8
-demoJobHandler4 beat at:8
-demoJobHandler2 beat at:9
-demoJobHandler3 beat at:9
-demoJobHandler4 beat at:9
->>>>>>>> demoJobHandler2 end
->>>>>>>> demoJobHandler3 end
->>>>>>>> demoJobHandler4 end
-22:56:35.788 logback [xxl-job, EmbedServer bizThreadPool-2001027085] INFO  c.x.job.core.executor.XxlJobExecutor - >>>>>>>>>>> xxl-job register JobThread success, jobId:290, handler:com.xxl.job.core.handler.impl.MethodJobHandler@64b018f3[class com.cc.job.executor.sample.service.jobhandler.SampleXxlJob#demoJobHandler6]
->>>>>>>> demoJobHandler6 start
-demoJobHandler6 beat at:0
-22:56:35.800 logback [xxl-job, EmbedServer bizThreadPool-2001027085] INFO  c.x.job.core.executor.XxlJobExecutor - >>>>>>>>>>> xxl-job register JobThread success, jobId:289, handler:com.xxl.job.core.handler.impl.MethodJobHandler@193bb809[class com.cc.job.executor.sample.service.jobhandler.SampleXxlJob#demoJobHandler5]
->>>>>>>> demoJobHandler5 start
-demoJobHandler5 beat at:0
-demoJobHandler6 beat at:1
-demoJobHandler5 beat at:1
-demoJobHandler6 beat at:2
-demoJobHandler5 beat at:2
-demoJobHandler6 beat at:3
-demoJobHandler5 beat at:3
-demoJobHandler6 beat at:4
-demoJobHandler5 beat at:4
-demoJobHandler6 beat at:5
-demoJobHandler5 beat at:5
-demoJobHandler6 beat at:6
-demoJobHandler5 beat at:6
-demoJobHandler6 beat at:7
-demoJobHandler5 beat at:7
-demoJobHandler5 beat at:8
-demoJobHandler6 beat at:8
-demoJobHandler5 beat at:9
-demoJobHandler6 beat at:9
->>>>>>>> demoJobHandler6 end
->>>>>>>> demoJobHandler5 end
-22:56:45.886 logback [xxl-job, EmbedServer bizThreadPool-2001027085] INFO  c.x.job.core.executor.XxlJobExecutor - >>>>>>>>>>> xxl-job register JobThread success, jobId:291, handler:com.xxl.job.core.handler.impl.MethodJobHandler@20801cbb[class com.cc.job.executor.sample.service.jobhandler.SampleXxlJob#demoJobHandler7]
->>>>>>>> demoJobHandler7 start
-demoJobHandler7 beat at:0
-demoJobHandler7 beat at:1
-demoJobHandler7 beat at:2
-demoJobHandler7 beat at:3
-demoJobHandler7 beat at:4
-demoJobHandler7 beat at:5
-demoJobHandler7 beat at:6
-demoJobHandler7 beat at:7
-demoJobHandler7 beat at:8
-demoJobHandler7 beat at:9
-```
-
-
-
-## 后续开发
-
-- 代码结构完善：现在使用的是开源的后台管理系统，后续会把没有用的模块删除掉
-- 方便更多数据源之间的同步，目前还只有了mysql和oracle数据源同步功能
-- 前端任务组绘图工具的完善，前端绘图节点后续如果能做成展开合并式就更好了（需要一个超级前端大佬…）
 
 
 
