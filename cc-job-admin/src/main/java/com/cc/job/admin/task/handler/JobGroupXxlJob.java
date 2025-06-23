@@ -391,7 +391,7 @@ public class JobGroupXxlJob {
         ReturnT<String> returnT = XxlJobTrigger.runExecutor(triggerParam, address);
         if(returnT.getCode()!=ReturnT.SUCCESS_CODE){
             XxlJobHelper.log(xxlJobContext,returnT.getMsg());
-            throw new BusinessException(returnT.getMsg());
+            JobGroupXxlJob.addJobData(setExecuteJobId(jobInfo.getId(),randomId),false);
         }
     }
 
