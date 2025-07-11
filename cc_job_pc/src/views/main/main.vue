@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// ================== 1. 依赖与组件引入 ==================
 import LogicFlow from "@logicflow/core";
 import {
   Menu,
@@ -10,8 +11,11 @@ import {
 import "@logicflow/core/lib/style/index.css";
 import "@logicflow/extension/lib/style/index.css";
 import { Close, FolderOpened, Document } from "@element-plus/icons-vue";
-import { nextTick, onMounted, reactive, ref, watch } from "vue";
+import { nextTick, onMounted, reactive, ref, watch, onBeforeUnmount } from "vue";
 import { useJobInfoStoreHook, useNavbarStoreHook, usePageStoreHook } from "@/store";
+import { ElMessage } from "element-plus";
+
+// LogicFlow 自定义节点组件
 import CustomJava from "./node/CustomJava";
 import CustomPython from "./node/CustomPython";
 import CustomShell from "./node/CustomShell";
@@ -23,14 +27,39 @@ import CustomSql from "./node/CustomSql";
 import CustomPowerShell from "./node/CustomPowerShell";
 import CustomRect from "./node/CustomRect";
 import CustomGroup from "./node/CustomGroup.ts";
-import { ElMessage } from "element-plus";
+
+// API 和工具类
 import JobInfoAPI from "@/api/job-info.ts";
-import Snowflake from "@/utils/snowflake.ts";
 import JobLogAPI from "@/api/job-log.ts";
+import Snowflake from "@/utils/snowflake.ts";
+import {
+  generateNode,
+  generateEdge,
+  clearData,
+  convertContent,
+  GLUE_NODE_TYPE_MAP,
+  PLATFORM_HEIGHT_LIMITS,
+  WEBSOCKET_CONFIG,
+  DYNAMIC_CUSTOM_GROUP,
+  clearHighlight as clearHighlightUtil,
+  updateEdgeStyleForTaskGroup as updateEdgeStyleForTaskGroupUtil,
+  layoutNodes as layoutNodesUtil,
+  clearCanvas as clearCanvasUtil,
+  selectNodes as selectNodesUtil,
+  selectElements,
+  getNodeColor,
+  canvasOperations,
+} from "@/utils/logicflow";
+
+// 组件
 import Log from "@/components/Log/Log.vue";
-import { onBeforeUnmount } from "vue";
 import EditJobNode from "@/views/side/operation/edit-job-node.vue";
 
+// ================== 2. 类型定义与接口声明 ==================
+
+/**
+ * 日志标签页接口定义
+ */
 interface LogTab {
   id: string;
   jobId: number | null;
@@ -39,29 +68,215 @@ interface LogTab {
   isRunning: boolean;
 }
 
-const pageTaps = ref([]);
-const jobId = ref(null);
-const logger = ref(null);
-const logTabs = ref<LogTab[]>([]);
-const activeLogTab = ref<string | null>(null); // 当前激活的日志标签页
-// 存储每个任务组对应的LogicFlow实例
-const lfInstances = ref({});
-// 存储DOM引用
-const lfRefs = ref({});
-// 添加拖拽相关的状态
-const isDragging = ref(false);
-const platformHeight = ref(60); // 60vh
+/**
+ * 任务组状态接口定义
+ */
+interface JobState {
+  fromLineNum: number;
+  pullFailCount: number;
+  logRun: any;
+  ws: WebSocket | null;
+  randomId: string;
+}
 
-// 添加容器引用
+/**
+ * 表单数据接口定义
+ */
+interface FormData {
+  executorTimeout: number;
+  nodes?: string;
+  edges?: string;
+  glueType?: string;
+  executorHandler?: string;
+}
+
+/**
+ * WebSocket消息接口定义
+ */
+interface WebSocketMessage {
+  jobId: number;
+  randomId: string;
+  status: number;
+  result?: string;
+}
+
+
+// 扩展Window接口以支持refreshTreeData
+declare global {
+  interface Window {
+    refreshTreeData?: () => void;
+  }
+}
+
+// ================== 3. 响应式数据声明 ==================
+
+/** 当前页面标签列表 */
+const pageTaps = ref<any[]>([]);
+
+/** 当前选中的任务组ID */
+const jobId = ref<number | null>(null);
+
+/** 日志组件引用 */
+const logger = ref<any>(null);
+
+/** 日志标签页列表 */
+const logTabs = ref<LogTab[]>([]);
+
+/** 当前激活的日志标签页ID */
+const activeLogTab = ref<string | null>(null);
+
+/** 存储每个任务组对应的LogicFlow实例 */
+const lfInstances = ref<Record<number, any>>({});
+
+/** 存储DOM引用 */
+const lfRefs = ref<Record<number, HTMLElement>>({});
+
+/** 拖拽状态 */
+const isDragging = ref(false);
+
+/** 平台区域高度（vh单位） */
+const platformHeight = ref(PLATFORM_HEIGHT_LIMITS.DEFAULT);
+
+/** 主容器引用 */
 const mainContainerRef = ref<HTMLElement>();
 
-// 监听定位节点信息
-// 高亮相关变量
-let highlightedElement = null;
-let highlightedType = null;
-let originalStyle = null;
+/** 日志组件引用映射 */
+const loggerRefs = ref<Record<string, any>>({});
 
-//============================watch管理====================
+// ================== 4. 全局变量声明 ==================
+
+/** 节点高亮相关变量 */
+let highlightedElement: any = null;
+let highlightedType: string | null = null;
+let originalStyle: any = null;
+
+/** LogicFlow 主实例引用 */
+const lf = ref<any>(null);
+
+/** 雪花算法实例 */
+const snowflake = new Snowflake(31, 31, true, new Date());
+
+/** 随机ID */
+const randomId = ref("");
+
+/** 运行时间记录 */
+const runTime = ref<any[]>([]);
+
+/** 全局日志获取定时器（向后兼容） */
+let logRun: any = null;
+
+/** 全局日志行号计数（向后兼容） */
+const fromLineNum = ref(0);
+
+/** 全局日志获取失败计数（向后兼容） */
+const pullFailCount = ref(0);
+
+/** 任务组状态管理 */
+const jobStates = ref<Map<number, JobState>>(new Map());
+
+// ================== 5. 表单与对话框状态 ==================
+
+/** 表单数据 */
+const formData = reactive<FormData>({
+  executorTimeout: 600000,
+});
+
+/** 任务节点编辑对话框可见性 */
+const jobNodeVisible = ref(false);
+
+/** 当前编辑的节点任务ID */
+const nodeJobId = ref<number | null>(null);
+
+/** 当前正在编辑的节点ID */
+const currentEditingNodeId = ref<string | null>(null);
+
+/** 任务选择对话框可见性 */
+const jobDialog = ref(false);
+
+/** 任务类型单选值 */
+const jobRadio = ref(0);
+
+/** 任务信息列表 */
+const jobInfoList = ref<any[]>([]);
+
+/** 可选任务信息列表 */
+const selectJobInfoList = ref<any[]>([]);
+
+/** 选中的任务ID */
+const jobSelectId = ref<number | undefined>(undefined);
+
+/** 任务节点编辑ID */
+const jobNodeEditId = ref<string | undefined>(undefined);
+
+/** 当前选中的节点 */
+const selectNode = ref<any>(null);
+
+// ================== 6. 工具函数定义 ==================
+
+/**
+ * 获取或创建任务组状态
+ * @param jobId 任务组ID
+ * @returns 任务组状态
+ */
+const getJobState = (jobId: number): JobState => {
+  if (!jobStates.value.has(jobId)) {
+    jobStates.value.set(jobId, {
+      fromLineNum: 0,
+      pullFailCount: 0,
+      logRun: null,
+      ws: null,
+      randomId: "",
+    });
+  }
+  return jobStates.value.get(jobId)!;
+};
+
+/**
+ * 清理任务组状态
+ * @param jobId 任务组ID
+ */
+const clearJobState = (jobId: number): void => {
+  const state = jobStates.value.get(jobId);
+  if (state) {
+    // 清理定时器
+    if (state.logRun) {
+      window.clearInterval(state.logRun);
+      state.logRun = null;
+    }
+    // 关闭WebSocket连接
+    if (state.ws) {
+      state.ws.close();
+      state.ws = null;
+    }
+    // 移除状态
+    jobStates.value.delete(jobId);
+  }
+};
+
+/**
+ * 获取指定标签页的日志组件引用
+ * @param tabId 标签页ID
+ * @returns 日志组件引用
+ */
+const getLoggerRef = (tabId: string) => {
+  return loggerRefs.value[tabId];
+};
+
+/**
+ * 刷新任务树数据
+ */
+const refreshTreeData = (): void => {
+  if (typeof window.refreshTreeData === "function") {
+    window.refreshTreeData();
+  }
+};
+
+// ================== 7. Watch监听器管理 ==================
+
+/**
+ * 监听页面标签变化，实时同步 pageTaps
+ * 当页面状态发生变化时，自动更新当前页面的标签列表
+ */
 watch(
   () => usePageStoreHook().pages,
   (pages: any) => {
@@ -73,6 +288,10 @@ watch(
   }
 );
 
+/**
+ * 监听当前页面变化，处理任务组切换逻辑
+ * 当用户切换任务组时，自动加载对应的LogicFlow实例和数据
+ */
 watch(
   () => usePageStoreHook().getCurrentPage(),
   (pageId: any) => {
@@ -83,7 +302,11 @@ watch(
         selectJobCompNode(pageId);
         // 切换任务组时更新边的样式以反映该任务组的运行状态
         setTimeout(() => {
-          updateEdgeStyle();
+          updateEdgeStyleForTaskGroupUtil(
+            pageId,
+            lfInstances.value[pageId],
+            usePageStoreHook().getCurrentPageRunStatus
+          );
         }, 100);
       } else {
         // 如果实例不存在，需要先创建实例
@@ -100,61 +323,87 @@ watch(
   }
 );
 
+/**
+ * 监听任务信息变化，处理任务新增和修改
+ * 当任务信息发生变化时，自动处理新增或修改逻辑
+ */
 watch(
   () => useJobInfoStoreHook().getJobInfo(),
   async (jobInfo: any) => {
     if (jobInfo.jobId) {
-      //修改
+      // 修改任务
+      console.log("修改任务:", jobInfo);
     } else {
-      //新增
+      // 新增任务
+      console.log("新增任务:", jobInfo);
       await addJobNode(jobInfo);
       await selectPage(jobInfo.parentId);
     }
   }
 );
 
+/**
+ * 监听导航栏动作，处理各种操作命令
+ * 根据不同的操作类型执行相应的功能
+ */
 watch(
   () => useNavbarStoreHook().getAction(),
   (actionObj: any) => {
-    if (actionObj.actionName == "save") {
-      saveOrUpdateJob();
-    } else if (actionObj.actionName == "start-current-job") {
-      // 启动当前任务组
-      const currentPageId = actionObj.pageId || usePageStoreHook().getCurrentPage();
-      if (currentPageId) {
-        triggerOne();
-      }
-    } else if (actionObj.actionName == "stop-current-job") {
-      // 停止当前任务组
-      const currentPageId = actionObj.pageId || usePageStoreHook().getCurrentPage();
-      if (currentPageId) {
-        stopTrigger();
-      }
-    } else if (actionObj.actionName == "undo") {
-      // 撤销操作
-      handleUndo();
-    } else if (actionObj.actionName == "redo") {
-      // 重做操作
-      handleRedo();
-    } else if (actionObj.actionName == "fit") {
-      // 适应画布
-      handleFit();
-    } else if (actionObj.actionName == "zoom-in") {
-      // 放大
-      handleZoomIn();
-    } else if (actionObj.actionName == "zoom-out") {
-      // 缩小
-      handleZoomOut();
-    } else if (actionObj.actionName == "clear") {
-      console.log("清除");
-      //清除画布
-      clearCanvas();
-    } else if (actionObj.actionName == "layout-horizontal") {
-      layoutNodes("horizontal");
-    } else if (actionObj.actionName == "layout-vertical") {
-      layoutNodes("vertical");
-    } else if (actionObj.actionName == "select") {
-      selectNodes();
+    if (!actionObj?.actionName) return;
+
+    const actionName = actionObj.actionName;
+    const currentPageId = actionObj.pageId || usePageStoreHook().getCurrentPage();
+    const currentLf = lfInstances.value[currentPageId] || lf.value;
+
+    switch (actionName) {
+      case "save":
+        saveOrUpdateJob();
+        break;
+      case "start-current-job":
+        if (currentPageId) {
+          triggerOne();
+        }
+        break;
+      case "stop-current-job":
+        if (currentPageId) {
+          stopTrigger();
+        }
+        break;
+      case "undo":
+        canvasOperations.undo(currentLf);
+        break;
+      case "redo":
+        canvasOperations.redo(currentLf);
+        break;
+      case "fit":
+        canvasOperations.fit(currentLf);
+        break;
+      case "zoom-in":
+        canvasOperations.zoomIn(currentLf);
+        break;
+      case "zoom-out":
+        canvasOperations.zoomOut(currentLf);
+        break;
+      case "clear":
+        console.log("清除");
+        try {
+          clearCanvasUtil(currentLf);
+          ElMessage.success("画布已清空");
+        } catch (error: any) {
+          ElMessage.error(error.message || "清除画布失败");
+        }
+        break;
+      case "layout-horizontal":
+        layoutNodesUtil("horizontal", currentLf);
+        break;
+      case "layout-vertical":
+        layoutNodesUtil("vertical", currentLf);
+        break;
+      case "select":
+        selectNodesUtil(currentLf);
+        break;
+      default:
+        console.warn(`未知的操作类型: ${actionName}`);
     }
   },
   {
@@ -163,63 +412,74 @@ watch(
   }
 );
 
-// 监听定位节点信息
+/**
+ * 监听定位节点信息，处理节点高亮定位
+ * 当需要定位到特定节点时，自动高亮显示该节点
+ */
 watch(
   () => usePageStoreHook().getLoactionObject(),
   (locationObj: any) => {
-    if (locationObj && Object.keys(locationObj).length > 0) {
-      console.log("检测到定位节点信息:", locationObj);
+    if (!locationObj || Object.keys(locationObj).length === 0) return;
 
-      // 获取当前LogicFlow实例
-      const currentPageId = usePageStoreHook().getCurrentPage();
-      const currentLf = lfInstances.value[currentPageId];
+    console.log("检测到定位节点信息:", locationObj);
 
-      if (currentLf && locationObj.id) {
-        // 定位到指定节点
-        try {
-          // 先清除之前的高亮
-          clearHighlight();
+    // 获取当前LogicFlow实例
+    const currentPageId = usePageStoreHook().getCurrentPage();
+    const currentLf = lfInstances.value[currentPageId];
 
-          if (locationObj.type == 4) {
-            const nodeElement = currentLf.getNodeModelById(locationObj.id);
-            if (nodeElement) {
-              console.log(`成功定位到节点: ${nodeElement.id}`);
-              // 记录原始样式
-              originalStyle = {
-                ...nodeElement.getData().properties?.style,
-                fill: nodeElement.style?.fill,
-              };
-              // 修改节点的边框颜色
-              nodeElement.setStyle("fill", "#0B57D0");
-              highlightedElement = nodeElement;
-              highlightedType = "node";
-              document.addEventListener("mousedown", clearHighlight, true);
-            } else {
-              console.warn(`未找到节点`);
-            }
-          } else {
-            const edgeElement = currentLf.getEdgeModelById(locationObj.id);
-            console.log(edgeElement);
-            if (edgeElement) {
-              console.log(`成功定位到节点: ${edgeElement.id}`);
-              // 记录原始样式
-              originalStyle = {
-                ...edgeElement.getData().properties?.style,
-                stroke: edgeElement.style?.stroke,
-              };
-              // 设置边的颜色
-              edgeElement.setStyle("stroke", "#0B57D0");
-              highlightedElement = edgeElement;
-              highlightedType = "edge";
-              document.addEventListener("mousedown", clearHighlight, true);
-            } else {
-              console.warn(`未找到节点`);
-            }
-          }
-        } catch (error) {
-          console.error("定位节点时出错:", error);
+    if (!currentLf || !locationObj.id) return;
+
+    try {
+      // 先清除之前的高亮
+      clearHighlightUtil(highlightedElement, highlightedType, originalStyle);
+
+      if (locationObj.type === 4) {
+        // 定位到节点
+        const nodeElement = currentLf.getNodeModelById(locationObj.id);
+        if (nodeElement) {
+          console.log(`成功定位到节点: ${nodeElement.id}`);
+          // 记录原始样式
+          originalStyle = {
+            ...nodeElement.getData().properties?.style,
+            fill: nodeElement.style?.fill,
+          };
+          // 修改节点的边框颜色
+          nodeElement.setStyle("fill", "#0B57D0");
+          highlightedElement = nodeElement;
+          highlightedType = "node";
+          document.addEventListener(
+            "mousedown",
+            () => clearHighlightUtil(highlightedElement, highlightedType, originalStyle),
+            true
+          );
+        } else {
+          console.warn(`未找到节点: ${locationObj.id}`);
+        }
+      } else {
+        // 定位到边
+        const edgeElement = currentLf.getEdgeModelById(locationObj.id);
+        if (edgeElement) {
+          console.log(`成功定位到边: ${edgeElement.id}`);
+          // 记录原始样式
+          originalStyle = {
+            ...edgeElement.getData().properties?.style,
+            stroke: edgeElement.style?.stroke,
+          };
+          // 设置边的颜色
+          edgeElement.setStyle("stroke", "#0B57D0");
+          highlightedElement = edgeElement;
+          highlightedType = "edge";
+          document.addEventListener(
+            "mousedown",
+            () => clearHighlightUtil(highlightedElement, highlightedType, originalStyle),
+            true
+          );
+        } else {
+          console.warn(`未找到边: ${locationObj.id}`);
         }
       }
+    } catch (error) {
+      console.error("定位节点时出错:", error);
     }
   },
   {
@@ -227,18 +487,27 @@ watch(
     deep: true,
   }
 );
+
 //============================watch管理====================
 
-//==============================拖拽函数管理==============================
-// 拖拽处理函数
-const handleMouseDown = (e: MouseEvent) => {
+// ================== 8. 拖拽功能管理 ==================
+
+/**
+ * 鼠标按下事件处理，开始拖拽
+ * @param e 鼠标事件
+ */
+const handleMouseDown = (e: MouseEvent): void => {
   isDragging.value = true;
   document.addEventListener("mousemove", handleMouseMove);
   document.addEventListener("mouseup", handleMouseUp);
   e.preventDefault();
 };
 
-const handleMouseMove = (e: MouseEvent) => {
+/**
+ * 鼠标移动事件处理，更新分隔线位置
+ * @param e 鼠标事件
+ */
+const handleMouseMove = (e: MouseEvent): void => {
   if (!isDragging.value || !mainContainerRef.value) return;
 
   // 获取 main-container 的边界信息
@@ -247,30 +516,41 @@ const handleMouseMove = (e: MouseEvent) => {
 
   // 计算鼠标相对于容器顶部的位置
   const relativeY = e.clientY - containerRect.top;
-
   const newHeight = (relativeY / containerHeight) * 100;
 
   // 限制最小和最大高度
-  if (newHeight >= 30 && newHeight <= 80) {
+  if (
+    newHeight >= PLATFORM_HEIGHT_LIMITS.MIN &&
+    newHeight <= PLATFORM_HEIGHT_LIMITS.MAX
+  ) {
     platformHeight.value = newHeight;
   }
 };
 
-const handleMouseUp = () => {
+/**
+ * 鼠标松开事件处理，结束拖拽
+ */
+const handleMouseUp = (): void => {
   isDragging.value = false;
   document.removeEventListener("mousemove", handleMouseMove);
   document.removeEventListener("mouseup", handleMouseUp);
 };
 
-// 组件卸载时清理事件监听器
+/**
+ * 组件卸载时清理事件监听器
+ */
 onBeforeUnmount(() => {
   document.removeEventListener("mousemove", handleMouseMove);
   document.removeEventListener("mouseup", handleMouseUp);
 });
-//==============================拖拽函数管理==============================
 
-//=========================页面管理=========================
-async function selectPage(id) {
+// ================== 8. 页面管理 ==================
+
+/**
+ * 选择任务组页面并初始化 LogicFlow 实例
+ * @param id 任务组ID
+ */
+async function selectPage(id: number): Promise<void> {
   console.log(`[流程3] 开始选择任务组 ${id} ==================`);
 
   try {
@@ -283,9 +563,10 @@ async function selectPage(id) {
 
     // 确保所有容器正确设置可见性
     Object.keys(lfRefs.value).forEach((pageId) => {
-      if (lfRefs.value[pageId]) {
+      const pageIdNum = parseInt(pageId);
+      if (lfRefs.value[pageIdNum]) {
         // 显式设置样式
-        lfRefs.value[pageId].style.display = pageId == id ? "block" : "none";
+        lfRefs.value[pageIdNum].style.display = pageIdNum === id ? "block" : "none";
       }
     });
 
@@ -323,7 +604,11 @@ async function selectPage(id) {
     // 切换任务组时，确保边动画状态正确
     setTimeout(() => {
       console.log(`切换到任务组 ${id}，更新边动画状态`);
-      updateEdgeStyleForTaskGroup(id);
+      updateEdgeStyleForTaskGroupUtil(
+        id,
+        lfInstances.value[id],
+        usePageStoreHook().getCurrentPageRunStatus
+      );
     }, 200);
 
     // 切换任务组时保留所有任务组的日志获取，不再清除任何定时器
@@ -334,7 +619,11 @@ async function selectPage(id) {
   }
 }
 
-function closePage(id: number) {
+/**
+ * 关闭指定任务组页面，并清理相关状态
+ * @param id 任务组ID
+ */
+function closePage(id: number): void {
   // 清理 LogicFlow 实例
   if (lfInstances.value[id]) {
     console.log(`[清理] 清理任务组 ${id} 的LogicFlow实例`);
@@ -372,14 +661,14 @@ function closePage(id: number) {
     usePageStoreHook().getLastPage();
   }
 }
-//=========================页面管理=========================
 
-//===========================log===============================
+// ================== 10. 日志管理 ==================
+
 /**
  * 重置日志状态
  * @param specificJobId 可选，指定要重置的任务组ID，不提供则重置当前激活的日志标签页
  */
-function logReset(specificJobId?: number | null) {
+function logReset(specificJobId?: number | null): void {
   console.log(
     "重置日志状态",
     specificJobId ? `指定任务组: ${specificJobId}` : "当前激活日志"
@@ -425,17 +714,11 @@ function logReset(specificJobId?: number | null) {
   }
 }
 
-function convertContent(str: string) {
-  return str
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, "'")
-    .replace(/&#39;/g, "'")
-    .replace(/&quot;/g, '"');
-}
-
-function run(id: number) {
+/**
+ * 启动指定任务的日志获取
+ * @param id 执行日志ID
+ */
+function run(id: number): void {
   // 保存当前执行的日志ID，这是后端返回的，与任务组ID不同
   const currentExecuteLogId = id;
   const currentJobId = jobId.value;
@@ -466,19 +749,19 @@ function run(id: number) {
   console.log(`任务组 ${currentJobId} 的日志获取定时器已启动`);
 }
 
-// 获取指定标签页的日志组件引用
-const loggerRefs = ref({});
-const getLoggerRef = (tabId) => {
-  return loggerRefs.value[tabId];
-};
-
-// 切换日志标签页
-const switchLogTab = (tabId: string) => {
+/**
+ * 切换日志标签页
+ * @param tabId 标签页ID
+ */
+const switchLogTab = (tabId: string): void => {
   activeLogTab.value = tabId;
 };
 
-// 关闭日志标签页
-const closeLogTab = (tabId) => {
+/**
+ * 关闭日志标签页
+ * @param tabId 标签页ID
+ */
+const closeLogTab = (tabId: string): void => {
   const index = logTabs.value.findIndex((tab) => tab.id === tabId);
   if (index > -1) {
     logTabs.value.splice(index, 1);
@@ -498,10 +781,11 @@ const closeLogTab = (tabId) => {
 };
 
 /**
- * 获取任务日志
- * @param id
+ * 获取任务执行日志
+ * @param id 执行日志ID
+ * @param targetJobId 可选的目标任务组ID
  */
-function getExecuteTaskLog(id: number, targetJobId?: number) {
+function getExecuteTaskLog(id: number, targetJobId?: number): void {
   // 如果提供了目标任务组ID，使用该任务组的状态；否则使用全局状态（向后兼容）
   const currentJobId = targetJobId || jobId.value;
   let currentFromLineNum: number;
@@ -554,7 +838,6 @@ function getExecuteTaskLog(id: number, targetJobId?: number) {
         fromLineNum.value = newFromLineNum;
       }
 
-      //execLog.value += convertContent(data.content.logContent);
       // 使用正确的任务ID作为标签页的唯一标识
       const currentTabId = `${currentJobId}`;
       // 获取对应标签页的日志组件
@@ -583,11 +866,11 @@ function getExecuteTaskLog(id: number, targetJobId?: number) {
 }
 
 /**
- * 任务日志停止运行
- * @param content
+ * 停止任务日志获取
+ * @param content 结束内容
  * @param targetJobId 可选的目标任务组ID
  */
-function logRunStop(content: string, targetJobId?: number) {
+function logRunStop(content: string, targetJobId?: number): void {
   const currentJobId = targetJobId || jobId.value;
 
   if (targetJobId) {
@@ -602,7 +885,11 @@ function logRunStop(content: string, targetJobId?: number) {
     // 日志停止意味着任务完成，立即更新任务组状态
     console.log(`任务组 ${targetJobId} 日志停止，立即更新运行状态为停止`);
     usePageStoreHook().updatePageRunStatus(targetJobId, false);
-    updateEdgeStyleForTaskGroup(targetJobId);
+    updateEdgeStyleForTaskGroupUtil(
+      targetJobId,
+      lfInstances.value[targetJobId],
+      usePageStoreHook().getCurrentPageRunStatus
+    );
 
     // 同时更新对应的日志标签页状态
     const tabId = `${targetJobId}`;
@@ -621,7 +908,12 @@ function logRunStop(content: string, targetJobId?: number) {
       if (currentJobId) {
         console.log(`当前任务组 ${currentJobId} 日志停止，立即更新运行状态为停止`);
         usePageStoreHook().updatePageRunStatus(currentJobId, false);
-        updateEdgeStyleForTaskGroup(currentJobId);
+
+        updateEdgeStyleForTaskGroupUtil(
+          currentJobId,
+          lfInstances.value[currentJobId],
+          usePageStoreHook().getCurrentPageRunStatus
+        );
 
         // 同时更新对应的日志标签页状态
         const tabId = `${currentJobId}`;
@@ -634,7 +926,6 @@ function logRunStop(content: string, targetJobId?: number) {
     }
   }
 
-  //execLog.value += convertContent(content);
   // 使用正确的任务ID作为标签页的唯一标识
   const currentTabId = `${currentJobId}`;
   // 获取对应标签页的日志组件
@@ -649,24 +940,13 @@ function logRunStop(content: string, targetJobId?: number) {
 }
 //===========================log===============================
 
-// =========================logicflow=========================
-// 监听全局点击事件，用于移除高亮
-function clearHighlight() {
-  if (highlightedElement) {
-    // 恢复原始样式
-    if (highlightedType === "node") {
-      highlightedElement.setStyle("fill", originalStyle?.fill || "#fff");
-    } else if (highlightedType === "edge") {
-      highlightedElement.setStyle("stroke", originalStyle?.stroke || "#333");
-    }
-    highlightedElement = null;
-    highlightedType = null;
-    originalStyle = null;
-    document.removeEventListener("mousedown", clearHighlight, true);
-  }
-}
-
-function initLogicFlowInstance(pageId) {
+// ================== 11. LogicFlow 核心功能 ==================
+/**
+ * 初始化LogicFlow实例
+ * @param pageId 页面ID
+ * @returns LogicFlow实例
+ */
+function initLogicFlowInstance(pageId: number): any {
   console.log(`[流程4] 开始初始化LogicFlow实例 ${pageId} ==================`);
 
   const container = lfRefs.value[pageId];
@@ -730,7 +1010,7 @@ function initLogicFlowInstance(pageId) {
   // 初始化逻辑
   console.log(`[流程4] 配置LogicFlow实例`);
 
-  newLf.extension.menu.setMenuConfig(menuConfig);
+  (newLf.extension.menu as any).setMenuConfig(menuConfig);
   newLf.register(CustomJava);
   newLf.register(CustomPython);
   newLf.register(CustomShell);
@@ -759,7 +1039,7 @@ function initLogicFlowInstance(pageId) {
 
   // 显示MiniMap (必须在render之后)
   console.log(`[流程4] 显示MiniMap`);
-  newLf.extension.miniMap.show();
+  (newLf.extension.miniMap as any).show();
 
   // 保存实例并返回
   lfInstances.value[pageId] = newLf;
@@ -768,27 +1048,29 @@ function initLogicFlowInstance(pageId) {
   const { eventCenter } = newLf.graphModel;
 
   eventCenter.on("selection:selected", () => {
-    selectElements();
+    selectElements(lfInstances,lf);
   });
-
   return newLf;
 }
 
-// 为每个LogicFlow实例绑定相同的事件处理
-function bindEvents(lfInstance) {
+/**
+ * 为LogicFlow实例绑定事件处理
+ * @param lfInstance LogicFlow实例
+ */
+function bindEvents(lfInstance: any): void {
   // 节点鼠标事件
-  lfInstance.on("node:mouseenter", ({ data }) => {
+  lfInstance.on("node:mouseenter", ({ data }: any) => {
     const node = lfInstance.getNodeModelById(data.id);
     node.buttonGroupOpacity = 1;
   });
 
-  lfInstance.on("node:mouseleave", ({ data }) => {
+  lfInstance.on("node:mouseleave", ({ data }: any) => {
     const node = lfInstance.getNodeModelById(data.id);
     node.buttonGroupOpacity = 0;
   });
 
   // 复制原有所有事件绑定
-  lfInstance.on("custom:node-toggle-status", ({ nodeId }) => {
+  lfInstance.on("custom:node-toggle-status", ({ nodeId }: any) => {
     const node = lfInstance.getNodeModelById(nodeId);
     node.isPause = !node.isPause;
 
@@ -800,13 +1082,13 @@ function bindEvents(lfInstance) {
     JobInfoAPI.pauseJob(node.properties.jobId, node.isPause ? 1 : 0);
 
     // 更新节点样式
-    const styleKey = node.type === DynamicCustomGroup ? "stroke" : "fill";
+    const styleKey = node.type === DYNAMIC_CUSTOM_GROUP ? "stroke" : "fill";
     node.setStyle(styleKey, node.isPause ? "#409EEE" : "#FFFFFF");
   });
 
-  lfInstance.on("custom:node-copy", async ({ nodeId }) => {
+  lfInstance.on("custom:node-copy", async ({ nodeId }: any) => {
     const node = lfInstance.getNodeModelById(nodeId);
-    if (DynamicCustomGroup == node.type) {
+    if (DYNAMIC_CUSTOM_GROUP == node.type) {
       ElMessage.warning("暂不支持任务组复制");
       return;
     }
@@ -843,9 +1125,6 @@ function bindEvents(lfInstance) {
       console.log(`📤 准备发送创建任务请求，数据:`, newJobData);
       const jobNode = await JobInfoAPI.saveJobNode(newJobData);
       console.log(`📥 后端响应原始数据:`, jobNode);
-      console.log(`📥 响应数据类型:`, typeof jobNode);
-      console.log(`📥 响应数据是否为null:`, jobNode === null);
-      console.log(`📥 响应数据是否为undefined:`, jobNode === undefined);
 
       // 检查后端返回的数据是否有效
       if (!jobNode) {
@@ -883,18 +1162,16 @@ function bindEvents(lfInstance) {
       lfInstance.addNode(newNode);
 
       //刷新任务树
-      if (typeof window.refreshTreeData === "function") {
-        window.refreshTreeData();
-      }
+      refreshTreeData();
 
       ElMessage.success("节点复制成功，已创建独立的后端任务");
-    } catch (error) {
+    } catch (error: any) {
       console.error(`❌ 复制节点失败:`, error);
       ElMessage.error("复制节点失败: " + (error.message || "未知错误"));
     }
   });
 
-  lfInstance.on("custom:node-edit", ({ nodeId }) => {
+  lfInstance.on("custom:node-edit", ({ nodeId }: any) => {
     const node = lfInstance.getNodeModelById(nodeId);
     if (node.properties.jobId === null || node.properties.jobId === undefined) {
       ElMessage.warning("请选择任务或任务组");
@@ -907,12 +1184,12 @@ function bindEvents(lfInstance) {
     currentEditingNodeId.value = nodeId;
   });
 
-  lfInstance.on("custom:node-task-edit", ({ nodeId }) => {
+  lfInstance.on("custom:node-task-edit", ({ nodeId }: any) => {
     jobDialog.value = true;
     jobNodeEditId.value = nodeId;
   });
 
-  lfInstance.on("custom:node-prop", ({ nodeId }) => {
+  lfInstance.on("custom:node-prop", ({ nodeId }: any) => {
     const node = lfInstance.getNodeModelById(nodeId);
     let startTime = "";
     let endTime = "";
@@ -933,50 +1210,31 @@ function bindEvents(lfInstance) {
     `);
   });
 
-  lfInstance.on("custom:node-delete", ({ nodeId }) => {
+  lfInstance.on("custom:node-delete", ({ nodeId }: any) => {
     lfInstance.deleteNode(nodeId);
   });
+}
 
-  // 添加其他必要的事件...
+/**
+ * 设置LogicFlow容器的DOM引用
+ * @param pageId 页面ID
+ * @param el DOM元素
+ */
+function setLfRef(pageId: number, el: HTMLElement | null): void {
+  if (el) {
+    console.log(`[流程9] 设置任务组 ${pageId} 的DOM引用`);
+    lfRefs.value[pageId] = el;
+
+    // 只记录引用，不立即初始化
+    // 选择当前页面时会通过selectPage调用initLogicFlowInstance
+  } else if (lfRefs.value[pageId]) {
+    console.log(`[流程9] 移除任务组 ${pageId} 的DOM引用`);
+    delete lfRefs.value[pageId];
+  }
 }
 
 LogicFlow.use(DndPanel); // 拖拽面板
 LogicFlow.use(MiniMap);
-
-const lf = ref<any>(null);
-const DynamicCustomGroup = "CustomGroup";
-const snowflake = new Snowflake(31, 31, true, new Date());
-const randomId = ref("");
-const runTime = ref([]);
-// 将全局变量改为每个任务组独立的状态管理
-const jobStates = ref<
-  Map<
-    number,
-    {
-      fromLineNum: number;
-      pullFailCount: number;
-      logRun: any;
-      ws: WebSocket | null;
-      randomId: string;
-    }
-  >
->(new Map());
-let logRun: any = null; // 保留用于向后兼容，但主要使用jobStates
-const fromLineNum = ref(0);
-const pullFailCount = ref(0);
-const formData = reactive({
-  executorTimeout: 600000,
-});
-const jobNodeVisible = ref(false);
-const nodeJobId = ref(null);
-const currentEditingNodeId = ref(null); // 添加当前正在编辑的节点ID
-const jobDialog = ref(false);
-const jobRadio = ref(0);
-const jobInfoList = ref([]);
-const selectJobInfoList = ref([]);
-const jobSelectId = ref<any>(undefined);
-const jobNodeEditId = ref<any>(undefined);
-const selectNode = ref(null);
 const menuConfig = {
   nodeMenu: [
     {
@@ -988,7 +1246,7 @@ const menuConfig = {
     {
       text: "选择任务",
       callback(node: { id: string }) {
-        if (DynamicCustomGroup == node.type) {
+        if (DYNAMIC_CUSTOM_GROUP == node.type) {
           ElMessage.warning("暂不支持任务组选择");
           return;
         }
@@ -1004,7 +1262,7 @@ const menuConfig = {
           ElMessage.warning("请选择任务或任务组");
           return;
         }
-        if (DynamicCustomGroup == node.type) {
+        if (DYNAMIC_CUSTOM_GROUP == node.type) {
           ElMessage.warning("暂不支持任务组编辑");
           return;
         }
@@ -1018,7 +1276,7 @@ const menuConfig = {
     {
       text: "复制",
       async callback(node: any) {
-        if (DynamicCustomGroup == node.type) {
+        if (DYNAMIC_CUSTOM_GROUP == node.type) {
           ElMessage.warning("暂不支持任务组复制");
           return;
         }
@@ -1144,18 +1402,6 @@ const menuConfig = {
   graphMenu: [], // 覆盖默认的边右键菜单，与false表现一样
 };
 
-const GLUE_NODE_TYPE_MAP: Record<string, string> = {
-  SQL: "custom-sql",
-  API: "custom-api",
-  BEAN: "custom-bean",
-  GLUE_GROOVY: "custom-java",
-  GLUE_SHELL: "custom-shell",
-  GLUE_PYTHON: "custom-python",
-  GLUE_PHP: "custom-php",
-  GLUE_NODEJS: "custom-nodejs",
-  GLUE_POWERSHELL: "custom-powershell",
-};
-
 function getJobInfoList() {
   JobInfoAPI.getList().then((data: any) => {
     jobInfoList.value = data;
@@ -1261,7 +1507,7 @@ function updateNodeTypeByGlueType(jobId: number, jobDesc: string, glueType: stri
 
   const nodeType =
     GLUE_NODE_TYPE_MAP[glueType] ||
-    (targetNode.nodeType === DynamicCustomGroup ? DynamicCustomGroup : "rect");
+    (targetNode.nodeType === DYNAMIC_CUSTOM_GROUP ? DYNAMIC_CUSTOM_GROUP : "rect");
   const graphModel = currentLf.graphModel;
 
   console.log(
@@ -1385,10 +1631,13 @@ async function addJobNode(jobInfo: any) {
   });
 }
 
+// ================== 12. 任务执行和操作处理 ==================
+
 /**
  * 任务执行一次
+ * 启动当前任务组的执行流程
  */
-async function triggerOne() {
+async function triggerOne(): Promise<void> {
   if (jobId.value == null) {
     ElMessage.warning("请选择任务组～");
     return;
@@ -1433,7 +1682,7 @@ async function triggerOne() {
     const _node = currentLf.getNodeModelById(node.id);
     _node.setProperty("randomId", randomId.value);
 
-    if (_node.type === DynamicCustomGroup) {
+    if (_node.type === DYNAMIC_CUSTOM_GROUP) {
       _node.setStyle("stroke", "#000");
     } else {
       _node.setStyle("fill", "#fff");
@@ -1442,6 +1691,7 @@ async function triggerOne() {
       `🔄 重置节点 ${node.id} - jobId: ${node.properties?.jobId}, 新randomId: ${randomId.value}, 颜色: 白色`
     );
   });
+
   // TODO 查找暂停中的任务并修改任务状态
   const jobIds = _nodes.map((node: any) => node.properties.jobId);
   console.log("暂停任务", jobIds);
@@ -1500,6 +1750,7 @@ async function triggerOne() {
   const jobInfoTriggerDto = {} as any;
   jobInfoTriggerDto.id = jobId.value;
   jobInfoTriggerDto.executorParam = randomId.value;
+
   JobInfoAPI.triggerJob(jobInfoTriggerDto)
     .then((data: any) => {
       if (data) {
@@ -1508,17 +1759,20 @@ async function triggerOne() {
         // 为当前任务组创建独立的WebSocket连接
         connectWs(jobId.value + ":" + randomId.value, jobId.value);
         // 更新当前任务组的运行状态
-        usePageStoreHook().updatePageRunStatus(jobId.value, true);
-        updateEdgeStyle();
+        usePageStoreHook().updatePageRunStatus(jobId.value!, true);
+        updateEdgeStyleForTaskGroupUtil(
+          jobId.value,
+          lfInstances.value[jobId.value],
+          usePageStoreHook().getCurrentPageRunStatus
+        );
       }
     })
-    .catch((e) => {
+    .catch((e: any) => {
       // 更新当前任务组的运行状态为停止
-      usePageStoreHook().updatePageRunStatus(jobId.value, false);
+      usePageStoreHook().updatePageRunStatus(jobId.value!, false);
       ElMessage.error(e);
-      //execLog.value += "读取任务日志失败...";
       // 获取当前激活标签页对应的日志组件
-      const loggerRef = getLoggerRef(activeLogTab.value);
+      const loggerRef = getLoggerRef(activeLogTab.value!);
       loggerRef?.addLogsFromText("读取任务日志失败...");
 
       // 任务启动失败时，更新日志标签页状态
@@ -1533,8 +1787,9 @@ async function triggerOne() {
 
 /**
  * 停止任务
+ * 停止当前任务组的执行
  */
-function stopTrigger() {
+function stopTrigger(): void {
   if (jobId.value == null) {
     ElMessage.warning("请选择任务组～");
     return;
@@ -1547,7 +1802,11 @@ function stopTrigger() {
     .then(() => {
       // 更新当前任务组的运行状态
       usePageStoreHook().updatePageRunStatus(currentJobId, false);
-      updateEdgeStyle();
+      updateEdgeStyleForTaskGroupUtil(
+        currentJobId,
+        lfInstances.value[currentJobId],
+        usePageStoreHook().getCurrentPageRunStatus
+      );
 
       // 停止对应任务组的日志获取
       if (state.logRun) {
@@ -1573,70 +1832,17 @@ function stopTrigger() {
 
       ElMessage.success("任务已停止");
     })
-    .catch((error) => {
+    .catch((error: any) => {
       console.error("停止任务失败:", error);
       ElMessage.error("停止任务失败");
     });
 }
 
 /**
- * 更新边的状态
- */
-function updateEdgeStyle() {
-  // 获取当前任务组对应的LogicFlow实例
-  const currentPageId = usePageStoreHook().getCurrentPage();
-  const currentLf = lfInstances.value[currentPageId];
-
-  if (!currentLf) {
-    console.warn(`无法找到任务组 ${currentPageId} 对应的LogicFlow实例`);
-    return;
-  }
-
-  const { edges } = currentLf.getGraphRawData() ?? {};
-  // 使用当前任务组的运行状态而不是全局状态
-  if (usePageStoreHook().getCurrentPageRunStatus()) {
-    edges?.forEach(({ id }) => {
-      currentLf.openEdgeAnimation(id);
-    });
-    return;
-  }
-  edges?.forEach(({ id }) => {
-    currentLf.closeEdgeAnimation(id);
-  });
-}
-
-/**
- * 更新指定任务组的边样式
- */
-function updateEdgeStyleForTaskGroup(taskGroupId: number) {
-  const targetLf = lfInstances.value[taskGroupId];
-
-  if (!targetLf) {
-    console.warn(`无法找到任务组 ${taskGroupId} 对应的LogicFlow实例`);
-    return;
-  }
-
-  const { edges } = targetLf.getGraphRawData() ?? {};
-  const isRunning = usePageStoreHook().getPageRunStatus(taskGroupId);
-
-  console.log(`更新任务组 ${taskGroupId} 的边样式，运行状态: ${isRunning}`);
-
-  if (isRunning) {
-    edges?.forEach(({ id }) => {
-      targetLf.openEdgeAnimation(id);
-    });
-  } else {
-    edges?.forEach(({ id }) => {
-      targetLf.closeEdgeAnimation(id);
-    });
-  }
-}
-
-/**
  * 选择任务组
- * @param id
+ * @param id 任务组ID
  */
-async function selectJobCompNode(id: number) {
+async function selectJobCompNode(id: number): Promise<void> {
   console.log(`[流程5] 开始获取任务组 ${id} 的节点数据 ==================`);
   // 只有在首次加载时调用，避免重复加载
   const currentLf = lfInstances.value[id];
@@ -1689,108 +1895,41 @@ async function selectJobCompNode(id: number) {
  * @param newNodes 新的节点
  * @param graphModel 画布模型
  * @param newEdges 新的边
+ * @param lfInstance LogicFlow实例
  */
-function addJobNodes(newNodes, graphModel, newEdges, lfInstance = null) {
+function addJobNodes(
+  newNodes: any[],
+  graphModel: any,
+  newEdges: any[],
+  lfInstance: any = null
+): void {
   // 允许指定实例或使用当前活跃实例
   const instance = lfInstance || lf.value;
   if (!instance) return;
 
   // 添加节点
-  newNodes.forEach((node) => {
+  newNodes.forEach((node: any) => {
     graphModel.addNode(generateNode(node));
   });
 
   // 设置节点样式和子节点
-  newNodes.forEach((n) => {
+  newNodes.forEach((n: any) => {
     const node = instance.getNodeModelById(n.id);
     if (node) {
       node.isPause = n.isPause == 1;
       node.setStyle("fill", n.isPause == 1 ? "#409EEE" : "#fff");
       // 触发节点重新渲染以更新图标
       node.setAttributes();
-      if (n.nodeType === DynamicCustomGroup && n.children) {
-        JSON.parse(n.children).forEach((id) => node.addChild(id));
+      if (n.nodeType === DYNAMIC_CUSTOM_GROUP && n.children) {
+        JSON.parse(n.children).forEach((id: string) => node.addChild(id));
       }
     }
   });
 
   // 添加边
-  newEdges.forEach((e) => {
+  newEdges.forEach((e: any) => {
     graphModel.addEdge(generateEdge(e));
   });
-}
-
-/**
- * 产生节点
- * @param node
- */
-function generateNode(node: any) {
-  console.log("generateNode", node, node.nodeType);
-  const properties = JSON.parse(node.properties);
-  // 类型判断逻辑
-  const nodeType =
-    node.nodeType || (node.nodeType === DynamicCustomGroup ? DynamicCustomGroup : "rect");
-  if (node.nodeType === DynamicCustomGroup) {
-    properties.children = JSON.parse(properties.children);
-  }
-
-  return {
-    id: node.id,
-    text: node.jobName,
-    type: nodeType,
-    x: node.nodePositionX,
-    y: node.nodePositionY,
-    properties: properties,
-    children: node.children != null ? JSON.parse(node.children) : node.children,
-  };
-}
-
-/**
- * 产生边
- * @param edge
- */
-function generateEdge(edge: any) {
-  return {
-    id: edge.id,
-    sourceNodeId: edge.fromNodeId,
-    targetNodeId: edge.endNodeId,
-    type: "bezier",
-  };
-}
-
-async function clearData(lfInstance = null) {
-  // 允许指定实例或使用当前活跃实例
-  const instance = lfInstance || lf.value;
-  if (!instance) {
-    console.log("没有可用的LogicFlow实例，跳过清理");
-    return;
-  }
-
-  try {
-    const graphData = instance.getGraphRawData();
-    if (!graphData) return;
-
-    const nodes = graphData.nodes || [];
-    const edges = graphData.edges || [];
-    const graphModel = instance.graphModel;
-
-    // 清理节点和边
-    nodes.forEach((node) => {
-      const _node = graphModel.getNodeModelById(node.id);
-      if (_node) {
-        graphModel.deleteNode(_node.id);
-      }
-    });
-
-    edges.forEach((edge) => {
-      const _edge = graphModel.getEdgeModelById(edge.id);
-      if (_edge) {
-        graphModel.deleteEdgeById(_edge.id);
-      }
-    });
-  } catch (err) {
-    console.error("清理画布时出错:", err);
-  }
 }
 
 //--------------------------------------------------ws------------------
@@ -1798,7 +1937,7 @@ const ws = ref(); // 保留全局WebSocket引用用于向后兼容
 const reconnectAttempts = ref(0);
 const maxReconnectAttempts = ref(3); // 自定义最大重试次数
 
-const connectWs = (id: string, targetJobId?: number) => {
+const connectWs = (id: string, targetJobId?: number): void => {
   // TODO 后端做多节点部署时，需要修改
   const wsUrl = "ws://localhost:8989/ccJobWs/" + id;
   console.log(`为任务组 ${targetJobId || "全局"} 创建WebSocket连接: ${wsUrl}`);
@@ -1836,7 +1975,10 @@ const connectWs = (id: string, targetJobId?: number) => {
         if (reconnectAttempts.value <= maxReconnectAttempts.value && state.randomId) {
           console.log(`使用当前randomId ${state.randomId} 进行重连`);
           const newId = `${targetJobId}:${state.randomId}`;
-          setTimeout(() => connectWs(newId, targetJobId), 3000); // 延迟重连
+          setTimeout(
+            () => connectWs(newId, targetJobId),
+            WEBSOCKET_CONFIG.RECONNECT_DELAY
+          );
         } else {
           console.log("停止重连 - 超过最大重连次数或无有效randomId");
         }
@@ -1848,15 +1990,15 @@ const connectWs = (id: string, targetJobId?: number) => {
       reconnectAttempts.value++;
       if (reconnectAttempts.value <= maxReconnectAttempts.value) {
         console.log("进行重连");
-        setTimeout(() => connectWs(id, targetJobId), 3000);
+        setTimeout(() => connectWs(id, targetJobId), WEBSOCKET_CONFIG.RECONNECT_DELAY);
       } else {
         console.log("连接关闭");
       }
     }
   };
 
-  newWs.onmessage = (e: any) => {
-    const _message = JSON.parse(e.data);
+  newWs.onmessage = (e: MessageEvent) => {
+    const _message: WebSocketMessage = JSON.parse(e.data);
     console.log(`收到WebSocket消息 (任务组 ${targetJobId || "全局"}):`, _message);
 
     // 获取消息对应的任务组状态
@@ -1946,7 +2088,7 @@ const connectWs = (id: string, targetJobId?: number) => {
         const nodes = (lfInstance as any).getGraphRawData().nodes;
         console.log(
           `任务组 ${groupId} 中的所有节点:`,
-          nodes.map((n) => ({
+          nodes.map((n: any) => ({
             id: n.id,
             jobId: n.properties?.jobId,
             randomId: n.properties?.randomId,
@@ -1964,7 +2106,7 @@ const connectWs = (id: string, targetJobId?: number) => {
         if (node) {
           const color = getNodeColor(_message.status);
           const _node = (lfInstance as any).getNodeModelById(node.id);
-          const style = _node.type === DynamicCustomGroup ? "stroke" : "fill";
+          const style = _node.type === DYNAMIC_CUSTOM_GROUP ? "stroke" : "fill";
           _node.setStyle(style, color);
           console.log(
             `更新任务组 ${groupId} 中节点 ${node.id} 状态为: ${_message.status}, 颜色: ${color}`
@@ -2003,19 +2145,6 @@ const connectWs = (id: string, targetJobId?: number) => {
   };
 };
 
-const getNodeColor = (status: number) => {
-  switch (status) {
-    case 0:
-      return "#CC0000";
-    case 1:
-      return "#66FF99";
-    case 2:
-      return "#FFFF33";
-    default:
-      return "#000";
-  }
-};
-
 onMounted(() => {
   console.log("[流程1] 组件挂载开始 ==================");
   console.log("[流程1] 获取任务组列表");
@@ -2038,226 +2167,7 @@ onMounted(() => {
     }
   });
 });
-
-function setLfRef(pageId, el) {
-  if (el) {
-    console.log(`[流程9] 设置任务组 ${pageId} 的DOM引用`);
-    lfRefs.value[pageId] = el;
-
-    // 只记录引用，不立即初始化
-    // 选择当前页面时会通过selectPage调用initLogicFlowInstance
-  } else if (lfRefs.value[pageId]) {
-    console.log(`[流程9] 移除任务组 ${pageId} 的DOM引用`);
-    delete lfRefs.value[pageId];
-  }
-}
-
-// =======================任务组状态管理辅助函数===========================
-const getJobState = (jobId: number) => {
-  if (!jobStates.value.has(jobId)) {
-    jobStates.value.set(jobId, {
-      fromLineNum: 0,
-      pullFailCount: 0,
-      logRun: null,
-      ws: null,
-      randomId: "",
-    });
-  }
-  return jobStates.value.get(jobId)!;
-};
-
-const clearJobState = (jobId: number) => {
-  const state = jobStates.value.get(jobId);
-  if (state) {
-    // 清理定时器
-    if (state.logRun) {
-      window.clearInterval(state.logRun);
-      state.logRun = null;
-    }
-    // 关闭WebSocket连接
-    if (state.ws) {
-      state.ws.close();
-      state.ws = null;
-    }
-    // 移除状态
-    jobStates.value.delete(jobId);
-  }
-};
-// =======================任务组状态管理辅助函数===========================
-
-// =======================LogicFlow操作处理函数===========================
-function handleUndo() {
-  const currentPageId = usePageStoreHook().getCurrentPage();
-  const currentLf = lfInstances.value[currentPageId] || lf.value;
-
-  if (!currentLf) {
-    ElMessage.warning("请先选择一个任务组");
-    return;
-  }
-  currentLf.undo();
-}
-
-function handleRedo() {
-  const currentPageId = usePageStoreHook().getCurrentPage();
-  const currentLf = lfInstances.value[currentPageId] || lf.value;
-
-  if (!currentLf) {
-    ElMessage.warning("请先选择一个任务组");
-    return;
-  }
-
-  currentLf.redo();
-}
-
-function handleFit() {
-  const currentPageId = usePageStoreHook().getCurrentPage();
-  const currentLf = lfInstances.value[currentPageId] || lf.value;
-
-  if (!currentLf) {
-    ElMessage.warning("请先选择一个任务组");
-    return;
-  }
-
-  const { transformModel } = currentLf.graphModel;
-  transformModel.resetZoom();
-}
-
-function handleZoomIn() {
-  const currentPageId = usePageStoreHook().getCurrentPage();
-  const currentLf = lfInstances.value[currentPageId] || lf.value;
-
-  if (!currentLf) {
-    ElMessage.warning("请先选择一个任务组");
-    return;
-  }
-
-  // 添加调试信息
-  console.log("LogicFlow实例结构:", currentLf);
-  console.log("LogicFlow实例的view属性:", currentLf.view);
-  console.log("LogicFlow实例的所有属性:", Object.keys(currentLf));
-
-  const { transformModel } = currentLf.graphModel;
-  transformModel.zoom(true);
-}
-
-function handleZoomOut() {
-  const currentPageId = usePageStoreHook().getCurrentPage();
-  const currentLf = lfInstances.value[currentPageId] || lf.value;
-
-  if (!currentLf) {
-    ElMessage.warning("请先选择一个任务组");
-    return;
-  }
-  const { transformModel } = currentLf.graphModel;
-  transformModel.zoom(false);
-}
-
-function clearCanvas() {
-  console.log("清除画布");
-  const currentPageId = usePageStoreHook().getCurrentPage();
-  const currentLf = lfInstances.value[currentPageId] || lf.value;
-
-  if (!currentLf) {
-    ElMessage.warning("请先选择一个任务组");
-    return;
-  }
-
-  try {
-    // 获取当前画布的所有数据
-    const graphData = currentLf.getGraphRawData();
-    if (!graphData) {
-      console.log("画布已经是空的");
-      return;
-    }
-
-    const nodes = graphData.nodes || [];
-    const edges = graphData.edges || [];
-    const graphModel = currentLf.graphModel;
-
-    console.log(`准备清除 ${nodes.length} 个节点和 ${edges.length} 条边`);
-
-    // 清除所有边
-    edges.forEach((edge) => {
-      const edgeModel = graphModel.getEdgeModelById(edge.id);
-      if (edgeModel) {
-        graphModel.deleteEdgeById(edge.id);
-      }
-    });
-
-    // 清除所有节点
-    nodes.forEach((node) => {
-      const nodeModel = graphModel.getNodeModelById(node.id);
-      if (nodeModel) {
-        graphModel.deleteNode(node.id);
-      }
-    });
-
-    console.log("画布清除完成");
-    ElMessage.success("画布已清空");
-  } catch (err) {
-    console.error("清除画布时出错:", err);
-    ElMessage.error("清除画布失败");
-  }
-}
-
-function selectNodes() {
-  const currentPageId = usePageStoreHook().getCurrentPage();
-  const currentLf = lfInstances.value[currentPageId] || lf.value;
-
-  if (!currentLf) {
-    ElMessage.warning("请先选择一个任务组");
-    return;
-  }
-  currentLf.extension.selectionSelect.openSelectionSelect();
-  currentLf.once("selection:selected", () => {
-    currentLf.extension.selectionSelect.closeSelectionSelect();
-  });
-}
-
-function selectElements() {
-  const currentPageId = usePageStoreHook().getCurrentPage();
-  const currentLf = lfInstances.value[currentPageId] || lf.value;
-  const elements = currentLf.graphModel.getSelectElements(true);
-  console.log(">>>>>>选择的元素", elements);
-}
-// =======================LogicFlow操作处理函数============================
-function avg(array: any) {
-  let len = array.length;
-  let sum = 0;
-  for (let i = 0; i < len; i++) {
-    sum += array[i];
-  }
-  return sum / len;
-}
-
-// 节点自动布局方法
-function layoutNodes(direction: "horizontal" | "vertical") {
-  const currentPageId = usePageStoreHook().getCurrentPage();
-  const currentLf = lfInstances.value[currentPageId] || lf.value;
-  if (!currentLf) {
-    ElMessage.warning("请先选择一个任务组");
-    return;
-  }
-  const elements = currentLf.graphModel.getSelectElements(true);
-  const nodes = elements.nodes;
-  if (!nodes || nodes.length === 0) return;
-
-  if (direction === "horizontal") {
-    const arrY = nodes.map((n: any) => n.y);
-    const avgY = avg(arrY);
-    nodes.forEach((node: any) => {
-      const _node = currentLf.getNodeModelById(node.id);
-      _node.moveTo(_node.x, avgY);
-    });
-  } else {
-    const arrX = nodes.map((n: any) => n.x);
-    const avgX = avg(arrX);
-    nodes.forEach((node: any) => {
-      const _node = currentLf.getNodeModelById(node.id);
-      _node.moveTo(avgX, _node.y);
-    });
-  }
-}
+// ================== 14. 组件生命周期 ==================
 </script>
 
 <template>
@@ -2826,26 +2736,6 @@ function layoutNodes(direction: "horizontal" | "vertical") {
   }
 }
 
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
 /* 响应式设计 */
 @media (max-width: 768px) {
   .main-container {
@@ -3285,120 +3175,5 @@ function layoutNodes(direction: "horizontal" | "vertical") {
     stroke-dasharray: 90, 150;
     stroke-dashoffset: -124;
   }
-}
-
-.log-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 16px;
-  background: #f7f8fa; /* 主页面常用浅灰 */
-  color: #222;
-  border-bottom: 1px solid #e5e6eb;
-  border-radius: 0;
-  box-shadow: none;
-}
-
-.log-stats {
-  display: flex;
-  gap: 20px;
-}
-
-.stat-item {
-  font-size: 13px;
-  color: #666;
-}
-.stat-value {
-  font-weight: bold;
-  color: #222;
-  background: none;
-  padding: 0 4px;
-}
-.error-count {
-  color: #f53f3f;
-}
-.warning-count {
-  color: #faad14;
-}
-
-.log-controls {
-  display: flex;
-  gap: 8px;
-}
-.control-btn {
-  background: none;
-  border: 1px solid #e5e6eb;
-  border-radius: 4px;
-  padding: 4px 8px;
-  color: #666;
-  transition: border-color 0.2s, background 0.2s;
-}
-.control-btn:hover {
-  border-color: #409eff;
-  background: #f0f7ff;
-  color: #409eff;
-}
-.control-btn.active {
-  border-color: #409eff;
-  background: #e6f7ff;
-  color: #409eff;
-}
-
-.log-content {
-  background: #fff;
-  padding: 0;
-  border-radius: 0 0 4px 4px;
-}
-
-.log-item {
-  padding: 6px 16px;
-  font-size: 13px;
-  border-bottom: 1px solid #f0f0f0;
-  background: none;
-}
-.log-item:last-child {
-  border-bottom: none;
-}
-
-.log-level-badge {
-  min-width: 40px;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-size: 11px;
-  font-weight: 500;
-  margin-right: 10px;
-}
-.log-level-badge.error {
-  background: #fff1f0;
-  color: #f53f3f;
-  border: 1px solid #ffd6d1;
-}
-.log-level-badge.warning {
-  background: #fffbe6;
-  color: #faad14;
-  border: 1px solid #ffe58f;
-}
-.log-level-badge.info {
-  background: #e6f7ff;
-  color: #409eff;
-  border: 1px solid #91d5ff;
-}
-.log-level-badge.debug {
-  background: #f4f4f5;
-  color: #909399;
-  border: 1px solid #e4e7ed;
-}
-
-.empty-state {
-  color: #bfbfbf;
-  font-size: 14px;
-  padding: 40px 0;
-  background: none;
-  border: none;
-}
-
-.dashboard-container {
-  /* ...原有样式... */
-  overflow-x: hidden !important;
 }
 </style>
