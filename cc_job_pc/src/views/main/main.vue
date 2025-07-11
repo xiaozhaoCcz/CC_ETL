@@ -1,0 +1,3478 @@
+<script setup lang="ts">
+import LogicFlow from "@logicflow/core";
+import {
+  Menu,
+  DndPanel,
+  DynamicGroup,
+  SelectionSelect,
+  MiniMap,
+} from "@logicflow/extension";
+import "@logicflow/core/lib/style/index.css";
+import "@logicflow/extension/lib/style/index.css";
+import { Close, FolderOpened, Document } from "@element-plus/icons-vue";
+import { nextTick, onMounted, reactive, ref, watch } from "vue";
+import { useJobInfoStoreHook, useNavbarStoreHook, usePageStoreHook } from "@/store";
+import CustomJava from "./node/CustomJava";
+import CustomPython from "./node/CustomPython";
+import CustomShell from "./node/CustomShell";
+import CustomPhp from "./node/CustomPhp";
+import CustomNodejs from "./node/CustomNodejs";
+import CustomApi from "./node/CustomAPI";
+import CustomBean from "./node/CustomBean";
+import CustomSql from "./node/CustomSql";
+import CustomPowerShell from "./node/CustomPowerShell";
+import CustomRect from "./node/CustomRect";
+import CustomGroup from "./node/CustomGroup.ts";
+import { ElMessage } from "element-plus";
+import JobInfoAPI from "@/api/job-info.ts";
+import Snowflake from "@/utils/snowflake.ts";
+import JobLogAPI from "@/api/job-log.ts";
+import Log from "@/components/Log/Log.vue";
+import { onBeforeUnmount } from "vue";
+import EditJobNode from "@/views/side/operation/edit-job-node.vue";
+
+interface LogTab {
+  id: string;
+  jobId: number | null;
+  randomId: string;
+  label: string;
+  isRunning: boolean;
+}
+
+const pageTaps = ref([]);
+const jobId = ref(null);
+const logger = ref(null);
+const logTabs = ref<LogTab[]>([]);
+const activeLogTab = ref<string | null>(null); // 当前激活的日志标签页
+// 存储每个任务组对应的LogicFlow实例
+const lfInstances = ref({});
+// 存储DOM引用
+const lfRefs = ref({});
+// 添加拖拽相关的状态
+const isDragging = ref(false);
+const platformHeight = ref(60); // 60vh
+
+// 添加容器引用
+const mainContainerRef = ref<HTMLElement>();
+
+// 监听定位节点信息
+// 高亮相关变量
+let highlightedElement = null;
+let highlightedType = null;
+let originalStyle = null;
+
+//============================watch管理====================
+watch(
+  () => usePageStoreHook().pages,
+  (pages: any) => {
+    pageTaps.value = pages;
+  },
+  {
+    immediate: true,
+    deep: true,
+  }
+);
+
+watch(
+  () => usePageStoreHook().getCurrentPage(),
+  (pageId: any) => {
+    if (pageId !== 0) {
+      jobId.value = pageId;
+      // 确保实例存在后再操作
+      if (lfInstances.value[pageId]) {
+        selectJobCompNode(pageId);
+        // 切换任务组时更新边的样式以反映该任务组的运行状态
+        setTimeout(() => {
+          updateEdgeStyle();
+        }, 100);
+      } else {
+        // 如果实例不存在，需要先创建实例
+        selectPage(pageId);
+      }
+    } else {
+      // 当pageId为0时，不执行clearData，显示空白画布
+      console.log("当前没有选中任何任务组");
+    }
+  },
+  {
+    immediate: true,
+    deep: true,
+  }
+);
+
+watch(
+  () => useJobInfoStoreHook().getJobInfo(),
+  async (jobInfo: any) => {
+    if (jobInfo.jobId) {
+      //修改
+    } else {
+      //新增
+      await addJobNode(jobInfo);
+      await selectPage(jobInfo.parentId);
+    }
+  }
+);
+
+watch(
+  () => useNavbarStoreHook().getAction(),
+  (actionObj: any) => {
+    if (actionObj.actionName == "save") {
+      saveOrUpdateJob();
+    } else if (actionObj.actionName == "start-current-job") {
+      // 启动当前任务组
+      const currentPageId = actionObj.pageId || usePageStoreHook().getCurrentPage();
+      if (currentPageId) {
+        triggerOne();
+      }
+    } else if (actionObj.actionName == "stop-current-job") {
+      // 停止当前任务组
+      const currentPageId = actionObj.pageId || usePageStoreHook().getCurrentPage();
+      if (currentPageId) {
+        stopTrigger();
+      }
+    } else if (actionObj.actionName == "undo") {
+      // 撤销操作
+      handleUndo();
+    } else if (actionObj.actionName == "redo") {
+      // 重做操作
+      handleRedo();
+    } else if (actionObj.actionName == "fit") {
+      // 适应画布
+      handleFit();
+    } else if (actionObj.actionName == "zoom-in") {
+      // 放大
+      handleZoomIn();
+    } else if (actionObj.actionName == "zoom-out") {
+      // 缩小
+      handleZoomOut();
+    } else if (actionObj.actionName == "clear") {
+      console.log("清除");
+      //清除画布
+      clearCanvas();
+    } else if (actionObj.actionName == "layout-horizontal") {
+      layoutNodes("horizontal");
+    } else if (actionObj.actionName == "layout-vertical") {
+      layoutNodes("vertical");
+    } else if (actionObj.actionName == "select") {
+      selectNodes();
+    }
+  },
+  {
+    immediate: true,
+    deep: true,
+  }
+);
+
+// 监听定位节点信息
+watch(
+  () => usePageStoreHook().getLoactionObject(),
+  (locationObj: any) => {
+    if (locationObj && Object.keys(locationObj).length > 0) {
+      console.log("检测到定位节点信息:", locationObj);
+
+      // 获取当前LogicFlow实例
+      const currentPageId = usePageStoreHook().getCurrentPage();
+      const currentLf = lfInstances.value[currentPageId];
+
+      if (currentLf && locationObj.id) {
+        // 定位到指定节点
+        try {
+          // 先清除之前的高亮
+          clearHighlight();
+
+          if (locationObj.type == 4) {
+            const nodeElement = currentLf.getNodeModelById(locationObj.id);
+            if (nodeElement) {
+              console.log(`成功定位到节点: ${nodeElement.id}`);
+              // 记录原始样式
+              originalStyle = {
+                ...nodeElement.getData().properties?.style,
+                fill: nodeElement.style?.fill,
+              };
+              // 修改节点的边框颜色
+              nodeElement.setStyle("fill", "#0B57D0");
+              highlightedElement = nodeElement;
+              highlightedType = "node";
+              document.addEventListener("mousedown", clearHighlight, true);
+            } else {
+              console.warn(`未找到节点`);
+            }
+          } else {
+            const edgeElement = currentLf.getEdgeModelById(locationObj.id);
+            console.log(edgeElement);
+            if (edgeElement) {
+              console.log(`成功定位到节点: ${edgeElement.id}`);
+              // 记录原始样式
+              originalStyle = {
+                ...edgeElement.getData().properties?.style,
+                stroke: edgeElement.style?.stroke,
+              };
+              // 设置边的颜色
+              edgeElement.setStyle("stroke", "#0B57D0");
+              highlightedElement = edgeElement;
+              highlightedType = "edge";
+              document.addEventListener("mousedown", clearHighlight, true);
+            } else {
+              console.warn(`未找到节点`);
+            }
+          }
+        } catch (error) {
+          console.error("定位节点时出错:", error);
+        }
+      }
+    }
+  },
+  {
+    immediate: true,
+    deep: true,
+  }
+);
+//============================watch管理====================
+
+//==============================拖拽函数管理==============================
+// 拖拽处理函数
+const handleMouseDown = (e: MouseEvent) => {
+  isDragging.value = true;
+  document.addEventListener("mousemove", handleMouseMove);
+  document.addEventListener("mouseup", handleMouseUp);
+  e.preventDefault();
+};
+
+const handleMouseMove = (e: MouseEvent) => {
+  if (!isDragging.value || !mainContainerRef.value) return;
+
+  // 获取 main-container 的边界信息
+  const containerRect = mainContainerRef.value.getBoundingClientRect();
+  const containerHeight = containerRect.height;
+
+  // 计算鼠标相对于容器顶部的位置
+  const relativeY = e.clientY - containerRect.top;
+
+  const newHeight = (relativeY / containerHeight) * 100;
+
+  // 限制最小和最大高度
+  if (newHeight >= 30 && newHeight <= 80) {
+    platformHeight.value = newHeight;
+  }
+};
+
+const handleMouseUp = () => {
+  isDragging.value = false;
+  document.removeEventListener("mousemove", handleMouseMove);
+  document.removeEventListener("mouseup", handleMouseUp);
+};
+
+// 组件卸载时清理事件监听器
+onBeforeUnmount(() => {
+  document.removeEventListener("mousemove", handleMouseMove);
+  document.removeEventListener("mouseup", handleMouseUp);
+});
+//==============================拖拽函数管理==============================
+
+//=========================页面管理=========================
+async function selectPage(id) {
+  console.log(`[流程3] 开始选择任务组 ${id} ==================`);
+
+  try {
+    // 先更新状态
+    usePageStoreHook().setCurrentPage(id);
+    jobId.value = id;
+
+    // 等待DOM更新
+    await nextTick();
+
+    // 确保所有容器正确设置可见性
+    Object.keys(lfRefs.value).forEach((pageId) => {
+      if (lfRefs.value[pageId]) {
+        // 显式设置样式
+        lfRefs.value[pageId].style.display = pageId == id ? "block" : "none";
+      }
+    });
+
+    // 再等待DOM更新
+    await nextTick();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // 确保容器已准备好
+    if (!lfRefs.value[id]) {
+      console.log(`[流程3] 任务组 ${id} 的DOM引用不存在，等待DOM渲染`);
+      setTimeout(() => selectPage(id), 300);
+      return;
+    }
+
+    // 检查是否已经有该任务组的实例
+    if (!lfInstances.value[id]) {
+      console.log(`[流程3] 为任务组 ${id} 创建新的LogicFlow实例`);
+      // 初始化LogicFlow实例
+      lfInstances.value[id] = initLogicFlowInstance(id);
+      lf.value = lfInstances.value[id];
+
+      if (lf.value) {
+        // 加载数据
+        console.log(`[流程3] 加载任务组 ${id} 的数据`);
+        await selectJobCompNode(id);
+
+        // 确保实例完全就绪，再移动MiniMap
+        setTimeout(() => {
+          lfInstances.value[id].resize();
+          setTimeout(moveMiniMapToSidebar, 100);
+        }, 100);
+      }
+    } else {
+      console.log(`[流程3] 使用任务组 ${id} 已有的LogicFlow实例`);
+      lf.value = lfInstances.value[id];
+
+      // 强制激活画布并刷新
+      lfInstances.value[id].resize();
+
+      // 延迟移动MiniMap
+      setTimeout(moveMiniMapToSidebar, 600);
+      // moveMiniMapToSidebar();
+    }
+
+    // 切换任务组时，确保边动画状态正确
+    setTimeout(() => {
+      console.log(`切换到任务组 ${id}，更新边动画状态`);
+      updateEdgeStyleForTaskGroup(id);
+    }, 200);
+
+    // 切换任务组时保留所有任务组的日志获取，不再清除任何定时器
+    // 每个任务组都有独立的日志获取状态，切换时不应该互相影响
+    console.log(`切换到任务组 ${id}，保持其他任务组的日志获取继续运行`);
+  } catch (err) {
+    console.error(`处理任务组 ${id} 切换时出错:`, err);
+  }
+}
+
+function closePage(id: number) {
+  // 清理 LogicFlow 实例
+  if (lfInstances.value[id]) {
+    console.log(`[清理] 清理任务组 ${id} 的LogicFlow实例`);
+    try {
+      // 销毁 LogicFlow 实例
+      lfInstances.value[id].destroy();
+    } catch (e) {
+      console.warn(`销毁LogicFlow实例时出错:`, e);
+    }
+    // 删除实例引用
+    delete lfInstances.value[id];
+  }
+
+  // 清理 DOM 引用（虽然 setLfRef 也会清理，但这里主动清理更安全）
+  if (lfRefs.value[id]) {
+    console.log(`[清理] 清理任务组 ${id} 的DOM引用`);
+    delete lfRefs.value[id];
+  }
+
+  // 清理相关的日志标签页
+  logTabs.value = logTabs.value.filter((tab) => tab.jobId !== id);
+  if (
+    activeLogTab.value &&
+    logTabs.value.find((tab) => tab.id === activeLogTab.value)?.jobId === id
+  ) {
+    activeLogTab.value = null;
+  }
+
+  // 清理任务组的状态（WebSocket连接、定时器等）
+  clearJobState(id);
+
+  // 移除页面状态
+  usePageStoreHook().removePage(id);
+  if (id === usePageStoreHook().getCurrentPage()) {
+    usePageStoreHook().getLastPage();
+  }
+}
+//=========================页面管理=========================
+
+//===========================log===============================
+/**
+ * 重置日志状态
+ * @param specificJobId 可选，指定要重置的任务组ID，不提供则重置当前激活的日志标签页
+ */
+function logReset(specificJobId?: number | null) {
+  console.log(
+    "重置日志状态",
+    specificJobId ? `指定任务组: ${specificJobId}` : "当前激活日志"
+  );
+
+  if (specificJobId) {
+    // 重置指定任务组的状态
+    const state = getJobState(specificJobId);
+    state.fromLineNum = 0;
+    state.pullFailCount = 0;
+
+    // 如果指定了任务组ID，只重置该任务组对应的日志组件
+    const tabId = `${specificJobId}`;
+    const loggerRef = getLoggerRef(tabId);
+    if (loggerRef) {
+      console.log(`重置指定的日志标签页: ${tabId}`);
+      loggerRef.reset();
+    } else {
+      console.warn(`未找到任务组 ${specificJobId} 的日志组件`);
+    }
+  } else {
+    // 重置全局计数器 - 这些是全局状态，只在需要时重置
+    fromLineNum.value = 0;
+    pullFailCount.value = 0;
+
+    // 清除定时器 - 定时器是全局的，需要在任务停止或切换时清除
+    if (logRun != null) {
+      console.log("清除日志获取定时器");
+      window.clearInterval(logRun);
+      logRun = null;
+    }
+
+    // 否则重置当前激活的日志标签页
+    if (activeLogTab.value) {
+      const loggerRef = getLoggerRef(activeLogTab.value);
+      if (loggerRef) {
+        console.log(`重置激活的日志标签页: ${activeLogTab.value}`);
+        loggerRef.reset();
+      } else {
+        console.warn(`未找到标签页 ${activeLogTab.value} 的日志组件`);
+      }
+    }
+  }
+}
+
+function convertContent(str: string) {
+  return str
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"');
+}
+
+function run(id: number) {
+  // 保存当前执行的日志ID，这是后端返回的，与任务组ID不同
+  const currentExecuteLogId = id;
+  const currentJobId = jobId.value;
+  console.log(`开始获取日志，执行ID: ${currentExecuteLogId}, 任务组ID: ${currentJobId}`);
+
+  if (!currentJobId) {
+    console.error("无法启动日志获取：任务组ID为空");
+    return;
+  }
+
+  // 获取或创建该任务组的状态
+  const state = getJobState(currentJobId);
+
+  // 重置该任务组的日志计数
+  state.fromLineNum = 0;
+  state.pullFailCount = 0;
+
+  // 清除该任务组之前的定时器（如果存在）
+  if (state.logRun) {
+    window.clearInterval(state.logRun);
+  }
+
+  // 为该任务组创建独立的日志获取定时器
+  state.logRun = setInterval(() => {
+    getExecuteTaskLog(currentExecuteLogId, currentJobId);
+  }, 2000);
+
+  console.log(`任务组 ${currentJobId} 的日志获取定时器已启动`);
+}
+
+// 获取指定标签页的日志组件引用
+const loggerRefs = ref({});
+const getLoggerRef = (tabId) => {
+  return loggerRefs.value[tabId];
+};
+
+// 切换日志标签页
+const switchLogTab = (tabId: string) => {
+  activeLogTab.value = tabId;
+};
+
+// 关闭日志标签页
+const closeLogTab = (tabId) => {
+  const index = logTabs.value.findIndex((tab) => tab.id === tabId);
+  if (index > -1) {
+    logTabs.value.splice(index, 1);
+
+    // 如果关闭的是当前激活的标签页，切换到其他标签页
+    if (activeLogTab.value === tabId) {
+      if (logTabs.value.length > 0) {
+        activeLogTab.value = logTabs.value[logTabs.value.length - 1].id;
+      } else {
+        activeLogTab.value = null;
+      }
+    }
+
+    // 清理对应的日志组件引用
+    delete loggerRefs.value[tabId];
+  }
+};
+
+/**
+ * 获取任务日志
+ * @param id
+ */
+function getExecuteTaskLog(id: number, targetJobId?: number) {
+  // 如果提供了目标任务组ID，使用该任务组的状态；否则使用全局状态（向后兼容）
+  const currentJobId = targetJobId || jobId.value;
+  let currentFromLineNum: number;
+  let currentPullFailCount: number;
+
+  if (targetJobId) {
+    const state = getJobState(targetJobId);
+    currentFromLineNum = state.fromLineNum;
+    currentPullFailCount = state.pullFailCount;
+    state.pullFailCount++;
+  } else {
+    currentFromLineNum = fromLineNum.value;
+    currentPullFailCount = pullFailCount.value++;
+  }
+
+  if (currentPullFailCount > 20) {
+    logRunStop("日志加载完成.....", targetJobId);
+    return;
+  }
+
+  JobLogAPI.logDetailCat(id, currentFromLineNum).then((data: any) => {
+    if (data.code == 200) {
+      if (!data.content) {
+        console.log("pullLog fail");
+        return;
+      }
+      if (currentFromLineNum != data.content.fromLineNum) {
+        console.log("pullLog fromLineNum not match");
+        return;
+      }
+      if (currentFromLineNum > data.content.toLineNum) {
+        console.log("pullLog already line-end");
+
+        // valid end
+        if (data.content.end) {
+          logRunStop("[Rolling Log Finish]", targetJobId);
+          return;
+        }
+        return;
+      }
+
+      // append content
+      const newFromLineNum = data.content.toLineNum + 1;
+
+      // 更新对应任务组的状态
+      if (targetJobId) {
+        const state = getJobState(targetJobId);
+        state.fromLineNum = newFromLineNum;
+      } else {
+        fromLineNum.value = newFromLineNum;
+      }
+
+      //execLog.value += convertContent(data.content.logContent);
+      // 使用正确的任务ID作为标签页的唯一标识
+      const currentTabId = `${currentJobId}`;
+      // 获取对应标签页的日志组件
+      const loggerRef = getLoggerRef(currentTabId);
+
+      if (loggerRef) {
+        console.log(
+          `添加日志到任务组 ${currentJobId} 的日志组件, 当前行号范围: ${data.content.fromLineNum}-${data.content.toLineNum}`
+        );
+        loggerRef.addLogsFromText(convertContent(data.content.logContent));
+      } else {
+        console.error(`未找到任务组 ${currentJobId} 的日志组件，无法添加日志`);
+      }
+
+      // 重置失败计数
+      if (targetJobId) {
+        const state = getJobState(targetJobId);
+        state.pullFailCount = 0;
+      } else {
+        pullFailCount.value = 0;
+      }
+    } else {
+      ElMessage.error("pullLog fail:" + data.msg);
+    }
+  });
+}
+
+/**
+ * 任务日志停止运行
+ * @param content
+ * @param targetJobId 可选的目标任务组ID
+ */
+function logRunStop(content: string, targetJobId?: number) {
+  const currentJobId = targetJobId || jobId.value;
+
+  if (targetJobId) {
+    // 停止特定任务组的日志获取
+    const state = jobStates.value.get(targetJobId);
+    if (state && state.logRun) {
+      window.clearInterval(state.logRun);
+      state.logRun = null;
+      console.log(`停止任务组 ${targetJobId} 的日志获取定时器`);
+    }
+
+    // 日志停止意味着任务完成，立即更新任务组状态
+    console.log(`任务组 ${targetJobId} 日志停止，立即更新运行状态为停止`);
+    usePageStoreHook().updatePageRunStatus(targetJobId, false);
+    updateEdgeStyleForTaskGroup(targetJobId);
+
+    // 同时更新对应的日志标签页状态
+    const tabId = `${targetJobId}`;
+    const tab = logTabs.value.find((t) => t.id === tabId);
+    if (tab) {
+      tab.isRunning = false;
+      console.log(`更新任务组 ${targetJobId} 的日志标签页状态为停止`);
+    }
+  } else {
+    // 停止全局日志获取（向后兼容）
+    if (logRun != null) {
+      window.clearInterval(logRun);
+      logRun = null;
+
+      // 更新当前任务组状态
+      if (currentJobId) {
+        console.log(`当前任务组 ${currentJobId} 日志停止，立即更新运行状态为停止`);
+        usePageStoreHook().updatePageRunStatus(currentJobId, false);
+        updateEdgeStyleForTaskGroup(currentJobId);
+
+        // 同时更新对应的日志标签页状态
+        const tabId = `${currentJobId}`;
+        const tab = logTabs.value.find((t) => t.id === tabId);
+        if (tab) {
+          tab.isRunning = false;
+          console.log(`更新任务组 ${currentJobId} 的日志标签页状态为停止`);
+        }
+      }
+    }
+  }
+
+  //execLog.value += convertContent(content);
+  // 使用正确的任务ID作为标签页的唯一标识
+  const currentTabId = `${currentJobId}`;
+  // 获取对应标签页的日志组件
+  const loggerRef = getLoggerRef(currentTabId);
+
+  if (loggerRef) {
+    console.log(`任务组 ${currentJobId} 日志结束: ${content}`);
+    loggerRef.addLogsFromText(convertContent(content));
+  } else {
+    console.error(`日志结束但未找到任务组 ${currentJobId} 的日志组件，无法添加结束日志`);
+  }
+}
+//===========================log===============================
+
+// =========================logicflow=========================
+// 监听全局点击事件，用于移除高亮
+function clearHighlight() {
+  if (highlightedElement) {
+    // 恢复原始样式
+    if (highlightedType === "node") {
+      highlightedElement.setStyle("fill", originalStyle?.fill || "#fff");
+    } else if (highlightedType === "edge") {
+      highlightedElement.setStyle("stroke", originalStyle?.stroke || "#333");
+    }
+    highlightedElement = null;
+    highlightedType = null;
+    originalStyle = null;
+    document.removeEventListener("mousedown", clearHighlight, true);
+  }
+}
+
+function initLogicFlowInstance(pageId) {
+  console.log(`[流程4] 开始初始化LogicFlow实例 ${pageId} ==================`);
+
+  const container = lfRefs.value[pageId];
+  if (!container) {
+    console.error(`[流程4] 错误：任务组 ${pageId} 的容器元素不存在`);
+    return null;
+  }
+
+  // 如果已存在实例，检查其容器是否仍然有效
+  if (lfInstances.value[pageId]) {
+    const existingInstance = lfInstances.value[pageId];
+    // 检查实例的容器是否还存在且可用
+    if (existingInstance.container && existingInstance.container.parentNode) {
+      console.log(`[流程4] 实例已存在且容器有效，直接返回`);
+      return existingInstance;
+    } else {
+      console.log(`[流程4] 实例存在但容器已失效，重新创建实例`);
+      // 清理无效实例
+      try {
+        existingInstance.destroy();
+      } catch (e) {
+        console.warn(`清理无效实例时出错:`, e);
+      }
+      delete lfInstances.value[pageId];
+    }
+  }
+
+  // 确保元素可见
+  const originalDisplay = container.style.display;
+  container.style.display = "block";
+
+  // 创建LogicFlow实例
+  console.log(`[流程4] 创建LogicFlow实例`);
+  const newLf = new LogicFlow({
+    container: container,
+    background: {
+      background: "#ECECEC", // 设置画布背景色
+    },
+    grid: {
+      visible: false,
+    },
+    multipleSelectKey: "alt",
+    autoExpand: false,
+    allowResize: true,
+    allowRotate: true,
+    keyboard: {
+      enabled: true,
+    },
+    plugins: [DynamicGroup, DndPanel, SelectionSelect, Menu, MiniMap],
+    pluginsOptions: {
+      miniMap: {
+        width: 120,
+        height: 120,
+        showEdge: true,
+        isShowHeader: false,
+        isShowCloseIcon: false,
+      },
+    },
+  });
+
+  // 初始化逻辑
+  console.log(`[流程4] 配置LogicFlow实例`);
+
+  newLf.extension.menu.setMenuConfig(menuConfig);
+  newLf.register(CustomJava);
+  newLf.register(CustomPython);
+  newLf.register(CustomShell);
+  newLf.register(CustomPhp);
+  newLf.register(CustomNodejs);
+  newLf.register(CustomApi);
+  newLf.register(CustomBean);
+  newLf.register(CustomSql);
+  newLf.register(CustomPowerShell);
+  newLf.register(CustomRect);
+  newLf.register(CustomGroup);
+  newLf.setDefaultEdgeType("bezier");
+
+  // 渲染空画布
+  console.log(`[流程4] 渲染空画布`);
+  newLf.render({
+    nodes: [],
+    edges: [],
+  });
+
+  // 绑定事件
+  bindEvents(newLf);
+
+  // 恢复元素原始显示状态
+  container.style.display = originalDisplay;
+
+  // 显示MiniMap (必须在render之后)
+  console.log(`[流程4] 显示MiniMap`);
+  newLf.extension.miniMap.show();
+
+  // 保存实例并返回
+  lfInstances.value[pageId] = newLf;
+  console.log(`[流程4] LogicFlow实例创建完成 ==================`);
+
+  const { eventCenter } = newLf.graphModel;
+
+  eventCenter.on("selection:selected", () => {
+    selectElements();
+  });
+
+  // 延迟移动MiniMap到侧边栏
+  setTimeout(() => {
+    if (pageId === usePageStoreHook().getCurrentPage()) {
+      moveMiniMapToSidebar();
+    }
+  }, 10);
+  return newLf;
+}
+
+// 为每个LogicFlow实例绑定相同的事件处理
+function bindEvents(lfInstance) {
+  // 节点鼠标事件
+  lfInstance.on("node:mouseenter", ({ data }) => {
+    const node = lfInstance.getNodeModelById(data.id);
+    node.buttonGroupOpacity = 1;
+  });
+
+  lfInstance.on("node:mouseleave", ({ data }) => {
+    const node = lfInstance.getNodeModelById(data.id);
+    node.buttonGroupOpacity = 0;
+  });
+
+  // 复制原有所有事件绑定
+  lfInstance.on("custom:node-toggle-status", ({ nodeId }) => {
+    const node = lfInstance.getNodeModelById(nodeId);
+    node.isPause = !node.isPause;
+
+    if (node.properties.jobId == null) {
+      ElMessage.warning("请选择任务～");
+      return;
+    }
+
+    JobInfoAPI.pauseJob(node.properties.jobId, node.isPause ? 1 : 0);
+
+    // 更新节点样式
+    const styleKey = node.type === DynamicCustomGroup ? "stroke" : "fill";
+    node.setStyle(styleKey, node.isPause ? "#409EEE" : "#FFFFFF");
+  });
+
+  lfInstance.on("custom:node-copy", async ({ nodeId }) => {
+    const node = lfInstance.getNodeModelById(nodeId);
+    if (DynamicCustomGroup == node.type) {
+      ElMessage.warning("暂不支持任务组复制");
+      return;
+    }
+
+    // 获取原节点的数据
+    const originalNodeData = node.getData();
+    console.log(`🔄 复制节点 - 原始节点数据:`, originalNodeData);
+
+    const originalJobId = originalNodeData.properties?.jobId;
+    if (!originalJobId) {
+      ElMessage.warning("原节点没有关联的任务，无法复制");
+      return;
+    }
+
+    try {
+      // 获取原任务的完整数据
+      const originalJobData = await JobInfoAPI.getFormData(originalJobId);
+      console.log(`📋 获取原任务数据:`, originalJobData);
+
+      // 创建新任务的数据，移除ID相关字段，添加_copy后缀
+      const newJobData = {
+        ...originalJobData,
+        id: undefined, // 移除id，让后端自动生成新的
+        jobDesc: (originalJobData.jobDesc || "") + "_copy",
+        addTime: undefined,
+        updateTime: undefined,
+        triggerLastTime: undefined,
+        triggerNextTime: undefined,
+        nodePositionX: originalJobData.nodePositionX + 50,
+        nodePositionY: originalJobData.nodePositionY + 50,
+      };
+
+      // 调用后端API创建新任务
+      console.log(`📤 准备发送创建任务请求，数据:`, newJobData);
+      const jobNode = await JobInfoAPI.saveJobNode(newJobData);
+      console.log(`📥 后端响应原始数据:`, jobNode);
+      console.log(`📥 响应数据类型:`, typeof jobNode);
+      console.log(`📥 响应数据是否为null:`, jobNode === null);
+      console.log(`📥 响应数据是否为undefined:`, jobNode === undefined);
+
+      // 检查后端返回的数据是否有效
+      if (!jobNode) {
+        console.error(`❌ 后端返回的数据为空`);
+        ElMessage.error(
+          "复制节点失败: 后端创建任务失败，未返回新任务数据。请检查后端API实现。"
+        );
+        return;
+      }
+
+      console.log(`✅ 创建新任务成功，新任务ID: ${jobNode.jobId}`);
+
+      // 创建新的独立属性，使用新的jobId
+      const newProperties = {
+        ...JSON.parse(JSON.stringify(originalNodeData.properties || {})), // 深拷贝原属性
+        jobId: jobNode.jobId, // 使用新任务的ID
+        glueType: newJobData.glueType, // 确保glueType正确
+      };
+
+      // 创建新节点，位置稍微偏移
+      const newNode = {
+        type: originalNodeData.type,
+        x: jobNode.nodePositionX,
+        y: jobNode.nodePositionY,
+        text: newJobData.jobDesc,
+        properties: newProperties,
+      };
+
+      console.log(`✅ 创建复制节点 - 新节点数据:`, newNode);
+      console.log(
+        `🆔 新节点独立jobId: ${newProperties.jobId}, glueType: ${newProperties.glueType}`
+      );
+
+      // 添加新节点
+      lfInstance.addNode(newNode);
+
+      //刷新任务树
+      if (typeof window.refreshTreeData === "function") {
+        window.refreshTreeData();
+      }
+
+      ElMessage.success("节点复制成功，已创建独立的后端任务");
+    } catch (error) {
+      console.error(`❌ 复制节点失败:`, error);
+      ElMessage.error("复制节点失败: " + (error.message || "未知错误"));
+    }
+  });
+
+  lfInstance.on("custom:node-edit", ({ nodeId }) => {
+    const node = lfInstance.getNodeModelById(nodeId);
+    if (node.properties.jobId === null || node.properties.jobId === undefined) {
+      ElMessage.warning("请选择任务或任务组");
+      return;
+    }
+    jobNodeVisible.value = true;
+    nodeJobId.value = node.properties.jobId;
+    selectNode.value = node;
+    // 保存当前正在编辑的节点ID，用于精确更新
+    currentEditingNodeId.value = nodeId;
+  });
+
+  lfInstance.on("custom:node-task-edit", ({ nodeId }) => {
+    jobDialog.value = true;
+    jobNodeEditId.value = nodeId;
+  });
+
+  lfInstance.on("custom:node-prop", ({ nodeId }) => {
+    const node = lfInstance.getNodeModelById(nodeId);
+    let startTime = "";
+    let endTime = "";
+
+    if (runTime.value.length > 0) {
+      const n = runTime.value.find((v) => v[0] == node.id) as any;
+      startTime = n ? n[1] : "";
+      endTime = n ? n[2] : "";
+    }
+    alert(`
+      节点id：${node.id}
+      节点类型：${node.type}
+      任务状态：${node.isPause ? "暂停" : "正常"}
+      X坐标：${node.x}
+      Y坐标：${node.y}
+      开始时间：${startTime}
+      结束时间：${endTime}
+    `);
+  });
+
+  lfInstance.on("custom:node-delete", ({ nodeId }) => {
+    lfInstance.deleteNode(nodeId);
+  });
+
+  // 添加其他必要的事件...
+}
+
+LogicFlow.use(DndPanel); // 拖拽面板
+LogicFlow.use(MiniMap);
+
+const lf = ref<any>(null);
+const DynamicCustomGroup = "CustomGroup";
+const snowflake = new Snowflake(31, 31, true, new Date());
+const randomId = ref("");
+const runTime = ref([]);
+// 将全局变量改为每个任务组独立的状态管理
+const jobStates = ref<
+  Map<
+    number,
+    {
+      fromLineNum: number;
+      pullFailCount: number;
+      logRun: any;
+      ws: WebSocket | null;
+      randomId: string;
+    }
+  >
+>(new Map());
+let logRun: any = null; // 保留用于向后兼容，但主要使用jobStates
+const fromLineNum = ref(0);
+const pullFailCount = ref(0);
+const formData = reactive({
+  executorTimeout: 600000,
+});
+const jobNodeVisible = ref(false);
+const nodeJobId = ref(null);
+const currentEditingNodeId = ref(null); // 添加当前正在编辑的节点ID
+const jobDialog = ref(false);
+const jobRadio = ref(0);
+const jobInfoList = ref([]);
+const selectJobInfoList = ref([]);
+const jobSelectId = ref<any>(undefined);
+const jobNodeEditId = ref<any>(undefined);
+const selectNode = ref(null);
+const menuConfig = {
+  nodeMenu: [
+    {
+      text: "删除",
+      callback(node: { id: string }) {
+        lf.value.deleteNode(node.id);
+      },
+    },
+    {
+      text: "选择任务",
+      callback(node: { id: string }) {
+        if (DynamicCustomGroup == node.type) {
+          ElMessage.warning("暂不支持任务组选择");
+          return;
+        }
+        console.log("选择任务", node);
+        jobDialog.value = true;
+        jobNodeEditId.value = node.id;
+      },
+    },
+    {
+      text: "编辑节点",
+      callback(node: any) {
+        if (node.properties.jobId === null || node.properties.jobId === undefined) {
+          ElMessage.warning("请选择任务或任务组");
+          return;
+        }
+        if (DynamicCustomGroup == node.type) {
+          ElMessage.warning("暂不支持任务组编辑");
+          return;
+        }
+        jobNodeVisible.value = true;
+        nodeJobId.value = node.properties.jobId;
+        currentEditingNodeId.value = node.id; // 保存当前正在编辑的节点ID
+        console.log("右键菜单编辑节点:", node);
+        selectNode.value = node;
+      },
+    },
+    {
+      text: "复制",
+      async callback(node: any) {
+        if (DynamicCustomGroup == node.type) {
+          ElMessage.warning("暂不支持任务组复制");
+          return;
+        }
+
+        // 获取当前LogicFlow实例
+        const currentPageId = usePageStoreHook().getCurrentPage();
+        const currentLf = lfInstances.value[currentPageId] || lf.value;
+
+        if (!currentLf) {
+          ElMessage.error("找不到对应的LogicFlow实例");
+          return;
+        }
+
+        // 获取节点数据
+        const nodeModel = currentLf.getNodeModelById(node.id);
+        const originalNodeData = nodeModel.getData();
+        console.log(`🔄 菜单复制节点 - 原始节点数据:`, originalNodeData);
+
+        const originalJobId = originalNodeData.properties?.jobId;
+        if (!originalJobId) {
+          ElMessage.warning("原节点没有关联的任务，无法复制");
+          return;
+        }
+
+        try {
+          // 获取原任务的完整数据
+          const originalJobData = await JobInfoAPI.getFormData(originalJobId);
+          console.log(`📋 菜单获取原任务数据:`, originalJobData);
+
+          // 创建新任务的数据，移除ID相关字段，添加_copy后缀
+          const newJobData = {
+            ...originalJobData,
+            id: undefined, // 移除id，让后端自动生成新的
+            jobDesc: (originalJobData.jobDesc || "") + "_copy",
+            addTime: undefined,
+            updateTime: undefined,
+            triggerLastTime: undefined,
+            triggerNextTime: undefined,
+          };
+
+          // 调用后端API创建新任务
+          console.log(`📤 菜单准备发送创建任务请求，数据:`, newJobData);
+          const newJobID = await JobInfoAPI.add(newJobData);
+
+          // 检查后端返回的数据是否有效
+          if (!newJobID) {
+            console.error(`❌ 菜单复制节点 - 后端返回的数据为空`);
+            ElMessage.error(
+              "复制节点失败: 后端创建任务失败，未返回新任务数据。请检查后端API实现。"
+            );
+            return;
+          }
+
+          // 创建新的独立属性，使用新的jobId
+          const newProperties = {
+            ...JSON.parse(JSON.stringify(originalNodeData.properties || {})), // 深拷贝原属性
+            jobId: newJobID, // 使用新任务的ID
+            glueType: newJobData.glueType, // 确保glueType正确
+          };
+
+          // 创建新节点
+          const newNode = {
+            type: originalNodeData.type,
+            x: originalNodeData.x + 50,
+            y: originalNodeData.y + 50,
+            text: newJobData.jobDesc,
+            properties: newProperties,
+          };
+
+          console.log(`✅ 菜单创建复制节点 - 新节点数据:`, newNode);
+          console.log(
+            `🆔 新节点独立jobId: ${newProperties.jobId}, glueType: ${newProperties.glueType}`
+          );
+
+          // 添加新节点
+          currentLf.addNode(newNode);
+
+          ElMessage.success("节点复制成功，已创建独立的后端任务");
+        } catch (error) {
+          console.error(`❌ 菜单复制节点失败:`, error);
+          ElMessage.error("复制节点失败: " + (error.message || "未知错误"));
+        }
+      },
+    },
+    {
+      text: "属性",
+      callback(node: any) {
+        console.log(node);
+        let startTime = "";
+        let endTime = "";
+
+        if (runTime.value.length > 0) {
+          const n = runTime.value.find((v) => v[0] == node.id) as any;
+          startTime = n[1];
+          endTime = n[2];
+        }
+        alert(`
+          节点id：${node.id}
+          节点任务开始时间：${startTime}
+          节点任务结束时间：${endTime}
+          节点类型：${node.type}
+          节点坐标：(x: ${node.x}, y: ${node.y})`);
+      },
+    },
+  ],
+  edgeMenu: [
+    {
+      text: "删除",
+      callback(edge: { id: string }) {
+        lf.value.graphModel.deleteEdgeById(edge.id);
+      },
+    },
+  ],
+  graphMenu: [
+    {
+      text: "分享",
+      callback() {
+        alert("分享成功！");
+      },
+    },
+  ],
+  // edgeMenu: false, // 删除默认的边右键菜单
+  graphMenu: [], // 覆盖默认的边右键菜单，与false表现一样
+};
+
+const GLUE_NODE_TYPE_MAP: Record<string, string> = {
+  SQL: "custom-sql",
+  API: "custom-api",
+  BEAN: "custom-bean",
+  GLUE_GROOVY: "custom-java",
+  GLUE_SHELL: "custom-shell",
+  GLUE_PYTHON: "custom-python",
+  GLUE_PHP: "custom-php",
+  GLUE_NODEJS: "custom-nodejs",
+  GLUE_POWERSHELL: "custom-powershell",
+};
+
+function getJobInfoList() {
+  JobInfoAPI.getList().then((data: any) => {
+    jobInfoList.value = data;
+    selectJobInfoList.value = data.filter((e: any) => e.jobType === 0);
+  });
+}
+
+function cancelDialog() {
+  jobSelectId.value = undefined;
+  jobDialog.value = false;
+}
+
+/**
+ * 确认选择任务
+ */
+async function confirmDialog() {
+  const _node = lf.value.getNodeModelById(jobNodeEditId.value);
+
+  const _jobInfo = jobInfoList.value.find((e: any) => e.id === jobSelectId.value) as any;
+
+  const graphModel = lf.value.graphModel;
+  if (_jobInfo.jobType === 2) {
+    graphModel.deleteNode(_node.id);
+    //新增任务组
+    let data = {} as any;
+
+    const formMap = {
+      id: jobSelectId.value,
+      type: 1,
+      x: _node.x,
+      y: _node.y,
+    };
+    await JobInfoAPI.getJobCompose(formMap).then((res) => (data = res));
+    const newNodes = data.nodes;
+    const newEdges = data.edges;
+
+    addJobNodes(newNodes, graphModel, newEdges);
+  } else {
+    // 后台更新
+    JobInfoAPI.updateJobNode(jobSelectId.value, _node.id).then((id) => {
+      _node.setProperty("jobId", id);
+      _node.updateText(_jobInfo.jobDesc);
+      updateNodeTypeByGlueType(id, _jobInfo.jobDesc, _jobInfo.glueType);
+    });
+  }
+  cancelDialog();
+}
+
+function changeJobRadio(val: string | number | boolean | undefined) {
+  selectJobInfoList.value = jobInfoList.value.filter((e: any) =>
+    val === 0 ? e.jobType === 0 : e.jobType !== 0
+  );
+}
+
+/**
+ * 根据glueType更新节点类型
+ * 优先使用当前编辑的节点ID进行精确更新，确保只更新正在编辑的特定节点
+ */
+function updateNodeTypeByGlueType(jobId: number, jobDesc: string, glueType: string) {
+  // 获取当前任务组对应的LogicFlow实例
+  const currentPageId = usePageStoreHook().getCurrentPage();
+  const currentLf = lfInstances.value[currentPageId] || lf.value;
+
+  if (!currentLf) {
+    console.error("找不到对应的LogicFlow实例");
+    return;
+  }
+
+  const nodes = currentLf.getGraphRawData().nodes;
+  const edges = currentLf.getGraphRawData().edges;
+
+  let targetNode = null;
+
+  // 优先使用当前编辑的节点ID进行精确匹配
+  if (currentEditingNodeId.value) {
+    targetNode = nodes.find((n) => n.id === currentEditingNodeId.value);
+    console.log(
+      `🎯 使用编辑节点ID ${currentEditingNodeId.value} 精确查找目标节点:`,
+      targetNode
+    );
+
+    // 验证找到的节点是否与jobId匹配（安全检查）
+    if (targetNode && targetNode.properties.jobId !== jobId) {
+      console.warn(
+        `⚠️ 节点ID匹配但jobId不符 - 节点jobId: ${targetNode.properties.jobId}, 传入jobId: ${jobId}`
+      );
+      // 如果节点ID匹配但jobId不符，说明可能存在数据不一致，继续使用节点ID匹配
+    }
+  }
+
+  // 如果没有通过节点ID找到目标节点，则报错，不再使用jobId进行模糊匹配
+  if (!targetNode) {
+    console.error(
+      `❌ 无法找到要更新的节点 - 编辑节点ID: ${currentEditingNodeId.value}, jobId: ${jobId}`
+    );
+    console.error(
+      `当前画布所有节点:`,
+      nodes.map((n) => ({ id: n.id, jobId: n.properties?.jobId, type: n.type }))
+    );
+    ElMessage.error("无法定位要更新的节点，请重新操作");
+    return;
+  }
+
+  const nodeType =
+    GLUE_NODE_TYPE_MAP[glueType] ||
+    (targetNode.nodeType === DynamicCustomGroup ? DynamicCustomGroup : "rect");
+  const graphModel = currentLf.graphModel;
+
+  console.log(
+    `🔄 精确更新节点 - 节点ID: ${targetNode.id}, jobId: ${jobId}, 新类型: ${nodeType}, glueType: ${glueType}`
+  );
+
+  // 创建新的节点对象，并指定新的 type
+  const newNode = {
+    ...targetNode, // 保留原有节点的属性
+  };
+  newNode.type = nodeType;
+
+  // 更新节点的properties，确保glueType也被更新
+  newNode.properties = {
+    ...newNode.properties,
+    glueType: glueType,
+  };
+
+  // 保留原来的连线
+  const relatedEdges = edges.filter(
+    (e) => e.sourceNodeId === targetNode.id || e.targetNodeId === targetNode.id
+  );
+
+  // 删除原节点
+  graphModel.deleteNode(targetNode.id);
+
+  // 重新添加节点
+  currentLf.addNode(newNode);
+
+  // 恢复连线
+  if (relatedEdges.length > 0) {
+    relatedEdges.forEach((edge) => {
+      currentLf.addEdge(edge);
+    });
+  }
+
+  // 更新节点文本
+  const newNodeModel = currentLf.getNodeModelById(newNode.id);
+  if (newNodeModel) {
+    newNodeModel.updateText(jobDesc);
+    console.log(
+      `✅ 节点精确更新完成 - 节点ID: ${newNode.id}, 类型: ${nodeType}, 文本: ${jobDesc}, glueType: ${glueType}`
+    );
+  }
+
+  // 清除当前编辑节点ID，避免影响后续操作
+  currentEditingNodeId.value = null;
+}
+
+function closeEditJobNode(
+  jobId: number,
+  jobDesc: string,
+  glueType: string,
+  type: number
+) {
+  if (type == 1) {
+    updateNodeTypeByGlueType(jobId, jobDesc, glueType);
+  }
+
+  // 清理编辑状态
+  jobNodeVisible.value = false;
+  currentEditingNodeId.value = null;
+  selectNode.value = null; // 清理选中的节点
+  console.log(
+    `📝 编辑对话框关闭 - jobId: ${jobId}, 操作类型: ${type === 1 ? "保存" : "取消"}`
+  );
+}
+
+async function saveOrUpdateJob() {
+  const nodes = lf.value!.getGraphRawData().nodes;
+  const edges = lf.value!.getGraphRawData().edges;
+
+  const valObj = {
+    nodes: JSON.stringify(nodes),
+    edges: JSON.stringify(edges),
+  };
+
+  let flag = true;
+  await JobInfoAPI.validateJobComposeEdge(valObj).then((data: any) => {
+    flag = data;
+  });
+
+  if (!flag) {
+    ElMessage.error("不同组的节点不能连接~");
+    return;
+  }
+
+  if (jobId.value) {
+    await JobInfoAPI.getFormData(jobId.value).then((data) => {
+      Object.assign(formData, data);
+      formData.nodes = JSON.stringify(nodes);
+      formData.edges = JSON.stringify(edges);
+    });
+
+    formData.glueType = "BEAN";
+    formData.executorHandler = "runJobGroupXxlJob";
+
+    await JobInfoAPI.updateJobCompose(jobId.value, formData)
+      .then(() => {
+        ElMessage.success("修改成功");
+      })
+      .finally(() => {});
+    window.refreshTreeData();
+  }
+}
+
+async function addJobNode(jobInfo: any) {
+  jobInfo.executorRouteStrategy = "FIRST";
+  await JobInfoAPI.saveJobNode(jobInfo).then((data: any) => {
+    const nodeType = GLUE_NODE_TYPE_MAP[jobInfo.glueType];
+    const node = {
+      id: data.id,
+      jobName: jobInfo.jobDesc,
+      nodeType: nodeType,
+      nodePositionX: data.nodePositionX,
+      nodePositionY: data.nodePositionY,
+      properties: data.properties,
+      children: null,
+    };
+    lf.value.graphModel.addNode(generateNode(node));
+  });
+}
+
+/**
+ * 任务执行一次
+ */
+async function triggerOne() {
+  if (jobId.value == null) {
+    ElMessage.warning("请选择任务组～");
+    return;
+  }
+
+  // 获取当前任务组对应的LogicFlow实例
+  const currentJobId = jobId.value;
+  const currentLf = lfInstances.value[currentJobId] || lf.value;
+
+  if (!currentLf) {
+    ElMessage.error("找不到对应的LogicFlow实例");
+    return;
+  }
+
+  // 获取或创建任务组状态
+  const state = getJobState(currentJobId);
+
+  // 在开始新任务前，先清理旧的连接和定时器
+  console.log(`开始新任务前清理任务组 ${currentJobId} 的旧状态`);
+
+  // 清理旧的WebSocket连接
+  if (state.ws) {
+    console.log(`关闭任务组 ${currentJobId} 的旧WebSocket连接`);
+    state.ws.close();
+    state.ws = null;
+  }
+
+  // 清理旧的日志定时器
+  if (state.logRun) {
+    console.log(`清理任务组 ${currentJobId} 的旧日志定时器`);
+    window.clearInterval(state.logRun);
+    state.logRun = null;
+  }
+
+  // 生成新的randomId
+  randomId.value = snowflake.nextId(1) as string;
+  console.log(`为任务组 ${currentJobId} 生成新的randomId: ${randomId.value}`);
+
+  const _nodes = currentLf.getGraphRawData().nodes;
+
+  _nodes.forEach((node: any) => {
+    const _node = currentLf.getNodeModelById(node.id);
+    _node.setProperty("randomId", randomId.value);
+
+    if (_node.type === DynamicCustomGroup) {
+      _node.setStyle("stroke", "#000");
+    } else {
+      _node.setStyle("fill", "#fff");
+    }
+    console.log(
+      `🔄 重置节点 ${node.id} - jobId: ${node.properties?.jobId}, 新randomId: ${randomId.value}, 颜色: 白色`
+    );
+  });
+  // TODO 查找暂停中的任务并修改任务状态
+  const jobIds = _nodes.map((node: any) => node.properties.jobId);
+  console.log("暂停任务", jobIds);
+  const pauseJobIds = await JobInfoAPI.pauseJobs(jobIds);
+
+  _nodes
+    .filter((node: any) => pauseJobIds.includes(node.properties.jobId))
+    .forEach((node: any) => {
+      console.log(">>>>>>>>>>>>>暂停的节点", node);
+      const _node = currentLf.getNodeModelById(node.id);
+      // 修改节点状态
+      _node.isPause = true;
+      _node.setStyle("fill", "#409EEE");
+      // 触发节点重新渲染以更新图标
+      _node.setAttributes();
+    });
+
+  // 保存当前任务组的randomId到状态中
+  state.randomId = randomId.value;
+  console.log(`任务组 ${currentJobId} 保存randomId: ${randomId.value}`);
+
+  // 创建或更新日志标签页
+  const currentPage = pageTaps.value.find((page) => page.id === jobId.value);
+  // 只使用任务ID作为标签页的唯一标识，而不是任务ID加随机ID
+  const tabId = `${jobId.value}`;
+
+  // 检查是否已存在该任务组的标签页
+  const existingTab = logTabs.value.find((tab) => tab.id === tabId);
+  if (!existingTab) {
+    // 如果不存在，创建新标签页
+    console.log(`为任务组 ${jobId.value} 创建新的日志标签页`);
+    logTabs.value.push({
+      id: tabId,
+      jobId: jobId.value,
+      randomId: randomId.value,
+      label: currentPage?.label || `任务组${jobId.value}`,
+      isRunning: true,
+    });
+  } else {
+    // 如果已存在，更新随机ID和运行状态
+    console.log(`更新任务组 ${jobId.value} 的日志标签页状态`);
+    existingTab.randomId = randomId.value;
+    existingTab.isRunning = true;
+  }
+
+  // 重置该任务组的日志状态 - 使用任务组独立的状态
+  state.fromLineNum = 0;
+  state.pullFailCount = 0;
+
+  // 重置该任务组对应的日志组件
+  logReset(jobId.value);
+
+  // 设置为当前激活的标签页
+  activeLogTab.value = tabId;
+
+  const jobInfoTriggerDto = {} as any;
+  jobInfoTriggerDto.id = jobId.value;
+  jobInfoTriggerDto.executorParam = randomId.value;
+  JobInfoAPI.triggerJob(jobInfoTriggerDto)
+    .then((data: any) => {
+      if (data) {
+        run(data);
+        ElMessage.success("执行任务成功");
+        // 为当前任务组创建独立的WebSocket连接
+        connectWs(jobId.value + ":" + randomId.value, jobId.value);
+        // 更新当前任务组的运行状态
+        usePageStoreHook().updatePageRunStatus(jobId.value, true);
+        updateEdgeStyle();
+      }
+    })
+    .catch((e) => {
+      // 更新当前任务组的运行状态为停止
+      usePageStoreHook().updatePageRunStatus(jobId.value, false);
+      ElMessage.error(e);
+      //execLog.value += "读取任务日志失败...";
+      // 获取当前激活标签页对应的日志组件
+      const loggerRef = getLoggerRef(activeLogTab.value);
+      loggerRef?.addLogsFromText("读取任务日志失败...");
+
+      // 任务启动失败时，更新日志标签页状态
+      const tab = logTabs.value.find((t) => t.id === tabId);
+      if (tab) {
+        tab.isRunning = false;
+        console.log(`任务启动失败：更新任务组 ${jobId.value} 的日志标签页状态为停止`);
+      }
+    })
+    .finally(() => {});
+}
+
+/**
+ * 停止任务
+ */
+function stopTrigger() {
+  if (jobId.value == null) {
+    ElMessage.warning("请选择任务组～");
+    return;
+  }
+
+  const currentJobId = jobId.value;
+  const state = getJobState(currentJobId);
+
+  JobInfoAPI.stopJobCompose(currentJobId, state.randomId || randomId.value)
+    .then(() => {
+      // 更新当前任务组的运行状态
+      usePageStoreHook().updatePageRunStatus(currentJobId, false);
+      updateEdgeStyle();
+
+      // 停止对应任务组的日志获取
+      if (state.logRun) {
+        window.clearInterval(state.logRun);
+        state.logRun = null;
+        console.log(`手动停止任务组 ${currentJobId} 的日志获取定时器`);
+      }
+
+      // 关闭对应任务组的WebSocket连接
+      if (state.ws) {
+        console.log(`手动停止：关闭任务组 ${currentJobId} 的WebSocket连接`);
+        state.ws.close();
+        state.ws = null;
+      }
+
+      // 更新对应的日志标签页状态
+      const tabId = `${currentJobId}`;
+      const tab = logTabs.value.find((t) => t.id === tabId);
+      if (tab) {
+        tab.isRunning = false;
+        console.log(`手动停止：更新任务组 ${currentJobId} 的日志标签页状态为停止`);
+      }
+
+      ElMessage.success("任务已停止");
+    })
+    .catch((error) => {
+      console.error("停止任务失败:", error);
+      ElMessage.error("停止任务失败");
+    });
+}
+
+/**
+ * 更新边的状态
+ */
+function updateEdgeStyle() {
+  // 获取当前任务组对应的LogicFlow实例
+  const currentPageId = usePageStoreHook().getCurrentPage();
+  const currentLf = lfInstances.value[currentPageId];
+
+  if (!currentLf) {
+    console.warn(`无法找到任务组 ${currentPageId} 对应的LogicFlow实例`);
+    return;
+  }
+
+  const { edges } = currentLf.getGraphRawData() ?? {};
+  // 使用当前任务组的运行状态而不是全局状态
+  if (usePageStoreHook().getCurrentPageRunStatus()) {
+    edges?.forEach(({ id }) => {
+      currentLf.openEdgeAnimation(id);
+    });
+    return;
+  }
+  edges?.forEach(({ id }) => {
+    currentLf.closeEdgeAnimation(id);
+  });
+}
+
+/**
+ * 更新指定任务组的边样式
+ */
+function updateEdgeStyleForTaskGroup(taskGroupId: number) {
+  const targetLf = lfInstances.value[taskGroupId];
+
+  if (!targetLf) {
+    console.warn(`无法找到任务组 ${taskGroupId} 对应的LogicFlow实例`);
+    return;
+  }
+
+  const { edges } = targetLf.getGraphRawData() ?? {};
+  const isRunning = usePageStoreHook().getPageRunStatus(taskGroupId);
+
+  console.log(`更新任务组 ${taskGroupId} 的边样式，运行状态: ${isRunning}`);
+
+  if (isRunning) {
+    edges?.forEach(({ id }) => {
+      targetLf.openEdgeAnimation(id);
+    });
+  } else {
+    edges?.forEach(({ id }) => {
+      targetLf.closeEdgeAnimation(id);
+    });
+  }
+}
+
+/**
+ * 选择任务组
+ * @param id
+ */
+async function selectJobCompNode(id: number) {
+  console.log(`[流程5] 开始获取任务组 ${id} 的节点数据 ==================`);
+  // 只有在首次加载时调用，避免重复加载
+  const currentLf = lfInstances.value[id];
+  if (!currentLf) {
+    console.error(`[流程5] 错误：找不到任务组 ${id} 的LogicFlow实例`);
+    return;
+  }
+
+  // 检查是否已有数据
+  const currentData = currentLf.getGraphRawData();
+  console.log(
+    `[流程5] 当前画布数据: 节点=${currentData.nodes.length}, 边=${currentData.edges.length}`
+  );
+
+  if (currentData.nodes.length > 0) {
+    console.log(`[流程5] 画布已有数据，跳过加载`);
+    return;
+  }
+
+  // 原有的数据加载逻辑
+  const graphModel = currentLf.graphModel;
+
+  // 清空现有数据
+  console.log(`[流程5] 准备清空现有数据`);
+  await clearData(currentLf);
+
+  // 获取任务组数据
+  console.log(`[流程5] 开始请求接口数据`);
+  const formMap = {
+    id: id,
+    type: 0,
+    x: 0,
+    y: 0,
+  };
+  const data = (await JobInfoAPI.getJobCompose(formMap)) as any;
+  console.log(data);
+  console.log(
+    `[流程5] 获取到数据: 节点=${data.nodes?.length || 0}, 边=${data.edges?.length || 0}`
+  );
+  const newNodes = data.nodes;
+  const newEdges = data.edges;
+
+  // 添加节点和边
+  console.log(`[流程5] 开始添加节点和边`);
+  addJobNodes(newNodes, graphModel, newEdges, currentLf);
+}
+
+/**
+ * 增加节点
+ * @param newNodes 新的节点
+ * @param graphModel 画布模型
+ * @param newEdges 新的边
+ */
+function addJobNodes(newNodes, graphModel, newEdges, lfInstance = null) {
+  // 允许指定实例或使用当前活跃实例
+  const instance = lfInstance || lf.value;
+  if (!instance) return;
+
+  // 添加节点
+  newNodes.forEach((node) => {
+    graphModel.addNode(generateNode(node));
+  });
+
+  // 设置节点样式和子节点
+  newNodes.forEach((n) => {
+    const node = instance.getNodeModelById(n.id);
+    if (node) {
+      node.isPause = n.isPause == 1;
+      node.setStyle("fill", n.isPause == 1 ? "#409EEE" : "#fff");
+      // 触发节点重新渲染以更新图标
+      node.setAttributes();
+      if (n.nodeType === DynamicCustomGroup && n.children) {
+        JSON.parse(n.children).forEach((id) => node.addChild(id));
+      }
+    }
+  });
+
+  // 添加边
+  newEdges.forEach((e) => {
+    graphModel.addEdge(generateEdge(e));
+  });
+}
+
+/**
+ * 产生节点
+ * @param node
+ */
+function generateNode(node: any) {
+  console.log("generateNode", node, node.nodeType);
+  const properties = JSON.parse(node.properties);
+  // 类型判断逻辑
+  const nodeType =
+    node.nodeType || (node.nodeType === DynamicCustomGroup ? DynamicCustomGroup : "rect");
+  if (node.nodeType === DynamicCustomGroup) {
+    properties.children = JSON.parse(properties.children);
+  }
+
+  return {
+    id: node.id,
+    text: node.jobName,
+    type: nodeType,
+    x: node.nodePositionX,
+    y: node.nodePositionY,
+    properties: properties,
+    children: node.children != null ? JSON.parse(node.children) : node.children,
+  };
+}
+
+/**
+ * 产生边
+ * @param edge
+ */
+function generateEdge(edge: any) {
+  return {
+    id: edge.id,
+    sourceNodeId: edge.fromNodeId,
+    targetNodeId: edge.endNodeId,
+    type: "bezier",
+  };
+}
+
+async function clearData(lfInstance = null) {
+  // 允许指定实例或使用当前活跃实例
+  const instance = lfInstance || lf.value;
+  if (!instance) {
+    console.log("没有可用的LogicFlow实例，跳过清理");
+    return;
+  }
+
+  try {
+    const graphData = instance.getGraphRawData();
+    if (!graphData) return;
+
+    const nodes = graphData.nodes || [];
+    const edges = graphData.edges || [];
+    const graphModel = instance.graphModel;
+
+    // 清理节点和边
+    nodes.forEach((node) => {
+      const _node = graphModel.getNodeModelById(node.id);
+      if (_node) {
+        graphModel.deleteNode(_node.id);
+      }
+    });
+
+    edges.forEach((edge) => {
+      const _edge = graphModel.getEdgeModelById(edge.id);
+      if (_edge) {
+        graphModel.deleteEdgeById(_edge.id);
+      }
+    });
+  } catch (err) {
+    console.error("清理画布时出错:", err);
+  }
+}
+
+//--------------------------------------------------ws------------------
+const ws = ref(); // 保留全局WebSocket引用用于向后兼容
+const reconnectAttempts = ref(0);
+const maxReconnectAttempts = ref(3); // 自定义最大重试次数
+
+const connectWs = (id: string, targetJobId?: number) => {
+  // TODO 后端做多节点部署时，需要修改
+  const wsUrl = "ws://localhost:8989/ccJobWs/" + id;
+  console.log(`为任务组 ${targetJobId || "全局"} 创建WebSocket连接: ${wsUrl}`);
+
+  const newWs = new WebSocket(wsUrl);
+
+  // 如果指定了任务组ID，将WebSocket保存到该任务组的状态中
+  if (targetJobId) {
+    const state = getJobState(targetJobId);
+    // 关闭之前的连接（如果存在）
+    if (state.ws) {
+      console.log(`关闭任务组 ${targetJobId} 的旧WebSocket连接`);
+      state.ws.close();
+    }
+    state.ws = newWs;
+  } else {
+    // 否则保存到全局引用（向后兼容）
+    ws.value = newWs;
+  }
+
+  newWs.onopen = () => {
+    reconnectAttempts.value = 0;
+    console.log(`任务组 ${targetJobId || "全局"} WebSocket连接成功: ${wsUrl}`);
+  };
+
+  newWs.onclose = () => {
+    console.log(`任务组 ${targetJobId || "全局"} WebSocket连接断开: ${wsUrl}`);
+
+    // 检查是否是任务组的连接，如果是，需要使用当前任务组的randomId重连
+    if (targetJobId) {
+      const state = getJobState(targetJobId);
+      // 只有当这个WebSocket仍然是当前状态中的WebSocket时才重连
+      if (state.ws === newWs) {
+        reconnectAttempts.value++;
+        if (reconnectAttempts.value <= maxReconnectAttempts.value && state.randomId) {
+          console.log(`使用当前randomId ${state.randomId} 进行重连`);
+          const newId = `${targetJobId}:${state.randomId}`;
+          setTimeout(() => connectWs(newId, targetJobId), 3000); // 延迟重连
+        } else {
+          console.log("停止重连 - 超过最大重连次数或无有效randomId");
+        }
+      } else {
+        console.log("跳过重连 - 这个WebSocket已经不是当前状态中的活跃连接");
+      }
+    } else {
+      // 全局连接的重连逻辑保持不变
+      reconnectAttempts.value++;
+      if (reconnectAttempts.value <= maxReconnectAttempts.value) {
+        console.log("进行重连");
+        setTimeout(() => connectWs(id, targetJobId), 3000);
+      } else {
+        console.log("连接关闭");
+      }
+    }
+  };
+
+  newWs.onmessage = (e: any) => {
+    const _message = JSON.parse(e.data);
+    console.log(`收到WebSocket消息 (任务组 ${targetJobId || "全局"}):`, _message);
+
+    // 获取消息对应的任务组状态
+    const messageJobId = _message.jobId;
+    const messageRandomId = _message.randomId;
+
+    console.log(
+      `处理WebSocket消息 - messageJobId: ${messageJobId}, messageRandomId: ${messageRandomId}, status: ${_message.status}`
+    );
+
+    if (_message.status == 5) {
+      // 任务完成 - 需要检查整个任务组是否都完成了
+      // 遍历所有LogicFlow实例，找到包含这个jobId的任务组
+      let taskGroupId = null;
+      let taskGroupLf = null;
+
+      for (const [groupId, lfInstance] of Object.entries(lfInstances.value)) {
+        if (lfInstance) {
+          const nodes = (lfInstance as any).getGraphRawData().nodes;
+          const foundNode = nodes.find(
+            (node: any) =>
+              node.properties.jobId == messageJobId &&
+              node.properties.randomId == messageRandomId
+          );
+          if (foundNode) {
+            taskGroupId = parseInt(groupId);
+            taskGroupLf = lfInstance;
+            break;
+          }
+        }
+      }
+
+      if (taskGroupId && taskGroupLf) {
+        console.log(`任务 ${messageJobId} 完成，所属任务组: ${taskGroupId}`);
+
+        // 延迟检查任务组是否完全完成
+        setTimeout(() => {
+          // 检查该任务组中是否还有其他正在运行的节点
+          const nodes = taskGroupLf.getGraphRawData().nodes;
+          const runningNodes = nodes.filter((node: any) => {
+            const nodeModel = taskGroupLf.getNodeModelById(node.id);
+            const nodeStyle = nodeModel.getStyle();
+            // 检查节点颜色是否为运行中状态（黄色 #FFFF33）
+            const isRunning =
+              nodeStyle.fill === "#FFFF33" || nodeStyle.stroke === "#FFFF33";
+            return isRunning;
+          });
+
+          console.log(`任务组 ${taskGroupId} 中还有 ${runningNodes.length} 个节点在运行`);
+
+          if (runningNodes.length === 0) {
+            // 没有正在运行的节点，任务组已完成
+            console.log(`任务组 ${taskGroupId} 已完成，更新运行状态为停止`);
+            usePageStoreHook().updatePageRunStatus(taskGroupId, false);
+
+            // 更新该任务组的边样式（无论是否为当前激活任务组）
+            updateEdgeStyleForTaskGroup(taskGroupId);
+
+            // 同时更新对应的日志标签页状态
+            const tabId = `${taskGroupId}`;
+            const tab = logTabs.value.find((t) => t.id === tabId);
+            if (tab) {
+              tab.isRunning = false;
+              console.log(`更新任务组 ${taskGroupId} 的日志标签页状态为停止`);
+            }
+          } else {
+            console.log(`任务组 ${taskGroupId} 中还有任务在执行，暂不更新整体状态`);
+          }
+        }, 1000); // 减少延迟时间，提高响应速度
+      }
+    } else if (_message.status == 9) {
+      // 运行时信息
+      if (messageJobId === jobId.value) {
+        runTime.value = JSON.parse(_message.result);
+      }
+    }
+
+    // 接收到消息后，需要做出相应的操作，比如更新节点或边
+    // 遍历所有LogicFlow实例，找到对应的节点
+    let foundNode = false;
+    console.log(
+      `开始查找节点 - 查找条件: jobId=${messageJobId}, randomId=${messageRandomId}`
+    );
+
+    for (const [groupId, lfInstance] of Object.entries(lfInstances.value)) {
+      if (lfInstance) {
+        const nodes = (lfInstance as any).getGraphRawData().nodes;
+        console.log(
+          `任务组 ${groupId} 中的所有节点:`,
+          nodes.map((n) => ({
+            id: n.id,
+            jobId: n.properties?.jobId,
+            randomId: n.properties?.randomId,
+            type: n.type,
+          }))
+        );
+
+        // 首先检查是否有完全匹配的节点（jobId和randomId都匹配）
+        const node = nodes.find(
+          (node: any) =>
+            node.properties.jobId == messageJobId &&
+            node.properties.randomId == messageRandomId
+        );
+
+        if (node) {
+          const color = getNodeColor(_message.status);
+          const _node = (lfInstance as any).getNodeModelById(node.id);
+          const style = _node.type === DynamicCustomGroup ? "stroke" : "fill";
+          _node.setStyle(style, color);
+          console.log(
+            `更新任务组 ${groupId} 中节点 ${node.id} 状态为: ${_message.status}, 颜色: ${color}`
+          );
+          foundNode = true;
+          break;
+        } else {
+          // 如果没有完全匹配，检查是否有jobId匹配但randomId不匹配的节点
+          const nodeWithSameJobId = nodes.find(
+            (node: any) => node.properties.jobId == messageJobId
+          );
+          if (nodeWithSameJobId) {
+            console.log(
+              `🔍 在任务组 ${groupId} 中找到了相同jobId但randomId不匹配的节点:`,
+              {
+                nodeId: nodeWithSameJobId.id,
+                nodeJobId: nodeWithSameJobId.properties.jobId,
+                nodeRandomId: nodeWithSameJobId.properties.randomId,
+                messageRandomId: messageRandomId,
+                randomIdMatch: nodeWithSameJobId.properties.randomId == messageRandomId,
+              }
+            );
+          } else {
+            console.log(`❌ 任务组 ${groupId} 中未找到jobId=${messageJobId}的节点`);
+          }
+        }
+      }
+    }
+
+    if (!foundNode) {
+      console.warn(
+        `🚨 未找到对应的节点 - jobId: ${messageJobId}, randomId: ${messageRandomId}`
+      );
+      console.warn(`当前所有LogicFlow实例:`, Object.keys(lfInstances.value));
+    }
+  };
+};
+
+const getNodeColor = (status: number) => {
+  switch (status) {
+    case 0:
+      return "#CC0000";
+    case 1:
+      return "#66FF99";
+    case 2:
+      return "#FFFF33";
+    default:
+      return "#000";
+  }
+};
+
+onMounted(() => {
+  console.log("[流程1] 组件挂载开始 ==================");
+  console.log("[流程1] 获取任务组列表");
+  getJobInfoList();
+  logger.value?.reset();
+
+  // 确保DOM已渲染完成
+  nextTick(() => {
+    // 初始化一个空画布实例，不加载任务组数据
+    console.log("[流程1] 初始化空画布");
+
+    // 如果已有初始任务组，则显示该任务组
+    const currentPageId = usePageStoreHook().getCurrentPage();
+    if (currentPageId) {
+      console.log(`[流程1] 存在初始任务组ID: ${currentPageId}`);
+      // 使用selectPage来处理初始任务组的选择和数据加载
+      selectPage(currentPageId);
+    } else {
+      console.log("[流程1] 没有初始任务组，显示空画布");
+    }
+  });
+});
+
+// 移动 miniMap 到侧边栏
+const moveMiniMapToSidebar = () => {
+  try {
+    // 获取当前活动的任务组ID
+    const currentPageId = usePageStoreHook().getCurrentPage();
+    if (!currentPageId) {
+      console.log("当前没有活动任务组，跳过MiniMap移动");
+      return;
+    }
+
+    // 找到侧边栏容器
+    const sideLayoutElement = document.querySelector(".side-layout .layout-content");
+
+    // 延迟一下再显示当前MiniMap
+    setTimeout(() => {
+      try {
+        // 显示当前实例的MiniMap
+        currentInstance.extension.miniMap.show();
+
+        // 再次延迟以确保DOM更新完成
+        setTimeout(() => {
+          // 查找MiniMap元素 - 此时应该只有当前活动的MiniMap显示
+          const miniMapElement = document.querySelector(".lf-mini-map");
+
+          if (miniMapElement && sideLayoutElement) {
+            console.log(`找到任务组 ${currentPageId} 的MiniMap元素`);
+
+            // 克隆节点而不是直接移动，避免父子关系问题
+            const clonedMiniMap = miniMapElement.cloneNode(true);
+
+            // 删除原始MiniMap（使用更安全的方法）
+            try {
+              miniMapElement.remove();
+            } catch (e) {
+              console.log("移除原MiniMap时出错，继续处理", e);
+            }
+
+            // 让克隆的节点成为侧边栏的子元素
+            sideLayoutElement.appendChild(clonedMiniMap);
+
+            // 设置样式
+            clonedMiniMap.style.position = "static";
+
+            console.log(`任务组 ${currentPageId} 的MiniMap已移动到侧边栏`);
+          } else {
+            console.log("未找到MiniMap元素，300ms后重试");
+            setTimeout(moveMiniMapToSidebar, 300);
+          }
+        }, 50);
+      } catch (err) {
+        console.log("操作MiniMap时出错，但已被捕获", err);
+      }
+    }, 50);
+  } catch (err) {
+    console.error("移动MiniMap过程中出错:", err);
+  }
+};
+
+function setLfRef(pageId, el) {
+  if (el) {
+    console.log(`[流程9] 设置任务组 ${pageId} 的DOM引用`);
+    lfRefs.value[pageId] = el;
+
+    // 只记录引用，不立即初始化
+    // 选择当前页面时会通过selectPage调用initLogicFlowInstance
+  } else if (lfRefs.value[pageId]) {
+    console.log(`[流程9] 移除任务组 ${pageId} 的DOM引用`);
+    delete lfRefs.value[pageId];
+  }
+}
+
+// =======================任务组状态管理辅助函数===========================
+const getJobState = (jobId: number) => {
+  if (!jobStates.value.has(jobId)) {
+    jobStates.value.set(jobId, {
+      fromLineNum: 0,
+      pullFailCount: 0,
+      logRun: null,
+      ws: null,
+      randomId: "",
+    });
+  }
+  return jobStates.value.get(jobId)!;
+};
+
+const clearJobState = (jobId: number) => {
+  const state = jobStates.value.get(jobId);
+  if (state) {
+    // 清理定时器
+    if (state.logRun) {
+      window.clearInterval(state.logRun);
+      state.logRun = null;
+    }
+    // 关闭WebSocket连接
+    if (state.ws) {
+      state.ws.close();
+      state.ws = null;
+    }
+    // 移除状态
+    jobStates.value.delete(jobId);
+  }
+};
+// =======================任务组状态管理辅助函数===========================
+
+// =======================LogicFlow操作处理函数===========================
+function handleUndo() {
+  const currentPageId = usePageStoreHook().getCurrentPage();
+  const currentLf = lfInstances.value[currentPageId] || lf.value;
+
+  if (!currentLf) {
+    ElMessage.warning("请先选择一个任务组");
+    return;
+  }
+  currentLf.undo();
+}
+
+function handleRedo() {
+  const currentPageId = usePageStoreHook().getCurrentPage();
+  const currentLf = lfInstances.value[currentPageId] || lf.value;
+
+  if (!currentLf) {
+    ElMessage.warning("请先选择一个任务组");
+    return;
+  }
+
+  currentLf.redo();
+}
+
+function handleFit() {
+  const currentPageId = usePageStoreHook().getCurrentPage();
+  const currentLf = lfInstances.value[currentPageId] || lf.value;
+
+  if (!currentLf) {
+    ElMessage.warning("请先选择一个任务组");
+    return;
+  }
+
+  const { transformModel } = currentLf.graphModel;
+  transformModel.resetZoom();
+}
+
+function handleZoomIn() {
+  const currentPageId = usePageStoreHook().getCurrentPage();
+  const currentLf = lfInstances.value[currentPageId] || lf.value;
+
+  if (!currentLf) {
+    ElMessage.warning("请先选择一个任务组");
+    return;
+  }
+
+  // 添加调试信息
+  console.log("LogicFlow实例结构:", currentLf);
+  console.log("LogicFlow实例的view属性:", currentLf.view);
+  console.log("LogicFlow实例的所有属性:", Object.keys(currentLf));
+
+  const { transformModel } = currentLf.graphModel;
+  transformModel.zoom(true);
+}
+
+function handleZoomOut() {
+  const currentPageId = usePageStoreHook().getCurrentPage();
+  const currentLf = lfInstances.value[currentPageId] || lf.value;
+
+  if (!currentLf) {
+    ElMessage.warning("请先选择一个任务组");
+    return;
+  }
+  const { transformModel } = currentLf.graphModel;
+  transformModel.zoom(false);
+}
+
+function clearCanvas() {
+  console.log("清除画布");
+  const currentPageId = usePageStoreHook().getCurrentPage();
+  const currentLf = lfInstances.value[currentPageId] || lf.value;
+
+  if (!currentLf) {
+    ElMessage.warning("请先选择一个任务组");
+    return;
+  }
+
+  try {
+    // 获取当前画布的所有数据
+    const graphData = currentLf.getGraphRawData();
+    if (!graphData) {
+      console.log("画布已经是空的");
+      return;
+    }
+
+    const nodes = graphData.nodes || [];
+    const edges = graphData.edges || [];
+    const graphModel = currentLf.graphModel;
+
+    console.log(`准备清除 ${nodes.length} 个节点和 ${edges.length} 条边`);
+
+    // 清除所有边
+    edges.forEach((edge) => {
+      const edgeModel = graphModel.getEdgeModelById(edge.id);
+      if (edgeModel) {
+        graphModel.deleteEdgeById(edge.id);
+      }
+    });
+
+    // 清除所有节点
+    nodes.forEach((node) => {
+      const nodeModel = graphModel.getNodeModelById(node.id);
+      if (nodeModel) {
+        graphModel.deleteNode(node.id);
+      }
+    });
+
+    console.log("画布清除完成");
+    ElMessage.success("画布已清空");
+  } catch (err) {
+    console.error("清除画布时出错:", err);
+    ElMessage.error("清除画布失败");
+  }
+}
+
+function selectNodes() {
+  const currentPageId = usePageStoreHook().getCurrentPage();
+  const currentLf = lfInstances.value[currentPageId] || lf.value;
+
+  if (!currentLf) {
+    ElMessage.warning("请先选择一个任务组");
+    return;
+  }
+  currentLf.extension.selectionSelect.openSelectionSelect();
+  currentLf.once("selection:selected", () => {
+    currentLf.extension.selectionSelect.closeSelectionSelect();
+  });
+}
+
+function selectElements() {
+  const currentPageId = usePageStoreHook().getCurrentPage();
+  const currentLf = lfInstances.value[currentPageId] || lf.value;
+  const elements = currentLf.graphModel.getSelectElements(true);
+  console.log(">>>>>>选择的元素", elements);
+}
+// =======================LogicFlow操作处理函数============================
+function avg(array: any) {
+  let len = array.length;
+  let sum = 0;
+  for (let i = 0; i < len; i++) {
+    sum += array[i];
+  }
+  return sum / len;
+}
+
+// 节点自动布局方法
+function layoutNodes(direction: "horizontal" | "vertical") {
+  const currentPageId = usePageStoreHook().getCurrentPage();
+  const currentLf = lfInstances.value[currentPageId] || lf.value;
+  if (!currentLf) {
+    ElMessage.warning("请先选择一个任务组");
+    return;
+  }
+  const elements = currentLf.graphModel.getSelectElements(true);
+  const nodes = elements.nodes;
+  if (!nodes || nodes.length === 0) return;
+
+  if (direction === "horizontal") {
+    const arrY = nodes.map((n: any) => n.y);
+    const avgY = avg(arrY);
+    nodes.forEach((node: any) => {
+      const _node = currentLf.getNodeModelById(node.id);
+      _node.moveTo(_node.x, avgY);
+    });
+  } else {
+    const arrX = nodes.map((n: any) => n.x);
+    const avgX = avg(arrX);
+    nodes.forEach((node: any) => {
+      const _node = currentLf.getNodeModelById(node.id);
+      _node.moveTo(avgX, _node.y);
+    });
+  }
+}
+</script>
+
+<template>
+  <div class="main-container" ref="mainContainerRef">
+    <div class="platform" :style="{ height: `${platformHeight}vh` }">
+      <div class="p-tap">
+        <ul>
+          <li
+            v-for="(item, index) in pageTaps"
+            :key="index"
+            :class="{ active: item.id == jobId }"
+          >
+            <span @click="selectPage(item.id)">
+              <el-icon class="tab-icon"><FolderOpened /></el-icon>
+              {{ item.label }}
+            </span>
+            <el-icon @click="closePage(item.id)" class="close-icon">
+              <Close />
+            </el-icon>
+          </li>
+        </ul>
+      </div>
+      <template v-for="page in pageTaps" :key="page.id">
+        <div
+          :ref="(el) => setLfRef(page.id, el)"
+          class="logic-flow"
+          v-show="page.id === usePageStoreHook().getCurrentPage()"
+          :style="{
+            width: '100%',
+            height: '100%',
+          }"
+        ></div>
+      </template>
+    </div>
+
+    <EditJobNode
+      :job-node-visible="jobNodeVisible"
+      :node-job-id="nodeJobId"
+      :now-date="new Date()"
+      :node="selectNode"
+      @close="closeEditJobNode"
+    />
+
+    <el-dialog v-model="jobDialog" style="width: 400px" title="选择任务" append-to-body>
+      <el-radio-group v-model="jobRadio" @change="changeJobRadio">
+        <el-radio :value="0" size="large">单任务</el-radio>
+        <el-radio :value="1" size="large">任务组</el-radio>
+      </el-radio-group>
+      <el-select
+        v-model="jobSelectId"
+        placeholder="选择任务"
+        size="large"
+        style="width: 240px"
+      >
+        <el-option
+          v-for="item in selectJobInfoList"
+          :key="item.id"
+          :label="item.jobDesc"
+          :value="item.id"
+        />
+      </el-select>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="cancelDialog">取消</el-button>
+          <el-button type="primary" @click="confirmDialog">确认</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 可拖拽的分隔线 -->
+    <div
+      class="resize-handle"
+      @mousedown="handleMouseDown"
+      :class="{ dragging: isDragging }"
+    ></div>
+
+    <div class="log" :style="{ height: `${100 - platformHeight}vh` }">
+      <div class="log-t">
+        <span>日志监控</span>
+        <el-icon>
+          <Close />
+        </el-icon>
+      </div>
+      <!-- 任务组标签页 -->
+      <div class="log-tabs" v-if="logTabs.length > 0">
+        <div
+          v-for="tab in logTabs"
+          :key="tab.id"
+          class="log-tab-item"
+          :class="{ active: activeLogTab === tab.id }"
+          @click="switchLogTab(tab.id)"
+        >
+          <el-icon class="tab-icon"><Document /></el-icon>
+          <span>{{ tab.label }}</span>
+          <span v-if="tab.isRunning" class="running-indicator">
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 10 10"
+              style="vertical-align: middle"
+            >
+              <circle cx="5" cy="5" r="4" fill="#10b981" />
+            </svg>
+          </span>
+          <el-icon class="close-tab-icon" @click.stop="closeLogTab(tab.id)">
+            <Close />
+          </el-icon>
+        </div>
+      </div>
+      <!-- 日志内容区域 -->
+      <div class="log-content">
+        <div v-if="logTabs.length === 0" class="no-logs">
+          <p>暂无运行日志</p>
+          <p style="font-size: 0.75rem; margin-top: 0.5rem; opacity: 0.7">
+            启动任务后将在此显示实时日志信息
+          </p>
+        </div>
+        <div v-else class="log-panels">
+          <div
+            v-for="tab in logTabs"
+            :key="tab.id"
+            v-show="activeLogTab === tab.id"
+            class="log-panel"
+          >
+            <Log
+              :ref="
+                (el) => {
+                  if (el) loggerRefs[tab.id] = el;
+                }
+              "
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+/* 全局变量 */
+.main-container {
+  --primary-color: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-light: #e0e7ff;
+  --secondary-color: #64748b;
+  --success-color: #10b981;
+  --warning-color: #f59e0b;
+  --danger-color: #ef4444;
+  --background-light: #f8fafc;
+  --background-white: #ffffff;
+  --border-light: #e5e7eb;
+  --border-medium: #cbd5e1;
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+
+  min-width: 85%;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--background-light);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  overflow-x: hidden !important;
+}
+
+.platform {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--background-white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  margin: 1rem;
+  overflow: hidden;
+
+  .p-tap {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    background: var(--background-white);
+    border-bottom: 1px solid var(--border-light); /* 恢复分隔线 */
+    height: 48px;
+    flex-shrink: 0;
+    padding: 0 1rem;
+    position: relative;
+
+    &::after {
+      display: none !important; /* 移除伪元素下划线 */
+    }
+
+    ul {
+      display: flex;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      gap: 0.25rem;
+    }
+
+    li {
+      font-size: 0.875rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius-md);
+      height: 36px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+      color: var(--text-secondary);
+      background: transparent;
+      border: 1px solid transparent;
+      border-bottom: none !important;
+
+      &:hover {
+        background: #f3f6fd;
+        color: var(--primary-color);
+        transform: translateY(-1px);
+      }
+
+      &.active {
+        background: var(--primary-light) !important;
+        color: var(--primary-color) !important;
+        border-color: transparent !important;
+        box-shadow: var(--shadow-sm) !important;
+        font-weight: 700 !important;
+        /* 移除下划线 */
+        &::after {
+          display: none !important;
+        }
+      }
+
+      span {
+        margin-right: 0.5rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 120px;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+
+        .tab-icon {
+          font-style: normal;
+          font-size: 1rem;
+          opacity: 0.8;
+          transition: all 0.2s ease;
+        }
+      }
+
+      .close-icon {
+        font-size: 0.875rem;
+        opacity: 0.6;
+        transition: all 0.2s ease;
+        padding: 0.25rem;
+        border-radius: var(--radius-sm);
+
+        &:hover {
+          opacity: 1;
+          background: rgba(239, 68, 68, 0.1);
+          color: var(--danger-color);
+          transform: scale(1.1);
+        }
+      }
+    }
+  }
+
+  .logic-flow {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 500px;
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    background: var(--background-white);
+  }
+}
+
+/* 可拖拽的分隔线 */
+.resize-handle {
+  width: 100%;
+  height: 3px;
+  background: #e2e2e2;
+  cursor: row-resize;
+  position: relative;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &::before {
+    content: "";
+    width: 40px;
+    height: 4px;
+    background: var(--border-medium);
+    border-radius: 2px;
+    transition: all 0.2s ease;
+  }
+
+  &:hover {
+    background: linear-gradient(
+      180deg,
+      var(--primary-color) 0%,
+      transparent 50%,
+      var(--primary-color) 100%
+    );
+
+    &::before {
+      background: var(--primary-color);
+      width: 60px;
+      height: 6px;
+    }
+  }
+
+  &.dragging {
+    background: linear-gradient(
+      180deg,
+      var(--primary-color) 0%,
+      transparent 50%,
+      var(--primary-color) 100%
+    );
+
+    &::before {
+      background: var(--primary-color);
+      width: 80px;
+      height: 8px;
+    }
+  }
+}
+
+.log {
+  background: var(--background-white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  margin: 0 1rem 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  .log-t {
+    padding: 0 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+    height: 56px;
+    background: var(--background-white);
+    border-bottom: 1px solid var(--border-light) !important; /* 恢复分隔线 */
+    position: relative;
+
+    &::after {
+      display: none !important;
+    }
+
+    span {
+      font-weight: 600;
+      font-size: 1rem;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+
+      &::before {
+        content: "📋";
+        font-size: 1.125rem;
+      }
+    }
+
+    .el-icon {
+      font-size: 1.125rem;
+      color: var(--text-secondary);
+      cursor: pointer;
+      padding: 0.5rem;
+      border-radius: var(--radius-sm);
+      transition: all 0.2s ease;
+
+      &:hover {
+        background: var(--background-light);
+        color: var(--danger-color);
+        transform: scale(1.1);
+      }
+    }
+  }
+
+  .log-tabs {
+    display: flex;
+    background: var(--background-light);
+    flex-shrink: 0;
+    height: 48px;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--border-light) !important; /* 恢复分隔线 */
+    padding: 0.2rem 1rem;
+    gap: 0.25rem;
+
+    /* 自定义滚动条 */
+    &::-webkit-scrollbar {
+      height: 4px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: var(--border-medium);
+      border-radius: 2px;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+      background: var(--secondary-color);
+    }
+
+    .log-tab-item {
+      display: flex;
+      align-items: center;
+      padding: 0 1rem;
+      cursor: pointer;
+      white-space: nowrap;
+      min-width: 140px;
+      height: 40px;
+      border-radius: var(--radius-md);
+      transition: all 0.2s ease;
+      position: relative;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-secondary);
+      border-bottom: none !important;
+      font-weight: 500;
+      .tab-icon {
+        margin-right: 0.5rem;
+        font-size: 1rem;
+        color: var(--primary-color);
+      }
+      &:hover {
+        background: #f3f6fd;
+        color: var(--primary-color);
+      }
+      &.active {
+        background: var(--primary-light) !important;
+        color: var(--primary-color) !important;
+        border-color: transparent !important;
+        box-shadow: var(--shadow-sm) !important;
+        font-weight: 700 !important;
+      }
+      span {
+        font-size: 0.875rem;
+        font-weight: 500;
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .running-indicator {
+        margin-left: 0.5rem;
+        display: flex;
+        align-items: center;
+      }
+      .close-tab-icon {
+        margin-left: 0.5rem;
+        font-size: 0.875rem;
+        opacity: 0.6;
+        padding: 0.25rem;
+        border-radius: var(--radius-sm);
+        transition: all 0.2s ease;
+        &:hover {
+          opacity: 1;
+          background: rgba(239, 68, 68, 0.1);
+          color: var(--danger-color);
+          transform: scale(1.1);
+        }
+      }
+    }
+  }
+
+  .log-content {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--background-white);
+
+    .no-logs {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      background: var(--background-light);
+      margin: 1rem;
+      border-radius: var(--radius-md);
+      border: 2px dashed var(--border-medium);
+      flex-direction: column;
+      padding: 2rem;
+      text-align: center;
+
+      p {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin: 0;
+        font-weight: 500;
+
+        &::before {
+          content: "📝";
+          font-size: 1.25rem;
+        }
+
+        &:last-child {
+          font-size: 0.75rem;
+          margin-top: 0.5rem;
+          opacity: 0.7;
+          font-weight: normal;
+          color: var(--text-muted);
+
+          &::before {
+            content: "💡";
+            font-size: 1rem;
+          }
+        }
+      }
+    }
+
+    .log-panels {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+
+      .log-panel {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 1rem;
+      }
+    }
+  }
+}
+
+/* 动画效果 */
+@keyframes pulse {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .main-container {
+    .platform {
+      margin: 0.5rem;
+      border-radius: var(--radius-md);
+
+      .p-tap {
+        height: 40px;
+        padding: 0 0.5rem;
+
+        li {
+          padding: 0.25rem 0.5rem;
+          height: 32px;
+          font-size: 0.75rem;
+
+          span {
+            max-width: 80px;
+          }
+        }
+      }
+    }
+
+    .log {
+      margin: 0 0.5rem 0.5rem 0.5rem;
+      border-radius: var(--radius-md);
+
+      .log-t {
+        height: 48px;
+        padding: 0 1rem;
+
+        span {
+          font-size: 0.875rem;
+        }
+      }
+
+      .log-tabs {
+        height: 40px;
+        padding: 0 0.5rem;
+
+        .log-tab-item {
+          min-width: 100px;
+          height: 32px;
+          padding: 0 0.5rem;
+
+          span {
+            font-size: 0.75rem;
+          }
+        }
+      }
+    }
+
+    .resize-handle {
+      height: 6px;
+
+      &::before {
+        width: 30px;
+        height: 3px;
+      }
+
+      &:hover::before {
+        width: 40px;
+        height: 4px;
+      }
+
+      &.dragging::before {
+        width: 50px;
+        height: 5px;
+      }
+    }
+  }
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .main-container {
+    --background-light: #1e293b;
+    --background-white: #334155;
+    --border-light: #475569;
+    --border-medium: #64748b;
+    --text-primary: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+    --primary-light: #1e3a8a;
+  }
+}
+
+/* 高对比度模式支持 */
+@media (prefers-contrast: high) {
+  .main-container {
+    --primary-color: #0000ff;
+    --border-light: #000000;
+    --border-medium: #000000;
+    --text-primary: #000000;
+    --text-secondary: #000000;
+  }
+}
+
+/* 减少动画模式支持 */
+@media (prefers-reduced-motion: reduce) {
+  .main-container * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Element Plus 组件样式优化 */
+:deep(.el-dialog) {
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-lg) !important;
+  border: none !important;
+  overflow: hidden !important;
+
+  .el-dialog__header {
+    background: var(--background-light) !important;
+    border-bottom: 1px solid var(--border-light) !important;
+    padding: 1.5rem !important;
+    margin: 0 !important;
+
+    .el-dialog__title {
+      font-weight: 600 !important;
+      color: var(--text-primary) !important;
+      font-size: 1.125rem !important;
+    }
+
+    .el-dialog__headerbtn {
+      top: 1.5rem !important;
+      right: 1.5rem !important;
+
+      .el-dialog__close {
+        font-size: 1.25rem !important;
+        color: var(--text-secondary) !important;
+        transition: all 0.2s ease !important;
+
+        &:hover {
+          color: var(--danger-color) !important;
+          transform: scale(1.1) !important;
+        }
+      }
+    }
+  }
+
+  .el-dialog__body {
+    padding: 2rem !important;
+    background: var(--background-white) !important;
+  }
+
+  .el-dialog__footer {
+    background: var(--background-light) !important;
+    border-top: 1px solid var(--border-light) !important;
+    padding: 1.5rem !important;
+    margin: 0 !important;
+
+    .dialog-footer {
+      display: flex !important;
+      justify-content: flex-end !important;
+      gap: 0.75rem !important;
+    }
+  }
+}
+
+:deep(.el-button) {
+  border-radius: var(--radius-md) !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
+  border: 1px solid transparent !important;
+
+  &:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: var(--shadow-sm) !important;
+  }
+
+  &.el-button--primary {
+    background: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+
+    &:hover {
+      background: var(--primary-hover) !important;
+      border-color: var(--primary-hover) !important;
+    }
+  }
+
+  &.el-button--default {
+    background: var(--background-white) !important;
+    border-color: var(--border-medium) !important;
+    color: var(--text-secondary) !important;
+
+    &:hover {
+      background: var(--background-light) !important;
+      border-color: var(--primary-color) !important;
+      color: var(--primary-color) !important;
+    }
+  }
+}
+
+:deep(.el-radio-group) {
+  margin-bottom: 1.5rem;
+
+  .el-radio {
+    margin-right: 1.5rem;
+    margin-bottom: 0.75rem;
+
+    .el-radio__label {
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .el-radio__input.is-checked .el-radio__inner {
+      background: var(--primary-color);
+      border-color: var(--primary-color);
+    }
+  }
+}
+
+:deep(.el-select) {
+  width: 100%;
+
+  .el-input__wrapper {
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-medium);
+    transition: all 0.2s ease;
+
+    &:hover {
+      border-color: var(--primary-color);
+    }
+
+    &.is-focus {
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+  }
+
+  .el-input__inner {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+}
+
+:deep(.el-option) {
+  font-weight: 500;
+  color: var(--text-primary);
+
+  &:hover {
+    background: var(--background-light);
+  }
+
+  &.selected {
+    background: var(--primary-light);
+    color: var(--primary-color);
+  }
+}
+
+/* 滚动条美化 */
+:deep(*) {
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: var(--background-light);
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--border-medium);
+    border-radius: 3px;
+    transition: background 0.2s ease;
+
+    &:hover {
+      background: var(--secondary-color);
+    }
+  }
+}
+
+/* 加载状态优化 */
+:deep(.el-loading-mask) {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(4px);
+
+  .el-loading-spinner {
+    .el-loading-text {
+      color: var(--primary-color);
+      font-weight: 500;
+    }
+
+    .path {
+      stroke: var(--primary-color);
+    }
+  }
+}
+
+/* 消息提示优化 */
+:deep(.el-message) {
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  border: none;
+  backdrop-filter: blur(8px);
+
+  &.el-message--success {
+    background: rgba(16, 185, 129, 0.1);
+    border-left: 4px solid var(--success-color);
+  }
+
+  &.el-message--warning {
+    background: rgba(245, 158, 11, 0.1);
+    border-left: 4px solid var(--warning-color);
+  }
+
+  &.el-message--error {
+    background: rgba(239, 68, 68, 0.1);
+    border-left: 4px solid var(--danger-color);
+  }
+
+  &.el-message--info {
+    background: rgba(37, 99, 235, 0.1);
+    border-left: 4px solid var(--primary-color);
+  }
+}
+
+/* 微交互效果 */
+.main-container {
+  .platform {
+    .p-tap {
+      li {
+        &:hover {
+          .tab-icon {
+            transform: rotate(5deg);
+          }
+        }
+
+        &.active {
+          .tab-icon {
+            animation: bounce 0.6s ease;
+          }
+        }
+      }
+    }
+  }
+
+  .log {
+    .log-tabs {
+      .log-tab-item {
+        &:hover {
+          .running-indicator {
+            animation: pulse 1s infinite;
+          }
+        }
+      }
+    }
+  }
+}
+
+@keyframes bounce {
+  0%,
+  20%,
+  53%,
+  80%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  40%,
+  43% {
+    transform: translate3d(0, -8px, 0);
+  }
+  70% {
+    transform: translate3d(0, -4px, 0);
+  }
+  90% {
+    transform: translate3d(0, -2px, 0);
+  }
+}
+
+/* 工具提示样式 */
+:deep(.el-tooltip__popper) {
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  border: none;
+  backdrop-filter: blur(8px);
+  background: rgba(30, 41, 59, 0.95);
+  color: white;
+  font-weight: 500;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+/* 焦点状态优化 */
+:deep(.el-button:focus),
+:deep(.el-select .el-input__wrapper.is-focus) {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+/* 禁用状态优化 */
+:deep(.el-button.is-disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* 加载状态优化 */
+:deep(.el-loading-spinner) {
+  .circular {
+    width: 42px;
+    height: 42px;
+    animation: loading-rotate 2s linear infinite;
+  }
+
+  .path {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: 0;
+    stroke-width: 2;
+    stroke: var(--primary-color);
+    stroke-linecap: round;
+    animation: loading-dash 1.5s ease-in-out infinite;
+  }
+}
+
+@keyframes loading-rotate {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes loading-dash {
+  0% {
+    stroke-dasharray: 1, 150;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: -35;
+  }
+  100% {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: -124;
+  }
+}
+
+.log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background: #f7f8fa; /* 主页面常用浅灰 */
+  color: #222;
+  border-bottom: 1px solid #e5e6eb;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.log-stats {
+  display: flex;
+  gap: 20px;
+}
+
+.stat-item {
+  font-size: 13px;
+  color: #666;
+}
+.stat-value {
+  font-weight: bold;
+  color: #222;
+  background: none;
+  padding: 0 4px;
+}
+.error-count {
+  color: #f53f3f;
+}
+.warning-count {
+  color: #faad14;
+}
+
+.log-controls {
+  display: flex;
+  gap: 8px;
+}
+.control-btn {
+  background: none;
+  border: 1px solid #e5e6eb;
+  border-radius: 4px;
+  padding: 4px 8px;
+  color: #666;
+  transition: border-color 0.2s, background 0.2s;
+}
+.control-btn:hover {
+  border-color: #409eff;
+  background: #f0f7ff;
+  color: #409eff;
+}
+.control-btn.active {
+  border-color: #409eff;
+  background: #e6f7ff;
+  color: #409eff;
+}
+
+.log-content {
+  background: #fff;
+  padding: 0;
+  border-radius: 0 0 4px 4px;
+}
+
+.log-item {
+  padding: 6px 16px;
+  font-size: 13px;
+  border-bottom: 1px solid #f0f0f0;
+  background: none;
+}
+.log-item:last-child {
+  border-bottom: none;
+}
+
+.log-level-badge {
+  min-width: 40px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 500;
+  margin-right: 10px;
+}
+.log-level-badge.error {
+  background: #fff1f0;
+  color: #f53f3f;
+  border: 1px solid #ffd6d1;
+}
+.log-level-badge.warning {
+  background: #fffbe6;
+  color: #faad14;
+  border: 1px solid #ffe58f;
+}
+.log-level-badge.info {
+  background: #e6f7ff;
+  color: #409eff;
+  border: 1px solid #91d5ff;
+}
+.log-level-badge.debug {
+  background: #f4f4f5;
+  color: #909399;
+  border: 1px solid #e4e7ed;
+}
+
+.empty-state {
+  color: #bfbfbf;
+  font-size: 14px;
+  padding: 40px 0;
+  background: none;
+  border: none;
+}
+
+.dashboard-container {
+  /* ...原有样式... */
+  overflow-x: hidden !important;
+}
+</style>

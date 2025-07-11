@@ -1,0 +1,63 @@
+server:
+  port: 8400
+
+logging:
+  config: classpath:logback.xml
+
+spring:
+  jackson:
+    ## 默认序列化时间格式
+    date-format: yyyy-MM-dd HH:mm:ss
+    ## 默认序列化时区
+    time-zone: GMT+8
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3307/cc_etl?zeroDateTimeBehavior=convertToNull&useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&autoReconnect=true&allowMultiQueries=true
+    username: root
+    password: root
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  global-config:
+    db-config:
+      # 主键ID类型
+      id-type: none
+      # 逻辑删除全局属性名(驼峰和下划线都支持)
+      logic-delete-field: isDeleted
+      # 逻辑删除-删除值
+      logic-delete-value: 1
+      # 逻辑删除-未删除值
+      logic-not-delete-value: 0
+  configuration:
+    # 驼峰下划线转换
+    map-underscore-to-camel-case: true
+    # 这个配置会将执行的sql打印出来，在开发或测试的时候可以用
+    # log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+cc-job:
+  job:
+    admin:
+      ### datax admin address list, such as "http://address" or "http://address01,http://address02"
+      #addresses: http://127.0.0.1:8080
+      addresses: http://127.0.0.1:8989/xxl-job-admin,http://127.0.0.1:8990/xxl-job-admin
+    executor:
+      appname: cc-job-executor
+      address:
+      ip:
+      #port: 9999
+      port: 12000
+      ### job log path
+      #logpath: ./data/applogs/executor/jobhandler
+      logpath: /Users/zhaowenpeng/logs
+      ### job log retention days
+      logretentiondays: 30
+    ### job, access token
+    accessToken: default_token
+
+  executor:
+    #jsonpath: D:\\temp\\executor\\json\\
+    jsonpath:  /Users/zhaowenpeng/Downloads/datax/
+
+  #pypath: F:\tools\datax\bin\datax.py
+  pypath: /Users/zhaowenpeng/Downloads/datax/bin/datax.py
