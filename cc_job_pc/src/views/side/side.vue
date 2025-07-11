@@ -288,7 +288,6 @@ function saveFile(blob: Blob, fileName: string) {
 }
 
 function deleteMessageNotice(id: number, type: number) {
-
   const messageArr = [
     {
       type: 0,
@@ -303,7 +302,7 @@ function deleteMessageNotice(id: number, type: number) {
       message: "确认删除当前节点",
     },
   ];
-  ElMessageBox.confirm(messageArr.find(m=>m.type === type)?.message, "删除", {
+  ElMessageBox.confirm(messageArr.find((m) => m.type === type)?.message, "删除", {
     confirmButtonText: "确认",
     cancelButtonText: "取消",
     type: "warning",
@@ -318,7 +317,7 @@ function deleteMessageNotice(id: number, type: number) {
           // 刷新任务树
           refreshTreeData();
         });
-      } else if(type == 1) {
+      } else if (type == 1) {
         JobInfoAPI.deleteByIds(id.toString()).then(() => {
           ElMessage({
             type: "success",
@@ -327,10 +326,10 @@ function deleteMessageNotice(id: number, type: number) {
           // 刷新任务树
           refreshTreeData();
         });
-      }else if(type == 4||type==5){
-        console.log(">>>delete nodes and edge")
+      } else if (type == 4 || type == 5) {
+        console.log(">>>delete nodes and edge");
         // 得到当前页面
-
+        useJobInfoStoreHook().setNodeToDelete(id);
       }
     })
     .catch(() => {
@@ -412,7 +411,7 @@ function refreshTreeData() {
 }
 
 // 让其他组件可以直接调用刷新树
-if (typeof window !== 'undefined') {
+if (typeof window !== "undefined") {
   window.refreshTreeData = refreshTreeData;
 }
 

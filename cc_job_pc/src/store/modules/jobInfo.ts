@@ -6,6 +6,7 @@ import { ref } from "vue";
 export const useJobInfoStore = defineStore("jobInfo", () => {
   const jobInfo = ref({});
   const treeNeedsRefresh = ref(false);
+  const nodeToDelete = ref(null as number | null);
 
   function setJobInfo(data: any) {
     jobInfo.value = data;
@@ -13,6 +14,18 @@ export const useJobInfoStore = defineStore("jobInfo", () => {
 
   function getJobInfo() {
     return jobInfo.value;
+  }
+
+  function setNodeToDelete(nodeId: number) {
+    nodeToDelete.value = nodeId;
+  }
+
+  function clearNodeToDelete() {
+    nodeToDelete.value = null;
+  }
+
+  function getNodeToDelete() {
+    return nodeToDelete.value;
   }
 
   /**
@@ -39,6 +52,9 @@ export const useJobInfoStore = defineStore("jobInfo", () => {
     setJobInfo,
     triggerTreeRefresh,
     getTreeRefreshState,
+    setNodeToDelete,
+    clearNodeToDelete,
+    getNodeToDelete,
   };
 });
 
