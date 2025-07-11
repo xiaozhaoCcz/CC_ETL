@@ -197,6 +197,8 @@ export default JobInfoAPI;
 
 /** task_info表单对象 */
 export interface JobInfoForm {
+  nodePositionX: number;
+  nodePositionY: number;
   id?: number;
   /** 执行器主键ID */
   jobGroup?: number;

@@ -311,12 +311,6 @@ async function selectPage(id) {
         // 加载数据
         console.log(`[流程3] 加载任务组 ${id} 的数据`);
         await selectJobCompNode(id);
-
-        // 确保实例完全就绪，再移动MiniMap
-        setTimeout(() => {
-          lfInstances.value[id].resize();
-          setTimeout(moveMiniMapToSidebar, 100);
-        }, 100);
       }
     } else {
       console.log(`[流程3] 使用任务组 ${id} 已有的LogicFlow实例`);
@@ -324,10 +318,6 @@ async function selectPage(id) {
 
       // 强制激活画布并刷新
       lfInstances.value[id].resize();
-
-      // 延迟移动MiniMap
-      setTimeout(moveMiniMapToSidebar, 600);
-      // moveMiniMapToSidebar();
     }
 
     // 切换任务组时，确保边动画状态正确
@@ -781,12 +771,6 @@ function initLogicFlowInstance(pageId) {
     selectElements();
   });
 
-  // 延迟移动MiniMap到侧边栏
-  setTimeout(() => {
-    if (pageId === usePageStoreHook().getCurrentPage()) {
-      moveMiniMapToSidebar();
-    }
-  }, 10);
   return newLf;
 }
 
@@ -2054,64 +2038,6 @@ onMounted(() => {
     }
   });
 });
-
-// 移动 miniMap 到侧边栏
-const moveMiniMapToSidebar = () => {
-  try {
-    // 获取当前活动的任务组ID
-    const currentPageId = usePageStoreHook().getCurrentPage();
-    if (!currentPageId) {
-      console.log("当前没有活动任务组，跳过MiniMap移动");
-      return;
-    }
-
-    // 找到侧边栏容器
-    const sideLayoutElement = document.querySelector(".side-layout .layout-content");
-
-    // 延迟一下再显示当前MiniMap
-    setTimeout(() => {
-      try {
-        // 显示当前实例的MiniMap
-        currentInstance.extension.miniMap.show();
-
-        // 再次延迟以确保DOM更新完成
-        setTimeout(() => {
-          // 查找MiniMap元素 - 此时应该只有当前活动的MiniMap显示
-          const miniMapElement = document.querySelector(".lf-mini-map");
-
-          if (miniMapElement && sideLayoutElement) {
-            console.log(`找到任务组 ${currentPageId} 的MiniMap元素`);
-
-            // 克隆节点而不是直接移动，避免父子关系问题
-            const clonedMiniMap = miniMapElement.cloneNode(true);
-
-            // 删除原始MiniMap（使用更安全的方法）
-            try {
-              miniMapElement.remove();
-            } catch (e) {
-              console.log("移除原MiniMap时出错，继续处理", e);
-            }
-
-            // 让克隆的节点成为侧边栏的子元素
-            sideLayoutElement.appendChild(clonedMiniMap);
-
-            // 设置样式
-            clonedMiniMap.style.position = "static";
-
-            console.log(`任务组 ${currentPageId} 的MiniMap已移动到侧边栏`);
-          } else {
-            console.log("未找到MiniMap元素，300ms后重试");
-            setTimeout(moveMiniMapToSidebar, 300);
-          }
-        }, 50);
-      } catch (err) {
-        console.log("操作MiniMap时出错，但已被捕获", err);
-      }
-    }, 50);
-  } catch (err) {
-    console.error("移动MiniMap过程中出错:", err);
-  }
-};
 
 function setLfRef(pageId, el) {
   if (el) {
