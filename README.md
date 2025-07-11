@@ -85,7 +85,7 @@ Cc-ETL 是一款基于 XXL-Job 深度改造的可视化定时任务调度工具�
 ### 1. 数据库初始化
 
 请先执行数据库脚本：  
-`/doc/cc_job_admin.sql`
+`/doc/cc_etl.sql`
 
 ### 2. 配置说明
 
@@ -134,24 +134,16 @@ xxl:
 
 ---
 
-## DataX 数据同步演示
-
-以 MySQL 到 MySQL 全量同步为例：
-
-1. 创建两个 MySQL 数据源（test1、test2），test2 的 `stu` 表为空。
-2. 在 cc-job 中创建 DataX 任务，配置 reader、writer 及数据源同步参数。
-3. 在任务列表点击执行，查看日志与同步结果。
-4. 验证目标库数据同步成功。
-
----
-
 ## 项目文档
 
 - [在线文档](http://175.178.249.190/blog/post/298)
 - [本地文档](/doc/cc-job)
   - [01 项目介绍](doc/cc-job/01项目介绍.md)
+  ![image-20241219212046125](./doc/cc-job/images/01-ccjob.png)
   - [02 快速开始](doc/cc-job/02快速开始.md)
+  ![image-20241219212046125](./doc/cc-job/images/02-ccjob.png)
   - [03 功能介绍](doc/cc-job/03功能介绍.md)
+  ![image-20241219212046125](./doc/cc-job/images/03-ccjob.png)
 
 ---
 
