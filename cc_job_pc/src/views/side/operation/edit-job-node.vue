@@ -453,8 +453,8 @@ function handleTableData(val: any) {
 }
 
 async function fetchJdbcDatasource() {
-  const response = await JobJdbcDatasourceAPI.getJdbcDatasourceList();
-  jdbcDatasourceList.value = (response as any).data || [];
+  const data = await JobJdbcDatasourceAPI.getJdbcDatasourceList();
+  jdbcDatasourceList.value = data
 }
 
 function cancelClick() {

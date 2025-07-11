@@ -1,120 +1,110 @@
 # Cc-ETL
 
-<p align=center>
-    基于xxl-job设计的可视化任务调度工具
-</p>
 <p align="center">
+    <b>基于 XXL-Job 改造的可视化任务调度平台</b>
+</p>
 
+---
 
-## 项目介绍
-基于xxl-job改造的可视化定时任务调度工具，支持任务可视化拖拽，支持任务失败重试，任务暂停和预测任务到达时间，设定超时时间等。支持单任务多任务串并联运行，可视化观察每一个任务运行的状况，并集成datax工具实现不同数据源的数据同步。
+## 项目简介
 
-## 数据库地址
-/doc/cc_job_admin.sql
+Cc-ETL 是一款基于 XXL-Job 深度改造的可视化定时任务调度工具。它支持任务可视化编排、任务失败重试、任务暂停、任务预测、超时控制等高级特性，并集成 DataX 实现多数据源间的数据同步。平台支持单任务、多任务串并联运行，运行状态可视化展示，极大提升了任务调度的易用性和可观测性。
 
-## 项目功能
-- **对任务编排模块前端进行重写，支持任务和任务组的编辑**
-- xxl-job的所有功能都已集成
-- 新增datax数据同步功能
-  - 目前支持mysql和oracle数据全量和增量同步
-  - 后续会支持更多数据源
-- 支持存储过程调用和sql调用
-- 支持api任务调度
-- 可视化任务编排
-  1. **新增预测任务节点开始运行的时间和运行完成的时间**
-  2.  **新增任务节点暂停运行**
-  3. 支持定义任务节点超时时间
-  4. 支持任务失败重试
-  5. 支持失败任务忽略运行
-  6. 任务节点运行状态可视化展示
-  7. 支持任务组节点串并联运行
+---
 
-## 任务调度
-1. 新建任务或任务组，支持拖拽的形式创建任务和任务组，**选择节点后要点击编辑选择任务或任务组**
+## 主要特性
 
-   | ![image-20241219212046125](./doc/img2/main/1.png) | ![image-20241219212046125](./doc/img2/main/2.png) |
-   | ------------------------------------------------- | ------------------------------------------------- |
-   | ![image-20241219212046125](./doc/img2/main/3.png) | ![image-20241219212046125](./doc/img2/main/4.png) |
+- **任务编排前端重构**：支持任务与任务组的可视化编辑与拖拽编排
+- **简洁**：只需数据库，不需要其他中间件即可使用
+- **pc端**：使用electron实现pc端可视化任务调度
+- **兼容 XXL-Job 全部功能**
+- **集成 DataX 数据同步**：
+  - 支持 MySQL、Oracle 数据的全量与增量同步
+  - 后续将支持更多数据源
+- **支持存储过程与 SQL 调用**
+- **支持 API 任务调度**
+- **任务编排高级特性**：
+  - 预测任务节点的开始与完成时间
+  - 任务节点可暂停
+  - 支持任务超时设置
+  - 任务失败自动重试
+  - 支持失败任务忽略继续执行
+  - 任务节点运行状态可视化
+  - 支持任务组节点串并联运行
 
-2. 保存任务组
+---
+## 项目展示
 
-   | ![image-20241219212046125](./doc/img2/main/5.png) | ![image-20241219212046125](./doc/img2/main/6.png) |
-   | ------------------------------------------------- | ------------------------------------------------- |
-   | ![image-20241219212046125](./doc/img2/main/7.png) | ![image-20241219212046125](./doc/img2/main/8.png) |
+### 1.启动pc端和web端
+分别启动pc端和web端，后端启动（启动方式后续会介绍）
 
-3. 运行任务组
+|||
+|-----------------------|-----------------------|
+| ![](./doc/image/img-md/01.png) | ![](./doc/image/img-md/02.png) |
 
-   **测试任务组3**，支持任务组中串联任务组，运行过程中状态也会发生改变
+### 2.在web端配置好执行器和数据源（如果需要执行sql任务）
+|||
+|-----------------------|-----------------------|
+| ![](./doc/image/img-md/03.png) | ![](./doc/image/img-md/04.png) |
 
-   - 运行成功的任务状态会变成绿色
-   - 运行失败的任务状态会变成红色
-   - 运行中的任务状态会变成黄色
-   - 运作中任务组节点的边框也会发生改变
+### 3.配置任务并执行
+#### 1.创建任务分区
+点击`新建`创建任务分区，一个任务分区下对应多个任务组
+|||
+|-----------------------|-----------------------|
+| ![](./doc/image/img-md/05.png) | ![](./doc/image/img-md/06.png) |
+#### 2.创建任务组
+⚠️任务组中任务执行器需要选择`任务集执行器`，此执行器需要在web端进行配置
+|||
+|-----------------------|-----------------------|
+| ![](./doc/image/img-md/07.png) | ![](./doc/image/img-md/08.png) |
+#### 3.新建任务
+支持创建多个任务
+- bean任务
+- api任务
+- sql任务
+- shell任务
+创建好不同的任务节点，并建立联系
 
-   | ![image-20241219212046125](./doc/img2/main/9.png)  | ![image-20241219212046125](./doc/img2/main/10.png) |
-   | -------------------------------------------------- | -------------------------------------------------- |
-   | ![image-20241219212046125](./doc/img2/main/11.png) | ![image-20241219212046125](./doc/img2/main/12.png) |
+|||
+|-----------------------|-----------------------|
+| ![](./doc/image/img-md/09.png) | ![](./doc/image/img-md/10.png) |
+| ![](./doc/image/img-md/11.png) |  |
+#### 4.运行任务组
+点击右上角`运行`，观察任务的运行日志和状态\
+运行成功的任务颜色会显示`绿色`，失败的任务显示`红色`，运行中的任务显示`黄色`\
+运行中的日志信息会展示到下方
 
-4. 修改任务
+|||
+|-----------------------|-----------------------|
+| ![](./doc/image/img-md/12.png) | ![](./doc/image/img-md/13.png) |
+---
 
-   将任务4修改成sql任务
+## 快速开始
 
-   | ![image-20241219212046125](./doc/img2/main/13.png) | ![image-20241219212046125](./doc/img2/main/14.png) |
-   | -------------------------------------------------- | -------------------------------------------------- |
-   | ![image-20241219212046125](./doc/img2/main/15.png) | ![image-20241219212046125](./doc/img2/main/16.png) |
+### 1. 数据库初始化
 
-5. 查看日志
+请先执行数据库脚本：  
+`/doc/cc_job_admin.sql`
 
-   也可以在任务日志中查看当前运行的日志信息
+### 2. 配置说明
 
-   | ![image-20241219212046125](./doc/img2/main/17.png) | ![image-20241219212046125](./doc/img2/main/18.png) |
-   | -------------------------------------------------- | -------------------------------------------------- |
+#### 执行器配置（以 xxl-job-executor-sample-springboot 为例）
 
-   
-
-
-## 项目文档
-http://175.178.249.190/blog/post/298
-
-## 本地文档
-`/doc/cc-job`
-
-[01项目介绍.md](doc/cc-job/01%E9%A1%B9%E7%9B%AE%E4%BB%8B%E7%BB%8D.md)
-![image-20241219212046125](./doc/cc-job/images/01-ccjob.png)
-
-[02快速开始.md](doc/cc-job/02%E5%BF%AB%E9%80%9F%E5%BC%80%E5%A7%8B.md)
-![image-20241219212046125](./doc/cc-job/images/02-ccjob.png)
-
-[03功能介绍.md](doc/cc-job/03%E5%8A%9F%E8%83%BD%E4%BB%8B%E7%BB%8D.md)
-![image-20241219212046125](./doc/cc-job/images/03-ccjob.png)
-### 修改配置
-与xxl-job后端的配置一样，只不过`admin.addresses`地址要换成`8989`，并且执行器端口不能为`9999`
-路径地址也需要进行配置
-
-示例配置（这是xxl-job-executor-sample-springboot的配置）
 ```yaml
-### xxl-job admin address list, such as "http://address" or "http://address01,http://address02"
 xxl.job.admin.addresses=http://127.0.0.1:8989/xxl-job-admin
-
-### xxl-job, access token
 xxl.job.accessToken=default_token
-
-### xxl-job executor appname
 xxl.job.executor.appname=xxl-job-executor-sample
-### xxl-job executor registry-address: default use address to registry , otherwise use ip:port if address is null
 xxl.job.executor.address=
-### xxl-job executor server-info
 xxl.job.executor.ip=
 xxl.job.executor.port=10000
-### xxl-job executor log-path
-xxl.job.executor.logpath= #路径地址
-### xxl-job executor log-retention-days
+xxl.job.executor.logpath= # 路径地址
 xxl.job.executor.logretentiondays=30
 ```
 
-admin模块配置 !!! 需要配置日志路径，最好与executor的路径一致
+#### 管理端配置（admin）
+
 ```yaml
-# xxl-job 定时任务配置
 xxl:
   job:
     i18n: zh_CN
@@ -125,63 +115,51 @@ xxl:
       slow:
         max: 200
     logretentiondays: 30
-    logpath:  #日志路径
+    logpath:  # 日志路径，建议与 executor 保持一致
 ```
-## 项目模块
 
-![image-20241219212046125](./doc/img/01img/image-20241219212046125.png)
+> ⚠️ 注意：`admin.addresses` 端口需为 `8989`，执行器端口不能为 `9999`。
 
-- cc-async-tool 异步任务调度工具，通过这个工具可以实现任务的重复调用，超时策略  **gitee地址**：https://gitee.com/xzjsccz/async-task-tool
-- cc-job-admin 任务注册中心，所有的任务和任务组都在当前注册中心进行注册
-- cc-job-core 任务执行的核心代码块
-- c c-job-executor: 任务执行器，包含datax任务，api任务，jdbc任务
-- cc-job-executor-sample：测试样例任务执行器
-- cc-job-xo：存储mapper，entity类
-- vue3-cc-job-admin：前端
+---
 
-## 简单演示
+## 模块说明
+- **cc_job_pc**：桌面端（PC端）管理界面，便于本地运维和管理。
+- **cc-job/cc-async-tool**：异步任务调度工具，支持任务的重复调用与超时处理。
+- **cc-job/cc-job-admin**：任务注册中心，负责任务与任务组的注册管理。
+- **cc-job/cc-job-core**：任务执行的核心模块，负责调度和执行任务。
+- **cc-job/cc-job-executor**：任务执行器，支持多种任务类型（如DataX、API、JDBC等）。
+- **cc-job/cc-job-executor-samples**：任务执行器的示例工程，便于开发和测试。
+- **cc-job/cc-job-xo**：数据存储与实体映射模块。
+- **cc-job-web**：Web端管理界面，提供可视化的任务管理与监控。
 
-### datax数据同步任务
+---
 
-简单演示mysql-mysql全量同步功能
+## DataX 数据同步演示
 
-首先创建2个mysql数据源**test1**和**test2**，其中**test2**中的表**stu**无数据，现在演示**test1**数据库的**stu**表数据全量同步到**test2**中的**stu**表中
+以 MySQL 到 MySQL 全量同步为例：
 
-<img src="./doc/img/01img/02.png" alt="02" style="zoom:50%;" />
+1. 创建两个 MySQL 数据源（test1、test2），test2 的 `stu` 表为空。
+2. 在 cc-job 中创建 DataX 任务，配置 reader、writer 及数据源同步参数。
+3. 在任务列表点击执行，查看日志与同步结果。
+4. 验证目标库数据同步成功。
 
-在cc-job中创建好datax任务，项目启动流程和任务构建在**第2章**，这里只是做简单演示
+---
 
-- 创建reader
+## 项目文档
 
-<img src="./doc/img/01img/03.png" alt="image-20241221222732953" style="zoom: 25%;" />
+- [在线文档](http://175.178.249.190/blog/post/298)
+- [本地文档](/doc/cc-job)
+  - [01 项目介绍](doc/cc-job/01项目介绍.md)
+  - [02 快速开始](doc/cc-job/02快速开始.md)
+  - [03 功能介绍](doc/cc-job/03功能介绍.md)
 
-- 创建writer
+---
 
-  <img src="./doc/img/01img/04.png" alt="image-20241221222945799" style="zoom:25%;" />
+## License
 
-- 数据源同步配置
+本项目遵循 [MIT License](./LICENSE)。
 
-  <img src="./doc/img/01img/05.png" alt="image-20241221223200946" style="zoom: 20%;" />
+---
 
-- 在任务列表点击执行，观察最终日志和运行结果
-
-  <img src="./doc/img/01img/06.png" alt="image-20241221223328191" style="zoom:20%;" />
-
-<img src="./doc/img/01img/07.png" alt="image-20241221223559400" style="zoom:20%;" />
-
-- 观察数据库中的数据是否同步成功
-
-  <img src="./doc/img/01img/08.png" alt="image-20241221223750176" style="zoom:50%;" />
-
-
-
-
-## 项目截图
-
-|                                 |                                 |
-|:-------------------------------:|:-------------------------------:|
-| ![image text](./doc/img/11.png) | ![image text](./doc/img/12.png) |
-| ![image text](./doc/img/13.png) | ![image text](./doc/img/14.png) |
-| ![image text](./doc/img/15.png) | ![image text](./doc/img/16.png) |
-| ![image text](./doc/img/17.png) | ![image text](./doc/img/18.png) |
+如需更多帮助或有任何建议，欢迎提交 Issue 或 PR！
 
