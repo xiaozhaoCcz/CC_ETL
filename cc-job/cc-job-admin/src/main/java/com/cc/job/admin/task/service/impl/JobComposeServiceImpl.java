@@ -378,6 +378,9 @@ public class JobComposeServiceImpl implements JobComposeService {
 
     @Override
     public boolean validateJobComposeEdge(String nodes, String edges) {
+        if(StringUtils.isBlank(nodes)){
+            return true;
+        }
         List<LfNode> lfNodes = JSONUtil.parseArray(nodes).toList(LfNode.class);
         List<LfEdge> lfEdges = JSONUtil.parseArray(edges).toList(LfEdge.class);
 

@@ -288,6 +288,7 @@ function saveFile(blob: Blob, fileName: string) {
 }
 
 function deleteMessageNotice(id: number, type: number) {
+
   const messageArr = [
     {
       type: 0,
@@ -297,8 +298,12 @@ function deleteMessageNotice(id: number, type: number) {
       type: 1,
       message: "确认删除当前任务组下的所有节点和关系",
     },
+    {
+      type: 4,
+      message: "确认删除当前节点",
+    },
   ];
-  ElMessageBox.confirm(messageArr[type].message, "删除", {
+  ElMessageBox.confirm(messageArr.find(m=>m.type === type)?.message, "删除", {
     confirmButtonText: "确认",
     cancelButtonText: "取消",
     type: "warning",
@@ -313,7 +318,7 @@ function deleteMessageNotice(id: number, type: number) {
           // 刷新任务树
           refreshTreeData();
         });
-      } else {
+      } else if(type == 1) {
         JobInfoAPI.deleteByIds(id.toString()).then(() => {
           ElMessage({
             type: "success",
@@ -322,12 +327,16 @@ function deleteMessageNotice(id: number, type: number) {
           // 刷新任务树
           refreshTreeData();
         });
+      }else if(type == 4||type==5){
+        console.log(">>>delete nodes and edge")
+        // 得到当前页面
+
       }
     })
     .catch(() => {
       ElMessage({
-        type: "error",
-        message: "删除异常",
+        type: "info",
+        message: "取消删除",
       });
     });
 }

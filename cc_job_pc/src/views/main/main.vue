@@ -332,10 +332,9 @@ watch(
   async (jobInfo: any) => {
     if (jobInfo.jobId) {
       // 修改任务
-      console.log("修改任务:", jobInfo);
+      
     } else {
       // 新增任务
-      console.log("新增任务:", jobInfo);
       await addJobNode(jobInfo);
       await selectPage(jobInfo.parentId);
     }
@@ -385,7 +384,6 @@ watch(
         canvasOperations.zoomOut(currentLf);
         break;
       case "clear":
-        console.log("清除");
         try {
           clearCanvasUtil(currentLf);
           ElMessage.success("画布已清空");
@@ -420,9 +418,6 @@ watch(
   () => usePageStoreHook().getLoactionObject(),
   (locationObj: any) => {
     if (!locationObj || Object.keys(locationObj).length === 0) return;
-
-    console.log("检测到定位节点信息:", locationObj);
-
     // 获取当前LogicFlow实例
     const currentPageId = usePageStoreHook().getCurrentPage();
     const currentLf = lfInstances.value[currentPageId];
@@ -437,7 +432,6 @@ watch(
         // 定位到节点
         const nodeElement = currentLf.getNodeModelById(locationObj.id);
         if (nodeElement) {
-          console.log(`成功定位到节点: ${nodeElement.id}`);
           // 记录原始样式
           originalStyle = {
             ...nodeElement.getData().properties?.style,
@@ -459,7 +453,6 @@ watch(
         // 定位到边
         const edgeElement = currentLf.getEdgeModelById(locationObj.id);
         if (edgeElement) {
-          console.log(`成功定位到边: ${edgeElement.id}`);
           // 记录原始样式
           originalStyle = {
             ...edgeElement.getData().properties?.style,
@@ -551,8 +544,6 @@ onBeforeUnmount(() => {
  * @param id 任务组ID
  */
 async function selectPage(id: number): Promise<void> {
-  console.log(`[流程3] 开始选择任务组 ${id} ==================`);
-
   try {
     // 先更新状态
     usePageStoreHook().setCurrentPage(id);
@@ -576,25 +567,22 @@ async function selectPage(id: number): Promise<void> {
 
     // 确保容器已准备好
     if (!lfRefs.value[id]) {
-      console.log(`[流程3] 任务组 ${id} 的DOM引用不存在，等待DOM渲染`);
+      
       setTimeout(() => selectPage(id), 300);
       return;
     }
 
     // 检查是否已经有该任务组的实例
     if (!lfInstances.value[id]) {
-      console.log(`[流程3] 为任务组 ${id} 创建新的LogicFlow实例`);
       // 初始化LogicFlow实例
       lfInstances.value[id] = initLogicFlowInstance(id);
       lf.value = lfInstances.value[id];
 
       if (lf.value) {
         // 加载数据
-        console.log(`[流程3] 加载任务组 ${id} 的数据`);
         await selectJobCompNode(id);
       }
     } else {
-      console.log(`[流程3] 使用任务组 ${id} 已有的LogicFlow实例`);
       lf.value = lfInstances.value[id];
 
       // 强制激活画布并刷新
@@ -603,17 +591,12 @@ async function selectPage(id: number): Promise<void> {
 
     // 切换任务组时，确保边动画状态正确
     setTimeout(() => {
-      console.log(`切换到任务组 ${id}，更新边动画状态`);
       updateEdgeStyleForTaskGroupUtil(
         id,
         lfInstances.value[id],
         usePageStoreHook().getCurrentPageRunStatus
       );
     }, 200);
-
-    // 切换任务组时保留所有任务组的日志获取，不再清除任何定时器
-    // 每个任务组都有独立的日志获取状态，切换时不应该互相影响
-    console.log(`切换到任务组 ${id}，保持其他任务组的日志获取继续运行`);
   } catch (err) {
     console.error(`处理任务组 ${id} 切换时出错:`, err);
   }
@@ -626,7 +609,6 @@ async function selectPage(id: number): Promise<void> {
 function closePage(id: number): void {
   // 清理 LogicFlow 实例
   if (lfInstances.value[id]) {
-    console.log(`[清理] 清理任务组 ${id} 的LogicFlow实例`);
     try {
       // 销毁 LogicFlow 实例
       lfInstances.value[id].destroy();
@@ -639,7 +621,6 @@ function closePage(id: number): void {
 
   // 清理 DOM 引用（虽然 setLfRef 也会清理，但这里主动清理更安全）
   if (lfRefs.value[id]) {
-    console.log(`[清理] 清理任务组 ${id} 的DOM引用`);
     delete lfRefs.value[id];
   }
 
@@ -684,7 +665,6 @@ function logReset(specificJobId?: number | null): void {
     const tabId = `${specificJobId}`;
     const loggerRef = getLoggerRef(tabId);
     if (loggerRef) {
-      console.log(`重置指定的日志标签页: ${tabId}`);
       loggerRef.reset();
     } else {
       console.warn(`未找到任务组 ${specificJobId} 的日志组件`);
@@ -696,7 +676,6 @@ function logReset(specificJobId?: number | null): void {
 
     // 清除定时器 - 定时器是全局的，需要在任务停止或切换时清除
     if (logRun != null) {
-      console.log("清除日志获取定时器");
       window.clearInterval(logRun);
       logRun = null;
     }
@@ -705,7 +684,6 @@ function logReset(specificJobId?: number | null): void {
     if (activeLogTab.value) {
       const loggerRef = getLoggerRef(activeLogTab.value);
       if (loggerRef) {
-        console.log(`重置激活的日志标签页: ${activeLogTab.value}`);
         loggerRef.reset();
       } else {
         console.warn(`未找到标签页 ${activeLogTab.value} 的日志组件`);
@@ -722,10 +700,8 @@ function run(id: number): void {
   // 保存当前执行的日志ID，这是后端返回的，与任务组ID不同
   const currentExecuteLogId = id;
   const currentJobId = jobId.value;
-  console.log(`开始获取日志，执行ID: ${currentExecuteLogId}, 任务组ID: ${currentJobId}`);
 
   if (!currentJobId) {
-    console.error("无法启动日志获取：任务组ID为空");
     return;
   }
 
@@ -746,7 +722,6 @@ function run(id: number): void {
     getExecuteTaskLog(currentExecuteLogId, currentJobId);
   }, 2000);
 
-  console.log(`任务组 ${currentJobId} 的日志获取定时器已启动`);
 }
 
 /**
@@ -809,15 +784,15 @@ function getExecuteTaskLog(id: number, targetJobId?: number): void {
   JobLogAPI.logDetailCat(id, currentFromLineNum).then((data: any) => {
     if (data.code == 200) {
       if (!data.content) {
-        console.log("pullLog fail");
+        
         return;
       }
       if (currentFromLineNum != data.content.fromLineNum) {
-        console.log("pullLog fromLineNum not match");
+        
         return;
       }
       if (currentFromLineNum > data.content.toLineNum) {
-        console.log("pullLog already line-end");
+        
 
         // valid end
         if (data.content.end) {
@@ -844,12 +819,7 @@ function getExecuteTaskLog(id: number, targetJobId?: number): void {
       const loggerRef = getLoggerRef(currentTabId);
 
       if (loggerRef) {
-        console.log(
-          `添加日志到任务组 ${currentJobId} 的日志组件, 当前行号范围: ${data.content.fromLineNum}-${data.content.toLineNum}`
-        );
         loggerRef.addLogsFromText(convertContent(data.content.logContent));
-      } else {
-        console.error(`未找到任务组 ${currentJobId} 的日志组件，无法添加日志`);
       }
 
       // 重置失败计数
@@ -879,11 +849,9 @@ function logRunStop(content: string, targetJobId?: number): void {
     if (state && state.logRun) {
       window.clearInterval(state.logRun);
       state.logRun = null;
-      console.log(`停止任务组 ${targetJobId} 的日志获取定时器`);
     }
 
     // 日志停止意味着任务完成，立即更新任务组状态
-    console.log(`任务组 ${targetJobId} 日志停止，立即更新运行状态为停止`);
     usePageStoreHook().updatePageRunStatus(targetJobId, false);
     updateEdgeStyleForTaskGroupUtil(
       targetJobId,
@@ -896,7 +864,6 @@ function logRunStop(content: string, targetJobId?: number): void {
     const tab = logTabs.value.find((t) => t.id === tabId);
     if (tab) {
       tab.isRunning = false;
-      console.log(`更新任务组 ${targetJobId} 的日志标签页状态为停止`);
     }
   } else {
     // 停止全局日志获取（向后兼容）
@@ -906,7 +873,6 @@ function logRunStop(content: string, targetJobId?: number): void {
 
       // 更新当前任务组状态
       if (currentJobId) {
-        console.log(`当前任务组 ${currentJobId} 日志停止，立即更新运行状态为停止`);
         usePageStoreHook().updatePageRunStatus(currentJobId, false);
 
         updateEdgeStyleForTaskGroupUtil(
@@ -920,7 +886,7 @@ function logRunStop(content: string, targetJobId?: number): void {
         const tab = logTabs.value.find((t) => t.id === tabId);
         if (tab) {
           tab.isRunning = false;
-          console.log(`更新任务组 ${currentJobId} 的日志标签页状态为停止`);
+          
         }
       }
     }
@@ -932,7 +898,7 @@ function logRunStop(content: string, targetJobId?: number): void {
   const loggerRef = getLoggerRef(currentTabId);
 
   if (loggerRef) {
-    console.log(`任务组 ${currentJobId} 日志结束: ${content}`);
+    
     loggerRef.addLogsFromText(convertContent(content));
   } else {
     console.error(`日志结束但未找到任务组 ${currentJobId} 的日志组件，无法添加结束日志`);
@@ -947,7 +913,7 @@ function logRunStop(content: string, targetJobId?: number): void {
  * @returns LogicFlow实例
  */
 function initLogicFlowInstance(pageId: number): any {
-  console.log(`[流程4] 开始初始化LogicFlow实例 ${pageId} ==================`);
+  
 
   const container = lfRefs.value[pageId];
   if (!container) {
@@ -960,10 +926,10 @@ function initLogicFlowInstance(pageId: number): any {
     const existingInstance = lfInstances.value[pageId];
     // 检查实例的容器是否还存在且可用
     if (existingInstance.container && existingInstance.container.parentNode) {
-      console.log(`[流程4] 实例已存在且容器有效，直接返回`);
+      
       return existingInstance;
     } else {
-      console.log(`[流程4] 实例存在但容器已失效，重新创建实例`);
+      
       // 清理无效实例
       try {
         existingInstance.destroy();
@@ -979,7 +945,7 @@ function initLogicFlowInstance(pageId: number): any {
   container.style.display = "block";
 
   // 创建LogicFlow实例
-  console.log(`[流程4] 创建LogicFlow实例`);
+  
   const newLf = new LogicFlow({
     container: container,
     background: {
@@ -1008,7 +974,7 @@ function initLogicFlowInstance(pageId: number): any {
   });
 
   // 初始化逻辑
-  console.log(`[流程4] 配置LogicFlow实例`);
+  
 
   (newLf.extension.menu as any).setMenuConfig(menuConfig);
   newLf.register(CustomJava);
@@ -1025,7 +991,7 @@ function initLogicFlowInstance(pageId: number): any {
   newLf.setDefaultEdgeType("bezier");
 
   // 渲染空画布
-  console.log(`[流程4] 渲染空画布`);
+  
   newLf.render({
     nodes: [],
     edges: [],
@@ -1038,12 +1004,12 @@ function initLogicFlowInstance(pageId: number): any {
   container.style.display = originalDisplay;
 
   // 显示MiniMap (必须在render之后)
-  console.log(`[流程4] 显示MiniMap`);
+  
   (newLf.extension.miniMap as any).show();
 
   // 保存实例并返回
   lfInstances.value[pageId] = newLf;
-  console.log(`[流程4] LogicFlow实例创建完成 ==================`);
+  
 
   const { eventCenter } = newLf.graphModel;
 
@@ -1095,7 +1061,7 @@ function bindEvents(lfInstance: any): void {
 
     // 获取原节点的数据
     const originalNodeData = node.getData();
-    console.log(`🔄 复制节点 - 原始节点数据:`, originalNodeData);
+    
 
     const originalJobId = originalNodeData.properties?.jobId;
     if (!originalJobId) {
@@ -1106,7 +1072,7 @@ function bindEvents(lfInstance: any): void {
     try {
       // 获取原任务的完整数据
       const originalJobData = await JobInfoAPI.getFormData(originalJobId);
-      console.log(`📋 获取原任务数据:`, originalJobData);
+      
 
       // 创建新任务的数据，移除ID相关字段，添加_copy后缀
       const newJobData = {
@@ -1122,9 +1088,9 @@ function bindEvents(lfInstance: any): void {
       };
 
       // 调用后端API创建新任务
-      console.log(`📤 准备发送创建任务请求，数据:`, newJobData);
+      
       const jobNode = await JobInfoAPI.saveJobNode(newJobData);
-      console.log(`📥 后端响应原始数据:`, jobNode);
+      
 
       // 检查后端返回的数据是否有效
       if (!jobNode) {
@@ -1135,7 +1101,7 @@ function bindEvents(lfInstance: any): void {
         return;
       }
 
-      console.log(`✅ 创建新任务成功，新任务ID: ${jobNode.jobId}`);
+      
 
       // 创建新的独立属性，使用新的jobId
       const newProperties = {
@@ -1153,7 +1119,7 @@ function bindEvents(lfInstance: any): void {
         properties: newProperties,
       };
 
-      console.log(`✅ 创建复制节点 - 新节点数据:`, newNode);
+      
       console.log(
         `🆔 新节点独立jobId: ${newProperties.jobId}, glueType: ${newProperties.glueType}`
       );
@@ -1222,13 +1188,10 @@ function bindEvents(lfInstance: any): void {
  */
 function setLfRef(pageId: number, el: HTMLElement | null): void {
   if (el) {
-    console.log(`[流程9] 设置任务组 ${pageId} 的DOM引用`);
     lfRefs.value[pageId] = el;
-
     // 只记录引用，不立即初始化
     // 选择当前页面时会通过selectPage调用initLogicFlowInstance
   } else if (lfRefs.value[pageId]) {
-    console.log(`[流程9] 移除任务组 ${pageId} 的DOM引用`);
     delete lfRefs.value[pageId];
   }
 }
@@ -1250,7 +1213,7 @@ const menuConfig = {
           ElMessage.warning("暂不支持任务组选择");
           return;
         }
-        console.log("选择任务", node);
+        
         jobDialog.value = true;
         jobNodeEditId.value = node.id;
       },
@@ -1269,7 +1232,7 @@ const menuConfig = {
         jobNodeVisible.value = true;
         nodeJobId.value = node.properties.jobId;
         currentEditingNodeId.value = node.id; // 保存当前正在编辑的节点ID
-        console.log("右键菜单编辑节点:", node);
+        
         selectNode.value = node;
       },
     },
@@ -1293,7 +1256,7 @@ const menuConfig = {
         // 获取节点数据
         const nodeModel = currentLf.getNodeModelById(node.id);
         const originalNodeData = nodeModel.getData();
-        console.log(`🔄 菜单复制节点 - 原始节点数据:`, originalNodeData);
+        
 
         const originalJobId = originalNodeData.properties?.jobId;
         if (!originalJobId) {
@@ -1304,7 +1267,7 @@ const menuConfig = {
         try {
           // 获取原任务的完整数据
           const originalJobData = await JobInfoAPI.getFormData(originalJobId);
-          console.log(`📋 菜单获取原任务数据:`, originalJobData);
+          
 
           // 创建新任务的数据，移除ID相关字段，添加_copy后缀
           const newJobData = {
@@ -1318,7 +1281,7 @@ const menuConfig = {
           };
 
           // 调用后端API创建新任务
-          console.log(`📤 菜单准备发送创建任务请求，数据:`, newJobData);
+          
           const newJobID = await JobInfoAPI.add(newJobData);
 
           // 检查后端返回的数据是否有效
@@ -1346,7 +1309,7 @@ const menuConfig = {
             properties: newProperties,
           };
 
-          console.log(`✅ 菜单创建复制节点 - 新节点数据:`, newNode);
+          
           console.log(
             `🆔 新节点独立jobId: ${newProperties.jobId}, glueType: ${newProperties.glueType}`
           );
@@ -1364,7 +1327,7 @@ const menuConfig = {
     {
       text: "属性",
       callback(node: any) {
-        console.log(node);
+        
         let startTime = "";
         let endTime = "";
 
@@ -1656,25 +1619,25 @@ async function triggerOne(): Promise<void> {
   const state = getJobState(currentJobId);
 
   // 在开始新任务前，先清理旧的连接和定时器
-  console.log(`开始新任务前清理任务组 ${currentJobId} 的旧状态`);
+  
 
   // 清理旧的WebSocket连接
   if (state.ws) {
-    console.log(`关闭任务组 ${currentJobId} 的旧WebSocket连接`);
+    
     state.ws.close();
     state.ws = null;
   }
 
   // 清理旧的日志定时器
   if (state.logRun) {
-    console.log(`清理任务组 ${currentJobId} 的旧日志定时器`);
+    
     window.clearInterval(state.logRun);
     state.logRun = null;
   }
 
   // 生成新的randomId
   randomId.value = snowflake.nextId(1) as string;
-  console.log(`为任务组 ${currentJobId} 生成新的randomId: ${randomId.value}`);
+  
 
   const _nodes = currentLf.getGraphRawData().nodes;
 
@@ -1694,13 +1657,13 @@ async function triggerOne(): Promise<void> {
 
   // TODO 查找暂停中的任务并修改任务状态
   const jobIds = _nodes.map((node: any) => node.properties.jobId);
-  console.log("暂停任务", jobIds);
+  
   const pauseJobIds = await JobInfoAPI.pauseJobs(jobIds);
 
   _nodes
     .filter((node: any) => pauseJobIds.includes(node.properties.jobId))
     .forEach((node: any) => {
-      console.log(">>>>>>>>>>>>>暂停的节点", node);
+      
       const _node = currentLf.getNodeModelById(node.id);
       // 修改节点状态
       _node.isPause = true;
@@ -1711,7 +1674,7 @@ async function triggerOne(): Promise<void> {
 
   // 保存当前任务组的randomId到状态中
   state.randomId = randomId.value;
-  console.log(`任务组 ${currentJobId} 保存randomId: ${randomId.value}`);
+  
 
   // 创建或更新日志标签页
   const currentPage = pageTaps.value.find((page) => page.id === jobId.value);
@@ -1722,7 +1685,7 @@ async function triggerOne(): Promise<void> {
   const existingTab = logTabs.value.find((tab) => tab.id === tabId);
   if (!existingTab) {
     // 如果不存在，创建新标签页
-    console.log(`为任务组 ${jobId.value} 创建新的日志标签页`);
+    
     logTabs.value.push({
       id: tabId,
       jobId: jobId.value,
@@ -1732,7 +1695,6 @@ async function triggerOne(): Promise<void> {
     });
   } else {
     // 如果已存在，更新随机ID和运行状态
-    console.log(`更新任务组 ${jobId.value} 的日志标签页状态`);
     existingTab.randomId = randomId.value;
     existingTab.isRunning = true;
   }
@@ -1779,7 +1741,7 @@ async function triggerOne(): Promise<void> {
       const tab = logTabs.value.find((t) => t.id === tabId);
       if (tab) {
         tab.isRunning = false;
-        console.log(`任务启动失败：更新任务组 ${jobId.value} 的日志标签页状态为停止`);
+        
       }
     })
     .finally(() => {});
@@ -1812,12 +1774,12 @@ function stopTrigger(): void {
       if (state.logRun) {
         window.clearInterval(state.logRun);
         state.logRun = null;
-        console.log(`手动停止任务组 ${currentJobId} 的日志获取定时器`);
+        
       }
 
       // 关闭对应任务组的WebSocket连接
       if (state.ws) {
-        console.log(`手动停止：关闭任务组 ${currentJobId} 的WebSocket连接`);
+        
         state.ws.close();
         state.ws = null;
       }
@@ -1827,7 +1789,7 @@ function stopTrigger(): void {
       const tab = logTabs.value.find((t) => t.id === tabId);
       if (tab) {
         tab.isRunning = false;
-        console.log(`手动停止：更新任务组 ${currentJobId} 的日志标签页状态为停止`);
+        
       }
 
       ElMessage.success("任务已停止");
@@ -1843,7 +1805,7 @@ function stopTrigger(): void {
  * @param id 任务组ID
  */
 async function selectJobCompNode(id: number): Promise<void> {
-  console.log(`[流程5] 开始获取任务组 ${id} 的节点数据 ==================`);
+  
   // 只有在首次加载时调用，避免重复加载
   const currentLf = lfInstances.value[id];
   if (!currentLf) {
@@ -1858,7 +1820,7 @@ async function selectJobCompNode(id: number): Promise<void> {
   );
 
   if (currentData.nodes.length > 0) {
-    console.log(`[流程5] 画布已有数据，跳过加载`);
+    
     return;
   }
 
@@ -1866,11 +1828,11 @@ async function selectJobCompNode(id: number): Promise<void> {
   const graphModel = currentLf.graphModel;
 
   // 清空现有数据
-  console.log(`[流程5] 准备清空现有数据`);
+  
   await clearData(currentLf);
 
   // 获取任务组数据
-  console.log(`[流程5] 开始请求接口数据`);
+  
   const formMap = {
     id: id,
     type: 0,
@@ -1878,7 +1840,7 @@ async function selectJobCompNode(id: number): Promise<void> {
     y: 0,
   };
   const data = (await JobInfoAPI.getJobCompose(formMap)) as any;
-  console.log(data);
+  
   console.log(
     `[流程5] 获取到数据: 节点=${data.nodes?.length || 0}, 边=${data.edges?.length || 0}`
   );
@@ -1886,7 +1848,7 @@ async function selectJobCompNode(id: number): Promise<void> {
   const newEdges = data.edges;
 
   // 添加节点和边
-  console.log(`[流程5] 开始添加节点和边`);
+  
   addJobNodes(newNodes, graphModel, newEdges, currentLf);
 }
 
@@ -1940,7 +1902,7 @@ const maxReconnectAttempts = ref(3); // 自定义最大重试次数
 const connectWs = (id: string, targetJobId?: number): void => {
   // TODO 后端做多节点部署时，需要修改
   const wsUrl = "ws://localhost:8989/ccJobWs/" + id;
-  console.log(`为任务组 ${targetJobId || "全局"} 创建WebSocket连接: ${wsUrl}`);
+
 
   const newWs = new WebSocket(wsUrl);
 
@@ -1949,7 +1911,7 @@ const connectWs = (id: string, targetJobId?: number): void => {
     const state = getJobState(targetJobId);
     // 关闭之前的连接（如果存在）
     if (state.ws) {
-      console.log(`关闭任务组 ${targetJobId} 的旧WebSocket连接`);
+
       state.ws.close();
     }
     state.ws = newWs;
@@ -1960,11 +1922,11 @@ const connectWs = (id: string, targetJobId?: number): void => {
 
   newWs.onopen = () => {
     reconnectAttempts.value = 0;
-    console.log(`任务组 ${targetJobId || "全局"} WebSocket连接成功: ${wsUrl}`);
+
   };
 
   newWs.onclose = () => {
-    console.log(`任务组 ${targetJobId || "全局"} WebSocket连接断开: ${wsUrl}`);
+
 
     // 检查是否是任务组的连接，如果是，需要使用当前任务组的randomId重连
     if (targetJobId) {
@@ -1973,40 +1935,34 @@ const connectWs = (id: string, targetJobId?: number): void => {
       if (state.ws === newWs) {
         reconnectAttempts.value++;
         if (reconnectAttempts.value <= maxReconnectAttempts.value && state.randomId) {
-          console.log(`使用当前randomId ${state.randomId} 进行重连`);
+
           const newId = `${targetJobId}:${state.randomId}`;
           setTimeout(
-            () => connectWs(newId, targetJobId),
-            WEBSOCKET_CONFIG.RECONNECT_DELAY
+              () => connectWs(newId, targetJobId),
+              WEBSOCKET_CONFIG.RECONNECT_DELAY
           );
-        } else {
-          console.log("停止重连 - 超过最大重连次数或无有效randomId");
         }
-      } else {
-        console.log("跳过重连 - 这个WebSocket已经不是当前状态中的活跃连接");
       }
     } else {
       // 全局连接的重连逻辑保持不变
       reconnectAttempts.value++;
       if (reconnectAttempts.value <= maxReconnectAttempts.value) {
-        console.log("进行重连");
+
         setTimeout(() => connectWs(id, targetJobId), WEBSOCKET_CONFIG.RECONNECT_DELAY);
-      } else {
-        console.log("连接关闭");
       }
     }
   };
 
   newWs.onmessage = (e: MessageEvent) => {
     const _message: WebSocketMessage = JSON.parse(e.data);
-    console.log(`收到WebSocket消息 (任务组 ${targetJobId || "全局"}):`, _message);
+
 
     // 获取消息对应的任务组状态
     const messageJobId = _message.jobId;
     const messageRandomId = _message.randomId;
 
     console.log(
-      `处理WebSocket消息 - messageJobId: ${messageJobId}, messageRandomId: ${messageRandomId}, status: ${_message.status}`
+        `处理WebSocket消息 - messageJobId: ${messageJobId}, messageRandomId: ${messageRandomId}, status: ${_message.status}`
     );
 
     if (_message.status == 5) {
@@ -2019,9 +1975,9 @@ const connectWs = (id: string, targetJobId?: number): void => {
         if (lfInstance) {
           const nodes = (lfInstance as any).getGraphRawData().nodes;
           const foundNode = nodes.find(
-            (node: any) =>
-              node.properties.jobId == messageJobId &&
-              node.properties.randomId == messageRandomId
+              (node: any) =>
+                  node.properties.jobId == messageJobId &&
+                  node.properties.randomId == messageRandomId
           );
           if (foundNode) {
             taskGroupId = parseInt(groupId);
@@ -2032,8 +1988,6 @@ const connectWs = (id: string, targetJobId?: number): void => {
       }
 
       if (taskGroupId && taskGroupLf) {
-        console.log(`任务 ${messageJobId} 完成，所属任务组: ${taskGroupId}`);
-
         // 延迟检查任务组是否完全完成
         setTimeout(() => {
           // 检查该任务组中是否还有其他正在运行的节点
@@ -2043,29 +1997,27 @@ const connectWs = (id: string, targetJobId?: number): void => {
             const nodeStyle = nodeModel.getStyle();
             // 检查节点颜色是否为运行中状态（黄色 #FFFF33）
             const isRunning =
-              nodeStyle.fill === "#FFFF33" || nodeStyle.stroke === "#FFFF33";
+                nodeStyle.fill === "#FFFF33" || nodeStyle.stroke === "#FFFF33";
             return isRunning;
           });
 
-          console.log(`任务组 ${taskGroupId} 中还有 ${runningNodes.length} 个节点在运行`);
-
           if (runningNodes.length === 0) {
             // 没有正在运行的节点，任务组已完成
-            console.log(`任务组 ${taskGroupId} 已完成，更新运行状态为停止`);
+
             usePageStoreHook().updatePageRunStatus(taskGroupId, false);
 
             // 更新该任务组的边样式（无论是否为当前激活任务组）
-            updateEdgeStyleForTaskGroup(taskGroupId);
-
+            updateEdgeStyleForTaskGroupUtil(
+                taskGroupId,
+                lfInstances.value[taskGroupId],
+                usePageStoreHook().getCurrentPageRunStatus
+            );
             // 同时更新对应的日志标签页状态
             const tabId = `${taskGroupId}`;
             const tab = logTabs.value.find((t) => t.id === tabId);
             if (tab) {
               tab.isRunning = false;
-              console.log(`更新任务组 ${taskGroupId} 的日志标签页状态为停止`);
             }
-          } else {
-            console.log(`任务组 ${taskGroupId} 中还有任务在执行，暂不更新整体状态`);
           }
         }, 1000); // 减少延迟时间，提高响应速度
       }
@@ -2080,27 +2032,27 @@ const connectWs = (id: string, targetJobId?: number): void => {
     // 遍历所有LogicFlow实例，找到对应的节点
     let foundNode = false;
     console.log(
-      `开始查找节点 - 查找条件: jobId=${messageJobId}, randomId=${messageRandomId}`
+        `开始查找节点 - 查找条件: jobId=${messageJobId}, randomId=${messageRandomId}`
     );
 
     for (const [groupId, lfInstance] of Object.entries(lfInstances.value)) {
       if (lfInstance) {
         const nodes = (lfInstance as any).getGraphRawData().nodes;
         console.log(
-          `任务组 ${groupId} 中的所有节点:`,
-          nodes.map((n: any) => ({
-            id: n.id,
-            jobId: n.properties?.jobId,
-            randomId: n.properties?.randomId,
-            type: n.type,
-          }))
+            `任务组 ${groupId} 中的所有节点:`,
+            nodes.map((n: any) => ({
+              id: n.id,
+              jobId: n.properties?.jobId,
+              randomId: n.properties?.randomId,
+              type: n.type,
+            }))
         );
 
         // 首先检查是否有完全匹配的节点（jobId和randomId都匹配）
         const node = nodes.find(
-          (node: any) =>
-            node.properties.jobId == messageJobId &&
-            node.properties.randomId == messageRandomId
+            (node: any) =>
+                node.properties.jobId == messageJobId &&
+                node.properties.randomId == messageRandomId
         );
 
         if (node) {
@@ -2109,28 +2061,26 @@ const connectWs = (id: string, targetJobId?: number): void => {
           const style = _node.type === DYNAMIC_CUSTOM_GROUP ? "stroke" : "fill";
           _node.setStyle(style, color);
           console.log(
-            `更新任务组 ${groupId} 中节点 ${node.id} 状态为: ${_message.status}, 颜色: ${color}`
+              `更新任务组 ${groupId} 中节点 ${node.id} 状态为: ${_message.status}, 颜色: ${color}`
           );
           foundNode = true;
           break;
         } else {
           // 如果没有完全匹配，检查是否有jobId匹配但randomId不匹配的节点
           const nodeWithSameJobId = nodes.find(
-            (node: any) => node.properties.jobId == messageJobId
+              (node: any) => node.properties.jobId == messageJobId
           );
           if (nodeWithSameJobId) {
             console.log(
-              `🔍 在任务组 ${groupId} 中找到了相同jobId但randomId不匹配的节点:`,
-              {
-                nodeId: nodeWithSameJobId.id,
-                nodeJobId: nodeWithSameJobId.properties.jobId,
-                nodeRandomId: nodeWithSameJobId.properties.randomId,
-                messageRandomId: messageRandomId,
-                randomIdMatch: nodeWithSameJobId.properties.randomId == messageRandomId,
-              }
+                `🔍 在任务组 ${groupId} 中找到了相同jobId但randomId不匹配的节点:`,
+                {
+                  nodeId: nodeWithSameJobId.id,
+                  nodeJobId: nodeWithSameJobId.properties.jobId,
+                  nodeRandomId: nodeWithSameJobId.properties.randomId,
+                  messageRandomId: messageRandomId,
+                  randomIdMatch: nodeWithSameJobId.properties.randomId == messageRandomId,
+                }
             );
-          } else {
-            console.log(`❌ 任务组 ${groupId} 中未找到jobId=${messageJobId}的节点`);
           }
         }
       }
@@ -2138,7 +2088,7 @@ const connectWs = (id: string, targetJobId?: number): void => {
 
     if (!foundNode) {
       console.warn(
-        `🚨 未找到对应的节点 - jobId: ${messageJobId}, randomId: ${messageRandomId}`
+          `🚨 未找到对应的节点 - jobId: ${messageJobId}, randomId: ${messageRandomId}`
       );
       console.warn(`当前所有LogicFlow实例:`, Object.keys(lfInstances.value));
     }
@@ -2146,24 +2096,20 @@ const connectWs = (id: string, targetJobId?: number): void => {
 };
 
 onMounted(() => {
-  console.log("[流程1] 组件挂载开始 ==================");
-  console.log("[流程1] 获取任务组列表");
   getJobInfoList();
   logger.value?.reset();
 
   // 确保DOM已渲染完成
   nextTick(() => {
     // 初始化一个空画布实例，不加载任务组数据
-    console.log("[流程1] 初始化空画布");
+
 
     // 如果已有初始任务组，则显示该任务组
     const currentPageId = usePageStoreHook().getCurrentPage();
     if (currentPageId) {
-      console.log(`[流程1] 存在初始任务组ID: ${currentPageId}`);
+
       // 使用selectPage来处理初始任务组的选择和数据加载
       selectPage(currentPageId);
-    } else {
-      console.log("[流程1] 没有初始任务组，显示空画布");
     }
   });
 });
