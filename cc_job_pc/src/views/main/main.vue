@@ -479,31 +479,65 @@ watch(
   }
 );
 
+/**
+ * 监听删除节点的功能
+ */
 watch(
   () => useJobInfoStoreHook().getNodeToDelete(),
   (nodeId) => {
     if (nodeId) {
-      console.log(nodeId);
-      const currentPageId = usePageStoreHook().getCurrentPage();
-      const currentLf = lfInstances.value[currentPageId] || lf.value;
-      if (currentLf) {
-        // 推荐：直接调用 deleteNode，LogicFlow 会自动删边
-        currentLf.deleteNode(nodeId);
-        // 如果发现边没有被删，可以用如下代码手动删边
-        const edges = currentLf.getGraphRawData().edges;
-        console.log(edges);
-        edges.forEach((edge: any) => {
-          if (
-            edge.sourceNodeId === String(nodeId) ||
-            edge.targetNodeId === String(nodeId)
-          ) {
-            currentLf.deleteEdge(edge.id);
+      JobInfoAPI.deleteJobNode(nodeId)
+        .then(() => {
+          ElMessage.success("删除节点成功");
+          const currentPageId = usePageStoreHook().getCurrentPage();
+          const currentLf = lfInstances.value[currentPageId] || lf.value;
+          if (currentLf) {
+            // 推荐：直接调用 deleteNode，LogicFlow 会自动删边
+            currentLf.deleteNode(nodeId);
+            // 如果发现边没有被删，可以用如下代码手动删边
+            const edges = currentLf.getGraphRawData().edges;
+            edges.forEach((edge: any) => {
+              if (
+                edge.sourceNodeId === String(nodeId) ||
+                edge.targetNodeId === String(nodeId)
+              ) {
+                currentLf.deleteEdge(edge.id);
+              }
+            });
+            currentLf.deleteNode(nodeId);
           }
+          useJobInfoStoreHook().clearNodeToDelete();
+          refreshTreeData();
+        })
+        .catch(() => {
+          ElMessage.error("删除节点失败");
         });
-        currentLf.deleteNode(nodeId);
-      }
-      useJobInfoStoreHook().clearNodeToDelete();
     }
+  }
+);
+
+watch(
+  () => useJobInfoStoreHook().getNodeToEdit(),
+  (node: any) => {
+    if (!node) return;
+    const currentPageId = usePageStoreHook().getCurrentPage();
+    const currentLf = lfInstances.value[currentPageId] || lf.value;
+    if (currentLf) {
+      const nodes = currentLf.getGraphRawData().nodes;
+      const _node = nodes.find((n: any) => n.properties.jobId == node.jobId);
+      if (_node) {
+        currentEditingNodeId.value = _node.id;
+        closeEditJobNode(node.jobId, node.jobDesc, node.glueType, node.type);
+        //refreshTreeData();
+      }
+    }
+    // 用 setTimeout 异步清理，确保 watch 回调已退出
+    setTimeout(() => {
+      useJobInfoStoreHook().clearNodeToEdit();
+    }, 1);
+  },
+  {
+    deep: true,
   }
 );
 

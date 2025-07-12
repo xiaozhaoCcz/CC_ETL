@@ -449,6 +449,21 @@ public class JobComposeServiceImpl implements JobComposeService {
         return list;
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteJobNode(Long nodeId) {
+        JobNode jobNode = jobNodeService.getById(nodeId);
+        if(jobNode==null){
+            throw new BusinessException("当前节点不存在");
+        }
+        //删除任务
+        jobInfoService.removeById(jobNode.getJobId());
+        //删除节点
+        jobNodeService.removeById(nodeId);
+        //删除与之相关的边
+        jobEdgeService.remove(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getFromNodeId,nodeId).or().eq(JobEdge::getEndNodeId,nodeId));
+    }
+
     /**
      * !!!!重点:获取任务组的宽度和高度，并获取任务组起始位置
      *

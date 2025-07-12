@@ -220,4 +220,11 @@ public class JobInfoController {
         List<Long> list  = jobComposeService.pauseJobs(jobIds);
         return Result.success(list);
     }
+
+    @Operation(summary = "删除任务节点")
+    @GetMapping("deleteJobNode/{nodeId}")
+    public Result<Void>  deleteJobNode(@PathVariable Long nodeId){
+        jobComposeService.deleteJobNode(nodeId);
+        return Result.success();
+    }
 }

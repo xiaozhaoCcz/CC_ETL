@@ -190,6 +190,12 @@ const JobInfoAPI = {
       data: data,
     });
   },
+  deleteJobNode(nodeId: number) {
+    return request({
+      url: `${JOB_INFO_BASE_URL}/deleteJobNode/${nodeId}`,
+      method: "get",
+    });
+  },
 };
 
 export default JobInfoAPI;

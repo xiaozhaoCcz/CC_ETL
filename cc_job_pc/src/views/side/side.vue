@@ -186,6 +186,8 @@ function handleAction(action: string, _node: TreeNode) {
     //新增节点
     jobNodeVisible.value = true;
     node.value = _node;
+    // 重置nodeJobId为null，确保新增时不会显示之前编辑的数据
+    nodeJobId.value = null;
   } else if (_node.type === 0 && action == "addJobGroup") {
     // 新增任务组
     jobGroupVisible.visible = true;
@@ -327,7 +329,6 @@ function deleteMessageNotice(id: number, type: number) {
           refreshTreeData();
         });
       } else if (type == 4 || type == 5) {
-        console.log(">>>delete nodes and edge");
         // 得到当前页面
         useJobInfoStoreHook().setNodeToDelete(id);
       }
@@ -343,6 +344,9 @@ function deleteMessageNotice(id: number, type: number) {
 function closeEditJobNode(id: any, jobDesc: any, glueType: any, type: any) {
   console.log(id, jobDesc, glueType, type);
   jobNodeVisible.value = false;
+  // 关闭对话框时重置nodeJobId，确保下次打开时状态正确
+  nodeJobId.value = null;
+  node.value = null;
 }
 
 // 全局点击处理逻辑

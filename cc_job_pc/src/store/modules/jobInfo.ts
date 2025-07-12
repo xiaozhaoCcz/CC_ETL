@@ -7,6 +7,7 @@ export const useJobInfoStore = defineStore("jobInfo", () => {
   const jobInfo = ref({});
   const treeNeedsRefresh = ref(false);
   const nodeToDelete = ref(null as number | null);
+  const nodeToEdit = ref({});
 
   function setJobInfo(data: any) {
     jobInfo.value = data;
@@ -26,6 +27,18 @@ export const useJobInfoStore = defineStore("jobInfo", () => {
 
   function getNodeToDelete() {
     return nodeToDelete.value;
+  }
+
+  function getNodeToEdit() {
+    return nodeToEdit.value;
+  }
+
+  function setNodeToEdit(node: object) {
+    nodeToEdit.value = node;
+  }
+
+  function clearNodeToEdit() {
+    nodeToEdit.value = {};
   }
 
   /**
@@ -55,6 +68,9 @@ export const useJobInfoStore = defineStore("jobInfo", () => {
     setNodeToDelete,
     clearNodeToDelete,
     getNodeToDelete,
+    getNodeToEdit,
+    setNodeToEdit,
+    clearNodeToEdit,
   };
 });
 
