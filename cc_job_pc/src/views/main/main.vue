@@ -489,23 +489,22 @@ watch(
       JobInfoAPI.deleteJobNode(nodeId)
         .then(() => {
           ElMessage.success("删除节点成功");
-          const currentPageId = usePageStoreHook().getCurrentPage();
-          const currentLf = lfInstances.value[currentPageId] || lf.value;
-          if (currentLf) {
-            // 推荐：直接调用 deleteNode，LogicFlow 会自动删边
-            currentLf.deleteNode(nodeId);
-            // 如果发现边没有被删，可以用如下代码手动删边
-            const edges = currentLf.getGraphRawData().edges;
-            edges.forEach((edge: any) => {
-              if (
-                edge.sourceNodeId === String(nodeId) ||
-                edge.targetNodeId === String(nodeId)
-              ) {
-                currentLf.deleteEdge(edge.id);
-              }
-            });
-            currentLf.deleteNode(nodeId);
-          }
+          // 遍历所有 LogicFlow 实例，删除节点
+          Object.values(lfInstances.value).forEach((lfInstance: any) => {
+            if (lfInstance && lfInstance.getNodeModelById(nodeId)) {
+              lfInstance.deleteNode(nodeId);
+              // 如果有边也一并删掉
+              const edges = lfInstance.getGraphRawData().edges;
+              edges.forEach((edge: any) => {
+                if (
+                  edge.sourceNodeId === String(nodeId) ||
+                  edge.targetNodeId === String(nodeId)
+                ) {
+                  lfInstance.deleteEdge(edge.id);
+                }
+              });
+            }
+          });
           useJobInfoStoreHook().clearNodeToDelete();
           refreshTreeData();
         })
@@ -520,18 +519,15 @@ watch(
   () => useJobInfoStoreHook().getNodeToEdit(),
   (node: any) => {
     if (!node) return;
-    const currentPageId = usePageStoreHook().getCurrentPage();
-    const currentLf = lfInstances.value[currentPageId] || lf.value;
-    if (currentLf) {
-      const nodes = currentLf.getGraphRawData().nodes;
+    // 遍历所有 LogicFlow 实例，找到对应 jobId 的节点并刷新
+    Object.values(lfInstances.value).forEach((lfInstance: any) => {
+      if (!lfInstance) return;
+      const nodes = lfInstance.getGraphRawData().nodes;
       const _node = nodes.find((n: any) => n.properties.jobId == node.jobId);
       if (_node) {
-        currentEditingNodeId.value = _node.id;
-        closeEditJobNode(node.jobId, node.jobDesc, node.glueType, node.type);
-        //refreshTreeData();
+        updateNodeTypeByGlueType(node.jobId, node.jobDesc, node.glueType, lfInstance);
       }
-    }
-    // 用 setTimeout 异步清理，确保 watch 回调已退出
+    });
     setTimeout(() => {
       useJobInfoStoreHook().clearNodeToEdit();
     }, 1);
@@ -1459,10 +1455,15 @@ function changeJobRadio(val: string | number | boolean | undefined) {
  * 根据glueType更新节点类型
  * 优先使用当前编辑的节点ID进行精确更新，确保只更新正在编辑的特定节点
  */
-function updateNodeTypeByGlueType(jobId: number, jobDesc: string, glueType: string) {
+function updateNodeTypeByGlueType(
+  jobId: number,
+  jobDesc: string,
+  glueType: string,
+  lfInstance?: any
+) {
   // 获取当前任务组对应的LogicFlow实例
   const currentPageId = usePageStoreHook().getCurrentPage();
-  const currentLf = lfInstances.value[currentPageId] || lf.value;
+  const currentLf = lfInstance || lfInstances.value[currentPageId] || lf.value;
 
   if (!currentLf) {
     console.error("找不到对应的LogicFlow实例");
@@ -1474,32 +1475,11 @@ function updateNodeTypeByGlueType(jobId: number, jobDesc: string, glueType: stri
 
   let targetNode = null;
 
-  // 优先使用当前编辑的节点ID进行精确匹配
-  if (currentEditingNodeId.value) {
-    targetNode = nodes.find((n) => n.id === currentEditingNodeId.value);
-    console.log(
-      `🎯 使用编辑节点ID ${currentEditingNodeId.value} 精确查找目标节点:`,
-      targetNode
-    );
+  // 只用 jobId 匹配
+  targetNode = nodes.find((n: any) => n.properties.jobId == jobId);
 
-    // 验证找到的节点是否与jobId匹配（安全检查）
-    if (targetNode && targetNode.properties.jobId !== jobId) {
-      console.warn(
-        `⚠️ 节点ID匹配但jobId不符 - 节点jobId: ${targetNode.properties.jobId}, 传入jobId: ${jobId}`
-      );
-      // 如果节点ID匹配但jobId不符，说明可能存在数据不一致，继续使用节点ID匹配
-    }
-  }
-
-  // 如果没有通过节点ID找到目标节点，则报错，不再使用jobId进行模糊匹配
   if (!targetNode) {
-    console.error(
-      `❌ 无法找到要更新的节点 - 编辑节点ID: ${currentEditingNodeId.value}, jobId: ${jobId}`
-    );
-    console.error(
-      `当前画布所有节点:`,
-      nodes.map((n) => ({ id: n.id, jobId: n.properties?.jobId, type: n.type }))
-    );
+    console.error(`❌ 无法找到要更新的节点 - jobId: ${jobId}`);
     ElMessage.error("无法定位要更新的节点，请重新操作");
     return;
   }
@@ -1508,10 +1488,6 @@ function updateNodeTypeByGlueType(jobId: number, jobDesc: string, glueType: stri
     GLUE_NODE_TYPE_MAP[glueType] ||
     (targetNode.nodeType === DYNAMIC_CUSTOM_GROUP ? DYNAMIC_CUSTOM_GROUP : "rect");
   const graphModel = currentLf.graphModel;
-
-  console.log(
-    `🔄 精确更新节点 - 节点ID: ${targetNode.id}, jobId: ${jobId}, 新类型: ${nodeType}, glueType: ${glueType}`
-  );
 
   // 创建新的节点对象，并指定新的 type
   const newNode = {
@@ -1527,7 +1503,7 @@ function updateNodeTypeByGlueType(jobId: number, jobDesc: string, glueType: stri
 
   // 保留原来的连线
   const relatedEdges = edges.filter(
-    (e) => e.sourceNodeId === targetNode.id || e.targetNodeId === targetNode.id
+    (e: any) => e.sourceNodeId === targetNode.id || e.targetNodeId === targetNode.id
   );
 
   // 删除原节点
@@ -1538,7 +1514,7 @@ function updateNodeTypeByGlueType(jobId: number, jobDesc: string, glueType: stri
 
   // 恢复连线
   if (relatedEdges.length > 0) {
-    relatedEdges.forEach((edge) => {
+    relatedEdges.forEach((edge: any) => {
       currentLf.addEdge(edge);
     });
   }
