@@ -1,8 +1,8 @@
 directories:
   output: dist-electron
   buildResources: build
-appId: com.ccjob.desktop
-productName: CC Job Desktop
+appId: com.ccetl.desktop
+productName: CcETL
 files:
   - filter:
       - dist/**/*
@@ -20,7 +20,7 @@ win:
     - target: nsis
       arch:
         - x64
-  icon: build/icon.ico
+  icon: build/icon.png
 linux:
   target:
     - target: AppImage
