@@ -1,6 +1,6 @@
 import { RectResize } from "@logicflow/extension";
 import { h } from "@logicflow/core";
-import { NODE_STYLES, getIconColor } from "@/utils/nodeStyles";
+import { NODE_STYLES, getIconColor } from "../../../utils/nodeStyles";
 import { getNodeStatusColor } from "@/utils/colors";
 
 // 定义类型接口
@@ -12,6 +12,12 @@ interface IconConfig {
 }
 
 export class BaseButtonNodeView extends RectResize.view {
+  constructor(props: any) {
+    super(props);
+    // 辅助排查 NODE_STYLES
+    // eslint-disable-next-line no-console
+    console.log('NODE_STYLES in BaseButtonNodeView:', NODE_STYLES);
+  }
   getButtonGroup() {
     const { model } = this.props;
     const { x, y, width, height } = model;
@@ -41,10 +47,10 @@ export class BaseButtonNodeView extends RectResize.view {
           width: width,
           height: 45,
           fill: "transparent",
-          "stroke-width": NODE_STYLES.buttonGroup.borderWidth,
-          rx: NODE_STYLES.buttonGroup.radius,
-          ry: NODE_STYLES.buttonGroup.radius,
-          filter: NODE_STYLES.buttonGroup.shadow,
+          "stroke-width": NODE_STYLES.buttonGroup?.borderWidth ?? 1,
+          rx: NODE_STYLES.buttonGroup?.radius ?? 8,
+          ry: NODE_STYLES.buttonGroup?.radius ?? 8,
+          filter: NODE_STYLES.buttonGroup?.shadow ?? '',
         }),
         // 按钮组顶部装饰线
       ],
@@ -147,13 +153,13 @@ export class BaseButtonNodeView extends RectResize.view {
         h("rect", {
           x: 0,
           y: 0,
-          width: NODE_STYLES.button.size,
-          height: NODE_STYLES.button.size,
-          fill: NODE_STYLES.button.background,
-          stroke: NODE_STYLES.button.border,
-          "stroke-width": NODE_STYLES.button.borderWidth,
-          rx: NODE_STYLES.button.radius,
-          ry: NODE_STYLES.button.radius,
+          width: NODE_STYLES.button?.size ?? 16,
+          height: NODE_STYLES.button?.size ?? 16,
+          fill: NODE_STYLES.button?.background ?? '#fff',
+          stroke: NODE_STYLES.button?.border ?? '#e2e8f0',
+          "stroke-width": NODE_STYLES.button?.borderWidth ?? 1,
+          rx: NODE_STYLES.button?.radius ?? 3,
+          ry: NODE_STYLES.button?.radius ?? 3,
           onMouseenter: (e: MouseEvent) => {
             const target = e.target as HTMLElement;
             const parent = target.parentElement;
@@ -164,8 +170,8 @@ export class BaseButtonNodeView extends RectResize.view {
               if (tooltipBg) tooltipBg.style.opacity = "1";
               if (tooltipText) tooltipText.style.opacity = "1";
               if (iconPath) iconPath.style.fill = iconColor.hover;
-              target.style.fill = NODE_STYLES.button.hoverBackground;
-              target.style.stroke = NODE_STYLES.button.hoverBorder;
+              target.style.fill = NODE_STYLES.button?.hoverBackground ?? '#fff';
+              target.style.stroke = NODE_STYLES.button?.hoverBorder ?? '#3b82f6';
             }
           },
           onMouseleave: (e: MouseEvent) => {
@@ -178,8 +184,8 @@ export class BaseButtonNodeView extends RectResize.view {
               if (tooltipBg) tooltipBg.style.opacity = "0";
               if (tooltipText) tooltipText.style.opacity = "0";
               if (iconPath) iconPath.style.fill = iconColor.normal;
-              target.style.fill = NODE_STYLES.button.background;
-              target.style.stroke = NODE_STYLES.button.border;
+              target.style.fill = NODE_STYLES.button?.background ?? '#fff';
+              target.style.stroke = NODE_STYLES.button?.border ?? '#e2e8f0';
             }
           },
         }),

@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from "vue-router";
+import { createRouter, createWebHashHistory } from "vue-router";
 
 export const routes = [
   {
@@ -24,7 +24,7 @@ export const routes = [
 ];
 const router = createRouter({
   scrollBehavior: () => ({ left: 0, top: 0 }),
-  history: createWebHistory(),
+  history: createWebHashHistory(),
   routes,
 });
 router.beforeEach((to, from, next) => {
