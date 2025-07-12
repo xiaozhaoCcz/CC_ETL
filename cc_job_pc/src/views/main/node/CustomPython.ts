@@ -46,23 +46,24 @@ class CustomPythonView extends BaseButtonNodeView {
         },
       },
       [
-        // Python蛇形图标
+        // 扁平风格蛇形
         h('path', {
-          fill: pythonStyle.iconColor,
-          d: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z',
-        }),
-        // Python装饰点
-        h('circle', {
-          fill: pythonStyle.accentColor,
-          cx: "8",
-          cy: "8",
-          r: "1.5",
+          d: 'M4 16c4-8 12-8 16 0',
+          stroke: pythonStyle.iconColor,
+          'stroke-width': 2.5,
+          fill: 'none',
         }),
         h('circle', {
+          cx: 8,
+          cy: 16,
+          r: 1.5,
           fill: pythonStyle.accentColor,
-          cx: "16",
-          cy: "16",
-          r: "1.5",
+        }),
+        h('circle', {
+          cx: 16,
+          cy: 16,
+          r: 1.5,
+          fill: pythonStyle.accentColor,
         }),
       ]
     );

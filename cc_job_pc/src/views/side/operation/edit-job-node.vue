@@ -297,7 +297,7 @@ import CodeEditor from "@/components/CodeEdit/index.vue";
 import JobJdbcDatasourceAPI from "@/api/job-jdbc-datasource";
 import { ref, reactive, watch, onMounted } from "vue";
 import { ElMessage } from "element-plus";
-import { useJobInfoStore, usePageStoreHook } from "@/store";
+import { useJobInfoStore, useJobInfoStoreHook, usePageStoreHook } from "@/store";
 import { Document, Setting, Tools, Edit } from "@element-plus/icons-vue";
 
 // 定义类型接口
@@ -381,6 +381,10 @@ watch(
   () => props.jobNodeVisible,
   (val) => {
     drawVisible.value = val;
+    // 当对话框打开时，如果是新增模式（没有nodeJobId），重置表单数据
+    if (val && !props.nodeJobId) {
+      formData.value = {};
+    }
   }
 );
 
@@ -390,6 +394,8 @@ watch(
     if (props.nodeJobId) {
       getTaskInfo();
     } else {
+      // 新增模式下重置表单数据
+      formData.value = {};
       drawVisible.value = props.jobNodeVisible;
     }
   }
@@ -454,7 +460,7 @@ function handleTableData(val: any) {
 
 async function fetchJdbcDatasource() {
   const data = await JobJdbcDatasourceAPI.getJdbcDatasourceList();
-  jdbcDatasourceList.value = data
+  jdbcDatasourceList.value = data;
 }
 
 function cancelClick() {
@@ -497,7 +503,7 @@ function confirmClick() {
       })
       .finally(() => {});
   } else if (props.nodeJobId) {
-    // 只有nodeJobId，没有node，仍然是编辑现有任务
+    // 只有nodeJobId，没有node，仍然是编辑现有任务，任务树编辑
     console.log("编辑现有任务（无node对象），nodeJobId:", props.nodeJobId);
     JobInfoAPI.update(props.nodeJobId, formData.value)
       .then(() => {
@@ -505,21 +511,26 @@ function confirmClick() {
         drawVisible.value = false;
         // 触发树刷新事件
         useJobInfoStore().triggerTreeRefresh();
-        emit(
-          "close",
-          props.nodeJobId,
-          formData.value.jobDesc,
-          formData.value.glueType,
-          1
-        );
+        // emit(
+        //   "close",
+        //   props.nodeJobId,
+        //   formData.value.jobDesc,
+        //   formData.value.glueType,
+        //   1
+        // );
+        const node = {
+          jobId: props.nodeJobId,
+          jobDesc: formData.value.jobDesc,
+          glueType: formData.value.glueType,
+          type: 1,
+        };
+        useJobInfoStoreHook().setNodeToEdit(node);
       })
       .finally(() => {});
   } else if (props.node) {
     // 新增任务
-    console.log("新增任务，node:", props.node);
     formData.value.jobId = props.nodeJobId;
     formData.value.parentId = props.node.id;
-    console.log("新增任务数据:", formData.value);
     useJobInfoStore().setJobInfo(formData.value);
     // 触发树刷新事件
     useJobInfoStore().triggerTreeRefresh();

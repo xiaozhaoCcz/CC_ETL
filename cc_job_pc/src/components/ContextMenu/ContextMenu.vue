@@ -38,7 +38,7 @@
     </div>
 
     <div
-      class="menu-item"
+      class="menu-item danger-item"
       v-if="node && ![5].includes(node.type)"
       @click="handleAction('delete')"
     >
@@ -47,7 +47,7 @@
     </div>
     <!-- 新增刷新按钮，仅type为1或2时显示 -->
     <div
-      class="menu-item danger-item"
+      class="menu-item "
       v-if="node && (node.type === 0 || node.type === 1)"
       @click="handleAction('refresh')"
     >

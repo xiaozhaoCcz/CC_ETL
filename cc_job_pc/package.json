@@ -1,9 +1,10 @@
 {
-  "name": "vite-project",
+  "name": "ccetl",
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "main": "electron/main.cjs",
+  "main": "electron/main.js",
+  "productName": "CcETL",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 3000",
     "dev:quiet": "vite --host 0.0.0.0 --port 3000 --logLevel warn",
@@ -28,6 +29,7 @@
     "@logicflow/core": "^2.0.13",
     "@logicflow/extension": "^2.0.18",
     "@monaco-editor/loader": "^1.5.0",
+    "@vueuse/core": "^13.5.0",
     "axios": "^1.5.1",
     "codemirror": "^5",
     "codemirror-editor-vue3": "^2.8.0",

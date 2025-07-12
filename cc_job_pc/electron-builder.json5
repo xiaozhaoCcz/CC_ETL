@@ -1,0 +1,57 @@
+{
+    appId: "com.ccetl.desktop",
+    productName: "CcETL",
+    directories: {
+        output: "dist-electron",
+    },
+    files: ["dist/**/*", "electron/**/*"],
+    mac: {
+        category: "public.app-category.developer-tools",
+        target: [
+            {
+                target: "dmg",
+                arch: ["x64", "arm64"],
+            },
+        ],
+        icon: "build/icon.icns",
+    },
+    win: {
+        target: [
+            {
+                target: "nsis",
+                arch: ["x64"],
+            },
+        ],
+        icon: "build/icon.png",
+    },
+    linux: {
+        target: [
+            {
+                target: "AppImage",
+                arch: ["x64"],
+            },
+        ],
+        icon: "build/icon.png",
+    },
+    nsis: {
+        oneClick: false,
+        allowToChangeInstallationDirectory: true,
+        createDesktopShortcut: true,
+        createStartMenuShortcut: true,
+    },
+    dmg: {
+        sign: false,
+        contents: [
+            {
+                x: 130,
+                y: 220,
+            },
+            {
+                x: 410,
+                y: 220,
+                type: "link",
+                path: "/Applications",
+            },
+        ],
+    },
+}

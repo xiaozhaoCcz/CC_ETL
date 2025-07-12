@@ -186,6 +186,8 @@ function handleAction(action: string, _node: TreeNode) {
     //新增节点
     jobNodeVisible.value = true;
     node.value = _node;
+    // 重置nodeJobId为null，确保新增时不会显示之前编辑的数据
+    nodeJobId.value = null;
   } else if (_node.type === 0 && action == "addJobGroup") {
     // 新增任务组
     jobGroupVisible.visible = true;
@@ -297,8 +299,12 @@ function deleteMessageNotice(id: number, type: number) {
       type: 1,
       message: "确认删除当前任务组下的所有节点和关系",
     },
+    {
+      type: 4,
+      message: "确认删除当前节点",
+    },
   ];
-  ElMessageBox.confirm(messageArr[type].message, "删除", {
+  ElMessageBox.confirm(messageArr.find((m) => m.type === type)?.message, "删除", {
     confirmButtonText: "确认",
     cancelButtonText: "取消",
     type: "warning",
@@ -313,7 +319,7 @@ function deleteMessageNotice(id: number, type: number) {
           // 刷新任务树
           refreshTreeData();
         });
-      } else {
+      } else if (type == 1) {
         JobInfoAPI.deleteByIds(id.toString()).then(() => {
           ElMessage({
             type: "success",
@@ -322,12 +328,15 @@ function deleteMessageNotice(id: number, type: number) {
           // 刷新任务树
           refreshTreeData();
         });
+      } else if (type == 4 || type == 5) {
+        // 得到当前页面
+        useJobInfoStoreHook().setNodeToDelete(id);
       }
     })
     .catch(() => {
       ElMessage({
-        type: "error",
-        message: "删除异常",
+        type: "info",
+        message: "取消删除",
       });
     });
 }
@@ -335,6 +344,9 @@ function deleteMessageNotice(id: number, type: number) {
 function closeEditJobNode(id: any, jobDesc: any, glueType: any, type: any) {
   console.log(id, jobDesc, glueType, type);
   jobNodeVisible.value = false;
+  // 关闭对话框时重置nodeJobId，确保下次打开时状态正确
+  nodeJobId.value = null;
+  node.value = null;
 }
 
 // 全局点击处理逻辑
@@ -403,7 +415,7 @@ function refreshTreeData() {
 }
 
 // 让其他组件可以直接调用刷新树
-if (typeof window !== 'undefined') {
+if (typeof window !== "undefined") {
   window.refreshTreeData = refreshTreeData;
 }
 

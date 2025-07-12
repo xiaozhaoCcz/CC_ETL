@@ -20,7 +20,6 @@ export function avg(array: number[]): number {
  * @returns LogicFlow节点对象
  */
 export function generateNode(node: any) {
-    console.log("generateNode", node, node.nodeType);
     const properties = JSON.parse(node.properties);
 
     // 类型判断逻辑
@@ -62,7 +61,6 @@ export function generateEdge(edge: any) {
  */
 export async function clearData(lfInstance: any) {
     if (!lfInstance) {
-        console.log("没有可用的LogicFlow实例，跳过清理");
         return;
     }
 
@@ -116,7 +114,6 @@ export function selectElements(lfInstances:any,lf:any): void {
     const currentPageId = usePageStoreHook().getCurrentPage();
     const currentLf = lfInstances.value[currentPageId] || lf.value;
     const elements = currentLf.graphModel.getSelectElements(true);
-    console.log(">>>>>>选择的元素", elements);
 }
 
 // ================== 新增工具函数 ==================
@@ -263,10 +260,7 @@ export function layoutNodes(direction: "horizontal" | "vertical", currentLf: any
  * @param currentLf 当前LogicFlow实例
  */
 export function clearCanvas(currentLf: any): void {
-    console.log("清除画布");
-
     if (!currentLf) {
-        console.warn("请先选择一个任务组");
         return;
     }
 
@@ -274,15 +268,12 @@ export function clearCanvas(currentLf: any): void {
         // 获取当前画布的所有数据
         const graphData = currentLf.getGraphRawData();
         if (!graphData) {
-            console.log("画布已经是空的");
             return;
         }
 
         const nodes = graphData.nodes || [];
         const edges = graphData.edges || [];
         const graphModel = currentLf.graphModel;
-
-        console.log(`准备清除 ${nodes.length} 个节点和 ${edges.length} 条边`);
 
         // 清除所有边
         edges.forEach((edge: any) => {
@@ -299,10 +290,7 @@ export function clearCanvas(currentLf: any): void {
                 graphModel.deleteNode(node.id);
             }
         });
-
-        console.log("画布清除完成");
     } catch (err: any) {
-        console.error("清除画布时出错:", err);
         throw new Error("清除画布失败");
     }
 }
@@ -313,7 +301,6 @@ export function clearCanvas(currentLf: any): void {
  */
 export function selectNodes(currentLf: any): void {
     if (!currentLf) {
-        console.warn("请先选择一个任务组");
         return;
     }
     currentLf.extension.selectionSelect.openSelectionSelect();
@@ -343,7 +330,6 @@ export const canvasOperations = {
      */
     undo: (currentLf: any) => {
         if (!currentLf) {
-            console.warn("请先选择一个任务组");
             return;
         }
         currentLf.undo();
@@ -354,7 +340,6 @@ export const canvasOperations = {
      */
     redo: (currentLf: any) => {
         if (!currentLf) {
-            console.warn("请先选择一个任务组");
             return;
         }
         currentLf.redo();
@@ -365,7 +350,6 @@ export const canvasOperations = {
      */
     fit: (currentLf: any) => {
         if (!currentLf) {
-            console.warn("请先选择一个任务组");
             return;
         }
         const { transformModel } = currentLf.graphModel;
@@ -377,7 +361,6 @@ export const canvasOperations = {
      */
     zoomIn: (currentLf: any) => {
         if (!currentLf) {
-            console.warn("请先选择一个任务组");
             return;
         }
         const { transformModel } = currentLf.graphModel;
@@ -389,7 +372,6 @@ export const canvasOperations = {
      */
     zoomOut: (currentLf: any) => {
         if (!currentLf) {
-            console.warn("请先选择一个任务组");
             return;
         }
         const { transformModel } = currentLf.graphModel;

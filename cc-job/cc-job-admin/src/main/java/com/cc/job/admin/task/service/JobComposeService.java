@@ -23,4 +23,6 @@ public interface JobComposeService {
     Long updateJobNode(Long jobId, Long nodeId);
 
     List<Long> pauseJobs(Long[] jobIds);
+
+    void deleteJobNode(Long nodeId);
 }

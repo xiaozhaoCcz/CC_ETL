@@ -378,6 +378,9 @@ public class JobComposeServiceImpl implements JobComposeService {
 
     @Override
     public boolean validateJobComposeEdge(String nodes, String edges) {
+        if(StringUtils.isBlank(nodes)){
+            return true;
+        }
         List<LfNode> lfNodes = JSONUtil.parseArray(nodes).toList(LfNode.class);
         List<LfEdge> lfEdges = JSONUtil.parseArray(edges).toList(LfEdge.class);
 
@@ -444,6 +447,21 @@ public class JobComposeServiceImpl implements JobComposeService {
             }
         });
         return list;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteJobNode(Long nodeId) {
+        JobNode jobNode = jobNodeService.getById(nodeId);
+        if(jobNode==null){
+            throw new BusinessException("当前节点不存在");
+        }
+        //删除任务
+        jobInfoService.removeById(jobNode.getJobId());
+        //删除节点
+        jobNodeService.removeById(nodeId);
+        //删除与之相关的边
+        jobEdgeService.remove(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getFromNodeId,nodeId).or().eq(JobEdge::getEndNodeId,nodeId));
     }
 
     /**

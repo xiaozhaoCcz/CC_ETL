@@ -46,15 +46,35 @@ class CustomJavaView extends BaseButtonNodeView {
         },
       },
       [
-        // Java咖啡杯主体
-        h('path', {
+        // 扁平风格咖啡杯
+        h('rect', {
+          x: 6,
+          y: 10,
+          width: 8,
+          height: 6,
+          rx: 2,
           fill: javaStyle.iconColor,
-          d: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z',
         }),
-        // 咖啡蒸汽
+        h('ellipse', {
+          cx: 10,
+          cy: 10,
+          rx: 4,
+          ry: 2,
+          fill: javaStyle.iconColor,
+        }),
+        // 杯把
         h('path', {
-          fill: javaStyle.accentColor,
-          d: 'M7 9h2v2H7zm4 0h2v2h-2zm4 0h2v2h-2z',
+          d: 'M14 12c2 0 2 4 0 4',
+          stroke: javaStyle.accentColor,
+          'stroke-width': 1.5,
+          fill: 'none',
+        }),
+        // 蒸汽
+        h('path', {
+          d: 'M9 8c0-1 2-1 2 0',
+          stroke: javaStyle.accentColor,
+          'stroke-width': 1,
+          fill: 'none',
         }),
       ]
     );
