@@ -5,6 +5,7 @@ import com.cc.job.admin.config.XxlJobAdminConfig;
 import com.cc.job.admin.task.enums.ExecutorRouteStrategyEnum;
 import com.cc.job.admin.task.enums.TriggerTypeEnum;
 import com.cc.job.admin.task.handler.JobGroupXxlJob;
+import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobLog;
@@ -43,7 +44,7 @@ public class XxlJobTrigger {
      * @param addressList           null: use executor addressList
      *                              not null: cover
      */
-    public static Pair<Long, Integer> trigger(Long jobId,
+    public static void trigger(Long jobId,
                                               TriggerTypeEnum triggerType,
                                               int failRetryCount,
                                               String executorShardingParam,
@@ -56,7 +57,7 @@ public class XxlJobTrigger {
         JobInfo jobInfo = XxlJobAdminConfig.getAdminConfig().getJobInfoMapper().selectById(jobId);
         if (jobInfo == null) {
             logger.warn(">>>>>>>>>>>> trigger fail, jobId invalid，jobId={}", jobId);
-            return null;
+            return ;
         }
         if (executorParam != null) {
             jobInfo.setExecutorParam(executorParam);
@@ -90,10 +91,8 @@ public class XxlJobTrigger {
             if (shardingParam == null) {
                 shardingParam = new int[]{0, 1};
             }
-            return processTrigger(group, jobInfo, finalFailRetryCount, triggerType, shardingParam[0], shardingParam[1], triggerOne, adminAddress);
+            processTrigger(group, jobInfo, finalFailRetryCount, triggerType, shardingParam[0], shardingParam[1], triggerOne, adminAddress);
         }
-
-        return null;
     }
 
     private static boolean isNumeric(String str) {
@@ -113,7 +112,7 @@ public class XxlJobTrigger {
      * @param index               sharding index
      * @param total               sharding index
      */
-    private static Pair<Long, Integer> processTrigger(JobGroup group, JobInfo jobInfo, int finalFailRetryCount, TriggerTypeEnum triggerType, int index, int total, int triggerOne, String adminAddress) {
+    private static void processTrigger(JobGroup group, JobInfo jobInfo, int finalFailRetryCount, TriggerTypeEnum triggerType, int index, int total, int triggerOne, String adminAddress) {
 
         // param
         ExecutorBlockStrategyEnum blockStrategy = ExecutorBlockStrategyEnum.match(jobInfo.getExecutorBlockStrategy(), ExecutorBlockStrategyEnum.SERIAL_EXECUTION);  // block strategy
@@ -179,7 +178,7 @@ public class XxlJobTrigger {
             triggerResult = new ReturnT<String>(ReturnT.FAIL_CODE, null);
         }
 
-        // 返回jobId
+        // 返回jobId,执行日志专区任务
         if (triggerOne == 1 && jobInfo.getJobType() == 2 && "N".equalsIgnoreCase(jobInfo.getIsNode())) {
             String key = JobGroupXxlJob.setExecuteJobId(jobInfo.getId(), jobInfo.getExecutorParam());
             String value = String.valueOf(jobLog.getId());
@@ -215,8 +214,13 @@ public class XxlJobTrigger {
         jobLog.setTriggerMsg(triggerMsgSb.toString());
         XxlJobAdminConfig.getAdminConfig().getJobLogMapper().updateById(jobLog);
 
+        //停止任务组
+        if(triggerResult.getCode()!=ReturnT.SUCCESS_CODE){
+            //关闭当前任务组
+            XxlJobAdminConfig.getAdminConfig().getJobInfoMapper().stopJobCompose(jobInfo.getId());
+            throw new RuntimeException(triggerResult.getMsg());
+        }
         logger.debug(">>>>>>>>>>> xxl-job trigger end, jobId:{}", jobLog.getId());
-        return new Pair<>(jobLog.getId(), triggerResult.getCode());
     }
 
     /**

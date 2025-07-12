@@ -132,8 +132,7 @@ public class XxlJobRemotingUtil {
 
             // parse returnT
             try {
-                ReturnT returnT = GsonTool.fromJson(resultJson, ReturnT.class, returnTargClassOfT);
-                return returnT;
+                return GsonTool.fromJson(resultJson, ReturnT.class, returnTargClassOfT);
             } catch (Exception e) {
                 logger.error("xxl-job remoting (url="+url+") response content invalid("+ resultJson +").", e);
                 return new ReturnT<String>(ReturnT.FAIL_CODE, "xxl-job remoting (url="+url+") response content invalid("+ resultJson +").");
