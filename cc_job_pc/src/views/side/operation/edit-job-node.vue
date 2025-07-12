@@ -1,12 +1,13 @@
 <template>
   <el-dialog
+    v-resize-dialog
     v-model="drawVisible"
     :title="props.nodeJobId ? '编辑任务' : '新增任务'"
     width="540px"
     @close="cancelClick"
     draggable
     :close-on-click-modal="false"
-    class="job-node-dialog compact resizable-dialog"
+    class="job-node-dialog compact"
     append-to-body
   >
     <div class="dialog-content">
@@ -268,22 +269,6 @@
         </div>
       </el-form>
     </div>
-    <div
-      v-for="dir in [
-        'top',
-        'right',
-        'bottom',
-        'left',
-        'top-left',
-        'top-right',
-        'bottom-left',
-        'bottom-right',
-      ]"
-      :key="dir"
-      class="resize-handle"
-      :class="`resize-handle-${dir}`"
-      @mousedown="(e) => handleResizeMousedown(e, dir)"
-    ></div>
     <template #footer>
       <div class="dialog-footer">
         <el-button @click="cancelClick" class="cancel-btn">取消</el-button>
@@ -576,79 +561,7 @@ onMounted(() => {
   fetchJdbcDatasource();
 });
 
-let resizing = false;
-let resizeDir = "";
-let startX = 0,
-  startY = 0,
-  startWidth = 0,
-  startHeight = 0,
-  startTop = 0,
-  startLeft = 0;
-
-function handleResizeMousedown(e: MouseEvent, dir: string) {
-  e.stopPropagation();
-  resizing = true;
-  resizeDir = dir;
-  const dialog = document.querySelector(".el-dialog") as HTMLElement;
-  const rect = dialog.getBoundingClientRect();
-  startX = e.clientX;
-  startY = e.clientY;
-  startWidth = rect.width;
-  startHeight = rect.height;
-  startTop = rect.top;
-  startLeft = rect.left;
-
-  document.addEventListener("mousemove", handleResizing);
-  document.addEventListener("mouseup", handleResizeMouseup);
-}
-
-function handleResizing(e: MouseEvent) {
-  if (!resizing) return;
-  const dialog = document.querySelector(".el-dialog") as HTMLElement;
-  if (!dialog) return;
-  let dx = e.clientX - startX;
-  let dy = e.clientY - startY;
-  let newWidth = startWidth,
-    newHeight = startHeight;
-  let newTop = startTop,
-    newLeft = startLeft;
-
-  // 限制最大最小宽高
-  const maxWidth = window.innerWidth * 0.9;
-  const maxHeight = window.innerHeight * 0.9;
-  const minWidth = 400;
-  const minHeight = 200;
-
-  if (resizeDir.includes("right"))
-    newWidth = Math.max(minWidth, Math.min(maxWidth, startWidth + dx));
-  if (resizeDir.includes("left")) {
-    newWidth = Math.max(minWidth, Math.min(maxWidth, startWidth - dx));
-    newLeft = startLeft + dx;
-  }
-  if (resizeDir.includes("bottom"))
-    newHeight = Math.max(minHeight, Math.min(maxHeight, startHeight + dy));
-  if (resizeDir.includes("top")) {
-    newHeight = Math.max(minHeight, Math.min(maxHeight, startHeight - dy));
-    newTop = startTop + dy;
-  }
-
-  dialog.style.width = newWidth + "px";
-  dialog.style.height = newHeight + "px";
-  dialog.style.top = newTop + "px";
-  dialog.style.left = newLeft + "px";
-  dialog.style.margin = "0"; // 防止居中影响
-}
-
-function handleResizeMouseup() {
-  resizing = false;
-  document.removeEventListener("mousemove", handleResizing);
-  document.removeEventListener("mouseup", handleResizeMouseup);
-}
-
-onBeforeUnmount(() => {
-  document.removeEventListener("mousemove", handleResizing);
-  document.removeEventListener("mouseup", handleResizeMouseup);
-});
+// 移除原有缩放相关逻辑
 </script>
 
 <style scoped lang="scss">
@@ -885,66 +798,5 @@ onBeforeUnmount(() => {
   background: #d1d1d1;
   border-radius: 2px;
 }
-.resizable-dialog {
-  position: relative;
-  .resize-handle {
-    position: absolute;
-    z-index: 10;
-    background: transparent;
-  }
-  .resize-handle-top,
-  .resize-handle-bottom {
-    left: 0;
-    right: 0;
-    height: 8px;
-    cursor: ns-resize;
-  }
-  .resize-handle-top {
-    top: -4px;
-  }
-  .resize-handle-bottom {
-    bottom: -4px;
-  }
-  .resize-handle-left,
-  .resize-handle-right {
-    top: 0;
-    bottom: 0;
-    width: 8px;
-    cursor: ew-resize;
-  }
-  .resize-handle-left {
-    left: -4px;
-  }
-  .resize-handle-right {
-    right: -4px;
-  }
-  .resize-handle-top-left,
-  .resize-handle-top-right,
-  .resize-handle-bottom-left,
-  .resize-handle-bottom-right {
-    width: 14px;
-    height: 14px;
-    z-index: 11;
-  }
-  .resize-handle-top-left {
-    top: -7px;
-    left: -7px;
-    cursor: nwse-resize;
-  }
-  .resize-handle-top-right {
-    top: -7px;
-    right: -7px;
-    cursor: nesw-resize;
-  }
-  .resize-handle-bottom-left {
-    bottom: -7px;
-    left: -7px;
-    cursor: nesw-resize;
-  }
-  .resize-handle-bottom-right {
-    bottom: -7px;
-    right: -7px;
-    cursor: nwse-resize;
-  }
-}
+// 移除 .resizable-dialog 和 .resize-handle 相关样式
 </style>

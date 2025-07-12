@@ -16,10 +16,13 @@ import router from "./router/index";
 import ElementPlus from "element-plus";
 import "element-plus/dist/index.css";
 import { InstallCodeMirror } from "codemirror-editor-vue3";
+import resizeDialog from '@/directives/resizeDialog'
+import '@/utils/dialogResizePatch'
 
 app.use(router);
 app.use(ElementPlus);
 app.use(InstallCodeMirror);
+app.directive('resize-dialog', resizeDialog)
 
 // 添加调试信息
 console.log('=== Vue App Starting ===');
