@@ -46,29 +46,40 @@ class CustomAPIView extends BaseButtonNodeView {
         },
       },
       [
-        // API连接图标
-        h('path', {
+        // 扁平风格三点连线
+        h('circle', {
+          cx: 6,
+          cy: 12,
+          r: 2,
           fill: apiStyle.iconColor,
-          d: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z',
-        }),
-        // 连接点
-        h('circle', {
-          fill: apiStyle.accentColor,
-          cx: "8",
-          cy: "8",
-          r: "1.5",
         }),
         h('circle', {
-          fill: apiStyle.accentColor,
-          cx: "16",
-          cy: "16",
-          r: "1.5",
+          cx: 18,
+          cy: 12,
+          r: 2,
+          fill: apiStyle.iconColor,
         }),
         h('circle', {
-          fill: apiStyle.accentColor,
-          cx: "12",
-          cy: "12",
-          r: "1.5",
+          cx: 12,
+          cy: 6,
+          r: 2,
+          fill: apiStyle.iconColor,
+        }),
+        h('line', {
+          x1: 6,
+          y1: 12,
+          x2: 12,
+          y2: 6,
+          stroke: apiStyle.accentColor,
+          'stroke-width': 1.5,
+        }),
+        h('line', {
+          x1: 12,
+          y1: 6,
+          x2: 18,
+          y2: 12,
+          stroke: apiStyle.accentColor,
+          'stroke-width': 1.5,
         }),
       ]
     );

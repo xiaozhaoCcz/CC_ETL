@@ -46,18 +46,20 @@ class CustomNodeView extends BaseButtonNodeView {
         },
       },
       [
-        // Node.js六边形图标
-        h('path', {
+        // 扁平风格六边形
+        h('polygon', {
+          points: '12,2 22,7 22,17 12,22 2,17 2,7',
           fill: nodejsStyle.iconColor,
-          d: 'M12 2L2 7v10l10 5 10-5V7L12 2zm0 2.236L19.764 8 12 11.764 4.236 8 12 4.236zM4 9.236V16l7 3.764V13L4 9.236zM20 16V9.236L13 13v6.764L20 16z',
         }),
-        // 中心装饰
-        h('circle', {
+        // JS字母
+        h('text', {
+          x: 12,
+          y: 16,
+          fontSize: 8,
           fill: nodejsStyle.accentColor,
-          cx: "12",
-          cy: "12",
-          r: "2",
-        }),
+          fontFamily: 'monospace',
+          'text-anchor': 'middle',
+        }, 'JS'),
       ]
     );
   }
