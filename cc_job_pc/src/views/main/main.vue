@@ -1901,7 +1901,7 @@ const maxReconnectAttempts = ref(3); // 自定义最大重试次数
 
 const connectWs = (id: string, targetJobId?: number): void => {
   // TODO 后端做多节点部署时，需要修改
-  const wsUrl = "ws://localhost:8989/ccJobWs/" + id;
+  const wsUrl = import.meta.env.VITE_APP_WS_ENDPOINT + id;
 
   const newWs = new WebSocket(wsUrl);
 

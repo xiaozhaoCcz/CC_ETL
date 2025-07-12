@@ -1,13 +1,13 @@
 import axios, { InternalAxiosRequestConfig, AxiosResponse } from "axios";
-import {getToken} from "@/utils/auth.ts";
-import {ResultEnum} from "@/enums/ResultEnum.ts";
-import {ElMessage, ElNotification} from "element-plus";
+import { getToken } from "@/utils/auth.ts";
+import { ResultEnum } from "@/enums/ResultEnum.ts";
+import { ElMessage, ElNotification } from "element-plus";
 
 
 
 // 创建 axios 实例
 const service = axios.create({
-    baseURL: "http://localhost:8989",
+    baseURL: import.meta.env.VITE_API_BASE_URL,
     timeout: 50000,
     headers: { "Content-Type": "application/json;charset=utf-8" },
 });
