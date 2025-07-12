@@ -268,7 +268,6 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
                  BadPaddingException | IOException e) {
             throw new RuntimeException(e);
         }
-        System.out.println(json);
         Gson gson = new Gson();
         JobPartVo jobPartVo = gson.fromJson(json, JobPartVo.class);
         //添加数据
@@ -278,6 +277,9 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
         this.save(copyJobPart);
         //2.往jobinfo中插入数据
         List<JobInfo> jobInfoList = jobInfoService.list(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getJobPartId, jobPartVo.getId()));
+        if(jobInfoList==null||jobInfoList.isEmpty()){
+            return;
+        }
         Map<Long, JobInfo> jobInfoMap = new HashMap<>();
         Map<Long,Long> jobParentIdMap = new HashMap<>();
         getAllJobInfoMap(jobInfoList, jobInfoMap,jobParentIdMap);

@@ -539,7 +539,6 @@ public class JobGroupXxlJob {
                 message.setRandomId(randomId);
                 message.setParentJobId(parentId);
                 webSocketServer.sendInfo(message);
-                System.out.println(">>>>>>>>>>>>>>>>>发送消息"+message);
 
                 if (status == 0) {
                     JobInfo jobInfo = jobInfoService.getById(jobId);
