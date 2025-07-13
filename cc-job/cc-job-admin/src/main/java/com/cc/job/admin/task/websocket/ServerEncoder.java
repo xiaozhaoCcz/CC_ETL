@@ -2,46 +2,45 @@ package com.cc.job.admin.task.websocket;
 
 import com.cc.job.admin.task.websocket.model.Message;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.websocket.EncodeException;
 import jakarta.websocket.Encoder;
 import jakarta.websocket.EndpointConfig;
 
-
 /**
- * websocket配置
+ * WebSocket消息编码器
+ * 使用单例ObjectMapper提高序列化性能
+ * 
  * @author xiaozhao
  */
 public class ServerEncoder implements Encoder.Text<Message> {
 
+    // 使用单例ObjectMapper，避免重复创建
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     @Override
     public void destroy() {
-        // TODO Auto-generated method stub
-        // 这里不重要
+        // 清理资源
     }
 
     @Override
-    public void init(EndpointConfig arg0) {
-        // TODO Auto-generated method stub
-        // 这里也不重要
-
+    public void init(EndpointConfig config) {
+        // 初始化配置
     }
 
-    /*
-     *  encode()方法里的参数和Text<T>里的T一致，如果你是Student，这里就是encode（Student student）
+    /**
+     * 将Message对象编码为JSON字符串
+     * 
+     * @param message 要编码的消息对象
+     * @return JSON字符串
+     * @throws EncodeException 编码异常
      */
     @Override
     public String encode(Message message) throws EncodeException {
         try {
-            /*
-             * 这里是重点，只需要返回Object序列化后的json字符串就行
-             * 你也可以使用gosn，fastJson来序列化。
-             */
-            JsonMapper jsonMapper = new JsonMapper();
-            return jsonMapper.writeValueAsString(message);
+            return OBJECT_MAPPER.writeValueAsString(message);
         } catch (JsonProcessingException e) {
-            e.printStackTrace();
-            return null;
+            throw new EncodeException(message, "Failed to encode message", e);
         }
     }
 }

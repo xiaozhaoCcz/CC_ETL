@@ -6,3 +6,26 @@ spring:
 project:
   version: 2.1.1
 
+# WebSocket配置
+websocket:
+  # 最大连接数
+  max-connections: 10000
+  # 连接超时时间（毫秒）
+  connection-timeout: 1800000
+  # 消息发送超时时间（毫秒）
+  message-timeout: 5000
+  # 最大文本消息大小（字节）
+  max-text-message-size: 65536
+  # 最大二进制消息大小（字节）
+  max-binary-message-size: 65536
+  # 异步发送超时时间（毫秒）
+  async-send-timeout: 5000
+  # 消息队列大小
+  message-queue-size: 10000
+  # 线程池核心线程数
+  core-thread-pool-size: 10
+  # 线程池最大线程数
+  max-thread-pool-size: 20
+  # 连接清理间隔（分钟）
+  cleanup-interval: 5
+
