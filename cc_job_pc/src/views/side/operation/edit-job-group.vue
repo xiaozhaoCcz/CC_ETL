@@ -1,7 +1,6 @@
 <template>
   <div class="job-group-container">
-    <el-dialog
-      v-resize-dialog
+    <el-dialog 
       v-model="jobGroupVisible.visible"
       :title="jobGroupVisible.title"
       :before-close="handleCloseDialog"

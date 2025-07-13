@@ -1,6 +1,5 @@
 <template>
   <el-dialog
-    v-resize-dialog
     v-model="drawVisible"
     :title="props.nodeJobId ? '编辑任务' : '新增任务'"
     @close="cancelClick"
