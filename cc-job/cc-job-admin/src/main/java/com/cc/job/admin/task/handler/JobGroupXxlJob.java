@@ -12,6 +12,7 @@ import com.cc.job.admin.task.service.JobEdgeService;
 import com.cc.job.admin.task.service.JobInfoService;
 import com.cc.job.admin.task.service.JobNodeService;
 import com.cc.job.admin.task.websocket.WebSocketServer;
+import com.cc.job.admin.task.websocket.MessageQueueService;
 import com.cc.job.admin.task.websocket.model.Message;
 import com.cc.tasktool.callback.ICallback;
 import com.cc.tasktool.callback.IWorker;
@@ -42,6 +43,7 @@ import static com.cc.job.admin.task.handler.JobConstant.*;
 /**
  * 任务组核心代码
  * TODO 可以考虑优化线程
+ * 
  * @author xiaozhao
  */
 @Component
@@ -58,6 +60,8 @@ public class JobGroupXxlJob {
     final JobEdgeService jobEdgeService;
 
     final WebSocketServer webSocketServer;
+
+    final MessageQueueService messageQueueService;
 
     final JobInfoMapper jobInfoMapper;
 
@@ -96,10 +100,11 @@ public class JobGroupXxlJob {
         ExecutorService executorService = null;
         try {
             // 如果jobId和执行参数一致，则需要匹配一个uuid，如果不匹配则代表是platform页面执行，会携带一个随机id
-            randomId = String.valueOf(jobId).equalsIgnoreCase(executeParam) ? UUID.randomUUID().toString() : executeParam;
+            randomId = String.valueOf(jobId).equalsIgnoreCase(executeParam) ? UUID.randomUUID().toString()
+                    : executeParam;
             JobInfo jobInfo = getJobInfoById(jobId);
-//            List<JobNode> nodes = getJobNodesByJobId(jobId);
-//            List<JobEdge> edges = getJobEdgesByJobId(jobId);
+            // List<JobNode> nodes = getJobNodesByJobId(jobId);
+            // List<JobEdge> edges = getJobEdgesByJobId(jobId);
 
             Map<Long, List<Long>> statusMap = new HashMap<>();
             // 设置初始状态，页面颜色提示
@@ -108,19 +113,19 @@ public class JobGroupXxlJob {
             List<JobNode> nodes = new ArrayList<>();
             List<JobEdge> edges = new ArrayList<>();
             getAllNodesAndEdges(jobId, nodes, edges);
-            //构图
+            // 构图
             buildGraph(jobId, nodes, edges);
             // 找到当前节点的next节点
             Map<Long, List<JobNode>> nextMap = buildNextNode(nodes, edges);
 
             // 设置任务的平均执行时间
-            //int avgTime = getAvgTime(nodes, jobInfo);
+            // int avgTime = getAvgTime(nodes, jobInfo);
             CONTEXT_HOLDER.set(XxlJobContext.getXxlJobContext());
             // 构造WorkerWrapper，实现任务的串并行执行
             List<WorkerWrapper<Long, String>> workerWrappers = buildWorkerWrappers(nodes, nextMap, randomId, statusMap);
             // 预测任务的运行时间
             getRuntime(workerWrappers, nodes, jobInfo.getExecutorTimeout(), jobId, randomId);
-            //构造一个开始节点
+            // 构造一个开始节点
             List<Long> startNodes = getStartNodes(nodes);
             List<WorkerWrapper<Long, String>> startWrappers = getStartWrappers(workerWrappers, startNodes);
             WorkerWrapper<Long, String> startWork = createStartWorkWrapper(jobId, startWrappers);
@@ -137,42 +142,44 @@ public class JobGroupXxlJob {
         }
     }
 
-    private void getRuntime(List<WorkerWrapper<Long, String>> workerWrappers, List<JobNode> nodes, long timeout, Long jobId, String randomId) {
+    private void getRuntime(List<WorkerWrapper<Long, String>> workerWrappers, List<JobNode> nodes, long timeout,
+            Long jobId, String randomId) {
         List<JobInfo> jobInfos = getJobInfos(nodes);
         Map<Long, JobInfo> jobInfoMap = new HashMap<>();
         final Map<Long, JobInfo> jobInfoDbMap = jobInfos.stream().collect(Collectors.toMap(JobInfo::getId, t -> t));
         for (JobNode jobNode : nodes) {
             jobInfoMap.put(jobNode.getId(), jobInfoDbMap.get(jobNode.getJobId()));
         }
-        String[][] nextRunTime = jobGroupUtils.getNextRunTime(workerWrappers, jobInfoMap, timeout, getStartNodes(nodes), jobId);
+        String[][] nextRunTime = jobGroupUtils.getNextRunTime(workerWrappers, jobInfoMap, timeout, getStartNodes(nodes),
+                jobId);
         Message message = new Message();
         message.setJobId(jobId);
         message.setParentJobId(jobId);
         message.setStatus(9);
         message.setRandomId(randomId);
         message.setResult(JSONUtil.toJsonStr(nextRunTime));
-        webSocketServer.sendInfo(message);
+        // 使用消息队列服务发送消息，提高响应速度
+        messageQueueService.addMessage(message);
     }
 
-
-//    private int getAvgTime(List<JobNode> nodes, JobInfo jobInfo) {
-//        List<JobInfo> jobInfos = getJobInfos(nodes);
-//        Integer executorTimeout = jobInfo.getExecutorTimeout();
-//        int size = nodes.size();
-//        for (JobInfo info : jobInfos) {
-//            if (info.getExecutorTimeout() > 0) {
-//                executorTimeout -= info.getExecutorTimeout();
-//                size--;
-//            }
-//            if (executorTimeout < 0) {
-//                throw new BusinessException("子任务运行时长超过任务组");
-//            }
-//        }
-//        if (size == 0) {
-//            size = 1;
-//        }
-//        return executorTimeout / size;
-//    }
+    // private int getAvgTime(List<JobNode> nodes, JobInfo jobInfo) {
+    // List<JobInfo> jobInfos = getJobInfos(nodes);
+    // Integer executorTimeout = jobInfo.getExecutorTimeout();
+    // int size = nodes.size();
+    // for (JobInfo info : jobInfos) {
+    // if (info.getExecutorTimeout() > 0) {
+    // executorTimeout -= info.getExecutorTimeout();
+    // size--;
+    // }
+    // if (executorTimeout < 0) {
+    // throw new BusinessException("子任务运行时长超过任务组");
+    // }
+    // }
+    // if (size == 0) {
+    // size = 1;
+    // }
+    // return executorTimeout / size;
+    // }
 
     private List<JobInfo> getJobInfos(List<JobNode> nodes) {
         List<Long> jobIds = nodes.stream().map(JobNode::getJobId).toList();
@@ -195,7 +202,7 @@ public class JobGroupXxlJob {
     }
 
     private List<WorkerWrapper<Long, String>> getStartWrappers(List<WorkerWrapper<Long, String>> workerWrappers,
-                                                               List<Long> startNodes) {
+            List<Long> startNodes) {
         return workerWrappers.stream().filter(v -> startNodes.contains(Long.valueOf(v.getId()))).toList();
     }
 
@@ -213,7 +220,7 @@ public class JobGroupXxlJob {
     }
 
     private static WorkerWrapper<Long, String> createStartWorkWrapper(long jobId,
-                                                                      List<WorkerWrapper<Long, String>> startWrappers) {
+            List<WorkerWrapper<Long, String>> startWrappers) {
         XxlJobContext xxlJobContext = CONTEXT_HOLDER.get();
         return new WorkerWrapper<Long, String>()
                 .id(String.valueOf(jobId))
@@ -231,7 +238,8 @@ public class JobGroupXxlJob {
         message.setParentJobId(jobId);
         message.setStatus(5);
         message.setRandomId(randomId);
-        webSocketServer.sendInfo(message);
+        // 使用消息队列服务发送消息，提高响应速度
+        messageQueueService.addMessage(message);
     }
 
     /**
@@ -244,7 +252,7 @@ public class JobGroupXxlJob {
      * @return
      */
     private List<WorkerWrapper<Long, String>> buildWorkerWrappers(List<JobNode> nodes, Map<Long, List<JobNode>> nextMap,
-                                                                  String randomId, Map<Long, List<Long>> statusMap) {
+            String randomId, Map<Long, List<Long>> statusMap) {
         List<WorkerWrapper<Long, String>> result = new ArrayList<>();
         List<JobInfo> jobInfos = getJobInfos(nodes);
         final Map<Long, JobInfo> jobInfoMap = jobInfos.stream().collect(Collectors.toMap(JobInfo::getId, t -> t));
@@ -259,7 +267,7 @@ public class JobGroupXxlJob {
                     .worker(new IWorker<>() {
                         @Override
                         public String action(Long jobId, Map<String, WorkerWrapper> allWrappers) {
-                            //当前wrapper
+                            // 当前wrapper
                             WorkerWrapper workerWrapper = allWrappers.get(String.valueOf(node.getId()));
                             int count = workerWrapper.getCount();
                             // 执行任务
@@ -306,11 +314,11 @@ public class JobGroupXxlJob {
      * @return 运行结果
      */
     private String executeJob(XxlJobContext xxlJobContext, JobNode node, JobInfo jobInfo, String randomId,
-                              Map<Long, List<Long>> statusMap, int count) {
-        //暂停任务执行
+            Map<Long, List<Long>> statusMap, int count) {
+        // 暂停任务执行
         pauseJob(jobInfo);
 
-        //触发任务
+        // 触发任务
         triggerJob(xxlJobContext, jobInfo, randomId);
 
         // 核心代码，创建一个线程用来监听任务是否运行完成
@@ -320,7 +328,8 @@ public class JobGroupXxlJob {
     /**
      * 监听任务是否运行完成
      */
-    private String listenerJob(JobNode node, JobInfo jobInfo, String randomId, Map<Long, List<Long>> statusMap, int count) {
+    private String listenerJob(JobNode node, JobInfo jobInfo, String randomId, Map<Long, List<Long>> statusMap,
+            int count) {
         String result;
         Thread thread = null;
         JobThreadListener jobThreadListener = null;
@@ -329,7 +338,9 @@ public class JobGroupXxlJob {
             FutureTask<String> futureTask = new FutureTask<>(jobThreadListener);
             thread = new Thread(futureTask);
             thread.start();
-            result = jobInfo.getExecutorTimeout() > 0 ? futureTask.get(jobInfo.getExecutorTimeout(), TimeUnit.MILLISECONDS) : futureTask.get();
+            result = jobInfo.getExecutorTimeout() > 0
+                    ? futureTask.get(jobInfo.getExecutorTimeout(), TimeUnit.MILLISECONDS)
+                    : futureTask.get();
         } catch (Exception e) {
             logger.error(e.getMessage());
             throw new RuntimeException(e);
@@ -341,9 +352,9 @@ public class JobGroupXxlJob {
     }
 
     private void pauseJob(JobInfo jobInfo) {
-        //重新获取jobInfo
+        // 重新获取jobInfo
         boolean isPause = jobInfo.getIsPause() == 1;
-        //暂停任务，默认暂停任务5分钟
+        // 暂停任务，默认暂停任务5分钟
         long timeout = jobInfo.getExecutorTimeout() > 0 ? jobInfo.getExecutorTimeout() : 5 * 60 * 1000;
         long startTime = System.currentTimeMillis();
         while (isPause) {
@@ -389,14 +400,14 @@ public class JobGroupXxlJob {
 
         String address = group.getRegistryList().get(0);
         ReturnT<String> returnT = XxlJobTrigger.runExecutor(triggerParam, address);
-        if(returnT.getCode()!=ReturnT.SUCCESS_CODE){
-            XxlJobHelper.log(xxlJobContext,returnT.getMsg());
-            JobGroupXxlJob.addJobData(setExecuteJobId(jobInfo.getId(),randomId),false);
+        if (returnT.getCode() != ReturnT.SUCCESS_CODE) {
+            XxlJobHelper.log(xxlJobContext, returnT.getMsg());
+            JobGroupXxlJob.addJobData(setExecuteJobId(jobInfo.getId(), randomId), false);
         }
     }
 
     private String handleJobCompletion(Pair<String, Boolean> pair, JobInfo jobInfo, JobNode node, String randomId,
-                                       Map<Long, List<Long>> statusMap, int count) {
+            Map<Long, List<Long>> statusMap, int count) {
         String key = pair.getKey();
         Long jobId = Long.valueOf(key.split(":")[0]);
         boolean success = pair.getValue();
@@ -427,13 +438,16 @@ public class JobGroupXxlJob {
     }
 
     private void getAllNodesAndEdges(Long jobId, List<JobNode> nodes, List<JobEdge> edges) {
-        List<JobNode> jobNodes = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, jobId));
-        List<JobEdge> jobEdges = jobEdgeService.list(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getJobParentId, jobId));
+        List<JobNode> jobNodes = jobNodeService
+                .list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, jobId));
+        List<JobEdge> jobEdges = jobEdgeService
+                .list(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getJobParentId, jobId));
 
         nodes.addAll(jobNodes);
         edges.addAll(jobEdges);
 
-        List<JobInfo> childJobInfos = jobInfoService.list(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getParentId, jobId));
+        List<JobInfo> childJobInfos = jobInfoService
+                .list(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getParentId, jobId));
         for (JobInfo childJobInfo : childJobInfos) {
             if (childJobInfo.getJobType() == 2) {
                 getAllNodesAndEdges(childJobInfo.getId(), nodes, edges);
@@ -455,8 +469,10 @@ public class JobGroupXxlJob {
 
     private void getNodeList(Long jobId, List<JobNode> nodes, List<JobEdge> edges, List<JobNode> nodeList) {
         for (JobNode node : nodeList) {
-            List<Long> preNodeIds = edges.stream().filter(v -> v.getEndNodeId().equals(node.getId())).map(JobEdge::getFromNodeId).toList();
-            List<Long> nextNodeIds = edges.stream().filter(v -> v.getFromNodeId().equals(node.getId())).map(JobEdge::getEndNodeId).toList();
+            List<Long> preNodeIds = edges.stream().filter(v -> v.getEndNodeId().equals(node.getId()))
+                    .map(JobEdge::getFromNodeId).toList();
+            List<Long> nextNodeIds = edges.stream().filter(v -> v.getFromNodeId().equals(node.getId()))
+                    .map(JobEdge::getEndNodeId).toList();
             concatNode(jobId, node, preNodeIds, nextNodeIds, nodes, edges);
         }
     }
@@ -471,15 +487,18 @@ public class JobGroupXxlJob {
      * @param nodes
      * @param edges
      */
-    private void concatNode(Long jobId, JobNode currentNode, List<Long> preNodeIds, List<Long> nextNodeIds, List<JobNode> nodes, List<JobEdge> edges) {
+    private void concatNode(Long jobId, JobNode currentNode, List<Long> preNodeIds, List<Long> nextNodeIds,
+            List<JobNode> nodes, List<JobEdge> edges) {
         JobInfo jobInfo = jobInfoService.getById(currentNode.getJobId());
         if (jobInfo.getJobType() == 2) {
             edges.removeIf(v -> preNodeIds.contains(v.getFromNodeId()) && v.getEndNodeId().equals(currentNode.getId()));
-            edges.removeIf(v -> nextNodeIds.contains(v.getEndNodeId()) && v.getFromNodeId().equals(currentNode.getId()));
+            edges.removeIf(
+                    v -> nextNodeIds.contains(v.getEndNodeId()) && v.getFromNodeId().equals(currentNode.getId()));
 
-            //得到开始节点
-            //得到当前节点的所有孩子节点
-            List<JobNode> childrenNodes = nodes.stream().filter(v -> v.getJobParentId().equals(jobInfo.getId())).toList();
+            // 得到开始节点
+            // 得到当前节点的所有孩子节点
+            List<JobNode> childrenNodes = nodes.stream().filter(v -> v.getJobParentId().equals(jobInfo.getId()))
+                    .toList();
             // 得到孩子节点的开始节点
             List<JobNode> startNodes = childrenNodes.stream().filter(v -> v.getNodeInDegree() == 0).toList();
             List<JobNode> endNodes = childrenNodes.stream().filter(v -> v.getNodeOutDegree() == 0).toList();
@@ -530,7 +549,7 @@ public class JobGroupXxlJob {
     }
 
     private void setNodeStatus(Map<Long, List<Long>> statusMap, Long jobId, Integer status, String randomId,
-                               Long parentId) {
+            Long parentId) {
         for (Map.Entry<Long, List<Long>> entry : statusMap.entrySet()) {
             if (entry.getValue().contains(jobId)) {
                 Message message = new Message();
@@ -538,7 +557,8 @@ public class JobGroupXxlJob {
                 message.setStatus(status);
                 message.setRandomId(randomId);
                 message.setParentJobId(parentId);
-                webSocketServer.sendInfo(message);
+                // 使用消息队列服务发送消息，提高响应速度
+                messageQueueService.addMessage(message);
 
                 if (status == 0) {
                     JobInfo jobInfo = jobInfoService.getById(jobId);
@@ -561,7 +581,7 @@ public class JobGroupXxlJob {
     }
 
     private void executeSuccessOrFailJob(Map<Long, List<Long>> statusMap, Long jobId, Integer status, String randomId,
-                                         Long parentId, Map.Entry<Long, List<Long>> entry) {
+            Long parentId, Map.Entry<Long, List<Long>> entry) {
         List<Long> value = new ArrayList<>(entry.getValue());
         value.remove(jobId);
         statusMap.put(entry.getKey(), value);
@@ -589,7 +609,7 @@ public class JobGroupXxlJob {
         private final int count;
 
         public JobThreadListener(JobInfo jobInfo, JobNode node, String randomId, Map<Long, List<Long>> statusMap,
-                                 int count) {
+                int count) {
             this.jobInfo = jobInfo;
             this.node = node;
             this.randomId = randomId;
@@ -635,7 +655,7 @@ public class JobGroupXxlJob {
         private long runtime;
 
         public JobCallback(XxlJobContext xxlJobContext, JobNode node, String randomId,
-                           Map<Long, List<Long>> statusMap) {
+                Map<Long, List<Long>> statusMap) {
             this.node = node;
             this.randomId = randomId;
             this.xxlJobContext = xxlJobContext;
@@ -655,7 +675,7 @@ public class JobGroupXxlJob {
             XxlJobHelper.log(xxlJobContext, ">>>>>>>>>>>>>>>>>>>>>任务运行完成:{}, 任务运行状态:{},运行结果:{}", param, success,
                     workResult.getResult());
             runtime = System.currentTimeMillis() - runtime;
-            //更新数据库
+            // 更新数据库
             if (success) {
                 Long jobId = this.node.getJobId();
                 JobInfo jobInfo = jobInfoMapper.selectById(jobId);

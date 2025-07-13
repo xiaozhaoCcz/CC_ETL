@@ -1,0 +1,43 @@
+# WebSocket配置
+cc:
+  job:
+    websocket:
+      # 是否启用异步发送
+      async-enabled: true
+      # 消息发送线程池核心线程数
+      core-pool-size: 10
+      # 消息发送线程池最大线程数
+      max-pool-size: 20
+      # 消息发送线程池队列大小
+      queue-capacity: 1000
+      # 心跳检测间隔（毫秒）
+      heartbeat-interval: 30000
+      # 批量发送间隔（毫秒）
+      batch-interval: 100
+      # 最大批量大小
+      max-batch-size: 10
+      # 是否启用消息队列
+      message-queue-enabled: true
+      # 连接超时时间（毫秒）
+      connection-timeout: 60000
+      # 最大消息大小（字节）
+      max-message-size: 8192
+
+# 服务器配置优化
+server:
+  # 增加连接超时时间
+  connection-timeout: 60s
+  # 增加读取超时时间
+  read-timeout: 60s
+  # 增加写入超时时间
+  write-timeout: 60s
+  # 最大连接数
+  max-connections: 1000
+  # 每个连接的缓冲区大小
+  buffer-size: 8192
+
+# 日志配置
+logging:
+  level:
+    com.cc.job.admin.task.websocket: DEBUG
+    org.springframework.web.socket: DEBUG 
