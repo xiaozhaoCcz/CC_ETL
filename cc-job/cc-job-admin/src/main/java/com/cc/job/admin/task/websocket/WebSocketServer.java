@@ -36,9 +36,9 @@ public class WebSocketServer {
 
     // 消息队列，用于异步发送
     private static final ExecutorService MESSAGE_EXECUTOR = new ThreadPoolExecutor(
-            10, 20, 60L, TimeUnit.SECONDS,
-            new LinkedBlockingQueue<>(10000),
-            new ThreadPoolExecutor.CallerRunsPolicy());
+            32, 128, 60L, TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(2000),
+            new ThreadPoolExecutor.DiscardOldestPolicy());
 
     // 连接清理定时器
     private static final ScheduledExecutorService CLEANUP_EXECUTOR = Executors.newSingleThreadScheduledExecutor();
@@ -90,6 +90,11 @@ public class WebSocketServer {
         MESSAGE_EXECUTOR.submit(() -> {
             try {
                 sendMessageSync(session, message);
+                // 刷新活跃时间
+                SESSION_POOLS.values().stream()
+                        .filter(ws -> ws.getSession().equals(session))
+                        .findFirst()
+                        .ifPresent(WebSocketSession::updateLastAccessTime);
                 MESSAGE_COUNT.incrementAndGet();
             } catch (Exception e) {
                 log.error("Failed to send message: {}", message, e);
@@ -106,10 +111,23 @@ public class WebSocketServer {
         if (session == null || !session.isOpen()) {
             return;
         }
-
         try {
             String messageJson = OBJECT_MAPPER.writeValueAsString(message);
-            session.getBasicRemote().sendText(messageJson);
+            Callable<Void> sendTask = () -> {
+                session.getBasicRemote().sendText(messageJson);
+                return null;
+            };
+            Future<Void> future = MESSAGE_EXECUTOR.submit(sendTask);
+            try {
+                future.get(MESSAGE_TIMEOUT, TimeUnit.MILLISECONDS);
+            } catch (TimeoutException e) {
+                log.error("Send message timeout: {}", messageJson);
+                future.cancel(true);
+                throw new IOException("Send message timeout", e);
+            } catch (Exception e) {
+                log.error("Failed to send message: {}", messageJson, e);
+                throw new IOException("Failed to send message", e);
+            }
             log.debug("Message sent successfully: {}", messageJson);
         } catch (Exception e) {
             log.error("Failed to send message: {}", message, e);
