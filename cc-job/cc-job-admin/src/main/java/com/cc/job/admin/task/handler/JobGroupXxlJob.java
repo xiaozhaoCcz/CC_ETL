@@ -12,7 +12,6 @@ import com.cc.job.admin.task.service.JobEdgeService;
 import com.cc.job.admin.task.service.JobInfoService;
 import com.cc.job.admin.task.service.JobNodeService;
 import com.cc.job.admin.task.websocket.WebSocketServer;
-import com.cc.job.admin.task.websocket.MessageQueueService;
 import com.cc.job.admin.task.websocket.model.Message;
 import com.cc.tasktool.callback.ICallback;
 import com.cc.tasktool.callback.IWorker;
@@ -60,8 +59,6 @@ public class JobGroupXxlJob {
     final JobEdgeService jobEdgeService;
 
     final WebSocketServer webSocketServer;
-
-    final MessageQueueService messageQueueService;
 
     final JobInfoMapper jobInfoMapper;
 
@@ -193,7 +190,7 @@ public class JobGroupXxlJob {
         message.setRandomId(randomId);
         message.setResult(JSONUtil.toJsonStr(nextRunTime));
         // 使用消息队列服务发送消息，提高响应速度
-        messageQueueService.addMessage(message);
+        webSocketServer.sendInfo(message);
         logger.debug("[JobGroup] 运行时间计算完成并发送消息 - jobId: {}, randomId: {}", jobId, randomId);
     }
 
@@ -283,7 +280,7 @@ public class JobGroupXxlJob {
         message.setStatus(5);
         message.setRandomId(randomId);
         // 使用消息队列服务发送消息，提高响应速度
-        messageQueueService.addMessage(message);
+        webSocketServer.sendInfo(message);
         logger.debug("[JobGroup] 发送任务完成消息 - jobId: {}, randomId: {}", jobId, randomId);
     }
 
@@ -655,7 +652,7 @@ public class JobGroupXxlJob {
                 message.setRandomId(randomId);
                 message.setParentJobId(parentId);
                 // 使用消息队列服务发送消息，提高响应速度
-                messageQueueService.addMessage(message);
+                webSocketServer.sendInfo(message);
                 logger.debug("[JobGroup] 发送节点状态消息 - jobId: {}, status: {}, randomId: {}", jobId, status, randomId);
 
                 if (status == 0) {
