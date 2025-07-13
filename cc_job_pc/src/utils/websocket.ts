@@ -175,11 +175,21 @@ export class WebSocketManager {
 
         this.ws.onmessage = (event: MessageEvent) => {
             try {
+                // 检查是否为心跳消息
+                if (event.data === "ping" || event.data === "pong") {
+                    console.log("收到心跳消息:", event.data);
+                    this.resetHeartbeat();
+                    return;
+                }
+
+                // 尝试解析JSON消息
                 const message: WebSocketMessage = JSON.parse(event.data);
                 this.handleMessage(message);
                 this.callbacks.onMessage?.(message);
             } catch (error) {
                 console.error("解析WebSocket消息失败:", error);
+                // 如果不是JSON格式，可能是其他类型的消息，记录但不抛出错误
+                console.log("收到非JSON格式消息:", event.data);
             }
         };
     }
@@ -232,7 +242,7 @@ export class WebSocketManager {
 
         this.heartbeatTimer = setInterval(() => {
             if (this.isConnected()) {
-                this.send(JSON.stringify({ type: "ping" }));
+                this.send("ping");
             }
         }, this.config.heartbeatInterval);
     }
