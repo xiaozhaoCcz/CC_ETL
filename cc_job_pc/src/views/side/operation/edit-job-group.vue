@@ -4,13 +4,13 @@
       v-resize-dialog
       v-model="jobGroupVisible.visible"
       :title="jobGroupVisible.title"
-      width="720px"
       :before-close="handleCloseDialog"
       draggable
       class="job-group-dialog"
       :close-on-click-modal="false"
       :close-on-press-escape="false"
       append-to-body
+      data-resize-options='{"minWidth":720,"maxWidth":"60%","minHeight":800,"maxHeight":"100vh","width":720}'
     >
       <div class="form-container">
         <!-- 基础配置 -->
@@ -329,6 +329,7 @@ const blockStrategyList = [
 ];
 
 const cronPopover = ref(false);
+const testDialog = ref(false);
 
 // 添加点击外部关闭CRON弹出层的功能
 const handleClickOutside = (event: Event) => {

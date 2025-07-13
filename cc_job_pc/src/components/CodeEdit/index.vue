@@ -6,6 +6,7 @@
     :before-close="handleCloseDialog"
     draggable
     append-to-body
+    data-resize-options='{"minWidth":520,"maxWidth":520,"minHeight":600, "maxHeight":600,"width":520}'
   >
     <div class="editor-container">
       <MonacoEditor style="text-align: left; height: 400px" v-model:value="_code" />

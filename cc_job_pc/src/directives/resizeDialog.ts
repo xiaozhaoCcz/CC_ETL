@@ -1,171 +1,192 @@
 import type { DirectiveBinding } from "vue";
+import type { ResizeDialogOptions } from "@/types/resizeDialog";
+import { setDialogResizeConfig, forceReapplyConfig } from "@/utils/dialogResizePatch";
 
-interface ResizeOptions {
-  minWidth?: number;
-  minHeight?: number;
-  maxWidth?: number;
-  maxHeight?: number;
+// 将值转换为像素
+function parseValue(value: number | string | undefined, containerSize: number, defaultValue: number): number {
+    if (value === undefined) return defaultValue;
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') {
+        if (value.endsWith('%')) {
+            return (parseFloat(value) / 100) * containerSize;
+        }
+        if (value.endsWith('px')) {
+            return parseFloat(value);
+        }
+        if (value.endsWith('vw')) {
+            return (parseFloat(value) / 100) * window.innerWidth;
+        }
+        if (value.endsWith('vh')) {
+            return (parseFloat(value) / 100) * window.innerHeight;
+        }
+        return parseFloat(value) || defaultValue;
+    }
+    return defaultValue;
 }
 
-interface ResizeState {
-  resizing: boolean;
-  dir: string;
-  startX: number;
-  startY: number;
-  startWidth: number;
-  startHeight: number;
-  startTop: number;
-  startLeft: number;
-  handles: HTMLElement[];
-  options: ResizeOptions;
+// 获取容器尺寸
+function getContainerSize(): { width: number; height: number } {
+    return {
+        width: window.innerWidth,
+        height: window.innerHeight
+    };
 }
 
-function setDialogMinMax(dialog: HTMLElement, options: ResizeOptions) {
-  if (options.minWidth) dialog.style.minWidth = options.minWidth + "px";
-  if (options.maxWidth) dialog.style.maxWidth = options.maxWidth + "px";
-  if (options.minHeight) dialog.style.minHeight = options.minHeight + "px";
-  if (options.maxHeight) dialog.style.maxHeight = options.maxHeight + "px";
+// 设置对话框的最小最大尺寸
+function setDialogMinMax(dialog: HTMLElement, options: ResizeDialogOptions) {
+    const containerSize = getContainerSize();
+
+    const minWidth = parseValue(options.minWidth, containerSize.width, 400);
+    const maxWidth = parseValue(options.maxWidth, containerSize.width, containerSize.width * 0.9);
+    const minHeight = parseValue(options.minHeight, containerSize.height, 300);
+    const maxHeight = parseValue(options.maxHeight, containerSize.height, containerSize.height * 0.9);
+
+    dialog.style.minWidth = minWidth + "px";
+    dialog.style.maxWidth = maxWidth + "px";
+    dialog.style.minHeight = minHeight + "px";
+    dialog.style.maxHeight = maxHeight + "px";
 }
 
-function enforceDialogSize(dialog: HTMLElement, options: ResizeOptions) {
-  const rect = dialog.getBoundingClientRect();
-  if (options.maxWidth && rect.width > options.maxWidth)
-    dialog.style.width = options.maxWidth + "px";
-  if (options.minWidth && rect.width < options.minWidth)
-    dialog.style.width = options.minWidth + "px";
-  if (options.maxHeight && rect.height > options.maxHeight)
-    dialog.style.height = options.maxHeight + "px";
-  if (options.minHeight && rect.height < options.minHeight)
-    dialog.style.height = options.minHeight + "px";
-}
+// 强制限制对话框尺寸
+function enforceDialogSize(dialog: HTMLElement, options: ResizeDialogOptions) {
+    const rect = dialog.getBoundingClientRect();
+    const containerSize = getContainerSize();
 
-function createHandle(dir: string, onMousedown: (e: MouseEvent, dir: string) => void) {
-  const handle = document.createElement("div");
-  handle.className = `resize-handle resize-handle-${dir}`;
-  handle.addEventListener("mousedown", (e) => onMousedown(e, dir));
-  return handle;
+    const minWidth = parseValue(options.minWidth, containerSize.width, 400);
+    const maxWidth = parseValue(options.maxWidth, containerSize.width, containerSize.width * 0.9);
+    const minHeight = parseValue(options.minHeight, containerSize.height, 300);
+    const maxHeight = parseValue(options.maxHeight, containerSize.height, containerSize.height * 0.9);
+
+    let newWidth = rect.width;
+    let newHeight = rect.height;
+
+    // 应用尺寸限制
+    if (maxWidth && newWidth > maxWidth) newWidth = maxWidth;
+    if (minWidth && newWidth < minWidth) newWidth = minWidth;
+    if (maxHeight && newHeight > maxHeight) newHeight = maxHeight;
+    if (minHeight && newHeight < minHeight) newHeight = minHeight;
+
+    // 应用宽高比限制
+    if (options.aspectRatio && options.lockAspectRatio) {
+        const ratio = options.aspectRatio;
+        if (newWidth / newHeight > ratio) {
+            newHeight = newWidth / ratio;
+        } else {
+            newWidth = newHeight * ratio;
+        }
+    }
+
+    dialog.style.width = newWidth + "px";
+    dialog.style.height = newHeight + "px";
 }
 
 const resizeDialog = {
-  mounted(el: HTMLElement, binding: DirectiveBinding<ResizeOptions>) {
-    const dialog = el;
-    if (!dialog) return;
-    const dirs = [
-      "top",
-      "right",
-      "bottom",
-      "left",
-      "top-left",
-      "top-right",
-      "bottom-left",
-      "bottom-right",
-    ];
-    const options: ResizeOptions = {
-      minWidth: binding.value?.minWidth ?? 400,
-      minHeight: binding.value?.minHeight ?? 800,
-      maxWidth: binding.value?.maxWidth ?? window.innerWidth * 0.9,
-      maxHeight: binding.value?.maxHeight ?? window.innerHeight * 0.9,
-    };
-    setDialogMinMax(dialog, options);
-    enforceDialogSize(dialog, options);
-    const state: ResizeState = {
-      resizing: false,
-      dir: "",
-      startX: 0,
-      startY: 0,
-      startWidth: 0,
-      startHeight: 0,
-      startTop: 0,
-      startLeft: 0,
-      handles: [],
-      options,
-    };
+    mounted(el: HTMLElement, binding: DirectiveBinding<ResizeDialogOptions>) {
+        const dialog = el;
+        if (!dialog) return;
 
-    function handleMousedown(e: MouseEvent, dir: string) {
-      e.stopPropagation();
-      state.resizing = true;
-      state.dir = dir;
-      const rect = dialog.getBoundingClientRect();
-      state.startX = e.clientX;
-      state.startY = e.clientY;
-      state.startWidth = rect.width;
-      state.startHeight = rect.height;
-      state.startTop = rect.top;
-      state.startLeft = rect.left;
+        console.log("自定义指令mounted:", dialog, binding.value);
 
-      document.addEventListener("mousemove", handleMousemove);
-      document.addEventListener("mouseup", handleMouseup);
-    }
+        // 如果禁用调整大小，直接返回
+        if (binding.value?.disabled) {
+            console.log("指令禁用调整大小");
+            return;
+        }
 
-    function handleMousemove(e: MouseEvent) {
-      if (!state.resizing) return;
-      let dx = e.clientX - state.startX;
-      let dy = e.clientY - state.startY;
-      let newWidth = state.startWidth,
-        newHeight = state.startHeight;
-      let newTop = state.startTop,
-        newLeft = state.startLeft;
-      const { minWidth, minHeight, maxWidth, maxHeight } = state.options;
-      setDialogMinMax(dialog, state.options);
-      if (state.dir.includes("right"))
-        newWidth = Math.max(minWidth!, Math.min(maxWidth!, state.startWidth + dx));
-      if (state.dir.includes("left")) {
-        newWidth = Math.max(minWidth!, Math.min(maxWidth!, state.startWidth - dx));
-        newLeft = state.startLeft + dx;
-      }
-      if (state.dir.includes("bottom"))
-        newHeight = Math.max(minHeight!, Math.min(maxHeight!, state.startHeight + dy));
-      if (state.dir.includes("top")) {
-        newHeight = Math.max(minHeight!, Math.min(maxHeight!, state.startHeight - dy));
-        newTop = state.startTop + dy;
-      }
-      // 强制限制
-      if (maxWidth && newWidth > maxWidth) newWidth = maxWidth;
-      if (minWidth && newWidth < minWidth) newWidth = minWidth;
-      if (maxHeight && newHeight > maxHeight) newHeight = maxHeight;
-      if (minHeight && newHeight < minHeight) newHeight = minHeight;
-      dialog.style.width = newWidth + "px";
-      dialog.style.height = newHeight + "px";
-      dialog.style.top = newTop + "px";
-      dialog.style.left = newLeft + "px";
-      dialog.style.margin = "0";
-    }
+        const containerSize = getContainerSize();
+        const options: ResizeDialogOptions = {
+            minWidth: binding.value?.minWidth ?? 400,
+            minHeight: binding.value?.minHeight ?? 300,
+            maxWidth: binding.value?.maxWidth ?? containerSize.width * 0.9,
+            maxHeight: binding.value?.maxHeight ?? containerSize.height * 0.9,
+            width: binding.value?.width,
+            height: binding.value?.height,
+            aspectRatio: binding.value?.aspectRatio,
+            lockAspectRatio: binding.value?.lockAspectRatio ?? false,
+            responsive: binding.value?.responsive ?? true,
+            disabled: binding.value?.disabled ?? false,
+        };
 
-    function handleMouseup() {
-      state.resizing = false;
-      document.removeEventListener("mousemove", handleMousemove);
-      document.removeEventListener("mouseup", handleMouseup);
-    }
+        console.log("指令配置选项:", options);
 
-    // 创建并插入8个拖拽点
-    dirs.forEach((dir) => {
-      const handle = createHandle(dir, handleMousedown);
-      dialog.appendChild(handle);
-      state.handles.push(handle);
-    });
+        // 设置初始尺寸
+        if (options.width) {
+            const width = parseValue(options.width, containerSize.width, 400);
+            console.log("指令设置初始宽度:", width);
+            dialog.style.width = width + "px";
+        }
+        if (options.height) {
+            const height = parseValue(options.height, containerSize.height, 300);
+            console.log("指令设置初始高度:", height);
+            dialog.style.height = height + "px";
+        }
 
-    (el as any).__resizeDialogState = state;
-  },
-  updated(el: HTMLElement, binding: DirectiveBinding<ResizeOptions>) {
-    // 响应参数变化
-    const state: ResizeState | undefined = (el as any).__resizeDialogState;
-    if (state && binding.value) {
-      state.options = {
-        minWidth: binding.value.minWidth ?? 400,
-        minHeight: binding.value.minHeight ?? 200,
-        maxWidth: binding.value.maxWidth ?? window.innerWidth * 0.9,
-        maxHeight: binding.value.maxHeight ?? window.innerHeight * 0.9,
-      };
-      setDialogMinMax(el, state.options);
-      enforceDialogSize(el, state.options);
-    }
-  },
-  unmounted(el: HTMLElement) {
-    const state: ResizeState | undefined = (el as any).__resizeDialogState;
-    if (state) {
-      state.handles.forEach((h) => h.remove());
-    }
-  },
+        setDialogMinMax(dialog, options);
+        enforceDialogSize(dialog, options);
+
+        // 将配置传递给全局补丁
+        console.log("指令调用setDialogResizeConfig");
+        setDialogResizeConfig(dialog, options);
+
+        // 延迟强制重新应用配置，确保DOM完全渲染
+        setTimeout(() => {
+            console.log("延迟强制重新应用配置");
+            forceReapplyConfig(dialog);
+        }, 100);
+
+        // 保存状态用于更新
+        (el as any).__resizeDialogState = {
+            options,
+            originalWidth: dialog.style.width,
+            originalHeight: dialog.style.height,
+        };
+    },
+
+    updated(el: HTMLElement, binding: DirectiveBinding<ResizeDialogOptions>) {
+        const state: any = (el as any).__resizeDialogState;
+        if (!state) return;
+
+        console.log("自定义指令updated:", el, binding.value);
+
+        // 如果禁用调整大小，移除所有手柄
+        if (binding.value?.disabled) {
+            const handles = el.querySelectorAll('.resize-handle');
+            handles.forEach((handle) => handle.remove());
+            return;
+        }
+
+        // 更新选项
+        if (binding.value) {
+            const containerSize = getContainerSize();
+            const options: ResizeDialogOptions = {
+                minWidth: binding.value.minWidth ?? 400,
+                minHeight: binding.value.minHeight ?? 300,
+                maxWidth: binding.value.maxWidth ?? containerSize.width * 0.9,
+                maxHeight: binding.value.maxHeight ?? containerSize.height * 0.9,
+                width: binding.value.width,
+                height: binding.value.height,
+                aspectRatio: binding.value.aspectRatio,
+                lockAspectRatio: binding.value.lockAspectRatio ?? false,
+                responsive: binding.value.responsive ?? true,
+                disabled: binding.value.disabled ?? false,
+            };
+
+            console.log("指令更新配置:", options);
+
+            state.options = options;
+            setDialogMinMax(el, options);
+            enforceDialogSize(el, options);
+
+            // 更新全局配置
+            setDialogResizeConfig(el, options);
+        }
+    },
+
+    unmounted(el: HTMLElement) {
+        console.log("自定义指令unmounted:", el);
+        // 清理状态
+        delete (el as any).__resizeDialogState;
+    },
 };
 
 export default resizeDialog;

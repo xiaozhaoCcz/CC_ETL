@@ -3,12 +3,12 @@
     v-resize-dialog
     v-model="drawVisible"
     :title="props.nodeJobId ? '编辑任务' : '新增任务'"
-    width="540px"
     @close="cancelClick"
     draggable
     :close-on-click-modal="false"
     class="job-node-dialog compact"
     append-to-body
+    data-resize-options='{"minWidth":540,"maxWidth":"60%","minHeight":680,"maxHeight":"90vh","width":540}'
   >
     <div class="dialog-content">
       <el-form
