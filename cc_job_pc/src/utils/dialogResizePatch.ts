@@ -1,6 +1,3 @@
-// 全局 Element Plus 弹窗缩放 patch
-console.log("全局弹窗缩放patch已加载");
-
 // 定义类型
 interface ResizeOptions {
     minWidth?: number | string;
@@ -36,10 +33,10 @@ export function setDialogResizeConfig(dialog: HTMLElement, options: ResizeOption
     dialogConfigs.set(dialog, options);
 
     // 如果对话框已经存在，立即应用配置
-    if (dialog.classList.contains('el-dialog')) {
+    if (dialog.classList.contains("el-dialog")) {
         // 移除现有的手柄
-        const existingHandles = dialog.querySelectorAll('.resize-handle');
-        existingHandles.forEach(handle => handle.remove());
+        const existingHandles = dialog.querySelectorAll(".resize-handle");
+        existingHandles.forEach((handle) => handle.remove());
 
         // 重置patch状态
         delete (dialog as any).__resizePatched;
@@ -56,8 +53,8 @@ export function forceReapplyConfig(dialog: HTMLElement) {
         console.log("强制重新应用配置:", options);
 
         // 移除现有的手柄
-        const existingHandles = dialog.querySelectorAll('.resize-handle');
-        existingHandles.forEach(handle => handle.remove());
+        const existingHandles = dialog.querySelectorAll(".resize-handle");
+        existingHandles.forEach((handle) => handle.remove());
 
         // 重置patch状态
         delete (dialog as any).__resizePatched;
@@ -68,20 +65,24 @@ export function forceReapplyConfig(dialog: HTMLElement) {
 }
 
 // 将值转换为像素
-function parseValue(value: number | string | undefined, containerSize: number, defaultValue: number): number {
+function parseValue(
+    value: number | string | undefined,
+    containerSize: number,
+    defaultValue: number
+): number {
     if (value === undefined) return defaultValue;
-    if (typeof value === 'number') return value;
-    if (typeof value === 'string') {
-        if (value.endsWith('%')) {
+    if (typeof value === "number") return value;
+    if (typeof value === "string") {
+        if (value.endsWith("%")) {
             return (parseFloat(value) / 100) * containerSize;
         }
-        if (value.endsWith('px')) {
+        if (value.endsWith("px")) {
             return parseFloat(value);
         }
-        if (value.endsWith('vw')) {
+        if (value.endsWith("vw")) {
             return (parseFloat(value) / 100) * window.innerWidth;
         }
-        if (value.endsWith('vh')) {
+        if (value.endsWith("vh")) {
             return (parseFloat(value) / 100) * window.innerHeight;
         }
         return parseFloat(value) || defaultValue;
@@ -93,7 +94,7 @@ function parseValue(value: number | string | undefined, containerSize: number, d
 function getContainerSize(): { width: number; height: number } {
     return {
         width: window.innerWidth,
-        height: window.innerHeight
+        height: window.innerHeight,
     };
 }
 
@@ -109,14 +110,14 @@ function getDialogOptions(dialog: HTMLElement): ResizeOptions {
     }
 
     // 尝试从 data 属性获取配置
-    const dataOptions = dialog.getAttribute('data-resize-options');
+    const dataOptions = dialog.getAttribute("data-resize-options");
     if (dataOptions) {
         try {
             const config = JSON.parse(dataOptions);
             console.log("使用data属性配置:", config);
             return config;
         } catch (e) {
-            console.warn('解析对话框配置失败:', e);
+            console.warn("解析对话框配置失败:", e);
         }
     }
 
@@ -127,7 +128,7 @@ function getDialogOptions(dialog: HTMLElement): ResizeOptions {
         maxWidth: containerSize.width * 0.9,
         maxHeight: containerSize.height * 0.9,
         responsive: true,
-        disabled: false
+        disabled: false,
     };
     console.log("使用默认配置:", defaultConfig);
     return defaultConfig;
@@ -138,9 +139,17 @@ function setDialogMinMax(dialog: HTMLElement, options: ResizeOptions) {
     const containerSize = getContainerSize();
 
     const minWidth = parseValue(options.minWidth, containerSize.width, 400);
-    const maxWidth = parseValue(options.maxWidth, containerSize.width, containerSize.width * 0.9);
+    const maxWidth = parseValue(
+        options.maxWidth,
+        containerSize.width,
+        containerSize.width * 0.9
+    );
     const minHeight = parseValue(options.minHeight, containerSize.height, 300);
-    const maxHeight = parseValue(options.maxHeight, containerSize.height, containerSize.height * 0.9);
+    const maxHeight = parseValue(
+        options.maxHeight,
+        containerSize.height,
+        containerSize.height * 0.9
+    );
 
     console.log("设置对话框尺寸限制:", { minWidth, maxWidth, minHeight, maxHeight });
 
@@ -156,9 +165,17 @@ function enforceDialogSize(dialog: HTMLElement, options: ResizeOptions) {
     const containerSize = getContainerSize();
 
     const minWidth = parseValue(options.minWidth, containerSize.width, 400);
-    const maxWidth = parseValue(options.maxWidth, containerSize.width, containerSize.width * 0.9);
+    const maxWidth = parseValue(
+        options.maxWidth,
+        containerSize.width,
+        containerSize.width * 0.9
+    );
     const minHeight = parseValue(options.minHeight, containerSize.height, 300);
-    const maxHeight = parseValue(options.maxHeight, containerSize.height, containerSize.height * 0.9);
+    const maxHeight = parseValue(
+        options.maxHeight,
+        containerSize.height,
+        containerSize.height * 0.9
+    );
 
     let newWidth = rect.width;
     let newHeight = rect.height;
@@ -206,65 +223,65 @@ function createHandle(dir: string, dialog: HTMLElement) {
 
     // 根据方向设置手柄样式
     switch (dir) {
-        case 'top':
-            handle.style.top = '0';
-            handle.style.left = '50%';
-            handle.style.transform = 'translateX(-50%)';
-            handle.style.width = '30px';
-            handle.style.height = '6px';
-            handle.style.cursor = 'ns-resize';
+        case "top":
+            handle.style.top = "0";
+            handle.style.left = "50%";
+            handle.style.transform = "translateX(-50%)";
+            handle.style.width = "30px";
+            handle.style.height = "6px";
+            handle.style.cursor = "ns-resize";
             break;
-        case 'right':
-            handle.style.top = '50%';
-            handle.style.right = '0';
-            handle.style.transform = 'translateY(-50%)';
-            handle.style.width = '6px';
-            handle.style.height = '30px';
-            handle.style.cursor = 'ew-resize';
+        case "right":
+            handle.style.top = "50%";
+            handle.style.right = "0";
+            handle.style.transform = "translateY(-50%)";
+            handle.style.width = "6px";
+            handle.style.height = "30px";
+            handle.style.cursor = "ew-resize";
             break;
-        case 'bottom':
-            handle.style.bottom = '0';
-            handle.style.left = '50%';
-            handle.style.transform = 'translateX(-50%)';
-            handle.style.width = '30px';
-            handle.style.height = '6px';
-            handle.style.cursor = 'ns-resize';
+        case "bottom":
+            handle.style.bottom = "0";
+            handle.style.left = "50%";
+            handle.style.transform = "translateX(-50%)";
+            handle.style.width = "30px";
+            handle.style.height = "6px";
+            handle.style.cursor = "ns-resize";
             break;
-        case 'left':
-            handle.style.top = '50%';
-            handle.style.left = '0';
-            handle.style.transform = 'translateY(-50%)';
-            handle.style.width = '6px';
-            handle.style.height = '30px';
-            handle.style.cursor = 'ew-resize';
+        case "left":
+            handle.style.top = "50%";
+            handle.style.left = "0";
+            handle.style.transform = "translateY(-50%)";
+            handle.style.width = "6px";
+            handle.style.height = "30px";
+            handle.style.cursor = "ew-resize";
             break;
-        case 'top-left':
-            handle.style.top = '0';
-            handle.style.left = '0';
-            handle.style.width = '10px';
-            handle.style.height = '10px';
-            handle.style.cursor = 'nw-resize';
+        case "top-left":
+            handle.style.top = "0";
+            handle.style.left = "0";
+            handle.style.width = "10px";
+            handle.style.height = "10px";
+            handle.style.cursor = "nw-resize";
             break;
-        case 'top-right':
-            handle.style.top = '0';
-            handle.style.right = '0';
-            handle.style.width = '10px';
-            handle.style.height = '10px';
-            handle.style.cursor = 'ne-resize';
+        case "top-right":
+            handle.style.top = "0";
+            handle.style.right = "0";
+            handle.style.width = "10px";
+            handle.style.height = "10px";
+            handle.style.cursor = "ne-resize";
             break;
-        case 'bottom-left':
-            handle.style.bottom = '0';
-            handle.style.left = '0';
-            handle.style.width = '10px';
-            handle.style.height = '10px';
-            handle.style.cursor = 'sw-resize';
+        case "bottom-left":
+            handle.style.bottom = "0";
+            handle.style.left = "0";
+            handle.style.width = "10px";
+            handle.style.height = "10px";
+            handle.style.cursor = "sw-resize";
             break;
-        case 'bottom-right':
-            handle.style.bottom = '0';
-            handle.style.right = '0';
-            handle.style.width = '10px';
-            handle.style.height = '10px';
-            handle.style.cursor = 'se-resize';
+        case "bottom-right":
+            handle.style.bottom = "0";
+            handle.style.right = "0";
+            handle.style.width = "10px";
+            handle.style.height = "10px";
+            handle.style.cursor = "se-resize";
             break;
     }
 
@@ -288,7 +305,7 @@ function handleMousedown(e: MouseEvent, dir: string, dialog: HTMLElement) {
         startHeight: 0,
         startTop: 0,
         startLeft: 0,
-        options: options
+        options: options,
     };
 
     const rect = dialog.getBoundingClientRect();
@@ -310,9 +327,17 @@ function handleMousedown(e: MouseEvent, dir: string, dialog: HTMLElement) {
 
         const containerSize = getContainerSize();
         const minWidth = parseValue(state.options.minWidth, containerSize.width, 400);
-        const maxWidth = parseValue(state.options.maxWidth, containerSize.width, containerSize.width * 0.9);
+        const maxWidth = parseValue(
+            state.options.maxWidth,
+            containerSize.width,
+            containerSize.width * 0.9
+        );
         const minHeight = parseValue(state.options.minHeight, containerSize.height, 300);
-        const maxHeight = parseValue(state.options.maxHeight, containerSize.height, containerSize.height * 0.9);
+        const maxHeight = parseValue(
+            state.options.maxHeight,
+            containerSize.height,
+            containerSize.height * 0.9
+        );
 
         // 根据拖拽方向调整尺寸
         if (state.dir.includes("right")) {

@@ -14,6 +14,7 @@ import { Close, FolderOpened, Document } from "@element-plus/icons-vue";
 import { nextTick, onMounted, reactive, ref, watch, onBeforeUnmount } from "vue";
 import { useJobInfoStoreHook, useNavbarStoreHook, usePageStoreHook } from "@/store";
 import { ElMessage } from "element-plus";
+import { debounce, throttle, PerformanceMonitor } from "@/utils/performance";
 
 // LogicFlow 自定义节点组件
 import CustomJava from "./node/CustomJava";
@@ -52,7 +53,7 @@ import {
 } from "@/utils/logicflow";
 
 // 组件
-import Log from "@/components/Log/Log.vue";
+import Log from "@/components/Log/EnhancedLog.vue";
 import EditJobNode from "@/views/side/operation/edit-job-node.vue";
 
 // ================== 2. 类型定义与接口声明 ==================
@@ -557,23 +558,7 @@ const handleMouseDown = (e: MouseEvent): void => {
  * @param e 鼠标事件
  */
 const handleMouseMove = (e: MouseEvent): void => {
-  if (!isDragging.value || !mainContainerRef.value) return;
-
-  // 获取 main-container 的边界信息
-  const containerRect = mainContainerRef.value.getBoundingClientRect();
-  const containerHeight = containerRect.height;
-
-  // 计算鼠标相对于容器顶部的位置
-  const relativeY = e.clientY - containerRect.top;
-  const newHeight = (relativeY / containerHeight) * 100;
-
-  // 限制最小和最大高度
-  if (
-    newHeight >= PLATFORM_HEIGHT_LIMITS.MIN &&
-    newHeight <= PLATFORM_HEIGHT_LIMITS.MAX
-  ) {
-    platformHeight.value = newHeight;
-  }
+  throttledMouseMove(e);
 };
 
 /**
@@ -586,11 +571,17 @@ const handleMouseUp = (): void => {
 };
 
 /**
- * 组件卸载时清理事件监听器
+ * 组件卸载时清理事件监听器、WebSocket连接和日志管理器
  */
 onBeforeUnmount(() => {
   document.removeEventListener("mousemove", handleMouseMove);
   document.removeEventListener("mouseup", handleMouseUp);
+
+  // 清理所有WebSocket连接
+  clearAllWsConnections();
+
+  // 清理所有日志管理器
+  LogManagerFactory.destroyAll();
 });
 
 // ================== 8. 页面管理 ==================
@@ -600,6 +591,8 @@ onBeforeUnmount(() => {
  * @param id 任务组ID
  */
 async function selectPage(id: number): Promise<void> {
+  performanceMonitor.startTimer("selectPage");
+
   try {
     // 先更新状态
     usePageStoreHook().setCurrentPage(id);
@@ -654,6 +647,9 @@ async function selectPage(id: number): Promise<void> {
     }, 200);
   } catch (err) {
     console.error(`处理任务组 ${id} 切换时出错:`, err);
+  } finally {
+    const duration = performanceMonitor.endTimer("selectPage");
+    console.log(`页面切换耗时: ${duration}ms`);
   }
 }
 
@@ -700,6 +696,29 @@ function closePage(id: number): void {
 
 // ================== 10. 日志管理 ==================
 
+// 导入日志管理工具
+import { LogManagerFactory } from "@/utils/logManager";
+
+// 日志管理器映射
+const logManagers = ref<Record<string, any>>({});
+
+/**
+ * 获取或创建日志管理器
+ * @param jobId 任务组ID
+ * @returns 日志管理器实例
+ */
+const getLogManager = (jobId: number): any => {
+  const key = `job_${jobId}`;
+  if (!logManagers.value[key]) {
+    logManagers.value[key] = LogManagerFactory.getInstance(key, {
+      maxLogs: 10000,
+      enablePerformance: true,
+      flushInterval: 100,
+    });
+  }
+  return logManagers.value[key];
+};
+
 /**
  * 重置日志状态
  * @param specificJobId 可选，指定要重置的任务组ID，不提供则重置当前激活的日志标签页
@@ -715,6 +734,10 @@ function logReset(specificJobId?: number | null): void {
     const state = getJobState(specificJobId);
     state.fromLineNum = 0;
     state.pullFailCount = 0;
+
+    // 重置对应的日志管理器
+    const logManager = getLogManager(specificJobId);
+    logManager.reset();
 
     // 如果指定了任务组ID，只重置该任务组对应的日志组件
     const tabId = `${specificJobId}`;
@@ -865,9 +888,15 @@ function getExecuteTaskLog(id: number, targetJobId?: number): void {
 
       // 使用正确的任务ID作为标签页的唯一标识
       const currentTabId = `${currentJobId}`;
+
+      // 获取对应的日志管理器
+      if (currentJobId) {
+        const logManager = getLogManager(currentJobId);
+        logManager.addLogsFromText(convertContent(data.content.logContent), currentJobId);
+      }
+
       // 获取对应标签页的日志组件
       const loggerRef = getLoggerRef(currentTabId);
-
       if (loggerRef) {
         loggerRef.addLogsFromText(convertContent(data.content.logContent));
       }
@@ -943,6 +972,13 @@ function logRunStop(content: string, targetJobId?: number): void {
 
   // 使用正确的任务ID作为标签页的唯一标识
   const currentTabId = `${currentJobId}`;
+
+  // 获取对应的日志管理器并添加结束日志
+  if (currentJobId) {
+    const logManager = getLogManager(currentJobId);
+    logManager.addLogsFromText(convertContent(content), currentJobId);
+  }
+
   // 获取对应标签页的日志组件
   const loggerRef = getLoggerRef(currentTabId);
 
@@ -1782,10 +1818,7 @@ function stopTrigger(): void {
       }
 
       // 关闭对应任务组的WebSocket连接
-      if (state.ws) {
-        state.ws.close();
-        state.ws = null;
-      }
+      disconnectWs(state.randomId || randomId.value, currentJobId);
 
       // 更新对应的日志标签页状态
       const tabId = `${currentJobId}`;
@@ -1894,197 +1927,90 @@ function addJobNodes(
   });
 }
 
-//--------------------------------------------------ws------------------
-const ws = ref(); // 保留全局WebSocket引用用于向后兼容
-const reconnectAttempts = ref(0);
-const maxReconnectAttempts = ref(3); // 自定义最大重试次数
+// ================== 13. WebSocket连接管理 ==================
 
+// 导入WebSocket管理工具
+import { WebSocketMessageHandler } from "@/utils/websocketHandler";
+import { webSocketPool } from "@/utils/websocket";
+
+// 创建WebSocket消息处理器实例
+const wsMessageHandler = new WebSocketMessageHandler(
+  lfInstances.value,
+  usePageStoreHook,
+  logTabs,
+  runTime,
+  jobId
+);
+
+/**
+ * 连接WebSocket
+ * @param id 连接ID
+ * @param targetJobId 目标任务组ID
+ */
 const connectWs = (id: string, targetJobId?: number): void => {
-  // TODO 后端做多节点部署时，需要修改
-  const wsUrl = import.meta.env.VITE_APP_WS_ENDPOINT + id;
+  try {
+    // 使用WebSocket连接池管理连接
+    const connection = webSocketPool.getConnection(id, targetJobId, {
+      onMessage: (message: WebSocketMessage) => {
+        // 使用消息处理器处理WebSocket消息
+        wsMessageHandler.handleMessage(message);
+      },
+      onError: (event: Event) => {
+        console.error("WebSocket连接错误:", event);
+        ElMessage.error("WebSocket连接失败，请检查网络连接");
+      },
+      onReconnect: (attempt: number) => {
+        console.log(`WebSocket重连尝试 ${attempt}`);
+      },
+      onReconnectFailed: () => {
+        ElMessage.error("WebSocket重连失败，请刷新页面重试");
+      },
+    });
 
-  const newWs = new WebSocket(wsUrl);
+    // 连接WebSocket
+    connection.connect();
 
-  // 如果指定了任务组ID，将WebSocket保存到该任务组的状态中
-  if (targetJobId) {
-    const state = getJobState(targetJobId);
-    // 关闭之前的连接（如果存在）
-    if (state.ws) {
-      state.ws.close();
-    }
-    state.ws = newWs;
-  } else {
-    // 否则保存到全局引用（向后兼容）
-    ws.value = newWs;
+    console.log(
+      `WebSocket连接已建立: ${id}${targetJobId ? ` (任务组: ${targetJobId})` : ""}`
+    );
+  } catch (error) {
+    console.error("WebSocket连接失败:", error);
+    ElMessage.error("WebSocket连接失败");
   }
+};
 
-  newWs.onopen = () => {
-    reconnectAttempts.value = 0;
-  };
-
-  newWs.onclose = () => {
-    // 检查是否是任务组的连接，如果是，需要使用当前任务组的randomId重连
-    if (targetJobId) {
-      const state = getJobState(targetJobId);
-      // 只有当这个WebSocket仍然是当前状态中的WebSocket时才重连
-      if (state.ws === newWs) {
-        reconnectAttempts.value++;
-        if (reconnectAttempts.value <= maxReconnectAttempts.value && state.randomId) {
-          const newId = `${targetJobId}:${state.randomId}`;
-          setTimeout(
-            () => connectWs(newId, targetJobId),
-            WEBSOCKET_CONFIG.RECONNECT_DELAY
-          );
-        }
-      }
-    } else {
-      // 全局连接的重连逻辑保持不变
-      reconnectAttempts.value++;
-      if (reconnectAttempts.value <= maxReconnectAttempts.value) {
-        setTimeout(() => connectWs(id, targetJobId), WEBSOCKET_CONFIG.RECONNECT_DELAY);
-      }
-    }
-  };
-
-  newWs.onmessage = (e: MessageEvent) => {
-    const _message: WebSocketMessage = JSON.parse(e.data);
-
-    // 获取消息对应的任务组状态
-    const messageJobId = _message.jobId;
-    const messageRandomId = _message.randomId;
-
+/**
+ * 关闭WebSocket连接
+ * @param id 连接ID
+ * @param targetJobId 目标任务组ID
+ */
+const disconnectWs = (id: string, targetJobId?: number): void => {
+  try {
+    webSocketPool.closeConnection(id, targetJobId);
     console.log(
-      `处理WebSocket消息 - messageJobId: ${messageJobId}, messageRandomId: ${messageRandomId}, status: ${_message.status}`
+      `WebSocket连接已关闭: ${id}${targetJobId ? ` (任务组: ${targetJobId})` : ""}`
     );
+  } catch (error) {
+    console.error("关闭WebSocket连接失败:", error);
+  }
+};
 
-    if (_message.status == 5) {
-      // 任务完成 - 需要检查整个任务组是否都完成了
-      // 遍历所有LogicFlow实例，找到包含这个jobId的任务组
-      let taskGroupId = null;
-      let taskGroupLf = null;
+/**
+ * 获取WebSocket连接状态
+ * @param id 连接ID
+ * @param targetJobId 目标任务组ID
+ * @returns 连接状态
+ */
+const getWsConnectionStatus = (id: string, targetJobId?: number): boolean => {
+  return webSocketPool.hasConnection(id, targetJobId);
+};
 
-      for (const [groupId, lfInstance] of Object.entries(lfInstances.value)) {
-        if (lfInstance) {
-          const nodes = (lfInstance as any).getGraphRawData().nodes;
-          const foundNode = nodes.find(
-            (node: any) =>
-              node.properties.jobId == messageJobId &&
-              node.properties.randomId == messageRandomId
-          );
-          if (foundNode) {
-            taskGroupId = parseInt(groupId);
-            taskGroupLf = lfInstance;
-            break;
-          }
-        }
-      }
-
-      if (taskGroupId && taskGroupLf) {
-        // 延迟检查任务组是否完全完成
-        setTimeout(() => {
-          // 检查该任务组中是否还有其他正在运行的节点
-          const nodes = taskGroupLf.getGraphRawData().nodes;
-          const runningNodes = nodes.filter((node: any) => {
-            const nodeModel = taskGroupLf.getNodeModelById(node.id);
-            const nodeStyle = nodeModel.getStyle();
-            // 检查节点颜色是否为运行中状态（黄色 #FFFF33）
-            const isRunning =
-              nodeStyle.fill === "#FFFF33" || nodeStyle.stroke === "#FFFF33";
-            return isRunning;
-          });
-
-          if (runningNodes.length === 0) {
-            // 没有正在运行的节点，任务组已完成
-
-            usePageStoreHook().updatePageRunStatus(taskGroupId, false);
-
-            // 更新该任务组的边样式（无论是否为当前激活任务组）
-            updateEdgeStyleForTaskGroupUtil(
-              taskGroupId,
-              lfInstances.value[taskGroupId],
-              usePageStoreHook().getCurrentPageRunStatus
-            );
-            // 同时更新对应的日志标签页状态
-            const tabId = `${taskGroupId}`;
-            const tab = logTabs.value.find((t) => t.id === tabId);
-            if (tab) {
-              tab.isRunning = false;
-            }
-          }
-        }, 1000); // 减少延迟时间，提高响应速度
-      }
-    } else if (_message.status == 9) {
-      // 运行时信息
-      if (messageJobId === jobId.value) {
-        runTime.value = JSON.parse(_message.result);
-      }
-    }
-
-    // 接收到消息后，需要做出相应的操作，比如更新节点或边
-    // 遍历所有LogicFlow实例，找到对应的节点
-    let foundNode = false;
-    console.log(
-      `开始查找节点 - 查找条件: jobId=${messageJobId}, randomId=${messageRandomId}`
-    );
-
-    for (const [groupId, lfInstance] of Object.entries(lfInstances.value)) {
-      if (lfInstance) {
-        const nodes = (lfInstance as any).getGraphRawData().nodes;
-        console.log(
-          `任务组 ${groupId} 中的所有节点:`,
-          nodes.map((n: any) => ({
-            id: n.id,
-            jobId: n.properties?.jobId,
-            randomId: n.properties?.randomId,
-            type: n.type,
-          }))
-        );
-
-        // 首先检查是否有完全匹配的节点（jobId和randomId都匹配）
-        const node = nodes.find(
-          (node: any) =>
-            node.properties.jobId == messageJobId &&
-            node.properties.randomId == messageRandomId
-        );
-
-        if (node) {
-          const color = getNodeColor(_message.status);
-          const _node = (lfInstance as any).getNodeModelById(node.id);
-          const style = _node.type === DYNAMIC_CUSTOM_GROUP ? "stroke" : "fill";
-          _node.setStyle(style, color);
-          console.log(
-            `更新任务组 ${groupId} 中节点 ${node.id} 状态为: ${_message.status}, 颜色: ${color}`
-          );
-          foundNode = true;
-          break;
-        } else {
-          // 如果没有完全匹配，检查是否有jobId匹配但randomId不匹配的节点
-          const nodeWithSameJobId = nodes.find(
-            (node: any) => node.properties.jobId == messageJobId
-          );
-          if (nodeWithSameJobId) {
-            console.log(
-              `🔍 在任务组 ${groupId} 中找到了相同jobId但randomId不匹配的节点:`,
-              {
-                nodeId: nodeWithSameJobId.id,
-                nodeJobId: nodeWithSameJobId.properties.jobId,
-                nodeRandomId: nodeWithSameJobId.properties.randomId,
-                messageRandomId: messageRandomId,
-                randomIdMatch: nodeWithSameJobId.properties.randomId == messageRandomId,
-              }
-            );
-          }
-        }
-      }
-    }
-
-    if (!foundNode) {
-      console.warn(
-        `🚨 未找到对应的节点 - jobId: ${messageJobId}, randomId: ${messageRandomId}`
-      );
-      console.warn(`当前所有LogicFlow实例:`, Object.keys(lfInstances.value));
-    }
-  };
+/**
+ * 清理所有WebSocket连接
+ */
+const clearAllWsConnections = (): void => {
+  webSocketPool.closeAllConnections();
+  console.log("所有WebSocket连接已清理");
 };
 
 onMounted(() => {
@@ -2104,6 +2030,30 @@ onMounted(() => {
   });
 });
 // ================== 14. 组件生命周期 ==================
+
+// 性能监控实例
+const performanceMonitor = new PerformanceMonitor();
+
+// 节流优化的鼠标移动处理
+const throttledMouseMove = throttle((e: MouseEvent) => {
+  if (!isDragging.value || !mainContainerRef.value) return;
+
+  // 获取 main-container 的边界信息
+  const containerRect = mainContainerRef.value.getBoundingClientRect();
+  const containerHeight = containerRect.height;
+
+  // 计算鼠标相对于容器顶部的位置
+  const relativeY = e.clientY - containerRect.top;
+  const newHeight = (relativeY / containerHeight) * 100;
+
+  // 限制最小和最大高度
+  if (
+    newHeight >= PLATFORM_HEIGHT_LIMITS.MIN &&
+    newHeight <= PLATFORM_HEIGHT_LIMITS.MAX
+  ) {
+    platformHeight.value = newHeight;
+  }
+}, 16); // 约60fps
 </script>
 
 <template>
