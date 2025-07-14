@@ -11,37 +11,40 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.FutureTask;
 
+/**
+ * @author xiaozhao
+ */
 public class JobLogHelper {
 
     private static Logger logger = LoggerFactory.getLogger(JobLogHelper.class);
 
-    private final static List<Pair<String,String>> JOB_LOG_LIST = Collections.synchronizedList(new ArrayList<>());
+    private final static Map<String,String> JOB_LOG_MAP = new ConcurrentHashMap<>();
 
-    private final static Map<String,Thread> threadMap = new ConcurrentHashMap<>();
+    private final static Map<String,Thread> THREAD_MAP = new ConcurrentHashMap<>();
 
     public static void addJobLog(Pair<String, String> jobLog) {
-        JOB_LOG_LIST.add(jobLog);
+        JOB_LOG_MAP.put(jobLog.getKey(),jobLog.getValue());
     }
 
-    public static List<Pair<String,String>> getJobLogList(){
-        return JOB_LOG_LIST;
+    public static Map<String,String> getJobLogMap(){
+        return JOB_LOG_MAP;
     }
 
     public static void addJobLogThread(String key,Thread thread){
-         threadMap.put(key, thread);
+        THREAD_MAP.put(key, thread);
     }
 
     public static void removeJobLogThread(String key){
-        JOB_LOG_LIST.removeIf(pair -> pair.getKey().equals(key));
-        Thread thread = threadMap.get(key);
+        THREAD_MAP.remove(key);
+        Thread thread = THREAD_MAP.get(key);
         if(thread != null){
            thread.interrupt();
         }
     }
 
     public static void stop(){
-        JOB_LOG_LIST.clear();
-        threadMap.values().forEach(Thread::interrupt);
+        JOB_LOG_MAP.clear();
+        THREAD_MAP.values().forEach(Thread::interrupt);
         logger.info(">>>>>>>>>>>关闭所有日志id读取任务");
     }
 }

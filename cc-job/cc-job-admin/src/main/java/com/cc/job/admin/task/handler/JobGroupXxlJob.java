@@ -70,20 +70,17 @@ public class JobGroupXxlJob {
     // 所有的子任务集合
     static final List<Pair<String, Boolean>> JOB_LIST = Collections.synchronizedList(new ArrayList<>());
 
+    static final Map<String,Boolean> JobMap = new ConcurrentHashMap<>();
+
     public static void removeJobData(String jobId) {
         if (jobId != null) {
-            int beforeSize = JOB_LIST.size();
-            JOB_LIST.removeIf(pair -> jobId.equals(pair.getKey()));
-            int afterSize = JOB_LIST.size();
-            if (beforeSize != afterSize) {
-                logger.debug("[JobGroup] 移除任务数据 - jobId: {}, 移除前数量: {}, 移除后数量: {}", jobId, beforeSize, afterSize);
-            }
+            JobMap.remove(jobId);
         }
     }
 
     public static void addJobData(String jobId, Boolean isRunning) {
-        JOB_LIST.add(Pair.of(jobId, isRunning));
-        logger.debug("[JobGroup] 添加任务数据 - jobId: {}, 运行状态: {}, 当前总数: {}", jobId, isRunning, JOB_LIST.size());
+        JobMap.put(jobId,isRunning);
+        logger.debug("[JobGroup] 添加任务数据 - jobId: {}, 运行状态: {}, 当前总数: {}", jobId, isRunning, JobMap.size());
     }
 
     public static WorkerWrapper<Long, String> getWorkWrapper(Long parentId, String randomId) {
@@ -729,16 +726,15 @@ public class JobGroupXxlJob {
         @Override
         public String call() {
             while (!stop) {
-                // 从任务集合中遍历
-                for (Pair<String, Boolean> pair : new ArrayList<>(JOB_LIST)) {
-                    if (pair.getKey().equals(setExecuteJobId(jobInfo.getId(), randomId))) {
-                        try {
-                            return handleJobCompletion(pair, jobInfo, node, randomId, statusMap, count);
-                        } catch (Exception e) {
-                            logger.error("[JobGroup] 任务完成处理异常 - jobId: {}, nodeId: {}, 异常信息: {}",
-                                    jobInfo.getId(), node.getId(), e.getMessage(), e);
-                            throw new RuntimeException(e);
-                        }
+                String targetKey = setExecuteJobId(jobInfo.getId(), randomId);
+                if(JobMap.containsKey(targetKey)){
+                    try {
+                        Pair<String, Boolean> pair = new Pair<>(targetKey, JobMap.get(targetKey));
+                        return handleJobCompletion(pair, jobInfo, node, randomId, statusMap, count);
+                    } catch (Exception e) {
+                        logger.error("[JobGroup] 任务完成处理异常 - jobId: {}, nodeId: {}, 异常信息: {}",
+                                jobInfo.getId(), node.getId(), e.getMessage(), e);
+                        throw new RuntimeException(e);
                     }
                 }
             }
