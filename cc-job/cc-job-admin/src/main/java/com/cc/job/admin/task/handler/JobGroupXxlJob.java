@@ -65,7 +65,7 @@ public class JobGroupXxlJob {
 
     final JobGroupUtils jobGroupUtils;
 
-    // // 存储第一个WorkerWrapper，后续暂停任务需要
+    //存储WorkerWrapper，后续暂停任务需要
     static final ConcurrentHashMap<String, List<WorkerWrapper<Long, String>>> STOP_MAP = new ConcurrentHashMap<>();
 
 
@@ -129,8 +129,6 @@ public class JobGroupXxlJob {
             Map<Long, List<JobNode>> nextMap = buildNextNode(nodes, edges);
             logger.debug("[JobGroup] 构建节点关系映射 - jobId: {}, 关系映射大小: {}", jobId, nextMap.size());
 
-            // 设置任务的平均执行时间
-            // int avgTime = getAvgTime(nodes, jobInfo);
             CONTEXT_HOLDER.set(XxlJobContext.getXxlJobContext());
             // 构造WorkerWrapper，实现任务的串并行执行
             List<WorkerWrapper<Long, String>> workerWrappers = buildWorkerWrappers(nodes, nextMap, randomId, statusMap);
@@ -145,7 +143,7 @@ public class JobGroupXxlJob {
 
             // 使用拓扑排序执行器，按层级执行任务，控制并发度
             Async.beginWork(jobInfo.getExecutorTimeout().longValue(), (List<WorkerWrapper>) (List<?>) workerWrappers);
-        } catch (ExecutionException | InterruptedException e) {
+        } catch (Exception  e) {
             handleExecutionException(jobId, e);
         } finally {
             completeJob(jobId, randomId);
@@ -174,25 +172,6 @@ public class JobGroupXxlJob {
         webSocketServer.sendInfo(message);
         logger.debug("[JobGroup] 运行时间计算完成并发送消息 - jobId: {}, randomId: {}", jobId, randomId);
     }
-
-    // private int getAvgTime(List<JobNode> nodes, JobInfo jobInfo) {
-    // List<JobInfo> jobInfos = getJobInfos(nodes);
-    // Integer executorTimeout = jobInfo.getExecutorTimeout();
-    // int size = nodes.size();
-    // for (JobInfo info : jobInfos) {
-    // if (info.getExecutorTimeout() > 0) {
-    // executorTimeout -= info.getExecutorTimeout();
-    // size--;
-    // }
-    // if (executorTimeout < 0) {
-    // throw new BusinessException("子任务运行时长超过任务组");
-    // }
-    // }
-    // if (size == 0) {
-    // size = 1;
-    // }
-    // return executorTimeout / size;
-    // }
 
     private List<JobInfo> getJobInfos(List<JobNode> nodes) {
         List<Long> jobIds = nodes.stream().map(JobNode::getJobId).toList();
