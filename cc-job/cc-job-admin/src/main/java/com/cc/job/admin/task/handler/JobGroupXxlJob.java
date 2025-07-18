@@ -234,6 +234,8 @@ public class JobGroupXxlJob {
         sendCompletionMessage(jobId, randomId);
         jobInfoMapper.stopJobCompose(jobId);
         STOP_MAP.remove(setExecuteJobId(jobId, randomId));
+        //关闭消息
+        webSocketServer.onClose(setExecuteJobId(jobId, randomId));
         logger.debug("[JobGroup] 清理任务组资源 - jobId: {}, 剩余任务组数量: {}", jobId, STOP_MAP.size());
     }
 

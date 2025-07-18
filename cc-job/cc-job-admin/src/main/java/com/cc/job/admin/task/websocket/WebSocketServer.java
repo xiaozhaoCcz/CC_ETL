@@ -13,6 +13,8 @@ import java.time.LocalDateTime;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 /**
  * 优化后的WebSocket服务器
@@ -79,29 +81,32 @@ public class WebSocketServer {
     }
 
     /**
-     * 异步发送消息
+     * 异步发送消息（改为队列+线程方式）
      */
     public void sendMessageAsync(Session session, Message message) {
         if (session == null || !session.isOpen()) {
             log.warn("Session is null or closed, message: {}", message);
             return;
         }
-
-        MESSAGE_EXECUTOR.submit(() -> {
+        WebSocketSession wsSession = null;
+        for (WebSocketSession s : SESSION_POOLS.values()) {
+            if (s.getSession().equals(session)) {
+                wsSession = s;
+                break;
+            }
+        }
+        if (wsSession != null && wsSession.isValid()) {
             try {
-                sendMessageSync(session, message);
-                // 刷新活跃时间
-                SESSION_POOLS.values().stream()
-                        .filter(ws -> ws.getSession().equals(session))
-                        .findFirst()
-                        .ifPresent(WebSocketSession::updateLastAccessTime);
+                String messageJson = OBJECT_MAPPER.writeValueAsString(message);
+                wsSession.enqueueMessage(messageJson);
                 MESSAGE_COUNT.incrementAndGet();
             } catch (Exception e) {
-                log.error("Failed to send message: {}", message, e);
-                // 发送失败时移除连接
+                log.error("Failed to enqueue message: {}", message, e);
                 removeSession(session);
             }
-        });
+        } else {
+            log.warn("WebSocketSession not found or invalid for session: {}", session);
+        }
     }
 
     /**
@@ -141,9 +146,15 @@ public class WebSocketServer {
     public void sendInfo(Message message) {
         String sessionKey = message.getParentJobId() + ":" + message.getRandomId();
         WebSocketSession webSocketSession = SESSION_POOLS.get(sessionKey);
-
         if (webSocketSession != null && webSocketSession.isValid()) {
-            sendMessageAsync(webSocketSession.getSession(), message);
+            try {
+                String messageJson = OBJECT_MAPPER.writeValueAsString(message);
+                webSocketSession.enqueueMessage(messageJson);
+                MESSAGE_COUNT.incrementAndGet();
+            } catch (Exception e) {
+                log.error("Failed to enqueue message: {}", message, e);
+                removeSession(webSocketSession.getSession());
+            }
         } else {
             log.warn("Session not found or invalid for key: {}", sessionKey);
         }
@@ -153,9 +164,16 @@ public class WebSocketServer {
      * 群发消息（异步）
      */
     public void broadcast(Message message) {
+        String msg;
+        try {
+            msg = OBJECT_MAPPER.writeValueAsString(message);
+        } catch (Exception e) {
+            log.error("广播消息序列化失败: {}", e.getMessage(), e);
+            return;
+        }
         SESSION_POOLS.values().parallelStream()
                 .filter(WebSocketSession::isValid)
-                .forEach(session -> sendMessageAsync(session.getSession(), message));
+                .forEach(session -> session.enqueueMessage(msg));
     }
 
     /**
@@ -303,12 +321,19 @@ public class WebSocketServer {
         private final String id;
         private final long createTime;
         private volatile long lastAccessTime;
+        private final BlockingQueue<String> messageQueue = new LinkedBlockingQueue<>();
+        private final Thread senderThread;
+        private volatile boolean running = true;
 
         public WebSocketSession(Session session, String id) {
             this.session = session;
             this.id = id;
             this.createTime = System.currentTimeMillis();
             this.lastAccessTime = this.createTime;
+            // 启动独立发送线程
+            this.senderThread = new Thread(this::processQueue, "ws-sender-" + id);
+            this.senderThread.setDaemon(true);
+            this.senderThread.start();
         }
 
         public Session getSession() {
@@ -335,7 +360,28 @@ public class WebSocketServer {
             return session != null && session.isOpen();
         }
 
+        public void enqueueMessage(String text) {
+            messageQueue.offer(text);
+        }
+
+        private void processQueue() {
+            try {
+                while (running && session.isOpen()) {
+                    String msg = messageQueue.take();
+                    try {
+                        session.getBasicRemote().sendText(msg);
+                    } catch (Exception e) {
+                        log.error("WebSocket消息发送失败，id: {}，异常: {}", id, e.getMessage(), e);
+                        break;
+                    }
+                }
+            } catch (InterruptedException e) {
+                // 线程中断，正常退出
+            }
+        }
+
         public void close() {
+            running = false;
             try {
                 if (session != null && session.isOpen()) {
                     session.close();
@@ -343,6 +389,7 @@ public class WebSocketServer {
             } catch (IOException e) {
                 log.error("Failed to close session: {}", id, e);
             }
+            senderThread.interrupt();
         }
     }
 }
