@@ -104,19 +104,23 @@ public class Async {
                             }else{
                                 throw new RuntimeException("任务组运行超时异常");
                             }
-                            inDegreeZero.remove(id);
-                            inDegree.remove(id);
-                            List<WorkerWrapper> nextWrappers = workerWrapper.getNextWrappers();
-                            if (nextWrappers != null && !nextWrappers.isEmpty()) {
-                                List<String> nextIds = nextWrappers.stream().map(WorkerWrapper::getId).toList();
-                                for (String nextId : nextIds) {
-                                    // -1;
-                                    inDegree.compute(nextId, (k, i) -> i - 1);
+
+                            synchronized (inDegree){
+                                inDegree.remove(id);
+                                List<WorkerWrapper> nextWrappers = workerWrapper.getNextWrappers();
+                                if (nextWrappers != null && !nextWrappers.isEmpty()) {
+                                    List<String> nextIds = nextWrappers.stream().map(WorkerWrapper::getId).toList();
+                                    for (String nextId : nextIds) {
+                                        // -1;
+                                        inDegree.compute(nextId, (k, i) -> i - 1);
+                                    }
                                 }
                             }
                         } catch (Exception e) {
                             //项目运行失败，抛出异常
-                            inDegree.clear();
+                            synchronized (inDegree){
+                                inDegree.clear();
+                            }
                             throw new RuntimeException(e);
                         }
                     });
