@@ -589,8 +589,12 @@ public class WorkerWrapper<T, V> {
     }
 
 
-    private int getState() {
+    public int getState() {
         return state.get();
+    }
+
+    public void setState(AtomicInteger state) {
+        this.state = state;
     }
 
     public String getId() {

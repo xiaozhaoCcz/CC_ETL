@@ -1818,7 +1818,7 @@ function stopTrigger(): void {
       }
 
       // 关闭对应任务组的WebSocket连接
-      disconnectWs(state.randomId || randomId.value, currentJobId);
+      disconnectWs(currentJobId,state.randomId || randomId.value,);
 
       // 更新对应的日志标签页状态
       const tabId = `${currentJobId}`;
@@ -1984,7 +1984,7 @@ const connectWs = (id: string, targetJobId?: number): void => {
  * @param id 连接ID
  * @param targetJobId 目标任务组ID
  */
-const disconnectWs = (id: string, targetJobId?: number): void => {
+const disconnectWs = (id: number, targetJobId?: string): void => {
   try {
     webSocketPool.closeConnection(id, targetJobId);
     console.log(

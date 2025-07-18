@@ -293,9 +293,7 @@ export class WebSocketPool {
         targetJobId?: number,
         callbacks?: WebSocketCallbacks
     ): WebSocketManager {
-        const connectionKey = targetJobId ? `${targetJobId}:${id}` : id;
-
-        if (!this.connections.has(connectionKey)) {
+        if (!this.connections.has(id)) {
             const wsUrl = import.meta.env.VITE_APP_WS_ENDPOINT + id;
 
             const manager = new WebSocketManager(
@@ -308,18 +306,19 @@ export class WebSocketPool {
                 targetJobId
             );
 
-            this.connections.set(connectionKey, manager);
-            console.log(`创建新的WebSocket连接: ${connectionKey}`);
+            this.connections.set(id, manager);
+            console.log(`创建新的WebSocket连接: ${id}`);
         }
 
-        return this.connections.get(connectionKey)!;
+        return this.connections.get(id)!;
     }
 
     /**
      * 关闭指定连接
      */
-    public closeConnection(id: string, targetJobId?: number): void {
-        const connectionKey = targetJobId ? `${targetJobId}:${id}` : id;
+    public closeConnection(jobId: number, randomId?: string): void {
+        const connectionKey = `${jobId}:${randomId}` ;
+        console.log("this.connections.delete(connectionKey):", this.connections);
         const manager = this.connections.get(connectionKey);
 
         if (manager) {

@@ -3,7 +3,7 @@
  * 专门处理任务状态更新、节点颜色变化等业务逻辑
  */
 
-import { WebSocketMessage } from "./websocket";
+import {WebSocketMessage, webSocketPool} from "./websocket";
 import { getNodeColor, updateEdgeStyleForTaskGroup } from "./logicflow";
 import { DYNAMIC_CUSTOM_GROUP } from "./logicflow";
 
@@ -79,18 +79,18 @@ export class WebSocketMessageHandler {
      * 处理任务完成消息
      */
     private handleTaskCompletion(jobId: number, randomId: string): void {
-        const completionResult = this.findTaskGroupByNode(jobId, randomId);
-
-        if (completionResult.taskGroupId && completionResult.taskGroupLf) {
-            // 延迟检查任务组是否完全完成
+        // const completionResult = this.findTaskGroupByNode(jobId, randomId);
+        //
+        // if (completionResult.taskGroupId && completionResult.taskGroupLf) {
+        //     // 延迟检查任务组是否完全完成
             setTimeout(() => {
-                const checkResult = this.checkTaskGroupCompletion(completionResult.taskGroupId!, completionResult.taskGroupLf!);
+                //const checkResult = this.checkTaskGroupCompletion(completionResult.taskGroupId!, completionResult.taskGroupLf!);
 
-                if (checkResult.isCompleted) {
-                    this.handleTaskGroupCompletion(checkResult.taskGroupId!);
-                }
+                //if (checkResult.isCompleted) {
+                    this.handleTaskGroupCompletion(jobId,randomId);
+                //}
             }, 1000);
-        }
+       // }
     }
 
     /**
@@ -172,8 +172,8 @@ export class WebSocketMessageHandler {
     /**
      * 处理任务组完成
      */
-    private handleTaskGroupCompletion(taskGroupId: number): void {
-        console.log(`任务组 ${taskGroupId} 已完成`);
+    private handleTaskGroupCompletion(taskGroupId: number,randomId:string): void {
+        console.log(`任务组 ${taskGroupId}:${randomId} 已完成;`);
 
         // 更新任务组运行状态
         this.usePageStoreHook().updatePageRunStatus(taskGroupId, false);
@@ -191,6 +191,8 @@ export class WebSocketMessageHandler {
         if (tab) {
             tab.isRunning = false;
         }
+
+        webSocketPool.closeConnection(taskGroupId,randomId)
     }
 
     /**

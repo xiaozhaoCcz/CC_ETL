@@ -5,6 +5,7 @@ import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.admin.task.executor.Async;
 import com.cc.job.admin.task.trigger.XxlJobTrigger;
+import com.cc.job.admin.task.websocket.WebSocketServer;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.admin.config.XxlJobAdminConfig;
 import com.cc.job.xo.mapper.JobInfoMapper;
@@ -12,7 +13,6 @@ import com.cc.job.xo.model.entity.*;
 import com.cc.job.admin.task.service.JobEdgeService;
 import com.cc.job.admin.task.service.JobInfoService;
 import com.cc.job.admin.task.service.JobNodeService;
-import com.cc.job.admin.task.websocket.WebSocketServer;
 import com.cc.job.admin.task.websocket.model.Message;
 import com.cc.tasktool.callback.ICallback;
 import com.cc.tasktool.callback.IWorker;
@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
 import java.time.ZoneOffset;
 import java.util.*;
 import java.util.List;
@@ -42,7 +43,7 @@ import static com.cc.job.admin.task.handler.JobConstant.*;
 /**
  * 任务组核心代码
  * TODO 可以考虑优化线程
- * 
+ *
  * @author xiaozhao
  */
 @Component
@@ -64,35 +65,26 @@ public class JobGroupXxlJob {
 
     final JobGroupUtils jobGroupUtils;
 
-    // 存储第一个WorkerWrapper，后续暂停任务需要
-    static final ConcurrentHashMap<String, WorkerWrapper<Long, String>> STOP_MAP = new ConcurrentHashMap<>();
+    // // 存储第一个WorkerWrapper，后续暂停任务需要
+    static final ConcurrentHashMap<String, List<WorkerWrapper<Long, String>>> STOP_MAP = new ConcurrentHashMap<>();
 
-    // 所有的子任务集合
-    static final List<Pair<String, Boolean>> JOB_LIST = Collections.synchronizedList(new ArrayList<>());
 
-    static final Map<String, Boolean> JobMap = new ConcurrentHashMap<>();
+    static final Map<String, Boolean> JOB_MAP = new ConcurrentHashMap<>();
 
     public static void removeJobData(String jobId) {
         if (jobId != null) {
-            JobMap.remove(jobId);
+            JOB_MAP.remove(jobId);
         }
     }
 
     public static void addJobData(String jobId, Boolean isRunning) {
-        JobMap.put(jobId, isRunning);
-        logger.debug("[JobGroup] 添加任务数据 - jobId: {}, 运行状态: {}, 当前总数: {}", jobId, isRunning, JobMap.size());
+        JOB_MAP.put(jobId, isRunning);
+        logger.debug("[JobGroup] 添加任务数据 - jobId: {}, 运行状态: {}, 当前总数: {}", jobId, isRunning, JOB_MAP.size());
     }
 
-    public static WorkerWrapper<Long, String> getWorkWrapper(Long parentId, String randomId) {
+    public static List<WorkerWrapper<Long, String>> getWorkWrapper(Long parentId, String randomId) {
         String key = setExecuteJobId(parentId, randomId);
-        WorkerWrapper<Long, String> wrapper = STOP_MAP.get(key);
-        if (wrapper == null) {
-            logger.warn("[JobGroup] 未找到WorkerWrapper - parentId: {}, randomId: {}, 当前STOP_MAP大小: {}",
-                    parentId, randomId, STOP_MAP.size());
-        } else {
-            logger.debug("[JobGroup] 找到WorkerWrapper - parentId: {}, randomId: {}", parentId, randomId);
-        }
-        return wrapper;
+        return STOP_MAP.get(key);
     }
 
     // 需要重新获取XxlJobContext解决线程问题，不然会出现日志文件错误添加的问题
@@ -108,7 +100,6 @@ public class JobGroupXxlJob {
         // 验证执行参数
         validateExecuteParam(executeParam);
         String randomId = "";
-        ExecutorService executorService = null;
         try {
             // 如果jobId和执行参数一致，则需要匹配一个uuid，如果不匹配则代表是platform页面执行，会携带一个随机id
             randomId = String.valueOf(jobId).equalsIgnoreCase(executeParam) ? UUID.randomUUID().toString()
@@ -145,16 +136,11 @@ public class JobGroupXxlJob {
             List<WorkerWrapper<Long, String>> workerWrappers = buildWorkerWrappers(nodes, nextMap, randomId, statusMap);
             logger.debug("[JobGroup] 构建WorkerWrapper完成 - jobId: {}, WorkerWrapper数量: {}", jobId, workerWrappers.size());
 
-//            // 预测任务的运行时间
-//            getRuntime(workerWrappers, nodes, jobInfo.getExecutorTimeout(), jobId, randomId);
-//            // 构造一个开始节点
-//            List<Long> startNodes = getStartNodes(nodes);
-//            List<WorkerWrapper<Long, String>> startWrappers = getStartWrappers(workerWrappers, startNodes);
-//            logger.debug("[JobGroup] 获取开始节点 - jobId: {}, 开始节点数量: {}", jobId, startNodes.size());
-//
-//            WorkerWrapper<Long, String> startWork = createStartWorkWrapper(jobId, startWrappers);
-//            STOP_MAP.put(setExecuteJobId(jobId, randomId), startWork);
+            // // 预测任务的运行时间
+            // getRuntime(workerWrappers, nodes, jobInfo.getExecutorTimeout(), jobId,
+            // randomId);
 
+            STOP_MAP.put(setExecuteJobId(jobId, randomId), workerWrappers);
             logger.info("[JobGroup] 开始拓扑排序执行任务组 - jobId: {}, 线程池大小: {}", jobId, nodes.size() + 1);
 
             // 使用拓扑排序执行器，按层级执行任务，控制并发度
@@ -162,16 +148,12 @@ public class JobGroupXxlJob {
         } catch (ExecutionException | InterruptedException e) {
             handleExecutionException(jobId, e);
         } finally {
-            if (executorService != null) {
-                executorService.shutdown();
-                logger.debug("[JobGroup] 关闭线程池 - jobId: {}", jobId);
-            }
             completeJob(jobId, randomId);
         }
     }
 
     private void getRuntime(List<WorkerWrapper<Long, String>> workerWrappers, List<JobNode> nodes, long timeout,
-            Long jobId, String randomId) {
+            Long jobId, String randomId) throws IOException {
         logger.debug("[JobGroup] 开始计算任务运行时间 - jobId: {}, 节点数量: {}, 超时时间: {}ms", jobId, nodes.size(), timeout);
 
         List<JobInfo> jobInfos = getJobInfos(nodes);
@@ -239,10 +221,6 @@ public class JobGroupXxlJob {
         return nodes.stream().filter(v -> v.getNodeInDegree().equals(0L)).map(JobNode::getId).toList();
     }
 
-    private List<WorkerWrapper<Long, String>> getStartWrappers(List<WorkerWrapper<Long, String>> workerWrappers,
-            List<Long> startNodes) {
-        return workerWrappers.stream().filter(v -> startNodes.contains(Long.valueOf(v.getId()))).toList();
-    }
 
     private void handleExecutionException(long jobId, Exception e) {
         XxlJobHelper.log("{}任务运行异常,message:{}", jobId, e.getMessage());
@@ -259,26 +237,13 @@ public class JobGroupXxlJob {
         logger.debug("[JobGroup] 清理任务组资源 - jobId: {}, 剩余任务组数量: {}", jobId, STOP_MAP.size());
     }
 
-    private static WorkerWrapper<Long, String> createStartWorkWrapper(long jobId,
-            List<WorkerWrapper<Long, String>> startWrappers) {
-        XxlJobContext xxlJobContext = CONTEXT_HOLDER.get();
-        return new WorkerWrapper<Long, String>()
-                .id(String.valueOf(jobId))
-                .param(jobId)
-                .worker((id, allWrappers) -> {
-                    logger.info("[JobGroup] 任务组开始执行 - jobId: {}, 开始节点数量: {}", id, startWrappers.size());
-                    XxlJobHelper.log(xxlJobContext, ">>>>>>>>>>>>>>>>>任务组：{}开始运行>>>>>>>>>>>>>>>>", id);
-                    return "";
-                }).next(startWrappers.toArray(new WorkerWrapper[0]));
-    }
-
     private void sendCompletionMessage(long jobId, String randomId) {
         Message message = new Message();
         message.setJobId(jobId);
         message.setParentJobId(jobId);
         message.setStatus(5);
         message.setRandomId(randomId);
-        // 使用消息队列服务发送消息，提高响应速度
+        // 使用Spring WebSocket服务发送消息
         webSocketServer.sendInfo(message);
         logger.debug("[JobGroup] 发送任务完成消息 - jobId: {}, randomId: {}", jobId, randomId);
     }
@@ -651,7 +616,9 @@ public class JobGroupXxlJob {
                 message.setRandomId(randomId);
                 message.setParentJobId(parentId);
                 // 使用消息队列服务发送消息，提高响应速度
+
                 webSocketServer.sendInfo(message);
+
                 logger.debug("[JobGroup] 发送节点状态消息 - jobId: {}, status: {}, randomId: {}", jobId, status, randomId);
 
                 if (status == 0) {
@@ -729,9 +696,9 @@ public class JobGroupXxlJob {
         public String call() {
             while (!stop) {
                 String targetKey = setExecuteJobId(jobInfo.getId(), randomId);
-                if (JobMap.containsKey(targetKey)) {
+                if (JOB_MAP.containsKey(targetKey)) {
                     try {
-                        Pair<String, Boolean> pair = new Pair<>(targetKey, JobMap.get(targetKey));
+                        Pair<String, Boolean> pair = new Pair<>(targetKey, JOB_MAP.get(targetKey));
                         return handleJobCompletion(pair, jobInfo, node, randomId, statusMap, count);
                     } catch (Exception e) {
                         logger.error("[JobGroup] 任务完成处理异常 - jobId: {}, nodeId: {}, 异常信息: {}",
