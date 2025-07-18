@@ -1,5 +1,6 @@
 package com.cc.job.admin.task.executor;
 
+import com.cc.job.admin.task.handler.JobConstant;
 import com.cc.tasktool.callback.ICallback;
 import com.cc.tasktool.callback.IWorker;
 import com.cc.tasktool.executor.timer.SystemClock;
@@ -8,6 +9,7 @@ import com.cc.tasktool.wrapper.WorkerWrapper;
 
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class Async {
@@ -104,7 +106,6 @@ public class Async {
                             }
                             inDegreeZero.remove(id);
                             inDegree.remove(id);
-                            //Set<String> nextIds = dependents.get(id);
                             List<WorkerWrapper> nextWrappers = workerWrapper.getNextWrappers();
                             if (nextWrappers != null && !nextWrappers.isEmpty()) {
                                 List<String> nextIds = nextWrappers.stream().map(WorkerWrapper::getId).toList();
@@ -130,15 +131,20 @@ public class Async {
         Object param = workerWrapper.getParam();
         IWorker worker = workerWrapper.getWorker();
         Integer retryCount = workerWrapper.getRetryCount();
-        callback.begin(param);
 
+        if(workerWrapper.getState()==3){
+            throw new RuntimeException("任务运行失败");
+        }
+
+        callback.begin(param);
         int count = 0;
+
 
        Object resultValue = null;
         try {
             resultValue = getResultValue(timeout, worker, param,wrapperMap);
 
-            while ("FAIL_RETRY".equals(String.valueOf(resultValue)) && retryCount != null && count++ <= retryCount) {
+            while (JobConstant.FAIL_RETRY.equals(String.valueOf(resultValue)) && retryCount != null && count++ <= retryCount) {
                 // 睡眠5秒重试任务
                 try {
                     TimeUnit.MILLISECONDS.sleep(5000);
@@ -155,6 +161,7 @@ public class Async {
     }
 
     private static Object getResultValue(long timeout, IWorker worker, Object param,Map<String, WorkerWrapper> wrapperMap) {
+
         Object resultValue = null;
         if (timeout > 0) {
             Thread thread = null;
@@ -174,5 +181,12 @@ public class Async {
             resultValue = worker.action(param, wrapperMap);
         }
         return resultValue;
+    }
+
+
+    public static void stopWork(List<WorkerWrapper> workerWrappers){
+        for (WorkerWrapper workerWrapper : workerWrappers) {
+            workerWrapper.setState(new AtomicInteger(3));
+        }
     }
 }
