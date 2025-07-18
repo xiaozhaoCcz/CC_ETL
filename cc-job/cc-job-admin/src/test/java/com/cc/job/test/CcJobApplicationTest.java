@@ -32,6 +32,7 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -152,11 +153,8 @@ public class CcJobApplicationTest {
 
     @Test
     public void test4() throws IOException, NoSuchPaddingException, NoSuchAlgorithmException {
-        // 添加任务
-        Path path = Files.writeString(Path.of("./test.myData"), "11");
-
-        String s = Files.readString(Path.of("./test.myData"));
-        System.out.println(s);
+        Map<Integer,Integer> ma = new HashMap<>();
+        System.out.println(ma.entrySet());
     }
 
     @Autowired

@@ -3,6 +3,7 @@ package com.cc.job.admin.task.handler;
 import cn.hutool.core.lang.Pair;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cc.job.admin.task.executor.Async;
 import com.cc.job.admin.task.trigger.XxlJobTrigger;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.admin.config.XxlJobAdminConfig;
@@ -15,7 +16,6 @@ import com.cc.job.admin.task.websocket.WebSocketServer;
 import com.cc.job.admin.task.websocket.model.Message;
 import com.cc.tasktool.callback.ICallback;
 import com.cc.tasktool.callback.IWorker;
-import com.cc.tasktool.executor.Async;
 import com.cc.tasktool.worker.WorkResult;
 import com.cc.tasktool.wrapper.WorkerWrapper;
 import com.xxl.job.core.biz.model.ReturnT;
@@ -70,7 +70,7 @@ public class JobGroupXxlJob {
     // 所有的子任务集合
     static final List<Pair<String, Boolean>> JOB_LIST = Collections.synchronizedList(new ArrayList<>());
 
-    static final Map<String,Boolean> JobMap = new ConcurrentHashMap<>();
+    static final Map<String, Boolean> JobMap = new ConcurrentHashMap<>();
 
     public static void removeJobData(String jobId) {
         if (jobId != null) {
@@ -79,7 +79,7 @@ public class JobGroupXxlJob {
     }
 
     public static void addJobData(String jobId, Boolean isRunning) {
-        JobMap.put(jobId,isRunning);
+        JobMap.put(jobId, isRunning);
         logger.debug("[JobGroup] 添加任务数据 - jobId: {}, 运行状态: {}, 当前总数: {}", jobId, isRunning, JobMap.size());
     }
 
@@ -145,18 +145,20 @@ public class JobGroupXxlJob {
             List<WorkerWrapper<Long, String>> workerWrappers = buildWorkerWrappers(nodes, nextMap, randomId, statusMap);
             logger.debug("[JobGroup] 构建WorkerWrapper完成 - jobId: {}, WorkerWrapper数量: {}", jobId, workerWrappers.size());
 
-            // 预测任务的运行时间
-            getRuntime(workerWrappers, nodes, jobInfo.getExecutorTimeout(), jobId, randomId);
-            // 构造一个开始节点
-            List<Long> startNodes = getStartNodes(nodes);
-            List<WorkerWrapper<Long, String>> startWrappers = getStartWrappers(workerWrappers, startNodes);
-            logger.debug("[JobGroup] 获取开始节点 - jobId: {}, 开始节点数量: {}", jobId, startNodes.size());
+//            // 预测任务的运行时间
+//            getRuntime(workerWrappers, nodes, jobInfo.getExecutorTimeout(), jobId, randomId);
+//            // 构造一个开始节点
+//            List<Long> startNodes = getStartNodes(nodes);
+//            List<WorkerWrapper<Long, String>> startWrappers = getStartWrappers(workerWrappers, startNodes);
+//            logger.debug("[JobGroup] 获取开始节点 - jobId: {}, 开始节点数量: {}", jobId, startNodes.size());
+//
+//            WorkerWrapper<Long, String> startWork = createStartWorkWrapper(jobId, startWrappers);
+//            STOP_MAP.put(setExecuteJobId(jobId, randomId), startWork);
 
-            WorkerWrapper<Long, String> startWork = createStartWorkWrapper(jobId, startWrappers);
-            STOP_MAP.put(setExecuteJobId(jobId, randomId), startWork);
-            executorService = Executors.newFixedThreadPool(nodes.size() + 1);
-            logger.info("[JobGroup] 开始异步执行任务组 - jobId: {}, 线程池大小: {}", jobId, nodes.size() + 1);
-            Async.beginWork(jobInfo.getExecutorTimeout(), executorService, startWork);
+            logger.info("[JobGroup] 开始拓扑排序执行任务组 - jobId: {}, 线程池大小: {}", jobId, nodes.size() + 1);
+
+            // 使用拓扑排序执行器，按层级执行任务，控制并发度
+            Async.beginWork(jobInfo.getExecutorTimeout().longValue(), (List<WorkerWrapper>) (List<?>) workerWrappers);
         } catch (ExecutionException | InterruptedException e) {
             handleExecutionException(jobId, e);
         } finally {
@@ -727,7 +729,7 @@ public class JobGroupXxlJob {
         public String call() {
             while (!stop) {
                 String targetKey = setExecuteJobId(jobInfo.getId(), randomId);
-                if(JobMap.containsKey(targetKey)){
+                if (JobMap.containsKey(targetKey)) {
                     try {
                         Pair<String, Boolean> pair = new Pair<>(targetKey, JobMap.get(targetKey));
                         return handleJobCompletion(pair, jobInfo, node, randomId, statusMap, count);

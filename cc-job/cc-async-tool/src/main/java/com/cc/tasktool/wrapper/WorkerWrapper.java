@@ -32,6 +32,15 @@ public class WorkerWrapper<T, V> {
     private T param;
     private IWorker<T, V> worker;
     private ICallback<T, V> callback = new DefaultCallback<>();
+
+    public IWorker<T, V> getWorker() {
+        return worker;
+    }
+
+    public ICallback<T, V> getCallback() {
+        return callback;
+    }
+
     /**
      * 在自己后面的wrapper，如果没有，自己就是末尾；如果有一个，就是串行；如果有多个，有几个就需要开几个线程</p>
      * -------2
@@ -90,6 +99,15 @@ public class WorkerWrapper<T, V> {
 
     public List<DependWrapper> getDependWrappers() {
         return dependWrappers;
+    }
+
+
+    public long getTimeout() {
+        return timeout;
+    }
+
+    public Integer getRetryCount() {
+        return retryCount;
     }
 
     /**
@@ -422,6 +440,8 @@ public class WorkerWrapper<T, V> {
 
     private int count = 0;
 
+
+
     /**
      * 具体的单个worker执行任务
      */
@@ -575,6 +595,10 @@ public class WorkerWrapper<T, V> {
 
     public String getId() {
         return id;
+    }
+
+    public void setCount(int count) {
+        this.count = count;
     }
 
     public int getCount() {
