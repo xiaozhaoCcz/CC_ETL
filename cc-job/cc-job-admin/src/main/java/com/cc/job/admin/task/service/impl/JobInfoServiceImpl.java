@@ -4,7 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
+import com.cc.job.admin.task.executor.Async;
 import com.cc.job.admin.task.service.*;
 import com.cc.job.admin.task.thread.JobLogHelper;
 import com.cc.job.admin.task.thread.JobLogThreadListener;
@@ -23,7 +23,6 @@ import com.cc.job.xo.model.vo.JobNodeVo;
 import com.cc.job.admin.task.thread.JobScheduleHelper;
 import com.cc.job.admin.task.thread.JobTriggerPoolHelper;
 import com.cc.job.admin.task.utils.I18nUtil;
-import com.cc.tasktool.executor.Async;
 import com.cc.tasktool.wrapper.WorkerWrapper;
 import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
@@ -685,10 +684,9 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         int flag = jobInfoMapper.stopJobCompose(id);
         if (flag > 0) {
             XxlJobExecutor.removeJobThread(id.intValue(), "stop task" + id);
-            WorkerWrapper<Long, String> workWrapper = JobGroupXxlJob.getWorkWrapper(id, randomId);
-            if (workWrapper != null) {
-                log.info(">>>>>>>>> stop task:{}", workWrapper.getId());
-                Async.stopWork(workWrapper);
+            List<WorkerWrapper<Long, String>> workWrappers = JobGroupXxlJob.getWorkWrapper(id, randomId);
+            if (workWrappers != null&&!workWrappers.isEmpty()) {
+                Async.stopWork((List<WorkerWrapper>) (List<?>) workWrappers);
             }
         }
         return true;
