@@ -1123,6 +1123,8 @@ function bindEvents(lfInstance: any): void {
       return;
     }
 
+    if(getCurrentPageRunStatus())return;
+
     JobInfoAPI.pauseJob(node.properties.jobId, node.isPause ? 1 : 0);
 
     // 更新节点样式
@@ -1136,6 +1138,8 @@ function bindEvents(lfInstance: any): void {
       ElMessage.warning("暂不支持任务组复制");
       return;
     }
+
+    if(getCurrentPageRunStatus())return;
 
     // 获取原节点的数据
     const originalNodeData = node.getData();
@@ -1215,6 +1219,9 @@ function bindEvents(lfInstance: any): void {
       ElMessage.warning("请选择任务或任务组");
       return;
     }
+
+    if(getCurrentPageRunStatus())return;
+
     jobNodeVisible.value = true;
     nodeJobId.value = node.properties.jobId;
     selectNode.value = node;
@@ -1223,6 +1230,8 @@ function bindEvents(lfInstance: any): void {
   });
 
   lfInstance.on("custom:node-task-edit", ({ nodeId }: any) => {
+    if(getCurrentPageRunStatus())return;
+
     jobDialog.value = true;
     jobNodeEditId.value = nodeId;
   });
@@ -1249,6 +1258,7 @@ function bindEvents(lfInstance: any): void {
   });
 
   lfInstance.on("custom:node-delete", ({ nodeId }: any) => {
+    if(getCurrentPageRunStatus())return;
     lfInstance.deleteNode(nodeId);
   });
 }
@@ -1275,6 +1285,7 @@ const menuConfig = {
     {
       text: "删除",
       callback(node: { id: string }) {
+        if(getCurrentPageRunStatus())return;
         lf.value.deleteNode(node.id);
       },
     },
@@ -1285,6 +1296,8 @@ const menuConfig = {
           ElMessage.warning("暂不支持任务组选择");
           return;
         }
+
+        if(getCurrentPageRunStatus())return;
 
         jobDialog.value = true;
         jobNodeEditId.value = node.id;
@@ -1301,6 +1314,9 @@ const menuConfig = {
           ElMessage.warning("暂不支持任务组编辑");
           return;
         }
+
+        if(getCurrentPageRunStatus())return;
+
         jobNodeVisible.value = true;
         nodeJobId.value = node.properties.jobId;
         currentEditingNodeId.value = node.id; // 保存当前正在编辑的节点ID
@@ -1315,6 +1331,8 @@ const menuConfig = {
           ElMessage.warning("暂不支持任务组复制");
           return;
         }
+
+        if(getCurrentPageRunStatus())return;
 
         // 获取当前LogicFlow实例
         const currentPageId = usePageStoreHook().getCurrentPage();
@@ -1417,6 +1435,7 @@ const menuConfig = {
     {
       text: "删除",
       callback(edge: { id: string }) {
+        if(getCurrentPageRunStatus())return;
         lf.value.graphModel.deleteEdgeById(edge.id);
       },
     },
@@ -1643,6 +1662,14 @@ async function addJobNode(jobInfo: any) {
 }
 
 // ================== 12. 任务执行和操作处理 ==================
+function getCurrentPageRunStatus(){
+  const isRun =  usePageStoreHook().getCurrentPageRunStatus();
+  if(isRun){
+    ElMessage.warning("当前任务组正在运行中，请暂停后再操作")
+  }
+  return isRun;
+}
+
 
 /**
  * 任务执行一次
@@ -1993,16 +2020,6 @@ const disconnectWs = (id: number, targetJobId?: string): void => {
   } catch (error) {
     console.error("关闭WebSocket连接失败:", error);
   }
-};
-
-/**
- * 获取WebSocket连接状态
- * @param id 连接ID
- * @param targetJobId 目标任务组ID
- * @returns 连接状态
- */
-const getWsConnectionStatus = (id: string, targetJobId?: number): boolean => {
-  return webSocketPool.hasConnection(id, targetJobId);
 };
 
 /**

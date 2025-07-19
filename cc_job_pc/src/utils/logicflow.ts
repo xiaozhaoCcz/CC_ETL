@@ -2,7 +2,7 @@
  * LogicFlow 相关工具函数
  */
 
-import {usePageStoreHook} from "@/store";
+import { usePageStoreHook } from "@/store";
 
 /**
  * 计算数组平均值
@@ -110,7 +110,7 @@ export function convertContent(str: string): string {
  * 选择元素
  * 获取当前选中的元素
  */
-export function selectElements(lfInstances:any,lf:any): void {
+export function selectElements(lfInstances: any, lf: any): void {
     const currentPageId = usePageStoreHook().getCurrentPage();
     const currentLf = lfInstances.value[currentPageId] || lf.value;
     const elements = currentLf.graphModel.getSelectElements(true);
@@ -238,6 +238,23 @@ export function layoutNodes(direction: "horizontal" | "vertical", currentLf: any
     const nodes = elements.nodes;
     if (!nodes || nodes.length === 0) return;
 
+    // 获取所有与选中节点相关的边
+    const allEdges = currentLf.getGraphRawData()?.edges || [];
+    const selectedNodeIds = nodes.map((node: any) => node.id);
+
+    // 保存与选中节点相关的边的配置
+    const relatedEdges = allEdges.filter((edge: any) =>
+        selectedNodeIds.includes(edge.sourceNodeId) || selectedNodeIds.includes(edge.targetNodeId)
+    );
+
+    // 删除与选中节点相关的边
+    relatedEdges.forEach((edge: any) => {
+        const edgeModel = currentLf.graphModel.getEdgeModelById(edge.id);
+        if (edgeModel) {
+            currentLf.graphModel.deleteEdgeById(edge.id);
+        }
+    });
+
     if (direction === "horizontal") {
         const arrY = nodes.map((n: any) => n.y);
         const avgY = avg(arrY);
@@ -253,6 +270,16 @@ export function layoutNodes(direction: "horizontal" | "vertical", currentLf: any
             _node.moveTo(avgX, _node.y);
         });
     }
+
+    // 重新添加之前删除的边
+    relatedEdges.forEach((edge: any) => {
+        currentLf.addEdge({
+            id: edge.id,
+            sourceNodeId: edge.sourceNodeId,
+            targetNodeId: edge.targetNodeId,
+            type: edge.type || "bezier"
+        });
+    });
 }
 
 /**

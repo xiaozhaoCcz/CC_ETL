@@ -29,7 +29,6 @@ const dialogConfigs = new Map<HTMLElement, ResizeOptions>();
 
 // 全局函数：设置对话框配置
 export function setDialogResizeConfig(dialog: HTMLElement, options: ResizeOptions) {
-    console.log("设置对话框配置:", dialog, options);
     dialogConfigs.set(dialog, options);
 
     // 如果对话框已经存在，立即应用配置
@@ -50,7 +49,6 @@ export function setDialogResizeConfig(dialog: HTMLElement, options: ResizeOption
 export function forceReapplyConfig(dialog: HTMLElement) {
     if (dialogConfigs.has(dialog)) {
         const options = dialogConfigs.get(dialog)!;
-        console.log("强制重新应用配置:", options);
 
         // 移除现有的手柄
         const existingHandles = dialog.querySelectorAll(".resize-handle");
@@ -105,7 +103,6 @@ function getDialogOptions(dialog: HTMLElement): ResizeOptions {
     // 首先检查全局配置
     if (dialogConfigs.has(dialog)) {
         const config = dialogConfigs.get(dialog)!;
-        console.log("使用全局配置:", config);
         return config;
     }
 
@@ -114,7 +111,6 @@ function getDialogOptions(dialog: HTMLElement): ResizeOptions {
     if (dataOptions) {
         try {
             const config = JSON.parse(dataOptions);
-            console.log("使用data属性配置:", config);
             return config;
         } catch (e) {
             console.warn("解析对话框配置失败:", e);
@@ -390,7 +386,6 @@ function handleMousedown(e: MouseEvent, dir: string, dialog: HTMLElement) {
 function patchDialog(dialog: Element) {
     if (!(dialog instanceof HTMLElement)) return;
 
-    console.log("尝试patch dialog:", dialog);
     // 防止重复插入
     if ((dialog as any).__resizePatched) {
         console.log("对话框已经patch过，跳过");
