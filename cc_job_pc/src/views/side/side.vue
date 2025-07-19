@@ -30,7 +30,7 @@ const jobGroupVisible = reactive({
   visible: false,
 });
 const formData = reactive<any>({
-  executorTimeout: 600000,
+  executorTimeout: 300,
 });
 
 // 创建全局展开状态并提供给所有组件

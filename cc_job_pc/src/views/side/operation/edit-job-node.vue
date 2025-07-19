@@ -228,7 +228,7 @@
             <span>高级配置</span>
           </div>
           <div class="form-grid">
-            <el-form-item label="任务超时时间" class="form-item">
+            <el-form-item label="任务超时时间(秒)" class="form-item">
               <el-input
                 v-model="formData.executorTimeout"
                 type="text"

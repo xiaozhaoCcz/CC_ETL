@@ -227,7 +227,7 @@
             </div>
             <div class="form-row">
               <div class="form-item">
-                <label class="form-label">任务超时时间</label>
+                <label class="form-label">任务超时时间(秒)</label>
                 <el-input
                   v-model="formData.executorTimeout"
                   type="text"
@@ -328,7 +328,6 @@ const blockStrategyList = [
 ];
 
 const cronPopover = ref(false);
-const testDialog = ref(false);
 
 // 添加点击外部关闭CRON弹出层的功能
 const handleClickOutside = (event: Event) => {

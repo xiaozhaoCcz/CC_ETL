@@ -109,7 +109,7 @@ public class Async {
     private static void executorWorkerWrapper(long timeout, Map<String, WorkerWrapper> wrapperMap,
             Map<String, Integer> inDegree, Set<String> submitted) {
         // 当前剩余时间
-        AtomicLong time = new AtomicLong(timeout);
+        AtomicLong time = new AtomicLong(timeout * 1000);
 
         Thread thread = null;
         try {
@@ -119,7 +119,7 @@ public class Async {
             });
             thread = new Thread(futureTask);
             thread.start();
-            futureTask.get(timeout, TimeUnit.MILLISECONDS);
+            futureTask.get(timeout, TimeUnit.SECONDS);
         }catch (Exception e){
             throw new RuntimeException(e);
         }finally {
@@ -168,6 +168,7 @@ public class Async {
                         long costTime = time.get() - (SystemClock.now() - beginTime);
                         if (costTime > 0) {
                             time.set(costTime);
+                            logger.info("任务组剩余时间{}",costTime);
                         } else {
                             logger.error("任务组运行超时异常，任务: {}", id);
                             throw new RuntimeException("任务组运行超时异常");
@@ -217,7 +218,7 @@ public class Async {
                 // 睡眠5秒重试任务
                 logger.warn("任务: {} 执行失败，进行第{}次重试", workerWrapper.getId(), count);
                 try {
-                    TimeUnit.MILLISECONDS.sleep(5000);
+                    TimeUnit.SECONDS.sleep(5);
                 } catch (InterruptedException e) {
                     logger.error("重试等待被中断: {}", e.getMessage(), e);
                     throw new RuntimeException(e);
@@ -251,7 +252,7 @@ public class Async {
                 FutureTask<Object> futureTask = new FutureTask<>(() -> worker.action(param, wrapperMap));
                 thread = new Thread(futureTask);
                 thread.start();
-                resultValue = futureTask.get(timeout, TimeUnit.MILLISECONDS);
+                resultValue = futureTask.get(timeout, TimeUnit.SECONDS);
             } catch (Exception e) {
                 logger.error("任务执行超时或异常: {}", e.getMessage(), e);
                 throw new RuntimeException(e);
