@@ -1,4 +1,4 @@
-package com.cc.tasktool.executor.timer;
+package com.cc.job.admin.task.executor.timer;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;

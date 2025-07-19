@@ -1,6 +1,7 @@
-package com.cc.tasktool.callback;
+package com.cc.job.admin.task.executor.callback;
 
-import com.cc.tasktool.wrapper.WorkerWrapper;
+
+import com.cc.job.admin.task.executor.wrapper.WorkerWrapper;
 
 import java.util.List;
 

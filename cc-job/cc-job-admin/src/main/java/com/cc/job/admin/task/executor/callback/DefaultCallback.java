@@ -1,7 +1,7 @@
-package com.cc.tasktool.callback;
+package com.cc.job.admin.task.executor.callback;
 
 
-import com.cc.tasktool.worker.WorkResult;
+import com.cc.job.admin.task.executor.worker.WorkResult;
 
 /**
  * 默认回调类，如果不设置的话，会默认给这个回调

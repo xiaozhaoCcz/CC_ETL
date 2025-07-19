@@ -1,11 +1,11 @@
 package com.cc.job.admin.task.handler;
 
+import com.cc.job.admin.task.executor.Async;
+import com.cc.job.admin.task.executor.callback.IWorker;
+import com.cc.job.admin.task.executor.worker.DependWrapper;
+import com.cc.job.admin.task.executor.worker.WorkResult;
+import com.cc.job.admin.task.executor.wrapper.WorkerWrapper;
 import com.cc.job.xo.model.entity.JobInfo;
-import com.cc.tasktool.callback.IWorker;
-import com.cc.tasktool.executor.Async;
-import com.cc.tasktool.worker.DependWrapper;
-import com.cc.tasktool.worker.WorkResult;
-import com.cc.tasktool.wrapper.WorkerWrapper;
 import org.springframework.stereotype.Component;
 
 import java.text.SimpleDateFormat;
@@ -103,17 +103,9 @@ public class JobGroupUtils {
             }
         }
 
-        List<WorkerWrapper<Long, Long[]>> startWorkers = timeWorkerWrappers.stream().filter(v -> startNodes.contains(Long.valueOf(v.getId()))).toList();
-
-        WorkerWrapper<Long, Long[]> next = new WorkerWrapper<Long, Long[]>()
-                .id(String.valueOf(jobId))
-                .param(jobId)
-                .worker((id, allWrappers) -> new Long[]{0L, 0L})
-                .next(startWorkers.toArray(new WorkerWrapper[0]));
-
         try {
-            Async.beginWork(timeout,next);
-        } catch (ExecutionException | InterruptedException e) {
+            Async.beginWork(timeout,(List<WorkerWrapper>) (List<?>) timeWorkerWrappers);
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
         List<String[]> resList = new ArrayList<>();

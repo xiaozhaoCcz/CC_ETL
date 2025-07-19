@@ -11,6 +11,7 @@
     <option name="ignoredFiles">
       <set>
         <option value="$PROJECT_DIR$/cc-job-executor-samples/cc-job-executor-sample-springboot2/pom.xml" />
+        <option value="$PROJECT_DIR$/cc-job/cc-async-tool/pom.xml" />
       </set>
     </option>
   </component>

@@ -4,6 +4,10 @@ import cn.hutool.core.lang.Pair;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.admin.task.executor.Async;
+import com.cc.job.admin.task.executor.callback.ICallback;
+import com.cc.job.admin.task.executor.callback.IWorker;
+import com.cc.job.admin.task.executor.worker.WorkResult;
+import com.cc.job.admin.task.executor.wrapper.WorkerWrapper;
 import com.cc.job.admin.task.trigger.XxlJobTrigger;
 import com.cc.job.admin.task.websocket.WebSocketServer;
 import com.cc.job.xo.common.exception.BusinessException;
@@ -14,10 +18,6 @@ import com.cc.job.admin.task.service.JobEdgeService;
 import com.cc.job.admin.task.service.JobInfoService;
 import com.cc.job.admin.task.service.JobNodeService;
 import com.cc.job.admin.task.websocket.model.Message;
-import com.cc.tasktool.callback.ICallback;
-import com.cc.tasktool.callback.IWorker;
-import com.cc.tasktool.worker.WorkResult;
-import com.cc.tasktool.wrapper.WorkerWrapper;
 import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.biz.model.TriggerParam;
 import com.xxl.job.core.context.XxlJobContext;
@@ -42,7 +42,6 @@ import static com.cc.job.admin.task.handler.JobConstant.*;
 
 /**
  * 任务组核心代码
- * TODO 可以考虑优化线程
  *
  * @author xiaozhao
  */

@@ -17,7 +17,6 @@
         <module>cc-job-core</module>
         <module>cc-job-admin</module>
         <module>cc-job-executor-samples</module>
-        <module>cc-async-tool</module>
         <module>cc-job-xo</module>
         <module>cc-job-executor</module>
     </modules>
