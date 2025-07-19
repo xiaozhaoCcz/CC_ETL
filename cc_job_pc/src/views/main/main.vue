@@ -1123,8 +1123,6 @@ function bindEvents(lfInstance: any): void {
       return;
     }
 
-    if(getCurrentPageRunStatus())return;
-
     JobInfoAPI.pauseJob(node.properties.jobId, node.isPause ? 1 : 0);
 
     // 更新节点样式
