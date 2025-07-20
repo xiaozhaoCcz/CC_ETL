@@ -41,8 +41,15 @@ import java.util.stream.Collectors;
 import static com.cc.job.admin.task.handler.JobConstant.*;
 
 /**
- * 任务组核心代码
- *
+ * 任务组核心处理器
+ * 
+ * 主要功能：
+ * 1. 处理任务组的拓扑排序执行
+ * 2. 管理任务间的依赖关系
+ * 3. 监控任务执行状态
+ * 4. 处理任务失败重试
+ * 5. 支持任务暂停和恢复
+ * 
  * @author xiaozhao
  */
 @Component
@@ -64,37 +71,76 @@ public class JobGroupXxlJob {
 
     final JobGroupUtils jobGroupUtils;
 
-    //存储WorkerWrapper，后续暂停任务需要
+    /**
+     * 存储WorkerWrapper，用于后续暂停任务操作
+     * Key: jobId:randomId, Value: WorkerWrapper列表
+     */
     static final ConcurrentHashMap<String, List<WorkerWrapper<Long, String>>> STOP_MAP = new ConcurrentHashMap<>();
 
-
+    /**
+     * 存储任务执行状态映射
+     * Key: jobId:randomId, Value: 是否成功执行
+     */
     static final Map<String, Boolean> JOB_MAP = new ConcurrentHashMap<>();
 
+    /**
+     * 移除任务数据
+     * 
+     * @param jobId 任务ID
+     */
     public static void removeJobData(String jobId) {
         if (jobId != null) {
             JOB_MAP.remove(jobId);
+            logger.debug("[JobGroup] 移除任务数据 - jobId: {}, 当前任务总数: {}", jobId, JOB_MAP.size());
         }
     }
 
+    /**
+     * 添加任务数据
+     * 
+     * @param jobId     任务ID
+     * @param isRunning 是否正在运行
+     */
     public static void addJobData(String jobId, Boolean isRunning) {
         JOB_MAP.put(jobId, isRunning);
-        logger.debug("[JobGroup] 添加任务数据 - jobId: {}, 运行状态: {}, 当前总数: {}", jobId, isRunning, JOB_MAP.size());
+        logger.debug("[JobGroup] 添加任务数据 - jobId: {}, 运行状态: {}, 当前总数: {}",
+                jobId, isRunning ? "运行中" : "已完成", JOB_MAP.size());
     }
 
+    /**
+     * 获取WorkerWrapper列表
+     * 
+     * @param parentId 父任务ID
+     * @param randomId 随机ID
+     * @return WorkerWrapper列表
+     */
     public static List<WorkerWrapper<Long, String>> getWorkWrapper(Long parentId, String randomId) {
         String key = setExecuteJobId(parentId, randomId);
         return STOP_MAP.get(key);
     }
 
-    // 需要重新获取XxlJobContext解决线程问题，不然会出现日志文件错误添加的问题
+    /**
+     * 线程本地变量，用于解决线程问题，避免日志文件错误添加
+     */
     private static final InheritableThreadLocal<XxlJobContext> CONTEXT_HOLDER = new InheritableThreadLocal<>();
 
+    /**
+     * 任务组执行入口方法
+     * 
+     * 执行流程：
+     * 1. 验证执行参数
+     * 2. 获取任务信息
+     * 3. 构建任务图
+     * 4. 执行拓扑排序
+     * 5. 监控执行状态
+     */
     @XxlJob("runJobGroupXxlJob")
     public void jobGroupXxlJob() {
         long jobId = XxlJobHelper.getJobId();
         String executeParam = XxlJobHelper.getJobParam();
 
-        logger.info("[JobGroup] 开始执行任务组 - jobId: {}, 执行参数: {}", jobId, executeParam);
+        logger.info("[JobGroup] ========== 开始执行任务组 ==========");
+        logger.info("[JobGroup] 任务ID: {}, 执行参数: {}", jobId, executeParam);
 
         // 验证执行参数
         validateExecuteParam(executeParam);
@@ -106,19 +152,20 @@ public class JobGroupXxlJob {
             logger.debug("[JobGroup] 生成随机ID - jobId: {}, randomId: {}", jobId, randomId);
 
             JobInfo jobInfo = getJobInfoById(jobId);
-            logger.debug("[JobGroup] 获取任务信息 - jobId: {}, 任务类型: {}, 执行器超时时间: {}ms",
-                    jobId, jobInfo.getJobType(), jobInfo.getExecutorTimeout());
+            logger.info("[JobGroup] 任务信息获取成功 - 任务名称: {}, 任务类型: {}, 执行器超时时间: {}ms",
+                    jobInfo.getJobDesc(), jobInfo.getJobType(), jobInfo.getExecutorTimeout());
 
             Map<Long, List<Long>> statusMap = new HashMap<>();
             // 设置初始状态，页面颜色提示
             getJobStatusMap(jobId, statusMap);
             logger.debug("[JobGroup] 初始化状态映射 - jobId: {}, 状态映射大小: {}", jobId, statusMap.size());
 
-            // 将多节点任务或任务组构图
+            // 获取所有节点和边信息
             List<JobNode> nodes = new ArrayList<>();
             List<JobEdge> edges = new ArrayList<>();
             getAllNodesAndEdges(jobId, nodes, edges);
-            logger.debug("[JobGroup] 获取节点和边信息 - jobId: {}, 节点数量: {}, 边数量: {}", jobId, nodes.size(), edges.size());
+            logger.info("[JobGroup] 节点和边信息获取完成 - jobId: {}, 节点数量: {}, 边数量: {}",
+                    jobId, nodes.size(), edges.size());
 
             // 构图
             buildGraph(jobId, nodes, edges);
@@ -131,7 +178,7 @@ public class JobGroupXxlJob {
             CONTEXT_HOLDER.set(XxlJobContext.getXxlJobContext());
             // 构造WorkerWrapper，实现任务的串并行执行
             List<WorkerWrapper<Long, String>> workerWrappers = buildWorkerWrappers(nodes, nextMap, randomId, statusMap);
-            logger.debug("[JobGroup] 构建WorkerWrapper完成 - jobId: {}, WorkerWrapper数量: {}", jobId, workerWrappers.size());
+            logger.info("[JobGroup] WorkerWrapper构建完成 - jobId: {}, WorkerWrapper数量: {}", jobId, workerWrappers.size());
 
             // // 预测任务的运行时间
             // getRuntime(workerWrappers, nodes, jobInfo.getExecutorTimeout(), jobId,
@@ -142,7 +189,9 @@ public class JobGroupXxlJob {
 
             // 使用拓扑排序执行器，按层级执行任务，控制并发度
             Async.beginWork(jobInfo.getExecutorTimeout().longValue(), (List<WorkerWrapper>) (List<?>) workerWrappers);
-        } catch (Exception  e) {
+
+            logger.info("[JobGroup] ========== 任务组执行完成 ==========");
+        } catch (Exception e) {
             handleExecutionException(jobId, e);
         } finally {
             completeJob(jobId, randomId);
@@ -172,11 +221,20 @@ public class JobGroupXxlJob {
         logger.debug("[JobGroup] 运行时间计算完成并发送消息 - jobId: {}, randomId: {}", jobId, randomId);
     }
 
+    /**
+     * 获取任务信息列表
+     */
     private List<JobInfo> getJobInfos(List<JobNode> nodes) {
         List<Long> jobIds = nodes.stream().map(JobNode::getJobId).toList();
         return jobInfoService.listByIds(jobIds);
     }
 
+    /**
+     * 验证执行参数
+     * 
+     * @param executeParam 执行参数
+     * @throws BusinessException 参数为空时抛出异常
+     */
     private void validateExecuteParam(String executeParam) {
         if (StringUtils.isBlank(executeParam)) {
             logger.error("[JobGroup] 执行参数验证失败 - executeParam为空");
@@ -185,6 +243,13 @@ public class JobGroupXxlJob {
         logger.debug("[JobGroup] 执行参数验证通过 - executeParam: {}", executeParam);
     }
 
+    /**
+     * 根据ID获取任务信息
+     * 
+     * @param jobId 任务ID
+     * @return 任务信息
+     * @throws BusinessException 任务不存在时抛出异常
+     */
     private JobInfo getJobInfoById(long jobId) {
         JobInfo jobInfo = jobInfoService.getById(jobId);
         if (jobInfo == null) {
@@ -195,28 +260,55 @@ public class JobGroupXxlJob {
         return jobInfo;
     }
 
+    /**
+     * 获取开始节点列表（入度为0的节点）
+     */
     private List<Long> getStartNodes(List<JobNode> nodes) {
         return nodes.stream().filter(v -> v.getNodeInDegree().equals(0L)).map(JobNode::getId).toList();
     }
 
-
+    /**
+     * 处理执行异常
+     * 
+     * @param jobId 任务ID
+     * @param e     异常信息
+     */
     private void handleExecutionException(long jobId, Exception e) {
-        XxlJobHelper.log("{}任务运行异常,message:{}", jobId, e.getMessage());
+        XxlJobHelper.log("========================================= 任务运行异常 =========================================");
+        XxlJobHelper.log("任务ID: {}, 异常信息: {}", jobId, e.getMessage());
         logger.error("[JobGroup] 任务组执行异常 - jobId: {}, 异常信息: {}", jobId, e.getMessage(), e);
         throw new BusinessException(e.getMessage());
     }
 
+    /**
+     * 完成任务组执行
+     * 
+     * @param jobId    任务ID
+     * @param randomId 随机ID
+     */
     private void completeJob(long jobId, String randomId) {
-        logger.info("[JobGroup] 任务组执行完成 - jobId: {}, randomId: {}", jobId, randomId);
-        XxlJobHelper.log("{}任务运行完成", jobId);
+        logger.info("[JobGroup] ========== 任务组执行完成 ==========");
+        logger.info("[JobGroup] 任务ID: {}, 随机ID: {}", jobId, randomId);
+        XxlJobHelper.log("========================================= 任务运行完成 =========================================");
+        XxlJobHelper.log("任务ID: {}, 随机ID: {}", jobId, randomId);
+
+        // 发送完成消息
         sendCompletionMessage(jobId, randomId);
+
+        // 停止任务组合
         jobInfoMapper.stopJobCompose(jobId);
+
+        // 清理资源
         STOP_MAP.remove(setExecuteJobId(jobId, randomId));
-        //关闭消息
+
+        // 关闭WebSocket连接
         webSocketServer.onClose(setExecuteJobId(jobId, randomId));
-        logger.debug("[JobGroup] 清理任务组资源 - jobId: {}, 剩余任务组数量: {}", jobId, STOP_MAP.size());
+        logger.debug("[JobGroup] 资源清理完成 - jobId: {}, 剩余任务组数量: {}", jobId, STOP_MAP.size());
     }
 
+    /**
+     * 发送任务完成消息
+     */
     private void sendCompletionMessage(long jobId, String randomId) {
         Message message = new Message();
         message.setJobId(jobId);
@@ -229,20 +321,24 @@ public class JobGroupXxlJob {
     }
 
     /**
-     * 构造WorkerWrapper，详情代码请看async tool
-     *
-     * @param nodes     当前节点
-     * @param nextMap   节点的next节点
+     * 构造WorkerWrapper，实现任务的串并行执行
+     * 
+     * @param nodes     当前节点列表
+     * @param nextMap   节点的next节点映射
      * @param randomId  随机id，前端页面运行传递
-     * @param statusMap 状态map
-     * @return
+     * @param statusMap 状态映射
+     * @return WorkerWrapper列表
      */
     private List<WorkerWrapper<Long, String>> buildWorkerWrappers(List<JobNode> nodes, Map<Long, List<JobNode>> nextMap,
             String randomId, Map<Long, List<Long>> statusMap) {
+        logger.debug("[JobGroup] 开始构建WorkerWrapper - 节点数量: {}", nodes.size());
+
         List<WorkerWrapper<Long, String>> result = new ArrayList<>();
         List<JobInfo> jobInfos = getJobInfos(nodes);
         final Map<Long, JobInfo> jobInfoMap = jobInfos.stream().collect(Collectors.toMap(JobInfo::getId, t -> t));
         XxlJobContext xxlJobContext = CONTEXT_HOLDER.get();
+
+        // 为每个节点创建WorkerWrapper
         for (JobNode node : nodes) {
             final JobInfo jobInfo = jobInfoMap.get(node.getJobId());
             WorkerWrapper<Long, String> worker = new WorkerWrapper<Long, String>()
@@ -275,6 +371,7 @@ public class JobGroupXxlJob {
             result.add(worker);
         }
 
+        // 设置节点间的依赖关系
         for (WorkerWrapper<Long, String> workerWrapper : result) {
             String id = workerWrapper.getId();
             List<JobNode> taskNodes = nextMap.get(Long.valueOf(id));
@@ -286,24 +383,26 @@ public class JobGroupXxlJob {
                     .filter(v -> cNodeIds.contains(Long.valueOf(v.getId()))).toList();
             workerWrapper.next(nextWorkers.toArray(new WorkerWrapper[0]));
         }
+
+        logger.debug("[JobGroup] WorkerWrapper构建完成 - 总数: {}", result.size());
         return result;
     }
 
     /**
-     * 执行任务的核心代码
+     * 执行任务的核心方法
      *
      * @param xxlJobContext jobContext，主要是将子任务日志写到主任务中
      * @param node          当前节点
      * @param jobInfo       当前节点对应的jobInfo
-     * @param randomId      随机id，随机id非常重要，保证多页面运行时节点状态运行正常
-     * @param statusMap     状态map
+     * @param randomId      随机id，保证多页面运行时节点状态运行正常
+     * @param statusMap     状态映射
      * @param count         失败重试次数
      * @return 运行结果
      */
     private String executeJob(XxlJobContext xxlJobContext, JobNode node, JobInfo jobInfo, String randomId,
             Map<Long, List<Long>> statusMap, int count) {
-        logger.debug("[JobGroup] 开始执行任务 - jobId: {}, nodeId: {}, 重试次数: {}",
-                jobInfo.getId(), node.getId(), count);
+        logger.info("[JobGroup] 开始执行任务 - jobId: {}, nodeId: {}, 重试次数: {}, 任务名称: {}",
+                jobInfo.getId(), node.getId(), count, jobInfo.getJobDesc());
 
         // 暂停任务执行
         pauseJob(jobInfo);
@@ -317,6 +416,13 @@ public class JobGroupXxlJob {
 
     /**
      * 监听任务是否运行完成
+     * 
+     * @param node      任务节点
+     * @param jobInfo   任务信息
+     * @param randomId  随机ID
+     * @param statusMap 状态映射
+     * @param count     重试次数
+     * @return 执行结果
      */
     private String listenerJob(JobNode node, JobInfo jobInfo, String randomId, Map<Long, List<Long>> statusMap,
             int count) {
@@ -333,7 +439,7 @@ public class JobGroupXxlJob {
             result = jobInfo.getExecutorTimeout() > 0
                     ? futureTask.get(jobInfo.getExecutorTimeout(), TimeUnit.MILLISECONDS)
                     : futureTask.get();
-            logger.debug("[JobGroup] 任务监听完成 - jobId: {}, nodeId: {}, 执行结果: {}",
+            logger.info("[JobGroup] 任务监听完成 - jobId: {}, nodeId: {}, 执行结果: {}",
                     jobInfo.getId(), node.getId(), result);
         } catch (Exception e) {
             logger.error("[JobGroup] 任务监听异常 - jobId: {}, nodeId: {}, 异常信息: {}",
@@ -350,11 +456,17 @@ public class JobGroupXxlJob {
         return result;
     }
 
+    /**
+     * 暂停任务执行
+     * 
+     * @param jobInfo 任务信息
+     */
     private void pauseJob(JobInfo jobInfo) {
         // 重新获取jobInfo
         boolean isPause = jobInfo.getIsPause() == 1;
         if (isPause) {
-            logger.info("[JobGroup] 任务处于暂停状态，等待恢复 - jobId: {}", jobInfo.getId());
+            logger.info("[JobGroup] 任务处于暂停状态，等待恢复 - jobId: {}, 任务名称: {}",
+                    jobInfo.getId(), jobInfo.getJobDesc());
         }
         // 暂停任务，默认暂停任务5分钟
         long timeout = jobInfo.getExecutorTimeout() > 0 ? jobInfo.getExecutorTimeout() : 5 * 60 * 1000;
@@ -375,10 +487,17 @@ public class JobGroupXxlJob {
             isPause = jobInfoModel.getIsPause() == 1;
         }
         if (!isPause) {
-            logger.info("[JobGroup] 任务恢复执行 - jobId: {}", jobInfo.getId());
+            logger.info("[JobGroup] 任务恢复执行 - jobId: {}, 任务名称: {}", jobInfo.getId(), jobInfo.getJobDesc());
         }
     }
 
+    /**
+     * 触发任务执行
+     * 
+     * @param xxlJobContext 任务上下文
+     * @param jobInfo       任务信息
+     * @param randomId      随机ID
+     */
     private void triggerJob(XxlJobContext xxlJobContext, JobInfo jobInfo, String randomId) {
         logger.debug("[JobGroup] 开始触发任务 - jobId: {}, 执行器处理器: {}, 随机ID: {}",
                 jobInfo.getId(), jobInfo.getExecutorHandler(), randomId);
@@ -414,23 +533,38 @@ public class JobGroupXxlJob {
         ReturnT<String> returnT = XxlJobTrigger.runExecutor(triggerParam, address);
         if (returnT.getCode() != ReturnT.SUCCESS_CODE) {
             logger.error("[JobGroup] 任务触发失败 - jobId: {}, 错误信息: {}", jobInfo.getId(), returnT.getMsg());
-            XxlJobHelper.log(xxlJobContext, returnT.getMsg());
+            XxlJobHelper.log(xxlJobContext,
+                    "========================================= 任务触发失败 =========================================");
+            XxlJobHelper.log(xxlJobContext, "任务ID: {}, 错误信息: {}", jobInfo.getId(), returnT.getMsg());
             JobGroupXxlJob.addJobData(setExecuteJobId(jobInfo.getId(), randomId), false);
         } else {
             logger.debug("[JobGroup] 任务触发成功 - jobId: {}", jobInfo.getId());
+            XxlJobHelper.log(xxlJobContext, "任务触发成功 - 任务ID: {}", jobInfo.getId());
         }
     }
 
+    /**
+     * 处理任务完成
+     * 
+     * @param pair      任务结果对
+     * @param jobInfo   任务信息
+     * @param node      任务节点
+     * @param randomId  随机ID
+     * @param statusMap 状态映射
+     * @param count     重试次数
+     * @return 处理结果
+     */
     private String handleJobCompletion(Pair<String, Boolean> pair, JobInfo jobInfo, JobNode node, String randomId,
             Map<Long, List<Long>> statusMap, int count) {
         String key = pair.getKey();
         Long jobId = Long.valueOf(key.split(":")[0]);
         boolean success = pair.getValue();
-        // 每次运行完需要重集合中删除节点
+        // 每次运行完需要从集合中删除节点
         removeJobData(setExecuteJobId(jobId, randomId));
         String res = "";
         if (success) {
             setNodeStatus(statusMap, jobId, 1, randomId, node.getJobParentId());
+            logger.info("[JobGroup] 任务执行成功 - jobId: {}, 任务名称: {}", jobId, jobInfo.getJobDesc());
         } else {
             if (count < jobInfo.getExecutorFailRetryCount()) {
                 logger.warn("[JobGroup] 任务执行失败，准备重试 - jobId: {}, nodeId: {}, 当前重试次数: {}, 最大重试次数: {}",
@@ -444,6 +578,13 @@ public class JobGroupXxlJob {
         return res;
     }
 
+    /**
+     * 构建节点关系映射
+     * 
+     * @param nodes 节点列表
+     * @param edges 边列表
+     * @return 节点关系映射
+     */
     private Map<Long, List<JobNode>> buildNextNode(List<JobNode> nodes, List<JobEdge> edges) {
         Map<Long, List<JobNode>> result = new HashMap<>();
         for (JobNode node : nodes) {
@@ -455,9 +596,17 @@ public class JobGroupXxlJob {
         return result;
     }
 
+    /**
+     * 获取所有节点和边信息
+     * 
+     * @param jobId 任务ID
+     * @param nodes 节点列表（输出参数）
+     * @param edges 边列表（输出参数）
+     */
     private void getAllNodesAndEdges(Long jobId, List<JobNode> nodes, List<JobEdge> edges) {
         logger.debug("[JobGroup] 开始获取所有节点和边 - jobId: {}", jobId);
 
+        // 获取直接子节点和边
         List<JobNode> jobNodes = jobNodeService
                 .list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, jobId));
         List<JobEdge> jobEdges = jobEdgeService
@@ -468,6 +617,7 @@ public class JobGroupXxlJob {
 
         logger.debug("[JobGroup] 获取直接子节点和边 - jobId: {}, 节点数量: {}, 边数量: {}", jobId, jobNodes.size(), jobEdges.size());
 
+        // 递归获取子任务组的节点和边
         List<JobInfo> childJobInfos = jobInfoService
                 .list(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getParentId, jobId));
         for (JobInfo childJobInfo : childJobInfos) {
@@ -480,12 +630,20 @@ public class JobGroupXxlJob {
         logger.debug("[JobGroup] 获取所有节点和边完成 - jobId: {}, 总节点数量: {}, 总边数量: {}", jobId, nodes.size(), edges.size());
     }
 
+    /**
+     * 构建任务图
+     * 
+     * @param jobId 任务ID
+     * @param nodes 节点列表
+     * @param edges 边列表
+     */
     private void buildGraph(Long jobId, List<JobNode> nodes, List<JobEdge> edges) {
         logger.debug("[JobGroup] 开始构建任务图 - jobId: {}", jobId);
 
         List<JobNode> nodeList = nodes.stream().filter(v -> v.getJobParentId().equals(jobId)).toList();
         getNodeList(jobId, nodes, edges, nodeList);
 
+        // 计算节点的入度和出度
         nodes.forEach(node -> {
             node.setNodeInDegree(edges.stream().filter(v -> v.getEndNodeId().equals(node.getId())).count());
             node.setNodeOutDegree(edges.stream().filter(v -> v.getFromNodeId().equals(node.getId())).count());
@@ -496,6 +654,14 @@ public class JobGroupXxlJob {
         logger.debug("[JobGroup] 任务图构建完成 - jobId: {}, 节点数量: {}, 边数量: {}", jobId, nodes.size(), edges.size());
     }
 
+    /**
+     * 处理节点列表
+     * 
+     * @param jobId    任务ID
+     * @param nodes    节点列表
+     * @param edges    边列表
+     * @param nodeList 待处理的节点列表
+     */
     private void getNodeList(Long jobId, List<JobNode> nodes, List<JobEdge> edges, List<JobNode> nodeList) {
         logger.debug("[JobGroup] 处理节点列表 - jobId: {}, 节点数量: {}", jobId, nodeList.size());
 
@@ -511,31 +677,34 @@ public class JobGroupXxlJob {
     }
 
     /**
-     * 将多维图像降唯
+     * 将多维图像降维
+     * 
+     * 处理任务组节点，将其子节点直接连接到父节点，实现图的扁平化
      *
-     * @param jobId
-     * @param currentNode
-     * @param preNodeIds
-     * @param nextNodeIds
-     * @param nodes
-     * @param edges
+     * @param jobId       任务ID
+     * @param currentNode 当前节点
+     * @param preNodeIds  前置节点ID列表
+     * @param nextNodeIds 后置节点ID列表
+     * @param nodes       节点列表
+     * @param edges       边列表
      */
     private void concatNode(Long jobId, JobNode currentNode, List<Long> preNodeIds, List<Long> nextNodeIds,
             List<JobNode> nodes, List<JobEdge> edges) {
         JobInfo jobInfo = jobInfoService.getById(currentNode.getJobId());
         if (jobInfo.getJobType() == 2) {
+            // 移除与当前节点相关的边
             edges.removeIf(v -> preNodeIds.contains(v.getFromNodeId()) && v.getEndNodeId().equals(currentNode.getId()));
             edges.removeIf(
                     v -> nextNodeIds.contains(v.getEndNodeId()) && v.getFromNodeId().equals(currentNode.getId()));
 
-            // 得到开始节点
-            // 得到当前节点的所有孩子节点
+            // 获取子任务组的节点
             List<JobNode> childrenNodes = nodes.stream().filter(v -> v.getJobParentId().equals(jobInfo.getId()))
                     .toList();
-            // 得到孩子节点的开始节点
+            // 获取开始节点和结束节点
             List<JobNode> startNodes = childrenNodes.stream().filter(v -> v.getNodeInDegree() == 0).toList();
             List<JobNode> endNodes = childrenNodes.stream().filter(v -> v.getNodeOutDegree() == 0).toList();
 
+            // 连接前置节点到开始节点
             for (JobNode startNode : startNodes) {
                 for (Long preNodeId : preNodeIds) {
                     JobEdge edge = new JobEdge();
@@ -546,6 +715,7 @@ public class JobGroupXxlJob {
                 }
             }
 
+            // 连接结束节点到后置节点
             for (JobNode endNode : endNodes) {
                 for (Long nextNodeId : nextNodeIds) {
                     JobEdge edge = new JobEdge();
@@ -558,16 +728,27 @@ public class JobGroupXxlJob {
 
             getNodeList(jobId, nodes, edges, childrenNodes);
 
+            // 移除当前节点
             nodes.removeIf(v -> v.getId().equals(currentNode.getId()));
         }
     }
 
+    /**
+     * 设置执行任务ID
+     * 
+     * @param jobId    任务ID
+     * @param randomId 随机ID
+     * @return 组合后的执行ID
+     */
     public static String setExecuteJobId(Long jobId, String randomId) {
         return jobId + ":" + randomId;
     }
 
     /**
-     * 更新任务运行状态
+     * 更新任务运行状态映射
+     * 
+     * @param jobId     任务ID
+     * @param statusMap 状态映射
      */
     private void getJobStatusMap(Long jobId, Map<Long, List<Long>> statusMap) {
         JobInfo jobInfo = jobInfoService.getById(jobId);
@@ -583,6 +764,15 @@ public class JobGroupXxlJob {
         }
     }
 
+    /**
+     * 设置节点状态
+     * 
+     * @param statusMap 状态映射
+     * @param jobId     任务ID
+     * @param status    状态值
+     * @param randomId  随机ID
+     * @param parentId  父任务ID
+     */
     private void setNodeStatus(Map<Long, List<Long>> statusMap, Long jobId, Integer status, String randomId,
             Long parentId) {
         logger.debug("[JobGroup] 设置节点状态 - jobId: {}, status: {}, randomId: {}, parentId: {}",
@@ -596,7 +786,6 @@ public class JobGroupXxlJob {
                 message.setRandomId(randomId);
                 message.setParentJobId(parentId);
                 // 使用消息队列服务发送消息，提高响应速度
-
                 webSocketServer.sendInfo(message);
 
                 logger.debug("[JobGroup] 发送节点状态消息 - jobId: {}, status: {}, randomId: {}", jobId, status, randomId);
@@ -628,6 +817,16 @@ public class JobGroupXxlJob {
         logger.warn("[JobGroup] 未找到对应的状态映射 - jobId: {}", jobId);
     }
 
+    /**
+     * 处理任务成功或失败的情况
+     * 
+     * @param statusMap 状态映射
+     * @param jobId     任务ID
+     * @param status    状态值
+     * @param randomId  随机ID
+     * @param parentId  父任务ID
+     * @param entry     状态映射条目
+     */
     private void executeSuccessOrFailJob(Map<Long, List<Long>> statusMap, Long jobId, Integer status, String randomId,
             Long parentId, Map.Entry<Long, List<Long>> entry) {
         List<Long> value = new ArrayList<>(entry.getValue());
@@ -644,6 +843,8 @@ public class JobGroupXxlJob {
 
     /**
      * 任务运行监听器
+     * 
+     * 负责监听任务执行状态，等待任务完成
      */
     private class JobThreadListener implements Callable<String> {
 
@@ -693,6 +894,8 @@ public class JobGroupXxlJob {
 
     /**
      * 任务回滚触发器
+     * 
+     * 负责处理任务开始和结束的回调
      */
     private class JobCallback implements ICallback<Long, String> {
         private final JobNode node;
@@ -715,19 +918,27 @@ public class JobGroupXxlJob {
 
         @Override
         public void begin(Long jobId) {
-            logger.info("[JobGroup] 任务开始执行 - jobId: {}, nodeId: {}, 父任务ID: {}", jobId, node.getId(),
+            logger.info("[JobGroup] ========== 任务开始执行 ==========");
+            logger.info("[JobGroup] 任务ID: {}, 节点ID: {}, 父任务ID: {}", jobId, node.getId(),
                     node.getJobParentId());
-            XxlJobHelper.log(xxlJobContext, ">>>>>>>>>>>>>>>>>>>>>任务：{}开始运行>>>>>>>>>>>>>>>>>>>>>", jobId);
+            XxlJobHelper.log(xxlJobContext,
+                    "========================================= 任务开始执行 =========================================");
+            XxlJobHelper.log(xxlJobContext, "任务ID: {}, 节点ID: {}, 父任务ID: {}", jobId, node.getId(),
+                    node.getJobParentId());
             setNodeStatus(statusMap, jobId, 2, randomId, node.getJobParentId());
             this.runtime = System.currentTimeMillis();
         }
 
         @Override
         public void result(boolean success, Long param, WorkResult<String> workResult) {
-            logger.info("[JobGroup] 任务执行完成 - jobId: {}, 执行结果: {}, 运行时长: {}ms, 返回结果: {}",
-                    param, success ? "成功" : "失败", System.currentTimeMillis() - runtime, workResult.getResult());
-            XxlJobHelper.log(xxlJobContext, ">>>>>>>>>>>>>>>>>>>>>任务运行完成:{}, 任务运行状态:{},运行结果:{}", param, success,
-                    workResult.getResult());
+            long duration = System.currentTimeMillis() - runtime;
+            logger.info("[JobGroup] ========== 任务执行完成 ==========");
+            logger.info("[JobGroup] 任务ID: {}, 执行结果: {}, 运行时长: {}ms, 返回结果: {}",
+                    param, success ? "成功" : "失败", duration, workResult.getResult());
+            XxlJobHelper.log(xxlJobContext,
+                    "========================================= 任务执行完成 =========================================");
+            XxlJobHelper.log(xxlJobContext, "任务ID: {}, 执行结果: {}, 运行时长: {}ms", param, success ? "成功" : "失败", duration);
+            XxlJobHelper.log(xxlJobContext, "返回结果: {}", workResult.getResult());
             runtime = System.currentTimeMillis() - runtime;
             // 更新数据库
             if (success) {
@@ -735,18 +946,27 @@ public class JobGroupXxlJob {
                 JobInfo jobInfo = jobInfoMapper.selectById(jobId);
                 jobInfo.setRunTime(runtime);
                 jobInfoMapper.updateById(jobInfo);
+                XxlJobHelper.log(xxlJobContext, "任务执行成功，已更新数据库运行时间: {}ms", runtime);
+            } else {
+                XxlJobHelper.log(xxlJobContext, "任务执行失败，跳过数据库更新");
             }
         }
     }
 
-    // 停止所有任务
+    /**
+     * 停止所有任务组
+     * 
+     * 遍历所有正在执行的任务组，停止它们的执行
+     */
     public static void stopJobGroup() {
+        logger.info("[JobGroup] ========== 开始停止所有任务组 ==========");
         STOP_MAP.forEach((k, v) -> {
             String[] split = k.split(":");
             Long jobId = Long.parseLong(split[0]);
             XxlJobAdminConfig.getAdminConfig().getJobInfoMapper().stopJobCompose(jobId);
             logger.info("[JobGroup] 停止任务组 - jobId: {}, 执行ID: {}", jobId, k);
         });
+        logger.info("[JobGroup] ========== 所有任务组停止完成 ==========");
     }
 
     private static final Logger logger = LoggerFactory.getLogger(JobGroupXxlJob.class);
