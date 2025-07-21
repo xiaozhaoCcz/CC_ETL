@@ -7,266 +7,285 @@
     :close-on-click-modal="false"
     class="job-node-dialog compact"
     append-to-body
-    data-resize-options='{"minWidth":540,"maxWidth":"60%","minHeight":680,"maxHeight":"90vh","width":540}'
+    data-resize-options='{"minWidth":"40%","maxWidth":"90%","minHeight":"650px","maxHeight":"auto","width":"auto"}'
+    :style="{ display: 'flex', flexDirection: 'column' }"
   >
     <div class="dialog-content">
-      <el-form
-        :model="formData"
-        label-width="120px"
-        :rules="rules"
-        class="job-form"
-        size="default"
-      >
-        <!-- 基本信息区域 -->
-        <div class="form-section">
-          <div class="section-header">
-            <el-icon><Document /></el-icon>
-            <span>基本信息</span>
-          </div>
-          <div class="form-grid">
-            <el-form-item label="执行器" prop="jobGroup" class="form-item">
-              <el-select
-                v-model="formData.jobGroup"
-                filterable
-                placeholder="请选择执行器"
-                class="form-select"
-                :disabled="formData.jobType == 2"
-              >
-                <el-option
-                  v-for="item in taskGroupList"
-                  :key="item.id"
-                  :label="item.title"
-                  :value="item.id"
+      <div class="dialog-content-wrapper">
+        <el-form
+          :model="formData"
+          label-width="120px"
+          :rules="rules"
+          class="job-form"
+          size="default"
+        >
+          <!-- 基本信息区域 -->
+          <div class="form-section">
+            <div class="section-header">
+              <el-icon><Document /></el-icon>
+              <span>基本信息</span>
+            </div>
+            <div class="form-grid">
+              <el-form-item label="执行器" prop="jobGroup" class="form-item">
+                <el-select
+                  v-model="formData.jobGroup"
+                  filterable
+                  placeholder="请选择执行器"
+                  class="form-select"
+                  :disabled="formData.jobType == 2"
+                >
+                  <el-option
+                    v-for="item in taskGroupList"
+                    :key="item.id"
+                    :label="item.title"
+                    :value="item.id"
+                  />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="负责人" prop="author" class="form-item">
+                <el-input
+                  v-model="formData.author"
+                  type="text"
+                  autocomplete="off"
+                  placeholder="请输入负责人姓名"
+                  class="form-input"
                 />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="负责人" prop="author" class="form-item">
-              <el-input
-                v-model="formData.author"
-                type="text"
-                autocomplete="off"
-                placeholder="请输入负责人姓名"
-                class="form-input"
-              />
-            </el-form-item>
-            <el-form-item label="任务描述" prop="jobDesc" class="form-item full-width">
-              <el-input
-                v-model="formData.jobDesc"
-                type="text"
-                autocomplete="off"
-                placeholder="请输入任务描述"
-                class="form-input"
-              />
-            </el-form-item>
-            <el-form-item label="报警邮件" class="form-item full-width">
-              <el-input
-                v-model="formData.alarmEmail"
-                type="text"
-                autocomplete="off"
-                placeholder="请输入报警邮件地址，多个用逗号分隔"
-                class="form-input"
-              />
-            </el-form-item>
-          </div>
-        </div>
-
-        <!-- 执行配置区域 -->
-        <div class="form-section">
-          <div class="section-header">
-            <el-icon><Setting /></el-icon>
-            <span>执行配置</span>
-          </div>
-          <div class="form-grid">
-            <el-form-item label="运行模式" prop="glueType" class="form-item">
-              <el-select
-                v-model="formData.glueType"
-                filterable
-                placeholder="请选择运行模式"
-                class="form-select"
-                @change="handleChangeGlueType"
-                :disabled="formData.jobType == 2"
+              </el-form-item>
+              <el-form-item
+                label="任务描述"
+                prop="jobDesc"
+                class="form-item full-width"
               >
-                <el-option
-                  v-for="item in glueTypeList"
-                  :key="item.type"
-                  :label="item.title"
-                  :value="item.type"
+                <el-input
+                  v-model="formData.jobDesc"
+                  type="text"
+                  autocomplete="off"
+                  placeholder="请输入任务描述"
+                  class="form-input"
                 />
-              </el-select>
-            </el-form-item>
-
-            <el-form-item
-              label="GLUE IDE"
-              v-if="!['BEAN', 'API', 'SQL'].includes(formData.glueType)"
-              class="form-item"
-            >
-              <el-button
-                type="primary"
-                @click="glueClick"
-                class="glue-button"
-                :icon="Edit"
-              >
-                GLUE IDE
-              </el-button>
-            </el-form-item>
-
-            <el-form-item
-              label="JobHandler"
-              prop="executorHandler"
-              v-if="formData.glueType == 'BEAN'"
-              class="form-item full-width"
-            >
-              <el-input
-                v-model="formData.executorHandler"
-                type="text"
-                autocomplete="off"
-                placeholder="请输入JobHandler名称"
-                :disabled="formData.jobType == 2"
-                class="form-input"
-              />
-            </el-form-item>
-
-            <el-form-item
-              label="请求类型"
-              prop="reqType"
-              v-if="formData.glueType == 'API'"
-              class="form-item"
-            >
-              <el-select v-model="formData.reqType" filterable class="form-select">
-                <el-option key="GET" label="GET" value="GET" />
-                <el-option key="POST" label="POST" value="POST" />
-              </el-select>
-            </el-form-item>
-
-            <el-form-item
-              label="数据库"
-              v-if="formData.glueType == 'SQL'"
-              class="form-item"
-            >
-              <el-select
-                v-model="formData.jdbcDatasourceId"
-                filterable
-                class="form-select"
-              >
-                <el-option
-                  v-for="item in jdbcDatasourceList"
-                  :key="item.id"
-                  :label="item.databaseName"
-                  :value="item.id"
+              </el-form-item>
+              <el-form-item label="报警邮件" class="form-item full-width">
+                <el-input
+                  v-model="formData.alarmEmail"
+                  type="text"
+                  autocomplete="off"
+                  placeholder="请输入报警邮件地址，多个用逗号分隔"
+                  class="form-input"
                 />
-              </el-select>
-            </el-form-item>
+              </el-form-item>
+            </div>
+          </div>
 
-            <el-form-item
-              label="请求地址"
-              prop="reqUrl"
-              v-if="formData.glueType === 'API'"
-              class="form-item full-width"
-            >
-              <el-input
-                v-model="formData.reqUrl"
-                type="textarea"
-                autocomplete="off"
-                placeholder="请输入请求地址"
-                :rows="3"
-                class="form-textarea"
-              />
-            </el-form-item>
+          <!-- 执行配置区域 -->
+          <div class="form-section">
+            <div class="section-header">
+              <el-icon><Setting /></el-icon>
+              <span>执行配置</span>
+            </div>
+            <div class="form-grid">
+              <el-form-item label="运行模式" prop="glueType" class="form-item">
+                <el-select
+                  v-model="formData.glueType"
+                  filterable
+                  placeholder="请选择运行模式"
+                  class="form-select"
+                  @change="handleChangeGlueType"
+                  :disabled="formData.jobType == 2"
+                >
+                  <el-option
+                    v-for="item in glueTypeList"
+                    :key="item.type"
+                    :label="item.title"
+                    :value="item.type"
+                  />
+                </el-select>
+              </el-form-item>
 
-            <el-form-item
-              label="请求头"
-              prop="reqHeader"
-              v-if="formData.glueType === 'API'"
-              class="form-item full-width"
-            >
-              <EditTable
-                :list="formData.reqHeader == null ? [] : JSON.parse(formData.reqHeader)"
-                @handleTableData="handleTableData"
-                class="edit-table"
-              />
-            </el-form-item>
+              <el-form-item
+                label="GLUE IDE"
+                v-if="!['BEAN', 'API', 'SQL'].includes(formData.glueType)"
+                class="form-item"
+              >
+                <el-button
+                  type="primary"
+                  @click="glueClick"
+                  class="glue-button"
+                  :icon="Edit"
+                >
+                  GLUE IDE
+                </el-button>
+              </el-form-item>
 
-            <el-form-item
-              label="请求体"
-              v-if="formData.glueType === 'API' && formData.reqType === 'POST'"
-              class="form-item full-width"
-            >
-              <el-input
-                v-model="formData.reqBody"
-                type="textarea"
-                autocomplete="off"
-                placeholder="请输入请求体内容"
-                :rows="4"
-                class="form-textarea"
-              />
-            </el-form-item>
+              <el-form-item
+                label="JobHandler"
+                prop="executorHandler"
+                v-if="formData.glueType == 'BEAN'"
+                class="form-item full-width"
+              >
+                <el-input
+                  v-model="formData.executorHandler"
+                  type="text"
+                  autocomplete="off"
+                  placeholder="请输入JobHandler名称"
+                  :disabled="formData.jobType == 2"
+                  class="form-input"
+                />
+              </el-form-item>
 
-            <el-form-item
-              :label="formData.glueType == 'SQL' ? 'SQL语句' : '任务参数'"
-              v-if="formData.glueType !== 'API'"
-              class="form-item full-width"
-            >
-              <el-input
-                v-model="formData.executorParam"
-                type="textarea"
-                autocomplete="off"
-                :placeholder="
-                  formData.glueType == 'SQL' ? '请输入SQL语句' : '请输入任务参数'
+              <el-form-item
+                label="请求类型"
+                prop="reqType"
+                v-if="formData.glueType == 'API'"
+                class="form-item"
+              >
+                <el-select
+                  v-model="formData.reqType"
+                  filterable
+                  class="form-select"
+                >
+                  <el-option key="GET" label="GET" value="GET" />
+                  <el-option key="POST" label="POST" value="POST" />
+                </el-select>
+              </el-form-item>
+
+              <el-form-item
+                label="数据库"
+                v-if="formData.glueType == 'SQL'"
+                class="form-item"
+              >
+                <el-select
+                  v-model="formData.jdbcDatasourceId"
+                  filterable
+                  class="form-select"
+                >
+                  <el-option
+                    v-for="item in jdbcDatasourceList"
+                    :key="item.id"
+                    :label="item.databaseName"
+                    :value="item.id"
+                  />
+                </el-select>
+              </el-form-item>
+
+              <el-form-item
+                label="请求地址"
+                prop="reqUrl"
+                v-if="formData.glueType === 'API'"
+                class="form-item full-width"
+              >
+                <el-input
+                  v-model="formData.reqUrl"
+                  type="textarea"
+                  autocomplete="off"
+                  placeholder="请输入请求地址"
+                  :rows="3"
+                  class="form-textarea"
+                />
+              </el-form-item>
+
+              <el-form-item
+                label="请求头"
+                prop="reqHeader"
+                v-if="formData.glueType === 'API'"
+                class="form-item full-width"
+              >
+                <EditTable
+                  :list="
+                    formData.reqHeader == null
+                      ? []
+                      : JSON.parse(formData.reqHeader)
+                  "
+                  @handleTableData="handleTableData"
+                  class="edit-table"
+                />
+              </el-form-item>
+
+              <el-form-item
+                label="请求体"
+                v-if="
+                  formData.glueType === 'API' && formData.reqType === 'POST'
                 "
-                :disabled="formData.jobType == 2"
-                :rows="4"
-                class="form-textarea"
-              />
-            </el-form-item>
-          </div>
-        </div>
-
-        <!-- 高级配置区域 -->
-        <div class="form-section">
-          <div class="section-header">
-            <el-icon><Tools /></el-icon>
-            <span>高级配置</span>
-          </div>
-          <div class="form-grid">
-            <el-form-item label="任务超时时间(秒)" class="form-item">
-              <el-input
-                v-model="formData.executorTimeout"
-                type="text"
-                autocomplete="off"
-                placeholder="单位：秒"
-                class="form-input"
-              />
-            </el-form-item>
-            <el-form-item
-              label="任务失败策略"
-              prop="executorBlockStrategy"
-              class="form-item"
-            >
-              <el-select
-                v-model="formData.executorBlockStrategy"
-                filterable
-                placeholder="请选择失败策略"
-                class="form-select"
+                class="form-item full-width"
               >
-                <el-option
-                  v-for="item in blockStrategyList"
-                  :key="item.type"
-                  :label="item.title"
-                  :value="item.type"
+                <el-input
+                  v-model="formData.reqBody"
+                  type="textarea"
+                  autocomplete="off"
+                  placeholder="请输入请求体内容"
+                  :rows="4"
+                  class="form-textarea"
                 />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="任务重试次数" class="form-item">
-              <el-input-number
-                v-model="formData.executorFailRetryCount"
-                :min="0"
-                :max="10"
-                class="form-number"
-              />
-            </el-form-item>
+              </el-form-item>
+
+              <el-form-item
+                :label="formData.glueType == 'SQL' ? 'SQL语句' : '任务参数'"
+                v-if="formData.glueType !== 'API'"
+                class="form-item full-width"
+              >
+                <el-input
+                  v-model="formData.executorParam"
+                  type="textarea"
+                  autocomplete="off"
+                  :placeholder="
+                    formData.glueType == 'SQL'
+                      ? '请输入SQL语句'
+                      : '请输入任务参数'
+                  "
+                  :disabled="formData.jobType == 2"
+                  :rows="4"
+                  class="form-textarea"
+                />
+              </el-form-item>
+            </div>
           </div>
-        </div>
-      </el-form>
+
+          <!-- 高级配置区域 -->
+          <div class="form-section">
+            <div class="section-header">
+              <el-icon><Tools /></el-icon>
+              <span>高级配置</span>
+            </div>
+            <div class="form-grid">
+              <el-form-item label="任务超时时间(秒)" class="form-item">
+                <el-input
+                  v-model="formData.executorTimeout"
+                  type="text"
+                  autocomplete="off"
+                  placeholder="单位：秒"
+                  class="form-input"
+                />
+              </el-form-item>
+              <el-form-item
+                label="任务失败策略"
+                prop="executorBlockStrategy"
+                class="form-item"
+              >
+                <el-select
+                  v-model="formData.executorBlockStrategy"
+                  filterable
+                  placeholder="请选择失败策略"
+                  class="form-select"
+                >
+                  <el-option
+                    v-for="item in blockStrategyList"
+                    :key="item.type"
+                    :label="item.title"
+                    :value="item.type"
+                  />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="任务重试次数" class="form-item">
+                <el-input-number
+                  v-model="formData.executorFailRetryCount"
+                  :min="0"
+                  :max="10"
+                  class="form-number"
+                />
+              </el-form-item>
+            </div>
+          </div>
+        </el-form>
+      </div>
     </div>
     <template #footer>
       <div class="dialog-footer">
@@ -294,9 +313,20 @@ import JobInfoAPI from "@/api/job-info";
 import { getThemeCode } from "@/utils/theme";
 import CodeEditor from "@/components/CodeEdit/index.vue";
 import JobJdbcDatasourceAPI from "@/api/job-jdbc-datasource";
-import { ref, reactive, watch, onMounted, onBeforeUnmount } from "vue";
+import {
+  ref,
+  reactive,
+  watch,
+  onMounted,
+  onBeforeUnmount,
+  nextTick,
+} from "vue";
 import { ElMessage } from "element-plus";
-import { useJobInfoStore, useJobInfoStoreHook, usePageStoreHook } from "@/store";
+import {
+  useJobInfoStore,
+  useJobInfoStoreHook,
+  usePageStoreHook,
+} from "@/store";
 import { Document, Setting, Tools, Edit } from "@element-plus/icons-vue";
 
 // 定义类型接口
@@ -350,10 +380,14 @@ const rules = reactive({
   author: [{ required: true, message: "请输入负责人", trigger: "blur" }],
   jobDesc: [{ required: true, message: "请输入任务描述", trigger: "blur" }],
   glueType: [{ required: true, message: "请选择运行模式", trigger: "change" }],
-  executorHandler: [{ required: true, message: "请输入JobHandler", trigger: "blur" }],
+  executorHandler: [
+    { required: true, message: "请输入JobHandler", trigger: "blur" },
+  ],
   reqType: [{ required: true, message: "请选择请求类型", trigger: "change" }],
   reqUrl: [{ required: true, message: "请输入请求地址", trigger: "blur" }],
-  misfireStrategy: [{ required: true, message: "请选择调度过期策略", trigger: "change" }],
+  misfireStrategy: [
+    { required: true, message: "请选择调度过期策略", trigger: "change" },
+  ],
   executorBlockStrategy: [
     { required: true, message: "请选择任务失败策略", trigger: "change" },
   ],
@@ -376,6 +410,38 @@ const blockStrategyList: BlockStrategy[] = [
   { type: "DO_NOTHING", title: "忽略" },
 ];
 
+// 强制应用弹窗样式
+const forceApplyDialogStyles = () => {
+  nextTick(() => {
+    const dialog = document.querySelector(".job-node-dialog .el-dialog");
+    const dialogBody = document.querySelector(
+      ".job-node-dialog .el-dialog__body"
+    );
+    const dialogContent = document.querySelector(
+      ".job-node-dialog .dialog-content"
+    );
+
+    if (dialog) {
+      dialog.style.display = "flex";
+      dialog.style.flexDirection = "column";
+    }
+
+    if (dialogBody) {
+      dialogBody.style.display = "flex";
+      dialogBody.style.flexDirection = "column";
+      dialogBody.style.justifyContent = "center";
+      dialogBody.style.flex = "1";
+    }
+
+    if (dialogContent) {
+      dialogContent.style.display = "flex";
+      dialogContent.style.flexDirection = "column";
+      dialogContent.style.justifyContent = "center";
+      dialogContent.style.flex = "1";
+    }
+  });
+};
+
 watch(
   () => props.jobNodeVisible,
   (val) => {
@@ -383,6 +449,10 @@ watch(
     // 当对话框打开时，如果是新增模式（没有nodeJobId），重置表单数据
     if (val && !props.nodeJobId) {
       formData.value = {};
+    }
+    // 当弹窗显示时强制应用样式
+    if (val) {
+      forceApplyDialogStyles();
     }
   }
 );
@@ -463,7 +533,13 @@ async function fetchJdbcDatasource() {
 }
 
 function cancelClick() {
-  emit("close", props.nodeJobId, formData.value.jobDesc, formData.value.glueType, 0);
+  emit(
+    "close",
+    props.nodeJobId,
+    formData.value.jobDesc,
+    formData.value.glueType,
+    0
+  );
 }
 
 function confirmClick() {
@@ -558,6 +634,8 @@ async function getTaskInfo() {
 onMounted(() => {
   fetchTaskGroupList();
   fetchJdbcDatasource();
+  // 组件挂载后强制应用样式
+  forceApplyDialogStyles();
 });
 
 // 移除原有缩放相关逻辑
@@ -566,11 +644,36 @@ onMounted(() => {
 <style scoped lang="scss">
 .job-node-dialog.compact {
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+
+  * {
+    box-sizing: border-box;
+  }
+
+  :deep(.el-dialog) {
+    min-width: 540px !important;
+    min-height: 600px !important;
+    width: auto !important;
+    height: auto !important;
+    max-width: 90vw !important;
+    max-height: 90vh !important;
+    margin: 5vh auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  // 更强的选择器确保样式应用
+  &.job-node-dialog :deep(.el-dialog) {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
   :deep(.el-dialog__header) {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     border-radius: 8px 8px 0 0;
     padding: 10px 16px;
+    box-sizing: border-box;
+    flex-shrink: 0 !important;
     .el-dialog__title {
       font-size: 14px;
       font-weight: 600;
@@ -585,37 +688,92 @@ onMounted(() => {
     }
   }
   :deep(.el-dialog__body) {
-    padding: 0;
+    padding: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    min-height: 0 !important;
   }
+
+  // 更强的选择器确保body样式应用
+  &.job-node-dialog :deep(.el-dialog__body) {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    flex: 1 !important;
+  }
+
   :deep(.el-dialog__footer) {
     border-top: 1px solid #f4f4f4;
     padding: 8px 16px;
+    box-sizing: border-box;
+    flex-shrink: 0 !important;
+  }
+
+  // 更强的选择器确保footer样式应用
+  &.job-node-dialog :deep(.el-dialog__footer) {
+    flex-shrink: 0 !important;
   }
 }
 .dialog-content {
-  padding: 10px 14px;
-  max-height: 56vh;
-  overflow-y: auto;
+  padding: 10px 14px !important;
+  height: auto !important;
+  overflow: visible;
+  box-sizing: border-box;
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  min-height: fit-content !important;
+}
+
+// 更强的选择器确保dialog-content样式应用
+.job-node-dialog .dialog-content {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  flex: 1 !important;
+}
+
+// 表单内容区域包装器
+.dialog-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
 }
 .job-form {
   text-align: left;
+  box-sizing: border-box;
+
+  * {
+    box-sizing: border-box;
+  }
+
   .el-form-item {
     justify-content: flex-start;
     align-items: flex-start;
+    box-sizing: border-box;
     .el-form-item__label {
       text-align: left;
       justify-content: flex-start;
       align-items: flex-start;
       padding-left: 0;
+      box-sizing: border-box;
     }
     .el-form-item__content {
       text-align: left;
       justify-content: flex-start;
       align-items: flex-start;
+      box-sizing: border-box;
     }
   }
   .form-section {
     margin-bottom: 12px;
+    box-sizing: border-box;
   }
   .section-header {
     display: flex;
@@ -638,8 +796,11 @@ onMounted(() => {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px 10px;
+    box-sizing: border-box;
+
     .form-item {
       margin-bottom: 6px;
+      box-sizing: border-box;
       &.full-width {
         grid-column: 1 / -1;
       }
@@ -768,8 +929,10 @@ onMounted(() => {
 }
 @media (max-width: 768px) {
   .job-node-dialog.compact :deep(.el-dialog) {
-    width: 99% !important;
-    margin: 2vh auto;
+    width: 95vw !important;
+    height: auto !important;
+    max-height: 95vh !important;
+    margin: 2.5vh auto;
   }
   .dialog-content {
     padding: 6px 2px;
@@ -798,4 +961,35 @@ onMounted(() => {
   border-radius: 2px;
 }
 // 移除 .resizable-dialog 和 .resize-handle 相关样式
+</style>
+
+<style lang="scss">
+/* 全局样式 - 不使用scoped确保样式能够应用到Element Plus组件 */
+.job-node-dialog .el-dialog {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.job-node-dialog .el-dialog__body {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  flex: 1 !important;
+  padding: 0 !important;
+}
+
+.job-node-dialog .el-dialog__header {
+  flex-shrink: 0 !important;
+}
+
+.job-node-dialog .el-dialog__footer {
+  flex-shrink: 0 !important;
+}
+
+.job-node-dialog .dialog-content {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  flex: 1 !important;
+}
 </style>

@@ -1,6 +1,14 @@
-html, body {
-  margin: 0 ;
-  padding: 0 ;
+/* 全局 box-sizing 设置 */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
   height: 100%;
   overflow: hidden;
   background-color: #f1f3f4;
@@ -31,11 +39,11 @@ a:hover {
   color: #535bf2;
 }
 
-ul{
+ul {
   margin: 0;
   padding: 0;
 }
-li{
+li {
   list-style: none;
   margin: 0;
 }
@@ -93,8 +101,8 @@ button:focus-visible {
   a:hover {
     color: #747bff;
   }
-  a{
-    color: #333333
+  a {
+    color: #333333;
   }
   button {
     background-color: #f9f9f9;
@@ -115,26 +123,44 @@ button:focus-visible {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
   background-color: #f8fafc;
   color: #1f2937;
 }
 
 /* 节点图标动画效果 */
 @keyframes blink {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0; }
+  0%,
+  50% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0;
+  }
 }
 
 @keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 @keyframes rotate {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* 节点图标悬停效果 */
@@ -144,7 +170,7 @@ body {
 
 .node-icon:hover {
   transform: scale(1.1);
-  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
 }
 
 /* 节点状态指示器 */
@@ -218,7 +244,7 @@ body {
   .node-icon {
     transform: scale(0.9);
   }
-  
+
   .node-icon:hover {
     transform: scale(1);
   }
@@ -232,26 +258,61 @@ body {
 }
 .resize-handle-top,
 .resize-handle-bottom {
-  left: 16px; right: 16px; height: 8px; width: auto;
+  left: 16px;
+  right: 16px;
+  height: 8px;
+  width: auto;
 }
-.resize-handle-top { top: -4px; cursor: ns-resize; }
-.resize-handle-bottom { bottom: -4px; cursor: ns-resize; }
+.resize-handle-top {
+  top: -4px;
+  cursor: ns-resize;
+}
+.resize-handle-bottom {
+  bottom: -4px;
+  cursor: ns-resize;
+}
 .resize-handle-left,
 .resize-handle-right {
-  top: 16px; bottom: 16px; width: 8px; height: auto;
+  top: 16px;
+  bottom: 16px;
+  width: 8px;
+  height: auto;
 }
-.resize-handle-left { left: -4px; cursor: ew-resize; }
-.resize-handle-right { right: -4px; cursor: ew-resize; }
+.resize-handle-left {
+  left: -4px;
+  cursor: ew-resize;
+}
+.resize-handle-right {
+  right: -4px;
+  cursor: ew-resize;
+}
 .resize-handle-top-left,
 .resize-handle-top-right,
 .resize-handle-bottom-left,
 .resize-handle-bottom-right {
-  width: 16px; height: 16px;
+  width: 16px;
+  height: 16px;
 }
-.resize-handle-top-left { top: -8px; left: -8px; cursor: nwse-resize; }
-.resize-handle-top-right { top: -8px; right: -8px; cursor: nesw-resize; }
-.resize-handle-bottom-left { bottom: -8px; left: -8px; cursor: nesw-resize; }
-.resize-handle-bottom-right { bottom: -8px; right: -8px; cursor: nwse-resize; }
+.resize-handle-top-left {
+  top: -8px;
+  left: -8px;
+  cursor: nwse-resize;
+}
+.resize-handle-top-right {
+  top: -8px;
+  right: -8px;
+  cursor: nesw-resize;
+}
+.resize-handle-bottom-left {
+  bottom: -8px;
+  left: -8px;
+  cursor: nesw-resize;
+}
+.resize-handle-bottom-right {
+  bottom: -8px;
+  right: -8px;
+  cursor: nwse-resize;
+}
 
 .el-dialog {
   box-sizing: border-box;

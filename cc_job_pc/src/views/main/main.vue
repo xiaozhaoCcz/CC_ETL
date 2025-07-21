@@ -11,8 +11,19 @@ import {
 import "@logicflow/core/lib/style/index.css";
 import "@logicflow/extension/lib/style/index.css";
 import { Close, FolderOpened, Document } from "@element-plus/icons-vue";
-import { nextTick, onMounted, reactive, ref, watch, onBeforeUnmount } from "vue";
-import { useJobInfoStoreHook, useNavbarStoreHook, usePageStoreHook } from "@/store";
+import {
+  nextTick,
+  onMounted,
+  reactive,
+  ref,
+  watch,
+  onBeforeUnmount,
+} from "vue";
+import {
+  useJobInfoStoreHook,
+  useNavbarStoreHook,
+  usePageStoreHook,
+} from "@/store";
 import { ElMessage } from "element-plus";
 import { debounce, throttle, PerformanceMonitor } from "@/utils/performance";
 
@@ -350,7 +361,8 @@ watch(
     if (!actionObj?.actionName) return;
 
     const actionName = actionObj.actionName;
-    const currentPageId = actionObj.pageId || usePageStoreHook().getCurrentPage();
+    const currentPageId =
+      actionObj.pageId || usePageStoreHook().getCurrentPage();
     const currentLf = lfInstances.value[currentPageId] || lf.value;
 
     switch (actionName) {
@@ -442,7 +454,12 @@ watch(
           highlightedType = "node";
           document.addEventListener(
             "mousedown",
-            () => clearHighlightUtil(highlightedElement, highlightedType, originalStyle),
+            () =>
+              clearHighlightUtil(
+                highlightedElement,
+                highlightedType,
+                originalStyle
+              ),
             true
           );
         } else {
@@ -463,7 +480,12 @@ watch(
           highlightedType = "edge";
           document.addEventListener(
             "mousedown",
-            () => clearHighlightUtil(highlightedElement, highlightedType, originalStyle),
+            () =>
+              clearHighlightUtil(
+                highlightedElement,
+                highlightedType,
+                originalStyle
+              ),
             true
           );
         } else {
@@ -526,7 +548,12 @@ watch(
       const nodes = lfInstance.getGraphRawData().nodes;
       const _node = nodes.find((n: any) => n.properties.jobId == node.jobId);
       if (_node) {
-        updateNodeTypeByGlueType(node.jobId, node.jobDesc, node.glueType, lfInstance);
+        updateNodeTypeByGlueType(
+          node.jobId,
+          node.jobDesc,
+          node.glueType,
+          lfInstance
+        );
       }
     });
     setTimeout(() => {
@@ -606,7 +633,8 @@ async function selectPage(id: number): Promise<void> {
       const pageIdNum = parseInt(pageId);
       if (lfRefs.value[pageIdNum]) {
         // 显式设置样式
-        lfRefs.value[pageIdNum].style.display = pageIdNum === id ? "block" : "none";
+        lfRefs.value[pageIdNum].style.display =
+          pageIdNum === id ? "block" : "none";
       }
     });
 
@@ -892,7 +920,10 @@ function getExecuteTaskLog(id: number, targetJobId?: number): void {
       // 获取对应的日志管理器
       if (currentJobId) {
         const logManager = getLogManager(currentJobId);
-        logManager.addLogsFromText(convertContent(data.content.logContent), currentJobId);
+        logManager.addLogsFromText(
+          convertContent(data.content.logContent),
+          currentJobId
+        );
       }
 
       // 获取对应标签页的日志组件
@@ -985,7 +1016,9 @@ function logRunStop(content: string, targetJobId?: number): void {
   if (loggerRef) {
     loggerRef.addLogsFromText(convertContent(content));
   } else {
-    console.error(`日志结束但未找到任务组 ${currentJobId} 的日志组件，无法添加结束日志`);
+    console.error(
+      `日志结束但未找到任务组 ${currentJobId} 的日志组件，无法添加结束日志`
+    );
   }
 }
 //===========================log===============================
@@ -1137,7 +1170,7 @@ function bindEvents(lfInstance: any): void {
       return;
     }
 
-    if(getCurrentPageRunStatus())return;
+    if (getCurrentPageRunStatus()) return;
 
     // 获取原节点的数据
     const originalNodeData = node.getData();
@@ -1218,7 +1251,7 @@ function bindEvents(lfInstance: any): void {
       return;
     }
 
-    if(getCurrentPageRunStatus())return;
+    if (getCurrentPageRunStatus()) return;
 
     jobNodeVisible.value = true;
     nodeJobId.value = node.properties.jobId;
@@ -1228,7 +1261,7 @@ function bindEvents(lfInstance: any): void {
   });
 
   lfInstance.on("custom:node-task-edit", ({ nodeId }: any) => {
-    if(getCurrentPageRunStatus())return;
+    if (getCurrentPageRunStatus()) return;
 
     jobDialog.value = true;
     jobNodeEditId.value = nodeId;
@@ -1256,7 +1289,7 @@ function bindEvents(lfInstance: any): void {
   });
 
   lfInstance.on("custom:node-delete", ({ nodeId }: any) => {
-    if(getCurrentPageRunStatus())return;
+    if (getCurrentPageRunStatus()) return;
     lfInstance.deleteNode(nodeId);
   });
 }
@@ -1283,7 +1316,7 @@ const menuConfig = {
     {
       text: "删除",
       callback(node: { id: string }) {
-        if(getCurrentPageRunStatus())return;
+        if (getCurrentPageRunStatus()) return;
         lf.value.deleteNode(node.id);
       },
     },
@@ -1295,7 +1328,7 @@ const menuConfig = {
           return;
         }
 
-        if(getCurrentPageRunStatus())return;
+        if (getCurrentPageRunStatus()) return;
 
         jobDialog.value = true;
         jobNodeEditId.value = node.id;
@@ -1304,7 +1337,10 @@ const menuConfig = {
     {
       text: "编辑节点",
       callback(node: any) {
-        if (node.properties.jobId === null || node.properties.jobId === undefined) {
+        if (
+          node.properties.jobId === null ||
+          node.properties.jobId === undefined
+        ) {
           ElMessage.warning("请选择任务或任务组");
           return;
         }
@@ -1313,7 +1349,7 @@ const menuConfig = {
           return;
         }
 
-        if(getCurrentPageRunStatus())return;
+        if (getCurrentPageRunStatus()) return;
 
         jobNodeVisible.value = true;
         nodeJobId.value = node.properties.jobId;
@@ -1330,7 +1366,7 @@ const menuConfig = {
           return;
         }
 
-        if(getCurrentPageRunStatus())return;
+        if (getCurrentPageRunStatus()) return;
 
         // 获取当前LogicFlow实例
         const currentPageId = usePageStoreHook().getCurrentPage();
@@ -1433,7 +1469,7 @@ const menuConfig = {
     {
       text: "删除",
       callback(edge: { id: string }) {
-        if(getCurrentPageRunStatus())return;
+        if (getCurrentPageRunStatus()) return;
         lf.value.graphModel.deleteEdgeById(edge.id);
       },
     },
@@ -1468,7 +1504,9 @@ function cancelDialog() {
 async function confirmDialog() {
   const _node = lf.value.getNodeModelById(jobNodeEditId.value);
 
-  const _jobInfo = jobInfoList.value.find((e: any) => e.id === jobSelectId.value) as any;
+  const _jobInfo = jobInfoList.value.find(
+    (e: any) => e.id === jobSelectId.value
+  ) as any;
 
   const graphModel = lf.value.graphModel;
   if (_jobInfo.jobType === 2) {
@@ -1539,7 +1577,9 @@ function updateNodeTypeByGlueType(
 
   const nodeType =
     GLUE_NODE_TYPE_MAP[glueType] ||
-    (targetNode.nodeType === DYNAMIC_CUSTOM_GROUP ? DYNAMIC_CUSTOM_GROUP : "rect");
+    (targetNode.nodeType === DYNAMIC_CUSTOM_GROUP
+      ? DYNAMIC_CUSTOM_GROUP
+      : "rect");
   const graphModel = currentLf.graphModel;
 
   // 创建新的节点对象，并指定新的 type
@@ -1556,7 +1596,8 @@ function updateNodeTypeByGlueType(
 
   // 保留原来的连线
   const relatedEdges = edges.filter(
-    (e: any) => e.sourceNodeId === targetNode.id || e.targetNodeId === targetNode.id
+    (e: any) =>
+      e.sourceNodeId === targetNode.id || e.targetNodeId === targetNode.id
   );
 
   // 删除原节点
@@ -1660,14 +1701,13 @@ async function addJobNode(jobInfo: any) {
 }
 
 // ================== 12. 任务执行和操作处理 ==================
-function getCurrentPageRunStatus(){
-  const isRun =  usePageStoreHook().getCurrentPageRunStatus();
-  if(isRun){
-    ElMessage.warning("当前任务组正在运行中，请暂停后再操作")
+function getCurrentPageRunStatus() {
+  const isRun = usePageStoreHook().getCurrentPageRunStatus();
+  if (isRun) {
+    ElMessage.warning("当前任务组正在运行中，请暂停后再操作");
   }
   return isRun;
 }
-
 
 /**
  * 任务执行一次
@@ -1843,7 +1883,7 @@ function stopTrigger(): void {
       }
 
       // 关闭对应任务组的WebSocket连接
-      disconnectWs(currentJobId,state.randomId || randomId.value,);
+      disconnectWs(currentJobId, state.randomId || randomId.value);
 
       // 更新对应的日志标签页状态
       const tabId = `${currentJobId}`;
@@ -2112,7 +2152,19 @@ const throttledMouseMove = throttle((e: MouseEvent) => {
       @close="closeEditJobNode"
     />
 
-    <el-dialog v-model="jobDialog" style="width: 400px" title="选择任务" append-to-body>
+    <el-dialog
+      v-model="jobDialog"
+      style="
+        width: auto;
+        height: auto;
+        min-width: 400px;
+        max-width: 90vw;
+        max-height: 90vh;
+      "
+      title="选择任务"
+      append-to-body
+      class="job-select-dialog"
+    >
       <el-radio-group v-model="jobRadio" @change="changeJobRadio">
         <el-radio :value="0" size="large">单任务</el-radio>
         <el-radio :value="1" size="large">任务组</el-radio>
@@ -2210,6 +2262,10 @@ const throttledMouseMove = throttle((e: MouseEvent) => {
 
 <style scoped>
 /* 全局变量 */
+* {
+  box-sizing: border-box;
+}
+
 .main-container {
   --primary-color: #2563eb;
   --primary-hover: #1d4ed8;
@@ -2227,7 +2283,8 @@ const throttledMouseMove = throttle((e: MouseEvent) => {
   --text-muted: #94a3b8;
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-lg:
+    0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
@@ -2238,7 +2295,8 @@ const throttledMouseMove = throttle((e: MouseEvent) => {
   display: flex;
   flex-direction: column;
   background: var(--background-light);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
     Arial, sans-serif;
   overflow-x: hidden !important;
 }
@@ -2745,6 +2803,36 @@ const throttledMouseMove = throttle((e: MouseEvent) => {
 }
 
 /* Element Plus 组件样式优化 */
+/* 任务选择弹框样式 */
+.job-select-dialog {
+  :deep(.el-dialog) {
+    min-width: 150px;
+    width: auto !important;
+    height: auto !important;
+    max-width: 90vw;
+    max-height: 90vh;
+    margin: 5vh auto;
+  }
+
+  :deep(.el-dialog__body) {
+    padding: 1.5rem !important;
+    height: auto !important;
+    overflow: visible !important;
+    box-sizing: border-box;
+  }
+
+  :deep(.el-radio-group) {
+    margin-bottom: 1rem;
+    display: flex;
+    gap: 1rem;
+  }
+
+  :deep(.el-select) {
+    width: 100% !important;
+    max-width: 400px;
+  }
+}
+
 :deep(.el-dialog) {
   border-radius: var(--radius-lg) !important;
   box-shadow: var(--shadow-lg) !important;

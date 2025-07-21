@@ -2,14 +2,17 @@
   <el-dialog
     v-model="_glueVisible"
     title="GLUE IDE"
-    width="520px"
+    width="auto"
     :before-close="handleCloseDialog"
     draggable
     append-to-body
-    data-resize-options='{"minWidth":520,"maxWidth":520,"minHeight":600, "maxHeight":600,"width":520}'
+    data-resize-options='{"minWidth":"60%","maxWidth":"90%","minHeight":"auto","maxHeight":"auto","width":"auto"}'
   >
     <div class="editor-container">
-      <MonacoEditor style="text-align: left; height: 400px" v-model:value="_code" />
+      <MonacoEditor
+        style="text-align: left; height: 100%; width: 100%"
+        v-model:value="_code"
+      />
     </div>
     <template #footer>
       <div class="footer">
@@ -40,7 +43,9 @@
           </el-select>
         </div>
         <div class="footer-item">
-          <el-button type="primary" size="small" @click="submitForm">保存</el-button>
+          <el-button type="primary" size="small" @click="submitForm"
+            >保存</el-button
+          >
           <el-button size="small" @click="handleCloseDialog">取消</el-button>
         </div>
       </div>
@@ -169,14 +174,35 @@ function submitForm() {
 </script>
 
 <style lang="scss" scoped>
+* {
+  box-sizing: border-box;
+}
+
+:deep(.el-dialog) {
+  min-width: 320px;
+  width: auto !important;
+  height: auto !important;
+  max-width: 90vw;
+  max-height: 90vh;
+  margin: 5vh auto;
+}
+
+:deep(.el-dialog__body) {
+  height: auto;
+  overflow: visible;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
 .editor-container {
   margin-bottom: 10px;
   border-radius: 6px;
   overflow: hidden;
   border: 1px solid #e5e6eb;
   background: #232323;
-  min-height: 120px;
-  max-height: 400px;
+  min-height: 300px;
+  height: 50vh;
+  box-sizing: border-box;
 }
 .footer {
   display: flex;
@@ -184,11 +210,13 @@ function submitForm() {
   align-items: center;
   gap: 16px;
   padding: 8px 0 0 0;
+  box-sizing: border-box;
 }
 .footer-item {
   display: flex;
   align-items: center;
   gap: 4px;
+  box-sizing: border-box;
 }
 .m_title {
   font-size: 14px;
