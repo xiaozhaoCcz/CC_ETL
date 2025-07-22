@@ -2,6 +2,7 @@ package com.cc.job.xo.model.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableLogic;
 import lombok.Getter;
 import lombok.Setter;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -80,4 +81,7 @@ public class JobLog {
      * 告警状态：0-默认、1-无需告警、2-告警成功、3-告警失败
      */
     private Integer alarmStatus;
+
+    @TableLogic
+    private Integer isDeleted;
 }

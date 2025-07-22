@@ -1,6 +1,6 @@
 <template>
   <div class="job-group-container">
-    <el-dialog 
+    <el-dialog
       v-model="jobGroupVisible.visible"
       :title="jobGroupVisible.title"
       :before-close="handleCloseDialog"
@@ -9,242 +9,248 @@
       :close-on-click-modal="false"
       :close-on-press-escape="false"
       append-to-body
-      data-resize-options='{"minWidth":720,"maxWidth":"60%","minHeight":800,"maxHeight":"100vh","width":720}'
+      data-resize-options='{"minWidth":"60%","maxWidth":"90%","minHeight":"750px","maxHeight":"auto","width":"auto"}'
+      :style="{ display: 'flex', flexDirection: 'column' }"
     >
       <div class="form-container">
-        <!-- 基础配置 -->
-        <div class="form-section">
-          <div class="section-header">
-            <div class="section-icon">
-              <el-icon><Setting /></el-icon>
+        <div class="form-sections-wrapper">
+          <!-- 基础配置 -->
+          <div class="form-section">
+            <div class="section-header">
+              <div class="section-icon">
+                <el-icon><Setting /></el-icon>
+              </div>
+              <div class="section-title">基础配置</div>
             </div>
-            <div class="section-title">基础配置</div>
-          </div>
-          <div class="section-content">
-            <div class="form-row">
-              <div class="form-item">
-                <label class="form-label required">执行器</label>
-                <el-select
-                  v-model="formData.jobGroup"
-                  filterable
-                  placeholder="请选择执行器"
-                  class="form-control"
-                >
-                  <el-option
-                    v-for="item in jobGroupList"
-                    :key="item.id"
-                    :label="item.title"
-                    :value="item.id"
-                  />
-                </el-select>
-              </div>
-              <div class="form-item">
-                <label class="form-label required">负责人</label>
-                <el-input
-                  v-model="formData.author"
-                  type="text"
-                  autocomplete="off"
-                  placeholder="请输入负责人"
-                  class="form-control"
-                />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-item">
-                <label class="form-label required">任务描述</label>
-                <el-input
-                  v-model="formData.jobDesc"
-                  type="text"
-                  autocomplete="off"
-                  placeholder="请输入任务描述"
-                  class="form-control"
-                />
-              </div>
-              <div class="form-item">
-                <label class="form-label">报警邮件</label>
-                <el-input
-                  v-model="formData.alarmEmail"
-                  type="text"
-                  autocomplete="off"
-                  placeholder="请输入报警邮件地址"
-                  class="form-control"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 调度配置 -->
-        <div class="form-section">
-          <div class="section-header">
-            <div class="section-icon">
-              <el-icon><Clock /></el-icon>
-            </div>
-            <div class="section-title">调度配置</div>
-          </div>
-          <div class="section-content">
-            <div class="form-row">
-              <div class="form-item">
-                <label class="form-label required">调度类型</label>
-                <el-select
-                  v-model="formData.scheduleType"
-                  filterable
-                  placeholder="请选择调度类型"
-                  class="form-control"
-                >
-                  <el-option
-                    v-for="item in scheduleTypeList"
-                    :key="item.type"
-                    :label="item.title"
-                    :value="item.type"
-                  />
-                </el-select>
-              </div>
-              <div class="form-item" v-if="formData.scheduleType === 'CRON'">
-                <label class="form-label required">CRON表达式</label>
-                <div class="cron-input-wrapper">
-                  <el-input
-                    v-model="formData.scheduleConf"
-                    placeholder="请输入cron表达式..."
+            <div class="section-content">
+              <div class="form-row">
+                <div class="form-item">
+                  <label class="form-label required">执行器</label>
+                  <el-select
+                    v-model="formData.jobGroup"
+                    filterable
+                    placeholder="请选择执行器"
                     class="form-control"
-                    readonly
                   >
-                    <template #append>
-                      <el-button
-                        @click="handleCronButtonClick"
-                        type="primary"
-                        size="small"
-                      >
-                        <el-icon><Edit /></el-icon>
-                        设置
-                      </el-button>
-                    </template>
-                  </el-input>
-                  <div v-show="cronPopover" class="cron-popover">
-                    <div class="cron-popover-header">
-                      <span>CRON表达式设置</span>
-                      <el-button
-                        type="text"
-                        @click="cronPopover = false"
-                        class="close-btn"
-                      >
-                        <el-icon><Close /></el-icon>
-                      </el-button>
-                    </div>
-                    <div class="cron-popover-content">
-                      <noVue3Cron
-                        :cron-value="formData.scheduleConf"
-                        i18n="cn"
-                        @change="changeCron"
-                        @close="cronPopover = false"
-                      />
+                    <el-option
+                      v-for="item in jobGroupList"
+                      :key="item.id"
+                      :label="item.title"
+                      :value="item.id"
+                    />
+                  </el-select>
+                </div>
+                <div class="form-item">
+                  <label class="form-label required">负责人</label>
+                  <el-input
+                    v-model="formData.author"
+                    type="text"
+                    autocomplete="off"
+                    placeholder="请输入负责人"
+                    class="form-control"
+                  />
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-item">
+                  <label class="form-label required">任务描述</label>
+                  <el-input
+                    v-model="formData.jobDesc"
+                    type="text"
+                    autocomplete="off"
+                    placeholder="请输入任务描述"
+                    class="form-control"
+                  />
+                </div>
+                <div class="form-item">
+                  <label class="form-label">报警邮件</label>
+                  <el-input
+                    v-model="formData.alarmEmail"
+                    type="text"
+                    autocomplete="off"
+                    placeholder="请输入报警邮件地址"
+                    class="form-control"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 调度配置 -->
+          <div class="form-section">
+            <div class="section-header">
+              <div class="section-icon">
+                <el-icon><Clock /></el-icon>
+              </div>
+              <div class="section-title">调度配置</div>
+            </div>
+            <div class="section-content">
+              <div class="form-row">
+                <div class="form-item">
+                  <label class="form-label required">调度类型</label>
+                  <el-select
+                    v-model="formData.scheduleType"
+                    filterable
+                    placeholder="请选择调度类型"
+                    class="form-control"
+                  >
+                    <el-option
+                      v-for="item in scheduleTypeList"
+                      :key="item.type"
+                      :label="item.title"
+                      :value="item.type"
+                    />
+                  </el-select>
+                </div>
+                <div class="form-item" v-if="formData.scheduleType === 'CRON'">
+                  <label class="form-label required">CRON表达式</label>
+                  <div class="cron-input-wrapper">
+                    <el-input
+                      v-model="formData.scheduleConf"
+                      placeholder="请输入cron表达式..."
+                      class="form-control"
+                      readonly
+                    >
+                      <template #append>
+                        <el-button
+                          @click="handleCronButtonClick"
+                          type="primary"
+                          size="small"
+                        >
+                          <el-icon><Edit /></el-icon>
+                          设置
+                        </el-button>
+                      </template>
+                    </el-input>
+                    <div v-show="cronPopover" class="cron-popover">
+                      <div class="cron-popover-header">
+                        <span>CRON表达式设置</span>
+                        <el-button
+                          type="text"
+                          @click="cronPopover = false"
+                          class="close-btn"
+                        >
+                          <el-icon><Close /></el-icon>
+                        </el-button>
+                      </div>
+                      <div class="cron-popover-content">
+                        <noVue3Cron
+                          :cron-value="formData.scheduleConf"
+                          i18n="cn"
+                          @change="changeCron"
+                          @close="cronPopover = false"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-              <div class="form-item" v-if="formData.scheduleType === 'FIX_RATE'">
-                <label class="form-label required">固定速度</label>
-                <el-input
-                  v-model="formData.scheduleConf"
-                  placeholder="请输入间隔时间（秒）"
-                  class="form-control"
-                />
+                <div
+                  class="form-item"
+                  v-if="formData.scheduleType === 'FIX_RATE'"
+                >
+                  <label class="form-label required">固定速度</label>
+                  <el-input
+                    v-model="formData.scheduleConf"
+                    placeholder="请输入间隔时间（秒）"
+                    class="form-control"
+                  />
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- 高级配置 -->
-        <div class="form-section">
-          <div class="section-header">
-            <div class="section-icon">
-              <el-icon><Tools /></el-icon>
+          <!-- 高级配置 -->
+          <div class="form-section">
+            <div class="section-header">
+              <div class="section-icon">
+                <el-icon><Tools /></el-icon>
+              </div>
+              <div class="section-title">高级配置</div>
             </div>
-            <div class="section-title">高级配置</div>
-          </div>
-          <div class="section-content">
-            <div class="form-row">
-              <div class="form-item">
-                <label class="form-label required">路由策略</label>
-                <el-select
-                  v-model="formData.executorRouteStrategy"
-                  filterable
-                  placeholder="请选择路由策略"
-                  class="form-control"
-                >
-                  <el-option
-                    v-for="item in routeStrategyList"
-                    :key="item.type"
-                    :label="item.title"
-                    :value="item.type"
+            <div class="section-content">
+              <div class="form-row">
+                <div class="form-item">
+                  <label class="form-label required">路由策略</label>
+                  <el-select
+                    v-model="formData.executorRouteStrategy"
+                    filterable
+                    placeholder="请选择路由策略"
+                    class="form-control"
+                  >
+                    <el-option
+                      v-for="item in routeStrategyList"
+                      :key="item.type"
+                      :label="item.title"
+                      :value="item.type"
+                    />
+                  </el-select>
+                </div>
+                <div class="form-item">
+                  <label class="form-label">子任务ID</label>
+                  <el-input
+                    v-model="formData.childJobid"
+                    type="text"
+                    autocomplete="off"
+                    placeholder="请输入子任务ID"
+                    class="form-control"
                   />
-                </el-select>
+                </div>
               </div>
-              <div class="form-item">
-                <label class="form-label">子任务ID</label>
-                <el-input
-                  v-model="formData.childJobid"
-                  type="text"
-                  autocomplete="off"
-                  placeholder="请输入子任务ID"
-                  class="form-control"
-                />
+              <div class="form-row">
+                <div class="form-item">
+                  <label class="form-label required">调度过期策略</label>
+                  <el-select
+                    v-model="formData.misfireStrategy"
+                    filterable
+                    placeholder="请选择过期策略"
+                    class="form-control"
+                  >
+                    <el-option
+                      v-for="item in misfireStrategyList"
+                      :key="item.type"
+                      :label="item.title"
+                      :value="item.type"
+                    />
+                  </el-select>
+                </div>
+                <div class="form-item">
+                  <label class="form-label required">阻塞处理策略</label>
+                  <el-select
+                    v-model="formData.executorBlockStrategy"
+                    filterable
+                    placeholder="请选择阻塞策略"
+                    class="form-control"
+                  >
+                    <el-option
+                      v-for="item in blockStrategyList"
+                      :key="item.type"
+                      :label="item.title"
+                      :value="item.type"
+                    />
+                  </el-select>
+                </div>
               </div>
-            </div>
-            <div class="form-row">
-              <div class="form-item">
-                <label class="form-label required">调度过期策略</label>
-                <el-select
-                  v-model="formData.misfireStrategy"
-                  filterable
-                  placeholder="请选择过期策略"
-                  class="form-control"
-                >
-                  <el-option
-                    v-for="item in misfireStrategyList"
-                    :key="item.type"
-                    :label="item.title"
-                    :value="item.type"
+              <div class="form-row">
+                <div class="form-item">
+                  <label class="form-label">任务超时时间(秒)</label>
+                  <el-input
+                    v-model="formData.executorTimeout"
+                    type="text"
+                    autocomplete="off"
+                    placeholder="请输入超时时间（秒）"
+                    class="form-control"
                   />
-                </el-select>
-              </div>
-              <div class="form-item">
-                <label class="form-label required">阻塞处理策略</label>
-                <el-select
-                  v-model="formData.executorBlockStrategy"
-                  filterable
-                  placeholder="请选择阻塞策略"
-                  class="form-control"
-                >
-                  <el-option
-                    v-for="item in blockStrategyList"
-                    :key="item.type"
-                    :label="item.title"
-                    :value="item.type"
+                </div>
+                <div class="form-item">
+                  <label class="form-label">失败重试次数</label>
+                  <el-input
+                    v-model="formData.executorFailRetryCount"
+                    type="text"
+                    autocomplete="off"
+                    placeholder="请输入重试次数"
+                    class="form-control"
                   />
-                </el-select>
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-item">
-                <label class="form-label">任务超时时间(秒)</label>
-                <el-input
-                  v-model="formData.executorTimeout"
-                  type="text"
-                  autocomplete="off"
-                  placeholder="请输入超时时间（秒）"
-                  class="form-control"
-                />
-              </div>
-              <div class="form-item">
-                <label class="form-label">失败重试次数</label>
-                <el-input
-                  v-model="formData.executorFailRetryCount"
-                  type="text"
-                  autocomplete="off"
-                  placeholder="请输入重试次数"
-                  class="form-control"
-                />
+                </div>
               </div>
             </div>
           </div>
@@ -274,7 +280,14 @@ import NoVue3Cron from "@/components/NoVue3Cron/index.vue";
 import { onMounted, ref, watch, nextTick } from "vue";
 import { ElMessage } from "element-plus";
 import { useJobInfoStoreHook } from "@/store/modules/jobInfo";
-import { Setting, Clock, Tools, Edit, Check, Close } from "@element-plus/icons-vue";
+import {
+  Setting,
+  Clock,
+  Tools,
+  Edit,
+  Check,
+  Close,
+} from "@element-plus/icons-vue";
 
 // 定义接口类型
 interface JobGroupItem {
@@ -345,7 +358,9 @@ const calculateCronPosition = () => {
     const inputElement = document.querySelector(
       ".cron-input-wrapper input"
     ) as HTMLElement;
-    const popoverElement = document.querySelector(".cron-popover") as HTMLElement;
+    const popoverElement = document.querySelector(
+      ".cron-popover"
+    ) as HTMLElement;
 
     if (!inputElement || !popoverElement) return;
 
@@ -388,9 +403,45 @@ watch(cronPopover, (newVal) => {
   }
 });
 
+// 强制应用弹窗样式
+const forceApplyDialogStyles = () => {
+  nextTick(() => {
+    const dialog = document.querySelector(".job-group-dialog .el-dialog");
+    const dialogBody = document.querySelector(
+      ".job-group-dialog .el-dialog__body"
+    );
+    const formContainer = document.querySelector(
+      ".job-group-dialog .form-container"
+    );
+
+    if (dialog) {
+      dialog.style.display = "flex";
+      dialog.style.flexDirection = "column";
+    }
+
+    if (dialogBody) {
+      dialogBody.style.display = "flex";
+      dialogBody.style.flexDirection = "column";
+      dialogBody.style.justifyContent = "center";
+      dialogBody.style.flex = "1";
+    }
+
+    if (formContainer) {
+      formContainer.style.display = "flex";
+      formContainer.style.flexDirection = "column";
+      formContainer.style.justifyContent = "center";
+      formContainer.style.flex = "1";
+    }
+  });
+};
+
 watch(
   () => props.jobGroupVisible,
-  () => {}
+  (newVal) => {
+    if (newVal && newVal.visible) {
+      forceApplyDialogStyles();
+    }
+  }
 );
 
 async function fetchTaskGroupList() {
@@ -406,7 +457,8 @@ async function fetchTaskGroupList() {
         jobGroupList.value = response;
       } else {
         // 其他格式，尝试提取数据
-        jobGroupList.value = (response as any).data || (response as any).result || [];
+        jobGroupList.value =
+          (response as any).data || (response as any).result || [];
       }
     } else {
       jobGroupList.value = [];
@@ -467,10 +519,32 @@ function handleCloseDialog() {
 
 onMounted(() => {
   fetchTaskGroupList();
+  // 组件挂载后强制应用样式
+  forceApplyDialogStyles();
 });
 </script>
 
 <style lang="scss" scoped>
+// 全局强制样式 - 不使用scoped
+:global(.job-group-dialog .el-dialog) {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+:global(.job-group-dialog .el-dialog__body) {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  flex: 1 !important;
+}
+
+:global(.job-group-dialog .form-container) {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  flex: 1 !important;
+}
+
 // 全局样式变量
 .job-group-container {
   --primary-color: #409eff;
@@ -485,11 +559,36 @@ onMounted(() => {
   --border-radius: 8px;
   --box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 
+  * {
+    box-sizing: border-box;
+  }
+
+  // 确保弹窗整体布局为flex
+  :deep(.el-dialog) {
+    min-width: 720px !important;
+    min-height: 650px !important;
+    width: auto !important;
+    height: auto !important;
+    max-width: 90vw !important;
+    max-height: 90vh !important;
+    margin: 5vh auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  // 更强的选择器确保样式应用
+  &.job-group-container :deep(.el-dialog) {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
   :deep(.el-dialog__header) {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     border-radius: var(--border-radius) var(--border-radius) 0 0;
     padding: 20px 24px;
+    box-sizing: border-box;
+    flex-shrink: 0 !important;
 
     .el-dialog__title {
       font-size: 18px;
@@ -509,21 +608,72 @@ onMounted(() => {
   }
 
   :deep(.el-dialog__body) {
-    max-height: 65vh;
-    overflow-y: auto;
-    padding: 0;
+    height: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    min-height: 0 !important;
+  }
+
+  // 更强的选择器确保body样式应用
+  &.job-group-container :deep(.el-dialog__body) {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    flex: 1 !important;
   }
 
   :deep(.el-dialog__footer) {
-    padding: 0;
+    padding: 0 !important;
     border-top: 1px solid var(--border-color);
+    box-sizing: border-box;
+    flex-shrink: 0 !important;
+  }
+
+  // 更强的选择器确保footer样式应用
+  &.job-group-container :deep(.el-dialog__footer) {
+    flex-shrink: 0 !important;
   }
 }
 
 .form-container {
-  padding: 16px 16px 0 16px;
+  padding: 16px 16px 20px 16px !important;
   background: #fff;
-  /* 去掉max-height和overflow-y，内容自适应 */
+  height: auto !important;
+  overflow: visible;
+  box-sizing: border-box;
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  min-height: fit-content !important;
+
+  // 当内容较少时，保持最小间距
+  &:before,
+  &:after {
+    content: "";
+    flex: 0 0 auto;
+  }
+}
+
+// 更强的选择器确保form-container样式应用
+.job-group-container .form-container {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  flex: 1 !important;
+}
+
+// 表单内容区域
+.form-sections-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 0 0 auto;
 }
 
 .form-section {
@@ -533,6 +683,7 @@ onMounted(() => {
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   transition: all 0.3s ease;
+  box-sizing: border-box;
 
   &:hover {
     box-shadow: 0 6px 20px rgba(102, 126, 234, 0.12);
@@ -550,6 +701,7 @@ onMounted(() => {
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
   border-bottom: 1px solid #e4e7ed;
   border-radius: 6px 6px 0 0;
+  box-sizing: border-box;
 
   .section-icon {
     display: flex;
@@ -562,6 +714,7 @@ onMounted(() => {
     margin-right: 8px;
     box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
     border: 2px solid #fff;
+    box-sizing: border-box;
 
     .el-icon {
       color: white;
@@ -580,12 +733,14 @@ onMounted(() => {
 .section-content {
   padding: 8px 12px;
   background: #fff;
+  box-sizing: border-box;
 }
 
 .form-row {
   display: flex;
   gap: 8px;
   margin-bottom: 6px;
+  box-sizing: border-box;
 
   &:last-child {
     margin-bottom: 0;
@@ -602,6 +757,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  box-sizing: border-box;
 }
 
 .form-label {
@@ -788,7 +944,11 @@ onMounted(() => {
     }
 
     &:hover {
-      background: linear-gradient(135deg, #66b1ff 0%, var(--primary-color) 100%);
+      background: linear-gradient(
+        135deg,
+        #66b1ff 0%,
+        var(--primary-color) 100%
+      );
       transform: translateY(-1px);
       box-shadow: 0 4px 12px rgba(64, 158, 255);
       color: rgba(64, 158, 255);
@@ -811,14 +971,19 @@ onMounted(() => {
 // 响应式设计
 @media (max-width: 768px) {
   .job-group-dialog {
+    display: flex;
+    align-items: center;
     :deep(.el-dialog) {
-      width: 95% !important;
-      margin: 5vh auto;
+      width: auto !important;
+      height: auto !important;
+      max-height: 95vh !important;
+      margin: 2.5vh auto;
     }
   }
 
   .form-container {
     padding: 16px;
+    justify-content: flex-start; // 移动端不需要居中
   }
 
   .section-content {
@@ -833,6 +998,25 @@ onMounted(() => {
     .submit-btn {
       width: 100%;
       justify-content: center;
+    }
+  }
+}
+
+// 针对弹窗被极度拉伸的情况
+@media (min-height: 900px) {
+  .job-group-container {
+    :deep(.el-dialog) {
+      // 当屏幕很高时，允许弹窗更大一些
+      max-height: 85vh;
+    }
+
+    .form-container {
+      // 当有足够空间时，稍微增加上下间距
+      padding: 32px 16px 40px 16px;
+    }
+
+    .form-sections-wrapper {
+      gap: 16px; // 增加表单段落间距
     }
   }
 }
@@ -865,5 +1049,36 @@ onMounted(() => {
   :deep(.el-input__wrapper.is-error) {
     box-shadow: 0 0 0 1px var(--danger-color);
   }
+}
+</style>
+
+<style lang="scss">
+/* 全局样式 - 不使用scoped确保样式能够应用到Element Plus组件 */
+.job-group-dialog .el-dialog {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.job-group-dialog .el-dialog__body {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  flex: 1 !important;
+  padding: 0 !important;
+}
+
+.job-group-dialog .el-dialog__header {
+  flex-shrink: 0 !important;
+}
+
+.job-group-dialog .el-dialog__footer {
+  flex-shrink: 0 !important;
+}
+
+.job-group-dialog .form-container {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  flex: 1 !important;
 }
 </style>

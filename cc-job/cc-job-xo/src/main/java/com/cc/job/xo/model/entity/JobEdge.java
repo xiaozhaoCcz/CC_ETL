@@ -35,4 +35,7 @@ public class JobEdge implements Serializable {
     @JsonInclude(value = JsonInclude.Include.NON_NULL)
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createTime;
+
+    @TableLogic
+    private Integer isDeleted;
 }

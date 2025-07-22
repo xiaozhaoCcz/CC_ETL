@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { Close, Search } from "@element-plus/icons-vue";
-import { ref, computed, provide, watch, onMounted, reactive } from "vue";
+import {
+  ref,
+  computed,
+  provide,
+  watch,
+  onMounted,
+  reactive,
+  nextTick,
+} from "vue";
 
 import EnhancedTree from "@/components/EnhancedTree/EnhancedTree.vue";
 import ContextMenu from "@/components/ContextMenu/ContextMenu.vue";
@@ -173,6 +181,13 @@ watch(
   }
 );
 
+// 监听任务组名称弹窗状态，强制应用样式
+watch(addJobGroupVisible, (newVal) => {
+  if (newVal) {
+    forceApplyDialogStyles();
+  }
+});
+
 function handleContextMenu({ event, node }: ContextMenuEvent) {
   console.log(event.clientX, event.clientY);
   showContextMenu.value = true;
@@ -216,7 +231,8 @@ function handleAction(action: string, _node: TreeNode) {
     deleteMessageNotice(_node.id, _node.type);
   } else if (action === "export") {
     JobPartAPI.exportData(_node.id).then((data) => {
-      const fileName = getFileNameFromHeaders(data.headers) || "encryptedData.cetl";
+      const fileName =
+        getFileNameFromHeaders(data.headers) || "encryptedData.cetl";
 
       // 创建Blob并保存文件
       const blob = new Blob([data.data], { type: "application/octet-stream" });
@@ -240,7 +256,11 @@ function handleAction(action: string, _node: TreeNode) {
 
 // 找到当前节点的父节点的父节点
 const findGrandParent = (nodeId: number) => {
-  const findParent = (nodes: any[], targetId: number, parent: any = null): any => {
+  const findParent = (
+    nodes: any[],
+    targetId: number,
+    parent: any = null
+  ): any => {
     for (const node of nodes) {
       if (node.id === targetId) {
         return parent;
@@ -305,11 +325,15 @@ function deleteMessageNotice(id: number, type: number) {
       message: "确认删除当前节点",
     },
   ];
-  ElMessageBox.confirm(messageArr.find((m) => m.type === type)?.message, "删除", {
-    confirmButtonText: "确认",
-    cancelButtonText: "取消",
-    type: "warning",
-  })
+  ElMessageBox.confirm(
+    messageArr.find((m) => m.type === type)?.message,
+    "删除",
+    {
+      confirmButtonText: "确认",
+      cancelButtonText: "取消",
+      type: "warning",
+    }
+  )
     .then(() => {
       if (type == 0) {
         JobPartAPI.deleteJobPart(id).then(() => {
@@ -358,6 +382,38 @@ const handleGlobalClick = (event: Event) => {
   ) {
     showContextMenu.value = false;
   }
+};
+
+// 强制应用弹窗样式
+const forceApplyDialogStyles = () => {
+  nextTick(() => {
+    const dialog = document.querySelector(".job-group-name-dialog .el-dialog");
+    const dialogBody = document.querySelector(
+      ".job-group-name-dialog .el-dialog__body"
+    );
+    const dialogContentContainer = document.querySelector(
+      ".job-group-name-dialog .dialog-content-container"
+    );
+
+    if (dialog) {
+      dialog.style.display = "flex";
+      dialog.style.flexDirection = "column";
+    }
+
+    if (dialogBody) {
+      dialogBody.style.display = "flex";
+      dialogBody.style.flexDirection = "column";
+      dialogBody.style.justifyContent = "center";
+      dialogBody.style.flex = "1";
+    }
+
+    if (dialogContentContainer) {
+      dialogContentContainer.style.display = "flex";
+      dialogContentContainer.style.flexDirection = "column";
+      dialogContentContainer.style.justifyContent = "center";
+      dialogContentContainer.style.flex = "1";
+    }
+  });
 };
 
 function saveJobPart() {
@@ -438,6 +494,8 @@ function hideSidebar() {
 onMounted(() => {
   // 初始加载任务树数据
   refreshTreeData();
+  // 组件挂载后强制应用样式
+  forceApplyDialogStyles();
 });
 </script>
 
@@ -511,8 +569,14 @@ onMounted(() => {
     width="300"
     draggable
     append-to-body
+    class="job-group-name-dialog"
+    :style="{ display: 'flex', flexDirection: 'column' }"
   >
-    <el-input v-model="jobPartName" placeholder="Please input" />
+    <div class="dialog-content-container">
+      <div class="dialog-content-wrapper">
+        <el-input v-model="jobPartName" placeholder="Please input" />
+      </div>
+    </div>
     <template #footer>
       <div class="dialog-footer">
         <el-button @click="addJobGroupVisible = false">取消</el-button>
@@ -523,12 +587,95 @@ onMounted(() => {
 </template>
 
 <style scoped lang="scss">
+* {
+  box-sizing: border-box;
+}
+
+// 任务组名称弹窗样式
+.job-group-name-dialog {
+  // 确保弹窗整体布局为flex
+  :deep(.el-dialog) {
+    min-width: 300px !important;
+    width: auto !important;
+    height: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  // 更强的选择器确保样式应用
+  &.job-group-name-dialog :deep(.el-dialog) {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  :deep(.el-dialog__header) {
+    flex-shrink: 0 !important;
+  }
+
+  :deep(.el-dialog__body) {
+    padding: 20px !important;
+    height: auto !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    min-height: 0 !important;
+  }
+
+  // 更强的选择器确保body样式应用
+  &.job-group-name-dialog :deep(.el-dialog__body) {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    flex: 1 !important;
+  }
+
+  :deep(.el-dialog__footer) {
+    flex-shrink: 0 !important;
+  }
+
+  // 更强的选择器确保footer样式应用
+  &.job-group-name-dialog :deep(.el-dialog__footer) {
+    flex-shrink: 0 !important;
+  }
+}
+
+.dialog-content-container {
+  padding: 0 !important;
+  height: auto !important;
+  overflow: visible;
+  box-sizing: border-box;
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  min-height: fit-content !important;
+}
+
+// 更强的选择器确保dialog-content-container样式应用
+.job-group-name-dialog .dialog-content-container {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  flex: 1 !important;
+}
+
+// 表单内容区域包装器
+.dialog-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+}
+
 .side-container {
   min-width: 120px;
   width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
 
   .side-tasks {
     display: flex;
@@ -604,5 +751,36 @@ onMounted(() => {
       font-weight: bolder;
     }
   }
+}
+</style>
+
+<style lang="scss">
+/* 全局样式 - 不使用scoped确保样式能够应用到Element Plus组件 */
+.job-group-name-dialog .el-dialog {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.job-group-name-dialog .el-dialog__body {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  flex: 1 !important;
+  padding: 20px !important;
+}
+
+.job-group-name-dialog .el-dialog__header {
+  flex-shrink: 0 !important;
+}
+
+.job-group-name-dialog .el-dialog__footer {
+  flex-shrink: 0 !important;
+}
+
+.job-group-name-dialog .dialog-content-container {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  flex: 1 !important;
 }
 </style>
