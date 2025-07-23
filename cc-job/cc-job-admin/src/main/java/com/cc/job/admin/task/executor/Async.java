@@ -4,6 +4,8 @@ import com.cc.job.admin.task.executor.callback.ICallback;
 import com.cc.job.admin.task.executor.callback.IWorker;
 import com.cc.job.admin.task.executor.timer.SystemClock;
 import com.cc.job.admin.task.executor.worker.DependWrapper;
+import com.cc.job.admin.task.executor.worker.ResultState;
+import com.cc.job.admin.task.executor.worker.WorkResult;
 import com.cc.job.admin.task.executor.wrapper.WorkerWrapper;
 import com.cc.job.admin.task.handler.JobConstant;
 
@@ -39,7 +41,7 @@ public class Async {
 
     /**
      * 启动任务组执行，使用默认线程池
-     * 
+     *
      * @param timeout        超时时间（毫秒）
      * @param workerWrappers 任务包装器列表
      * @return 是否成功启动
@@ -51,7 +53,7 @@ public class Async {
 
     /**
      * 启动任务组执行，支持自定义线程池
-     * 
+     *
      * @param timeout         超时时间（毫秒）
      * @param executorService 线程池
      * @param workerWrappers  任务包装器列表
@@ -59,7 +61,7 @@ public class Async {
      * @throws ExecutionException 执行异常
      */
     public static boolean beginWork(long timeout, ExecutorService executorService,
-            List<WorkerWrapper> workerWrappers) throws ExecutionException {
+                                    List<WorkerWrapper> workerWrappers) throws ExecutionException {
         if (workerWrappers == null || workerWrappers.isEmpty()) {
             logger.warn("workerWrappers 为空，未执行任何任务");
             return false;
@@ -100,14 +102,14 @@ public class Async {
 
     /**
      * 执行任务调度，拓扑排序依赖调度
-     * 
+     *
      * @param timeout    超时时间
      * @param wrapperMap 任务映射
      * @param inDegree   入度表
      * @param submitted  已提交任务集合
      */
     private static void executorWorkerWrapper(long timeout, Map<String, WorkerWrapper> wrapperMap,
-            Map<String, Integer> inDegree, Set<String> submitted) {
+                                              Map<String, Integer> inDegree, Set<String> submitted) {
         // 当前剩余时间
         AtomicLong time = new AtomicLong(timeout * 1000);
 
@@ -120,9 +122,9 @@ public class Async {
             thread = new Thread(futureTask);
             thread.start();
             futureTask.get(timeout, TimeUnit.SECONDS);
-        }catch (Exception e){
+        } catch (Exception e) {
             throw new RuntimeException(e);
-        }finally {
+        } finally {
             if (thread != null) {
                 thread.interrupt();
             }
@@ -168,7 +170,7 @@ public class Async {
                         long costTime = time.get() - (SystemClock.now() - beginTime);
                         if (costTime > 0) {
                             time.set(costTime);
-                            logger.info("任务组剩余时间{}",costTime);
+                            logger.info("任务组剩余时间{}", costTime);
                         } else {
                             logger.error("任务组运行超时异常，任务: {}", id);
                             throw new RuntimeException("任务组运行超时异常");
@@ -190,7 +192,7 @@ public class Async {
 
     /**
      * 执行单个任务，包含重试逻辑
-     * 
+     *
      * @param workerWrapper 任务包装器
      * @param wrapperMap    任务映射
      */
@@ -210,6 +212,7 @@ public class Async {
         int count = 0;
 
         Object resultValue = null;
+        boolean success = true;
         try {
             resultValue = getResultValue(timeout, worker, param, wrapperMap);
 
@@ -226,16 +229,21 @@ public class Async {
                 resultValue = getResultValue(timeout, worker, param, wrapperMap);
                 workerWrapper.setCount(count);
             }
+            workerWrapper.setWorkResult(new WorkResult(resultValue, ResultState.SUCCESS));
 
         } catch (Exception e) {
             logger.error("任务: {} 执行异常: {}", workerWrapper.getId(), e.getMessage(), e);
+            success = false;
+            workerWrapper.setWorkResult(new WorkResult(e.getMessage(), ResultState.EXCEPTION));
             throw new RuntimeException(e);
+        } finally {
+            callback.result(success, param, workerWrapper.getWorkResult());
         }
     }
 
     /**
      * 获取任务执行结果，支持超时控制
-     * 
+     *
      * @param timeout    超时时间
      * @param worker     任务工作者
      * @param param      参数
@@ -243,7 +251,7 @@ public class Async {
      * @return 结果
      */
     private static Object getResultValue(long timeout, IWorker worker, Object param,
-            Map<String, WorkerWrapper> wrapperMap) {
+                                         Map<String, WorkerWrapper> wrapperMap) {
 
         Object resultValue = null;
         if (timeout > 0) {
@@ -269,7 +277,7 @@ public class Async {
 
     /**
      * 停止任务组执行，将所有任务状态置为3（失败）
-     * 
+     *
      * @param workerWrappers 任务包装器列表
      */
     public static void stopWork(List<WorkerWrapper> workerWrappers) {

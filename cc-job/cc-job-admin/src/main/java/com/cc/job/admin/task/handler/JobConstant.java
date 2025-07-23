@@ -1,6 +1,8 @@
 package com.cc.job.admin.task.handler;
 
 public interface JobConstant {
+    String SUCCESS = "SUCCESS";
+
     String FAIL_RETRY = "FAIL_RETRY";
 
     String DO_NOTHING = "DO_NOTHING";

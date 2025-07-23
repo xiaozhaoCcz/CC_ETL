@@ -180,9 +180,8 @@ public class JobGroupXxlJob {
             List<WorkerWrapper<Long, String>> workerWrappers = buildWorkerWrappers(nodes, nextMap, randomId, statusMap);
             logger.info("[JobGroup] WorkerWrapper构建完成 - jobId: {}, WorkerWrapper数量: {}", jobId, workerWrappers.size());
 
-            // // 预测任务的运行时间
-            // getRuntime(workerWrappers, nodes, jobInfo.getExecutorTimeout(), jobId,
-            // randomId);
+             // 预测任务的运行时间
+             getRuntime(workerWrappers, nodes, jobInfo.getExecutorTimeout(), jobId, randomId);
 
             STOP_MAP.put(setExecuteJobId(jobId, randomId), workerWrappers);
             logger.info("[JobGroup] 开始拓扑排序执行任务组 - jobId: {}, 线程池大小: {}", jobId, nodes.size() + 1);
@@ -561,7 +560,6 @@ public class JobGroupXxlJob {
         boolean success = pair.getValue();
         // 每次运行完需要从集合中删除节点
         removeJobData(setExecuteJobId(jobId, randomId));
-        String res = "";
         if (success) {
             setNodeStatus(statusMap, jobId, 1, randomId, node.getJobParentId());
             logger.info("[JobGroup] 任务执行成功 - jobId: {}, 任务名称: {}", jobId, jobInfo.getJobDesc());
@@ -575,7 +573,7 @@ public class JobGroupXxlJob {
                     jobId, node.getJobId(), count);
             setNodeStatus(statusMap, jobId, 0, randomId, node.getJobParentId());
         }
-        return res;
+        return SUCCESS;
     }
 
     /**
@@ -888,7 +886,7 @@ public class JobGroupXxlJob {
                     }
                 }
             }
-            return "";
+            return SUCCESS;
         }
     }
 

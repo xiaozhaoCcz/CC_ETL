@@ -158,6 +158,9 @@ public class WorkerWrapper<T, V> {
         return this;
     }
 
+    public void setWorkResult(WorkResult<V> workResult) {
+        this.workResult = workResult;
+    }
 
     public WorkResult<V> getWorkResult() {
         return workResult;
