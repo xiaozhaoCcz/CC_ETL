@@ -75,12 +75,6 @@
         </dependency>
 
         <dependency>
-            <groupId>com.ccJob</groupId>
-            <artifactId>cc-async-tool</artifactId>
-            <version>2.4.2-SNAPSHOT</version>
-        </dependency>
-
-        <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>easyexcel</artifactId>
             <version>${easyexcel.version}</version>
