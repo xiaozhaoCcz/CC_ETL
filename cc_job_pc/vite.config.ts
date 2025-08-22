@@ -24,6 +24,7 @@ export default defineConfig({
           'monaco': ['monaco-editor', '@monaco-editor/loader'],
           'codemirror': ['codemirror', 'codemirror-editor-vue3'],
           'utils': ['axios', '@vueuse/core'],
+          'pinia': ['pinia', 'pinia-plugin-persistedstate'],
         },
         // 优化chunk大小
         chunkFileNames: 'assets/js/[name]-[hash].js',
@@ -37,12 +38,25 @@ export default defineConfig({
       compress: {
         drop_console: true,
         drop_debugger: true,
+        pure_funcs: ['console.log', 'console.info'],
+        passes: 2,
+      },
+      mangle: {
+        safari10: true,
       },
     },
     // 启用CSS代码分割
     cssCodeSplit: true,
     // 设置chunk大小警告阈值
     chunkSizeWarningLimit: 1000,
+    // 启用源码映射（生产环境可关闭）
+    sourcemap: false,
+    // 启用目标优化
+    target: 'es2015',
+    // 启用模块预加载
+    modulePreload: {
+      polyfill: false,
+    },
   },
   server: {
     host: '0.0.0.0',
@@ -51,6 +65,8 @@ export default defineConfig({
     hmr: {
       overlay: false,
     },
+    // 启用预构建优化
+    force: false,
   },
   // 优化依赖预构建
   optimizeDeps: {
@@ -65,6 +81,17 @@ export default defineConfig({
       'codemirror',
       'axios',
       '@vueuse/core',
+      'pinia',
+      'pinia-plugin-persistedstate',
     ],
+    exclude: ['@monaco-editor/loader'],
+  },
+  // 启用CSS优化
+  css: {
+    preprocessorOptions: {
+      scss: {
+        additionalData: `@import "@/style/variables.scss";`,
+      },
+    },
   },
 })

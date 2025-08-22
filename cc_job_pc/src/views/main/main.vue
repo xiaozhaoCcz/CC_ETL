@@ -18,6 +18,7 @@ import {
   ref,
   watch,
   onBeforeUnmount,
+  defineAsyncComponent,
 } from "vue";
 import {
   useJobInfoStoreHook,
@@ -25,9 +26,9 @@ import {
   usePageStoreHook,
 } from "@/store";
 import { ElMessage } from "element-plus";
-import { debounce, throttle, PerformanceMonitor } from "@/utils/performance";
+import { debounce, throttle, PerformanceMonitor, createLazyComponent } from "@/utils/performance";
 
-// LogicFlow 自定义节点组件
+// LogicFlow 自定义节点组件 - 保持同步导入以确保可用性
 import CustomJava from "./node/CustomJava";
 import CustomPython from "./node/CustomPython";
 import CustomShell from "./node/CustomShell";
@@ -63,9 +64,9 @@ import {
   canvasOperations,
 } from "@/utils/logicflow";
 
-// 组件
-import Log from "@/components/Log/EnhancedLog.vue";
-import EditJobNode from "@/views/side/operation/edit-job-node.vue";
+// 组件 - 改为懒加载
+const Log = defineAsyncComponent(() => import("@/components/Log/EnhancedLog.vue"));
+const EditJobNode = defineAsyncComponent(() => import("@/views/side/operation/edit-job-node.vue"));
 
 // ================== 2. 类型定义与接口声明 ==================
 
@@ -644,6 +645,7 @@ async function selectPage(id: number): Promise<void> {
 
     // 确保容器已准备好
     if (!lfRefs.value[id]) {
+      console.warn(`容器未准备好，延迟重试: ${id}`);
       setTimeout(() => selectPage(id), 300);
       return;
     }
@@ -651,7 +653,14 @@ async function selectPage(id: number): Promise<void> {
     // 检查是否已经有该任务组的实例
     if (!lfInstances.value[id]) {
       // 初始化LogicFlow实例
-      lfInstances.value[id] = initLogicFlowInstance(id);
+      const instance = initLogicFlowInstance(id);
+      
+      if (!instance) {
+        console.error(`LogicFlow实例初始化失败: ${id}`);
+        return;
+      }
+      
+      lfInstances.value[id] = instance;
       lf.value = lfInstances.value[id];
 
       if (lf.value) {
@@ -662,16 +671,24 @@ async function selectPage(id: number): Promise<void> {
       lf.value = lfInstances.value[id];
 
       // 强制激活画布并刷新
-      lfInstances.value[id].resize();
+      try {
+        lfInstances.value[id].resize();
+      } catch (error) {
+        console.warn('画布刷新失败:', error);
+      }
     }
 
     // 切换任务组时，确保边动画状态正确
     setTimeout(() => {
-      updateEdgeStyleForTaskGroupUtil(
-        id,
-        lfInstances.value[id],
-        usePageStoreHook().getCurrentPageRunStatus
-      );
+      try {
+        updateEdgeStyleForTaskGroupUtil(
+          id,
+          lfInstances.value[id],
+          usePageStoreHook().getCurrentPageRunStatus
+        );
+      } catch (error) {
+        console.warn('更新边样式失败:', error);
+      }
     }, 200);
   } catch (err) {
     console.error(`处理任务组 ${id} 切换时出错:`, err);
@@ -1030,104 +1047,123 @@ function logRunStop(content: string, targetJobId?: number): void {
  * @returns LogicFlow实例
  */
 function initLogicFlowInstance(pageId: number): any {
-  const container = lfRefs.value[pageId];
-  if (!container) {
-    console.error(`[流程4] 错误：任务组 ${pageId} 的容器元素不存在`);
+  performanceMonitor.startTimer(`initLogicFlow-${pageId}`);
+  
+  try {
+    const container = lfRefs.value[pageId];
+    if (!container) {
+      console.error(`[流程4] 错误：任务组 ${pageId} 的容器元素不存在`);
+      return null;
+    }
+
+    // 如果已存在实例，检查其容器是否仍然有效
+    if (lfInstances.value[pageId]) {
+      const existingInstance = lfInstances.value[pageId];
+      // 检查实例的容器是否还存在且可用
+      if (existingInstance.container && existingInstance.container.parentNode) {
+        return existingInstance;
+      } else {
+        // 清理无效实例
+        try {
+          existingInstance.destroy();
+        } catch (e) {
+          console.warn(`清理无效实例时出错:`, e);
+        }
+        delete lfInstances.value[pageId];
+      }
+    }
+
+    // 确保元素可见
+    const originalDisplay = container.style.display;
+    container.style.display = "block";
+
+    // 创建LogicFlow实例
+    const newLf = new LogicFlow({
+      container: container,
+      background: {
+        background: "#ECECEC", // 设置画布背景色
+      },
+      grid: {
+        visible: false,
+      },
+      multipleSelectKey: "alt",
+      autoExpand: false,
+      allowResize: true,
+      allowRotate: true,
+      keyboard: {
+        enabled: true,
+      },
+      plugins: [DynamicGroup, DndPanel, SelectionSelect, Menu, MiniMap],
+      pluginsOptions: {
+        miniMap: {
+          width: 120,
+          height: 120,
+          showEdge: true,
+          isShowHeader: false,
+          isShowCloseIcon: false,
+        },
+      },
+    });
+
+    // 初始化逻辑
+    (newLf.extension.menu as any).setMenuConfig(menuConfig);
+    
+    // 注册自定义节点组件
+    try {
+      newLf.register(CustomJava);
+      newLf.register(CustomPython);
+      newLf.register(CustomShell);
+      newLf.register(CustomPhp);
+      newLf.register(CustomNodejs);
+      newLf.register(CustomApi);
+      newLf.register(CustomBean);
+      newLf.register(CustomSql);
+      newLf.register(CustomPowerShell);
+      newLf.register(CustomRect);
+      newLf.register(CustomGroup);
+    } catch (error) {
+      console.error('注册自定义节点组件失败:', error);
+      // 继续执行，不中断初始化流程
+    }
+    
+    newLf.setDefaultEdgeType("bezier");
+
+    // 渲染空画布
+    newLf.render({
+      nodes: [],
+      edges: [],
+    });
+
+    // 绑定事件
+    bindEvents(newLf);
+
+    // 恢复元素原始显示状态
+    container.style.display = originalDisplay;
+
+    // 显示MiniMap (必须在render之后)
+    try {
+      (newLf.extension.miniMap as any).show();
+    } catch (error) {
+      console.warn('显示MiniMap失败:', error);
+    }
+
+    // 保存实例并返回
+    lfInstances.value[pageId] = newLf;
+
+    const { eventCenter } = newLf.graphModel;
+    eventCenter.on("selection:selected", () => {
+      selectElements(lfInstances, lf);
+    });
+    
+    const duration = performanceMonitor.endTimer(`initLogicFlow-${pageId}`);
+    console.log(`LogicFlow实例初始化完成，耗时: ${duration.toFixed(2)}ms`);
+    
+    return newLf;
+  } catch (error) {
+    console.error(`初始化LogicFlow实例失败 (pageId: ${pageId}):`, error);
+    performanceMonitor.endTimer(`initLogicFlow-${pageId}`);
     return null;
   }
-
-  // 如果已存在实例，检查其容器是否仍然有效
-  if (lfInstances.value[pageId]) {
-    const existingInstance = lfInstances.value[pageId];
-    // 检查实例的容器是否还存在且可用
-    if (existingInstance.container && existingInstance.container.parentNode) {
-      return existingInstance;
-    } else {
-      // 清理无效实例
-      try {
-        existingInstance.destroy();
-      } catch (e) {
-        console.warn(`清理无效实例时出错:`, e);
-      }
-      delete lfInstances.value[pageId];
-    }
-  }
-
-  // 确保元素可见
-  const originalDisplay = container.style.display;
-  container.style.display = "block";
-
-  // 创建LogicFlow实例
-
-  const newLf = new LogicFlow({
-    container: container,
-    background: {
-      background: "#ECECEC", // 设置画布背景色
-    },
-    grid: {
-      visible: false,
-    },
-    multipleSelectKey: "alt",
-    autoExpand: false,
-    allowResize: true,
-    allowRotate: true,
-    keyboard: {
-      enabled: true,
-    },
-    plugins: [DynamicGroup, DndPanel, SelectionSelect, Menu, MiniMap],
-    pluginsOptions: {
-      miniMap: {
-        width: 120,
-        height: 120,
-        showEdge: true,
-        isShowHeader: false,
-        isShowCloseIcon: false,
-      },
-    },
-  });
-
-  // 初始化逻辑
-
-  (newLf.extension.menu as any).setMenuConfig(menuConfig);
-  newLf.register(CustomJava);
-  newLf.register(CustomPython);
-  newLf.register(CustomShell);
-  newLf.register(CustomPhp);
-  newLf.register(CustomNodejs);
-  newLf.register(CustomApi);
-  newLf.register(CustomBean);
-  newLf.register(CustomSql);
-  newLf.register(CustomPowerShell);
-  newLf.register(CustomRect);
-  newLf.register(CustomGroup);
-  newLf.setDefaultEdgeType("bezier");
-
-  // 渲染空画布
-
-  newLf.render({
-    nodes: [],
-    edges: [],
-  });
-
-  // 绑定事件
-  bindEvents(newLf);
-
-  // 恢复元素原始显示状态
-  container.style.display = originalDisplay;
-
-  // 显示MiniMap (必须在render之后)
-
-  (newLf.extension.miniMap as any).show();
-
-  // 保存实例并返回
-  lfInstances.value[pageId] = newLf;
-
-  const { eventCenter } = newLf.graphModel;
-
-  eventCenter.on("selection:selected", () => {
-    selectElements(lfInstances, lf);
-  });
-  return newLf;
 }
 
 /**

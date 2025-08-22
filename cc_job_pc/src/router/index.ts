@@ -31,16 +31,21 @@ const router = createRouter({
   routes,
 });
 
-// 路由守卫优化
+// 路由前置守卫 - 性能监控
 router.beforeEach((to, from, next) => {
-  // 添加路由切换性能监控
   const startTime = performance.now();
-
+  
+  // 添加性能标记
+  performance.mark(`route-${to.name}-start`);
+  
   next();
-
-  // 记录路由切换时间
+  
+  // 延迟记录性能数据，避免阻塞路由切换
   setTimeout(() => {
     const endTime = performance.now();
+    performance.mark(`route-${to.name}-end`);
+    performance.measure(`route-${to.name}`, `route-${to.name}-start`, `route-${to.name}-end`);
+    
     console.log(`路由切换耗时: ${endTime - startTime}ms`);
   }, 0);
 });

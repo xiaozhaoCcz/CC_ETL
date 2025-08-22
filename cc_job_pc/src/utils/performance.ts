@@ -153,6 +153,24 @@ export function createLazyComponent(importFn: () => Promise<any>) {
 // 性能监控
 export class PerformanceMonitor {
     private metrics: Map<string, number[]> = new Map();
+    private observers: Map<string, PerformanceObserver> = new Map();
+
+    constructor() {
+        this.initObservers();
+    }
+
+    private initObservers() {
+        // 监控长任务
+        if ('PerformanceObserver' in window) {
+            const longTaskObserver = new PerformanceObserver((list) => {
+                for (const entry of list.getEntries()) {
+                    console.warn('检测到长任务:', entry.duration, 'ms');
+                }
+            });
+            longTaskObserver.observe({ entryTypes: ['longtask'] });
+            this.observers.set('longtask', longTaskObserver);
+        }
+    }
 
     public startTimer(name: string): void {
         performance.mark(`${name}-start`);
@@ -191,6 +209,24 @@ export class PerformanceMonitor {
             result[name] = this.getAverageTime(name);
         }
         return result;
+    }
+
+    public getMemoryUsage(): Record<string, number> {
+        if ('memory' in performance) {
+            const memory = (performance as any).memory;
+            return {
+                usedJSHeapSize: memory.usedJSHeapSize,
+                totalJSHeapSize: memory.totalJSHeapSize,
+                jsHeapSizeLimit: memory.jsHeapSizeLimit,
+            };
+        }
+        return {};
+    }
+
+    public destroy(): void {
+        this.observers.forEach(observer => observer.disconnect());
+        this.observers.clear();
+        this.metrics.clear();
     }
 }
 
@@ -247,5 +283,61 @@ export class SimpleCache<K, V> {
 
     size(): number {
         return this.cache.size;
+    }
+}
+
+// 资源预加载
+export function preloadResource(url: string, type: 'script' | 'style' | 'image' = 'script'): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const link = document.createElement('link');
+        link.rel = 'preload';
+        link.as = type;
+        link.href = url;
+        
+        link.onload = () => resolve();
+        link.onerror = () => reject(new Error(`Failed to preload: ${url}`));
+        
+        document.head.appendChild(link);
+    });
+}
+
+// 防抖的resize监听器
+export function createDebouncedResizeListener(callback: () => void, delay = 150): () => void {
+    const debouncedCallback = debounce(callback, delay);
+    
+    const handleResize = () => {
+        requestAnimationFrame(debouncedCallback);
+    };
+    
+    window.addEventListener('resize', handleResize, { passive: true });
+    
+    return () => {
+        window.removeEventListener('resize', handleResize);
+    };
+}
+
+// 性能标记工具
+export class PerformanceMarker {
+    private static markers: Map<string, number> = new Map();
+
+    static mark(name: string): void {
+        this.markers.set(name, performance.now());
+    }
+
+    static measure(name: string, startMark: string, endMark: string): number {
+        const start = this.markers.get(startMark);
+        const end = this.markers.get(endMark);
+        
+        if (start && end) {
+            const duration = end - start;
+            console.log(`${name}: ${duration.toFixed(2)}ms`);
+            return duration;
+        }
+        
+        return 0;
+    }
+
+    static clear(): void {
+        this.markers.clear();
     }
 } 
