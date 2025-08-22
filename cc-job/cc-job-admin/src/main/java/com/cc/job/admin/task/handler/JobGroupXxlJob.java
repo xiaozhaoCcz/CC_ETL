@@ -302,6 +302,9 @@ public class JobGroupXxlJob {
 
         // 关闭WebSocket连接
         webSocketServer.onClose(setExecuteJobId(jobId, randomId));
+
+        CONTEXT_HOLDER.remove();
+
         logger.debug("[JobGroup] 资源清理完成 - jobId: {}, 剩余任务组数量: {}", jobId, STOP_MAP.size());
     }
 

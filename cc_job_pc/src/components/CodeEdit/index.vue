@@ -85,6 +85,18 @@ watch(
   () => props.glueVisible,
   (val) => {
     _glueVisible.value = val;
+    console.log("👁️ GLUE IDE可见性变化:", val, "glueTaskId:", props.glueTaskId);
+    
+    // 当GLUE IDE打开时，如果有taskId则获取历史记录
+    if (val && props.glueTaskId && props.glueTaskId > 0) {
+      console.log("📥 设置taskId并获取历史记录:", props.glueTaskId);
+      taskId.value = props.glueTaskId;
+      getGlueList(props.glueTaskId);
+    } else if (val) {
+      console.log("ℹ️ GLUE IDE打开但无有效taskId，清空历史记录");
+      taskId.value = null;
+      glueList.value = [];
+    }
   }
 );
 
@@ -96,21 +108,19 @@ watch(
 );
 
 watch(
-  () => props.glueTaskId,
-  (val) => {
-    if (val && val > 0) {
-      taskId.value = val;
-      getGlueList(val);
+  () => props.nowDate,
+  () => {
+    if (props.glueTaskId && props.glueTaskId > 0) {
+      taskId.value = props.glueTaskId;
+      // 只有在GLUE IDE打开时才获取历史记录
+      if (_glueVisible.value) {
+        getGlueList(props.glueTaskId);
+      }
     } else {
       taskId.value = null;
       glueList.value = [];
     }
   }
-);
-
-watch(
-  () => props.nowDate,
-  () => {}
 );
 
 function handleCloseDialog() {
@@ -130,13 +140,21 @@ function getGlueList(taskId: number) {
   if (taskId && taskId > 0) {
     JobInfoAPI.getGlueList(taskId)
       .then((response: any) => {
-        glueList.value = (response as any).data || [];
+        // 检查响应结构
+        if (response && response.data) {
+          glueList.value = response.data;
+        } else if (Array.isArray(response)) {
+          // 如果响应直接是数组
+          glueList.value = response;
+        } else {
+          glueList.value = [];
+        }
       })
       .catch((error) => {
-        console.error("获取GLUE列表失败:", error);
         glueList.value = [];
       });
   } else {
+    console.log("ℹ️ taskId无效，清空GLUE历史记录列表");
     glueList.value = [];
   }
 }
