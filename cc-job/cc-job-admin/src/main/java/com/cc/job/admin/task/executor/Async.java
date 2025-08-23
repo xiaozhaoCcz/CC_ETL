@@ -90,6 +90,20 @@ public class Async {
                     inDegree.put(id, dependWrappers.size());
                 }
             }
+            
+            // 第二遍遍历：确保所有nextWrappers中的任务ID都在inDegree中存在
+            for (WorkerWrapper wrapper : workerWrappers) {
+                List<WorkerWrapper> nextWrappers = wrapper.getNextWrappers();
+                if (nextWrappers != null && !nextWrappers.isEmpty()) {
+                    for (WorkerWrapper nextWrapper : nextWrappers) {
+                        String nextId = nextWrapper.getId();
+                        if (!inDegree.containsKey(nextId)) {
+                            logger.debug("发现nextWrappers中的任务ID: {}，将其初始化为0", nextId);
+                            inDegree.put(nextId, 0);
+                        }
+                    }
+                }
+            }
 
             logger.info("任务依赖图构建完成，任务数: {}", workerWrappers.size());
             executorWorkerWrapper(timeout, wrapperMap, inDegree, submitted);
@@ -161,8 +175,18 @@ public class Async {
                             if (nextWrappers != null && !nextWrappers.isEmpty()) {
                                 List<String> nextIds = nextWrappers.stream().map(WorkerWrapper::getId).toList();
                                 for (String nextId : nextIds) {
-                                    // -1;
-                                    inDegree.compute(nextId, (k, i) -> i - 1);
+                                    // 安全地减少入度，如果nextId不在inDegree中则跳过
+                                    if (nextId != null && inDegree.containsKey(nextId)) {
+                                        inDegree.compute(nextId, (k, i) -> {
+                                            if (i == null) {
+                                                logger.warn("发现inDegree中值为null的任务ID: {}，重置为0", nextId);
+                                                return 0;
+                                            }
+                                            return i - 1;
+                                        });
+                                    } else {
+                                        logger.warn("发现不在inDegree中的任务ID: {}，跳过入度减少", nextId);
+                                    }
                                 }
                             }
                         }
@@ -186,7 +210,6 @@ public class Async {
                     }
                 });
             }
-
         }
     }
 
