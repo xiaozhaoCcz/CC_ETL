@@ -25,4 +25,6 @@ public interface JobComposeService {
     List<Long> pauseJobs(Long[] jobIds);
 
     void deleteJobNode(Long nodeId);
+
+    Map<String, Object> saveJobNodeAndJobEdges(Map<String, Object> formMap);
 }

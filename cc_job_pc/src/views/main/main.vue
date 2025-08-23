@@ -62,6 +62,7 @@ import {
   selectElements,
   getNodeColor,
   canvasOperations,
+  safeAddEdge,
 } from "@/utils/logicflow";
 
 // 组件 - 改为懒加载
@@ -1092,6 +1093,168 @@ function initLogicFlowInstance(pageId: number): any {
       allowRotate: true,
       keyboard: {
         enabled: true,
+        shortcuts: [
+          {
+            keys: ["cmd + c", "ctrl + c"],
+            callback: () => {
+              // 复制功能
+              console.log("复制快捷键触发");
+              const currentPageId = usePageStoreHook().getCurrentPage();
+              const currentLf = lfInstances.value[currentPageId] || lf.value;
+              
+              if (!currentLf) {
+                ElMessage.warning("找不到对应的LogicFlow实例");
+                return;
+              }
+
+              // 获取选中的元素
+              const elements = currentLf.graphModel.getSelectElements(true);
+              const selectedNodes = elements.nodes || [];
+              const selectedEdges = elements.edges || [];
+
+              if (selectedNodes.length === 0 && selectedEdges.length === 0) {
+                ElMessage.warning("请先选择要复制的节点或连线");
+                return;
+              }
+
+              // 保存到剪贴板
+              usePageStoreHook().setClipboard(selectedNodes, selectedEdges);
+              
+              const totalElements = selectedNodes.length + selectedEdges.length;
+              ElMessage.success(`已复制 ${totalElements} 个元素到剪贴板`);
+              console.log("复制到剪贴板:", { nodes: selectedNodes, edges: selectedEdges });
+            },
+          },
+          {
+            keys: ["cmd + v", "ctrl + v"],
+            callback: async () => {
+              // 粘贴功能
+              console.log("粘贴快捷键触发");
+              const currentPageId = usePageStoreHook().getCurrentPage();
+              const currentLf = lfInstances.value[currentPageId] || lf.value;
+              
+              if (!currentLf) {
+                ElMessage.warning("找不到对应的LogicFlow实例");
+                return;
+              }
+
+              // 检查剪贴板状态
+              if (usePageStoreHook().isClipboardEmpty()) {
+                ElMessage.warning("剪贴板为空，请先复制元素");
+                return;
+              }
+
+              if (usePageStoreHook().isClipboardExpired()) {
+                ElMessage.warning("剪贴板内容已过期，请重新复制");
+                usePageStoreHook().clearClipboard();
+                return;
+              }
+
+              // 获取剪贴板内容
+              const clipboardData = usePageStoreHook().getClipboard();
+              if (!clipboardData) {
+                ElMessage.warning("剪贴板数据无效");
+                return;
+              }
+
+
+
+              try {
+                // 粘贴节点
+                if(clipboardData.nodes.length == 1&&clipboardData.edges.length == 0) {
+                  //粘贴一个节点
+                  const node = clipboardData.nodes[0]
+                  const newNode = await copyNode(node);
+                  // 添加新节点
+                  currentLf.addNode(newNode);
+
+                  //刷新任务树
+                  refreshTreeData();
+
+                  ElMessage.success("节点复制成功，已创建独立的后端任务");
+                }else{
+                  //更新多个节点和边
+                  const nodes = clipboardData.nodes
+                  const edges = clipboardData.edges
+
+                  console.log("开始粘贴操作:", { nodes: nodes.length, edges: edges.length });
+
+                  const formMap = {
+                    nodes: nodes,
+                    edges: edges,
+                    jobId: jobId.value,
+                  }
+
+                  const data = await JobInfoAPI.saveJobNodeAndJobEdges(formMap) as any;
+
+                  console.log("后端返回数据:", data);
+                  const newNodes = data.nodes
+                  const newEdges = data.edges
+                  const nodeIds = data.nodeIds
+
+                  console.log("准备添加节点:", newNodes.length, "个");
+                  // 先添加所有节点，确保边可以正确连接
+                  nodes.forEach((node) => {
+                    // 创建新的独立属性，使用新的jobId
+                    const jobNodeId = nodeIds[node.id]
+                    const jobNode = newNodes.find(newNode => newNode.id === jobNodeId)
+
+                    console.log("处理节点:", { nodeId: node.id, jobNodeId, jobNode });
+
+                    const newProperties = {
+                      ...JSON.parse(JSON.stringify(node.properties || {})), // 深拷贝原属性
+                      jobId: jobNode.jobId, // 使用新任务的ID
+                      glueType: jobNode.nodeType, // 确保glueType正确
+                    };
+
+                    // 创建新节点，位置稍微偏移
+                    const newNode = {
+                      id: jobNode.id,
+                      type: node.type,
+                      x: jobNode.nodePositionX,
+                      y: jobNode.nodePositionY,
+                      text: (node.text.value || "") + "_copy",
+                      properties: newProperties,
+                    };
+
+                    console.log("添加节点:", newNode);
+                    // 添加新节点
+                    currentLf.addNode(newNode);
+                  })
+
+                  // 等待节点添加完成后再添加边
+                  await nextTick();
+                  
+                  console.log("准备添加边:", newEdges.length, "条");
+                  // 添加边，确保源节点和目标节点都存在
+                  newEdges.forEach((newEdge) => {
+                    console.log("处理边:", newEdge);
+                    // 使用安全的边创建函数
+                    const success = safeAddEdge(currentLf, {
+                      id: newEdge.id,
+                      sourceNodeId: newEdge.fromNodeId,
+                      targetNodeId: newEdge.endNodeId,
+                      type: "bezier"
+                    });
+                    
+                    if (!success) {
+                      console.warn(`边创建失败: ${newEdge.id}`);
+                    } else {
+                      console.log(`边创建成功: ${newEdge.id}`);
+                    }
+                  })
+                  //刷新任务树
+                  refreshTreeData();
+                  
+                  ElMessage.success(`粘贴完成: ${newNodes.length} 个节点, ${newEdges.length} 条边`);
+                }
+              } catch (error: any) {
+                console.error("粘贴失败:", error);
+                ElMessage.error("粘贴失败: " + (error.message || "未知错误"));
+              }
+            },
+          }
+        ],
       },
       plugins: [DynamicGroup, DndPanel, SelectionSelect, Menu, MiniMap],
       pluginsOptions: {
@@ -1218,55 +1381,7 @@ function bindEvents(lfInstance: any): void {
     }
 
     try {
-      // 获取原任务的完整数据
-      const originalJobData = await JobInfoAPI.getFormData(originalJobId);
-
-      // 创建新任务的数据，移除ID相关字段，添加_copy后缀
-      const newJobData = {
-        ...originalJobData,
-        id: undefined, // 移除id，让后端自动生成新的
-        jobDesc: (originalJobData.jobDesc || "") + "_copy",
-        addTime: undefined,
-        updateTime: undefined,
-        triggerLastTime: undefined,
-        triggerNextTime: undefined,
-        nodePositionX: originalJobData.nodePositionX + 50,
-        nodePositionY: originalJobData.nodePositionY + 50,
-      };
-
-      // 调用后端API创建新任务
-
-      const jobNode = await JobInfoAPI.saveJobNode(newJobData);
-
-      // 检查后端返回的数据是否有效
-      if (!jobNode) {
-        console.error(`❌ 后端返回的数据为空`);
-        ElMessage.error(
-          "复制节点失败: 后端创建任务失败，未返回新任务数据。请检查后端API实现。"
-        );
-        return;
-      }
-
-      // 创建新的独立属性，使用新的jobId
-      const newProperties = {
-        ...JSON.parse(JSON.stringify(originalNodeData.properties || {})), // 深拷贝原属性
-        jobId: jobNode.jobId, // 使用新任务的ID
-        glueType: newJobData.glueType, // 确保glueType正确
-      };
-
-      // 创建新节点，位置稍微偏移
-      const newNode = {
-        type: originalNodeData.type,
-        x: jobNode.nodePositionX,
-        y: jobNode.nodePositionY,
-        text: newJobData.jobDesc,
-        properties: newProperties,
-      };
-
-      console.log(
-        `🆔 新节点独立jobId: ${newProperties.jobId}, glueType: ${newProperties.glueType}`
-      );
-
+      const newNode = await copyNode(originalNodeData);
       // 添加新节点
       lfInstance.addNode(newNode);
 
@@ -1328,6 +1443,60 @@ function bindEvents(lfInstance: any): void {
     if (getCurrentPageRunStatus()) return;
     lfInstance.deleteNode(nodeId);
   });
+}
+
+
+async function copyNode(node: any) {
+  const originalJobId = node.properties?.jobId;
+  // 获取原任务的完整数据
+  const originalJobData = await JobInfoAPI.getFormData(originalJobId);
+
+  // 创建新任务的数据，移除ID相关字段，添加_copy后缀
+  const newJobData = {
+    ...originalJobData,
+    id: undefined, // 移除id，让后端自动生成新的
+    jobDesc: (originalJobData.jobDesc || "") + "_copy",
+    addTime: undefined,
+    updateTime: undefined,
+    triggerLastTime: undefined,
+    triggerNextTime: undefined,
+    nodePositionX: originalJobData.nodePositionX + 50,
+    nodePositionY: originalJobData.nodePositionY + 50,
+  };
+
+  // 调用后端API创建新任务
+
+  const jobNode = await JobInfoAPI.saveJobNode(newJobData);
+
+  // 检查后端返回的数据是否有效
+  if (!jobNode) {
+    console.error(`❌ 后端返回的数据为空`);
+    ElMessage.error(
+        "复制节点失败: 后端创建任务失败，未返回新任务数据。请检查后端API实现。"
+    );
+    return;
+  }
+
+  // 创建新的独立属性，使用新的jobId
+  const newProperties = {
+    ...JSON.parse(JSON.stringify(node.properties || {})), // 深拷贝原属性
+    jobId: jobNode.jobId, // 使用新任务的ID
+    glueType: newJobData.glueType, // 确保glueType正确
+  };
+
+  // 创建新节点，位置稍微偏移
+  const newNode = {
+    type: node.type,
+    x: jobNode.nodePositionX,
+    y: jobNode.nodePositionY,
+    text: newJobData.jobDesc,
+    properties: newProperties,
+  };
+
+  console.log(
+      `🆔 新节点独立jobId: ${newProperties.jobId}, glueType: ${newProperties.glueType}`
+  );
+  return newNode;
 }
 
 /**
@@ -2145,6 +2314,73 @@ const throttledMouseMove = throttle((e: MouseEvent) => {
     platformHeight.value = newHeight;
   }
 }, 16); // 约60fps
+
+/**
+ * 处理粘贴的任务节点
+ * 为粘贴的任务节点创建新的后端任务
+ * @param pastedNodes 新粘贴的节点
+ * @param originalNodes 原始节点数据（用于获取任务信息）
+ */
+async function handlePastedTaskNodes(pastedNodes: any[], originalNodes: any[]) {
+  try {
+    for (let i = 0; i < pastedNodes.length; i++) {
+      const pastedNode = pastedNodes[i];
+      const originalNode = originalNodes[i];
+      
+      // 检查是否是任务节点（有jobId的节点）
+      if (originalNode.properties?.jobId && 
+          originalNode.properties.jobId !== null && 
+          originalNode.properties.jobId !== undefined) {
+        
+        try {
+          // 获取原任务的完整数据
+          const originalJobData = await JobInfoAPI.getFormData(originalNode.properties.jobId);
+          
+          // 创建新任务的数据
+          const newJobData = {
+            ...originalJobData,
+            id: undefined, // 移除id，让后端自动生成新的
+            jobDesc: (originalJobData.jobDesc || "") + "_copy",
+            addTime: undefined,
+            updateTime: undefined,
+            triggerLastTime: undefined,
+            triggerNextTime: undefined,
+            nodePositionX: pastedNode.x,
+            nodePositionY: pastedNode.y,
+          };
+
+          // 调用后端API创建新任务
+          const jobNode = await JobInfoAPI.saveJobNode(newJobData);
+          
+          if (jobNode && jobNode.jobId) {
+            // 更新节点的jobId属性
+            const nodeModel = lfInstances.value[usePageStoreHook().getCurrentPage()].getNodeModelById(pastedNode.id);
+            if (nodeModel) {
+              nodeModel.setProperties({
+                ...nodeModel.getProperties(),
+                jobId: jobNode.jobId,
+              });
+            }
+            
+            console.log(`✅ 任务节点 ${pastedNode.id} 已关联新任务 ${jobNode.jobId}`);
+          }
+        } catch (error: any) {
+          console.error(`❌ 为粘贴节点 ${pastedNode.id} 创建任务失败:`, error);
+          ElMessage.warning(`节点 ${pastedNode.text || pastedNode.id} 的任务创建失败，将作为普通节点使用`);
+        }
+      }
+    }
+    
+    // 刷新任务树
+    if (typeof window.refreshTreeData === 'function') {
+      window.refreshTreeData();
+    }
+    
+  } catch (error: any) {
+    console.error("处理粘贴任务节点失败:", error);
+    ElMessage.warning("部分任务节点处理失败，请检查节点状态");
+  }
+}
 </script>
 
 <template>

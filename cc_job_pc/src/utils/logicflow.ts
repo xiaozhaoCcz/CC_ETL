@@ -47,12 +47,56 @@ export function generateNode(node: any) {
  * @returns LogicFlow边对象
  */
 export function generateEdge(edge: any) {
-    return {
-        id: edge.id,
-        sourceNodeId: edge.fromNodeId,
-        targetNodeId: edge.endNodeId,
-        type: "bezier",
+    // 验证输入参数
+    if (!edge || typeof edge !== 'object') {
+        console.warn('generateEdge: 无效的边数据', edge);
+        return null;
+    }
+
+    // 确保边数据包含必要的锚点信息
+    const edgeData: any = {
+        id: edge.id || `edge_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        sourceNodeId: edge.fromNodeId || edge.sourceNodeId,
+        targetNodeId: edge.endNodeId || edge.targetNodeId,
+        type: edge.type || "bezier",
     };
+
+    // 验证必要的属性
+    if (!edgeData.sourceNodeId || !edgeData.targetNodeId) {
+        console.warn('generateEdge: 边数据缺少必要的节点ID', edge);
+        return null;
+    }
+
+    // 如果原始边数据包含锚点信息，则保留
+    if (edge.anchors && Array.isArray(edge.anchors)) {
+        edgeData.anchors = edge.anchors;
+    }
+
+    // 如果原始边数据包含起点和终点锚点，则保留
+    if (edge.startPoint && typeof edge.startPoint === 'object') {
+        edgeData.startPoint = edge.startPoint;
+    }
+    if (edge.endPoint && typeof edge.endPoint === 'object') {
+        edgeData.endPoint = edge.endPoint;
+    }
+
+    // 如果原始边数据包含控制点，则保留（对于贝塞尔曲线）
+    if (edge.controlPoints && Array.isArray(edge.controlPoints)) {
+        edgeData.controlPoints = edge.controlPoints;
+    }
+
+    // 添加默认的锚点配置（如果完全没有锚点信息）
+    if (!edgeData.anchors && !edgeData.startPoint && !edgeData.endPoint) {
+        // 为贝塞尔曲线添加默认锚点
+        if (edgeData.type === 'bezier') {
+            edgeData.anchors = [
+                { x: 0, y: 0, id: 'start' },
+                { x: 0, y: 0, id: 'end' }
+            ];
+        }
+    }
+
+    return edgeData;
 }
 
 /**
@@ -405,3 +449,58 @@ export const canvasOperations = {
         transformModel.zoom(false);
     },
 };
+
+/**
+ * 安全地创建LogicFlow边，包含完整的错误处理
+ * @param lfInstance LogicFlow实例
+ * @param edgeData 边数据
+ * @returns 是否创建成功
+ */
+export function safeAddEdge(lfInstance: any, edgeData: any): boolean {
+    if (!lfInstance || !edgeData) {
+        console.warn('safeAddEdge: 缺少必要参数', { lfInstance, edgeData });
+        return false;
+    }
+
+    try {
+        // 验证边数据的基本结构
+        if (!edgeData.sourceNodeId || !edgeData.targetNodeId) {
+            console.warn('safeAddEdge: 边数据缺少必要的节点ID', edgeData);
+            return false;
+        }
+
+        // 检查源节点和目标节点是否存在
+        const sourceNode = lfInstance.graphModel.getNodeModelById(edgeData.sourceNodeId);
+        const targetNode = lfInstance.graphModel.getNodeModelById(edgeData.targetNodeId);
+        
+        if (!sourceNode || !targetNode) {
+            console.warn('safeAddEdge: 源节点或目标节点不存在', {
+                sourceNodeId: edgeData.sourceNodeId,
+                targetNodeId: edgeData.targetNodeId,
+                sourceExists: !!sourceNode,
+                targetExists: !!targetNode
+            });
+            return false;
+        }
+
+        // 构建完整的边数据
+        const completeEdgeData = {
+            id: edgeData.id || `edge_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            sourceNodeId: edgeData.sourceNodeId,
+            targetNodeId: edgeData.targetNodeId,
+            type: edgeData.type || "bezier",
+            // 确保包含必要的锚点信息
+            anchors: edgeData.anchors || [
+                { x: 0, y: 0, id: 'start' },
+                { x: 0, y: 0, id: 'end' }
+            ]
+        };
+
+        // 添加边到画布
+        lfInstance.addEdge(completeEdgeData);
+        return true;
+    } catch (error) {
+        console.error('safeAddEdge: 创建边失败', error, edgeData);
+        return false;
+    }
+}

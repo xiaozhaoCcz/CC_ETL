@@ -200,6 +200,13 @@ public class JobInfoController {
         return Result.success(jobNode);
     }
 
+    @Operation(summary = "添加任务节点和边")
+    @PostMapping("saveJobNodeAndJobEdges")
+    public Result<Map<String,Object>>  saveJobNodeAndJobEdges(@RequestBody Map<String,Object> formMap){
+        Map<String,Object> data = jobComposeService.saveJobNodeAndJobEdges(formMap);
+        return Result.success(data);
+    }
+
     @Operation(summary = "任务运行状态")
     @GetMapping("getJobStatus/{id}")
     public Result<Boolean>  getJobStatus(@PathVariable Long id){

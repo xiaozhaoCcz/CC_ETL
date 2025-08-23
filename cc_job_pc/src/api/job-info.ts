@@ -3,199 +3,207 @@ import request from "@/utils/request";
 const JOB_INFO_BASE_URL = "/api/v1/jobInfos";
 
 const JobInfoAPI = {
-  initData() {
-    return request({
-      url: `${JOB_INFO_BASE_URL}/initData`,
-      method: "get",
-    });
-  },
-  /** 获取task_info分页数据 */
-  getPage(queryParams?: any) {
-    return request<any, any>({
-      url: `${JOB_INFO_BASE_URL}/page`,
-      method: "get",
-      params: queryParams,
-    });
-  },
+    initData() {
+        return request({
+            url: `${JOB_INFO_BASE_URL}/initData`,
+            method: "get",
+        });
+    },
+    /** 获取task_info分页数据 */
+    getPage(queryParams?: any) {
+        return request<any, any>({
+            url: `${JOB_INFO_BASE_URL}/page`,
+            method: "get",
+            params: queryParams,
+        });
+    },
 
-  getList(jobType?: number) {
-    return request({
-      url: `${JOB_INFO_BASE_URL}/list`,
-      method: "get",
-      params: { jobType },
-    });
-  },
-  /**
-   * 获取task_info表单数据
-   *
-   * @param id TaskInfoID
-   * @returns TaskInfo表单数据
-   */
-  getFormData(id: number) {
-    return request<any, JobInfoForm>({
-      url: `${JOB_INFO_BASE_URL}/${id}/form`,
-      method: "get",
-    });
-  },
+    getList(jobType?: number) {
+        return request({
+            url: `${JOB_INFO_BASE_URL}/list`,
+            method: "get",
+            params: {jobType},
+        });
+    },
+    /**
+     * 获取task_info表单数据
+     *
+     * @param id TaskInfoID
+     * @returns TaskInfo表单数据
+     */
+    getFormData(id: number) {
+        return request<any, JobInfoForm>({
+            url: `${JOB_INFO_BASE_URL}/${id}/form`,
+            method: "get",
+        });
+    },
 
-  /** 添加task_info*/
-  add(data: JobInfoForm) {
-    return request({
-      url: `${JOB_INFO_BASE_URL}`,
-      method: "post",
-      data: data,
-    });
-  },
+    /** 添加task_info*/
+    add(data: JobInfoForm) {
+        return request({
+            url: `${JOB_INFO_BASE_URL}`,
+            method: "post",
+            data: data,
+        });
+    },
 
-  /**
-   * 更新task_info
-   *
-   * @param id TaskInfoID
-   * @param data TaskInfo表单数据
-   */
-  update(id: number, data: JobInfoForm) {
-    return request({
-      url: `${JOB_INFO_BASE_URL}/${id}`,
-      method: "put",
-      data: data,
-    });
-  },
+    /**
+     * 更新task_info
+     *
+     * @param id TaskInfoID
+     * @param data TaskInfo表单数据
+     */
+    update(id: number, data: JobInfoForm) {
+        return request({
+            url: `${JOB_INFO_BASE_URL}/${id}`,
+            method: "put",
+            data: data,
+        });
+    },
 
-  /**
-   * 批量删除task_info，多个以英文逗号(,)分割
-   *
-   * @param ids task_infoID字符串，多个以英文逗号(,)分割
-   */
-  deleteByIds(ids: string) {
-    return request({
-      url: `${JOB_INFO_BASE_URL}/${ids}`,
-      method: "delete",
-    });
-  },
+    /**
+     * 批量删除task_info，多个以英文逗号(,)分割
+     *
+     * @param ids task_infoID字符串，多个以英文逗号(,)分割
+     */
+    deleteByIds(ids: string) {
+        return request({
+            url: `${JOB_INFO_BASE_URL}/${ids}`,
+            method: "delete",
+        });
+    },
 
-  triggerJob(data: any) {
-    return request({
-      url: `${JOB_INFO_BASE_URL}/trigger`,
-      method: "post",
-      data: data,
-    });
-  },
+    triggerJob(data: any) {
+        return request({
+            url: `${JOB_INFO_BASE_URL}/trigger`,
+            method: "post",
+            data: data,
+        });
+    },
 
-  startJob(id: number) {
-    return request({
-      url: `${JOB_INFO_BASE_URL}/startJob/${id}`,
-      method: "get",
-    });
-  },
+    startJob(id: number) {
+        return request({
+            url: `${JOB_INFO_BASE_URL}/startJob/${id}`,
+            method: "get",
+        });
+    },
 
-  stopJob(id: number) {
-    return request({
-      url: `${JOB_INFO_BASE_URL}/stopJob/${id}`,
-      method: "get",
-    });
-  },
+    stopJob(id: number) {
+        return request({
+            url: `${JOB_INFO_BASE_URL}/stopJob/${id}`,
+            method: "get",
+        });
+    },
 
-  stopJobCompose(id: number, randomId: string) {
-    return request({
-      url: `${JOB_INFO_BASE_URL}/stopJobCompose/${id}/${randomId}`,
-      method: "get",
-    });
-  },
+    stopJobCompose(id: number, randomId: string) {
+        return request({
+            url: `${JOB_INFO_BASE_URL}/stopJobCompose/${id}/${randomId}`,
+            method: "get",
+        });
+    },
 
-  nextTriggerTime(scheduleType: string, scheduleConf: string) {
-    return request({
-      url: `${JOB_INFO_BASE_URL}/nextTriggerTime`,
-      method: "get",
-      params: { scheduleType, scheduleConf },
-    });
-  },
+    nextTriggerTime(scheduleType: string, scheduleConf: string) {
+        return request({
+            url: `${JOB_INFO_BASE_URL}/nextTriggerTime`,
+            method: "get",
+            params: {scheduleType, scheduleConf},
+        });
+    },
 
-  /** 添加task_info*/
-  saveJobCompose(data: JobInfoForm) {
-    return request({
-      url: `${JOB_INFO_BASE_URL}/saveJobCompose`,
-      method: "post",
-      data: data,
-    });
-  },
+    /** 添加task_info*/
+    saveJobCompose(data: JobInfoForm) {
+        return request({
+            url: `${JOB_INFO_BASE_URL}/saveJobCompose`,
+            method: "post",
+            data: data,
+        });
+    },
 
-  updateJobCompose(id: number, data: JobInfoForm) {
-    return request({
-      url: `${JOB_INFO_BASE_URL}/updateJobCompose/${id}`,
-      method: "put",
-      data: data,
-    });
-  },
+    updateJobCompose(id: number, data: JobInfoForm) {
+        return request({
+            url: `${JOB_INFO_BASE_URL}/updateJobCompose/${id}`,
+            method: "put",
+            data: data,
+        });
+    },
 
-  saveGlueSource(data: any) {
-    return request({
-      url: `${JOB_INFO_BASE_URL}/saveGlueSource`,
-      method: "post",
-      data: data,
-    });
-  },
+    saveGlueSource(data: any) {
+        return request({
+            url: `${JOB_INFO_BASE_URL}/saveGlueSource`,
+            method: "post",
+            data: data,
+        });
+    },
 
-  getGlueList(id: number) {
-    return request({
-      url: `${JOB_INFO_BASE_URL}/getGlueList/${id}`,
-      method: "get",
-    });
-  },
-  getJobCompose(data: any) {
-    return request({
-      url: `${JOB_INFO_BASE_URL}/getJobCompose`,
-      method: "post",
-      data: data,
-    });
-  },
-  validateJobComposeEdge(data: JobInfoForm) {
-    return request({
-      url: `${JOB_INFO_BASE_URL}/validateJobComposeEdge`,
-      method: "post",
-      data: data,
-    });
-  },
-  pauseJob(id: number, isPause: number) {
-    return request({
-      url: `${JOB_INFO_BASE_URL}/pauseJob/${id}`,
-      method: "get",
-      params: { isPause },
-    });
-  },
-  /** 添加task_info*/
-  saveJobNode(data: JobInfoForm) {
-    return request({
-      url: `${JOB_INFO_BASE_URL}/saveJobNode`,
-      method: "post",
-      data: data,
-    });
-  },
-  getJobStatus(id: number) {
-    return request({
-      url: `${JOB_INFO_BASE_URL}/getJobStatus/${id}`,
-      method: "get",
-    });
-  },
-  updateJobNode(jobId: number, nodeId: number) {
-    return request({
-      url: `${JOB_INFO_BASE_URL}/updateJobNode/${jobId}/${nodeId}`,
-      method: "get",
-    });
-  },
+    getGlueList(id: number) {
+        return request({
+            url: `${JOB_INFO_BASE_URL}/getGlueList/${id}`,
+            method: "get",
+        });
+    },
+    getJobCompose(data: any) {
+        return request({
+            url: `${JOB_INFO_BASE_URL}/getJobCompose`,
+            method: "post",
+            data: data,
+        });
+    },
+    validateJobComposeEdge(data: JobInfoForm) {
+        return request({
+            url: `${JOB_INFO_BASE_URL}/validateJobComposeEdge`,
+            method: "post",
+            data: data,
+        });
+    },
+    pauseJob(id: number, isPause: number) {
+        return request({
+            url: `${JOB_INFO_BASE_URL}/pauseJob/${id}`,
+            method: "get",
+            params: {isPause},
+        });
+    },
+    /** 添加task_info*/
+    saveJobNode(data: JobInfoForm) {
+        return request({
+            url: `${JOB_INFO_BASE_URL}/saveJobNode`,
+            method: "post",
+            data: data,
+        });
+    },
 
-  pauseJobs(data: any) {
-    return request({
-      url: `${JOB_INFO_BASE_URL}/pauseJobs`,
-      method: "post",
-      data: data,
-    });
-  },
-  deleteJobNode(nodeId: number) {
-    return request({
-      url: `${JOB_INFO_BASE_URL}/deleteJobNode/${nodeId}`,
-      method: "get",
-    });
-  },
+    saveJobNodeAndJobEdges(data: any) {
+        return request({
+            url: `${JOB_INFO_BASE_URL}/saveJobNodeAndJobEdges`,
+            method: "post",
+            data: data,
+        });
+    },
+    getJobStatus(id: number) {
+        return request({
+            url: `${JOB_INFO_BASE_URL}/getJobStatus/${id}`,
+            method: "get",
+        });
+    },
+    updateJobNode(jobId: number, nodeId: number) {
+        return request({
+            url: `${JOB_INFO_BASE_URL}/updateJobNode/${jobId}/${nodeId}`,
+            method: "get",
+        });
+    },
+
+    pauseJobs(data: any) {
+        return request({
+            url: `${JOB_INFO_BASE_URL}/pauseJobs`,
+            method: "post",
+            data: data,
+        });
+    },
+    deleteJobNode(nodeId: number) {
+        return request({
+            url: `${JOB_INFO_BASE_URL}/deleteJobNode/${nodeId}`,
+            method: "get",
+        });
+    },
 };
 
 export default JobInfoAPI;

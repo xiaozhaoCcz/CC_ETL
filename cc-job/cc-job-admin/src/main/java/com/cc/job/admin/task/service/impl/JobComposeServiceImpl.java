@@ -16,12 +16,14 @@ import com.cc.job.xo.model.form.JobGlueForm;
 import com.cc.job.xo.model.form.JobInfoForm;
 import com.cc.job.xo.model.vo.JobEdgeVo;
 import com.cc.job.xo.model.vo.JobNodeVo;
+import com.google.gson.Gson;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -463,6 +465,114 @@ public class JobComposeServiceImpl implements JobComposeService {
         //删除与之相关的边
         jobEdgeService.remove(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getFromNodeId,nodeId).or().eq(JobEdge::getEndNodeId,nodeId));
     }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> saveJobNodeAndJobEdges(Map<String, Object> formMap) {
+        Object nodes = formMap.get("nodes");
+        Object edges = formMap.get("edges");
+        Object parentId = formMap.get("jobId");
+        Map<Long,Long> nodeIds = new HashMap<>();
+        Map<String,Object> result = new HashMap<>();
+
+            Object[] objects = ((ArrayList<?>) nodes).toArray();
+            List<JobNode> jobNodes = new ArrayList<>();
+            for (Object object : objects) {
+                Map<String, Object> objectMap = (Map<String, Object>) object;
+                Object id = objectMap.get("id");
+                Object properties = objectMap.get("properties");
+                Object x = objectMap.get( "x");
+                Object y = objectMap.get("y");
+
+                Map<String, Object> propertiesMap = (Map<String, Object>)properties;
+                Object width = propertiesMap.get("width");
+                Object height = propertiesMap.get("height");
+                Object jobId = propertiesMap.get("jobId");
+                Object glueType = objectMap.get("type");
+                // 添加新的节点
+                JobInfo jobInfo = jobInfoService.getById(String.valueOf(jobId));
+                jobInfo.setJobDesc(jobInfo.getJobDesc()+"_copy");
+                jobInfo.setParentId(Long.parseLong(String.valueOf(parentId)));
+                jobInfo.setIsNode("Y");
+                jobInfo.setIsPause(0);
+                jobInfo.setId(null);
+                jobInfoService.save(jobInfo);
+                JobNode jobNode = new JobNode();
+                jobNode.setJobId(jobInfo.getId());
+                jobNode.setJobParentId(Long.parseLong(String.valueOf(parentId)));
+                jobNode.setNodeType(String.valueOf(glueType));
+                jobNode.setNodePositionX(x==null?(double)0:(Double.parseDouble(String.valueOf(x))+50));
+                jobNode.setNodePositionY(x==null?(double)0:(Double.parseDouble(String.valueOf(y))+50));
+                Map<String,Object> propertieMap = new HashMap<>();
+                propertieMap.put(JOB_ID, jobInfo.getId());
+                propertieMap.put("width",width);
+                propertieMap.put("height",height);
+                jobNode.setProperties(JSONUtil.toJsonStr(propertieMap));
+                jobNodeService.save(jobNode);
+                nodeIds.put(Long.parseLong(String.valueOf(id)),jobNode.getId());
+                jobNodes.add(jobNode);
+
+            }
+
+
+            Object[] objects2 = ((ArrayList<?>) edges).toArray();;
+            List<JobEdge> jobEdges = new ArrayList<>();
+            for (Object object : objects2) {
+                Map<String, Object> objectMap = (Map<String, Object>) object;
+                Object sourceNodeId = objectMap.get("sourceNodeId");
+                Object targetNodeId = objectMap.get("targetNodeId");
+                JobEdge jobEdge = jobEdgeService.getOne(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getFromNodeId,Long.parseLong(String.valueOf(sourceNodeId))).eq(JobEdge::getEndNodeId,Long.parseLong(String.valueOf(targetNodeId))));
+                Long fromNodeId = jobEdge.getFromNodeId();
+                Long endNodeId = jobEdge.getEndNodeId();
+                JobEdge newjobEdge = new JobEdge();
+                newjobEdge.setFromNodeId(nodeIds.get(fromNodeId));
+                newjobEdge.setEndNodeId(nodeIds.get(endNodeId));
+                newjobEdge.setJobParentId(Long.parseLong(String.valueOf(parentId)));
+                jobEdgeService.save(newjobEdge);
+                jobEdges.add(newjobEdge);
+
+            }
+            result.put("nodes",jobNodes);
+            result.put("edges",jobEdges);
+            result.put("nodeIds",nodeIds);
+        return result;
+    }
+
+    public static Object getPropertyValue(Object obj, String propertyName) {
+        if (obj == null || propertyName == null) return null;
+
+        try {
+            Class<?> clazz = obj.getClass();
+            Field field = clazz.getDeclaredField(propertyName);
+            field.setAccessible(true);
+            return field.get(obj);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public static Map<String, Object> convertToMapExcludeNull(Object obj) {
+        if (obj == null) return null;
+
+        Map<String, Object> map = new HashMap<>();
+        try {
+            Class<?> clazz = obj.getClass();
+            Field[] fields = clazz.getDeclaredFields();
+
+            for (Field field : fields) {
+                field.setAccessible(true);
+                Object value = field.get(obj);
+                if (value != null) {
+                    map.put(field.getName(), value);
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return map;
+    }
+
 
     /**
      * !!!!重点:获取任务组的宽度和高度，并获取任务组起始位置

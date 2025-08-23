@@ -12,6 +12,13 @@ export const usePageStore = defineStore("page", () => {
 
   const loactionObject = ref<object>({});
 
+  // 新增：剪贴板状态管理
+  const clipboard = ref<{
+    nodes: any[];
+    edges: any[];
+    timestamp: number;
+  } | null>(null);
+
   function addPage(data: any) {
     currentPage.value = data.id;
     const p = pages.value.find((item) => item.id === data.id);
@@ -88,6 +95,38 @@ export const usePageStore = defineStore("page", () => {
     loactionObject.value = {};
   }
 
+  // 新增：设置剪贴板内容
+  function setClipboard(nodes: any[], edges: any[]) {
+    clipboard.value = {
+      nodes: JSON.parse(JSON.stringify(nodes)), // 深拷贝
+      edges: JSON.parse(JSON.stringify(edges)), // 深拷贝
+      timestamp: Date.now(),
+    };
+  }
+
+  // 新增：获取剪贴板内容
+  function getClipboard() {
+    return clipboard.value;
+  }
+
+  // 新增：清空剪贴板
+  function clearClipboard() {
+    clipboard.value = null;
+  }
+
+  // 新增：检查剪贴板是否为空
+  function isClipboardEmpty(): boolean {
+    return !clipboard.value || 
+           (!clipboard.value.nodes.length && !clipboard.value.edges.length);
+  }
+
+  // 新增：检查剪贴板是否过期（超过1小时）
+  function isClipboardExpired(): boolean {
+    if (!clipboard.value) return true;
+    const oneHour = 60 * 60 * 1000; // 1小时的毫秒数
+    return Date.now() - clipboard.value.timestamp > oneHour;
+  }
+
   return {
     pages,
     addPage,
@@ -106,14 +145,18 @@ export const usePageStore = defineStore("page", () => {
     setLoactionObject,
     getLoactionObject,
     clearLoactionObject,
+    // 剪贴板相关方法
+    setClipboard,
+    getClipboard,
+    clearClipboard,
+    isClipboardEmpty,
+    isClipboardExpired,
   };
 });
 
 /**
  * 用于在组件外部（如在Pinia Store 中）使用 Pinia 提供的 store 实例。
  * 官方文档解释了如何在组件外部使用 Pinia Store：
- * https://pinia.vuejs.org/core-concepts/outside-component-usage.html#using-a-store-outside-of-a-component
+ * https://pinia.vuejs.org/core-concepts/outside-component-usage.html#usage-outside-of-components.html
  */
-export function usePageStoreHook() {
-  return usePageStore(store);
-}
+export const usePageStoreHook = () => usePageStore(store);
