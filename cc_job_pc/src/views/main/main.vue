@@ -1123,6 +1123,7 @@ function initLogicFlowInstance(pageId: number): any {
               const totalElements = selectedNodes.length + selectedEdges.length;
               ElMessage.success(`已复制 ${totalElements} 个元素到剪贴板`);
               console.log("复制到剪贴板:", { nodes: selectedNodes, edges: selectedEdges });
+
             },
           },
           {
@@ -1158,7 +1159,6 @@ function initLogicFlowInstance(pageId: number): any {
               }
 
 
-
               try {
                 // 粘贴节点
                 if(clipboardData.nodes.length == 1&&clipboardData.edges.length == 0) {
@@ -1167,7 +1167,7 @@ function initLogicFlowInstance(pageId: number): any {
                   const newNode = await copyNode(node);
                   // 添加新节点
                   currentLf.addNode(newNode);
-
+                  
                   //刷新任务树
                   refreshTreeData();
 
@@ -1243,6 +1243,29 @@ function initLogicFlowInstance(pageId: number): any {
                       console.log(`边创建成功: ${newEdge.id}`);
                     }
                   })
+
+                  //设置框选 - 选择新粘贴的节点
+                  // 清除当前选择
+                  const currentElements = currentLf.graphModel.getSelectElements(true);
+                  currentElements.nodes.forEach((node: any) => {
+                    const nodeModel = currentLf.getNodeModelById(node.id);
+                    if (nodeModel) nodeModel.setSelected(false);
+                  });
+                  currentElements.edges.forEach((edge: any) => {
+                    const edgeModel = currentLf.getEdgeModelById(edge.id);
+                    if (edgeModel) edgeModel.setSelected(false);
+                  });
+                  
+                  // 选择新粘贴的元素
+                  newNodes.forEach((node: any) => {
+                    const nodeModel = currentLf.getNodeModelById(node.id);
+                    if (nodeModel) nodeModel.setSelected(true);
+                  });
+                  newEdges.forEach((edge: any) => {
+                    const edgeModel = currentLf.getEdgeModelById(edge.id);
+                    if (edgeModel) edgeModel.setSelected(true);
+                  });
+
                   //刷新任务树
                   refreshTreeData();
                   
@@ -1384,6 +1407,22 @@ function bindEvents(lfInstance: any): void {
       const newNode = await copyNode(originalNodeData);
       // 添加新节点
       lfInstance.addNode(newNode);
+
+      //设置框选 - 选择新复制的节点
+      // 清除当前选择
+      const currentElements = lfInstance.graphModel.getSelectElements(true);
+      currentElements.nodes.forEach((node: any) => {
+        const nodeModel = lfInstance.getNodeModelById(node.id);
+        if (nodeModel) nodeModel.setSelected(false);
+      });
+      currentElements.edges.forEach((edge: any) => {
+        const edgeModel = lfInstance.getEdgeModelById(edge.id);
+        if (edgeModel) edgeModel.setSelected(false);
+      });
+      
+      // 选择新复制的节点
+      const newNodeModel = lfInstance.getNodeModelById(newNode.id);
+      if (newNodeModel) newNodeModel.setSelected(true);
 
       //刷新任务树
       refreshTreeData();
@@ -1642,6 +1681,22 @@ const menuConfig = {
 
           // 添加新节点
           currentLf.addNode(newNode);
+
+          //设置框选 - 选择新复制的节点
+          // 清除当前选择
+          const currentElements = currentLf.graphModel.getSelectElements(true);
+          currentElements.nodes.forEach((node: any) => {
+            const nodeModel = currentLf.getNodeModelById(node.id);
+            if (nodeModel) nodeModel.setSelected(false);
+          });
+          currentElements.edges.forEach((edge: any) => {
+            const edgeModel = currentLf.getEdgeModelById(edge.id);
+            if (edgeModel) edgeModel.setSelected(false);
+          });
+          
+          // 选择新复制的节点
+          const newNodeModel = currentLf.getNodeModelById(newNode.id);
+          if (newNodeModel) newNodeModel.setSelected(true);
 
           ElMessage.success("节点复制成功，已创建独立的后端任务");
         } catch (error) {
