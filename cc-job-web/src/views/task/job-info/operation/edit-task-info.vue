@@ -392,6 +392,10 @@ import NoVue3Cron from "@/components/NoVue3Cron/index.vue";
 import EditTable from "@/components/EditTable/EditTable.vue";
 import JobJdbcDatasourceAPI from "@/api/task/job-jdbc-datasource";
 import IncrEditTable from "@/views/task/job-datax/componects/IncrEditTable.vue";
+import { defineAsyncComponent } from "vue";
+
+// Lazy-load JSON editor when needed
+const JsonEditorVue = defineAsyncComponent(() => import("json-editor-vue3"));
 
 const emit = defineEmits(["close", "handleResetQuery"]);
 

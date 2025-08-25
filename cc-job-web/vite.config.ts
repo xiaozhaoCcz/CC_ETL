@@ -1,5 +1,6 @@
 import vue from "@vitejs/plugin-vue";
 import { type UserConfig, type ConfigEnv, loadEnv, defineConfig } from "vite";
+import viteCompression from "vite-plugin-compression";
 
 import AutoImport from "unplugin-auto-import/vite";
 import Components from "unplugin-vue-components/vite";
@@ -71,6 +72,9 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
       UnoCSS({
         hmrTopLevelAwait: false,
       }),
+      // Output pre-compressed assets (brotli + gzip) for faster network delivery
+      viteCompression({ algorithm: "brotliCompress", ext: ".br", threshold: 1024, deleteOriginFile: false }),
+      viteCompression({ algorithm: "gzip", ext: ".gz", threshold: 1024, deleteOriginFile: false }),
       // 自动导入配置 https://github.com/sxzz/element-plus-best-practices/blob/main/vite.config.ts
       AutoImport({
         // 导入 Vue 函数，如：ref, reactive, toRef 等
@@ -207,6 +211,19 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
       },
       rollupOptions: {
         output: {
+          // Split heavy vendor libraries into separate async chunks to improve caching and initial load
+          manualChunks(id) {
+            if (id.includes("node_modules")) {
+              if (id.includes("element-plus")) return "vendor-element-plus";
+              if (id.includes("@logicflow")) return "vendor-logicflow";
+              if (id.includes("monaco-editor")) return "vendor-monaco";
+              if (id.includes("codemirror")) return "vendor-codemirror";
+              if (id.includes("@wangeditor")) return "vendor-wangeditor";
+              if (id.includes("echarts")) return "vendor-echarts";
+              if (id.match(/\/(vue|vue-router|pinia)\//)) return "vendor-vue";
+              return "vendor";
+            }
+          },
           // manualChunks: {
           //   "vue-i18n": ["vue-i18n"],
           // },

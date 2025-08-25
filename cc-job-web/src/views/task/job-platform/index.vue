@@ -185,6 +185,7 @@ import CustomGroup from "@/components/CustomGroup/CustomGroup";
 import router from "@/router";
 import Dialog from "@/components/Dialog/Dialog.vue";
 import JobLogAPI from "@/api/task/job-log";
+import { defineAsyncComponent } from "vue";
 import CustomRect, { CustomRectModel, CustomRectView } from "./node/CustomRect";
 
 LogicFlow.use(Control); // 控制面板
@@ -309,7 +310,7 @@ const menuConfig = {
     },
   ],
   // edgeMenu: false, // 删除默认的边右键菜单
-  graphMenu: [], // 覆盖默认的边右键菜单，与false表现一样
+  // graphMenu: [], // 覆盖默认的边右键菜单，与false表现一样
 };
 const jobComposeVisible = reactive({
   title: "",
@@ -343,6 +344,9 @@ const logHeight = ref("100vh");
 const fromLineNum = ref(0);
 let logRun: any = null;
 const pullFailCount = ref(0);
+
+// Lazy-load Codemirror editor only when dialog is rendered
+const Codemirror = defineAsyncComponent(async () => (await import("codemirror-editor-vue3")).Codemirror);
 
 onBeforeRouteLeave((to, from, next) => {
   if (triggerOneVisible.value) {

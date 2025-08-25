@@ -5,7 +5,6 @@ import { setupRouter } from "@/router";
 import { setupStore } from "@/store";
 import { setupElIcons } from "./icons";
 import { setupPermission } from "./permission";
-import { InstallCodeMirror } from "codemirror-editor-vue3";
 
 export default {
   install(app: App<Element>) {
@@ -19,7 +18,5 @@ export default {
     setupElIcons(app);
     // 路由守卫
     setupPermission();
-    // 注册 CodeMirror
-    app.use(InstallCodeMirror);
   },
 };

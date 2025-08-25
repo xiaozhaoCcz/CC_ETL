@@ -238,6 +238,10 @@ import JobInfoAPI from "@/api/task/job-info";
 //当前使用的页面引入
 import NoVue3Cron from "@/components/NoVue3Cron/index.vue";
 import IncrEditTable from "@/views/task/job-datax/componects/IncrEditTable.vue";
+import { defineAsyncComponent } from "vue";
+
+// Lazy-load JSON editor when needed
+const JsonEditorVue = defineAsyncComponent(() => import("json-editor-vue3"));
 
 const emit = defineEmits(["pre"]);
 

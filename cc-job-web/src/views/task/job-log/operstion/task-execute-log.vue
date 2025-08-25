@@ -27,6 +27,7 @@
 <script setup lang="ts">
 import JobLogAPI from "@/api/task/job-log";
 import { FullScreen } from "@element-plus/icons-vue";
+import { defineAsyncComponent } from "vue";
 
 const emit = defineEmits(["close"]);
 const props = defineProps({
@@ -46,6 +47,9 @@ const pullFailCount = ref(0);
 let logRun: any = null;
 const fullscreen = ref(false);
 const logHeight = ref("800px");
+
+// Lazy-load Codemirror only when the dialog is used
+const Codemirror = defineAsyncComponent(async () => (await import("codemirror-editor-vue3")).Codemirror);
 
 const cmOptions = {
   mode: "log",
