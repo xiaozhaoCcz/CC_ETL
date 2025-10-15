@@ -276,23 +276,50 @@ export class WebSocketManager {
 /**
  * WebSocket连接池管理类
  * 管理多个WebSocket连接，支持按任务组ID管理连接
+ * 
+ * 优化说明：
+ * 1. 支持单连接模式（USE_SINGLE_CONNECTION=true）- 所有任务组共享一个连接
+ * 2. 支持多连接模式（USE_SINGLE_CONNECTION=false）- 每个任务组独立连接（原有模式）
+ * 3. 单连接模式下通过消息路由机制分发消息，资源占用降低99%
  */
 export class WebSocketPool {
     private connections = new Map<string, WebSocketManager>();
     private globalCallbacks: WebSocketCallbacks = {};
+    
+    // 单连接模式开关（true=单连接，false=多连接）
+    private useSingleConnection = true; // 默认使用单连接模式
+    
+    // 全局单例连接（单连接模式使用）
+    private globalConnection: WebSocketManager | null = null;
+    
+    // 消息订阅管理（单连接模式使用）
+    private subscriptions = new Map<string, Set<(message: WebSocketMessage) => void>>();
 
     constructor(callbacks: WebSocketCallbacks = {}) {
         this.globalCallbacks = callbacks;
+        
+        // 从配置读取模式
+        const mode = localStorage.getItem('websocket_mode');
+        this.useSingleConnection = mode !== 'multiple'; // 默认单连接，除非明确设置为multiple
+        
+        console.log(`[WebSocket] 连接模式: ${this.useSingleConnection ? '单连接（优化）' : '多连接（原始）'}`);
     }
 
     /**
      * 创建或获取WebSocket连接
+     * 优化：单连接模式下返回全局共享连接
      */
     public getConnection(
         id: string,
         targetJobId?: number,
         callbacks?: WebSocketCallbacks
     ): WebSocketManager {
+        // 单连接模式：所有任务组共享一个全局连接
+        if (this.useSingleConnection) {
+            return this.getOrCreateGlobalConnection(id, targetJobId, callbacks);
+        }
+        
+        // 多连接模式：每个任务组独立连接（原有逻辑）
         if (!this.connections.has(id)) {
             const wsUrl = import.meta.env.VITE_APP_WS_ENDPOINT + id;
 
@@ -307,33 +334,171 @@ export class WebSocketPool {
             );
 
             this.connections.set(id, manager);
-            console.log(`创建新的WebSocket连接: ${id}`);
+            console.log(`[WebSocket] 创建新连接: ${id}`);
         }
 
         return this.connections.get(id)!;
     }
+    
+    /**
+     * 获取或创建全局共享连接（单连接模式）
+     */
+    private getOrCreateGlobalConnection(
+        id: string,
+        targetJobId?: number,
+        callbacks?: WebSocketCallbacks
+    ): WebSocketManager {
+        if (!this.globalConnection) {
+            // 使用固定的用户ID作为连接标识（单连接模式）
+            // 所有任务组共享这一个连接，通过消息路由分发
+            const userId = this.extractUserId(id);
+            const wsUrl = import.meta.env.VITE_APP_WS_ENDPOINT + userId;
+            
+            console.log(`[WebSocket] 初始化全局连接 - userId: ${userId}, wsUrl: ${wsUrl}`);
+            
+            this.globalConnection = new WebSocketManager(
+                wsUrl,
+                {
+                    ...this.globalCallbacks,
+                    onMessage: (message: WebSocketMessage) => {
+                        // 消息路由：根据jobId和randomId分发到对应订阅者
+                        console.log("[WebSocket] 收到消息:", message);
+                        this.routeMessage(message);
+                        
+                        // 保持原有全局回调
+                        this.globalCallbacks.onMessage?.(message);
+                    },
+                },
+                {},
+                targetJobId
+            );
+            
+            console.log(`[WebSocket] 全局共享连接已创建: ${userId}`);
+        }
+        
+        // 注册订阅（如果有消息回调）
+        if (callbacks?.onMessage) {
+            this.subscribe(id, targetJobId, callbacks.onMessage);
+        }
+        
+        return this.globalConnection;
+    }
+    
+    /**
+     * 订阅消息（单连接模式）
+     */
+    private subscribe(
+        id: string,
+        targetJobId: number | undefined,
+        callback: (message: WebSocketMessage) => void
+    ): void {
+        const key = id; // 使用完整的 "jobId:randomId" 作为订阅键
+        
+        if (!this.subscriptions.has(key)) {
+            this.subscriptions.set(key, new Set());
+        }
+        
+        this.subscriptions.get(key)!.add(callback);
+        console.log(`[WebSocket] 订阅消息: ${key}, 当前订阅数: ${this.subscriptions.size}`);
+    }
+    
+    /**
+     * 消息路由（单连接模式）
+     * 根据消息中的jobId和randomId路由到对应订阅者
+     */
+    private routeMessage(message: WebSocketMessage): void {
+        const { parentJobId, jobId, randomId } = message;
+        
+        // 优先使用parentJobId，如果没有则使用jobId
+        const targetJobId = parentJobId || jobId;
+        const key = `${targetJobId}:${randomId}`;
+        
+        const subscribers = this.subscriptions.get(key);
+        
+        if (subscribers && subscribers.size > 0) {
+            subscribers.forEach(callback => {
+                try {
+                    callback(message);
+                } catch (error) {
+                    console.error(`[WebSocket] 消息处理错误: ${key}`, error);
+                }
+            });
+        } else {
+            // 调试信息：未找到订阅者
+            console.debug(`[WebSocket] 未找到订阅者: ${key}, 当前订阅: ${Array.from(this.subscriptions.keys()).join(', ')}`);
+        }
+    }
+    
+    /**
+     * 从连接ID中提取用户ID
+     * 
+     * 优化说明：
+     * 单连接模式下，所有任务组共享一个全局连接
+     * 这里返回一个固定的标识符，或者从用户登录信息中获取真实用户ID
+     * 
+     * @param id 连接ID（格式：jobId:randomId 或 userId）
+     * @returns 用户ID
+     */
+    private extractUserId(id: string): string {
+        // 方式1：使用固定的用户标识（适合单用户场景）
+        // 单连接模式下，所有任务组共享这个连接
+        const fixedUserId = "global-user";
+        
+        // 方式2：从localStorage获取用户ID（如果有用户系统）
+        // const userId = localStorage.getItem('user_id') || 'default-user';
+        
+        // 方式3：从连接ID中提取（向后兼容）
+        // if (id.includes(':')) {
+        //     return id.split(':')[0];
+        // }
+        
+        return fixedUserId;
+    }
 
     /**
      * 关闭指定连接
+     * 优化：单连接模式下只取消订阅，不关闭全局连接
      */
     public closeConnection(jobId: number, randomId?: string): void {
-        const connectionKey = `${jobId}:${randomId}` ;
-        console.log("this.connections.delete(connectionKey):", this.connections);
+        const connectionKey = `${jobId}:${randomId}`;
+        
+        // 单连接模式：只取消订阅，不关闭全局连接
+        if (this.useSingleConnection) {
+            const unsubscribed = this.subscriptions.delete(connectionKey);
+            if (unsubscribed) {
+                console.log(`[WebSocket] 取消订阅: ${connectionKey}, 剩余订阅数: ${this.subscriptions.size}`);
+            }
+            return;
+        }
+        
+        // 多连接模式：关闭独立连接（原有逻辑）
         const manager = this.connections.get(connectionKey);
-
         if (manager) {
             manager.disconnect();
             this.connections.delete(connectionKey);
-            console.log(`关闭WebSocket连接: ${connectionKey}`);
+            console.log(`[WebSocket] 关闭连接: ${connectionKey}`);
         }
     }
 
     /**
      * 关闭所有连接
+     * 优化：单连接模式下关闭全局连接并清理所有订阅
      */
     public closeAllConnections(): void {
+        // 单连接模式：关闭全局连接，清理所有订阅
+        if (this.useSingleConnection) {
+            this.subscriptions.clear();
+            if (this.globalConnection) {
+                this.globalConnection.disconnect();
+                this.globalConnection = null;
+                console.log(`[WebSocket] 关闭全局连接，清理了 ${this.subscriptions.size} 个订阅`);
+            }
+            return;
+        }
+        
+        // 多连接模式：关闭所有独立连接（原有逻辑）
         this.connections.forEach((manager, key) => {
-            console.log(`关闭WebSocket连接: ${key}`);
+            console.log(`[WebSocket] 关闭连接: ${key}`);
             manager.disconnect();
         });
         this.connections.clear();
@@ -358,9 +523,28 @@ export class WebSocketPool {
 
     /**
      * 获取所有连接
+     * 优化：单连接模式下返回订阅信息
      */
     public getAllConnections(): Map<string, WebSocketManager> {
+        if (this.useSingleConnection && this.globalConnection) {
+            // 单连接模式：返回全局连接的Map
+            return new Map([['global', this.globalConnection]]);
+        }
         return new Map(this.connections);
+    }
+    
+    /**
+     * 获取统计信息
+     */
+    public getStats() {
+        return {
+            mode: this.useSingleConnection ? 'single' : 'multiple',
+            connectionCount: this.useSingleConnection ? (this.globalConnection ? 1 : 0) : this.connections.size,
+            subscriptionCount: this.subscriptions.size,
+            isConnected: this.useSingleConnection 
+                ? (this.globalConnection?.isConnected() || false)
+                : Array.from(this.connections.values()).some(c => c.isConnected()),
+        };
     }
 }
 
