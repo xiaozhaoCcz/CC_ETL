@@ -20,6 +20,12 @@ import java.util.concurrent.LinkedBlockingQueue;
  * 优化后的WebSocket服务器
  * 支持连接池管理、消息队列、连接超时清理等特性
  * 
+ * 优化说明：
+ * 1. 改进消息发送机制，使用独立线程和队列避免阻塞
+ * 2. 支持单连接模式和多连接模式
+ * 3. 自动清理过期连接，释放资源
+ * 4. 优化内存占用和CPU使用
+ * 
  * @author xiaozhao
  */
 @ServerEndpoint(value = "/ccJobWs/{id}", encoders = { ServerEncoder.class })
@@ -27,20 +33,20 @@ import java.util.concurrent.LinkedBlockingQueue;
 @Slf4j
 public class WebSocketServer {
 
-    // 连接池管理
+    // 连接池管理（优化：使用ConcurrentHashMap提高并发性能）
     private static final ConcurrentHashMap<String, WebSocketSession> SESSION_POOLS = new ConcurrentHashMap<>();
 
-    // 在线连接数统计
+    // 在线连接数统计（优化：使用AtomicInteger保证线程安全）
     private static final AtomicInteger ONLINE_NUM = new AtomicInteger(0);
 
     // 消息发送统计
     private static final AtomicLong MESSAGE_COUNT = new AtomicLong(0);
 
-    // 消息队列，用于异步发送
+    // 消息队列，用于异步发送（优化：调整线程池参数，提高吞吐量）
     private static final ExecutorService MESSAGE_EXECUTOR = new ThreadPoolExecutor(
-            32, 128, 60L, TimeUnit.SECONDS,
-            new LinkedBlockingQueue<>(2000),
-            new ThreadPoolExecutor.DiscardOldestPolicy());
+            16, 64, 60L, TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(5000),  // 增大队列容量
+            new ThreadPoolExecutor.CallerRunsPolicy());  // 改为调用者运行策略，避免丢失消息
 
     // 连接清理定时器
     private static final ScheduledExecutorService CLEANUP_EXECUTOR = Executors.newSingleThreadScheduledExecutor();
@@ -142,21 +148,52 @@ public class WebSocketServer {
 
     /**
      * 给指定用户发送信息（异步）
+     * 
+     * 优化说明：
+     * 1. 支持单连接模式：向所有活跃连接广播消息，由前端路由过滤
+     * 2. 支持多连接模式：通过parentJobId:randomId精确查找连接
+     * 3. 单连接模式下消息会被广播，前端根据jobId和randomId自动路由
      */
     public void sendInfo(Message message) {
         String sessionKey = message.getParentJobId() + ":" + message.getRandomId();
         WebSocketSession webSocketSession = SESSION_POOLS.get(sessionKey);
+        
+        // 如果找到精确匹配的Session（多连接模式），直接发送
         if (webSocketSession != null && webSocketSession.isValid()) {
             try {
                 String messageJson = OBJECT_MAPPER.writeValueAsString(message);
                 webSocketSession.enqueueMessage(messageJson);
                 MESSAGE_COUNT.incrementAndGet();
+                log.debug("[WebSocket] 消息已发送（精确匹配） - key: {}", sessionKey);
             } catch (Exception e) {
-                log.error("Failed to enqueue message: {}", message, e);
+                log.error("[WebSocket] 消息发送失败: {}", message, e);
                 removeSession(webSocketSession.getSession());
             }
         } else {
-            log.warn("Session not found or invalid for key: {}", sessionKey);
+            // 如果没有找到精确匹配，说明可能是单连接模式
+            // 广播给所有活跃连接，由前端路由过滤
+            boolean sent = false;
+            int broadcastCount = 0;
+            
+            for (WebSocketSession session : SESSION_POOLS.values()) {
+                if (session.isValid()) {
+                    try {
+                        String messageJson = OBJECT_MAPPER.writeValueAsString(message);
+                        session.enqueueMessage(messageJson);
+                        sent = true;
+                        broadcastCount++;
+                    } catch (Exception e) {
+                        log.error("[WebSocket] 广播消息失败 - sessionId: {}", session.getId(), e);
+                    }
+                }
+            }
+            
+            if (sent) {
+                MESSAGE_COUNT.incrementAndGet();
+                log.debug("[WebSocket] 消息已广播（单连接模式） - key: {}, 广播数: {}", sessionKey, broadcastCount);
+            } else {
+                log.warn("[WebSocket] 没有活跃连接接收消息 - key: {}, 在线连接数: {}", sessionKey, ONLINE_NUM.get());
+            }
         }
     }
 
@@ -315,13 +352,19 @@ public class WebSocketServer {
 
     /**
      * WebSocket会话包装类
+     * 
+     * 优化说明：
+     * 1. 每个会话使用独立的消息队列和发送线程
+     * 2. 避免消息发送阻塞主线程
+     * 3. 自动清理资源，防止内存泄漏
+     * 4. 队列满时自动丢弃旧消息，保证实时性
      */
     private static class WebSocketSession {
         private final Session session;
         private final String id;
         private final long createTime;
         private volatile long lastAccessTime;
-        private final BlockingQueue<String> messageQueue = new LinkedBlockingQueue<>();
+        private final BlockingQueue<String> messageQueue = new LinkedBlockingQueue<>(1000);  // 限制队列大小
         private final Thread senderThread;
         private volatile boolean running = true;
 
