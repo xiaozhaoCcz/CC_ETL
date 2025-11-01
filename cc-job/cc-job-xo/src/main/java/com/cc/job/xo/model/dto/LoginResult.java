@@ -13,4 +13,14 @@ public class LoginResult {
     private String refreshToken;
 
     private Long expires;
+    
+    /**
+     * 用户ID
+     */
+    private Long userId;
+    
+    /**
+     * 用户名
+     */
+    private String username;
 }

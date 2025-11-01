@@ -37,5 +37,14 @@ public interface JobUserService extends IService<JobUser> {
      * @return true-密码正确，false-密码错误
      */
     boolean checkPassword(String rawPassword, String encodedPassword);
+    
+    /**
+     * 用户注册
+     *
+     * @param username 用户名
+     * @param password 密码
+     * @return 注册结果
+     */
+    LoginResult register(String username, String password);
 }
 

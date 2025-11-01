@@ -281,18 +281,39 @@ public class TopToolBar extends VBox {
         
         SeparatorMenuItem separator = new SeparatorMenuItem();
         
-        // 退出登录菜单项
-        MenuItem logoutItem = new MenuItem("退出登录");
-        logoutItem.setStyle("-fx-text-fill: #EF4444; -fx-font-weight: bold;");
-        logoutItem.setOnAction(e -> {
-            // TODO: 实现退出登录功能
-            System.out.println("用户点击退出登录");
-            Alert alert = new Alert(Alert.AlertType.INFORMATION);
-            alert.setTitle("提示");
-            alert.setHeaderText(null);
-            alert.setContentText("退出登录功能开发中...");
-            alert.showAndWait();
-        });
+            // 退出登录菜单项
+            MenuItem logoutItem = new MenuItem("退出登录");
+            logoutItem.setStyle("-fx-text-fill: #EF4444; -fx-font-weight: bold;");
+            logoutItem.setOnAction(e -> {
+                System.out.println("用户点击退出登录");
+                
+                // 确认对话框
+                Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
+                confirmAlert.setTitle("确认退出");
+                confirmAlert.setHeaderText(null);
+                confirmAlert.setContentText("确定要退出登录吗？");
+                
+                confirmAlert.showAndWait().ifPresent(response -> {
+                    if (response == ButtonType.OK) {
+                        // 清除会话
+                        SessionManager.getInstance().logout();
+                        
+                        // 关闭当前窗口
+                        javafx.stage.Stage stage = (javafx.stage.Stage) getScene().getWindow();
+                        stage.close();
+                        
+                        // 重新启动应用（显示登录界面）
+                        javafx.application.Platform.runLater(() -> {
+                            try {
+                                new com.cc.job.gui.CcJobGuiApplication().start(new javafx.stage.Stage());
+                            } catch (Exception ex) {
+                                System.err.println("重新启动失败: " + ex.getMessage());
+                                ex.printStackTrace();
+                            }
+                        });
+                    }
+                });
+            });
         
         userMenu.getItems().addAll(infoItem, idItem, separator, logoutItem);
         

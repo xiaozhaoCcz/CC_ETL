@@ -203,6 +203,9 @@ public class MainView extends BorderPane {
                 // 更新页面Store
                 usePageStoreHook().setCurrentPage(taskId);
                 loadTaskGroupData(taskId, taskGroupName);
+                
+                // 检查任务运行状态并更新小绿点显示
+                checkAndUpdateTaskGroupRunningStatus(taskId, taskGroupName);
             } else {
                 logPanel.warn("⚠ 未找到任务组ID，无法加载流程图: " + taskGroupName);
                 logPanel.info("提示: 请先在左侧任务树中选择该任务组");
@@ -336,6 +339,9 @@ public class MainView extends BorderPane {
             // 更新顶部工具栏当前任务组ID
             toolBar.setCurrentTaskGroupId(taskId);
             loadTaskGroupData(taskId, taskName);
+            
+            // 检查任务运行状态并更新小绿点显示
+            checkAndUpdateTaskGroupRunningStatus(taskId, taskName);
         } else {
             // 如果是分区或其他类型，不显示提示（因为这是正常行为）
             if (type != null && type == 0) {
@@ -582,6 +588,9 @@ public class MainView extends BorderPane {
         logPanel.success(currentJobId, "✨ 开始执行任务组: " + jobName + " (ID: " + currentJobId + ")");
         logPanel.info(currentJobId, "执行批次ID: " + randomId);
         logPanel.info(currentJobId, "════════════════════════════════");
+
+        // 更新导航栏中的小绿点（任务开始运行）
+        navigationBar.updateTaskGroupRunningStatus(jobName, true);
 
         // 更新工具栏显示
         updateToolBarRunningJobs();
@@ -873,6 +882,13 @@ public class MainView extends BorderPane {
 
             // 从运行列表中移除
             runningJobs.remove(runningJob.getJobId());
+            
+            // 更新导航栏中的小绿点（任务完成）
+            String jobNameStr = getJobNameById(runningJob.getJobId());
+            if (jobNameStr != null) {
+                navigationBar.updateTaskGroupRunningStatus(jobNameStr, false);
+            }
+            
             updateToolBarRunningJobs();
 
             // 恢复边的正常状态（停止虚线动画）
@@ -938,6 +954,12 @@ public class MainView extends BorderPane {
                     // 清理该任务组的状态
                     runningJob.cleanup();
                     runningJobs.remove(jobId);
+                    
+                    // 更新导航栏中的小绿点（任务停止）
+                    String jobNameStr = getJobNameById(jobId);
+                    if (jobNameStr != null) {
+                        navigationBar.updateTaskGroupRunningStatus(jobNameStr, false);
+                    }
 
                     // 更新工具栏显示
                     updateToolBarRunningJobs();
@@ -1011,6 +1033,31 @@ public class MainView extends BorderPane {
         }
 
         return null;
+    }
+    
+    /**
+     * 检查并更新任务组运行状态（显示/隐藏小绿点）
+     */
+    private void checkAndUpdateTaskGroupRunningStatus(Long taskId, String taskGroupName) {
+        // 在后台线程调用API
+        new Thread(() -> {
+            try {
+                boolean isRunning = jobInfoService.getJobStatus(taskId);
+                System.out.println("📊 任务组 " + taskId + " (" + taskGroupName + ") 运行状态: " + isRunning);
+                
+                // 更新导航栏中的小绿点
+                navigationBar.updateTaskGroupRunningStatus(taskGroupName, isRunning);
+                
+                if (isRunning) {
+                    logPanel.debug("✅ 任务组 " + taskGroupName + " 正在运行中");
+                } else {
+                    logPanel.debug("⚪ 任务组 " + taskGroupName + " 未运行");
+                }
+            } catch (Exception e) {
+                System.err.println("❌ 获取任务组运行状态失败: " + e.getMessage());
+                logPanel.warn("获取任务组运行状态失败: " + e.getMessage());
+            }
+        }).start();
     }
 
     /**

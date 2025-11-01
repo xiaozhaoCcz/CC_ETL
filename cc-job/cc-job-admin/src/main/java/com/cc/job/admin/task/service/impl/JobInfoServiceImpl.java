@@ -291,6 +291,12 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         String adminAddress = String.format(ADMIN_ADDRESS, ip, port);
         JobTriggerPoolHelper.trigger(taskInfoTriggerDto.getId().intValue(), TriggerTypeEnum.MANUAL, -1, null, taskInfoTriggerDto.getExecutorParam(), taskInfoTriggerDto.getAddressList(), 1, adminAddress);
 
+        // 只在任务组（jobType == 2）时记录触发用户ID
+        if (taskInfo.getJobType() == 2 && taskInfoTriggerDto.getTriggerUserId() != null) {
+            taskInfo.setTriggerUserId(taskInfoTriggerDto.getTriggerUserId());
+            System.out.println("✓ 记录任务组触发用户ID: " + taskInfoTriggerDto.getTriggerUserId());
+        }
+        
         taskInfo.setRankTriggerStatus(1);
         this.updateById(taskInfo);
 

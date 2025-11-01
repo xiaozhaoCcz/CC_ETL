@@ -5,6 +5,7 @@ import com.cc.job.gui.model.TreeNodeData;
 import com.cc.job.gui.service.JobPartService;
 import com.cc.job.gui.util.IconUtil;
 import com.cc.job.gui.util.StyleUtil;
+import javafx.animation.FadeTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -12,9 +13,15 @@ import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.scene.layout.StackPane;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
+import javafx.util.Duration;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 /**
  * 任务组树形视图组件
@@ -36,6 +43,9 @@ public class TaskTreeView extends VBox {
     
     // API 服务
     private final JobPartService jobPartService;
+    
+    // 运行中的任务组ID集合
+    private Map<Long, Boolean> runningTaskGroups = new HashMap<>();
     
     public interface TaskSelectionCallback {
         void onTaskSelected(String taskName);
@@ -137,6 +147,11 @@ public class TaskTreeView extends VBox {
         tree.setCellFactory(tv -> new TreeCell<TreeNodeData>() {
             
             private ContextMenu contextMenu;
+            private HBox contentBox;
+            private StackPane iconContainer;
+            private Label textLabel;
+            private Circle runningIndicator;
+            private FadeTransition blinkAnimation;
             
             @Override
             protected void updateItem(TreeNodeData item, boolean empty) {
@@ -147,11 +162,50 @@ public class TaskTreeView extends VBox {
                     setGraphic(null);
                     setStyle("");
                     setContextMenu(null);
+                    stopBlinking();
                 } else {
-                    setText(item.getLabel());
+                    // 创建内容容器
+                    if (contentBox == null) {
+                        contentBox = new HBox(8);
+                        contentBox.setAlignment(Pos.CENTER_LEFT);
+                        
+                        iconContainer = new StackPane();
+                        iconContainer.setMinSize(16, 16);
+                        iconContainer.setMaxSize(16, 16);
+                        
+                        textLabel = new Label();
+                        
+                        runningIndicator = new Circle(4);
+                        runningIndicator.setFill(Color.web("#10B981"));
+                        runningIndicator.setVisible(false);
+                        
+                        contentBox.getChildren().addAll(iconContainer, textLabel, runningIndicator);
+                    }
                     
-                    // 根据节点类型设置图标
-                    setGraphic(IconUtil.getIconByType(item.getType()));
+                    // 设置文本
+                    textLabel.setText(item.getLabel());
+                    
+                    // 设置图标
+                    iconContainer.getChildren().clear();
+                    iconContainer.getChildren().add(IconUtil.getIconByType(item.getType()));
+                    
+                    // 检查是否为任务组且正在运行
+                    boolean isTaskGroup = item.getType() != null && item.getType() == 1;
+                    boolean isRunning = isTaskGroup && runningTaskGroups.containsKey(item.getId()) 
+                        && runningTaskGroups.get(item.getId());
+                    
+                    // 显示/隐藏运行指示器
+                    if (isRunning) {
+                        runningIndicator.setVisible(true);
+                        startBlinking();
+                    } else {
+                        runningIndicator.setVisible(false);
+                        stopBlinking();
+                    }
+                    
+                    // 设置graphic而不是text
+                    setText(null);
+                    setGraphic(contentBox);
                     
                     // 样式
                     setStyle(
@@ -170,12 +224,48 @@ public class TaskTreeView extends VBox {
                             "-fx-padding: 8 12; " +
                             "-fx-background-radius: " + StyleUtil.RADIUS_MD + ";"
                         );
+                        textLabel.setStyle("-fx-text-fill: " + StyleUtil.PRIMARY + ";");
+                    } else {
+                        textLabel.setStyle("-fx-text-fill: #374151;");
                     }
                     
                     // 设置右键菜单
                     TreeItem<TreeNodeData> treeItem = getTreeItem();
                     contextMenu = createTreeContextMenu(item, treeItem);
                     setContextMenu(contextMenu);
+                }
+            }
+            
+            /**
+             * 开始闪烁动画
+             */
+            private void startBlinking() {
+                if (runningIndicator != null && !runningIndicator.isVisible()) {
+                    return;
+                }
+                
+                if (blinkAnimation == null) {
+                    blinkAnimation = new FadeTransition(Duration.millis(800), runningIndicator);
+                    blinkAnimation.setFromValue(1.0);
+                    blinkAnimation.setToValue(0.2);
+                    blinkAnimation.setCycleCount(FadeTransition.INDEFINITE);
+                    blinkAnimation.setAutoReverse(true);
+                }
+                
+                if (blinkAnimation.getStatus() != FadeTransition.Status.RUNNING) {
+                    blinkAnimation.play();
+                }
+            }
+            
+            /**
+             * 停止闪烁动画
+             */
+            private void stopBlinking() {
+                if (blinkAnimation != null && blinkAnimation.getStatus() == FadeTransition.Status.RUNNING) {
+                    blinkAnimation.stop();
+                    if (runningIndicator != null) {
+                        runningIndicator.setOpacity(1.0);
+                    }
                 }
             }
             
@@ -676,6 +766,50 @@ public class TaskTreeView extends VBox {
      */
     public void setOnDetach(Runnable callback) {
         this.onDetach = callback;
+    }
+    
+    /**
+     * 更新运行中的任务组状态
+     * @param taskGroupId 任务组ID
+     * @param isRunning 是否正在运行
+     */
+    public void updateTaskGroupRunningStatus(Long taskGroupId, boolean isRunning) {
+        Platform.runLater(() -> {
+            if (isRunning) {
+                runningTaskGroups.put(taskGroupId, true);
+            } else {
+                runningTaskGroups.remove(taskGroupId);
+            }
+            
+            // 刷新树形视图
+            treeView.refresh();
+        });
+    }
+    
+    /**
+     * 批量更新运行中的任务组
+     * @param runningMap 运行状态Map
+     */
+    public void updateRunningTaskGroups(Map<Long, Boolean> runningMap) {
+        Platform.runLater(() -> {
+            this.runningTaskGroups.clear();
+            if (runningMap != null) {
+                this.runningTaskGroups.putAll(runningMap);
+            }
+            
+            // 刷新树形视图
+            treeView.refresh();
+        });
+    }
+    
+    /**
+     * 清除所有运行状态
+     */
+    public void clearAllRunningStatus() {
+        Platform.runLater(() -> {
+            runningTaskGroups.clear();
+            treeView.refresh();
+        });
     }
     
     /**

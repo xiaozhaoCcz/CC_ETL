@@ -66,6 +66,8 @@ public class JobUserServiceImpl extends ServiceImpl<JobUserMapper, JobUser> impl
                 .accessToken(token)
                 .tokenType("Bearer")
                 .expires(expiresIn)
+                .userId(user.getId())
+                .username(user.getUsername())
                 .build();
     }
 
@@ -109,6 +111,65 @@ public class JobUserServiceImpl extends ServiceImpl<JobUserMapper, JobUser> impl
             log.warn("检测到明文密码，建议使用BCrypt加密！用户密码: {}", encodedPassword.substring(0, Math.min(3, encodedPassword.length())) + "***");
             return rawPassword.equals(encodedPassword);
         }
+    }
+
+    /**
+     * 用户注册
+     *
+     * @param username 用户名
+     * @param password 密码
+     * @return 注册结果
+     */
+    @Override
+    public LoginResult register(String username, String password) {
+        log.info("用户注册请求 - 用户名: {}", username);
+
+        // 参数验证
+        Assert.notBlank(username, "用户名不能为空");
+        Assert.notBlank(password, "密码不能为空");
+        
+        // 用户名长度验证
+        if (username.length() < 3 || username.length() > 20) {
+            throw new BusinessException("用户名长度必须在3-20个字符之间");
+        }
+        
+        // 密码强度验证
+        if (password.length() < 6) {
+            throw new BusinessException("密码长度不能少于6位");
+        }
+
+        // 检查用户名是否已存在
+        JobUser existingUser = findByUsername(username);
+        if (existingUser != null) {
+            log.warn("注册失败 - 用户名已存在: {}", username);
+            throw new BusinessException("用户名已存在");
+        }
+
+        // 创建新用户
+        JobUser newUser = new JobUser();
+        newUser.setUsername(username);
+        newUser.setPassword(encodePassword(password));
+        
+        // 保存到数据库
+        boolean saved = this.save(newUser);
+        if (!saved) {
+            log.error("注册失败 - 数据库保存失败: {}", username);
+            throw new BusinessException("注册失败，请稍后重试");
+        }
+
+        log.info("用户注册成功 - 用户名: {}, 用户ID: {}", username, newUser.getId());
+
+        // 自动登录，生成JWT Token
+        String token = JwtUtil.generateToken(newUser.getId(), newUser.getUsername());
+        long expiresIn = 24 * 60 * 60 * 1000; // 24小时
+
+        return LoginResult.builder()
+                .accessToken(token)
+                .tokenType("Bearer")
+                .expires(expiresIn)
+                .userId(newUser.getId())
+                .username(newUser.getUsername())
+                .build();
     }
 
     /**

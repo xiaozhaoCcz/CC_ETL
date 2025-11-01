@@ -30,6 +30,18 @@ public class JobInfoService extends BaseService {
         requestMap.put("id", jobId);
         requestMap.put("executorParam", executorParam);
         
+        // 添加触发用户ID（从SessionManager获取）
+        com.cc.job.gui.util.SessionManager session = com.cc.job.gui.util.SessionManager.getInstance();
+        if (session.isLoggedIn() && session.getUserId() != null) {
+            try {
+                Integer triggerUserId = Integer.parseInt(session.getUserId());
+                requestMap.put("triggerUserId", triggerUserId);
+                System.out.println("✓ 传递触发用户ID: " + triggerUserId);
+            } catch (NumberFormatException e) {
+                System.err.println("⚠ 用户ID格式错误: " + session.getUserId());
+            }
+        }
+        
         String jsonBody = apiUtil.getGson().toJson(requestMap);
         RequestBody body = RequestBody.create(jsonBody, MediaType.get("application/json; charset=utf-8"));
         

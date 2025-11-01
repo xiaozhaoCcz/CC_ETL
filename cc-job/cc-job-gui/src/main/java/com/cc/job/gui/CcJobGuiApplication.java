@@ -1,8 +1,8 @@
 package com.cc.job.gui;
 
-import com.cc.job.gui.service.LoginService;
 import com.cc.job.gui.util.SessionManager;
 import com.cc.job.gui.view.LoginView;
+import com.cc.job.gui.view.RegisterView;
 import com.cc.job.gui.view.MainView;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -31,8 +31,17 @@ public class CcJobGuiApplication extends Application {
         this.primaryStage = primaryStage;
         
         try {
-            // 先显示登录窗口
-            showLoginWindow();
+            // 尝试从本地文件加载会话
+            boolean sessionLoaded = SessionManager.getInstance().loadSessionFromFile();
+            
+            if (sessionLoaded) {
+                // 如果会话加载成功，直接显示主窗口
+                System.out.println("🎉 自动登录成功，跳过登录界面");
+                showMainWindow();
+            } else {
+                // 否则显示登录窗口
+                showLoginWindow();
+            }
             
         } catch (Exception e) {
             System.err.println("启动失败：" + e.getMessage());
@@ -69,6 +78,12 @@ public class CcJobGuiApplication extends Application {
             Platform.runLater(() -> showMainWindow());
         });
         
+        // 设置注册回调
+        loginView.setOnRegister(() -> {
+            // 切换到注册界面
+            showRegisterWindow();
+        });
+        
         // 创建登录场景
         Scene loginScene = new Scene(loginView, 900, 600);
         
@@ -98,6 +113,57 @@ public class CcJobGuiApplication extends Application {
         loginStage.show();
         
         System.out.println("✓ 登录界面已显示");
+    }
+    
+    /**
+     * 显示注册窗口
+     */
+    private void showRegisterWindow() {
+        System.out.println("正在创建注册界面...");
+        
+        // 创建注册视图
+        RegisterView registerView = new RegisterView();
+        
+        // 设置注册成功回调
+        registerView.setOnRegisterSuccess(result -> {
+            // 保存会话信息
+            SessionManager.getInstance().login(
+                result.getToken(),
+                result.getUserId(),
+                result.getUsername()
+            );
+            
+            // 关闭注册窗口
+            if (loginStage != null) {
+                loginStage.close();
+            }
+            
+            // 显示主窗口
+            Platform.runLater(() -> showMainWindow());
+        });
+        
+        // 设置返回回调
+        registerView.setOnBack(() -> {
+            // 返回登录界面
+            showLoginWindow();
+        });
+        
+        // 创建注册场景
+        Scene registerScene = new Scene(registerView, 900, 600);
+        
+        // 加载全局CSS样式
+        try {
+            String css = getClass().getResource("/styles.css").toExternalForm();
+            registerScene.getStylesheets().add(css);
+        } catch (Exception e) {
+            System.err.println("⚠ 样式表加载失败: " + e.getMessage());
+        }
+        
+        // 更新窗口内容
+        loginStage.setTitle("NodeFx - 用户注册");
+        loginStage.setScene(registerScene);
+        
+        System.out.println("✓ 注册界面已显示");
     }
     
     /**

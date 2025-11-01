@@ -24,9 +24,11 @@ public class LoginView extends StackPane {
     private TextField usernameField;
     private PasswordField passwordField;
     private Button loginButton;
+    private Button registerButton;
     private Label errorLabel;
     private ProgressIndicator loadingIndicator;
     private Consumer<LoginService.LoginResult> onLoginSuccess;
+    private Runnable onRegister;
     private final LoginService loginService;
     
     public LoginView() {
@@ -142,10 +144,8 @@ public class LoginView extends StackPane {
         // 登录按钮
         HBox buttonArea = createButtonArea();
         
-        // 底部提示
-        Label footerLabel = new Label("首次登录？请联系管理员");
-        footerLabel.setFont(Font.font("System", FontWeight.NORMAL, 12));
-        footerLabel.setTextFill(Color.web("#9CA3AF"));
+        // 底部注册区域
+        HBox registerArea = createRegisterArea();
         
         card.getChildren().addAll(
             logoArea,
@@ -154,7 +154,7 @@ public class LoginView extends StackPane {
             formArea,
             errorLabel,
             buttonArea,
-            footerLabel
+            registerArea
         );
         
         return card;
@@ -467,10 +467,52 @@ public class LoginView extends StackPane {
     }
     
     /**
+     * 创建注册区域
+     */
+    private HBox createRegisterArea() {
+        HBox registerArea = new HBox(5);
+        registerArea.setAlignment(Pos.CENTER);
+        
+        Label text = new Label("还没有账号？");
+        text.setFont(Font.font("System", 13));
+        text.setTextFill(Color.web("#6B7280"));
+        
+        registerButton = new Button("立即注册");
+        registerButton.setFont(Font.font("System", FontWeight.BOLD, 13));
+        registerButton.setTextFill(Color.web("#667EEA"));
+        registerButton.setStyle(
+            "-fx-background-color: transparent; " +
+            "-fx-border-width: 0; " +
+            "-fx-cursor: hand; " +
+            "-fx-underline: true;"
+        );
+        
+        registerButton.setOnMouseEntered(e -> registerButton.setTextFill(Color.web("#5568D3")));
+        registerButton.setOnMouseExited(e -> registerButton.setTextFill(Color.web("#667EEA")));
+        
+        registerButton.setOnAction(e -> {
+            if (onRegister != null) {
+                onRegister.run();
+            }
+        });
+        
+        registerArea.getChildren().addAll(text, registerButton);
+        
+        return registerArea;
+    }
+    
+    /**
      * 设置登录成功回调
      */
     public void setOnLoginSuccess(Consumer<LoginService.LoginResult> callback) {
         this.onLoginSuccess = callback;
+    }
+    
+    /**
+     * 设置注册回调
+     */
+    public void setOnRegister(Runnable callback) {
+        this.onRegister = callback;
     }
 }
 

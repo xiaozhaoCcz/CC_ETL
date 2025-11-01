@@ -1,6 +1,7 @@
 package com.cc.job.gui.view;
 
 import com.cc.job.gui.model.RunningJobGroup;
+import javafx.animation.FadeTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -8,6 +9,9 @@ import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
+import javafx.util.Duration;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -313,6 +317,29 @@ public class TaskNavigationBar extends HBox {
     }
     
     /**
+     * 更新指定任务组的运行状态（显示/隐藏小绿点）
+     */
+    public void updateTaskGroupRunningStatus(String taskGroupName, boolean isRunning) {
+        Platform.runLater(() -> {
+            TaskTab tab = tabs.get(taskGroupName);
+            if (tab != null) {
+                tab.setRunning(isRunning);
+            }
+        });
+    }
+    
+    /**
+     * 清除所有任务组的运行状态
+     */
+    public void clearAllRunningStatus() {
+        Platform.runLater(() -> {
+            for (TaskTab tab : tabs.values()) {
+                tab.setRunning(false);
+            }
+        });
+    }
+    
+    /**
      * 任务组标签
      */
     private static class TaskTab extends StackPane {
@@ -321,6 +348,11 @@ public class TaskNavigationBar extends HBox {
         private boolean active;
         private Runnable onClickCallback;
         private Runnable onCloseCallback;
+        
+        // 运行状态指示器
+        private Circle runningIndicator;
+        private FadeTransition blinkAnimation;
+        private boolean isRunning = false;
         
         public TaskTab(String taskGroupName) {
             this.taskGroupName = taskGroupName;
@@ -340,6 +372,18 @@ public class TaskNavigationBar extends HBox {
             
             HBox content = new HBox(8);
             content.setAlignment(Pos.CENTER_LEFT);
+            
+            // 运行状态指示器（小绿点）
+            runningIndicator = new Circle(4);
+            runningIndicator.setFill(Color.web("#10B981"));
+            runningIndicator.setVisible(false);
+            
+            // 设置闪烁动画
+            blinkAnimation = new FadeTransition(Duration.millis(800), runningIndicator);
+            blinkAnimation.setFromValue(1.0);
+            blinkAnimation.setToValue(0.2);
+            blinkAnimation.setCycleCount(FadeTransition.INDEFINITE);
+            blinkAnimation.setAutoReverse(true);
             
             // 任务组名称
             Label nameLabel = new Label(taskGroupName);
@@ -376,7 +420,7 @@ public class TaskNavigationBar extends HBox {
                 e.consume(); // 阻止事件冒泡
             });
             
-            content.getChildren().addAll(nameLabel, closeBtn);
+            content.getChildren().addAll(runningIndicator, nameLabel, closeBtn);
             getChildren().add(content);
             
             // 点击标签切换
@@ -438,6 +482,34 @@ public class TaskNavigationBar extends HBox {
         
         public void setOnClose(Runnable callback) {
             this.onCloseCallback = callback;
+        }
+        
+        /**
+         * 设置运行状态
+         */
+        public void setRunning(boolean running) {
+            Platform.runLater(() -> {
+                this.isRunning = running;
+                if (running) {
+                    runningIndicator.setVisible(true);
+                    if (blinkAnimation.getStatus() != FadeTransition.Status.RUNNING) {
+                        blinkAnimation.play();
+                    }
+                } else {
+                    runningIndicator.setVisible(false);
+                    if (blinkAnimation.getStatus() == FadeTransition.Status.RUNNING) {
+                        blinkAnimation.stop();
+                        runningIndicator.setOpacity(1.0);
+                    }
+                }
+            });
+        }
+        
+        /**
+         * 获取任务组名称
+         */
+        public String getTaskGroupName() {
+            return taskGroupName;
         }
     }
 }

@@ -43,6 +43,23 @@ public class AuthController {
         }
     }
 
+    @Operation(summary = "注册")
+    @PostMapping("/register")
+    public Result<LoginResult> register(
+            @Parameter(description = "用户名", example = "newuser") @RequestParam String username,
+            @Parameter(description = "密码", example = "123456") @RequestParam String password
+    ) {
+        try {
+            log.info("收到注册请求 - 用户名: {}", username);
+            LoginResult loginResult = jobUserService.register(username, password);
+            log.info("注册成功 - 用户名: {}", username);
+            return Result.success(loginResult);
+        } catch (Exception e) {
+            log.error("注册失败 - 用户名: {}, 错误: {}", username, e.getMessage());
+            return Result.failed(e.getMessage());
+        }
+    }
+
     @Operation(summary = "注销")
     @DeleteMapping("/logout")
     public Result<?> logout() {
