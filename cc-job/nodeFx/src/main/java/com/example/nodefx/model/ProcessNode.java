@@ -48,6 +48,7 @@ public class ProcessNode extends StackPane {
     private boolean enabled = true;
     private String currentColor = "#8B5CF6"; // 默认紫色
     private String type = "Bean"; // 节点类型：Bean, API, SQL等
+    private NodeStatus status = NodeStatus.IDLE; // 节点运行状态
     
     // UI元素引用
     private javafx.scene.shape.Rectangle background;
@@ -474,11 +475,17 @@ public class ProcessNode extends StackPane {
     }
     
     /**
-     * 更改节点颜色
+     * 更改节点颜色（用于手动更改，如右键菜单）
      */
     private void changeNodeColor(String color) {
         this.currentColor = color;
+        // 更新边框颜色
         background.setStroke(Color.web(color));
+        // 手动更改颜色时保持白色背景（除非是状态相关的颜色）
+        if (status == NodeStatus.IDLE) {
+            background.setFill(Color.WHITE);
+        }
+        // 否则保持当前状态对应的背景颜色
         
         // 更新连接点颜色
         topConnector.setFill(Color.web(color));
@@ -486,7 +493,37 @@ public class ProcessNode extends StackPane {
         leftConnector.setFill(Color.web(color));
         rightConnector.setFill(Color.web(color));
         
-        System.out.println("🎨 更改节点颜色: " + jobHandlerName + " → " + color);
+        System.out.println("🎨 更改节点颜色: " + jobHandlerName + " → " + color + " (状态: " + status + ")");
+    }
+    
+    /**
+     * 根据状态更新背景填充颜色
+     * @param newStatus 新的状态
+     */
+    private void updateBackgroundColorByStatus(NodeStatus newStatus) {
+        switch (newStatus) {
+            case RUNNING:
+                // 运行中：黄色背景
+                background.setFill(Color.web("#F59E0B"));
+                System.out.println("🟡 节点背景设为黄色（运行中）: " + jobHandlerName);
+                break;
+            case SUCCESS:
+                // 成功：绿色背景
+                background.setFill(Color.web("#10B981"));
+                System.out.println("🟢 节点背景设为绿色（成功）: " + jobHandlerName);
+                break;
+            case FAILED:
+                // 失败：红色背景
+                background.setFill(Color.web("#EF4444"));
+                System.out.println("🔴 节点背景设为红色（失败）: " + jobHandlerName);
+                break;
+            case IDLE:
+            default:
+                // 空闲：白色背景
+                background.setFill(Color.WHITE);
+                System.out.println("⚪ 节点背景设为白色（空闲）: " + jobHandlerName);
+                break;
+        }
     }
     
     /**
@@ -496,10 +533,8 @@ public class ProcessNode extends StackPane {
         enabled = !enabled;
         
         if (enabled) {
-            // 启用状态：恢复正常样式
-            background.setFill(Color.WHITE);
-            background.setStroke(Color.web(currentColor));
-            background.setStrokeWidth(2);
+            // 启用状态：根据当前状态恢复颜色
+            changeNodeColor(currentColor);
             this.setOpacity(1.0);
             System.out.println("✅ 启用节点: " + jobHandlerName);
         } else {
@@ -531,5 +566,88 @@ public class ProcessNode extends StackPane {
      */
     public boolean getEnabled() {
         return enabled;
+    }
+    
+    /**
+     * 节点状态枚举
+     */
+    public enum NodeStatus {
+        IDLE,      // 空闲（默认紫色）
+        RUNNING,   // 运行中（黄色）
+        SUCCESS,   // 成功（绿色）
+        FAILED     // 失败（红色）
+    }
+    
+    /**
+     * 更新节点状态（根据运行状态改变颜色）
+     * @param newStatus 新的状态
+     */
+    public void updateStatus(NodeStatus newStatus) {
+        NodeStatus oldStatus = this.status;
+        this.status = newStatus;
+        
+        String statusColor;
+        switch (newStatus) {
+            case RUNNING:
+                statusColor = "#F59E0B"; // 黄色（运行中）
+                break;
+            case SUCCESS:
+                statusColor = "#10B981"; // 绿色（成功）
+                break;
+            case FAILED:
+                statusColor = "#EF4444"; // 红色（失败）
+                break;
+            case IDLE:
+            default:
+                statusColor = "#8B5CF6"; // 紫色（默认/空闲）
+                break;
+        }
+        
+        // 更新边框颜色和连接点颜色
+        background.setStroke(Color.web(statusColor));
+        topConnector.setFill(Color.web(statusColor));
+        bottomConnector.setFill(Color.web(statusColor));
+        leftConnector.setFill(Color.web(statusColor));
+        rightConnector.setFill(Color.web(statusColor));
+        
+        // 更新背景填充颜色（直接根据状态设置，不依赖其他字段）
+        updateBackgroundColorByStatus(newStatus);
+        
+        // 更新当前颜色
+        this.currentColor = statusColor;
+        
+        System.out.println("📊 节点状态更新: " + jobHandlerName + " [" + oldStatus + " → " + newStatus + "] (边框颜色: " + statusColor + ")");
+    }
+    
+    /**
+     * 获取当前节点状态
+     */
+    public NodeStatus getStatus() {
+        return status;
+    }
+    
+    /**
+     * 根据状态码更新节点状态（用于WebSocket消息）
+     * @param statusCode 状态码：0=失败, 1=成功, 2=运行中
+     */
+    public void updateStatusByCode(Integer statusCode) {
+        if (statusCode == null) {
+            return;
+        }
+        
+        switch (statusCode) {
+            case 0:
+                updateStatus(NodeStatus.FAILED);
+                break;
+            case 1:
+                updateStatus(NodeStatus.SUCCESS);
+                break;
+            case 2:
+                updateStatus(NodeStatus.RUNNING);
+                break;
+            default:
+                updateStatus(NodeStatus.IDLE);
+                break;
+        }
     }
 }

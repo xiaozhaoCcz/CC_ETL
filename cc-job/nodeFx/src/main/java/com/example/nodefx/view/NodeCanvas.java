@@ -347,6 +347,38 @@ public class NodeCanvas extends Pane {
     }
     
     /**
+     * 根据锚点字符串获取对应的连接点
+     * @param node 节点
+     * @param anchor 锚点字符串，可能为 "top", "bottom", "left", "right" 或 null
+     * @param isSource 是否为源节点（true=源节点，false=目标节点）
+     * @return 连接点Circle对象
+     */
+    private Circle getConnectorByAnchor(ProcessNode node, String anchor, boolean isSource) {
+        if (anchor != null && !anchor.isEmpty()) {
+            // 根据锚点字符串返回对应的连接点（不区分大小写）
+            String anchorLower = anchor.toLowerCase();
+            if ("top".equals(anchorLower)) {
+                return node.getTopConnector();
+            } else if ("bottom".equals(anchorLower)) {
+                return node.getBottomConnector();
+            } else if ("left".equals(anchorLower)) {
+                return node.getLeftConnector();
+            } else if ("right".equals(anchorLower)) {
+                return node.getRightConnector();
+            }
+        }
+        
+        // 如果没有指定锚点，使用默认值
+        // 源节点默认使用右侧（数据流出）
+        // 目标节点默认使用左侧（数据流入）
+        if (isSource) {
+            return node.getRightConnector();
+        } else {
+            return node.getLeftConnector();
+        }
+    }
+    
+    /**
      * 清空画布
      */
     public void clear() {
@@ -414,6 +446,11 @@ public class NodeCanvas extends Pane {
                 // ⭐ 设置任务ID（jobId）
                 if (nodeData.getJobId() != null) {
                     node.setJobId(nodeData.getJobId());
+                    System.out.println("✅ 节点 " + text + " (nodeId: " + nodeData.getId() + ") 已设置jobId: " + nodeData.getJobId());
+                    log("✅ 节点已设置jobId: " + text + " -> jobId: " + nodeData.getJobId());
+                } else {
+                    System.out.println("⚠️ 节点 " + text + " (nodeId: " + nodeData.getId() + ") 的jobId为空！");
+                    log("⚠️ 警告: 节点 " + text + " 的jobId为空！");
                 }
                 
                 // 设置位置
@@ -470,24 +507,76 @@ public class NodeCanvas extends Pane {
     }
     
     /**
-     * 根据锚点名称获取连接器
-     * @param node 节点
-     * @param anchor 锚点名称（top/bottom/left/right）
-     * @param isSource 是否为源节点（true=源节点默认右侧，false=目标节点默认左侧）
+     * 设置所有边的运行状态（任务组运行时调用）
+     * @param running 是否运行中
      */
-    private Circle getConnectorByAnchor(ProcessNode node, String anchor, boolean isSource) {
-        if (anchor == null || "null".equals(anchor)) {
-            // 如果没有指定锚点，使用默认值
-            // 源节点默认右侧（数据流出），目标节点默认左侧（数据流入）
-            return isSource ? node.getRightConnector() : node.getLeftConnector();
+    public void setAllConnectionsRunning(boolean running) {
+        for (NodeConnection conn : connections) {
+            conn.setRunning(running);
+        }
+        System.out.println("📊 所有边的运行状态已更新: " + (running ? "运行中" : "停止"));
+    }
+    
+    /**
+     * 根据jobId更新节点状态
+     * @param jobId 任务ID
+     * @param statusCode 状态码：0=失败, 1=成功, 2=运行中
+     */
+    public void updateNodeStatusByJobId(Long jobId, Integer statusCode) {
+        if (jobId == null || statusCode == null) {
+            System.out.println("⚠️ 参数无效: jobId=" + jobId + ", statusCode=" + statusCode);
+            return;
         }
         
-        return switch (anchor.toLowerCase()) {
-            case "top" -> node.getTopConnector();
-            case "bottom" -> node.getBottomConnector();
-            case "left" -> node.getLeftConnector();
-            case "right" -> node.getRightConnector();
-            default -> isSource ? node.getRightConnector() : node.getLeftConnector();
-        };
+        System.out.println("🔍 开始查找节点: jobId=" + jobId + ", statusCode=" + statusCode);
+        System.out.println("📋 画布中共有 " + nodes.size() + " 个节点");
+        
+        boolean found = false;
+        for (ProcessNode node : nodes) {
+            Long nodeJobId = node.getJobId();
+            System.out.println("   → 检查节点: " + node.getJobHandlerName() + ", jobId=" + nodeJobId);
+            
+            if (nodeJobId != null && nodeJobId.equals(jobId)) {
+                System.out.println("✅ 找到匹配的节点: " + node.getJobHandlerName() + " (jobId=" + jobId + ")");
+                System.out.println("   当前状态: " + node.getStatus());
+                System.out.println("   即将更新为状态码: " + statusCode);
+                
+                node.updateStatusByCode(statusCode);
+                
+                System.out.println("✅ 节点状态已更新: jobId=" + jobId + ", statusCode=" + statusCode);
+                System.out.println("   更新后状态: " + node.getStatus());
+                
+                found = true;
+                break; // 找到节点后更新并退出
+            }
+        }
+        
+        if (!found) {
+            System.out.println("⚠️ 未找到jobId=" + jobId + "的节点");
+            System.out.println("📋 画布中的节点jobId列表:");
+            for (ProcessNode node : nodes) {
+                System.out.println("   - " + node.getJobHandlerName() + ": jobId=" + node.getJobId());
+            }
+        }
+    }
+    
+    /**
+     * 获取指定jobId的节点
+     * @param jobId 任务ID
+     * @return 节点对象，如果未找到返回null
+     */
+    public ProcessNode getNodeByJobId(Long jobId) {
+        if (jobId == null) {
+            return null;
+        }
+        
+        for (ProcessNode node : nodes) {
+            if (node.getJobId() != null && node.getJobId().equals(jobId)) {
+                return node;
+            }
+        }
+        
+        return null;
     }
 }
+

@@ -776,6 +776,9 @@ public class JobGroupXxlJob {
      */
     private void setNodeStatus(Map<Long, List<Long>> statusMap, Long jobId, Integer status, String randomId,
             Long parentId) {
+        logger.info("[JobGroup] ========== 设置节点状态 ==========");
+        logger.info("[JobGroup] jobId: {}, status: {}, randomId: {}, parentId: {}", 
+                jobId, status, randomId, parentId);
         logger.debug("[JobGroup] 设置节点状态 - jobId: {}, status: {}, randomId: {}, parentId: {}",
                 jobId, status, randomId, parentId);
 
@@ -786,9 +789,18 @@ public class JobGroupXxlJob {
                 message.setStatus(status);
                 message.setRandomId(randomId);
                 message.setParentJobId(parentId);
+                
+                String sessionKey = parentId + ":" + randomId;
+                logger.info("[JobGroup] 准备发送WebSocket消息");
+                logger.info("[JobGroup] sessionKey: {}", sessionKey);
+                logger.info("[JobGroup] message: jobId={}, status={}, randomId={}, parentJobId={}", 
+                        message.getJobId(), message.getStatus(), message.getRandomId(), message.getParentJobId());
+                
                 // 使用消息队列服务发送消息，提高响应速度
                 webSocketServer.sendInfo(message);
 
+                logger.info("[JobGroup] ✅ 已发送节点状态消息 - jobId: {}, status: {}, randomId: {}, sessionKey: {}", 
+                        jobId, status, randomId, sessionKey);
                 logger.debug("[JobGroup] 发送节点状态消息 - jobId: {}, status: {}, randomId: {}", jobId, status, randomId);
 
                 if (status == 0) {

@@ -1,10 +1,10 @@
 package com.example.nodefx.view;
 
+import com.example.nodefx.model.RunningJobGroup;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.ScrollPane;
+import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
@@ -22,6 +22,29 @@ public class TaskNavigationBar extends HBox {
     private Map<String, TaskTab> tabs;
     private String currentTaskGroup;
     private TaskSwitchCallback switchCallback;
+    
+    // 运行/停止按钮区域
+    private HBox actionButtonArea;
+    private Button runOrRetryButton;
+    private MenuButton runningTasksMenu;
+    
+    // 回调接口
+    public interface RunCallback {
+        void onRun();
+    }
+    
+    public interface StopCallback {
+        void onStop(Long jobId);
+    }
+    
+    private RunCallback runCallback;
+    private StopCallback stopCallback;
+    
+    // 当前任务组ID（用于判断是否正在运行）
+    private Long currentTaskGroupId;
+    
+    // 运行中的任务组列表
+    private Map<Long, RunningJobGroup> runningJobs = new HashMap<>();
     
     public interface TaskSwitchCallback {
         void onTaskSwitch(String taskGroupName);
@@ -57,6 +80,7 @@ public class TaskNavigationBar extends HBox {
         
         HBox.setHgrow(scrollPane, Priority.ALWAYS);
         
+        // 不再显示运行/停止按钮，这些按钮已移至顶部工具栏
         getChildren().add(scrollPane);
     }
     
@@ -107,6 +131,128 @@ public class TaskNavigationBar extends HBox {
         if (switchCallback != null) {
             switchCallback.onTaskSwitch(taskGroupName);
         }
+        
+        // 更新按钮状态
+        updateButtonState();
+    }
+    
+    /**
+     * 设置当前任务组ID
+     */
+    public void setCurrentTaskGroupId(Long taskGroupId) {
+        this.currentTaskGroupId = taskGroupId;
+        updateButtonState();
+    }
+    
+    /**
+     * 设置运行回调
+     */
+    public void setOnRun(RunCallback callback) {
+        this.runCallback = callback;
+    }
+    
+    /**
+     * 设置停止回调
+     */
+    public void setOnStop(StopCallback callback) {
+        this.stopCallback = callback;
+    }
+    
+    /**
+     * 更新运行中的任务组列表
+     */
+    public void updateRunningJobs(Map<Long, RunningJobGroup> runningJobs) {
+        this.runningJobs = runningJobs != null ? new HashMap<>(runningJobs) : new HashMap<>();
+        updateButtonState();
+    }
+    
+    /**
+     * 更新按钮状态
+     */
+    private void updateButtonState() {
+        Platform.runLater(() -> {
+            // 判断当前任务组是否正在运行
+            boolean isCurrentRunning = currentTaskGroupId != null && 
+                runningJobs.containsKey(currentTaskGroupId) && 
+                runningJobs.get(currentTaskGroupId).isRunning();
+            
+            // 更新运行/重试按钮
+            if (isCurrentRunning) {
+                runOrRetryButton.setText("🔄 重试");
+                runOrRetryButton.setStyle(
+                    "-fx-background-color: #F97316; " +
+                    "-fx-text-fill: white; " +
+                    "-fx-font-size: 12; " +
+                    "-fx-font-weight: bold; " +
+                    "-fx-padding: 4 12 4 12; " +
+                    "-fx-border-radius: 4; " +
+                    "-fx-background-radius: 4; " +
+                    "-fx-cursor: hand;"
+                );
+            } else {
+                runOrRetryButton.setText("▶️ 开始");
+                runOrRetryButton.setStyle(
+                    "-fx-background-color: #10B981; " +
+                    "-fx-text-fill: white; " +
+                    "-fx-font-size: 12; " +
+                    "-fx-font-weight: bold; " +
+                    "-fx-padding: 4 12 4 12; " +
+                    "-fx-border-radius: 4; " +
+                    "-fx-background-radius: 4; " +
+                    "-fx-cursor: hand;"
+                );
+            }
+            
+            // 更新运行中任务下拉菜单
+            if (runningJobs.isEmpty()) {
+                runningTasksMenu.setVisible(false);
+            } else {
+                runningTasksMenu.setVisible(true);
+                runningTasksMenu.setText("🛑 运行中 (" + runningJobs.size() + ")");
+                runningTasksMenu.getItems().clear();
+                
+                // 添加每个运行中的任务组
+                for (RunningJobGroup job : runningJobs.values()) {
+                    if (job.isRunning()) {
+                        MenuItem menuItem = new MenuItem(
+                            "🛑 " + job.getJobName() + " (ID: " + job.getJobId() + ")"
+                        );
+                        menuItem.setStyle(
+                            "-fx-text-fill: #EF4444; " +
+                            "-fx-font-weight: bold;"
+                        );
+                        
+                        menuItem.setOnAction(e -> {
+                            if (stopCallback != null) {
+                                stopCallback.onStop(job.getJobId());
+                            }
+                        });
+                        
+                        runningTasksMenu.getItems().add(menuItem);
+                    }
+                }
+                
+                // 添加分隔线
+                if (!runningTasksMenu.getItems().isEmpty()) {
+                    runningTasksMenu.getItems().add(new SeparatorMenuItem());
+                    
+                    // 添加"停止所有"选项
+                    MenuItem stopAllItem = new MenuItem("🛑 停止所有");
+                    stopAllItem.setStyle(
+                        "-fx-text-fill: #EF4444; " +
+                        "-fx-font-weight: bold;"
+                    );
+                    stopAllItem.setOnAction(e -> {
+                        for (RunningJobGroup job : runningJobs.values()) {
+                            if (job.isRunning() && stopCallback != null) {
+                                stopCallback.onStop(job.getJobId());
+                            }
+                        }
+                    });
+                    runningTasksMenu.getItems().add(stopAllItem);
+                }
+            }
+        });
     }
     
     /**
@@ -132,6 +278,17 @@ public class TaskNavigationBar extends HBox {
      */
     public String getCurrentTaskGroup() {
         return currentTaskGroup;
+    }
+    
+    /**
+     * 根据任务组ID获取任务组名称
+     * 注意：这个方法需要配合外部存储的ID到名称的映射来使用
+     * 当前实现只是简单地从标签名称中查找
+     */
+    public String getTaskNameById(Long jobId) {
+        // 如果有任务组名称到ID的映射，可以通过反向查找
+        // 这里暂时返回null，让调用方从映射中查找
+        return null;
     }
     
     /**

@@ -382,13 +382,30 @@ public class TaskTreeView extends VBox {
         // 清空现有数据
         rootItem.getChildren().clear();
         
-        // 构建树形结构
+        // 构建树形结构：显示完整的层级结构（分区 -> 任务组）
         for (JobPartVo partVo : data) {
-            TreeItem<TreeNodeData> partitionItem = createTreeItem(partVo);
-            rootItem.getChildren().add(partitionItem);
+            // partVo 是1级节点（分区，type=0）
+            // 只添加有子节点（任务组）的分区
+            if (partVo.getChildren() != null && !partVo.getChildren().isEmpty()) {
+                // 检查是否有任务组（type=1）
+                boolean hasTaskGroup = false;
+                for (JobPartVo child : partVo.getChildren()) {
+                    if (child.getType() != null && child.getType() == 1) {
+                        hasTaskGroup = true;
+                        break;
+                    }
+                }
+                
+                // 如果有任务组，添加分区节点
+                if (hasTaskGroup) {
+                    // 使用createPartitionItem创建分区节点（只包含任务组，过滤掉"任务"和"关系"节点）
+                    TreeItem<TreeNodeData> partitionItem = createPartitionItem(partVo);
+                    rootItem.getChildren().add(partitionItem);
+                }
+            }
         }
         
-        // 默认展开第一个分区并选中第一个任务
+        // 默认展开第一个分区并选中第一个任务组
         if (!rootItem.getChildren().isEmpty()) {
             TreeItem<TreeNodeData> firstPartition = rootItem.getChildren().get(0);
             firstPartition.setExpanded(true);
@@ -400,7 +417,30 @@ public class TaskTreeView extends VBox {
     }
     
     /**
-     * 递归创建树节点
+     * 创建分区节点（只包含任务组，过滤掉"任务"和"关系"节点）
+     */
+    private TreeItem<TreeNodeData> createPartitionItem(JobPartVo partVo) {
+        TreeNodeData partitionData = new TreeNodeData(partVo.getId(), partVo.getLabel(), partVo.getType(), partVo.getExt1());
+        TreeItem<TreeNodeData> partitionItem = new TreeItem<>(partitionData);
+        partitionItem.setExpanded(true); // 默认展开分区
+        
+        // 只添加任务组（type=1），过滤掉"任务"（type=2）和"关系"（type=3）节点
+        if (partVo.getChildren() != null && !partVo.getChildren().isEmpty()) {
+            for (JobPartVo child : partVo.getChildren()) {
+                if (child.getType() != null && child.getType() == 1) {
+                    // 创建任务组节点（不包含子节点，因为子节点是"任务"和"关系"）
+                    TreeNodeData taskGroupData = new TreeNodeData(child.getId(), child.getLabel(), child.getType(), child.getExt1());
+                    TreeItem<TreeNodeData> taskGroupItem = new TreeItem<>(taskGroupData);
+                    partitionItem.getChildren().add(taskGroupItem);
+                }
+            }
+        }
+        
+        return partitionItem;
+    }
+    
+    /**
+     * 递归创建树节点（保留用于其他场景）
      */
     private TreeItem<TreeNodeData> createTreeItem(JobPartVo vo) {
         TreeNodeData nodeData = new TreeNodeData(vo.getId(), vo.getLabel(), vo.getType(), vo.getExt1());

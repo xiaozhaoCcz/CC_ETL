@@ -1,11 +1,14 @@
 package com.example.nodefx.model;
 
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.beans.binding.DoubleBinding;
 import javafx.scene.Group;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.CubicCurve;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Polygon;
+import javafx.util.Duration;
 
 /**
  * 节点连接线，使用贝塞尔曲线
@@ -19,6 +22,8 @@ public class NodeConnection extends Group {
     
     private CubicCurve curve;
     private Polygon arrowHead;
+    private Timeline dashAnimation;
+    private boolean isRunning = false; // 是否处于运行状态
     
     /**
      * 创建连接（指定具体的连接点）
@@ -166,18 +171,102 @@ public class NodeConnection extends Group {
     private void setupHoverEffect() {
         // 整个Group的悬停效果
         this.setOnMouseEntered(e -> {
-            curve.setStroke(Color.web("#8B5CF6"));
-            curve.setStrokeWidth(3.5);
-            arrowHead.setFill(Color.web("#8B5CF6"));
-            arrowHead.setStroke(Color.web("#8B5CF6"));
+            if (!isRunning) {
+                curve.setStroke(Color.web("#8B5CF6"));
+                curve.setStrokeWidth(3.5);
+                arrowHead.setFill(Color.web("#8B5CF6"));
+                arrowHead.setStroke(Color.web("#8B5CF6"));
+            }
         });
         
         this.setOnMouseExited(e -> {
-            curve.setStroke(Color.web("#374151"));
+            if (!isRunning) {
+                curve.setStroke(Color.web("#374151"));
+                curve.setStrokeWidth(2.5);
+                arrowHead.setFill(Color.web("#374151"));
+                arrowHead.setStroke(Color.web("#374151"));
+            }
+        });
+    }
+    
+    /**
+     * 设置运行状态（运行时显示虚线并添加动画）
+     * @param running 是否运行中
+     */
+    public void setRunning(boolean running) {
+        this.isRunning = running;
+        
+        if (running) {
+            // 设置为虚线样式
+            curve.getStrokeDashArray().clear();
+            curve.getStrokeDashArray().addAll(10.0, 5.0); // 虚线样式：10px实线，5px空白
+            curve.setStroke(Color.web("#F59E0B")); // 黄色（运行中）
+            curve.setStrokeWidth(3.0);
+            arrowHead.setFill(Color.web("#F59E0B"));
+            arrowHead.setStroke(Color.web("#F59E0B"));
+            
+            // 创建虚线滚动动画
+            startDashAnimation();
+            
+            System.out.println("▶️ 边开始运行: " + sourceNode.getJobHandlerName() + " → " + targetNode.getJobHandlerName());
+        } else {
+            // 恢复正常样式
+            curve.getStrokeDashArray().clear();
+            curve.setStroke(Color.web("#374151")); // 恢复默认颜色
             curve.setStrokeWidth(2.5);
             arrowHead.setFill(Color.web("#374151"));
             arrowHead.setStroke(Color.web("#374151"));
-        });
+            
+            // 停止动画
+            stopDashAnimation();
+            
+            System.out.println("⏹️ 边停止运行: " + sourceNode.getJobHandlerName() + " → " + targetNode.getJobHandlerName());
+        }
+    }
+    
+    /**
+     * 启动虚线滚动动画
+     */
+    private void startDashAnimation() {
+        if (dashAnimation != null) {
+            dashAnimation.stop();
+        }
+        
+        // 创建动画：每200ms移动一次虚线偏移量
+        dashAnimation = new Timeline(
+            new KeyFrame(Duration.ZERO, e -> curve.setStrokeDashOffset(0)),
+            new KeyFrame(Duration.millis(200), e -> {
+                // 获取当前偏移量并增加
+                double currentOffset = curve.getStrokeDashOffset();
+                curve.setStrokeDashOffset(currentOffset + 5); // 每次移动5px
+                
+                // 重置偏移量以创建循环效果（虚线总长度为15）
+                if (curve.getStrokeDashOffset() >= 15) {
+                    curve.setStrokeDashOffset(0);
+                }
+            })
+        );
+        
+        dashAnimation.setCycleCount(Timeline.INDEFINITE);
+        dashAnimation.play();
+    }
+    
+    /**
+     * 停止虚线滚动动画
+     */
+    private void stopDashAnimation() {
+        if (dashAnimation != null) {
+            dashAnimation.stop();
+            dashAnimation = null;
+        }
+        curve.setStrokeDashOffset(0); // 重置偏移量
+    }
+    
+    /**
+     * 检查是否处于运行状态
+     */
+    public boolean isRunning() {
+        return isRunning;
     }
     
     // Getters
