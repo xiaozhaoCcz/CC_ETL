@@ -1,8 +1,10 @@
 package com.example.nodefx.util;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import okhttp3.OkHttpClient;
 
+import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 
 public class ApiUtil {
@@ -39,7 +41,11 @@ public class ApiUtil {
                 .readTimeout(AppConfig.getReadTimeout(), TimeUnit.SECONDS)
                 .writeTimeout(AppConfig.getReadTimeout(), TimeUnit.SECONDS)
                 .build();
-        this.gson = new Gson();
+        
+        // 配置 Gson，添加 LocalDateTime 适配器以解决 Java 模块系统限制
+        this.gson = new GsonBuilder()
+                .registerTypeAdapter(LocalDateTime.class, new LocalDateTimeAdapter())
+                .create();
 
         System.out.println("✓ API Service 初始化完成");
         System.out.println("  后端地址: " + this.baseUrl);

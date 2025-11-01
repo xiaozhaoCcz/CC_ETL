@@ -411,6 +411,11 @@ public class NodeCanvas extends Pane {
                 // 创建节点
                 ProcessNode node = new ProcessNode(nodeData.getId(), text);
                 
+                // ⭐ 设置任务ID（jobId）
+                if (nodeData.getJobId() != null) {
+                    node.setJobId(nodeData.getJobId());
+                }
+                
                 // 设置位置
                 if (nodeData.getX() != null && nodeData.getY() != null) {
                     node.setLayoutX(nodeData.getX());

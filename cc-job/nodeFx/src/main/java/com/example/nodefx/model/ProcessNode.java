@@ -20,6 +20,7 @@ import javafx.scene.shape.Circle;
 public class ProcessNode extends StackPane {
     
     private String nodeId;
+    private Long jobId;  // 任务ID，用于后端保存
     private String jobHandlerName;
     private double dragStartX;
     private double dragStartY;
@@ -40,12 +41,18 @@ public class ProcessNode extends StackPane {
     // 拖动回调
     private Runnable onDragged;
     
+    // 编辑回调
+    private Runnable onEdit;
+    
     // 节点状态
     private boolean enabled = true;
     private String currentColor = "#8B5CF6"; // 默认紫色
+    private String type = "Bean"; // 节点类型：Bean, API, SQL等
     
     // UI元素引用
     private javafx.scene.shape.Rectangle background;
+    private Label typeLabel;    // 类型标签引用
+    private Label handlerLabel; // 处理器名称标签引用
     
     private static final double NODE_WIDTH = 180;
     private static final double NODE_HEIGHT = 80;
@@ -57,6 +64,12 @@ public class ProcessNode extends StackPane {
         initializeUI();
         setupDragHandlers();
         setupContextMenu();
+    }
+    
+    public ProcessNode(String nodeId, String jobHandlerName, double x, double y) {
+        this(nodeId, jobHandlerName);
+        this.setLayoutX(x);
+        this.setLayoutY(y);
     }
     
     private void initializeUI() {
@@ -80,16 +93,16 @@ public class ProcessNode extends StackPane {
         contentBox.setPadding(new Insets(10));
         contentBox.setMouseTransparent(true); // 内容不拦截鼠标事件
         
-        // Bean 标签
-        Label beanLabel = new Label("Bean");
-        beanLabel.setStyle("-fx-font-size: 10; -fx-text-fill: #9CA3AF;");
+        // 类型标签
+        typeLabel = new Label(type);
+        typeLabel.setStyle("-fx-font-size: 10; -fx-text-fill: #9CA3AF;");
         
         // 任务处理器名称
-        Label handlerLabel = new Label(jobHandlerName);
+        handlerLabel = new Label(jobHandlerName);
         handlerLabel.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #1F2937;");
         handlerLabel.setMaxWidth(NODE_WIDTH - 20);
         
-        contentBox.getChildren().addAll(beanLabel, handlerLabel);
+        contentBox.getChildren().addAll(typeLabel, handlerLabel);
         
         // 创建独立的连接点容器
         // 容器与节点大小相同，连接点将定位在边缘外部
@@ -243,8 +256,13 @@ public class ProcessNode extends StackPane {
         // 📝 编辑节点
         MenuItem editItem = new MenuItem("📝 编辑节点");
         editItem.setOnAction(e -> {
-            System.out.println("✏️ 编辑节点: " + jobHandlerName);
-            // TODO: 打开编辑对话框
+            System.out.println("✏️ 点击编辑节点: " + jobHandlerName + " (nodeId: " + nodeId + ")");
+            if (onEdit != null) {
+                System.out.println("✓ 触发 onEdit 回调");
+                onEdit.run();
+            } else {
+                System.err.println("✗ onEdit 回调为 null！");
+            }
         });
         
         // 📋 复制节点
@@ -365,8 +383,33 @@ public class ProcessNode extends StackPane {
         return nodeId;
     }
     
+    public Long getJobId() {
+        return jobId;
+    }
+    
+    public void setJobId(Long jobId) {
+        this.jobId = jobId;
+    }
+    
     public String getJobHandlerName() {
         return jobHandlerName;
+    }
+    
+    /**
+     * 更新节点显示名称
+     * @param newName 新的名称
+     */
+    public void updateJobHandlerName(String newName) {
+        if (newName == null) {
+            return;
+        }
+        
+        this.jobHandlerName = newName;
+        
+        // 直接更新标签文本
+        if (handlerLabel != null) {
+            handlerLabel.setText(newName);
+        }
     }
     
     public Circle getTopConnector() {
@@ -395,6 +438,39 @@ public class ProcessNode extends StackPane {
     
     public void setOnDragged(Runnable onDragged) {
         this.onDragged = onDragged;
+    }
+    
+    public void setOnEdit(Runnable onEdit) {
+        this.onEdit = onEdit;
+    }
+    
+    public String getType() {
+        return type;
+    }
+    
+    public void setType(String type) {
+        this.type = type;
+        if (typeLabel != null) {
+            typeLabel.setText(type);
+        }
+    }
+    
+    /**
+     * 更新节点的显示信息（名称和类型）
+     * @param newName 新名称
+     * @param newType 新类型
+     */
+    public void updateNodeInfo(String newName, String newType) {
+        updateJobHandlerName(newName);
+        setType(newType);
+    }
+    
+    public double getX() {
+        return getLayoutX();
+    }
+    
+    public double getY() {
+        return getLayoutY();
     }
     
     /**

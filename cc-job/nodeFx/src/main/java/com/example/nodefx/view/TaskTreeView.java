@@ -38,6 +38,8 @@ public class TaskTreeView extends VBox {
     public interface TaskSelectionCallback {
         void onTaskSelected(String taskName);
         void onTaskSelected(Long taskId, String taskName, Integer type);
+        void onNewJobGroup(Long partitionId, String partitionName);
+        void onNewJobNode(Long taskGroupId, String taskGroupName);
     }
     
     public TaskTreeView() {
@@ -231,8 +233,7 @@ public class TaskTreeView extends VBox {
                     
                     // 设置右键菜单
                     TreeItem<TreeNodeData> treeItem = getTreeItem();
-                    boolean isLeaf = treeItem != null && treeItem.getChildren().isEmpty();
-                    contextMenu = createTreeContextMenu(item.getLabel(), isLeaf);
+                    contextMenu = createTreeContextMenu(item, treeItem);
                     setContextMenu(contextMenu);
                 }
             }
@@ -246,136 +247,80 @@ public class TaskTreeView extends VBox {
             /**
              * 创建树节点的右键菜单
              */
-            private ContextMenu createTreeContextMenu(String nodeName, boolean isLeaf) {
+            private ContextMenu createTreeContextMenu(TreeNodeData nodeData, TreeItem<TreeNodeData> treeItem) {
                 ContextMenu menu = new ContextMenu();
+                String nodeName = nodeData.getLabel();
+                Integer nodeType = nodeData.getType();
                 
-                if (isLeaf) {
-                    // 任务组的右键菜单
-                    MenuItem openItem = new MenuItem("📂 打开任务组");
+                // type: 0=分区, 1=任务组, 2=任务节点
+                if (nodeType == 0) {
+                    // 一级节点（分区）- 只显示新建任务组功能
+                    MenuItem newTaskItem = new MenuItem("➕ 新建任务组");
+                    newTaskItem.setStyle(
+                        "-fx-font-size: 13; " +
+                        "-fx-font-weight: bold; " +
+                        "-fx-text-fill: #2563EB;"
+                    );
+                    newTaskItem.setOnAction(e -> {
+                        System.out.println("➕ 在分区 " + nodeName + " 中新建任务组, ID: " + nodeData.getId());
+                        if (selectionCallback != null) {
+                            selectionCallback.onNewJobGroup(nodeData.getId(), nodeData.getLabel());
+                        }
+                    });
+                    
+                    menu.getItems().add(newTaskItem);
+                    
+                } else if (nodeType == 1) {
+                    // 二级节点（任务组）- 新增节点和刷新功能
+                    MenuItem addNodeItem = new MenuItem("➕ 新增节点");
+                    addNodeItem.setStyle(
+                        "-fx-font-size: 13; " +
+                        "-fx-font-weight: bold; " +
+                        "-fx-text-fill: #10B981;"
+                    );
+                    addNodeItem.setOnAction(e -> {
+                        System.out.println("➕ 在任务组 " + nodeName + " 中新增节点, ID: " + nodeData.getId());
+                        if (selectionCallback != null) {
+                            selectionCallback.onNewJobNode(nodeData.getId(), nodeData.getLabel());
+                        }
+                    });
+                    
+                    MenuItem refreshItem = new MenuItem("🔄 刷新");
+                    refreshItem.setOnAction(e -> {
+                        System.out.println("🔄 刷新任务组: " + nodeName);
+                        // 重新加载树数据
+                        loadTreeData();
+                    });
+                    
+                    menu.getItems().addAll(addNodeItem, refreshItem);
+                    
+                } else {
+                    // 三级及以下节点（任务节点）- 基本操作
+                    MenuItem openItem = new MenuItem("📂 打开");
                     openItem.setOnAction(e -> {
-                        System.out.println("📂 打开任务组: " + nodeName);
+                        System.out.println("📂 打开节点: " + nodeName);
                         if (selectionCallback != null) {
                             selectionCallback.onTaskSelected(nodeName);
                         }
                     });
                     
-                    MenuItem renameItem = new MenuItem("✏️ 重命名");
-                    renameItem.setOnAction(e -> {
-                        System.out.println("✏️ 重命名任务组: " + nodeName);
-                        // TODO: 显示重命名对话框
+                    MenuItem editItem = new MenuItem("✏️ 编辑");
+                    editItem.setOnAction(e -> {
+                        System.out.println("✏️ 编辑节点: " + nodeName);
+                        // TODO: 显示编辑对话框
                     });
-                    
-                    MenuItem copyItem = new MenuItem("📋 复制");
-                    copyItem.setOnAction(e -> {
-                        System.out.println("📋 复制任务组: " + nodeName);
-                        // TODO: 复制任务组
-                    });
-                    
-                    MenuItem exportItem = new MenuItem("💾 导出");
-                    exportItem.setOnAction(e -> {
-                        System.out.println("💾 导出任务组: " + nodeName);
-                        // TODO: 导出任务组
-                    });
-                    
-                    SeparatorMenuItem separator1 = new SeparatorMenuItem();
-                    
-                    MenuItem propertiesItem = new MenuItem("⚙️ 属性");
-                    propertiesItem.setOnAction(e -> {
-                        System.out.println("⚙️ 查看属性: " + nodeName);
-                        // TODO: 显示属性对话框
-                    });
-                    
-                    SeparatorMenuItem separator2 = new SeparatorMenuItem();
                     
                     MenuItem deleteItem = new MenuItem("🗑️ 删除");
                     deleteItem.setStyle("-fx-text-fill: #EF4444;");
                     deleteItem.setOnAction(e -> {
-                        System.out.println("🗑️ 删除任务组: " + nodeName);
-                        // TODO: 确认并删除任务组
+                        System.out.println("🗑️ 删除节点: " + nodeName);
+                        // TODO: 确认并删除节点
                     });
                     
-                    menu.getItems().addAll(
-                        openItem,
-                        renameItem,
-                        copyItem,
-                        exportItem,
-                        separator1,
-                        propertiesItem,
-                        separator2,
-                        deleteItem
-                    );
-                } else {
-                    // 分区的右键菜单
-                    MenuItem newTaskItem = new MenuItem("➕ 新建任务组");
-                    newTaskItem.setOnAction(e -> {
-                        System.out.println("➕ 在分区 " + nodeName + " 中新建任务组");
-                        // TODO: 显示新建任务组对话框
-                    });
-                    
-                    MenuItem expandAllItem = new MenuItem("📂 展开全部");
-                    expandAllItem.setOnAction(e -> {
-                        TreeItem<TreeNodeData> currentItem = getTreeItem();
-                        if (currentItem != null) {
-                            expandAllChildren(currentItem);
-                        }
-                    });
-                    
-                    MenuItem collapseAllItem = new MenuItem("📁 折叠全部");
-                    collapseAllItem.setOnAction(e -> {
-                        TreeItem<TreeNodeData> currentItem = getTreeItem();
-                        if (currentItem != null) {
-                            collapseAllChildren(currentItem);
-                        }
-                    });
-                    
-                    MenuItem renameItem = new MenuItem("✏️ 重命名");
-                    renameItem.setOnAction(e -> {
-                        System.out.println("✏️ 重命名分区: " + nodeName);
-                        // TODO: 显示重命名对话框
-                    });
-                    
-                    SeparatorMenuItem separator1 = new SeparatorMenuItem();
-                    
-                    MenuItem deleteItem = new MenuItem("🗑️ 删除分区");
-                    deleteItem.setStyle("-fx-text-fill: #EF4444;");
-                    deleteItem.setOnAction(e -> {
-                        System.out.println("🗑️ 删除分区: " + nodeName);
-                        // TODO: 确认并删除分区
-                    });
-                    
-                    menu.getItems().addAll(
-                        newTaskItem,
-                        expandAllItem,
-                        collapseAllItem,
-                        renameItem,
-                        separator1,
-                        deleteItem
-                    );
+                    menu.getItems().addAll(openItem, editItem, new SeparatorMenuItem(), deleteItem);
                 }
                 
                 return menu;
-            }
-            
-            /**
-             * 展开所有子节点
-             */
-            private void expandAllChildren(TreeItem<TreeNodeData> item) {
-                if (item == null) return;
-                item.setExpanded(true);
-                for (TreeItem<TreeNodeData> child : item.getChildren()) {
-                    expandAllChildren(child);
-                }
-            }
-            
-            /**
-             * 折叠所有子节点
-             */
-            private void collapseAllChildren(TreeItem<TreeNodeData> item) {
-                if (item == null) return;
-                item.setExpanded(false);
-                for (TreeItem<TreeNodeData> child : item.getChildren()) {
-                    collapseAllChildren(child);
-                }
             }
         });
         
@@ -766,6 +711,52 @@ public class TaskTreeView extends VBox {
             Long foundId = findTaskGroupIdRecursive(child, taskGroupName);
             if (foundId != null) {
                 return foundId;
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * 根据任务组ID选中对应的树节点
+     * @param taskGroupId 任务组ID
+     */
+    public void selectTaskGroupById(Long taskGroupId) {
+        if (taskGroupId == null) {
+            return;
+        }
+        
+        TreeItem<TreeNodeData> foundItem = findTreeItemById(rootItem, taskGroupId);
+        if (foundItem != null) {
+            // 选中找到的节点
+            treeView.getSelectionModel().select(foundItem);
+            // 确保节点可见
+            int row = treeView.getRow(foundItem);
+            if (row >= 0) {
+                treeView.scrollTo(row);
+            }
+        }
+    }
+    
+    /**
+     * 递归查找指定ID的树节点
+     */
+    private TreeItem<TreeNodeData> findTreeItemById(TreeItem<TreeNodeData> item, Long targetId) {
+        if (item == null || item.getValue() == null) {
+            return null;
+        }
+        
+        TreeNodeData nodeData = item.getValue();
+        // 检查当前节点是否匹配
+        if (targetId.equals(nodeData.getId())) {
+            return item;
+        }
+        
+        // 递归查找子节点
+        for (TreeItem<TreeNodeData> child : item.getChildren()) {
+            TreeItem<TreeNodeData> found = findTreeItemById(child, targetId);
+            if (found != null) {
+                return found;
             }
         }
         

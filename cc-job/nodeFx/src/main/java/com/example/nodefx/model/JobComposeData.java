@@ -35,6 +35,7 @@ public class JobComposeData {
      */
     public static class NodeData {
         private String id;
+        private Long jobId;      // 任务ID，用于编辑节点
         private String type;
         private String jobName;  // 节点显示名称
         private Double x;
@@ -47,6 +48,14 @@ public class JobComposeData {
         
         public void setId(String id) {
             this.id = id;
+        }
+        
+        public Long getJobId() {
+            return jobId;
+        }
+        
+        public void setJobId(Long jobId) {
+            this.jobId = jobId;
         }
         
         public String getType() {
@@ -93,6 +102,7 @@ public class JobComposeData {
         public String toString() {
             return "NodeData{" +
                     "id='" + id + '\'' +
+                    ", jobId=" + jobId +
                     ", type='" + type + '\'' +
                     ", jobName='" + jobName + '\'' +
                     ", x=" + x +

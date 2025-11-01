@@ -82,6 +82,44 @@ public class JobPartService extends  BaseService {
     }
     
     /**
+     * 保存分区数据
+     * @param jobPartName 分区名称
+     * @return 是否保存成功
+     * @throws IOException 网络异常
+     */
+    public boolean saveJobPart(String jobPartName) throws IOException {
+        String url = apiUtil.getBaseUrl() + "/api/v1/jobParts/saveJobPart";
+        
+        // 构建请求参数
+        Map<String, Object> requestMap = new HashMap<>();
+        requestMap.put("jobPartName", jobPartName);
+        requestMap.put("sort", 0); // 默认排序为0
+        
+        String jsonBody = apiUtil.getGson().toJson(requestMap);
+        RequestBody body = RequestBody.create(jsonBody, MediaType.get("application/json; charset=utf-8"));
+        
+        Request request = new Request.Builder()
+                .url(url)
+                .post(body)
+                .build();
+        
+        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("请求失败: " + response);
+            }
+            
+            String responseBody = response.body().string();
+            System.out.println("saveJobPart API 响应: " + responseBody);
+            
+            // 解析 JSON 响应
+            Type resultType = new TypeToken<Result<Void>>(){}.getType();
+            Result<Void> result = apiUtil.getGson().fromJson(responseBody, resultType);
+            
+            return Result.isSuccess(result);
+        }
+    }
+    
+    /**
      * 获取任务组合数据（节点和边）
      * @param jobId 任务组ID
      * @return 任务组合数据
@@ -145,6 +183,15 @@ public class JobPartService extends  BaseService {
                     node.setId(String.valueOf(nodeMap.get("id")));
                     node.setType(String.valueOf(nodeMap.get("nodeType")));  // 后端字段是nodeType
                     node.setJobName(String.valueOf(nodeMap.get("jobName")));  // 节点显示名称
+                    
+                    // ⭐ 关键修复：解析 jobId 字段
+                    if (nodeMap.get("jobId") != null) {
+                        try {
+                            node.setJobId(((Number) nodeMap.get("jobId")).longValue());
+                        } catch (Exception e) {
+                            System.err.println("解析节点 jobId 失败: " + e.getMessage());
+                        }
+                    }
                     
                     // 解析坐标 - 后端字段是nodePositionX和nodePositionY
                     if (nodeMap.get("nodePositionX") != null) {
