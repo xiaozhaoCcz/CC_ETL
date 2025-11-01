@@ -40,6 +40,7 @@ public class JobComposeData {
         private String jobName;  // 节点显示名称
         private Double x;
         private Double y;
+        private Integer triggerStatus; // 节点运行状态：0=失败, 1=成功, 2=运行中
         private Map<String, Object> properties;
         
         public String getId() {
@@ -88,6 +89,14 @@ public class JobComposeData {
         
         public void setY(Double y) {
             this.y = y;
+        }
+        
+        public Integer getTriggerStatus() {
+            return triggerStatus;
+        }
+        
+        public void setTriggerStatus(Integer triggerStatus) {
+            this.triggerStatus = triggerStatus;
         }
         
         public Map<String, Object> getProperties() {

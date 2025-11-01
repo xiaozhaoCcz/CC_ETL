@@ -198,7 +198,15 @@ public class CcJobGuiApplication extends Application {
             // 窗口关闭事件
             primaryStage.setOnCloseRequest(event -> {
                 System.out.println("正在关闭应用...");
+                
+                // ⭐ 重要：关闭前立即同步所有待更新的节点状态到数据库
+                System.out.println("⏳ 正在同步节点状态到数据库...");
+                com.cc.job.gui.util.NodeStatusSyncManager.getInstance().shutdown();
+                System.out.println("✓ 节点状态已同步");
+                
+                // 退出登录
                 SessionManager.getInstance().logout();
+                
                 Platform.exit();
                 System.exit(0);
             });
@@ -229,6 +237,16 @@ public class CcJobGuiApplication extends Application {
     
     @Override
     public void stop() throws Exception {
+        System.out.println("NodeFx 正在停止...");
+        
+        // ⭐ 确保所有待更新的节点状态都已同步到数据库
+        try {
+            com.cc.job.gui.util.NodeStatusSyncManager.getInstance().shutdown();
+            System.out.println("✓ 节点状态同步完成");
+        } catch (Exception e) {
+            System.err.println("⚠ 节点状态同步失败: " + e.getMessage());
+        }
+        
         System.out.println("NodeFx 已停止");
         super.stop();
     }

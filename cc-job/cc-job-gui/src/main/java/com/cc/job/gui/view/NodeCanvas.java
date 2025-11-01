@@ -453,6 +453,13 @@ public class NodeCanvas extends Pane {
                     log("⚠️ 警告: 节点 " + text + " 的jobId为空！");
                 }
                 
+                // ⭐ 恢复节点运行状态（triggerStatus）
+                if (nodeData.getTriggerStatus() != null && nodeData.getTriggerStatus() > 0) {
+                    node.updateStatusByCode(nodeData.getTriggerStatus());
+                    System.out.println("✅ 恢复节点运行状态: " + text + " -> " + nodeData.getTriggerStatus());
+                    log("✅ 恢复节点运行状态: " + text + " -> " + nodeData.getTriggerStatus());
+                }
+                
                 // 设置位置
                 if (nodeData.getX() != null && nodeData.getY() != null) {
                     node.setLayoutX(nodeData.getX());
@@ -546,6 +553,9 @@ public class NodeCanvas extends Pane {
                 System.out.println("✅ 节点状态已更新: jobId=" + jobId + ", statusCode=" + statusCode);
                 System.out.println("   更新后状态: " + node.getStatus());
                 
+                // ⭐ 添加到批量更新队列（不立即调用后端）
+                com.cc.job.gui.util.NodeStatusSyncManager.getInstance().addPendingUpdate(jobId, statusCode);
+                
                 found = true;
                 break; // 找到节点后更新并退出
             }
@@ -558,6 +568,14 @@ public class NodeCanvas extends Pane {
                 System.out.println("   - " + node.getJobHandlerName() + ": jobId=" + node.getJobId());
             }
         }
+    }
+    
+    /**
+     * 同步所有待更新的节点状态到数据库
+     * 在页面切换、任务完成等时机调用
+     */
+    public void syncPendingNodeStatus() {
+        com.cc.job.gui.util.NodeStatusSyncManager.getInstance().syncNow();
     }
     
     /**

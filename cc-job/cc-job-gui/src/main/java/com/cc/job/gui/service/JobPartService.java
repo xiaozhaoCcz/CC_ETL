@@ -193,6 +193,16 @@ public class JobPartService extends  BaseService {
                         }
                     }
                     
+                    // 解析节点运行状态
+                    if (nodeMap.get("triggerStatus") != null) {
+                        try {
+                            node.setTriggerStatus(((Number) nodeMap.get("triggerStatus")).intValue());
+                            System.out.println("✅ 解析节点运行状态: " + node.getId() + " -> " + node.getTriggerStatus());
+                        } catch (Exception e) {
+                            System.err.println("解析节点 triggerStatus 失败: " + e.getMessage());
+                        }
+                    }
+                    
                     // 解析坐标 - 后端字段是nodePositionX和nodePositionY
                     if (nodeMap.get("nodePositionX") != null) {
                         node.setX(((Number) nodeMap.get("nodePositionX")).doubleValue());

@@ -43,6 +43,8 @@ public class JobInfoController {
     private final JobInfoService jobInfoService;
 
     private final JobComposeService jobComposeService;
+    
+    private final com.cc.job.admin.task.service.JobNodeService jobNodeService;
 
     @Operation(summary = "initData")
     @GetMapping("initData")
@@ -233,5 +235,44 @@ public class JobInfoController {
     public Result<Void>  deleteJobNode(@PathVariable Long nodeId){
         jobComposeService.deleteJobNode(nodeId);
         return Result.success();
+    }
+    
+    @Operation(summary = "更新节点运行状态")
+    @PostMapping("updateNodeStatus")
+    public Result<Boolean> updateNodeStatus(
+            @Parameter(description = "任务ID") @RequestParam Long jobId,
+            @Parameter(description = "运行状态：0=失败, 1=成功, 2=运行中") @RequestParam Integer triggerStatus
+    ) {
+        try {
+            boolean success = jobNodeService.updateNodeStatus(jobId, triggerStatus);
+            return Result.judge(success);
+        } catch (Exception e) {
+            return Result.failed("更新节点状态失败: " + e.getMessage());
+        }
+    }
+    
+    @Operation(summary = "批量更新节点运行状态")
+    @PostMapping("batchUpdateNodeStatus")
+    public Result<Integer> batchUpdateNodeStatus(
+            @Parameter(description = "节点状态映射 {jobId: triggerStatus}") @RequestBody Map<String, Integer> statusMap
+    ) {
+        try {
+            // 将String类型的key转换为Long
+            Map<Long, Integer> convertedMap = new java.util.HashMap<>();
+            for (Map.Entry<String, Integer> entry : statusMap.entrySet()) {
+                try {
+                    Long jobId = Long.parseLong(entry.getKey());
+                    convertedMap.put(jobId, entry.getValue());
+                } catch (NumberFormatException e) {
+                    // 跳过无效的jobId
+                    continue;
+                }
+            }
+            
+            int successCount = jobNodeService.batchUpdateNodeStatus(convertedMap);
+            return Result.success(successCount);
+        } catch (Exception e) {
+            return Result.failed("批量更新节点状态失败: " + e.getMessage());
+        }
     }
 }

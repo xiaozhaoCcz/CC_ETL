@@ -313,5 +313,82 @@ public class JobInfoService extends BaseService {
             }
         }
     }
+    
+    /**
+     * 更新节点运行状态
+     * @param jobId 任务ID
+     * @param triggerStatus 运行状态：0=失败, 1=成功, 2=运行中
+     * @throws IOException 网络异常
+     */
+    public void updateNodeStatus(Long jobId, Integer triggerStatus) throws IOException {
+        String url = apiUtil.getBaseUrl() + "/api/v1/jobInfos/updateNodeStatus?jobId=" + jobId + "&triggerStatus=" + triggerStatus;
+        
+        RequestBody body = RequestBody.create("", MediaType.get("application/x-www-form-urlencoded"));
+        
+        Request request = new Request.Builder()
+                .url(url)
+                .post(body)
+                .build();
+        
+        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("请求失败: " + response);
+            }
+            
+            String responseBody = response.body().string();
+            System.out.println("updateNodeStatus API 响应: " + responseBody);
+            
+            Type resultType = new TypeToken<Result<Boolean>>(){}.getType();
+            Result<Boolean> result = apiUtil.getGson().fromJson(responseBody, resultType);
+            
+            if (!Result.isSuccess(result)) {
+                throw new IOException("API 返回错误: " + result.getMsg());
+            }
+            
+            System.out.println("✓ 节点状态更新成功: jobId=" + jobId + ", triggerStatus=" + triggerStatus);
+        }
+    }
+    
+    /**
+     * 批量更新节点运行状态
+     * @param statusMap 节点状态映射 Map<jobId, triggerStatus>
+     * @throws IOException 网络异常
+     */
+    public void batchUpdateNodeStatus(java.util.Map<Long, Integer> statusMap) throws IOException {
+        if (statusMap == null || statusMap.isEmpty()) {
+            System.out.println("⚠ 批量更新节点状态 - 参数为空");
+            return;
+        }
+        
+        String url = apiUtil.getBaseUrl() + "/api/v1/jobInfos/batchUpdateNodeStatus";
+        
+        // 将Map转换为JSON
+        String jsonBody = apiUtil.getGson().toJson(statusMap);
+        
+        RequestBody body = RequestBody.create(jsonBody, MediaType.get("application/json; charset=utf-8"));
+        
+        Request request = new Request.Builder()
+                .url(url)
+                .post(body)
+                .build();
+        
+        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("请求失败: " + response);
+            }
+            
+            String responseBody = response.body().string();
+            System.out.println("batchUpdateNodeStatus API 响应: " + responseBody);
+            
+            Type resultType = new TypeToken<Result<Integer>>(){}.getType();
+            Result<Integer> result = apiUtil.getGson().fromJson(responseBody, resultType);
+            
+            if (!Result.isSuccess(result)) {
+                throw new IOException("API 返回错误: " + result.getMsg());
+            }
+            
+            System.out.println("✓ 批量更新节点状态成功: " + result.getData() + "/" + statusMap.size() + " 个节点");
+        }
+    }
 }
 

@@ -359,6 +359,10 @@ public class MainView extends BorderPane {
         logPanel.info("════════════════════════════════");
         logPanel.info("开始加载任务组: " + taskName);
         logPanel.info("任务组ID: " + taskId);
+        
+        // ⭐ 页面切换前，先同步当前页面的节点状态到数据库
+        canvas.syncPendingNodeStatus();
+        logPanel.info("已触发节点状态批量同步");
 
         // 在后台线程中加载数据
         new Thread(() -> {
@@ -896,6 +900,10 @@ public class MainView extends BorderPane {
 
             // 断开WebSocket连接
             WebSocketService.getInstance().disconnect(runningJob.getJobId(), runningJob.getRandomId());
+            
+            // ⭐ 任务执行完成后，立即同步所有节点状态到数据库
+            canvas.syncPendingNodeStatus();
+            logPanel.info(runningJob.getJobId(), "已触发节点状态批量同步");
 
             // ⚠️ 重要：不重置节点状态，让节点保持最终状态（成功/失败）
             // 节点状态会在以下情况重置：
