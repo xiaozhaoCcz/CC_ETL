@@ -1,6 +1,8 @@
 package com.cc.job.gui.view;
 
 import com.cc.job.gui.model.RunningJobGroup;
+import com.cc.job.gui.util.IconUtil;
+import com.cc.job.gui.util.StyleUtil;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -53,16 +55,13 @@ public class TopToolBar extends VBox {
     }
     
     private void initializeUI() {
-        setStyle("-fx-background-color: #FFFFFF; -fx-border-color: #E5E7EB; -fx-border-width: 0 0 1 0;");
+        setStyle(StyleUtil.toolbar());
         setPadding(new Insets(0));
         
-        // 主菜单栏
-        HBox menuBar = createMenuBar();
-        
-        // 工具栏
+        // 工具栏（移除菜单栏，使用更简洁的设计）
         HBox toolBar = createToolBar();
         
-        getChildren().addAll(menuBar, toolBar);
+        getChildren().add(toolBar);
     }
     
     private HBox createMenuBar() {
@@ -71,9 +70,9 @@ public class TopToolBar extends VBox {
         menuBar.setPadding(new Insets(8, 10, 8, 10));
         menuBar.setStyle("-fx-background-color: #F9FAFB;");
         
-        // 文件菜单
-        Label fileMenu = createMenuLabel("📄 文件");
-        Label taskMenu = createMenuLabel("📋 任务组");
+        // 文件菜单 - 扁平化设计
+        Label fileMenu = createMenuLabel("文件");
+        Label taskMenu = createMenuLabel("任务组");
         
         menuBar.getChildren().addAll(fileMenu, taskMenu);
         
@@ -82,68 +81,62 @@ public class TopToolBar extends VBox {
     
     private Label createMenuLabel(String text) {
         Label label = new Label(text);
-        label.setStyle("-fx-padding: 5 15 5 15; -fx-font-size: 13; -fx-cursor: hand;");
+        label.setStyle("-fx-padding: 5 15 5 15; -fx-font-size: 13; -fx-cursor: hand; -fx-font-weight: 500;");
         label.setOnMouseEntered(e -> {
             if (!label.getStyle().contains("border-width")) {
-                label.setStyle("-fx-background-color: #F3F4F6; -fx-padding: 5 15 5 15; -fx-font-size: 13; -fx-cursor: hand;");
+                label.setStyle("-fx-background-color: #F3F4F6; -fx-padding: 5 15 5 15; -fx-font-size: 13; -fx-cursor: hand; -fx-font-weight: 500;");
             }
         });
         label.setOnMouseExited(e -> {
             if (!label.getStyle().contains("border-width")) {
-                label.setStyle("-fx-padding: 5 15 5 15; -fx-font-size: 13; -fx-cursor: hand;");
+                label.setStyle("-fx-padding: 5 15 5 15; -fx-font-size: 13; -fx-cursor: hand; -fx-font-weight: 500;");
             }
         });
         return label;
     }
     
     private HBox createToolBar() {
-        HBox toolBar = new HBox(5);
+        HBox toolBar = new HBox(8);
         toolBar.setAlignment(Pos.CENTER_LEFT);
-        toolBar.setPadding(new Insets(8, 10, 8, 10));
+        toolBar.setPadding(new Insets(0));
         
         // 文件操作组
         HBox fileGroup = createToolGroup(
-            createToolButton("📄 新建", "创建新的流程图", () -> safeCall(ToolBarCallback::onNew)),
-            createToolButton("📂 打开", "打开已有流程图", () -> safeCall(ToolBarCallback::onOpen)),
-            createToolButton("💾 保存", "保存当前流程图", () -> safeCall(ToolBarCallback::onSave))
+            createIconButton(IconUtil.plusIcon(), "新建", "创建新的流程图", () -> safeCall(ToolBarCallback::onNew)),
+            createIconButton(IconUtil.folderIcon(), "打开", "打开已有流程图", () -> safeCall(ToolBarCallback::onOpen)),
+            createIconButton(IconUtil.saveIcon(), "保存", "保存当前流程图", () -> safeCall(ToolBarCallback::onSave))
         );
         
-        Separator sep1 = new Separator();
-        sep1.setOrientation(javafx.geometry.Orientation.VERTICAL);
-        sep1.setPrefHeight(25);
+        Separator sep1 = createSeparator();
         
         // 编辑操作组
         HBox editGroup = createToolGroup(
-            createToolButton("↶ 撤销", "撤销上一步操作", () -> safeCall(ToolBarCallback::onUndo)),
-            createToolButton("↷ 重做", "重做上一步操作", () -> safeCall(ToolBarCallback::onRedo))
+            createIconButton(IconUtil.undoIcon(), "撤销", "撤销上一步操作", () -> safeCall(ToolBarCallback::onUndo)),
+            createIconButton(IconUtil.redoIcon(), "重做", "重做上一步操作", () -> safeCall(ToolBarCallback::onRedo))
         );
         
-        Separator sep2 = new Separator();
-        sep2.setOrientation(javafx.geometry.Orientation.VERTICAL);
-        sep2.setPrefHeight(25);
+        Separator sep2 = createSeparator();
         
         // 视图操作组
         zoomLabel = new Label("100%");
-        zoomLabel.setStyle("-fx-text-fill: #6B7280; -fx-font-size: 12; -fx-padding: 0 5 0 5;");
+        zoomLabel.setStyle(StyleUtil.body() + "-fx-font-weight: 700; -fx-padding: 0 8 0 8;");
         
         HBox viewGroup = createToolGroup(
-            createToolButton("🔍➕ 放大", "放大画布", () -> safeCall(ToolBarCallback::onZoomIn)),
-            createToolButton("🔍➖ 缩小", "缩小画布", () -> safeCall(ToolBarCallback::onZoomOut)),
+            createIconButton(IconUtil.zoomInIcon(), "放大", "放大画布", () -> safeCall(ToolBarCallback::onZoomIn)),
+            createIconButton(IconUtil.zoomOutIcon(), "缩小", "缩小画布", () -> safeCall(ToolBarCallback::onZoomOut)),
             zoomLabel,
-            createToolButton("⬜ 适应", "适应窗口大小", () -> safeCall(ToolBarCallback::onZoomFit))
+            createIconButton(IconUtil.expandIcon(), "适应", "适应窗口大小", () -> safeCall(ToolBarCallback::onZoomFit))
         );
         
         // 右侧空白区域
         HBox spacer = new HBox();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         
-        Separator sep3 = new Separator();
-        sep3.setOrientation(javafx.geometry.Orientation.VERTICAL);
-        sep3.setPrefHeight(25);
+        Separator sep3 = createSeparator();
         
-        // 运行操作组 - 只显示开始/停止和运行中按钮
+        // 运行操作组
         runGroup = createToolGroup();
-        createRetryButton();
+        createRunButton();
         createRunningTasksMenu();
         updateRunGroupButtons();
         
@@ -158,50 +151,35 @@ public class TopToolBar extends VBox {
         return toolBar;
     }
     
+    /**
+     * 创建分隔线
+     */
+    private Separator createSeparator() {
+        Separator sep = new Separator();
+        sep.setOrientation(javafx.geometry.Orientation.VERTICAL);
+        sep.setPrefHeight(24);
+        sep.setStyle("-fx-background-color: " + StyleUtil.GRAY_200 + ";");
+        return sep;
+    }
+    
     private HBox createToolGroup(javafx.scene.Node... buttons) {
-        HBox group = new HBox(5);
+        HBox group = new HBox(4);
         group.setAlignment(Pos.CENTER_LEFT);
         group.getChildren().addAll(buttons);
         return group;
     }
     
-    private Button createToolButton(String text, String tooltip, Runnable action) {
-        Button btn = new Button(text);
-        btn.setStyle(
-            "-fx-background-color: #F9FAFB; " +
-            "-fx-text-fill: #374151; " +
-            "-fx-font-size: 12; " +
-            "-fx-padding: 6 12 6 12; " +
-            "-fx-border-color: #E5E7EB; " +
-            "-fx-border-radius: 4; " +
-            "-fx-background-radius: 4; " +
-            "-fx-cursor: hand;"
-        );
-        
-        btn.setOnMouseEntered(e -> btn.setStyle(
-            "-fx-background-color: #F3F4F6; " +
-            "-fx-text-fill: #1F2937; " +
-            "-fx-font-size: 12; " +
-            "-fx-padding: 6 12 6 12; " +
-            "-fx-border-color: #D1D5DB; " +
-            "-fx-border-radius: 4; " +
-            "-fx-background-radius: 4; " +
-            "-fx-cursor: hand;"
-        ));
-        
-        btn.setOnMouseExited(e -> btn.setStyle(
-            "-fx-background-color: #F9FAFB; " +
-            "-fx-text-fill: #374151; " +
-            "-fx-font-size: 12; " +
-            "-fx-padding: 6 12 6 12; " +
-            "-fx-border-color: #E5E7EB; " +
-            "-fx-border-radius: 4; " +
-            "-fx-background-radius: 4; " +
-            "-fx-cursor: hand;"
-        ));
+    /**
+     * 创建带图标的工具按钮
+     */
+    private Button createIconButton(Label icon, String text, String tooltip, Runnable action) {
+        Button btn = new Button(text, icon);
+        btn.setGraphicTextGap(6);
+        StyleUtil.applyIconButtonHover(btn);
         
         if (tooltip != null) {
             Tooltip tip = new Tooltip(tooltip);
+            tip.setStyle("-fx-font-size: 12px;");
             btn.setTooltip(tip);
         }
         
@@ -275,70 +253,10 @@ public class TopToolBar extends VBox {
     /**
      * 创建开始/停止按钮
      */
-    private void createRetryButton() {
-        runButton = new Button("▶️ 开始");
-        runButton.setStyle(
-            "-fx-background-color: #10B981; " +
-            "-fx-text-fill: white; " +
-            "-fx-font-size: 12; " +
-            "-fx-font-weight: bold; " +
-            "-fx-padding: 4 12 4 12; " +
-            "-fx-border-radius: 4; " +
-            "-fx-background-radius: 4; " +
-            "-fx-cursor: hand;"
-        );
-        
-        runButton.setOnMouseEntered(e -> {
-            if (runButton.getText().contains("开始")) {
-                runButton.setStyle(
-                    "-fx-background-color: #059669; " +
-                    "-fx-text-fill: white; " +
-                    "-fx-font-size: 12; " +
-                    "-fx-font-weight: bold; " +
-                    "-fx-padding: 4 12 4 12; " +
-                    "-fx-border-radius: 4; " +
-                    "-fx-background-radius: 4; " +
-                    "-fx-cursor: hand;"
-                );
-            } else {
-                runButton.setStyle(
-                    "-fx-background-color: #DC2626; " +
-                    "-fx-text-fill: white; " +
-                    "-fx-font-size: 12; " +
-                    "-fx-font-weight: bold; " +
-                    "-fx-padding: 4 12 4 12; " +
-                    "-fx-border-radius: 4; " +
-                    "-fx-background-radius: 4; " +
-                    "-fx-cursor: hand;"
-                );
-            }
-        });
-        
-        runButton.setOnMouseExited(e -> {
-            if (runButton.getText().contains("开始")) {
-                runButton.setStyle(
-                    "-fx-background-color: #10B981; " +
-                    "-fx-text-fill: white; " +
-                    "-fx-font-size: 12; " +
-                    "-fx-font-weight: bold; " +
-                    "-fx-padding: 4 12 4 12; " +
-                    "-fx-border-radius: 4; " +
-                    "-fx-background-radius: 4; " +
-                    "-fx-cursor: hand;"
-                );
-            } else {
-                runButton.setStyle(
-                    "-fx-background-color: #EF4444; " +
-                    "-fx-text-fill: white; " +
-                    "-fx-font-size: 12; " +
-                    "-fx-font-weight: bold; " +
-                    "-fx-padding: 4 12 4 12; " +
-                    "-fx-border-radius: 4; " +
-                    "-fx-background-radius: 4; " +
-                    "-fx-cursor: hand;"
-                );
-            }
-        });
+    private void createRunButton() {
+        runButton = new Button("开始", IconUtil.playIcon());
+        runButton.setGraphicTextGap(8);
+        StyleUtil.applySuccessButtonHover(runButton);
         
         // 按钮点击事件会在updateButtonState中根据状态动态设置
     }
@@ -390,17 +308,9 @@ public class TopToolBar extends VBox {
             
             // 更新运行/停止按钮
             if (isCurrentRunning) {
-                runButton.setText("🛑 停止");
-                runButton.setStyle(
-                    "-fx-background-color: #EF4444; " +
-                    "-fx-text-fill: white; " +
-                    "-fx-font-size: 12; " +
-                    "-fx-font-weight: bold; " +
-                    "-fx-padding: 4 12 4 12; " +
-                    "-fx-border-radius: 4; " +
-                    "-fx-background-radius: 4; " +
-                    "-fx-cursor: hand;"
-                );
+                runButton.setText("停止");
+                runButton.setGraphic(IconUtil.stopIcon());
+                StyleUtil.applyErrorButtonHover(runButton);
                 // 点击停止按钮时，停止当前任务组
                 runButton.setOnAction(e -> {
                     if (callback != null && currentTaskGroupId != null) {
@@ -408,17 +318,9 @@ public class TopToolBar extends VBox {
                     }
                 });
             } else {
-                runButton.setText("▶️ 开始");
-                runButton.setStyle(
-                    "-fx-background-color: #10B981; " +
-                    "-fx-text-fill: white; " +
-                    "-fx-font-size: 12; " +
-                    "-fx-font-weight: bold; " +
-                    "-fx-padding: 4 12 4 12; " +
-                    "-fx-border-radius: 4; " +
-                    "-fx-background-radius: 4; " +
-                    "-fx-cursor: hand;"
-                );
+                runButton.setText("开始");
+                runButton.setGraphic(IconUtil.playIcon());
+                StyleUtil.applySuccessButtonHover(runButton);
                 // 点击开始按钮时，运行当前任务组
                 runButton.setOnAction(e -> {
                     if (callback != null) {
@@ -432,14 +334,14 @@ public class TopToolBar extends VBox {
                 runningTasksMenu.setVisible(false);
             } else {
                 runningTasksMenu.setVisible(true);
-                runningTasksMenu.setText("🛑 运行中 (" + runningJobs.size() + ")");
+                runningTasksMenu.setText("运行中 (" + runningJobs.size() + ")");
                 runningTasksMenu.getItems().clear();
                 
-                // 添加每个运行中的任务组
+                // 添加每个运行中的任务组 - 扁平化设计
                 for (RunningJobGroup job : runningJobs.values()) {
                     if (job.isRunning()) {
                         MenuItem menuItem = new MenuItem(
-                            "🛑 " + job.getJobName() + " (ID: " + job.getJobId() + ")"
+                            job.getJobName() + " (ID: " + job.getJobId() + ")"
                         );
                         menuItem.setStyle(
                             "-fx-text-fill: #EF4444; " +
@@ -460,8 +362,8 @@ public class TopToolBar extends VBox {
                 if (!runningTasksMenu.getItems().isEmpty()) {
                     runningTasksMenu.getItems().add(new SeparatorMenuItem());
                     
-                    // 添加"停止所有"选项
-                    MenuItem stopAllItem = new MenuItem("🛑 停止所有");
+                    // 添加"停止所有"选项 - 扁平化设计
+                    MenuItem stopAllItem = new MenuItem("停止所有");
                     stopAllItem.setStyle(
                         "-fx-text-fill: #EF4444; " +
                         "-fx-font-weight: bold;"

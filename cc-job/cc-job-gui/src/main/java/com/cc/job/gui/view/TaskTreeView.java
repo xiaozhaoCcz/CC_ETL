@@ -3,6 +3,8 @@ package com.cc.job.gui.view;
 import com.cc.job.xo.model.vo.JobPartVo;
 import com.cc.job.gui.model.TreeNodeData;
 import com.cc.job.gui.service.JobPartService;
+import com.cc.job.gui.util.IconUtil;
+import com.cc.job.gui.util.StyleUtil;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -50,16 +52,16 @@ public class TaskTreeView extends VBox {
     
     private void initializeUI() {
         // 设置面板样式
-        setStyle("-fx-background-color: #FFFFFF; -fx-border-color: #E5E7EB; -fx-border-width: 0 1 0 0;");
-        setMinWidth(200);  // 最小宽度200px
-        setPadding(new Insets(10));
-        setSpacing(10);
+        setStyle(StyleUtil.sidebar());
+        setMinWidth(240);  // 最小宽度240px
+        setPadding(new Insets(16));
+        setSpacing(12);
         
         // 标题栏
         HBox titleBar = createTitleBar();
         
         // 搜索框
-        HBox searchBar = createSearchBar();
+        TextField searchBar = createSearchBar();
         
         // 树形视图
         treeView = createTreeView();
@@ -70,39 +72,19 @@ public class TaskTreeView extends VBox {
     }
     
     private HBox createTitleBar() {
-        HBox titleBar = new HBox(10);
+        HBox titleBar = new HBox(8);
         titleBar.setAlignment(Pos.CENTER_LEFT);
         
-        Label titleLabel = new Label("📁 任务组");
-        titleLabel.setStyle("-fx-font-size: 16; -fx-font-weight: bold; -fx-text-fill: #1F2937;");
+        // 标题
+        Label titleLabel = new Label("任务组");
+        titleLabel.setStyle(StyleUtil.subtitle());
         
         HBox.setHgrow(titleLabel, Priority.ALWAYS);
         
         // 弹出按钮
-        Button detachBtn = new Button("🪟");
-        detachBtn.setStyle(
-            "-fx-background-color: transparent; " +
-            "-fx-text-fill: #6B7280; " +
-            "-fx-font-size: 14; " +
-            "-fx-cursor: hand; " +
-            "-fx-padding: 2 6 2 6;"
-        );
+        Button detachBtn = new Button("", IconUtil.windowIcon());
+        StyleUtil.applyIconButtonHover(detachBtn);
         detachBtn.setTooltip(new Tooltip("弹出为独立窗口"));
-        detachBtn.setOnMouseEntered(e -> detachBtn.setStyle(
-            "-fx-background-color: #EEF2FF; " +
-            "-fx-text-fill: #8B5CF6; " +
-            "-fx-font-size: 14; " +
-            "-fx-cursor: hand; " +
-            "-fx-padding: 2 6 2 6; " +
-            "-fx-background-radius: 3;"
-        ));
-        detachBtn.setOnMouseExited(e -> detachBtn.setStyle(
-            "-fx-background-color: transparent; " +
-            "-fx-text-fill: #6B7280; " +
-            "-fx-font-size: 14; " +
-            "-fx-cursor: hand; " +
-            "-fx-padding: 2 6 2 6;"
-        ));
         detachBtn.setOnAction(e -> {
             if (onDetach != null) {
                 onDetach.run();
@@ -110,30 +92,9 @@ public class TaskTreeView extends VBox {
         });
         
         // 关闭按钮
-        Button closeBtn = new Button("✕");
-        closeBtn.setStyle(
-            "-fx-background-color: transparent; " +
-            "-fx-text-fill: #6B7280; " +
-            "-fx-font-size: 14; " +
-            "-fx-cursor: hand; " +
-            "-fx-padding: 2 6 2 6;"
-        );
+        Button closeBtn = new Button("", IconUtil.closeIcon());
+        StyleUtil.applyIconButtonHover(closeBtn);
         closeBtn.setTooltip(new Tooltip("关闭面板"));
-        closeBtn.setOnMouseEntered(e -> closeBtn.setStyle(
-            "-fx-background-color: #F3F4F6; " +
-            "-fx-text-fill: #1F2937; " +
-            "-fx-font-size: 14; " +
-            "-fx-cursor: hand; " +
-            "-fx-padding: 2 6 2 6; " +
-            "-fx-background-radius: 3;"
-        ));
-        closeBtn.setOnMouseExited(e -> closeBtn.setStyle(
-            "-fx-background-color: transparent; " +
-            "-fx-text-fill: #6B7280; " +
-            "-fx-font-size: 14; " +
-            "-fx-cursor: hand; " +
-            "-fx-padding: 2 6 2 6;"
-        ));
         closeBtn.setOnAction(e -> {
             if (onClose != null) {
                 onClose.run();
@@ -145,36 +106,18 @@ public class TaskTreeView extends VBox {
         return titleBar;
     }
     
-    private HBox createSearchBar() {
-        HBox searchBar = new HBox(5);
-        searchBar.setAlignment(Pos.CENTER_LEFT);
-        searchBar.setStyle(
-            "-fx-background-color: #F9FAFB; " +
-            "-fx-border-color: #D1D5DB; " +
-            "-fx-border-radius: 6; " +
-            "-fx-background-radius: 6; " +
-            "-fx-padding: 8;"
-        );
-        
+    private TextField createSearchBar() {
         searchField = new TextField();
-        searchField.setPromptText("🔍 搜索节点");
-        searchField.setStyle(
-            "-fx-background-color: transparent; " +
-            "-fx-border-color: transparent; " +
-            "-fx-text-fill: #1F2937; " +
-            "-fx-prompt-text-fill: #9CA3AF;"
-        );
-        searchField.setPrefWidth(240);
-        HBox.setHgrow(searchField, Priority.ALWAYS);
+        searchField.setPromptText("搜索节点...");
+        searchField.setStyle(StyleUtil.searchField());
+        searchField.setPrefHeight(36);
         
         // 搜索功能
         searchField.textProperty().addListener((obs, oldVal, newVal) -> {
             filterTree(newVal);
         });
         
-        searchBar.getChildren().add(searchField);
-        
-        return searchBar;
+        return searchField;
     }
     
     private TreeView<TreeNodeData> createTreeView() {
@@ -208,26 +151,24 @@ public class TaskTreeView extends VBox {
                     setText(item.getLabel());
                     
                     // 根据节点类型设置图标
-                    String icon = item.getTypeIcon();
-                    String color = item.getTypeColor();
-                    setGraphic(createIcon(icon, color));
+                    setGraphic(IconUtil.getIconByType(item.getType()));
                     
                     // 样式
                     setStyle(
-                        "-fx-text-fill: #1F2937; " +
-                        "-fx-font-size: 13; " +
-                        "-fx-padding: 6 8 6 8;"
+                        StyleUtil.body() +
+                        "-fx-padding: 8 12; " +
+                        "-fx-background-radius: " + StyleUtil.RADIUS_MD + ";"
                     );
                     
                     // 选中样式
                     if (isSelected()) {
                         setStyle(
-                            "-fx-background-color: #EDE9FE; " +
-                            "-fx-text-fill: #7C3AED; " +
-                            "-fx-font-size: 13; " +
-                            "-fx-font-weight: bold; " +
-                            "-fx-padding: 6 8 6 8; " +
-                            "-fx-background-radius: 6;"
+                            "-fx-background-color: " + StyleUtil.PRIMARY + "20; " +
+                            "-fx-text-fill: " + StyleUtil.PRIMARY + "; " +
+                            "-fx-font-size: 13px; " +
+                            "-fx-font-weight: 600; " +
+                            "-fx-padding: 8 12; " +
+                            "-fx-background-radius: " + StyleUtil.RADIUS_MD + ";"
                         );
                     }
                     
@@ -238,12 +179,6 @@ public class TaskTreeView extends VBox {
                 }
             }
             
-            private Label createIcon(String emoji, String color) {
-                Label icon = new Label(emoji);
-                icon.setStyle("-fx-font-size: 14;");
-                return icon;
-            }
-            
             /**
              * 创建树节点的右键菜单
              */
@@ -252,10 +187,10 @@ public class TaskTreeView extends VBox {
                 String nodeName = nodeData.getLabel();
                 Integer nodeType = nodeData.getType();
                 
-                // type: 0=分区, 1=任务组, 2=任务节点
+                // type: 0=分区, 1=任务组, 2=任务节点 - 扁平化设计
                 if (nodeType == 0) {
                     // 一级节点（分区）- 只显示新建任务组功能
-                    MenuItem newTaskItem = new MenuItem("➕ 新建任务组");
+                    MenuItem newTaskItem = new MenuItem("新建任务组");
                     newTaskItem.setStyle(
                         "-fx-font-size: 13; " +
                         "-fx-font-weight: bold; " +
@@ -272,7 +207,7 @@ public class TaskTreeView extends VBox {
                     
                 } else if (nodeType == 1) {
                     // 二级节点（任务组）- 新增节点和刷新功能
-                    MenuItem addNodeItem = new MenuItem("➕ 新增节点");
+                    MenuItem addNodeItem = new MenuItem("新增节点");
                     addNodeItem.setStyle(
                         "-fx-font-size: 13; " +
                         "-fx-font-weight: bold; " +
@@ -285,7 +220,7 @@ public class TaskTreeView extends VBox {
                         }
                     });
                     
-                    MenuItem refreshItem = new MenuItem("🔄 刷新");
+                    MenuItem refreshItem = new MenuItem("刷新");
                     refreshItem.setOnAction(e -> {
                         System.out.println("🔄 刷新任务组: " + nodeName);
                         // 重新加载树数据
@@ -296,7 +231,7 @@ public class TaskTreeView extends VBox {
                     
                 } else {
                     // 三级及以下节点（任务节点）- 基本操作
-                    MenuItem openItem = new MenuItem("📂 打开");
+                    MenuItem openItem = new MenuItem("打开");
                     openItem.setOnAction(e -> {
                         System.out.println("📂 打开节点: " + nodeName);
                         if (selectionCallback != null) {
@@ -304,13 +239,13 @@ public class TaskTreeView extends VBox {
                         }
                     });
                     
-                    MenuItem editItem = new MenuItem("✏️ 编辑");
+                    MenuItem editItem = new MenuItem("编辑");
                     editItem.setOnAction(e -> {
                         System.out.println("✏️ 编辑节点: " + nodeName);
                         // TODO: 显示编辑对话框
                     });
                     
-                    MenuItem deleteItem = new MenuItem("🗑️ 删除");
+                    MenuItem deleteItem = new MenuItem("删除");
                     deleteItem.setStyle("-fx-text-fill: #EF4444;");
                     deleteItem.setOnAction(e -> {
                         System.out.println("🗑️ 删除节点: " + nodeName);
@@ -417,26 +352,48 @@ public class TaskTreeView extends VBox {
     }
     
     /**
-     * 创建分区节点（只包含任务组，过滤掉"任务"和"关系"节点）
+     * 创建分区节点（包含完整的层级结构：分区 -> 任务组 -> 任务/关系 -> 任务节点/关系边）
      */
     private TreeItem<TreeNodeData> createPartitionItem(JobPartVo partVo) {
         TreeNodeData partitionData = new TreeNodeData(partVo.getId(), partVo.getLabel(), partVo.getType(), partVo.getExt1());
         TreeItem<TreeNodeData> partitionItem = new TreeItem<>(partitionData);
         partitionItem.setExpanded(true); // 默认展开分区
         
-        // 只添加任务组（type=1），过滤掉"任务"（type=2）和"关系"（type=3）节点
+        // 添加所有子节点（包括任务组及其子节点）
         if (partVo.getChildren() != null && !partVo.getChildren().isEmpty()) {
             for (JobPartVo child : partVo.getChildren()) {
                 if (child.getType() != null && child.getType() == 1) {
-                    // 创建任务组节点（不包含子节点，因为子节点是"任务"和"关系"）
-                    TreeNodeData taskGroupData = new TreeNodeData(child.getId(), child.getLabel(), child.getType(), child.getExt1());
-                    TreeItem<TreeNodeData> taskGroupItem = new TreeItem<>(taskGroupData);
+                    // 创建任务组节点，递归添加子节点
+                    TreeItem<TreeNodeData> taskGroupItem = createTreeItemRecursive(child);
                     partitionItem.getChildren().add(taskGroupItem);
                 }
             }
         }
         
         return partitionItem;
+    }
+    
+    /**
+     * 递归创建树节点（包含所有子节点）
+     */
+    private TreeItem<TreeNodeData> createTreeItemRecursive(JobPartVo vo) {
+        TreeNodeData nodeData = new TreeNodeData(vo.getId(), vo.getLabel(), vo.getType(), vo.getExt1());
+        TreeItem<TreeNodeData> item = new TreeItem<>(nodeData);
+        
+        // 默认展开状态：分区和任务组默认展开
+        if (vo.getType() != null && (vo.getType() == 0 || vo.getType() == 1)) {
+            item.setExpanded(true);
+        }
+        
+        // 递归添加所有子节点
+        if (vo.getChildren() != null && !vo.getChildren().isEmpty()) {
+            for (JobPartVo child : vo.getChildren()) {
+                TreeItem<TreeNodeData> childItem = createTreeItemRecursive(child);
+                item.getChildren().add(childItem);
+            }
+        }
+        
+        return item;
     }
     
     /**

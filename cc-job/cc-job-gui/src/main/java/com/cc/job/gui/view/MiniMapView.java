@@ -1,5 +1,7 @@
 package com.cc.job.gui.view;
 
+import com.cc.job.gui.util.IconUtil;
+import com.cc.job.gui.util.StyleUtil;
 import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -111,43 +113,19 @@ public class MiniMapView extends VBox {
     }
     
     private HBox createTitleBar() {
-        HBox titleBar = new HBox(10);
+        HBox titleBar = new HBox(8);
         titleBar.setAlignment(Pos.CENTER_LEFT);
         
-        Label titleLabel = new Label("🗺️ 小地图");
-        titleLabel.setStyle(
-            "-fx-font-size: 11; " +
-            "-fx-font-weight: bold; " +
-            "-fx-text-fill: #374151;"
-        );
+        // 标题
+        Label titleLabel = new Label("小地图");
+        titleLabel.setStyle(StyleUtil.caption() + "-fx-font-weight: 600;");
         
         HBox.setHgrow(titleLabel, Priority.ALWAYS);
         
         // 弹出按钮
-        Button detachBtn = new Button("🪟");
-        detachBtn.setStyle(
-            "-fx-background-color: transparent; " +
-            "-fx-text-fill: #6B7280; " +
-            "-fx-font-size: 12; " +
-            "-fx-cursor: hand; " +
-            "-fx-padding: 2 6 2 6;"
-        );
+        Button detachBtn = new Button("", IconUtil.windowIcon());
+        StyleUtil.applyIconButtonHover(detachBtn);
         detachBtn.setTooltip(new Tooltip("弹出为独立窗口"));
-        detachBtn.setOnMouseEntered(e -> detachBtn.setStyle(
-            "-fx-background-color: #EEF2FF; " +
-            "-fx-text-fill: #8B5CF6; " +
-            "-fx-font-size: 12; " +
-            "-fx-cursor: hand; " +
-            "-fx-padding: 2 6 2 6; " +
-            "-fx-background-radius: 3;"
-        ));
-        detachBtn.setOnMouseExited(e -> detachBtn.setStyle(
-            "-fx-background-color: transparent; " +
-            "-fx-text-fill: #6B7280; " +
-            "-fx-font-size: 12; " +
-            "-fx-cursor: hand; " +
-            "-fx-padding: 2 6 2 6;"
-        ));
         detachBtn.setOnAction(e -> {
             if (onDetach != null) {
                 onDetach.run();
@@ -155,30 +133,9 @@ public class MiniMapView extends VBox {
         });
         
         // 关闭按钮
-        Button closeBtn = new Button("✕");
-        closeBtn.setStyle(
-            "-fx-background-color: transparent; " +
-            "-fx-text-fill: #6B7280; " +
-            "-fx-font-size: 12; " +
-            "-fx-cursor: hand; " +
-            "-fx-padding: 2 6 2 6;"
-        );
+        Button closeBtn = new Button("", IconUtil.closeIcon());
+        StyleUtil.applyIconButtonHover(closeBtn);
         closeBtn.setTooltip(new Tooltip("关闭面板"));
-        closeBtn.setOnMouseEntered(e -> closeBtn.setStyle(
-            "-fx-background-color: #F3F4F6; " +
-            "-fx-text-fill: #1F2937; " +
-            "-fx-font-size: 12; " +
-            "-fx-cursor: hand; " +
-            "-fx-padding: 2 6 2 6; " +
-            "-fx-background-radius: 3;"
-        ));
-        closeBtn.setOnMouseExited(e -> closeBtn.setStyle(
-            "-fx-background-color: transparent; " +
-            "-fx-text-fill: #6B7280; " +
-            "-fx-font-size: 12; " +
-            "-fx-cursor: hand; " +
-            "-fx-padding: 2 6 2 6;"
-        ));
         closeBtn.setOnAction(e -> {
             if (onClose != null) {
                 onClose.run();

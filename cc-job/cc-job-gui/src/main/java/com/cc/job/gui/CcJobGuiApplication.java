@@ -30,6 +30,15 @@ public class CcJobGuiApplication extends Application {
             // 创建场景
             Scene scene = new Scene(mainView, 1400, 900);
             
+            // 加载全局CSS样式
+            try {
+                String css = getClass().getResource("/styles.css").toExternalForm();
+                scene.getStylesheets().add(css);
+                System.out.println("✓ 样式表加载成功");
+            } catch (Exception e) {
+                System.err.println("⚠ 样式表加载失败: " + e.getMessage());
+            }
+            
             // 设置窗口
             primaryStage.setTitle("NodeFx - 流程节点编辑器");
             primaryStage.setScene(scene);

@@ -57,18 +57,18 @@ public class TreeNodeData {
     }
     
     /**
-     * 获取类型图标
+     * 获取类型图标 - 扁平化设计
      */
     public String getTypeIcon() {
-        if (type == null) return "❓";
+        if (type == null) return "?";
         return switch (type) {
-            case 0 -> "📦";  // 分区 - 箱子
-            case 1 -> "📂";  // 任务组 - 文件夹
-            case 2 -> "📋";  // 任务容器 - 剪贴板
-            case 3 -> "🔗";  // 关系容器 - 链接
-            case 4 -> "⚙️";  // 任务节点 - 齿轮
-            case 5 -> "➡️";  // 关系边 - 箭头
-            default -> "❓"; // 未知
+            case 0 -> "□";  // 分区 - 方框
+            case 1 -> "◇";  // 任务组 - 菱形
+            case 2 -> "≡";  // 任务容器 - 三横线
+            case 3 -> "⇄";  // 关系容器 - 左右箭头
+            case 4 -> "●";  // 任务节点 - 圆点
+            case 5 -> "→";  // 关系边 - 箭头
+            default -> "?"; // 未知
         };
     }
     

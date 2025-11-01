@@ -114,8 +114,8 @@ public class LogPanel extends VBox {
             Text welcome2 = createText("║                     NodeFx 流程节点编辑器                       ║\n", "#9CA3AF");
             Text welcome3 = createText("║                      日志监控系统 v1.0                         ║\n", "#9CA3AF");
             Text welcome4 = createText("╚════════════════════════════════════════════════════════════════╝\n\n", "#9CA3AF");
-            Text welcome5 = createText("📌 系统就绪，等待任务启动...\n", "#6B7280");
-            Text welcome6 = createText("💡 所有操作日志将实时显示在此处\n\n", "#6B7280");
+            Text welcome5 = createText("[i] 系统就绪，等待任务启动...\n", "#6B7280");
+            Text welcome6 = createText("[i] 所有操作日志将实时显示在此处\n\n", "#6B7280");
             Text welcome7 = createText("─────────────────────────────────────────────────────────────────\n\n", "#9CA3AF");
             
             textFlow.getChildren().addAll(welcome1, welcome2, welcome3, welcome4, welcome5, welcome6, welcome7);
@@ -398,8 +398,8 @@ public class LogPanel extends VBox {
         titleBar.setMinHeight(48);
         titleBar.setMaxHeight(48);
         
-        // 标题
-        Label titleLabel = new Label("📊 日志监控");
+        // 标题 - 扁平化设计
+        Label titleLabel = new Label("日志监控");
         titleLabel.setFont(Font.font("System", FontWeight.BOLD, 14));
         titleLabel.setTextFill(Color.web("#111827"));
         titleLabel.setStyle("-fx-font-weight: 600;");
@@ -460,11 +460,11 @@ public class LogPanel extends VBox {
         separator2.setPrefHeight(20);
         separator2.setStyle("-fx-background-color: #E5E7EB;");
         
-        // 清空按钮
-        clearBtn = createToolButton("🗑️ 清空", this::clearLogs);
+        // 清空按钮 - 扁平化设计，靠右排列
+        clearBtn = createToolButton("清空", this::clearLogs);
         
-        // 导出按钮
-        exportBtn = createToolButton("📥 导出", this::exportLogs);
+        // 导出按钮 - 扁平化设计，靠右排列
+        exportBtn = createToolButton("导出", this::exportLogs);
         
         titleBar.getChildren().addAll(
             titleLabel,
@@ -494,7 +494,7 @@ public class LogPanel extends VBox {
         statusBar.setMinHeight(36);
         statusBar.setMaxHeight(36);
         
-        Label infoLabel = new Label("💡 提示: 启动任务后将显示实时日志信息");
+        Label infoLabel = new Label("提示: 启动任务后将显示实时日志信息");
         infoLabel.setFont(Font.font("System", FontWeight.NORMAL, 11));
         infoLabel.setTextFill(Color.web("#6B7280"));
         infoLabel.setStyle("-fx-font-weight: 400;");
@@ -502,7 +502,7 @@ public class LogPanel extends VBox {
         HBox spacer = new HBox();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         
-        Label timeLabel = new Label("⏱️ 最后更新: 从未");
+        Label timeLabel = new Label("最后更新: 从未");
         timeLabel.setFont(Font.font("System", FontWeight.NORMAL, 11));
         timeLabel.setTextFill(Color.web("#9CA3AF"));
         timeLabel.setStyle("-fx-font-weight: 400;");
@@ -817,39 +817,39 @@ public class LogPanel extends VBox {
             String timestamp = LocalDateTime.now().format(TIME_FORMAT);
             String levelPadded = String.format("%-7s", level);
             
-            // 根据级别选择图标和颜色
+            // 根据级别选择图标和颜色 - 扁平化设计
             String icon;
             String levelColor;
             String messageColor;
             
             switch (level) {
                 case "INFO":
-                    icon = "ℹ️";
+                    icon = "[i]";
                     levelColor = "#2563EB"; // 蓝色
                     messageColor = "#1E40AF"; // 深蓝色
                     break;
                 case "WARN":
-                    icon = "⚠️";
+                    icon = "[!]";
                     levelColor = "#D97706"; // 黄色
                     messageColor = "#B45309"; // 深黄色
                     break;
                 case "ERROR":
-                    icon = "❌";
+                    icon = "[×]";
                     levelColor = "#DC2626"; // 红色
                     messageColor = "#B91C1C"; // 深红色
                     break;
                 case "DEBUG":
-                    icon = "🔍";
+                    icon = "[?]";
                     levelColor = "#7C3AED"; // 紫色
                     messageColor = "#6D28D9"; // 深紫色
                     break;
                 case "SUCCESS":
-                    icon = "✅";
+                    icon = "[✓]";
                     levelColor = "#059669"; // 绿色
                     messageColor = "#047857"; // 深绿色
                     break;
                 default:
-                    icon = "📝";
+                    icon = "[-]";
                     levelColor = "#6B7280"; // 灰色
                     messageColor = "#374151"; // 深灰色
                     break;
