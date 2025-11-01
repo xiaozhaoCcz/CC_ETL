@@ -12,11 +12,9 @@ import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.xo.model.entity.JobEdge;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobNode;
-import com.cc.job.xo.model.form.JobGlueForm;
 import com.cc.job.xo.model.form.JobInfoForm;
 import com.cc.job.xo.model.vo.JobEdgeVo;
 import com.cc.job.xo.model.vo.JobNodeVo;
-import com.google.gson.Gson;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
@@ -368,10 +366,20 @@ public class JobComposeServiceImpl implements JobComposeService {
         if (type == 1) {
             nodeVos.add(jobNodeVo);
         }
-        double x = Double.parseDouble(String.valueOf(formMap.get("x")));
-        double y = Double.parseDouble(String.valueOf(formMap.get("y")));
-        double[] nodeXY = new double[]{x, y};
-        updateNodeXY(nodeVos, nodeXY, new double[]{jobNodeVo.getNodePositionX(), jobNodeVo.getNodePositionY()});
+        
+        // 只有 type=1 (运行时模式) 才需要调整节点位置
+        // type=0 (普通查看模式) 直接返回数据库中的原始位置
+        if (type == 1) {
+            Object xObj = formMap.get("x");
+            Object yObj = formMap.get("y");
+            if (xObj != null && yObj != null) {
+                double x = Double.parseDouble(String.valueOf(xObj));
+                double y = Double.parseDouble(String.valueOf(yObj));
+                double[] nodeXY = new double[]{x, y};
+                updateNodeXY(nodeVos, nodeXY, new double[]{jobNodeVo.getNodePositionX(), jobNodeVo.getNodePositionY()});
+            }
+        }
+        
         res.put("jobNode", jobNodeVo);
         res.put("nodes", nodeVos);
         res.put("edges", edgeVos);
@@ -657,6 +665,10 @@ public class JobComposeServiceImpl implements JobComposeService {
             jobEdgeVo.setId(randomId + jobEdge.getId());
             jobEdgeVo.setFromNodeId(randomId + jobEdge.getFromNodeId());
             jobEdgeVo.setEndNodeId(randomId + jobEdge.getEndNodeId());
+            // 复制锚点信息
+            jobEdgeVo.setStartPoint(jobEdge.getStartPoint());
+            jobEdgeVo.setEndPoint(jobEdge.getEndPoint());
+            jobEdgeVo.setProperties(jobEdge.getProperties());
             edgeVos.add(jobEdgeVo);
         }
     }
