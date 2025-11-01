@@ -13,11 +13,22 @@ public class RunningJobGroup {
     private int fromLineNum;
     private int pullFailCount;
     private boolean isRunning;
+    private String triggerUserId;  // 触发任务的用户ID
     
     public RunningJobGroup(Long jobId, String jobName, String randomId) {
         this.jobId = jobId;
         this.jobName = jobName;
         this.randomId = randomId;
+        this.fromLineNum = 0;
+        this.pullFailCount = 0;
+        this.isRunning = true;
+    }
+    
+    public RunningJobGroup(Long jobId, String jobName, String randomId, String triggerUserId) {
+        this.jobId = jobId;
+        this.jobName = jobName;
+        this.randomId = randomId;
+        this.triggerUserId = triggerUserId;
         this.fromLineNum = 0;
         this.pullFailCount = 0;
         this.isRunning = true;
@@ -85,6 +96,14 @@ public class RunningJobGroup {
     
     public void setRunning(boolean running) {
         isRunning = running;
+    }
+    
+    public String getTriggerUserId() {
+        return triggerUserId;
+    }
+    
+    public void setTriggerUserId(String triggerUserId) {
+        this.triggerUserId = triggerUserId;
     }
     
     /**

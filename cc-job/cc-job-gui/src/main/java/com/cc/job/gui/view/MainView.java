@@ -580,9 +580,12 @@ public class MainView extends BorderPane {
 
         // 生成新的randomId
         String randomId = snowflake.nextIdStr();
+        
+        // 获取当前登录用户ID
+        String currentUserId = com.cc.job.gui.util.SessionManager.getInstance().getUserId();
 
-        // 创建新的运行任务组记录
-        RunningJobGroup runningJob = new RunningJobGroup(currentJobId, jobName, randomId);
+        // 创建新的运行任务组记录（包含触发用户ID）
+        RunningJobGroup runningJob = new RunningJobGroup(currentJobId, jobName, randomId, currentUserId);
         runningJobs.put(currentJobId, runningJob);
 
         // 创建或切换到任务组的日志标签页

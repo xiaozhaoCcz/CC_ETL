@@ -46,6 +46,7 @@ public class TopToolBar extends VBox {
     
     // 运行按钮和下拉菜单
     private Button runButton;
+    private Button stopButton;  // 独立的停止按钮
     private Button retryButton;
     private MenuButton runningTasksMenu;
     private HBox runGroup;
@@ -146,6 +147,7 @@ public class TopToolBar extends VBox {
         // 运行操作组
         runGroup = createToolGroup();
         createRunButton();
+        createStopButton();  // 创建停止按钮
         createRunningTasksMenu();
         updateRunGroupButtons();
         
@@ -421,14 +423,49 @@ public class TopToolBar extends VBox {
     }
     
     /**
-     * 创建开始/停止按钮
+     * 创建开始按钮
      */
     private void createRunButton() {
         runButton = new Button("开始", IconUtil.playIcon());
         runButton.setGraphicTextGap(8);
         StyleUtil.applySuccessButtonHover(runButton);
         
-        // 按钮点击事件会在updateButtonState中根据状态动态设置
+        // 点击开始按钮时，运行当前任务组
+        runButton.setOnAction(e -> {
+            if (callback != null) {
+                callback.onRun();
+            }
+        });
+    }
+    
+    /**
+     * 创建停止按钮（独立的停止按钮，只在满足条件时显示）
+     */
+    private void createStopButton() {
+        stopButton = new Button("停止", IconUtil.stopIcon());
+        stopButton.setGraphicTextGap(8);
+        stopButton.setStyle(
+            "-fx-background-color: #EF4444; " +
+            "-fx-text-fill: white; " +
+            "-fx-font-size: 12; " +
+            "-fx-font-weight: bold; " +
+            "-fx-padding: 6 16 6 16; " +
+            "-fx-border-radius: 4; " +
+            "-fx-background-radius: 4; " +
+            "-fx-cursor: hand;"
+        );
+        StyleUtil.applyErrorButtonHover(stopButton);
+        
+        // 点击停止按钮时，停止当前任务组
+        stopButton.setOnAction(e -> {
+            if (callback != null && currentTaskGroupId != null) {
+                callback.onStop(currentTaskGroupId);
+            }
+        });
+        
+        // 默认隐藏
+        stopButton.setVisible(false);
+        stopButton.setManaged(false);  // 不占用空间
     }
     
     /**
@@ -455,6 +492,7 @@ public class TopToolBar extends VBox {
     private void updateRunGroupButtons() {
         runGroup.getChildren().clear();
         runGroup.getChildren().add(runButton);
+        runGroup.getChildren().add(stopButton);  // 添加停止按钮
         runGroup.getChildren().add(runningTasksMenu);
     }
     
@@ -476,27 +514,34 @@ public class TopToolBar extends VBox {
                 runningJobs.containsKey(currentTaskGroupId) && 
                 runningJobs.get(currentTaskGroupId).isRunning();
             
-            // 更新运行/停止按钮
+            // 获取当前登录用户ID
+            String currentUserId = SessionManager.getInstance().getUserId();
+            
+            // 判断是否应该显示停止按钮
+            boolean shouldShowStopButton = false;
+            if (isCurrentRunning && currentUserId != null) {
+                RunningJobGroup runningJob = runningJobs.get(currentTaskGroupId);
+                String triggerUserId = runningJob.getTriggerUserId();
+                // 只有当触发用户ID等于当前登录用户ID时才显示停止按钮
+                shouldShowStopButton = currentUserId.equals(triggerUserId);
+            }
+            
+            // 显示/隐藏停止按钮
+            stopButton.setVisible(shouldShowStopButton);
+            stopButton.setManaged(shouldShowStopButton);  // 控制是否占用空间
+            
+            // 开始按钮始终显示，但在任务运行时禁用
             if (isCurrentRunning) {
-                runButton.setText("停止");
-                runButton.setGraphic(IconUtil.stopIcon());
-                StyleUtil.applyErrorButtonHover(runButton);
-                // 点击停止按钮时，停止当前任务组
-                runButton.setOnAction(e -> {
-                    if (callback != null && currentTaskGroupId != null) {
-                        callback.onStop(currentTaskGroupId);
-                    }
-                });
+                runButton.setDisable(true);
+                runButton.setStyle(
+                    "-fx-background-color: #9CA3AF; " +
+                    "-fx-text-fill: white; " +
+                    "-fx-opacity: 0.6; " +
+                    "-fx-cursor: default;"
+                );
             } else {
-                runButton.setText("开始");
-                runButton.setGraphic(IconUtil.playIcon());
+                runButton.setDisable(false);
                 StyleUtil.applySuccessButtonHover(runButton);
-                // 点击开始按钮时，运行当前任务组
-                runButton.setOnAction(e -> {
-                    if (callback != null) {
-                        callback.onRun();
-                    }
-                });
             }
             
             // 更新运行中任务下拉菜单
