@@ -32,6 +32,8 @@ public class JobNode extends BaseEntity {
 
     private String nodeType;
 
+    private int  triggerStatus;
+
     @Override
     public boolean equals(Object o) {
         if (o == null || getClass() != o.getClass()) return false;

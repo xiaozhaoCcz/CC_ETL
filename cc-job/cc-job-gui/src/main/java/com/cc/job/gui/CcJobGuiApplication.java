@@ -1,15 +1,22 @@
 package com.cc.job.gui;
 
+import com.cc.job.gui.service.LoginService;
+import com.cc.job.gui.util.SessionManager;
+import com.cc.job.gui.view.LoginView;
 import com.cc.job.gui.view.MainView;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 
 /**
  * JavaFX流程节点编辑器应用程序主入口
  */
 public class CcJobGuiApplication extends Application {
+    
+    private Stage primaryStage;
+    private Stage loginStage;
     
     @Override
     public void init() throws Exception {
@@ -21,6 +28,82 @@ public class CcJobGuiApplication extends Application {
     
     @Override
     public void start(Stage primaryStage) {
+        this.primaryStage = primaryStage;
+        
+        try {
+            // 先显示登录窗口
+            showLoginWindow();
+            
+        } catch (Exception e) {
+            System.err.println("启动失败：" + e.getMessage());
+            e.printStackTrace();
+            Platform.exit();
+            System.exit(1);
+        }
+    }
+    
+    /**
+     * 显示登录窗口
+     */
+    private void showLoginWindow() {
+        System.out.println("正在创建登录界面...");
+        
+        // 创建登录视图
+        LoginView loginView = new LoginView();
+        
+        // 设置登录成功回调
+        loginView.setOnLoginSuccess(result -> {
+            // 保存会话信息
+            SessionManager.getInstance().login(
+                result.getToken(),
+                result.getUserId(),
+                result.getUsername()
+            );
+            
+            // 关闭登录窗口
+            if (loginStage != null) {
+                loginStage.close();
+            }
+            
+            // 显示主窗口
+            Platform.runLater(() -> showMainWindow());
+        });
+        
+        // 创建登录场景
+        Scene loginScene = new Scene(loginView, 900, 600);
+        
+        // 加载全局CSS样式
+        try {
+            String css = getClass().getResource("/styles.css").toExternalForm();
+            loginScene.getStylesheets().add(css);
+        } catch (Exception e) {
+            System.err.println("⚠ 样式表加载失败: " + e.getMessage());
+        }
+        
+        // 创建登录窗口
+        loginStage = new Stage();
+        loginStage.setTitle("NodeFx - 用户登录");
+        loginStage.setScene(loginScene);
+        loginStage.setResizable(false);
+        loginStage.initStyle(StageStyle.UNDECORATED); // 无边框窗口
+        
+        // 窗口关闭事件
+        loginStage.setOnCloseRequest(event -> {
+            System.out.println("用户取消登录，退出应用");
+            Platform.exit();
+            System.exit(0);
+        });
+        
+        // 显示登录窗口
+        loginStage.show();
+        
+        System.out.println("✓ 登录界面已显示");
+    }
+    
+    /**
+     * 显示主窗口
+     */
+    private void showMainWindow() {
         try {
             System.out.println("正在创建主界面...");
             
@@ -39,8 +122,9 @@ public class CcJobGuiApplication extends Application {
                 System.err.println("⚠ 样式表加载失败: " + e.getMessage());
             }
             
-            // 设置窗口
-            primaryStage.setTitle("NodeFx - 流程节点编辑器");
+            // 设置窗口标题，显示用户名
+            String username = SessionManager.getInstance().getUsername();
+            primaryStage.setTitle("NodeFx - 流程节点编辑器 [" + username + "]");
             primaryStage.setScene(scene);
             primaryStage.setMinWidth(1000);
             primaryStage.setMinHeight(700);
@@ -48,6 +132,7 @@ public class CcJobGuiApplication extends Application {
             // 窗口关闭事件
             primaryStage.setOnCloseRequest(event -> {
                 System.out.println("正在关闭应用...");
+                SessionManager.getInstance().logout();
                 Platform.exit();
                 System.exit(0);
             });
@@ -69,7 +154,7 @@ public class CcJobGuiApplication extends Application {
             System.out.println("=================================");
             
         } catch (Exception e) {
-            System.err.println("启动失败：" + e.getMessage());
+            System.err.println("主界面创建失败：" + e.getMessage());
             e.printStackTrace();
             Platform.exit();
             System.exit(1);

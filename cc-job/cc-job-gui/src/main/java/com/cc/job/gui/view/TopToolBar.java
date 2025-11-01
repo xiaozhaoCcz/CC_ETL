@@ -2,6 +2,7 @@ package com.cc.job.gui.view;
 
 import com.cc.job.gui.model.RunningJobGroup;
 import com.cc.job.gui.util.IconUtil;
+import com.cc.job.gui.util.SessionManager;
 import com.cc.job.gui.util.StyleUtil;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -10,6 +11,11 @@ import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.scene.layout.StackPane;
+import javafx.scene.shape.Circle;
+import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
 
 import java.util.Map;
 
@@ -132,6 +138,9 @@ public class TopToolBar extends VBox {
         HBox spacer = new HBox();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         
+        // 用户信息区域
+        HBox userInfoArea = createUserInfoArea();
+        
         Separator sep3 = createSeparator();
         
         // 运行操作组
@@ -145,10 +154,150 @@ public class TopToolBar extends VBox {
             editGroup, sep2,
             viewGroup,
             spacer,
+            userInfoArea,
             sep3, runGroup
         );
         
         return toolBar;
+    }
+    
+    /**
+     * 创建用户信息区域
+     */
+    private HBox createUserInfoArea() {
+        HBox userInfo = new HBox(10);
+        userInfo.setAlignment(Pos.CENTER_RIGHT);
+        userInfo.setPadding(new Insets(0, 12, 0, 12));
+        
+        // 从SessionManager获取用户信息
+        SessionManager session = SessionManager.getInstance();
+        String username = session.getUsername();
+        String userId = session.getUserId();
+        
+        // 如果未登录，返回空容器
+        if (username == null || username.isEmpty()) {
+            return userInfo;
+        }
+        
+        // 创建用户头像（使用首字母）
+        StackPane avatar = createUserAvatar(username);
+        
+        // 创建用户信息文本区域
+        VBox textArea = new VBox(2);
+        textArea.setAlignment(Pos.CENTER_RIGHT);
+        
+        // 用户名
+        Label nameLabel = new Label(username);
+        nameLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
+        nameLabel.setTextFill(Color.web("#1F2937"));
+        
+        // 用户ID
+        Label idLabel = new Label("ID: " + (userId != null ? userId : "N/A"));
+        idLabel.setFont(Font.font("System", FontWeight.NORMAL, 11));
+        idLabel.setTextFill(Color.web("#6B7280"));
+        
+        textArea.getChildren().addAll(nameLabel, idLabel);
+        
+        // 组合头像和文本
+        HBox userCard = new HBox(8);
+        userCard.setAlignment(Pos.CENTER);
+        userCard.setPadding(new Insets(4, 12, 4, 12));
+        userCard.setStyle(
+            "-fx-background-color: #F9FAFB; " +
+            "-fx-background-radius: 8; " +
+            "-fx-cursor: hand;"
+        );
+        userCard.getChildren().addAll(avatar, textArea);
+        
+        // 添加悬停效果
+        userCard.setOnMouseEntered(e -> {
+            userCard.setStyle(
+                "-fx-background-color: #F3F4F6; " +
+                "-fx-background-radius: 8; " +
+                "-fx-cursor: hand; " +
+                "-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.1), 4, 0, 0, 2);"
+            );
+        });
+        
+        userCard.setOnMouseExited(e -> {
+            userCard.setStyle(
+                "-fx-background-color: #F9FAFB; " +
+                "-fx-background-radius: 8; " +
+                "-fx-cursor: hand;"
+            );
+        });
+        
+        // 添加点击事件（可选：显示用户菜单）
+        userCard.setOnMouseClicked(e -> {
+            showUserMenu(userCard);
+        });
+        
+        userInfo.getChildren().add(userCard);
+        
+        return userInfo;
+    }
+    
+    /**
+     * 创建用户头像（使用首字母圆形图标）
+     */
+    private StackPane createUserAvatar(String username) {
+        StackPane avatar = new StackPane();
+        avatar.setPrefSize(32, 32);
+        avatar.setMinSize(32, 32);
+        avatar.setMaxSize(32, 32);
+        
+        // 圆形背景
+        Circle circle = new Circle(16);
+        circle.setFill(Color.web("#6366F1"));
+        circle.setStroke(Color.web("#4F46E5"));
+        circle.setStrokeWidth(2);
+        
+        // 首字母
+        String initial = username.substring(0, 1).toUpperCase();
+        Label initialLabel = new Label(initial);
+        initialLabel.setFont(Font.font("System", FontWeight.BOLD, 14));
+        initialLabel.setTextFill(Color.WHITE);
+        
+        avatar.getChildren().addAll(circle, initialLabel);
+        
+        return avatar;
+    }
+    
+    /**
+     * 显示用户菜单
+     */
+    private void showUserMenu(javafx.scene.Node node) {
+        ContextMenu userMenu = new ContextMenu();
+        
+        // 用户信息菜单项（不可点击）
+        SessionManager session = SessionManager.getInstance();
+        MenuItem infoItem = new MenuItem("用户: " + session.getUsername());
+        infoItem.setStyle("-fx-font-weight: bold; -fx-text-fill: #1F2937;");
+        infoItem.setDisable(true);
+        
+        MenuItem idItem = new MenuItem("ID: " + session.getUserId());
+        idItem.setStyle("-fx-text-fill: #6B7280;");
+        idItem.setDisable(true);
+        
+        SeparatorMenuItem separator = new SeparatorMenuItem();
+        
+        // 退出登录菜单项
+        MenuItem logoutItem = new MenuItem("退出登录");
+        logoutItem.setStyle("-fx-text-fill: #EF4444; -fx-font-weight: bold;");
+        logoutItem.setOnAction(e -> {
+            // TODO: 实现退出登录功能
+            System.out.println("用户点击退出登录");
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("提示");
+            alert.setHeaderText(null);
+            alert.setContentText("退出登录功能开发中...");
+            alert.showAndWait();
+        });
+        
+        userMenu.getItems().addAll(infoItem, idItem, separator, logoutItem);
+        
+        // 显示菜单
+        userMenu.show(node, javafx.geometry.Side.BOTTOM, 0, 0);
     }
     
     /**
