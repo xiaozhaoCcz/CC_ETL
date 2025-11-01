@@ -3,7 +3,10 @@ package com.example.nodefx.view;
 import com.example.nodefx.model.JobComposeData;
 import com.example.nodefx.model.ProcessNode;
 import com.example.nodefx.service.JobPartService;
+import com.example.nodefx.service.JobInfoService;
+import com.example.nodefx.service.JobLogService;
 import com.example.nodefx.util.DetachablePanel;
+import com.example.nodefx.util.SnowflakeIdGenerator;
 import javafx.application.Platform;
 import javafx.geometry.Orientation;
 import javafx.scene.control.ScrollPane;
@@ -39,14 +42,32 @@ public class MainView extends BorderPane {
     
     // API 服务
     private final JobPartService jobPartService;
+    private final JobInfoService jobInfoService;
+    private final JobLogService jobLogService;
     
     // 可分离面板管理器
     private DetachablePanel treeViewDetachable;
     private DetachablePanel miniMapDetachable;
     private DetachablePanel logPanelDetachable;
     
+    // 任务组名称到ID的映射
+    private java.util.Map<String, Long> taskGroupNameToIdMap = new java.util.HashMap<>();
+    
+    // 雪花算法ID生成器
+    private final SnowflakeIdGenerator snowflake = SnowflakeIdGenerator.getInstance();
+    
+    // 任务执行状态
+    private String currentRandomId = null;
+    private Long currentLogId = null;
+    private java.util.Timer logTimer = null;
+    private int fromLineNum = 0;
+    private int pullFailCount = 0;
+    private boolean isRunning = false;
+    
     public MainView() {
         this.jobPartService = new JobPartService();
+        this.jobInfoService = new JobInfoService();
+        this.jobLogService = new JobLogService();
         initializeUI();
         setupCallbacks();
     }
@@ -170,8 +191,21 @@ public class MainView extends BorderPane {
         // 导航栏切换任务组回调
         navigationBar.setOnTaskSwitch((TaskNavigationBar.TaskSwitchCallback) taskGroupName -> {
             logPanel.info("导航栏切换到任务组: " + taskGroupName);
-            // TODO: 加载对应任务组的流程图
-            // 这里可以实现切换不同任务组的画布内容
+            // 根据任务组名称查找对应的ID并加载流程图
+            Long taskId = taskGroupNameToIdMap.get(taskGroupName);
+            if (taskId == null) {
+                // 如果映射中没有，尝试从树形视图中查找
+                taskId = findTaskGroupIdByName(taskGroupName);
+                if (taskId != null) {
+                    taskGroupNameToIdMap.put(taskGroupName, taskId);
+                }
+            }
+            if (taskId != null) {
+                loadTaskGroupData(taskId, taskGroupName);
+            } else {
+                logPanel.warn("⚠ 未找到任务组ID，无法加载流程图: " + taskGroupName);
+                logPanel.info("提示: 请先在左侧任务树中选择该任务组");
+            }
         });
         
         // 画布日志回调
@@ -232,35 +266,7 @@ public class MainView extends BorderPane {
             
             @Override
             public void onRun() {
-                logPanel.info("═══════════════════════════════════════");
-                logPanel.success("开始执行任务流程...");
-                logPanel.info("检查节点配置...");
-                
-                // 模拟任务执行
-                new Thread(() -> {
-                    try {
-                        Thread.sleep(500);
-                        logPanel.info("节点1: demoJobHandler1 执行中...");
-                        Thread.sleep(800);
-                        logPanel.success("节点1: demoJobHandler1 执行完成");
-                        
-                        Thread.sleep(500);
-                        logPanel.info("节点2: demoJobHandler2 执行中...");
-                        Thread.sleep(800);
-                        logPanel.success("节点2: demoJobHandler2 执行完成");
-                        
-                        Thread.sleep(500);
-                        logPanel.info("节点3: demoJobHandler3 执行中...");
-                        Thread.sleep(800);
-                        logPanel.success("节点3: demoJobHandler3 执行完成");
-                        
-                        Thread.sleep(300);
-                        logPanel.success("═══════════════════════════════════════");
-                        logPanel.success("任务流程执行完成！✨");
-                    } catch (InterruptedException e) {
-                        logPanel.error("任务执行中断: " + e.getMessage());
-                    }
-                }).start();
+                triggerJobExecution();
             }
             
             @Override
@@ -307,6 +313,10 @@ public class MainView extends BorderPane {
         
         // 只有任务组（type=1）才加载流程图
         if (type != null && type == 1 && taskId != null) {
+            // 更新任务组名称到ID的映射
+            taskGroupNameToIdMap.put(taskName, taskId);
+            // 更新当前选中的任务组ID
+            usePageStoreHook().setCurrentPage(taskId);
             loadTaskGroupData(taskId, taskName);
         } else {
             logPanel.info("提示: 只有任务组节点才能展示流程图");
@@ -369,6 +379,18 @@ public class MainView extends BorderPane {
             case 5 -> "关系边";
             default -> "未知";
         };
+    }
+    
+    /**
+     * 根据任务组名称从树形视图中查找任务组ID
+     */
+    private Long findTaskGroupIdByName(String taskGroupName) {
+        if (taskGroupName == null || taskGroupName.isEmpty()) {
+            return null;
+        }
+        
+        // 使用树形视图的方法查找任务组ID
+        return treeView.findTaskGroupIdByName(taskGroupName);
     }
     
     /**
@@ -489,5 +511,275 @@ public class MainView extends BorderPane {
     
     public LogPanel getLogPanel() {
         return logPanel;
+    }
+    
+    /**
+     * 触发任务执行
+     */
+    private void triggerJobExecution() {
+        // 获取当前选中的任务组
+        Long currentJobId = usePageStoreHook().getCurrentPage();
+        if (currentJobId == null || currentJobId == 0) {
+            logPanel.warn("⚠ 请先选择一个任务组");
+            return;
+        }
+        
+        // 检查是否正在运行
+        if (isRunning) {
+            logPanel.warn("⚠ 任务组正在运行中，请稍后再试");
+            return;
+        }
+        
+        // 清理旧的状态
+        cleanupRunningState();
+        
+        // 生成新的randomId
+        currentRandomId = snowflake.nextIdStr();
+        fromLineNum = 0;
+        pullFailCount = 0;
+        isRunning = true;
+        
+        logPanel.info("════════════════════════════════");
+        logPanel.success("✨ 开始执行任务组 ID: " + currentJobId);
+        logPanel.info("执行批次ID: " + currentRandomId);
+        logPanel.info("════════════════════════════════");
+        
+        // 在后台线程中执行任务
+        new Thread(() -> {
+            try {
+                // 调用后端API触发任务
+                Long logId = jobInfoService.triggerJob(currentJobId, currentRandomId);
+                currentLogId = logId;
+                
+                Platform.runLater(() -> {
+                    logPanel.success("✓ 任务已提交，日志ID: " + logId);
+                    logPanel.info("开始获取执行日志...");
+                });
+                
+                // 启动日志轮询
+                startLogPolling();
+                
+            } catch (Exception e) {
+                System.err.println("触发任务执行失败: " + e.getMessage());
+                e.printStackTrace();
+                
+                Platform.runLater(() -> {
+                    logPanel.error("✗ 任务执行失败: " + e.getMessage());
+                    isRunning = false;
+                });
+            }
+        }).start();
+    }
+    
+    /**
+     * 启动日志轮询
+     */
+    private void startLogPolling() {
+        if (logTimer != null) {
+            logTimer.cancel();
+        }
+        
+        logTimer = new java.util.Timer("LogPollingTimer", true);
+        logTimer.schedule(new java.util.TimerTask() {
+            @Override
+            public void run() {
+                fetchExecutionLog();
+            }
+        }, 1000, 2000); // 1秒后开始，每2秒轮询一次
+    }
+    
+    /**
+     * 获取执行日志
+     */
+    private void fetchExecutionLog() {
+        if (currentLogId == null) {
+            return;
+        }
+        
+        // 防止无限轮询
+        if (pullFailCount > 20) {
+            stopLogPolling("日志加载完成");
+            return;
+        }
+        
+        try {
+            JobLogService.LogDetailResponse response = jobLogService.getLogDetail(currentLogId, fromLineNum);
+            
+            if (response != null && response.isSuccess()) {
+                JobLogService.LogContent content = response.getContent();
+                
+                if (content == null) {
+                    pullFailCount++;
+                    return;
+                }
+                
+                // 检查行号是否匹配
+                if (fromLineNum != content.getFromLineNum()) {
+                    return;
+                }
+                
+                // 检查是否有新日志
+                if (fromLineNum > content.getToLineNum()) {
+                    if (content.isEnd()) {
+                        stopLogPolling("任务执行完成");
+                    }
+                    return;
+                }
+                
+                // 更新行号
+                fromLineNum = content.getToLineNum() + 1;
+                pullFailCount = 0;
+                
+                // 获取日志内容
+                String logContent = content.getLogContent();
+                if (logContent != null && !logContent.isEmpty()) {
+                    // 在UI线程中更新日志
+                    Platform.runLater(() -> {
+                        // 转换日志内容（处理特殊字符）
+                        String processedLog = convertLogContent(logContent);
+                        logPanel.appendText(processedLog);
+                    });
+                }
+                
+                // 检查是否结束
+                if (content.isEnd()) {
+                    stopLogPolling("任务执行完成");
+                }
+                
+            } else {
+                pullFailCount++;
+                if (response != null) {
+                    System.err.println("获取日志失败: " + response.getMsg());
+                }
+            }
+            
+        } catch (Exception e) {
+            System.err.println("获取执行日志失败: " + e.getMessage());
+            pullFailCount++;
+        }
+    }
+    
+    /**
+     * 停止日志轮询
+     */
+    private void stopLogPolling(String message) {
+        if (logTimer != null) {
+            logTimer.cancel();
+            logTimer = null;
+        }
+        
+        Platform.runLater(() -> {
+            logPanel.info("════════════════════════════════");
+            logPanel.success("✓ " + message);
+            logPanel.info("════════════════════════════════");
+            isRunning = false;
+        });
+    }
+    
+    /**
+     * 清理运行状态
+     */
+    private void cleanupRunningState() {
+        if (logTimer != null) {
+            logTimer.cancel();
+            logTimer = null;
+        }
+        currentRandomId = null;
+        currentLogId = null;
+        fromLineNum = 0;
+        pullFailCount = 0;
+    }
+    
+    /**
+     * 转换日志内容
+     * 将特殊字符转换为可读格式
+     */
+    private String convertLogContent(String content) {
+        if (content == null) {
+            return "";
+        }
+        
+        // 替换一些特殊字符
+        content = content.replace("\r\n", "\n");
+        content = content.replace("\r", "\n");
+        
+        return content;
+    }
+    
+    /**
+     * 停止任务执行
+     */
+    private void stopJobExecution() {
+        Long currentJobId = usePageStoreHook().getCurrentPage();
+        if (currentJobId == null || currentJobId == 0) {
+            logPanel.warn("⚠ 请先选择一个任务组");
+            return;
+        }
+        
+        if (!isRunning) {
+            logPanel.warn("⚠ 当前没有运行的任务");
+            return;
+        }
+        
+        if (currentRandomId == null) {
+            logPanel.warn("⚠ 未找到执行批次ID");
+            return;
+        }
+        
+        logPanel.info("正在停止任务...");
+        
+        // 在后台线程中停止任务
+        new Thread(() -> {
+            try {
+                jobInfoService.stopJobCompose(currentJobId, currentRandomId);
+                
+                Platform.runLater(() -> {
+                    logPanel.success("✓ 任务已停止");
+                    cleanupRunningState();
+                    isRunning = false;
+                });
+                
+            } catch (Exception e) {
+                System.err.println("停止任务失败: " + e.getMessage());
+                e.printStackTrace();
+                
+                Platform.runLater(() -> {
+                    logPanel.error("✗ 停止任务失败: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+    
+    /**
+     * 获取页面Store的Helper方法（临时实现）
+     */
+    private static class PageStoreHelper {
+        private Long currentPage = 0L;
+        
+        public void setCurrentPage(Long pageId) {
+            this.currentPage = pageId;
+        }
+        
+        public Long getCurrentPage() {
+            return this.currentPage;
+        }
+        
+        public void removePage(Long pageId) {
+            // 实现页面移除逻辑
+        }
+        
+        public void getLastPage() {
+            // 实现获取最后一个页面的逻辑
+        }
+    }
+    
+    // 页面Store单例
+    private static final PageStoreHelper pageStoreHelper = new PageStoreHelper();
+    
+    /**
+     * 获取页面Store
+     */
+    private PageStoreHelper usePageStoreHook() {
+        return pageStoreHelper;
     }
 }

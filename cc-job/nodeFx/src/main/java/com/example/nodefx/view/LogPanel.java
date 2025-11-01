@@ -245,6 +245,22 @@ public class LogPanel extends VBox {
         appendLog("SUCCESS", message, "#10B981");
     }
     
+    /**
+     * 直接追加文本（不添加时间戳和格式）
+     * 用于显示原始日志内容
+     */
+    public void appendText(String text) {
+        Platform.runLater(() -> {
+            logArea.appendText(text);
+            
+            // 自动滚动到底部
+            logArea.setScrollTop(Double.MAX_VALUE);
+            
+            // 更新状态
+            updateStatus("运行中", "#10B981");
+        });
+    }
+    
     private void appendLog(String level, String message, String colorHex) {
         Platform.runLater(() -> {
             String timestamp = LocalDateTime.now().format(TIME_FORMAT);

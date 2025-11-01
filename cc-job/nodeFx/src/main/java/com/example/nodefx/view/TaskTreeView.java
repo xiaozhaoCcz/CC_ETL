@@ -735,5 +735,41 @@ public class TaskTreeView extends VBox {
     public void setOnDetach(Runnable callback) {
         this.onDetach = callback;
     }
+    
+    /**
+     * 根据任务组名称查找任务组ID
+     */
+    public Long findTaskGroupIdByName(String taskGroupName) {
+        if (taskGroupName == null || taskGroupName.isEmpty() || rootItem == null) {
+            return null;
+        }
+        return findTaskGroupIdRecursive(rootItem, taskGroupName);
+    }
+    
+    /**
+     * 递归查找任务组ID
+     */
+    private Long findTaskGroupIdRecursive(TreeItem<TreeNodeData> item, String taskGroupName) {
+        if (item == null || item.getValue() == null) {
+            return null;
+        }
+        
+        TreeNodeData nodeData = item.getValue();
+        // 检查是否是任务组且名称匹配
+        if (nodeData.getType() != null && nodeData.getType() == 1 && 
+            taskGroupName.equals(nodeData.getLabel())) {
+            return nodeData.getId();
+        }
+        
+        // 递归查找子节点
+        for (TreeItem<TreeNodeData> child : item.getChildren()) {
+            Long foundId = findTaskGroupIdRecursive(child, taskGroupName);
+            if (foundId != null) {
+                return foundId;
+            }
+        }
+        
+        return null;
+    }
 }
 
