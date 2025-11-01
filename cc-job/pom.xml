@@ -19,7 +19,7 @@
         <module>cc-job-executor-samples</module>
         <module>cc-job-xo</module>
         <module>cc-job-executor</module>
-        <module>nodeFx</module>
+        <module>cc-job-gui</module>
     </modules>
 
     <properties>
