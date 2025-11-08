@@ -1,18 +1,20 @@
 package com.cc.job.gui.view;
 
-import com.cc.job.xo.model.entity.JobGroup;
+import com.cc.job.gui.history.UndoRedoManager;
 import com.cc.job.gui.model.JobComposeData;
 import com.cc.job.gui.model.NodeConnection;
 import com.cc.job.gui.model.ProcessNode;
 import com.cc.job.gui.model.RunningJobGroup;
 import com.cc.job.gui.service.JobGroupService;
-import com.cc.job.gui.service.JobPartService;
 import com.cc.job.gui.service.JobInfoService;
 import com.cc.job.gui.service.JobLogService;
+import com.cc.job.gui.service.JobPartService;
 import com.cc.job.gui.service.WebSocketService;
 import com.cc.job.gui.util.ApiUtil;
 import com.cc.job.gui.util.DetachablePanel;
 import com.cc.job.gui.util.SnowflakeIdGenerator;
+import com.cc.job.xo.model.entity.JobGroup;
+import com.cc.job.xo.model.form.JobInfoForm;
 import javafx.application.Platform;
 import javafx.geometry.Orientation;
 import javafx.scene.control.ScrollPane;
@@ -37,6 +39,8 @@ public class MainView extends BorderPane {
     private MiniMapView miniMap;
     private CollapsedSidebar collapsedSidebar;
     private TaskNavigationBar navigationBar;
+
+    private UndoRedoManager undoRedoManager;
 
     private javafx.scene.layout.VBox leftArea;
     private boolean treeViewVisible = true;
@@ -111,6 +115,9 @@ public class MainView extends BorderPane {
 
         // 画布区域
         canvas = new NodeCanvas();
+        undoRedoManager = new UndoRedoManager();
+        undoRedoManager.setOnChange(this::updateUndoRedoButtons);
+        canvas.setUndoRedoManager(undoRedoManager);
         scrollPane = new ScrollPane(canvas);
         scrollPane.setFitToWidth(false);
         scrollPane.setFitToHeight(false);
@@ -151,6 +158,16 @@ public class MainView extends BorderPane {
 
         // 初始化左侧边栏状态（重要！确保图标正确显示/隐藏）
         updateLeftSidebar();
+    }
+
+    private void updateUndoRedoButtons() {
+        boolean canUndo = undoRedoManager != null && undoRedoManager.canUndo();
+        boolean canRedo = undoRedoManager != null && undoRedoManager.canRedo();
+        Platform.runLater(() -> {
+            if (toolBar != null) {
+                toolBar.updateUndoRedoState(canUndo, canRedo);
+            }
+        });
     }
 
     private void setupCallbacks() {
@@ -243,12 +260,22 @@ public class MainView extends BorderPane {
 
             @Override
             public void onUndo() {
-                logPanel.info("撤销操作功能开发中...");
+                if (undoRedoManager != null && undoRedoManager.canUndo()) {
+                    undoRedoManager.undo();
+                    logPanel.info("↩ 已撤销上一条操作");
+                } else {
+                    logPanel.warn("目前没有可撤销的操作");
+                }
             }
 
             @Override
             public void onRedo() {
-                logPanel.info("重做操作功能开发中...");
+                if (undoRedoManager != null && undoRedoManager.canRedo()) {
+                    undoRedoManager.redo();
+                    logPanel.info("↪ 已恢复上一条操作");
+                } else {
+                    logPanel.warn("目前没有可重做的操作");
+                }
             }
 
             @Override
@@ -453,12 +480,15 @@ public class MainView extends BorderPane {
         node3.setLayoutX(400);
         node3.setLayoutY(175);
 
-        canvas.addNode(node1);
-        canvas.addNode(node2);
-        canvas.addNode(node3);
+        canvas.addNode(node1, false);
+        canvas.addNode(node2, false);
+        canvas.addNode(node3, false);
+        configureNodeCallbacks(node1);
+        configureNodeCallbacks(node2);
+        configureNodeCallbacks(node3);
 
-        canvas.addConnection(node1, node1.getRightConnector(), node3, node3.getLeftConnector());
-        canvas.addConnection(node1, node1.getBottomConnector(), node2, node2.getTopConnector());
+        canvas.addConnection(node1, node1.getRightConnector(), node3, node3.getLeftConnector(), false);
+        canvas.addConnection(node1, node1.getBottomConnector(), node2, node2.getTopConnector(), false);
 
         logPanel.success("示例流程图加载完成");
         logPanel.info("共 3 个节点, 2 条连接");
@@ -1652,11 +1682,9 @@ public class MainView extends BorderPane {
             String nodeType = getNodeTypeIcon(formData.getGlueType());
             node.setType(nodeType);
 
-            // 设置编辑回调
-            node.setOnEdit(() -> editNode(jobNode.getJobId(), node));
-
             // 添加节点到画布
-            canvas.addNode(node);
+            canvas.addNode(node, true);
+            configureNodeCallbacks(node);
 
             logPanel.success("✓ 节点已添加到画布: " + formData.getJobDesc());
             logPanel.info("节点坐标: (" + x + ", " + y + ")");
@@ -1666,6 +1694,264 @@ public class MainView extends BorderPane {
             e.printStackTrace();
             logPanel.error("✗ 添加节点到画布失败: " + e.getMessage());
         }
+    }
+
+    private void configureNodeCallbacks(ProcessNode node) {
+        if (node == null) {
+            return;
+        }
+        node.setOnEdit(() -> {
+            Long jobId = node.getJobId();
+            if (jobId == null) {
+                logPanel.warn("⚠ 该节点未绑定后端任务，无法编辑");
+                return;
+            }
+            editNode(jobId, node);
+        });
+        node.setOnCopy(() -> copyNode(node));
+        node.setOnShowDetails(() -> showNodeDetails(node));
+    }
+
+    private void copyNode(ProcessNode sourceNode) {
+        if (sourceNode == null) {
+            logPanel.warn("⚠ 当前节点为空，无法复制");
+            return;
+        }
+        Long sourceJobId = sourceNode.getJobId();
+        if (sourceJobId == null) {
+            logPanel.warn("⚠ 该节点未绑定后端任务，无法复制");
+            return;
+        }
+        Long currentTaskGroupId = usePageStoreHook().getCurrentTaskGroupId();
+        if (currentTaskGroupId == null) {
+            logPanel.warn("⚠ 请先选择任务组后再复制节点");
+            return;
+        }
+
+        logPanel.info("════════════════════════════════");
+        logPanel.info("📋 正在复制节点: " + safeString(sourceNode.getJobHandlerName()));
+
+        new Thread(() -> {
+            try {
+                JobInfoForm originalForm = jobInfoService.getJobNodeFormData(sourceJobId);
+                if (originalForm == null) {
+                    Platform.runLater(() -> logPanel.error("✗ 获取原节点数据失败"));
+                    return;
+                }
+
+                JobInfoForm copyForm = deepCopyJobInfoForm(originalForm);
+                if (copyForm == null) {
+                    Platform.runLater(() -> logPanel.error("✗ 复制节点数据失败"));
+                    return;
+                }
+
+                copyForm.setId(null);
+                copyForm.setParentId(currentTaskGroupId);
+                copyForm.setJobDesc(generateCopyName(copyForm.getJobDesc()));
+                copyForm.setNodePositionX(sourceNode.getLayoutX() + 60);
+                copyForm.setNodePositionY(sourceNode.getLayoutY() + 40);
+                if (copyForm.getExecutorParam() == null) {
+                    copyForm.setExecutorParam("");
+                }
+
+                com.cc.job.xo.model.entity.JobNode newJobNode = jobInfoService.saveJobNode(copyForm);
+                if (newJobNode == null) {
+                    Platform.runLater(() -> logPanel.error("✗ 复制节点失败：后端返回空数据"));
+                    return;
+                }
+
+                if (copyForm.getNodePositionX() != null) {
+                    newJobNode.setNodePositionX(copyForm.getNodePositionX());
+                }
+                if (copyForm.getNodePositionY() != null) {
+                    newJobNode.setNodePositionY(copyForm.getNodePositionY());
+                }
+
+                Platform.runLater(() -> {
+                    try {
+                        addNodeToCanvas(newJobNode, copyForm);
+                        refreshTreeViewWithoutNavigation(currentTaskGroupId);
+                        logPanel.success("✓ 节点复制成功: " + copyForm.getJobDesc());
+                    } catch (Exception e) {
+                        logPanel.error("✗ 添加复制节点到画布失败: " + e.getMessage());
+                    } finally {
+                        logPanel.info("════════════════════════════════");
+                    }
+                });
+            } catch (Exception e) {
+                e.printStackTrace();
+                Platform.runLater(() -> {
+                    logPanel.error("✗ 节点复制失败: " + e.getMessage());
+                    logPanel.info("════════════════════════════════");
+                });
+            }
+        }, "copy-node-thread").start();
+    }
+
+    private void showNodeDetails(ProcessNode node) {
+        if (node == null) {
+            logPanel.warn("⚠ 当前节点为空，无法查看详情");
+            return;
+        }
+        Long jobId = node.getJobId();
+        if (jobId == null) {
+            logPanel.warn("⚠ 该节点未绑定后端任务，无法查看详情");
+            return;
+        }
+
+        logPanel.info("════════════════════════════════");
+        logPanel.info("🔍 正在获取节点详情: " + safeString(node.getJobHandlerName()));
+
+        new Thread(() -> {
+            try {
+                JobInfoForm form = jobInfoService.getJobNodeFormData(jobId);
+                List<JobGroup> jobGroups = jobGroupService.getAllJobGroupList();
+                Platform.runLater(() -> {
+                    showJobNodeDetailDialog(node, form, jobGroups);
+                    logPanel.info("════════════════════════════════");
+                });
+            } catch (Exception e) {
+                e.printStackTrace();
+                Platform.runLater(() -> {
+                    logPanel.error("✗ 获取节点详情失败: " + e.getMessage());
+                    logPanel.info("════════════════════════════════");
+                });
+            }
+        }, "detail-node-thread").start();
+    }
+
+    private void showJobNodeDetailDialog(ProcessNode node, JobInfoForm form, List<JobGroup> jobGroups) {
+        if (form == null) {
+            logPanel.warn("⚠ 未获取到节点详情数据");
+            return;
+        }
+        javafx.scene.control.Dialog<Void> dialog = new javafx.scene.control.Dialog<>();
+        dialog.setTitle("节点详情 - " + safeString(node.getJobHandlerName()));
+        dialog.setHeaderText(null);
+        dialog.getDialogPane().getButtonTypes().add(javafx.scene.control.ButtonType.CLOSE);
+
+        javafx.scene.layout.GridPane grid = new javafx.scene.layout.GridPane();
+        grid.setHgap(12);
+        grid.setVgap(10);
+        grid.setPadding(new javafx.geometry.Insets(20));
+
+        addDetailRow(grid, 0, "任务描述", form.getJobDesc());
+        addDetailRow(grid, 1, "执行器", findJobGroupName(jobGroups, form.getJobGroup()));
+        addDetailRow(grid, 2, "JobHandler", form.getExecutorHandler());
+        addDetailRow(grid, 3, "运行模式", form.getGlueType());
+        addDetailRow(grid, 4, "任务参数", form.getExecutorParam());
+        addDetailRow(grid, 5, "负责人", form.getAuthor());
+        addDetailRow(grid, 6, "报警邮件", form.getAlarmEmail());
+        addDetailRow(grid, 7, "阻塞策略", form.getExecutorBlockStrategy());
+        addDetailRow(grid, 8, "超时时间(秒)", form.getExecutorTimeout());
+        addDetailRow(grid, 9, "失败重试次数", form.getExecutorFailRetryCount());
+        addDetailRow(grid, 10, "所属任务组ID", form.getParentId());
+        addDetailRow(grid, 11, "Job ID", node.getJobId());
+
+        javafx.scene.control.TextArea advancedArea = new javafx.scene.control.TextArea(buildAdvancedDetailText(form));
+        advancedArea.setEditable(false);
+        advancedArea.setWrapText(true);
+        advancedArea.setPrefRowCount(8);
+
+        javafx.scene.layout.VBox container = new javafx.scene.layout.VBox(12, grid, advancedArea);
+        container.setPadding(new javafx.geometry.Insets(10));
+
+        dialog.getDialogPane().setContent(container);
+        dialog.getDialogPane().setPrefWidth(520);
+        dialog.getDialogPane().setPrefHeight(520);
+        dialog.showAndWait();
+    }
+
+    private void addDetailRow(javafx.scene.layout.GridPane grid, int rowIndex, String label, Object value) {
+        javafx.scene.control.Label nameLabel = new javafx.scene.control.Label(label + "：");
+        nameLabel.setStyle("-fx-text-fill: #4B5563; -fx-font-size: 13; -fx-font-weight: 600;");
+        javafx.scene.control.Label valueLabel = new javafx.scene.control.Label(safeString(value));
+        valueLabel.setStyle("-fx-text-fill: #111827; -fx-font-size: 13;");
+        valueLabel.setWrapText(true);
+        grid.add(nameLabel, 0, rowIndex);
+        grid.add(valueLabel, 1, rowIndex);
+    }
+
+    private String buildAdvancedDetailText(JobInfoForm form) {
+        StringBuilder sb = new StringBuilder();
+        appendDetailLine(sb, "调度类型", form.getScheduleType());
+        appendDetailLine(sb, "调度配置", form.getScheduleConf());
+        appendDetailLine(sb, "调度过期策略", form.getMisfireStrategy());
+        appendDetailLine(sb, "路由策略", form.getExecutorRouteStrategy());
+        appendDetailLine(sb, "请求类型", form.getReqType());
+        appendDetailLine(sb, "请求地址", form.getReqUrl());
+        appendDetailLine(sb, "请求头", form.getReqHeader());
+        appendDetailLine(sb, "请求体", form.getReqBody());
+        appendDetailLine(sb, "节点X坐标", form.getNodePositionX());
+        appendDetailLine(sb, "节点Y坐标", form.getNodePositionY());
+        appendDetailLine(sb, "子任务", form.getChildJobid());
+        appendDetailLine(sb, "增量类型", form.getIncrType());
+        appendDetailLine(sb, "增量内容", form.getIncrContent());
+        return sb.length() == 0 ? "暂无更多配置信息" : sb.toString();
+    }
+
+    private void appendDetailLine(StringBuilder sb, String label, Object value) {
+        if (value == null) {
+            return;
+        }
+        if (value instanceof String str && str.isBlank()) {
+            return;
+        }
+        if (sb.length() > 0) {
+            sb.append('\n');
+        }
+        sb.append(label).append(": ").append(value);
+    }
+
+    private String findJobGroupName(List<JobGroup> jobGroups, Long id) {
+        if (id == null) {
+            return "未设置";
+        }
+        if (jobGroups == null || jobGroups.isEmpty()) {
+            return "ID: " + id;
+        }
+        return jobGroups.stream()
+                .filter(group -> id.equals(group.getId()))
+                .map(JobGroup::getTitle)
+                .findFirst()
+                .orElse("ID: " + id);
+    }
+
+    private JobInfoForm deepCopyJobInfoForm(JobInfoForm original) {
+        if (original == null) {
+            return null;
+        }
+        String json = apiUtil.getGson().toJson(original);
+        return apiUtil.getGson().fromJson(json, JobInfoForm.class);
+    }
+
+    private String generateCopyName(String originalName) {
+        String base = (originalName == null || originalName.trim().isEmpty())
+                ? "新任务"
+                : originalName.trim();
+
+        java.util.Set<String> existingNames = new java.util.HashSet<>();
+        for (ProcessNode node : canvas.getNodes()) {
+            if (node.getJobHandlerName() != null) {
+                existingNames.add(node.getJobHandlerName());
+            }
+        }
+
+        String candidate = base + "_copy";
+        int index = 2;
+        while (existingNames.contains(candidate)) {
+            candidate = base + "_copy" + index;
+            index++;
+        }
+        return candidate;
+    }
+
+    private String safeString(Object value) {
+        if (value == null) {
+            return "无";
+        }
+        String str = String.valueOf(value);
+        return str.isBlank() ? "无" : str;
     }
 
     /**
@@ -1788,9 +2074,9 @@ public class MainView extends BorderPane {
                     .filter(node -> node.getNodeId() != null && node.getNodeId().equals(nodeId))
                     .findFirst()
                     .ifPresent(node -> {
-                        // 设置编辑回调
-                        node.setOnEdit(() -> editNode(jobId, node));
-                        System.out.println("✓ 已为节点 " + nodeId + " (jobId: " + jobId + ") 设置编辑回调");
+                        node.setJobId(jobId);
+                        configureNodeCallbacks(node);
+                        System.out.println("✓ 已为节点 " + nodeId + " (jobId: " + jobId + ") 设置回调");
                     });
             callbackSetCount++;
         }

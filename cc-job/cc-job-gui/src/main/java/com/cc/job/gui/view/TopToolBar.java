@@ -50,6 +50,9 @@ public class TopToolBar extends VBox {
     private Button retryButton;
     private MenuButton runningTasksMenu;
     private HBox runGroup;
+
+    private Button undoButton;
+    private Button redoButton;
     
     // 当前任务组ID（用于判断是否正在运行）
     private Long currentTaskGroupId;
@@ -117,10 +120,11 @@ public class TopToolBar extends VBox {
         Separator sep1 = createSeparator();
         
         // 编辑操作组
-        HBox editGroup = createToolGroup(
-            createIconButton(IconUtil.undoIcon(), "撤销", "撤销上一步操作", () -> safeCall(ToolBarCallback::onUndo)),
-            createIconButton(IconUtil.redoIcon(), "重做", "重做上一步操作", () -> safeCall(ToolBarCallback::onRedo))
-        );
+        undoButton = createIconButton(IconUtil.undoIcon(), "撤销", "撤销上一步操作", () -> safeCall(ToolBarCallback::onUndo));
+        redoButton = createIconButton(IconUtil.redoIcon(), "重做", "重做上一步操作", () -> safeCall(ToolBarCallback::onRedo));
+        undoButton.setDisable(true);
+        redoButton.setDisable(true);
+        HBox editGroup = createToolGroup(undoButton, redoButton);
         
         Separator sep2 = createSeparator();
         
@@ -420,6 +424,15 @@ public class TopToolBar extends VBox {
     
     public double getCurrentZoom() {
         return currentZoom;
+    }
+
+    public void updateUndoRedoState(boolean canUndo, boolean canRedo) {
+        if (undoButton != null) {
+            undoButton.setDisable(!canUndo);
+        }
+        if (redoButton != null) {
+            redoButton.setDisable(!canRedo);
+        }
     }
     
     /**

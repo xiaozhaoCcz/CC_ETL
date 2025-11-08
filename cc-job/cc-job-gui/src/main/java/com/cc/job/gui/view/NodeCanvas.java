@@ -1,5 +1,7 @@
 package com.cc.job.gui.view;
 
+import com.cc.job.gui.history.CanvasAction;
+import com.cc.job.gui.history.UndoRedoManager;
 import com.cc.job.gui.model.JobComposeData;
 import com.cc.job.gui.model.NodeConnection;
 import com.cc.job.gui.model.ProcessNode;
@@ -17,10 +19,14 @@ import java.util.Map;
  * 画布，用于管理节点和连接线
  */
 public class NodeCanvas extends Pane {
-    
+
+    private static final String NODE_LISTENER_KEY = "nodeCanvasListenersAttached";
+
     private List<ProcessNode> nodes = new ArrayList<>();
     private List<NodeConnection> connections = new ArrayList<>();
-    
+    private UndoRedoManager undoRedoManager;
+    private boolean historyEnabled = true;
+
     // 临时连线相关
     private ProcessNode startNode;
     private Circle startConnector;
@@ -59,6 +65,33 @@ public class NodeCanvas extends Pane {
     public List<NodeConnection> getConnections() {
         return connections;
     }
+
+    public void setUndoRedoManager(UndoRedoManager undoRedoManager) {
+        this.undoRedoManager = undoRedoManager;
+    }
+
+    private void pushAction(CanvasAction action) {
+        if (undoRedoManager != null && historyEnabled && action != null) {
+            undoRedoManager.push(action);
+        }
+    }
+
+    private void notifyNodeStructureChanged() {
+        updateCanvasSize();
+        if (onNodeMoved != null) {
+            onNodeMoved.run();
+        }
+    }
+
+    private void runWithoutHistory(Runnable runnable) {
+        boolean previous = historyEnabled;
+        historyEnabled = false;
+        try {
+            runnable.run();
+        } finally {
+            historyEnabled = previous;
+        }
+    }
     
     private void log(String message) {
         System.out.println(message);
@@ -71,89 +104,171 @@ public class NodeCanvas extends Pane {
      * 添加节点
      */
     public void addNode(ProcessNode node) {
-        nodes.add(node);
-        this.getChildren().add(node);
-        
+        addNode(node, true);
+    }
+
+    public void addNode(ProcessNode node, boolean recordHistory) {
+        if (node == null) {
+            return;
+        }
+
+        if (!nodes.contains(node)) {
+            nodes.add(node);
+        }
+        if (!this.getChildren().contains(node)) {
+            this.getChildren().add(node);
+        }
+
         // 为节点的连接点设置事件处理器
         setupConnectorHandler(node, node.getTopConnector());
         setupConnectorHandler(node, node.getBottomConnector());
         setupConnectorHandler(node, node.getLeftConnector());
         setupConnectorHandler(node, node.getRightConnector());
-        
+
         // 设置删除回调
-        node.setOnDelete(() -> removeNode(node));
-        
+        node.setOnDelete(() -> removeNode(node, true));
+
         // 设置拖动回调 - 实时更新小地图
         node.setOnDragged(() -> {
             if (onNodeMoved != null) {
                 onNodeMoved.run();
             }
         });
-        
-        // 监听节点位置变化，动态调整画布大小
-        node.layoutXProperty().addListener((obs, oldVal, newVal) -> updateCanvasSize());
-        node.layoutYProperty().addListener((obs, oldVal, newVal) -> updateCanvasSize());
-        
+
+        // 拖拽结束后记录历史
+        node.setOnDragFinished((oldX, oldY, newX, newY) -> {
+            if (undoRedoManager != null && historyEnabled) {
+                pushAction(new MoveNodeAction(node, oldX, oldY, newX, newY));
+            }
+            notifyNodeStructureChanged();
+        });
+
+        // 监听节点位置变化，动态调整画布大小（仅注册一次）
+        if (!Boolean.TRUE.equals(node.getProperties().get(NODE_LISTENER_KEY))) {
+            node.layoutXProperty().addListener((obs, oldVal, newVal) -> updateCanvasSize());
+            node.layoutYProperty().addListener((obs, oldVal, newVal) -> updateCanvasSize());
+            node.getProperties().put(NODE_LISTENER_KEY, Boolean.TRUE);
+        }
+
         log("✓ 添加节点: " + node.getJobHandlerName());
-        updateCanvasSize();
+        notifyNodeStructureChanged();
+
+        if (recordHistory) {
+            pushAction(new AddNodeAction(node));
+        }
     }
     
     /**
      * 移除节点
      */
     public void removeNode(ProcessNode node) {
-        // 移除相关的连接
-        List<NodeConnection> toRemove = new ArrayList<>();
-        for (NodeConnection conn : connections) {
+        removeNode(node, true);
+    }
+
+    public void removeNode(ProcessNode node, boolean recordHistory) {
+        if (node == null) {
+            return;
+        }
+
+        double oldX = node.getLayoutX();
+        double oldY = node.getLayoutY();
+
+        List<NodeConnection> attachedConnections = new ArrayList<>();
+        for (NodeConnection conn : new ArrayList<>(connections)) {
             if (conn.getSourceNode() == node || conn.getTargetNode() == node) {
-                toRemove.add(conn);
+                attachedConnections.add(conn);
+                removeConnection(conn, false);
             }
         }
-        toRemove.forEach(this::removeConnection);
-        
+
         nodes.remove(node);
         this.getChildren().remove(node);
-        
+
         log("✓ 删除节点: " + node.getJobHandlerName());
+        notifyNodeStructureChanged();
+
+        if (recordHistory) {
+            pushAction(new RemoveNodeAction(node, oldX, oldY, attachedConnections));
+        }
     }
     
     /**
      * 添加连接线（指定具体的连接点）
      */
-    public void addConnection(ProcessNode source, Circle sourceConnector, 
-                             ProcessNode target, Circle targetConnector) {
-        NodeConnection connection = new NodeConnection(source, sourceConnector, target, targetConnector);
-        connections.add(connection);
-        
-        // 将连接线添加到最底层（索引0），这样节点会显示在连接线之上
-        // 由于连接点在节点外部，箭头和连接点仍然清晰可见
-        this.getChildren().add(0, connection);
-        
-        String sourcePos = getConnectorPosition(source, sourceConnector);
-        String targetPos = getConnectorPosition(target, targetConnector);
-        
-        log("✓ 添加连接: " + source.getJobHandlerName() + "[" + sourcePos + "] → " + 
-            target.getJobHandlerName() + "[" + targetPos + "]");
+    public NodeConnection addConnection(ProcessNode source, Circle sourceConnector,
+                                        ProcessNode target, Circle targetConnector) {
+        return addConnection(source, sourceConnector, target, targetConnector, true);
     }
-    
+
+    public NodeConnection addConnection(ProcessNode source, Circle sourceConnector,
+                                        ProcessNode target, Circle targetConnector, boolean recordHistory) {
+        NodeConnection connection = new NodeConnection(source, sourceConnector, target, targetConnector);
+        addConnectionInternal(connection);
+        notifyNodeStructureChanged();
+        if (recordHistory) {
+            pushAction(new AddConnectionAction(connection));
+        }
+        return connection;
+    }
+
     /**
      * 添加连接线（自动选择连接点 - 兼容旧方法）
      */
-    public void addConnection(ProcessNode source, ProcessNode target) {
+    public NodeConnection addConnection(ProcessNode source, ProcessNode target) {
         // 默认使用右侧连接到左侧
-        addConnection(source, source.getRightConnector(), target, target.getLeftConnector());
+        return addConnection(source, source.getRightConnector(), target, target.getLeftConnector(), true);
     }
-    
+
     /**
      * 移除连接线
      */
     public void removeConnection(NodeConnection connection) {
+        removeConnection(connection, true);
+    }
+
+    public void removeConnection(NodeConnection connection, boolean recordHistory) {
+        if (connection == null) {
+            return;
+        }
+        removeConnectionInternal(connection);
+        notifyNodeStructureChanged();
+        if (recordHistory) {
+            pushAction(new RemoveConnectionAction(connection));
+        }
+    }
+
+    private void addConnectionInternal(NodeConnection connection) {
+        if (connection == null) {
+            return;
+        }
+        if (!connections.contains(connection)) {
+            connections.add(connection);
+        }
+        if (!this.getChildren().contains(connection)) {
+            this.getChildren().add(0, connection);
+        }
+        logConnection("✓ 添加连接", connection);
+    }
+
+    private void removeConnectionInternal(NodeConnection connection) {
+        if (connection == null) {
+            return;
+        }
         connections.remove(connection);
         this.getChildren().remove(connection);
-        
-        log("✓ 删除连接: " + 
-            connection.getSourceNode().getJobHandlerName() + " → " + 
-            connection.getTargetNode().getJobHandlerName());
+        logConnection("✓ 删除连接", connection);
+    }
+
+    private void logConnection(String prefix, NodeConnection connection) {
+        if (connection == null) {
+            return;
+        }
+        ProcessNode source = connection.getSourceNode();
+        ProcessNode target = connection.getTargetNode();
+        String sourcePos = getConnectorPosition(source, connection.getSourceConnector());
+        String targetPos = getConnectorPosition(target, connection.getTargetConnector());
+        log(prefix + ": " + source.getJobHandlerName() + "[" + sourcePos + "] → " +
+            target.getJobHandlerName() + "[" + targetPos + "]");
     }
     
     /**
@@ -226,7 +341,7 @@ public class NodeCanvas extends Pane {
                     
                     if (!exists) {
                         // 创建连接，指定具体的连接点
-                        addConnection(startNode, connector, targetNode, targetConnector);
+                        addConnection(startNode, connector, targetNode, targetConnector, true);
                     } else {
                         log("⚠️ 连接已存在");
                     }
@@ -426,106 +541,113 @@ public class NodeCanvas extends Pane {
             log("⚠ 没有数据可加载");
             return;
         }
+        if (undoRedoManager != null) {
+            undoRedoManager.clear();
+        }
 
-        Map<Long, double[]> previousPositionsByJobId = snapshotNodePositionsByJobId();
-        Map<String, double[]> previousPositionsByNodeId = snapshotNodePositionsByNodeId();
+        runWithoutHistory(() -> {
+            Map<Long, double[]> previousPositionsByJobId = snapshotNodePositionsByJobId();
+            Map<String, double[]> previousPositionsByNodeId = snapshotNodePositionsByNodeId();
 
-        // 清空现有内容
-        clear();
-        
-        // 用于存储节点ID到节点对象的映射
-        Map<String, ProcessNode> nodeMap = new HashMap<>();
-        
-        // 加载节点
-        List<JobComposeData.NodeData> nodeDataList = composeData.getNodes();
-        if (nodeDataList != null && !nodeDataList.isEmpty()) {
-            for (JobComposeData.NodeData nodeData : nodeDataList) {
-                // 获取节点显示文本
-                String text = nodeData.getJobName() != null ? nodeData.getJobName() : "Node";
-                
-                // 创建节点
-                ProcessNode node = new ProcessNode(nodeData.getId(), text);
-                
-                // ⭐ 设置任务ID（jobId）
-                if (nodeData.getJobId() != null) {
-                    node.setJobId(nodeData.getJobId());
-                    System.out.println("✅ 节点 " + text + " (nodeId: " + nodeData.getId() + ") 已设置jobId: " + nodeData.getJobId());
-                    log("✅ 节点已设置jobId: " + text + " -> jobId: " + nodeData.getJobId());
-                } else {
-                    System.out.println("⚠️ 节点 " + text + " (nodeId: " + nodeData.getId() + ") 的jobId为空！");
-                    log("⚠️ 警告: 节点 " + text + " 的jobId为空！");
-                }
-                
-                // ⭐ 恢复节点运行状态（triggerStatus）
-                if (nodeData.getTriggerStatus() != null && nodeData.getTriggerStatus() > 0) {
-                    node.updateStatusByCode(nodeData.getTriggerStatus());
-                    System.out.println("✅ 恢复节点运行状态: " + text + " -> " + nodeData.getTriggerStatus());
-                    log("✅ 恢复节点运行状态: " + text + " -> " + nodeData.getTriggerStatus());
-                }
-                
-                // 设置位置
-                if (hasValidCoordinates(nodeData.getX(), nodeData.getY())) {
-                    node.setLayoutX(nodeData.getX());
-                    node.setLayoutY(nodeData.getY());
-                } else {
-                    double[] previous = null;
+            // 清空现有内容
+            clear();
+
+            // 用于存储节点ID到节点对象的映射
+            Map<String, ProcessNode> nodeMap = new HashMap<>();
+
+            // 加载节点
+            List<JobComposeData.NodeData> nodeDataList = composeData.getNodes();
+            if (nodeDataList != null && !nodeDataList.isEmpty()) {
+                for (JobComposeData.NodeData nodeData : nodeDataList) {
+                    // 获取节点显示文本
+                    String text = nodeData.getJobName() != null ? nodeData.getJobName() : "Node";
+
+                    // 创建节点
+                    ProcessNode node = new ProcessNode(nodeData.getId(), text);
+
+                    // ⭐ 设置任务ID（jobId）
                     if (nodeData.getJobId() != null) {
-                        previous = previousPositionsByJobId.get(nodeData.getJobId());
-                    }
-                    if (previous == null) {
-                        previous = previousPositionsByNodeId.get(nodeData.getId());
-                    }
-                    if (previous != null) {
-                        node.setLayoutX(previous[0]);
-                        node.setLayoutY(previous[1]);
+                        node.setJobId(nodeData.getJobId());
+                        System.out.println("✅ 节点 " + text + " (nodeId: " + nodeData.getId() + ") 已设置jobId: " + nodeData.getJobId());
+                        log("✅ 节点已设置jobId: " + text + " -> jobId: " + nodeData.getJobId());
                     } else {
-                    // 如果没有位置信息，使用默认布局
-                    int index = nodeDataList.indexOf(nodeData);
-                    node.setLayoutX(100 + (index % 3) * 250);
-                    node.setLayoutY(100 + (index / 3) * 200);
-                }
-                }
-                
-                // 添加节点到画布
-                addNode(node);
-                nodeMap.put(nodeData.getId(), node);
-            }
-            
-            log("✓ 加载了 " + nodeDataList.size() + " 个节点");
-        }
-        
-        // 加载边（连接线）
-        List<JobComposeData.EdgeData> edgeDataList = composeData.getEdges();
-        if (edgeDataList != null && !edgeDataList.isEmpty()) {
-            int successCount = 0;
-            for (JobComposeData.EdgeData edgeData : edgeDataList) {
-                // 查找源节点和目标节点
-                ProcessNode sourceNode = nodeMap.get(edgeData.getSourceNodeId());
-                ProcessNode targetNode = nodeMap.get(edgeData.getTargetNodeId());
-                
-                if (sourceNode != null && targetNode != null) {
-                    // 根据锚点确定连接点
-                    // 源节点：如果没有指定锚点，默认使用右侧（数据流出）
-                    Circle sourceConnector = getConnectorByAnchor(sourceNode, edgeData.getSourceAnchor(), true);
-                    // 目标节点：如果没有指定锚点，默认使用左侧（数据流入）
-                    Circle targetConnector = getConnectorByAnchor(targetNode, edgeData.getTargetAnchor(), false);
-                    
-                    if (sourceConnector != null && targetConnector != null) {
-                        addConnection(sourceNode, sourceConnector, targetNode, targetConnector);
-                        successCount++;
+                        System.out.println("⚠️ 节点 " + text + " (nodeId: " + nodeData.getId() + ") 的jobId为空！");
+                        log("⚠️ 警告: 节点 " + text + " 的jobId为空！");
                     }
-                } else {
-                    log("⚠ 无法创建连接: 找不到节点 " + edgeData.getSourceNodeId() + " 或 " + edgeData.getTargetNodeId());
+
+                    // ⭐ 恢复节点运行状态（triggerStatus）
+                    if (nodeData.getTriggerStatus() != null && nodeData.getTriggerStatus() > 0) {
+                        node.updateStatusByCode(nodeData.getTriggerStatus());
+                        System.out.println("✅ 恢复节点运行状态: " + text + " -> " + nodeData.getTriggerStatus());
+                        log("✅ 恢复节点运行状态: " + text + " -> " + nodeData.getTriggerStatus());
+                    }
+
+                    // 设置位置
+                    if (hasValidCoordinates(nodeData.getX(), nodeData.getY())) {
+                        node.setLayoutX(nodeData.getX());
+                        node.setLayoutY(nodeData.getY());
+                    } else {
+                        double[] previous = null;
+                        if (nodeData.getJobId() != null) {
+                            previous = previousPositionsByJobId.get(nodeData.getJobId());
+                        }
+                        if (previous == null) {
+                            previous = previousPositionsByNodeId.get(nodeData.getId());
+                        }
+                        if (previous != null) {
+                            node.setLayoutX(previous[0]);
+                            node.setLayoutY(previous[1]);
+                        } else {
+                            // 如果没有位置信息，使用默认布局
+                            int index = nodeDataList.indexOf(nodeData);
+                            node.setLayoutX(100 + (index % 3) * 250);
+                            node.setLayoutY(100 + (index / 3) * 200);
+                        }
+                    }
+
+                    // 添加节点到画布
+                    addNode(node, false);
+                    nodeMap.put(nodeData.getId(), node);
                 }
+
+                log("✓ 加载了 " + nodeDataList.size() + " 个节点");
             }
-            
-            log("✓ 加载了 " + successCount + " 条连接");
-        }
-        
-        // 更新画布大小
-        updateCanvasSize();
-        
-        log("✓ 任务组数据加载完成");
+
+            // 加载边（连接线）
+            List<JobComposeData.EdgeData> edgeDataList = composeData.getEdges();
+            if (edgeDataList != null && !edgeDataList.isEmpty()) {
+                int successCount = 0;
+                for (JobComposeData.EdgeData edgeData : edgeDataList) {
+                    // 查找源节点和目标节点
+                    ProcessNode sourceNode = nodeMap.get(edgeData.getSourceNodeId());
+                    ProcessNode targetNode = nodeMap.get(edgeData.getTargetNodeId());
+                
+                    if (sourceNode != null && targetNode != null) {
+                        // 根据锚点确定连接点
+                        // 源节点：如果没有指定锚点，默认使用右侧（数据流出）
+                        Circle sourceConnector = getConnectorByAnchor(sourceNode, edgeData.getSourceAnchor(), true);
+                        // 目标节点：如果没有指定锚点，默认使用左侧（数据流入）
+                        Circle targetConnector = getConnectorByAnchor(targetNode, edgeData.getTargetAnchor(), false);
+
+                        if (sourceConnector != null && targetConnector != null) {
+                            addConnection(sourceNode, sourceConnector, targetNode, targetConnector, false);
+                            successCount++;
+                        }
+                    } else {
+                        log("⚠ 无法创建连接: 找不到节点 " + edgeData.getSourceNodeId() + " 或 " + edgeData.getTargetNodeId());
+                    }
+                }
+
+                log("✓ 加载了 " + successCount + " 条连接");
+            }
+
+            // 更新画布大小
+            updateCanvasSize();
+
+            log("✓ 任务组数据加载完成");
+        });
+
+        notifyNodeStructureChanged();
     }
 
     private boolean hasValidCoordinates(Double x, Double y) {
@@ -646,6 +768,127 @@ public class NodeCanvas extends Pane {
         }
         
         return null;
+    }
+
+    private class AddNodeAction implements CanvasAction {
+        private final ProcessNode node;
+
+        AddNodeAction(ProcessNode node) {
+            this.node = node;
+        }
+
+        @Override
+        public void undo() {
+            removeNode(node, false);
+            notifyNodeStructureChanged();
+        }
+
+        @Override
+        public void redo() {
+            addNode(node, false);
+            notifyNodeStructureChanged();
+        }
+    }
+
+    private class RemoveNodeAction implements CanvasAction {
+        private final ProcessNode node;
+        private final double oldX;
+        private final double oldY;
+        private final List<NodeConnection> attachedConnections;
+
+        RemoveNodeAction(ProcessNode node, double oldX, double oldY, List<NodeConnection> attachedConnections) {
+            this.node = node;
+            this.oldX = oldX;
+            this.oldY = oldY;
+            this.attachedConnections = new ArrayList<>(attachedConnections);
+        }
+
+        @Override
+        public void undo() {
+            addNode(node, false);
+            node.setLayoutX(oldX);
+            node.setLayoutY(oldY);
+            for (NodeConnection connection : attachedConnections) {
+                addConnectionInternal(connection);
+            }
+            notifyNodeStructureChanged();
+        }
+
+        @Override
+        public void redo() {
+            removeNode(node, false);
+            notifyNodeStructureChanged();
+        }
+    }
+
+    private class MoveNodeAction implements CanvasAction {
+        private final ProcessNode node;
+        private final double oldX;
+        private final double oldY;
+        private final double newX;
+        private final double newY;
+
+        MoveNodeAction(ProcessNode node, double oldX, double oldY, double newX, double newY) {
+            this.node = node;
+            this.oldX = oldX;
+            this.oldY = oldY;
+            this.newX = newX;
+            this.newY = newY;
+        }
+
+        @Override
+        public void undo() {
+            node.setLayoutX(oldX);
+            node.setLayoutY(oldY);
+            notifyNodeStructureChanged();
+        }
+
+        @Override
+        public void redo() {
+            node.setLayoutX(newX);
+            node.setLayoutY(newY);
+            notifyNodeStructureChanged();
+        }
+    }
+
+    private class AddConnectionAction implements CanvasAction {
+        private final NodeConnection connection;
+
+        AddConnectionAction(NodeConnection connection) {
+            this.connection = connection;
+        }
+
+        @Override
+        public void undo() {
+            removeConnection(connection, false);
+            notifyNodeStructureChanged();
+        }
+
+        @Override
+        public void redo() {
+            addConnectionInternal(connection);
+            notifyNodeStructureChanged();
+        }
+    }
+
+    private class RemoveConnectionAction implements CanvasAction {
+        private final NodeConnection connection;
+
+        RemoveConnectionAction(NodeConnection connection) {
+            this.connection = connection;
+        }
+
+        @Override
+        public void undo() {
+            addConnectionInternal(connection);
+            notifyNodeStructureChanged();
+        }
+
+        @Override
+        public void redo() {
+            removeConnection(connection, false);
+            notifyNodeStructureChanged();
+        }
     }
 }
 

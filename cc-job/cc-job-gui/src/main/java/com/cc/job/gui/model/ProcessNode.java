@@ -24,6 +24,8 @@ public class ProcessNode extends StackPane {
     private String jobHandlerName;
     private double dragStartX;
     private double dragStartY;
+    private double initialLayoutX;
+    private double initialLayoutY;
     
     // 连接点
     private Circle topConnector;
@@ -40,9 +42,12 @@ public class ProcessNode extends StackPane {
     
     // 拖动回调
     private Runnable onDragged;
+    private DragFinishedListener dragFinishedListener;
     
-    // 编辑回调
+    // 编辑/复制/详情回调
     private Runnable onEdit;
+    private Runnable onCopy;
+    private Runnable onShowDetails;
     
     // 节点状态
     private boolean enabled = true;
@@ -214,6 +219,8 @@ public class ProcessNode extends StackPane {
         // 开始拖拽（只处理节点本身，不处理连接点）
         this.setOnMousePressed(e -> {
             if (e.isPrimaryButtonDown() && !isConnectorClick(e.getTarget())) {
+                initialLayoutX = this.getLayoutX();
+                initialLayoutY = this.getLayoutY();
                 dragStartX = e.getSceneX() - this.getLayoutX();
                 dragStartY = e.getSceneY() - this.getLayoutY();
                 this.setCursor(Cursor.CLOSED_HAND);
@@ -246,6 +253,13 @@ public class ProcessNode extends StackPane {
             if (!isConnectorClick(e.getTarget())) {
                 this.setCursor(Cursor.MOVE);
                 showConnectors(true); // 保持连接点显示
+                if (dragFinishedListener != null) {
+                    double newX = this.getLayoutX();
+                    double newY = this.getLayoutY();
+                    if (Math.abs(newX - initialLayoutX) > 0.5 || Math.abs(newY - initialLayoutY) > 0.5) {
+                        dragFinishedListener.onDragFinished(initialLayoutX, initialLayoutY, newX, newY);
+                    }
+                }
                 e.consume();
             }
         });
@@ -270,14 +284,18 @@ public class ProcessNode extends StackPane {
         MenuItem copyItem = new MenuItem("📋 复制节点");
         copyItem.setOnAction(e -> {
             System.out.println("📋 复制节点: " + jobHandlerName);
-            // TODO: 实现复制功能
+            if (onCopy != null) {
+                onCopy.run();
+            }
         });
         
         // 📄 节点详情
         MenuItem detailsItem = new MenuItem("📄 查看详情");
         detailsItem.setOnAction(e -> {
             System.out.println("📄 查看详情: " + jobHandlerName);
-            // TODO: 显示节点详情对话框
+            if (onShowDetails != null) {
+                onShowDetails.run();
+            }
         });
         
         // 分隔符
@@ -441,8 +459,24 @@ public class ProcessNode extends StackPane {
         this.onDragged = onDragged;
     }
     
+    public void setOnDragFinished(DragFinishedListener listener) {
+        this.dragFinishedListener = listener;
+    }
+    
     public void setOnEdit(Runnable onEdit) {
         this.onEdit = onEdit;
+    }
+    
+    public void setOnCopy(Runnable onCopy) {
+        this.onCopy = onCopy;
+    }
+    
+    public void setOnShowDetails(Runnable onShowDetails) {
+        this.onShowDetails = onShowDetails;
+    }
+
+    public interface DragFinishedListener {
+        void onDragFinished(double oldX, double oldY, double newX, double newY);
     }
     
     public String getType() {
