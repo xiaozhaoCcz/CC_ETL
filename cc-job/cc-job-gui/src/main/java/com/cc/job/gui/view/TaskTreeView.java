@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Optional;
 
 /**
  * 任务组树形视图组件
@@ -46,6 +47,12 @@ public class TaskTreeView extends VBox {
     
     // 运行中的任务组ID集合
     private Map<Long, Boolean> runningTaskGroups = new HashMap<>();
+
+    // 记录各节点的展开状态
+    private final Map<Long, Boolean> expandedState = new HashMap<>();
+
+    // 刷新后需要重新选中的节点ID
+    private volatile Long pendingSelectId;
     
     public interface TaskSelectionCallback {
         void onTaskSelected(String taskName);
@@ -279,7 +286,7 @@ public class TaskTreeView extends VBox {
                 
                 // type: 0=分区, 1=任务组, 2=任务节点 - 扁平化设计
                 if (nodeType == 0) {
-                    // 一级节点（分区）- 只显示新建任务组功能
+                    // 一级节点（分区）- 新建任务组 + 刷新/删除
                     MenuItem newTaskItem = new MenuItem("新建任务组");
                     newTaskItem.setStyle(
                         "-fx-font-size: 13; " +
@@ -292,8 +299,16 @@ public class TaskTreeView extends VBox {
                             selectionCallback.onNewJobGroup(nodeData.getId(), nodeData.getLabel());
                         }
                     });
-                    
+
+                    MenuItem refreshItem = new MenuItem("刷新");
+                    refreshItem.setOnAction(e -> handleRefresh(nodeData, treeItem));
+
                     menu.getItems().add(newTaskItem);
+                    menu.getItems().add(refreshItem);
+                    if (supportsDeletion(nodeData)) {
+                        menu.getItems().add(new SeparatorMenuItem());
+                        menu.getItems().add(createDeleteMenuItem(nodeData, treeItem));
+                    }
                     
                 } else if (nodeType == 1) {
                     // 二级节点（任务组）- 新增节点和刷新功能
@@ -311,16 +326,20 @@ public class TaskTreeView extends VBox {
                     });
                     
                     MenuItem refreshItem = new MenuItem("刷新");
-                    refreshItem.setOnAction(e -> {
-                        System.out.println("🔄 刷新任务组: " + nodeName);
-                        // 重新加载树数据
-                        loadTreeData();
-                    });
-                    
-                    menu.getItems().addAll(addNodeItem, refreshItem);
+                    refreshItem.setOnAction(e -> handleRefresh(nodeData, treeItem));
+
+                    menu.getItems().add(addNodeItem);
+                    menu.getItems().add(refreshItem);
+                    if (supportsDeletion(nodeData)) {
+                        menu.getItems().add(new SeparatorMenuItem());
+                        menu.getItems().add(createDeleteMenuItem(nodeData, treeItem));
+                    }
                     
                 } else {
                     // 三级及以下节点（任务节点）- 基本操作
+                    MenuItem refreshItem = new MenuItem("刷新");
+                    refreshItem.setOnAction(e -> handleRefresh(nodeData, treeItem));
+                    
                     MenuItem openItem = new MenuItem("打开");
                     openItem.setOnAction(e -> {
                         System.out.println("📂 打开节点: " + nodeName);
@@ -339,10 +358,15 @@ public class TaskTreeView extends VBox {
                     deleteItem.setStyle("-fx-text-fill: #EF4444;");
                     deleteItem.setOnAction(e -> {
                         System.out.println("🗑️ 删除节点: " + nodeName);
-                        // TODO: 确认并删除节点
+                        confirmDeleteNode(nodeData, treeItem);
                     });
                     
-                    menu.getItems().addAll(openItem, editItem, new SeparatorMenuItem(), deleteItem);
+                    menu.getItems().add(refreshItem);
+                    menu.getItems().add(new SeparatorMenuItem());
+                    menu.getItems().add(openItem);
+                    menu.getItems().add(editItem);
+                    menu.getItems().add(new SeparatorMenuItem());
+                    menu.getItems().add(deleteItem);
                 }
                 
                 return menu;
@@ -403,6 +427,14 @@ public class TaskTreeView extends VBox {
             loadSampleData();
             return;
         }
+
+        Map<Long, Boolean> previousExpanded = new HashMap<>();
+        captureExpandedState(rootItem, previousExpanded);
+        expandedState.clear();
+        expandedState.putAll(previousExpanded);
+
+        // 清空搜索缓存
+        originalChildren.clear();
         
         // 清空现有数据
         rootItem.getChildren().clear();
@@ -431,14 +463,43 @@ public class TaskTreeView extends VBox {
         }
         
         // 默认展开第一个分区并选中第一个任务组
-        if (!rootItem.getChildren().isEmpty()) {
-            TreeItem<TreeNodeData> firstPartition = rootItem.getChildren().get(0);
-            firstPartition.setExpanded(true);
-            
-            if (!firstPartition.getChildren().isEmpty()) {
-                treeView.getSelectionModel().select(firstPartition.getChildren().get(0));
+        if (pendingSelectId != null) {
+            Long targetId = pendingSelectId;
+            TreeItem<TreeNodeData> target = findTreeItemById(rootItem, targetId);
+            pendingSelectId = null;
+            if (target != null) {
+                treeView.getSelectionModel().select(target);
+                int row = treeView.getRow(target);
+                if (row >= 0) {
+                    treeView.scrollTo(row);
+                }
+                System.out.println("✓ 定位到刷新节点: " + targetId);
+                refreshExpandedStateCache();
+                return;
+            } else {
+                System.out.println("⚠ 未找到ID为 " + targetId + " 的节点，使用默认选择");
             }
         }
+
+        if (!rootItem.getChildren().isEmpty()) {
+            TreeItem<TreeNodeData> firstPartition = rootItem.getChildren().get(0);
+            TreeNodeData firstData = firstPartition.getValue();
+            Long firstId = firstData != null ? firstData.getId() : null;
+            if (firstId == null || !expandedState.containsKey(firstId)) {
+                firstPartition.setExpanded(true);
+            }
+            
+            if (!firstPartition.getChildren().isEmpty()) {
+                TreeItem<TreeNodeData> firstChild = firstPartition.getChildren().get(0);
+                TreeNodeData childData = firstChild.getValue();
+                Long childId = childData != null ? childData.getId() : null;
+                if (childId == null || !expandedState.containsKey(childId)) {
+                    treeView.getSelectionModel().select(firstChild);
+                }
+            }
+        }
+
+        refreshExpandedStateCache();
     }
     
     /**
@@ -447,7 +508,7 @@ public class TaskTreeView extends VBox {
     private TreeItem<TreeNodeData> createPartitionItem(JobPartVo partVo) {
         TreeNodeData partitionData = new TreeNodeData(partVo.getId(), partVo.getLabel(), partVo.getType(), partVo.getExt1());
         TreeItem<TreeNodeData> partitionItem = new TreeItem<>(partitionData);
-        partitionItem.setExpanded(true); // 默认展开分区
+        applyExpandedState(partitionItem);
         
         // 添加所有子节点（包括任务组及其子节点）
         if (partVo.getChildren() != null && !partVo.getChildren().isEmpty()) {
@@ -469,11 +530,7 @@ public class TaskTreeView extends VBox {
     private TreeItem<TreeNodeData> createTreeItemRecursive(JobPartVo vo) {
         TreeNodeData nodeData = new TreeNodeData(vo.getId(), vo.getLabel(), vo.getType(), vo.getExt1());
         TreeItem<TreeNodeData> item = new TreeItem<>(nodeData);
-        
-        // 默认展开状态：分区和任务组默认展开
-        if (vo.getType() != null && (vo.getType() == 0 || vo.getType() == 1)) {
-            item.setExpanded(true);
-        }
+        applyExpandedState(item);
         
         // 递归添加所有子节点
         if (vo.getChildren() != null && !vo.getChildren().isEmpty()) {
@@ -489,6 +546,7 @@ public class TaskTreeView extends VBox {
     /**
      * 递归创建树节点（保留用于其他场景）
      */
+    @SuppressWarnings("unused")
     private TreeItem<TreeNodeData> createTreeItem(JobPartVo vo) {
         TreeNodeData nodeData = new TreeNodeData(vo.getId(), vo.getLabel(), vo.getType(), vo.getExt1());
         TreeItem<TreeNodeData> item = new TreeItem<>(nodeData);
@@ -524,7 +582,9 @@ public class TaskTreeView extends VBox {
         TreeItem<TreeNodeData> task2 = new TreeItem<>(new TreeNodeData(102L, "测试任务组2", 1));
         TreeItem<TreeNodeData> task3 = new TreeItem<>(new TreeNodeData(103L, "数据处理任务", 1));
         
-        partition1.getChildren().addAll(task1, task2, task3);
+        partition1.getChildren().add(task1);
+        partition1.getChildren().add(task2);
+        partition1.getChildren().add(task3);
         
         // 分区2
         TreeItem<TreeNodeData> partition2 = new TreeItem<>(new TreeNodeData(2L, "分区2", 0));
@@ -533,7 +593,8 @@ public class TaskTreeView extends VBox {
         TreeItem<TreeNodeData> task4 = new TreeItem<>(new TreeNodeData(201L, "定时任务组", 1));
         TreeItem<TreeNodeData> task5 = new TreeItem<>(new TreeNodeData(202L, "批量任务组", 1));
         
-        partition2.getChildren().addAll(task4, task5);
+        partition2.getChildren().add(task4);
+        partition2.getChildren().add(task5);
         
         // 分区3
         TreeItem<TreeNodeData> partition3 = new TreeItem<>(new TreeNodeData(3L, "分区3", 0));
@@ -543,13 +604,19 @@ public class TaskTreeView extends VBox {
         TreeItem<TreeNodeData> task7 = new TreeItem<>(new TreeNodeData(302L, "报表任务组", 1));
         TreeItem<TreeNodeData> task8 = new TreeItem<>(new TreeNodeData(303L, "清理任务组", 1));
         
-        partition3.getChildren().addAll(task6, task7, task8);
+        partition3.getChildren().add(task6);
+        partition3.getChildren().add(task7);
+        partition3.getChildren().add(task8);
         
         // 添加到根节点
-        rootItem.getChildren().addAll(partition1, partition2, partition3);
+        rootItem.getChildren().add(partition1);
+        rootItem.getChildren().add(partition2);
+        rootItem.getChildren().add(partition3);
         
         // 默认选中第一个任务
         treeView.getSelectionModel().select(task1);
+
+        refreshExpandedStateCache();
     }
     
     /**
@@ -892,6 +959,202 @@ public class TaskTreeView extends VBox {
         }
         
         return null;
+    }
+
+    private void captureExpandedState(TreeItem<TreeNodeData> item, Map<Long, Boolean> snapshot) {
+        if (item == null || snapshot == null) {
+            return;
+        }
+        TreeNodeData data = item.getValue();
+        if (data != null && data.getId() != null) {
+            snapshot.put(data.getId(), item.isExpanded());
+        }
+        for (TreeItem<TreeNodeData> child : item.getChildren()) {
+            captureExpandedState(child, snapshot);
+        }
+    }
+
+    private void applyExpandedState(TreeItem<TreeNodeData> item) {
+        if (item == null) {
+            return;
+        }
+        TreeNodeData data = item.getValue();
+        if (data == null) {
+            item.setExpanded(false);
+            return;
+        }
+
+        Long id = data.getId();
+        Boolean stored = id != null ? expandedState.get(id) : null;
+        if (stored != null) {
+            item.setExpanded(stored);
+        } else if (data.getType() != null && (data.getType() == 0 || data.getType() == 1)) {
+            item.setExpanded(true);
+        } else {
+            item.setExpanded(false);
+        }
+    }
+
+    private void refreshExpandedStateCache() {
+        expandedState.clear();
+        captureExpandedState(rootItem, expandedState);
+    }
+
+    /**
+     * 处理刷新逻辑（可选删除）
+     */
+    private void handleRefresh(TreeNodeData nodeData, TreeItem<TreeNodeData> treeItem) {
+        if (nodeData == null) {
+            System.out.println("🔄 刷新全部树形数据");
+            reloadTreeWithFocus(null);
+            return;
+        }
+
+        if (!supportsDeletion(nodeData)) {
+            System.out.println("🔄 刷新节点: " + nodeData.getLabel());
+            reloadTreeWithFocus(nodeData.getId());
+            return;
+        }
+
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("刷新节点");
+        alert.setHeaderText("刷新 \"" + nodeData.getLabel() + "\"");
+        alert.setContentText("是否同时删除当前节点？删除后将一并移除所有子节点。");
+
+        ButtonType deleteButton = new ButtonType("删除节点", ButtonBar.ButtonData.OK_DONE);
+        ButtonType refreshOnlyButton = new ButtonType("仅刷新", ButtonBar.ButtonData.NO);
+        ButtonType cancelButton = new ButtonType("取消", ButtonBar.ButtonData.CANCEL_CLOSE);
+        alert.getButtonTypes().setAll(deleteButton, refreshOnlyButton, cancelButton);
+
+        Optional<ButtonType> result = alert.showAndWait();
+        if (result.isEmpty() || result.get() == cancelButton) {
+            return;
+        }
+
+        if (result.get() == deleteButton) {
+            performDelete(nodeData, treeItem);
+        } else if (result.get() == refreshOnlyButton) {
+            reloadTreeWithFocus(nodeData.getId());
+        }
+    }
+
+    /**
+     * 创建删除菜单项
+     */
+    private MenuItem createDeleteMenuItem(TreeNodeData nodeData, TreeItem<TreeNodeData> treeItem) {
+        MenuItem deleteItem = new MenuItem("删除");
+        deleteItem.setStyle("-fx-text-fill: #EF4444;");
+        deleteItem.setOnAction(e -> confirmDeleteNode(nodeData, treeItem));
+        return deleteItem;
+    }
+
+    /**
+     * 删除确认
+     */
+    private void confirmDeleteNode(TreeNodeData nodeData, TreeItem<TreeNodeData> treeItem) {
+        if (!supportsDeletion(nodeData)) {
+            showAlert(Alert.AlertType.INFORMATION, "删除节点", "暂不支持删除此类型的节点。");
+            return;
+        }
+
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("删除节点");
+        alert.setHeaderText("确认删除 \"" + nodeData.getLabel() + "\" ?");
+        alert.setContentText("删除后，该节点及其所有子节点都将被移除，且不可恢复。");
+
+        ButtonType confirmButton = new ButtonType("确认删除", ButtonBar.ButtonData.OK_DONE);
+        ButtonType cancelButton = new ButtonType("取消", ButtonBar.ButtonData.CANCEL_CLOSE);
+        alert.getButtonTypes().setAll(confirmButton, cancelButton);
+
+        Optional<ButtonType> result = alert.showAndWait();
+        if (result.isPresent() && result.get() == confirmButton) {
+            performDelete(nodeData, treeItem);
+        }
+    }
+
+    /**
+     * 执行删除动作
+     */
+    private void performDelete(TreeNodeData nodeData, TreeItem<TreeNodeData> treeItem) {
+        if (nodeData == null || nodeData.getId() == null) {
+            return;
+        }
+
+        Long nodeId = nodeData.getId();
+        Integer nodeType = nodeData.getType();
+        System.out.println("🗑️ 准备删除节点: " + nodeData.getLabel() + " (ID=" + nodeId + ", type=" + nodeType + ")");
+
+        new Thread(() -> {
+            boolean success = false;
+            String errorMessage = null;
+
+            try {
+                if (nodeType != null && nodeType == 0) {
+                    success = jobPartService.deleteJobPart(nodeId);
+                } else if (nodeType != null && nodeType == 1) {
+                    success = jobPartService.deleteJobInfo(nodeId);
+                } else {
+                    errorMessage = "暂不支持删除该类型的节点。";
+                }
+            } catch (IOException ex) {
+                errorMessage = ex.getMessage();
+                System.err.println("删除节点发生异常: " + ex.getMessage());
+                ex.printStackTrace();
+            }
+
+            boolean finalSuccess = success;
+            String finalErrorMessage = errorMessage;
+
+            Platform.runLater(() -> {
+                if (finalSuccess) {
+                    Long focusId = null;
+                    if (treeItem != null) {
+                        TreeItem<TreeNodeData> parentItem = treeItem.getParent();
+                        if (parentItem != null && parentItem.getValue() != null) {
+                            Integer parentType = parentItem.getValue().getType();
+                            if (parentType != null && parentType >= 0) {
+                                focusId = parentItem.getValue().getId();
+                            }
+                        }
+                    }
+
+                    reloadTreeWithFocus(focusId);
+                    showAlert(Alert.AlertType.INFORMATION, "删除成功", "节点 \"" + nodeData.getLabel() + "\" 已删除。");
+                } else {
+                    String message = finalErrorMessage != null ? finalErrorMessage : "删除失败，请稍后重试。";
+                    showAlert(Alert.AlertType.ERROR, "删除失败", message);
+                }
+            });
+        }, "task-tree-delete-" + nodeId).start();
+    }
+
+    /**
+     * 判断节点是否支持删除
+     */
+    private boolean supportsDeletion(TreeNodeData nodeData) {
+        if (nodeData == null || nodeData.getType() == null) {
+            return false;
+        }
+        return nodeData.getType() == 0 || nodeData.getType() == 1;
+    }
+
+    /**
+     * 刷新树并尝试保留选中节点
+     */
+    private void reloadTreeWithFocus(Long focusNodeId) {
+        pendingSelectId = focusNodeId;
+        loadTreeData();
+    }
+
+    /**
+     * 统一弹窗提示
+     */
+    private void showAlert(Alert.AlertType alertType, String title, String message) {
+        Alert alert = new Alert(alertType);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
     }
 }
 

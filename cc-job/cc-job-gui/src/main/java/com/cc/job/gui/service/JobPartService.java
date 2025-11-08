@@ -279,4 +279,58 @@ public class JobPartService extends  BaseService {
         
         return composeData;
     }
+
+    /**
+     * 删除任务分区
+     * 使用 admin 服务提供的 /api/v1/jobParts/deleteJobPart/{id} 接口
+     */
+    public boolean deleteJobPart(Long partId) throws IOException {
+        String url = apiUtil.getBaseUrl() + "/api/v1/jobParts/deleteJobPart/" + partId;
+
+        Request request = new Request.Builder()
+                .url(url)
+                .get()
+                .build();
+
+        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("删除任务分区失败: " + response);
+            }
+
+            String responseBody = response.body().string();
+            System.out.println("deleteJobPart API 响应: " + responseBody);
+
+            Type resultType = new TypeToken<Result<Void>>() {
+            }.getType();
+            Result<Void> result = apiUtil.getGson().fromJson(responseBody, resultType);
+            return Result.isSuccess(result);
+        }
+    }
+
+    /**
+     * 删除任务组
+     * 对应 admin 服务的 DELETE /api/v1/jobInfos/{id}
+     */
+    public boolean deleteJobInfo(Long jobInfoId) throws IOException {
+        String url = apiUtil.getBaseUrl() + "/api/v1/jobInfos/" + jobInfoId;
+
+        Request request = new Request.Builder()
+                .url(url)
+                .delete()
+                .build();
+
+        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("删除任务组失败: " + response);
+            }
+
+            String responseBody = response.body().string();
+            System.out.println("deleteJobInfo API 响应: " + responseBody);
+
+            Type resultType = new TypeToken<Result<Void>>() {
+            }.getType();
+            Result<Void> result = apiUtil.getGson().fromJson(responseBody, resultType);
+            return Result.isSuccess(result);
+        }
+    }
 }

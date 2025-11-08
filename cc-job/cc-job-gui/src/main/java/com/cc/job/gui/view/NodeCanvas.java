@@ -426,7 +426,10 @@ public class NodeCanvas extends Pane {
             log("⚠ 没有数据可加载");
             return;
         }
-        
+
+        Map<Long, double[]> previousPositionsByJobId = snapshotNodePositionsByJobId();
+        Map<String, double[]> previousPositionsByNodeId = snapshotNodePositionsByNodeId();
+
         // 清空现有内容
         clear();
         
@@ -461,14 +464,26 @@ public class NodeCanvas extends Pane {
                 }
                 
                 // 设置位置
-                if (nodeData.getX() != null && nodeData.getY() != null) {
+                if (hasValidCoordinates(nodeData.getX(), nodeData.getY())) {
                     node.setLayoutX(nodeData.getX());
                     node.setLayoutY(nodeData.getY());
                 } else {
+                    double[] previous = null;
+                    if (nodeData.getJobId() != null) {
+                        previous = previousPositionsByJobId.get(nodeData.getJobId());
+                    }
+                    if (previous == null) {
+                        previous = previousPositionsByNodeId.get(nodeData.getId());
+                    }
+                    if (previous != null) {
+                        node.setLayoutX(previous[0]);
+                        node.setLayoutY(previous[1]);
+                    } else {
                     // 如果没有位置信息，使用默认布局
                     int index = nodeDataList.indexOf(nodeData);
                     node.setLayoutX(100 + (index % 3) * 250);
                     node.setLayoutY(100 + (index / 3) * 200);
+                }
                 }
                 
                 // 添加节点到画布
@@ -511,6 +526,42 @@ public class NodeCanvas extends Pane {
         updateCanvasSize();
         
         log("✓ 任务组数据加载完成");
+    }
+
+    private boolean hasValidCoordinates(Double x, Double y) {
+        if (!isCoordinateNumber(x) || !isCoordinateNumber(y)) {
+            return false;
+        }
+        return Math.abs(x) + Math.abs(y) > 1e-3;
+    }
+
+    private boolean isCoordinateNumber(Double value) {
+        if (value == null) {
+            return false;
+        }
+        return !value.isNaN() && !value.isInfinite();
+    }
+
+    private Map<Long, double[]> snapshotNodePositionsByJobId() {
+        Map<Long, double[]> map = new HashMap<>();
+        for (ProcessNode node : nodes) {
+            Long jobId = node.getJobId();
+            if (jobId != null) {
+                map.put(jobId, new double[]{node.getLayoutX(), node.getLayoutY()});
+            }
+        }
+        return map;
+    }
+
+    private Map<String, double[]> snapshotNodePositionsByNodeId() {
+        Map<String, double[]> map = new HashMap<>();
+        for (ProcessNode node : nodes) {
+            String nodeId = node.getNodeId();
+            if (nodeId != null) {
+                map.put(nodeId, new double[]{node.getLayoutX(), node.getLayoutY()});
+            }
+        }
+        return map;
     }
     
     /**

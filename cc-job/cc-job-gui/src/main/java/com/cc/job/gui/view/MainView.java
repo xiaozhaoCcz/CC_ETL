@@ -1624,9 +1624,11 @@ public class MainView extends BorderPane {
 
             // 计算节点位置：如果后端没有返回坐标，则自动计算一个不重叠的位置
             double x, y;
-            if (jobNode.getNodePositionX() != null && jobNode.getNodePositionY() != null) {
-                x = jobNode.getNodePositionX();
-                y = jobNode.getNodePositionY();
+            Double rawX = jobNode.getNodePositionX();
+            Double rawY = jobNode.getNodePositionY();
+            if (hasValidCoordinates(rawX, rawY)) {
+                x = rawX;
+                y = rawY;
             } else {
                 // 自动计算位置，避免节点重叠
                 double[] position = calculateNewNodePosition();
@@ -1707,6 +1709,24 @@ public class MainView extends BorderPane {
         }
 
         return new double[]{x, y};
+    }
+
+    /**
+     * 判断后端返回的坐标是否有效（过滤为0或异常值的坐标）
+     */
+    private boolean hasValidCoordinates(Double x, Double y) {
+        if (!isCoordinateNumber(x) || !isCoordinateNumber(y)) {
+            return false;
+        }
+        // 当后端未初始化坐标时通常返回(0,0)，视为无效
+        return Math.abs(x) + Math.abs(y) > 1e-3;
+    }
+
+    private boolean isCoordinateNumber(Double value) {
+        if (value == null) {
+            return false;
+        }
+        return !value.isNaN() && !value.isInfinite();
     }
 
     /**
