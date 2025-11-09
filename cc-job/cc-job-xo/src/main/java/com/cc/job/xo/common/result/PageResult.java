@@ -1,7 +1,6 @@
 package com.cc.job.xo.common.result;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import lombok.Data;
 
 import java.io.Serializable;
 import java.util.List;
@@ -12,7 +11,6 @@ import java.util.List;
  * @author Ray
  * @since 2022/2/18
  */
-@Data
 public class PageResult<T> implements Serializable {
 
     private String code;
@@ -20,6 +18,30 @@ public class PageResult<T> implements Serializable {
     private Data<T> data;
 
     private String msg;
+
+    public String getCode() {
+        return code;
+    }
+
+    public void setCode(String code) {
+        this.code = code;
+    }
+
+    public Data<T> getData() {
+        return data;
+    }
+
+    public void setData(Data<T> data) {
+        this.data = data;
+    }
+
+    public String getMsg() {
+        return msg;
+    }
+
+    public void setMsg(String msg) {
+        this.msg = msg;
+    }
 
     public static <T> PageResult<T> success(IPage<T> page) {
         PageResult<T> result = new PageResult<>();
@@ -34,12 +56,27 @@ public class PageResult<T> implements Serializable {
         return result;
     }
 
-    @lombok.Data
     public static class Data<T> {
 
         private List<T> list;
 
         private long total;
+
+        public List<T> getList() {
+            return list;
+        }
+
+        public void setList(List<T> list) {
+            this.list = list;
+        }
+
+        public long getTotal() {
+            return total;
+        }
+
+        public void setTotal(long total) {
+            this.total = total;
+        }
 
     }
 

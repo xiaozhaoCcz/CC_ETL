@@ -1,338 +1,179 @@
 package com.cc.job.gui.util;
 
-import javafx.scene.control.Label;
+import atlantafx.base.theme.Styles;
 import javafx.scene.paint.Color;
-import javafx.scene.shape.*;
-import javafx.scene.layout.StackPane;
+import org.kordamp.ikonli.feather.Feather;
+import org.kordamp.ikonli.javafx.FontIcon;
 
 /**
- * 图标工具类 - 统一管理界面图标
- * 使用Unicode符号和SVG形状
+ * 图标工具类 - 使用 Ikonli Dashicons 图标并与 Atlantafx 主题配色保持一致。
  */
-public class IconUtil {
-    
-    // 默认颜色
+public final class IconUtil {
+
     private static final String SECONDARY_COLOR = "#64748B";
+    private static final String ACCENT_COLOR = "#6366F1";
+    private static final String SUCCESS_COLOR = "#10B981";
+    private static final String WARNING_COLOR = "#F59E0B";
+    private static final String DANGER_COLOR = "#EF4444";
+    private static final String MUTED_COLOR = "#6B7280";
     private static final String WHITE_COLOR = "#FFFFFF";
-    
-    /**
-     * 创建文字图标
-     */
-    private static Label createTextIcon(String text, String color, int size) {
-        Label label = new Label(text);
-        label.setStyle(
-            "-fx-text-fill: " + color + "; " +
-            "-fx-font-size: " + size + "px; " +
-            "-fx-font-weight: 600;"
-        );
-        return label;
+
+    private IconUtil() {
+        // utility class
     }
-    
+
+    /**
+     * 创建 Feather 线性图标。
+     */
+    private static FontIcon createFeatherIcon(Feather feather, String color, int size) {
+        FontIcon icon = new FontIcon(feather);
+        icon.getStyleClass().addAll(Styles.FONT_ICON, Styles.TEXT_MUTED);
+        icon.setIconSize(size);
+        if (color != null) {
+            icon.setIconColor(Color.web(color));
+        }
+        return icon;
+    }
+
     // ============ 工具栏图标 ============
-    
-    public static Label fileIcon() {
-        return createTextIcon("📄", SECONDARY_COLOR, 16);
+
+    public static FontIcon fileIcon() {
+        return createFeatherIcon(Feather.FILE_TEXT, SECONDARY_COLOR, 16);
     }
-    
-    public static Label folderIcon() {
-        return createTextIcon("📂", SECONDARY_COLOR, 16);
+
+    public static FontIcon folderIcon() {
+        return createFeatherIcon(Feather.FOLDER, SECONDARY_COLOR, 16);
     }
-    
-    public static Label saveIcon() {
-        return createTextIcon("💾", SECONDARY_COLOR, 16);
+
+    public static FontIcon saveIcon() {
+        return createFeatherIcon(Feather.DOWNLOAD, ACCENT_COLOR, 16);
     }
-    
-    public static Label undoIcon() {
-        return createTextIcon("↶", SECONDARY_COLOR, 16);
+
+    public static FontIcon undoIcon() {
+        return createFeatherIcon(Feather.CORNER_UP_LEFT, SECONDARY_COLOR, 16);
     }
-    
-    public static Label redoIcon() {
-        return createTextIcon("↷", SECONDARY_COLOR, 16);
+
+    public static FontIcon redoIcon() {
+        return createFeatherIcon(Feather.CORNER_UP_RIGHT, SECONDARY_COLOR, 16);
     }
-    
-    public static Label zoomInIcon() {
-        return createTextIcon("🔍+", SECONDARY_COLOR, 14);
+
+    public static FontIcon zoomInIcon() {
+        return createFeatherIcon(Feather.ZOOM_IN, SECONDARY_COLOR, 16);
     }
-    
-    public static Label zoomOutIcon() {
-        return createTextIcon("🔍−", SECONDARY_COLOR, 14);
+
+    public static FontIcon zoomOutIcon() {
+        return createFeatherIcon(Feather.ZOOM_OUT, SECONDARY_COLOR, 16);
     }
-    
-    public static Label expandIcon() {
-        return createTextIcon("⤢", SECONDARY_COLOR, 16);
+
+    public static FontIcon expandIcon() {
+        return createFeatherIcon(Feather.MAXIMIZE_2, SECONDARY_COLOR, 16);
     }
-    
-    public static Label playIcon() {
-        return createTextIcon("▶", WHITE_COLOR, 14);
+
+    public static FontIcon playIcon() {
+        return createFeatherIcon(Feather.PLAY, WHITE_COLOR, 18);
     }
-    
-    public static Label stopIcon() {
-        return createTextIcon("◼", WHITE_COLOR, 14);
+
+    public static FontIcon stopIcon() {
+        return createFeatherIcon(Feather.PAUSE, WHITE_COLOR, 18);
     }
-    
-    public static Label plusIcon() {
-        return createTextIcon("+", SECONDARY_COLOR, 18);
+
+    public static FontIcon plusIcon() {
+        return createFeatherIcon(Feather.PLUS_CIRCLE, SECONDARY_COLOR, 18);
     }
-    
+
     // ============ 面板图标 ============
-    
-    public static Label searchIcon() {
-        return createTextIcon("🔍", "#9CA3AF", 14);
+
+    public static FontIcon searchIcon() {
+        return createFeatherIcon(Feather.SEARCH, MUTED_COLOR, 14);
     }
-    
-    public static Label closeIcon() {
-        return createTextIcon("×", "#6B7280", 18);
+
+    public static FontIcon closeIcon() {
+        return createFeatherIcon(Feather.X, MUTED_COLOR, 16);
     }
-    
-    public static Label windowIcon() {
-        return createTextIcon("⧉", "#6B7280", 16);
+
+    public static FontIcon windowIcon() {
+        return createFeatherIcon(Feather.EXTERNAL_LINK, MUTED_COLOR, 16);
     }
-    
-    public static Label trashIcon() {
-        return createTextIcon("🗑", SECONDARY_COLOR, 16);
+
+    public static FontIcon trashIcon() {
+        return createFeatherIcon(Feather.TRASH_2, SECONDARY_COLOR, 16);
     }
-    
-    public static Label exportIcon() {
-        return createTextIcon("⬇", SECONDARY_COLOR, 16);
+
+    public static FontIcon exportIcon() {
+        return createFeatherIcon(Feather.UPLOAD, SECONDARY_COLOR, 16);
     }
-    
-    public static Label refreshIcon() {
-        return createTextIcon("⟳", SECONDARY_COLOR, 16);
+
+    public static FontIcon refreshIcon() {
+        return createFeatherIcon(Feather.REFRESH_CW, SECONDARY_COLOR, 16);
     }
-    
+
     // ============ 树节点图标 ============
-    
-    /**
-     * 任务分区图标 - 立方体
-     */
-    public static StackPane partitionIcon() {
-        // 使用SVG Path绘制立方体
-        SVGPath cube = new SVGPath();
-        cube.setContent("M 2 5 L 8 2 L 14 5 L 14 11 L 8 14 L 2 11 Z M 8 2 L 8 8 M 2 5 L 8 8 M 14 5 L 8 8");
-        cube.setFill(Color.TRANSPARENT);
-        cube.setStroke(Color.web("#3B82F6"));
-        cube.setStrokeWidth(1.5);
-        
-        StackPane pane = new StackPane(cube);
-        pane.setMinSize(16, 16);
-        pane.setMaxSize(16, 16);
-        return pane;
+
+    public static FontIcon partitionIcon() {
+        return createFeatherIcon(Feather.LAYERS, ACCENT_COLOR, 16);
     }
-    
-    /**
-     * 任务组图标 - 文件夹
-     */
-    public static StackPane taskGroupIcon() {
-        SVGPath folder = new SVGPath();
-        folder.setContent("M 2 4 L 6 4 L 7 2 L 14 2 L 14 12 L 2 12 Z");
-        folder.setFill(Color.web("#8B5CF6"));
-        folder.setStroke(Color.web("#7C3AED"));
-        folder.setStrokeWidth(1.2);
-        
-        StackPane pane = new StackPane(folder);
-        pane.setMinSize(16, 16);
-        pane.setMaxSize(16, 16);
-        return pane;
+
+    public static FontIcon taskGroupIcon() {
+        return createFeatherIcon(Feather.FOLDER, ACCENT_COLOR, 16);
     }
-    
-    /**
-     * 任务容器图标 - 列表
-     */
-    public static StackPane taskContainerIcon() {
-        SVGPath list = new SVGPath();
-        list.setContent("M 2 3 L 14 3 M 2 7 L 14 7 M 2 11 L 14 11 M 3 3 L 3 3.5 M 3 7 L 3 7.5 M 3 11 L 3 11.5");
-        list.setFill(Color.TRANSPARENT);
-        list.setStroke(Color.web("#10B981"));
-        list.setStrokeWidth(1.5);
-        list.setStrokeLineCap(StrokeLineCap.ROUND);
-        
-        StackPane pane = new StackPane(list);
-        pane.setMinSize(16, 16);
-        pane.setMaxSize(16, 16);
-        return pane;
+
+    public static FontIcon taskContainerIcon() {
+        return createFeatherIcon(Feather.PACKAGE, SUCCESS_COLOR, 16);
     }
-    
-    /**
-     * 关系容器图标 - 连接节点
-     */
-    public static StackPane relationContainerIcon() {
-        SVGPath network = new SVGPath();
-        network.setContent("M 3 3 L 8 8 M 13 3 L 8 8 M 8 8 L 8 13 M 3 3 A 1 1 0 1 1 3 3.01 M 13 3 A 1 1 0 1 1 13 3.01 M 8 13 A 1 1 0 1 1 8 13.01");
-        network.setFill(Color.TRANSPARENT);
-        network.setStroke(Color.web("#F59E0B"));
-        network.setStrokeWidth(1.5);
-        network.setStrokeLineCap(StrokeLineCap.ROUND);
-        
-        StackPane pane = new StackPane(network);
-        pane.setMinSize(16, 16);
-        pane.setMaxSize(16, 16);
-        return pane;
+
+    public static FontIcon relationContainerIcon() {
+        return createFeatherIcon(Feather.SHARE_2, WARNING_COLOR, 16);
     }
-    
-    /**
-     * 任务节点图标 - 圆点带边框
-     */
-    public static StackPane taskNodeIcon() {
-        javafx.scene.shape.Circle circle = new javafx.scene.shape.Circle(5);
-        circle.setFill(Color.web("#06B6D4"));
-        circle.setStroke(Color.web("#0891B2"));
-        circle.setStrokeWidth(1.5);
-        
-        StackPane pane = new StackPane(circle);
-        pane.setMinSize(16, 16);
-        pane.setMaxSize(16, 16);
-        return pane;
+
+    public static FontIcon taskNodeIcon() {
+        return createFeatherIcon(Feather.CPU, "#0EA5E9", 16);
     }
-    
-    /**
-     * 关系边图标 - 箭头
-     */
-    public static StackPane relationEdgeIcon() {
-        SVGPath arrow = new SVGPath();
-        arrow.setContent("M 2 8 L 12 8 M 8 4 L 12 8 L 8 12");
-        arrow.setFill(Color.TRANSPARENT);
-        arrow.setStroke(Color.web("#EC4899"));
-        arrow.setStrokeWidth(1.5);
-        arrow.setStrokeLineCap(StrokeLineCap.ROUND);
-        arrow.setStrokeLineJoin(StrokeLineJoin.ROUND);
-        
-        StackPane pane = new StackPane(arrow);
-        pane.setMinSize(16, 16);
-        pane.setMaxSize(16, 16);
-        return pane;
+
+    public static FontIcon relationEdgeIcon() {
+        return createFeatherIcon(Feather.ARROW_RIGHT, "#EC4899", 16);
     }
-    
+
     // ============ 日志级别图标 ============
-    
-    /**
-     * 信息图标 - 圆形i
-     */
-    public static StackPane infoIcon() {
-        javafx.scene.shape.Circle circle = new javafx.scene.shape.Circle(6);
-        circle.setFill(Color.TRANSPARENT);
-        circle.setStroke(Color.web("#2563EB"));
-        circle.setStrokeWidth(1.5);
-        
-        SVGPath i = new SVGPath();
-        i.setContent("M 8 5 L 8 11 M 8 3 L 8 3.5");
-        i.setStroke(Color.web("#2563EB"));
-        i.setStrokeWidth(1.8);
-        i.setStrokeLineCap(StrokeLineCap.ROUND);
-        
-        StackPane pane = new StackPane(circle, i);
-        pane.setMinSize(16, 16);
-        pane.setMaxSize(16, 16);
-        return pane;
+
+    public static FontIcon infoIcon() {
+        return createFeatherIcon(Feather.INFO, ACCENT_COLOR, 16);
     }
-    
-    /**
-     * 警告图标 - 三角形感叹号
-     */
-    public static StackPane warnIcon() {
-        SVGPath triangle = new SVGPath();
-        triangle.setContent("M 8 2 L 14 13 L 2 13 Z");
-        triangle.setFill(Color.TRANSPARENT);
-        triangle.setStroke(Color.web("#D97706"));
-        triangle.setStrokeWidth(1.5);
-        
-        SVGPath exclamation = new SVGPath();
-        exclamation.setContent("M 8 6 L 8 9 M 8 11 L 8 11.5");
-        exclamation.setStroke(Color.web("#D97706"));
-        exclamation.setStrokeWidth(1.8);
-        exclamation.setStrokeLineCap(StrokeLineCap.ROUND);
-        
-        StackPane pane = new StackPane(triangle, exclamation);
-        pane.setMinSize(16, 16);
-        pane.setMaxSize(16, 16);
-        return pane;
+
+    public static FontIcon warnIcon() {
+        return createFeatherIcon(Feather.ALERT_TRIANGLE, WARNING_COLOR, 16);
     }
-    
-    /**
-     * 错误图标 - 圆形X
-     */
-    public static StackPane errorIcon() {
-        javafx.scene.shape.Circle circle = new javafx.scene.shape.Circle(6);
-        circle.setFill(Color.TRANSPARENT);
-        circle.setStroke(Color.web("#DC2626"));
-        circle.setStrokeWidth(1.5);
-        
-        SVGPath x = new SVGPath();
-        x.setContent("M 5 5 L 11 11 M 11 5 L 5 11");
-        x.setStroke(Color.web("#DC2626"));
-        x.setStrokeWidth(1.8);
-        x.setStrokeLineCap(StrokeLineCap.ROUND);
-        
-        StackPane pane = new StackPane(circle, x);
-        pane.setMinSize(16, 16);
-        pane.setMaxSize(16, 16);
-        return pane;
+
+    public static FontIcon errorIcon() {
+        return createFeatherIcon(Feather.ALERT_OCTAGON, DANGER_COLOR, 16);
     }
-    
-    /**
-     * 成功图标 - 圆形对勾
-     */
-    public static StackPane successIcon() {
-        javafx.scene.shape.Circle circle = new javafx.scene.shape.Circle(6);
-        circle.setFill(Color.TRANSPARENT);
-        circle.setStroke(Color.web("#059669"));
-        circle.setStrokeWidth(1.5);
-        
-        SVGPath check = new SVGPath();
-        check.setContent("M 5 8 L 7 10 L 11 6");
-        check.setStroke(Color.web("#059669"));
-        check.setStrokeWidth(1.8);
-        check.setStrokeLineCap(StrokeLineCap.ROUND);
-        check.setStrokeLineJoin(StrokeLineJoin.ROUND);
-        
-        StackPane pane = new StackPane(circle, check);
-        pane.setMinSize(16, 16);
-        pane.setMaxSize(16, 16);
-        return pane;
+
+    public static FontIcon successIcon() {
+        return createFeatherIcon(Feather.CHECK_CIRCLE, SUCCESS_COLOR, 16);
     }
-    
-    /**
-     * 调试图标 - 虫子
-     */
-    public static StackPane debugIcon() {
-        SVGPath bug = new SVGPath();
-        bug.setContent("M 8 3 L 8 13 M 5 5 L 11 5 M 5 8 L 11 8 M 5 11 L 11 11 M 5 3 L 3 1 M 11 3 L 13 1 M 5 6 L 3 6 M 11 6 L 13 6 M 5 10 L 3 10 M 11 10 L 13 10");
-        bug.setFill(Color.TRANSPARENT);
-        bug.setStroke(Color.web("#7C3AED"));
-        bug.setStrokeWidth(1.3);
-        bug.setStrokeLineCap(StrokeLineCap.ROUND);
-        
-        StackPane pane = new StackPane(bug);
-        pane.setMinSize(16, 16);
-        pane.setMaxSize(16, 16);
-        return pane;
+
+    public static FontIcon debugIcon() {
+        return createFeatherIcon(Feather.TERMINAL, "#7C3AED", 16);
     }
-    
+
     // ============ 状态图标 ============
-    
-    public static Label runningIcon() {
-        return createTextIcon("◷", "#10B981", 14);
+
+    public static FontIcon runningIcon() {
+        return createFeatherIcon(Feather.ACTIVITY, SUCCESS_COLOR, 16);
     }
-    
-    public static Label chartIcon() {
-        return createTextIcon("📊", "#6366F1", 16);
+
+    public static FontIcon chartIcon() {
+        return createFeatherIcon(Feather.PIE_CHART, ACCENT_COLOR, 16);
     }
-    
-    public static Label mapIcon() {
-        return createTextIcon("🗺", "#6366F1", 16);
+
+    public static FontIcon mapIcon() {
+        return createFeatherIcon(Feather.MAP, ACCENT_COLOR, 16);
     }
-    
+
     // ============ 辅助方法 ============
-    
-    /**
-     * 根据节点类型获取图标
-     */
-    public static StackPane getIconByType(Integer type) {
+
+    public static FontIcon getIconByType(Integer type) {
         if (type == null) {
-            Label label = createTextIcon("?", "#6B7280", 14);
-            StackPane pane = new StackPane(label);
-            pane.setMinSize(16, 16);
-            pane.setMaxSize(16, 16);
-            return pane;
+            return createFeatherIcon(Feather.SQUARE, MUTED_COLOR, 16);
         }
         return switch (type) {
             case 0 -> partitionIcon();
@@ -341,13 +182,7 @@ public class IconUtil {
             case 3 -> relationContainerIcon();
             case 4 -> taskNodeIcon();
             case 5 -> relationEdgeIcon();
-            default -> {
-                Label label = createTextIcon("?", "#6B7280", 14);
-                StackPane pane = new StackPane(label);
-                pane.setMinSize(16, 16);
-                pane.setMaxSize(16, 16);
-                yield pane;
-            }
+            default -> createFeatherIcon(Feather.SQUARE, MUTED_COLOR, 16);
         };
     }
 }

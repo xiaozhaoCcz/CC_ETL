@@ -249,15 +249,35 @@
 /* ============ 分隔符样式 ============ */
 
 .separator {
-    -fx-background-color: #E5E7EB;
+    -fx-background-color: #E2E8F0;
+    -fx-opacity: 1;
 }
 
 .separator:horizontal {
     -fx-pref-height: 1;
+    -fx-background-color: #E2E8F0;
 }
 
 .separator:vertical {
     -fx-pref-width: 1;
+    -fx-background-color: #E2E8F0;
+}
+
+/* SplitPane 分割线优化 */
+.split-pane-divider {
+    -fx-background-color: #E2E8F0;
+    -fx-pref-width: 3;
+    -fx-pref-height: 3;
+    -fx-background-radius: 2;
+}
+
+.split-pane-divider:horizontal,
+.split-pane-divider:vertical {
+    -fx-background-color: #E2E8F0;
+}
+
+.split-pane-divider:hover {
+    -fx-background-color: #CBD5F5;
 }
 
 /* ============ 工具提示样式 ============ */

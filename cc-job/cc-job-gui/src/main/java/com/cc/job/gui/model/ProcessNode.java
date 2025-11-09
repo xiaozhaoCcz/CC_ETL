@@ -14,9 +14,12 @@ import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.Pane;
+import javafx.scene.layout.HBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.util.Duration;
+import org.kordamp.ikonli.feather.Feather;
+import org.kordamp.ikonli.javafx.FontIcon;
 
 /**
  * 流程节点类，支持拖拽、右键菜单等功能
@@ -63,6 +66,7 @@ public class ProcessNode extends StackPane {
     private javafx.scene.shape.Rectangle background;
     private Label typeLabel;    // 类型标签引用
     private Label handlerLabel; // 处理器名称标签引用
+    private FontIcon typeIcon;  // 节点类型图标
     private Timeline locateAnimation;
     
     private static final double NODE_WIDTH = 180;
@@ -89,6 +93,9 @@ public class ProcessNode extends StackPane {
         this.setMaxSize(NODE_WIDTH, NODE_HEIGHT);
         this.setMinSize(NODE_WIDTH, NODE_HEIGHT);
         
+        // 根据节点类型设置边框颜色
+        updateBorderColorByType();
+        
         // 创建背景
         background = new javafx.scene.shape.Rectangle(NODE_WIDTH, NODE_HEIGHT);
         background.setFill(Color.WHITE);
@@ -104,16 +111,29 @@ public class ProcessNode extends StackPane {
         contentBox.setPadding(new Insets(10));
         contentBox.setMouseTransparent(true); // 内容不拦截鼠标事件
         
-        // 类型标签
+        // 创建类型标签容器（包含图标和文字）
+        HBox typeContainer = new HBox(6);
+        typeContainer.setAlignment(Pos.CENTER);
+        
+        // 创建节点类型图标
+        typeIcon = getNodeTypeIcon(type);
+        if (typeIcon != null) {
+            typeIcon.setIconSize(16);
+            typeContainer.getChildren().add(typeIcon);
+        }
+        
+        // 类型标签 - 增大字体大小
         typeLabel = new Label(type);
-        typeLabel.setStyle("-fx-font-size: 10; -fx-text-fill: #9CA3AF;");
+        typeLabel.setStyle("-fx-font-size: 14; -fx-font-weight: 600; -fx-text-fill: #374151;");
+        
+        typeContainer.getChildren().add(typeLabel);
         
         // 任务处理器名称
         handlerLabel = new Label(jobHandlerName);
         handlerLabel.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #1F2937;");
         handlerLabel.setMaxWidth(NODE_WIDTH - 20);
         
-        contentBox.getChildren().addAll(typeLabel, handlerLabel);
+        contentBox.getChildren().addAll(typeContainer, handlerLabel);
         
         // 创建独立的连接点容器
         // 容器与节点大小相同，连接点将定位在边缘外部
@@ -172,7 +192,7 @@ public class ProcessNode extends StackPane {
     
     private Circle createConnector() {
         Circle connector = new Circle(5); // 减小半径，使连接点更小巧
-        connector.setFill(Color.web("#8B5CF6"));
+        connector.setFill(Color.web(currentColor)); // 使用当前节点类型的颜色
         connector.setStroke(Color.WHITE);
         connector.setStrokeWidth(2);
         connector.setVisible(false); // 初始隐藏
@@ -183,18 +203,42 @@ public class ProcessNode extends StackPane {
         
         // 鼠标悬停效果 - 只改变颜色，不改变大小
         connector.setOnMouseEntered(e -> {
-            connector.setFill(Color.web("#A78BFA")); // 浅紫色
+            // 使用当前颜色的浅色版本
+            connector.setFill(Color.web(lightenColor(currentColor)));
             connector.setCursor(Cursor.CROSSHAIR);
             e.consume();
         });
         
         connector.setOnMouseExited(e -> {
-            connector.setFill(Color.web("#8B5CF6"));
+            connector.setFill(Color.web(currentColor));
             connector.setCursor(Cursor.DEFAULT);
             e.consume();
         });
         
         return connector;
+    }
+    
+    /**
+     * 将颜色变浅（用于悬停效果）
+     */
+    private String lightenColor(String color) {
+        if (color == null || !color.startsWith("#")) {
+            return "#A78BFA"; // 默认浅紫色
+        }
+        // 简单的颜色变浅处理，将RGB值增加
+        try {
+            int r = Integer.parseInt(color.substring(1, 3), 16);
+            int g = Integer.parseInt(color.substring(3, 5), 16);
+            int b = Integer.parseInt(color.substring(5, 7), 16);
+            
+            r = Math.min(255, r + 30);
+            g = Math.min(255, g + 30);
+            b = Math.min(255, b + 30);
+            
+            return String.format("#%02X%02X%02X", r, g, b);
+        } catch (Exception e) {
+            return "#A78BFA"; // 默认浅紫色
+        }
     }
     
     private void setupDragHandlers() {
@@ -492,6 +536,101 @@ public class ProcessNode extends StackPane {
         this.type = type;
         if (typeLabel != null) {
             typeLabel.setText(type);
+        }
+        // 更新边框颜色和图标
+        updateBorderColorByType();
+        updateTypeIcon();
+    }
+    
+    /**
+     * 根据节点类型更新边框颜色
+     */
+    private void updateBorderColorByType() {
+        if (type == null) {
+            currentColor = "#8B5CF6"; // 默认紫色
+            return;
+        }
+        
+        currentColor = switch (type) {
+            case "Bean" -> "#8B5CF6";      // 紫色
+            case "API" -> "#FF6B35";      // 橙色
+            case "SQL" -> "#3B82F6";      // 蓝色
+            case "Java" -> "#E74C3C";     // 红色
+            case "Shell" -> "#4A5568";    // 深灰色
+            case "Python" -> "#3776AB";   // 蓝色
+            case "PHP" -> "#777BB4";     // 紫色
+            case "Node" -> "#339933";     // 绿色
+            case "PS" -> "#0078D4";       // 蓝色
+            default -> "#8B5CF6";          // 默认紫色
+        };
+        
+        // 如果背景已创建，更新边框颜色
+        if (background != null) {
+            background.setStroke(Color.web(currentColor));
+        }
+        
+        // 更新连接点颜色
+        if (topConnector != null) {
+            topConnector.setFill(Color.web(currentColor));
+            bottomConnector.setFill(Color.web(currentColor));
+            leftConnector.setFill(Color.web(currentColor));
+            rightConnector.setFill(Color.web(currentColor));
+        }
+    }
+    
+    /**
+     * 根据节点类型获取图标
+     */
+    private FontIcon getNodeTypeIcon(String nodeType) {
+        if (nodeType == null) {
+            return createNodeIcon(Feather.CPU, "#4B5563", 18);
+        }
+        
+        return switch (nodeType) {
+            case "Bean" -> createNodeIcon(Feather.DATABASE, "#4B5563", 18);
+            case "API" -> createNodeIcon(Feather.GLOBE, "#EA580C", 18);
+            case "SQL" -> createNodeIcon(Feather.SERVER, "#2563EB", 18);
+            case "Java" -> createNodeIcon(Feather.CODE, "#DC2626", 18);
+            case "Shell" -> createNodeIcon(Feather.TERMINAL, "#475569", 18);
+            case "Python" -> createNodeIcon(Feather.FEATHER, "#1D4ED8", 18);
+            case "PHP" -> createNodeIcon(Feather.FILE_TEXT, "#6B21A8", 18);
+            case "Node" -> createNodeIcon(Feather.PACKAGE, "#15803D", 18);
+            case "PS" -> createNodeIcon(Feather.ZAP, "#0369A1", 18);
+            default -> createNodeIcon(Feather.CPU, "#4B5563", 18);
+        };
+    }
+    
+    /**
+     * 创建节点图标
+     */
+    private FontIcon createNodeIcon(Feather feather, String color, int size) {
+        FontIcon icon = new FontIcon(feather);
+        icon.setIconSize(size);
+        icon.setIconColor(Color.web(color));
+        return icon;
+    }
+    
+    /**
+     * 更新类型图标
+     */
+    private void updateTypeIcon() {
+        if (typeIcon != null && typeLabel != null) {
+            // 获取父容器
+            javafx.scene.Node parent = typeIcon.getParent();
+            if (parent instanceof HBox) {
+                HBox container = (HBox) parent;
+                container.getChildren().clear();
+                
+                // 创建新图标
+                FontIcon newIcon = getNodeTypeIcon(type);
+                if (newIcon != null) {
+                    newIcon.setIconSize(16);
+                    container.getChildren().addAll(newIcon, typeLabel);
+                    typeIcon = newIcon;
+                } else {
+                    container.getChildren().add(typeLabel);
+                }
+            }
         }
     }
     

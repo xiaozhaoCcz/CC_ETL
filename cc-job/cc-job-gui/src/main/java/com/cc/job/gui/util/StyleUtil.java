@@ -163,7 +163,7 @@ public class StyleUtil {
      */
     public static String card() {
         return String.format(
-            "-fx-background-color: white; " +
+            "-fx-background-color: -color-bg-elevated; " +
             "-fx-background-radius: %s; " +
             "-fx-effect: %s;",
             RADIUS_LG, SHADOW_MD
@@ -174,25 +174,19 @@ public class StyleUtil {
      * 侧边栏样式
      */
     public static String sidebar() {
-        return String.format(
-            "-fx-background-color: white; " +
-            "-fx-border-color: %s; " +
-            "-fx-border-width: 0 1 0 0;",
-            GRAY_200
-        );
+        return "-fx-background-color: -color-bg-elevated; " +
+               "-fx-border-color: -color-border-muted; " +
+               "-fx-border-width: 0 1 0 0;";
     }
     
     /**
      * 工具栏样式
      */
     public static String toolbar() {
-        return String.format(
-            "-fx-background-color: white; " +
-            "-fx-border-color: %s; " +
-            "-fx-border-width: 0 0 1 0; " +
-            "-fx-padding: 12 16;",
-            GRAY_200
-        );
+        return "-fx-background-color: -color-bg-elevated; " +
+               "-fx-border-color: -color-border-muted; " +
+               "-fx-border-width: 0 0 1 0; " +
+               "-fx-padding: 12 16;";
     }
     
     /**

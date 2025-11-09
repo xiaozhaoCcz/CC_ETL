@@ -6,6 +6,7 @@ import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -421,10 +422,7 @@ public class LogPanel extends VBox {
         statusIndicator.getChildren().addAll(indicator, statusLabel);
         
         // 分隔线
-        Separator separator1 = new Separator();
-        separator1.setOrientation(javafx.geometry.Orientation.VERTICAL);
-        separator1.setPrefHeight(20);
-        separator1.setStyle("-fx-background-color: #E5E7EB;");
+        Region separator1 = createInlineSeparator();
         
         // 过滤器
         filterCombo = new ComboBox<>();
@@ -455,10 +453,7 @@ public class LogPanel extends VBox {
         countLabel.setStyle("-fx-font-weight: 500;");
         
         // 分隔线
-        Separator separator2 = new Separator();
-        separator2.setOrientation(javafx.geometry.Orientation.VERTICAL);
-        separator2.setPrefHeight(20);
-        separator2.setStyle("-fx-background-color: #E5E7EB;");
+        Region separator2 = createInlineSeparator();
         
         // 清空按钮 - 扁平化设计，靠右排列
         clearBtn = createToolButton("清空", this::clearLogs);
@@ -479,6 +474,17 @@ public class LogPanel extends VBox {
         );
         
         return titleBar;
+    }
+
+    private Region createInlineSeparator() {
+        Region separator = new Region();
+        separator.setPrefWidth(1);
+        separator.setMinWidth(1);
+        separator.setMaxWidth(1);
+        separator.setPrefHeight(24);
+        separator.setMinHeight(18);
+        separator.setStyle("-fx-background-color: #E2E8F0;");
+        return separator;
     }
     
     private HBox createStatusBar() {

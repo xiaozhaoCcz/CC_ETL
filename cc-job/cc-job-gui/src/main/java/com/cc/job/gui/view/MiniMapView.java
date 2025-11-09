@@ -237,23 +237,7 @@ public class MiniMapView extends VBox {
         double offsetX = (MINIMAP_WIDTH - canvasWidth * scale) / 2;
         double offsetY = (MINIMAP_HEIGHT - canvasHeight * scale) / 2;
         
-        // 绘制节点
-        gc.setFill(Color.web("#8B5CF6"));
-        gc.setStroke(Color.web("#7C3AED"));
-        gc.setLineWidth(1);
-        
-        nodeCanvas.getNodes().forEach(node -> {
-            double x = node.getLayoutX() * scale + offsetX;
-            double y = node.getLayoutY() * scale + offsetY;
-            double w = node.getPrefWidth() * scale;
-            double h = node.getPrefHeight() * scale;
-            
-            // 绘制节点矩形
-            gc.fillRoundRect(x, y, w, h, 3, 3);
-            gc.strokeRoundRect(x, y, w, h, 3, 3);
-        });
-        
-        // 绘制连接线
+        // 先绘制连接线（在节点下方）
         gc.setStroke(Color.web("#6B7280"));
         gc.setLineWidth(1);
         
@@ -268,6 +252,22 @@ public class MiniMapView extends VBox {
                        conn.getTargetNode().getPrefHeight() * scale / 2;
             
             gc.strokeLine(x1, y1, x2, y2);
+        });
+        
+        // 再绘制节点（覆盖在线条上面）- 使用统一的颜色，不区分节点类型
+        gc.setFill(Color.WHITE);
+        gc.setStroke(Color.web("#9CA3AF")); // 统一的灰色边框
+        gc.setLineWidth(1);
+        
+        nodeCanvas.getNodes().forEach(node -> {
+            double x = node.getLayoutX() * scale + offsetX;
+            double y = node.getLayoutY() * scale + offsetY;
+            double w = node.getPrefWidth() * scale;
+            double h = node.getPrefHeight() * scale;
+            
+            // 绘制节点矩形 - 白色填充，统一灰色边框
+            gc.fillRoundRect(x, y, w, h, 3, 3);
+            gc.strokeRoundRect(x, y, w, h, 3, 3);
         });
         
         updateViewport();

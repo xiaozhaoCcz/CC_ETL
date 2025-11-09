@@ -12,6 +12,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.Region;
 import javafx.scene.shape.Circle;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
@@ -117,7 +118,7 @@ public class TopToolBar extends VBox {
             createIconButton(IconUtil.saveIcon(), "保存", "保存当前流程图", () -> safeCall(ToolBarCallback::onSave))
         );
         
-        Separator sep1 = createSeparator();
+        Region sep1 = createSeparator();
         
         // 编辑操作组
         undoButton = createIconButton(IconUtil.undoIcon(), "撤销", "撤销上一步操作", () -> safeCall(ToolBarCallback::onUndo));
@@ -126,7 +127,7 @@ public class TopToolBar extends VBox {
         redoButton.setDisable(true);
         HBox editGroup = createToolGroup(undoButton, redoButton);
         
-        Separator sep2 = createSeparator();
+        Region sep2 = createSeparator();
         
         // 视图操作组
         zoomLabel = new Label("100%");
@@ -146,7 +147,7 @@ public class TopToolBar extends VBox {
         // 用户信息区域
         HBox userInfoArea = createUserInfoArea();
         
-        Separator sep3 = createSeparator();
+        Region sep3 = createSeparator();
         
         // 运行操作组
         runGroup = createToolGroup();
@@ -330,12 +331,15 @@ public class TopToolBar extends VBox {
     /**
      * 创建分隔线
      */
-    private Separator createSeparator() {
-        Separator sep = new Separator();
-        sep.setOrientation(javafx.geometry.Orientation.VERTICAL);
-        sep.setPrefHeight(24);
-        sep.setStyle("-fx-background-color: " + StyleUtil.GRAY_200 + ";");
-        return sep;
+    private Region createSeparator() {
+        Region separator = new Region();
+        separator.setPrefWidth(1);
+        separator.setMinWidth(1);
+        separator.setMaxWidth(1);
+        separator.setPrefHeight(28);
+        separator.setMinHeight(20);
+        separator.setStyle("-fx-background-color: #E2E8F0;");
+        return separator;
     }
     
     private HBox createToolGroup(javafx.scene.Node... buttons) {
@@ -348,7 +352,7 @@ public class TopToolBar extends VBox {
     /**
      * 创建带图标的工具按钮
      */
-    private Button createIconButton(Label icon, String text, String tooltip, Runnable action) {
+    private Button createIconButton(javafx.scene.Node icon, String text, String tooltip, Runnable action) {
         Button btn = new Button(text, icon);
         btn.setGraphicTextGap(6);
         StyleUtil.applyIconButtonHover(btn);

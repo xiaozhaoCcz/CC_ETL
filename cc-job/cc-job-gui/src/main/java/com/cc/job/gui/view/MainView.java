@@ -46,6 +46,7 @@ public class MainView extends BorderPane {
     private javafx.scene.layout.VBox leftArea;
     private boolean treeViewVisible = true;
     private boolean miniMapVisible = true;
+    private boolean suppressNextTaskLoad = false;
 
     private ScrollPane scrollPane;
     private double currentZoom = 1.0;
@@ -122,7 +123,7 @@ public class MainView extends BorderPane {
         scrollPane = new ScrollPane(canvas);
         scrollPane.setFitToWidth(false);
         scrollPane.setFitToHeight(false);
-        scrollPane.setStyle("-fx-background-color: #F3F4F6;");
+        scrollPane.getStyleClass().add("canvas-scroller");
         scrollPane.setPannable(true);
 
         // 设置滚动条策略：只在需要时显示
@@ -174,12 +175,18 @@ public class MainView extends BorderPane {
     private void setupCallbacks() {
         // 树形视图关闭回调
         treeView.setOnClose(() -> {
+            if (treeViewDetachable != null && treeViewDetachable.isDetached()) {
+                treeViewDetachable.reattach();
+            }
             treeViewVisible = false;
             updateLeftSidebar();
         });
 
         // 小地图关闭回调
         miniMap.setOnClose(() -> {
+            if (miniMapDetachable != null && miniMapDetachable.isDetached()) {
+                miniMapDetachable.reattach();
+            }
             miniMapVisible = false;
             updateLeftSidebar();
         });
@@ -349,6 +356,15 @@ public class MainView extends BorderPane {
      * 任务选择回调（带详细信息）
      */
     private void onTaskSelectedWithDetails(Long taskId, String taskName, Integer type) {
+        if (suppressNextTaskLoad) {
+            suppressNextTaskLoad = false;
+            Long currentTaskGroupId = usePageStoreHook().getCurrentTaskGroupId();
+            if (taskId != null && currentTaskGroupId != null && taskId.equals(currentTaskGroupId)) {
+                logPanel.debug("跳过任务组重新加载（保持当前位置）: " + taskName);
+                return;
+            }
+        }
+
         logPanel.info("选择节点: " + taskName + " [类型: " + getTypeNameByType(type) + "]");
 
         // ⚠️ 重要：只有任务组（type=1）才添加到导航栏，过滤掉分区（type=0）等其他节点
@@ -1414,8 +1430,9 @@ public class MainView extends BorderPane {
                         // 重新设置选择回调
                         setupTreeViewCallback();
 
-                        // 尝试重新选中当前任务组
+                        // 尝试重新选中当前任务组（避免触发重新加载）
                         if (currentTaskGroupId != null) {
+                            suppressNextTaskLoad = true;
                             treeView.selectTaskGroupById(currentTaskGroupId);
                         }
 
