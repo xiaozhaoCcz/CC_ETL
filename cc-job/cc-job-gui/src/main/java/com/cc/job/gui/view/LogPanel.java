@@ -17,7 +17,9 @@ import javafx.scene.text.TextFlow;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -39,10 +41,13 @@ public class LogPanel extends VBox {
     private Button clearBtn;
     private Button exportBtn;
     private ComboBox<String> filterCombo;
+    private TextField searchField;
+    private String currentSearchKeyword = "";
     
     // 当前活动标签页的日志数据
     private Map<Long, LogTabData> tabDataMap;
     
+    @SuppressWarnings("unused")
     private Runnable onDetach;  // 弹出回调
     private static final DateTimeFormatter TIME_FORMAT = 
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
@@ -54,11 +59,12 @@ public class LogPanel extends VBox {
         ScrollPane scrollPane;
         TextFlow textFlow;
         int logCount = 0;
+        int filteredCount = 0;
         String status = "就绪";
         String statusColor = "#10B981";
+        private final List<LogEntry> entries = new ArrayList<>();
         
         LogTabData() {
-            // 创建 TextFlow 用于显示富文本
             textFlow = new TextFlow();
             textFlow.setStyle(
                 "-fx-background-color: #FFFFFF; " +
@@ -66,7 +72,6 @@ public class LogPanel extends VBox {
             );
             textFlow.setLineSpacing(2);
             
-            // 创建 ScrollPane 包装 TextFlow
             scrollPane = new ScrollPane(textFlow);
             scrollPane.setFitToWidth(true);
             scrollPane.setStyle(
@@ -76,7 +81,6 @@ public class LogPanel extends VBox {
             scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
             scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
             
-            // 延迟设置滚动条样式（需要在添加到场景图后）
             Platform.runLater(() -> {
                 try {
                     javafx.scene.Node scrollBar = scrollPane.lookup(".scroll-bar:vertical");
@@ -102,37 +106,125 @@ public class LogPanel extends VBox {
                             "-fx-background-radius: 2;"
                         );
                     }
-                } catch (Exception e) {
-                    // 忽略样式设置失败
+                } catch (Exception ignored) {
                 }
             });
             
-            appendWelcomeMessage();
+            render("");
         }
         
-        private void appendWelcomeMessage() {
-            Text welcome1 = createText("╔════════════════════════════════════════════════════════════════╗\n", "#9CA3AF");
-            Text welcome2 = createText("║                     NodeFx 流程节点编辑器                       ║\n", "#9CA3AF");
-            Text welcome3 = createText("║                      日志监控系统 v1.0                         ║\n", "#9CA3AF");
-            Text welcome4 = createText("╚════════════════════════════════════════════════════════════════╝\n\n", "#9CA3AF");
-            Text welcome5 = createText("[i] 系统就绪，等待任务启动...\n", "#6B7280");
-            Text welcome6 = createText("[i] 所有操作日志将实时显示在此处\n\n", "#6B7280");
-            Text welcome7 = createText("─────────────────────────────────────────────────────────────────\n\n", "#9CA3AF");
+        void addEntry(LogEntry entry) {
+            entries.add(entry);
+            logCount = entries.size();
+        }
+        
+        void clearEntries() {
+            entries.clear();
+            logCount = 0;
+        }
+        
+        void render(String keyword) {
+            String normalized = keyword == null ? "" : keyword.trim().toLowerCase();
+            boolean hasKeyword = !normalized.isEmpty();
             
-            textFlow.getChildren().addAll(welcome1, welcome2, welcome3, welcome4, welcome5, welcome6, welcome7);
+            textFlow.getChildren().clear();
+            
+            if (!hasKeyword) {
+                textFlow.getChildren().addAll(createWelcomeTexts());
+            }
+            
+            int matches = 0;
+            if (entries.isEmpty()) {
+                if (hasKeyword) {
+                    textFlow.getChildren().add(createStyledText("暂无日志可供搜索\n", "#9CA3AF"));
+                }
+            } else {
+                for (LogEntry entry : entries) {
+                    if (!hasKeyword || entry.matches(normalized)) {
+                        textFlow.getChildren().addAll(entry.toTexts());
+                        matches++;
+                    }
+                }
+                if (hasKeyword && matches == 0) {
+                    textFlow.getChildren().add(createStyledText("未找到匹配的日志记录\n", "#9CA3AF"));
+                }
+            }
+            
+            filteredCount = hasKeyword ? matches : entries.size();
+            
+            if (hasKeyword) {
+                Platform.runLater(() -> scrollPane.setVvalue(0));
+            } else {
+                scrollToBottom();
+            }
         }
         
-        private Text createText(String content, String color) {
-            Text text = new Text(content);
-            text.setFill(Color.web(color));
-            text.setFont(Font.font("Consolas", FontWeight.NORMAL, 13));
-            return text;
+        private List<Text> createWelcomeTexts() {
+            List<Text> texts = new ArrayList<>();
+            texts.add(createStyledText("╔════════════════════════════════════════════════════════════════╗\n", "#9CA3AF"));
+            texts.add(createStyledText("║                     NodeFx 流程节点编辑器                       ║\n", "#9CA3AF"));
+            texts.add(createStyledText("║                      日志监控系统 v1.0                         ║\n", "#9CA3AF"));
+            texts.add(createStyledText("╚════════════════════════════════════════════════════════════════╝\n\n", "#9CA3AF"));
+            texts.add(createStyledText("[i] 系统就绪，等待任务启动...\n", "#6B7280"));
+            texts.add(createStyledText("[i] 所有操作日志将实时显示在此处\n\n", "#6B7280"));
+            texts.add(createStyledText("─────────────────────────────────────────────────────────────────\n\n", "#9CA3AF"));
+            return texts;
         }
         
         private void scrollToBottom() {
-            Platform.runLater(() -> {
-                scrollPane.setVvalue(1.0);
-            });
+            Platform.runLater(() -> scrollPane.setVvalue(1.0));
+        }
+    }
+    
+    private static class LogEntry {
+        final String timestamp;
+        final String icon;
+        final String level;
+        final String levelColor;
+        final String message;
+        final String messageColor;
+        final boolean raw;
+        
+        LogEntry(String timestamp,
+                 String icon,
+                 String level,
+                 String levelColor,
+                 String message,
+                 String messageColor,
+                 boolean raw) {
+            this.timestamp = timestamp;
+            this.icon = icon;
+            this.level = level;
+            this.levelColor = levelColor;
+            this.message = message;
+            this.messageColor = messageColor;
+            this.raw = raw;
+        }
+        
+        List<Text> toTexts() {
+            List<Text> nodes = new ArrayList<>();
+            if (raw) {
+                String content = message.endsWith("\n") ? message : message + "\n";
+                nodes.add(createStyledText(content, messageColor));
+            } else {
+                nodes.add(createStyledText("[" + timestamp + "] ", "#9CA3AF"));
+                nodes.add(createStyledText(icon + " ", levelColor));
+                String levelPadded = String.format("%-7s", level);
+                nodes.add(createStyledText(levelPadded + " │ ", levelColor));
+                nodes.add(createStyledText(message + "\n", messageColor));
+            }
+            return nodes;
+        }
+        
+        boolean matches(String keywordLower) {
+            if (keywordLower == null || keywordLower.isEmpty()) {
+                return true;
+            }
+            String baseMessage = message == null ? "" : message;
+            String target = raw
+                ? baseMessage
+                : ((timestamp != null ? timestamp : "") + " " + (level != null ? level : "") + " " + baseMessage);
+            return target != null && target.toLowerCase().contains(keywordLower);
         }
     }
     
@@ -293,10 +385,12 @@ public class LogPanel extends VBox {
             }
         }
         
+        @SuppressWarnings("unused")
         public Long getTaskGroupId() {
             return taskGroupId;
         }
         
+        @SuppressWarnings("unused")
         public String getTaskGroupName() {
             return taskGroupName;
         }
@@ -346,6 +440,9 @@ public class LogPanel extends VBox {
         HBox statusBar = createStatusBar();
         
         getChildren().addAll(tabBar, titleBar, logContainer, statusBar);
+        
+        // 默认显示系统日志
+        switchToTaskGroup(null);
     }
     
     /**
@@ -442,6 +539,25 @@ public class LogPanel extends VBox {
             "-fx-padding: 0 8 0 8;"
         );
         
+        // 搜索框
+        searchField = new TextField();
+        searchField.setPromptText("搜索日志...");
+        searchField.setPrefWidth(200);
+        searchField.setStyle(
+            "-fx-background-color: #FFFFFF; " +
+            "-fx-text-fill: #374151; " +
+            "-fx-font-size: 12px; " +
+            "-fx-border-color: #D1D5DB; " +
+            "-fx-border-width: 1; " +
+            "-fx-border-radius: 4; " +
+            "-fx-background-radius: 4; " +
+            "-fx-padding: 4 10 4 28; " +
+            "-fx-background-image: url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" fill=\"%236B7280\" viewBox=\"0 0 24 24\"><path d=\"M10 2a8 8 0 105.293 14.293l4.147 4.147 1.414-1.414-4.147-4.147A8 8 0 0010 2zm0 2a6 6 0 110 12 6 6 0 010-12z\"/></svg>'); " +
+            "-fx-background-repeat: no-repeat; " +
+            "-fx-background-position: 8px center;"
+        );
+        searchField.textProperty().addListener((obs, oldVal, newVal) -> applySearchFilter(newVal));
+        
         // 空白区域
         HBox spacer = new HBox();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -466,6 +582,7 @@ public class LogPanel extends VBox {
             statusIndicator,
             separator1,
             filterCombo,
+            searchField,
             spacer,
             countLabel,
             separator2,
@@ -611,6 +728,7 @@ public class LogPanel extends VBox {
             if (tabData != null) {
                 logContainer.getChildren().clear();
                 logContainer.getChildren().add(tabData.scrollPane);
+                tabData.render(currentSearchKeyword);
                 
                 // 更新状态栏
                 updateStatusBar(tabData);
@@ -649,9 +767,22 @@ public class LogPanel extends VBox {
      */
     private void updateStatusBar(LogTabData tabData) {
         if (tabData != null) {
-            countLabel.setText(tabData.logCount + " 条日志");
+            if (currentSearchKeyword != null && !currentSearchKeyword.isBlank()) {
+                countLabel.setText("匹配 " + tabData.filteredCount + " / 共 " + tabData.logCount + " 条");
+            } else {
+                countLabel.setText(tabData.logCount + " 条日志");
+            }
             statusLabel.setText(tabData.status);
             statusLabel.setTextFill(Color.web(tabData.statusColor));
+        }
+    }
+    
+    private void applySearchFilter(String keyword) {
+        currentSearchKeyword = keyword == null ? "" : keyword.trim();
+        LogTabData tabData = getCurrentTabData();
+        if (tabData != null) {
+            tabData.render(currentSearchKeyword);
+            updateStatusBar(tabData);
         }
     }
     
@@ -660,6 +791,11 @@ public class LogPanel extends VBox {
      */
     private LogTabData getCurrentTabData() {
         return tabDataMap.get(currentTaskGroupId);
+    }
+    
+    private boolean isCurrentTab(Long taskGroupId) {
+        return (taskGroupId == null && currentTaskGroupId == null) ||
+               (taskGroupId != null && taskGroupId.equals(currentTaskGroupId));
     }
     
     /**
@@ -677,63 +813,63 @@ public class LogPanel extends VBox {
      * 添加日志 - INFO级别（针对特定任务组）
      */
     public void info(Long taskGroupId, String message) {
-        appendLog(taskGroupId, "INFO", message, "#10B981");
+        appendLog(taskGroupId, "INFO", message);
     }
     
     /**
      * 添加日志 - INFO级别（添加到当前标签页）
      */
     public void info(String message) {
-        appendLog(null, "INFO", message, "#10B981");
+        appendLog(null, "INFO", message);
     }
     
     /**
      * 添加日志 - WARN级别
      */
     public void warn(String message) {
-        appendLog(null, "WARN", message, "#F59E0B");
+        appendLog(null, "WARN", message);
     }
     
     /**
      * 添加日志 - WARN级别（针对特定任务组）
      */
     public void warn(Long taskGroupId, String message) {
-        appendLog(taskGroupId, "WARN", message, "#F59E0B");
+        appendLog(taskGroupId, "WARN", message);
     }
     
     /**
      * 添加日志 - ERROR级别
      */
     public void error(String message) {
-        appendLog(null, "ERROR", message, "#EF4444");
+        appendLog(null, "ERROR", message);
     }
     
     /**
      * 添加日志 - ERROR级别（针对特定任务组）
      */
     public void error(Long taskGroupId, String message) {
-        appendLog(taskGroupId, "ERROR", message, "#EF4444");
+        appendLog(taskGroupId, "ERROR", message);
     }
     
     /**
      * 添加日志 - DEBUG级别
      */
     public void debug(String message) {
-        appendLog(null, "DEBUG", message, "#8B5CF6");
+        appendLog(null, "DEBUG", message);
     }
     
     /**
      * 添加日志 - SUCCESS级别
      */
     public void success(String message) {
-        appendLog(null, "SUCCESS", message, "#10B981");
+        appendLog(null, "SUCCESS", message);
     }
     
     /**
      * 添加日志 - SUCCESS级别（针对特定任务组）
      */
     public void success(Long taskGroupId, String message) {
-        appendLog(taskGroupId, "SUCCESS", message, "#10B981");
+        appendLog(taskGroupId, "SUCCESS", message);
     }
     
     /**
@@ -744,53 +880,48 @@ public class LogPanel extends VBox {
     public void appendText(Long taskGroupId, String text) {
         Platform.runLater(() -> {
             LogTabData tabData = getTabData(taskGroupId);
-            if (tabData != null) {
-                // 智能检测错误信息
-                String lowerText = text.toLowerCase();
-                boolean isError = lowerText.contains("错误") || 
-                                 lowerText.contains("error") || 
-                                 lowerText.contains("失败") || 
-                                 lowerText.contains("fail") ||
-                                 lowerText.contains("exception") ||
-                                 lowerText.contains("异常") ||
-                                 lowerText.contains("执行结果:失败") ||
-                                 lowerText.contains("任务执行失败") ||
-                                 lowerText.contains("任务触发失败");
-                
-                // 检测警告信息
-                boolean isWarn = lowerText.contains("警告") || 
-                               lowerText.contains("warn") ||
-                               lowerText.contains("⚠");
-                
-                // 检测成功信息
-                boolean isSuccess = lowerText.contains("成功") || 
-                                  lowerText.contains("success") ||
-                                  lowerText.contains("执行结果:成功") ||
-                                  lowerText.contains("任务执行成功");
-                
-                String color;
-                if (isError) {
-                    color = "#DC2626"; // 红色（调整为适合白色背景的深红色）
-                } else if (isWarn) {
-                    color = "#D97706"; // 黄色（调整为适合白色背景的深黄色）
-                } else if (isSuccess) {
-                    color = "#059669"; // 绿色（调整为适合白色背景的深绿色）
-                } else {
-                    color = "#374151"; // 默认深灰色（适合白色背景）
-                }
-                
-                Text textNode = createStyledText(text, color);
-                tabData.textFlow.getChildren().add(textNode);
-                tabData.scrollToBottom();
-                
-                // 更新状态
-                tabData.status = "运行中";
-                tabData.statusColor = "#10B981";
-                
-                // 如果当前显示的是这个标签页，更新状态栏
-                if (taskGroupId != null && taskGroupId.equals(currentTaskGroupId)) {
-                    updateStatusBar(tabData);
-                }
+            if (tabData == null || text == null) {
+                return;
+            }
+            
+            String lowerText = text.toLowerCase();
+            boolean isError = lowerText.contains("错误") ||
+                              lowerText.contains("error") ||
+                              lowerText.contains("失败") ||
+                              lowerText.contains("fail") ||
+                              lowerText.contains("exception") ||
+                              lowerText.contains("异常") ||
+                              lowerText.contains("执行结果:失败") ||
+                              lowerText.contains("任务执行失败") ||
+                              lowerText.contains("任务触发失败");
+            boolean isWarn = lowerText.contains("警告") ||
+                             lowerText.contains("warn") ||
+                             lowerText.contains("⚠");
+            boolean isSuccess = lowerText.contains("成功") ||
+                                lowerText.contains("success") ||
+                                lowerText.contains("执行结果:成功") ||
+                                lowerText.contains("任务执行成功");
+            
+            String color;
+            if (isError) {
+                color = "#DC2626";
+            } else if (isWarn) {
+                color = "#D97706";
+            } else if (isSuccess) {
+                color = "#059669";
+            } else {
+                color = "#374151";
+            }
+            
+            LogEntry entry = new LogEntry(null, null, "TEXT", color, text, color, true);
+            tabData.addEntry(entry);
+            
+            tabData.status = "运行中";
+            tabData.statusColor = "#10B981";
+            
+            if (isCurrentTab(taskGroupId)) {
+                tabData.render(currentSearchKeyword);
+                updateStatusBar(tabData);
             }
         });
     }
@@ -798,7 +929,7 @@ public class LogPanel extends VBox {
     /**
      * 创建带样式的文本节点
      */
-    private Text createStyledText(String content, String color) {
+    private static Text createStyledText(String content, String color) {
         Text text = new Text(content);
         text.setFill(Color.web(color));
         text.setFont(Font.font("Consolas", FontWeight.NORMAL, 13));
@@ -813,7 +944,7 @@ public class LogPanel extends VBox {
         appendText(null, text);
     }
     
-    private void appendLog(Long taskGroupId, String level, String message, String colorHex) {
+    private void appendLog(Long taskGroupId, String level, String message) {
         Platform.runLater(() -> {
             LogTabData tabData = getTabData(taskGroupId);
             if (tabData == null) {
@@ -821,7 +952,6 @@ public class LogPanel extends VBox {
             }
             
             String timestamp = LocalDateTime.now().format(TIME_FORMAT);
-            String levelPadded = String.format("%-7s", level);
             
             // 根据级别选择图标和颜色 - 扁平化设计
             String icon;
@@ -861,25 +991,16 @@ public class LogPanel extends VBox {
                     break;
             }
             
-            // 创建带颜色的文本节点
-            Text timestampText = createStyledText("[" + timestamp + "] ", "#9CA3AF"); // 时间戳：灰色
-            Text iconText = createStyledText(icon + " ", levelColor); // 图标：级别颜色
-            Text levelText = createStyledText(levelPadded + " │ ", levelColor); // 级别：级别颜色
-            Text messageText = createStyledText(message + "\n", messageColor); // 消息：消息颜色
-            
-            tabData.textFlow.getChildren().addAll(timestampText, iconText, levelText, messageText);
-            
-            tabData.logCount++;
-            
-            // 自动滚动到底部
-            tabData.scrollToBottom();
+            LogEntry entry = new LogEntry(timestamp, icon, level, levelColor, message, messageColor, false);
+            tabData.addEntry(entry);
             
             // 更新状态
             tabData.status = "运行中";
             tabData.statusColor = "#10B981";
             
             // 如果当前显示的是这个标签页，更新状态栏
-            if (taskGroupId == null || taskGroupId.equals(currentTaskGroupId)) {
+            if (isCurrentTab(taskGroupId)) {
+                tabData.render(currentSearchKeyword);
                 updateStatusBar(tabData);
             }
         });
@@ -892,9 +1013,10 @@ public class LogPanel extends VBox {
         Platform.runLater(() -> {
             LogTabData tabData = getCurrentTabData();
             if (tabData != null) {
-                tabData.textFlow.getChildren().clear();
-                tabData.logCount = 0;
-                tabData.appendWelcomeMessage();
+                tabData.clearEntries();
+                tabData.status = "就绪";
+                tabData.statusColor = "#10B981";
+                tabData.render(currentSearchKeyword);
                 updateStatusBar(tabData);
                 info("日志已清空");
             }
@@ -930,9 +1052,22 @@ public class LogPanel extends VBox {
         LogTabData tabData = getCurrentTabData();
         if (tabData != null) {
             StringBuilder sb = new StringBuilder();
-            for (javafx.scene.Node node : tabData.textFlow.getChildren()) {
-                if (node instanceof Text) {
-                    sb.append(((Text) node).getText());
+            for (LogEntry entry : tabData.entries) {
+                if (entry.raw) {
+                    sb.append(entry.message);
+                    if (!entry.message.endsWith("\n")) {
+                        sb.append("\n");
+                    }
+                } else {
+                    sb.append("[")
+                      .append(entry.timestamp)
+                      .append("] ")
+                      .append(entry.icon)
+                      .append(" ")
+                      .append(String.format("%-7s", entry.level))
+                      .append(" │ ")
+                      .append(entry.message)
+                      .append("\n");
                 }
             }
             return sb.toString();
