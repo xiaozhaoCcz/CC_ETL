@@ -1,9 +1,9 @@
 package com.cc.job.gui.view;
 
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
-import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -107,6 +107,11 @@ public class NewPartitionDialog extends Dialog<String> {
         // 设置对话框大小
         getDialogPane().setPrefWidth(450);
         getDialogPane().setPrefHeight(200);
+        getDialogPane().setMinWidth(360);
+        getDialogPane().setMinHeight(180);
+        getDialogPane().setMaxWidth(Double.MAX_VALUE);
+        getDialogPane().setMaxHeight(Double.MAX_VALUE);
+        setResizable(true);
         
         // 设置对话框样式
         getDialogPane().setStyle(
@@ -144,6 +149,15 @@ public class NewPartitionDialog extends Dialog<String> {
                 "-fx-cursor: hand;"
             );
         }
+        
+        Platform.runLater(() -> {
+            Stage stage = (Stage) getDialogPane().getScene().getWindow();
+            if (stage != null) {
+                stage.setResizable(true);
+                stage.setMinWidth(360);
+                stage.setMinHeight(180);
+            }
+        });
     }
     
     /**

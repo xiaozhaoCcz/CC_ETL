@@ -4,15 +4,12 @@ import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.form.JobInfoForm;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
-import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 新建/编辑任务组对话框
@@ -125,7 +122,7 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
         grid.setPadding(new Insets(15));
         
         // 执行器
-        Label jobGroupLabel = createRequiredLabel("执行器");
+        Label jobGroupLabel = createFormLabel("执行器", true);
         jobGroupCombo = new ComboBox<>();
         jobGroupCombo.setPrefWidth(350);
         jobGroupCombo.setPromptText("请选择执行器");
@@ -146,19 +143,19 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
         });
         
         // 任务描述
-        Label jobDescLabel = createRequiredLabel("任务描述");
+        Label jobDescLabel = createFormLabel("任务描述", true);
         jobDescField = new TextField();
         jobDescField.setPrefWidth(350);
         jobDescField.setPromptText("请输入任务描述");
         
         // 负责人
-        Label authorLabel = createRequiredLabel("负责人");
+        Label authorLabel = createFormLabel("负责人", true);
         authorField = new TextField();
         authorField.setPrefWidth(350);
         authorField.setPromptText("请输入负责人");
         
         // 报警邮件
-        Label alarmEmailLabel = new Label("报警邮件");
+        Label alarmEmailLabel = createFormLabel("报警邮件", false);
         alarmEmailField = new TextField();
         alarmEmailField.setPrefWidth(350);
         alarmEmailField.setPromptText("请输入报警邮件地址");
@@ -189,7 +186,7 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
         grid.setPadding(new Insets(15));
         
         // 调度类型
-        Label scheduleTypeLabel = createRequiredLabel("调度类型");
+        Label scheduleTypeLabel = createFormLabel("调度类型", true);
         scheduleTypeCombo = new ComboBox<>();
         scheduleTypeCombo.setPrefWidth(350);
         scheduleTypeCombo.setPromptText("请选择调度类型");
@@ -197,7 +194,7 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
         scheduleTypeCombo.setValue(ScheduleType.CRON);
         
         // CRON表达式
-        Label scheduleConfLabel = createRequiredLabel("CRON表达式");
+        Label scheduleConfLabel = createFormLabel("CRON表达式", true);
         scheduleConfField = new TextField();
         scheduleConfField.setPrefWidth(350);
         scheduleConfField.setPromptText("请输入cron表达式");
@@ -224,7 +221,7 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
         grid.setPadding(new Insets(15));
         
         // 路由策略
-        Label routeStrategyLabel = createRequiredLabel("路由策略");
+        Label routeStrategyLabel = createFormLabel("路由策略", true);
         routeStrategyCombo = new ComboBox<>();
         routeStrategyCombo.setPrefWidth(350);
         routeStrategyCombo.setPromptText("请选择路由策略");
@@ -232,13 +229,13 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
         routeStrategyCombo.setValue(RouteStrategy.FIRST);
         
         // 子任务ID
-        Label childJobidLabel = new Label("子任务ID");
+        Label childJobidLabel = createFormLabel("子任务ID", false);
         childJobidField = new TextField();
         childJobidField.setPrefWidth(350);
         childJobidField.setPromptText("请输入子任务ID");
         
         // 调度过期策略
-        Label misfireStrategyLabel = createRequiredLabel("调度过期策略");
+        Label misfireStrategyLabel = createFormLabel("调度过期策略", true);
         misfireStrategyCombo = new ComboBox<>();
         misfireStrategyCombo.setPrefWidth(350);
         misfireStrategyCombo.setPromptText("请选择过期策略");
@@ -246,7 +243,7 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
         misfireStrategyCombo.setValue(MisfireStrategy.DO_NOTHING);
         
         // 阻塞处理策略
-        Label blockStrategyLabel = createRequiredLabel("阻塞处理策略");
+        Label blockStrategyLabel = createFormLabel("阻塞处理策略", true);
         blockStrategyCombo = new ComboBox<>();
         blockStrategyCombo.setPrefWidth(350);
         blockStrategyCombo.setPromptText("请选择阻塞策略");
@@ -254,14 +251,14 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
         blockStrategyCombo.setValue(BlockStrategy.SERIAL_EXECUTION);
         
         // 任务超时时间
-        Label timeoutLabel = new Label("任务超时时间(秒)");
+        Label timeoutLabel = createFormLabel("任务超时时间(秒)", false);
         executorTimeoutField = new TextField();
         executorTimeoutField.setPrefWidth(350);
         executorTimeoutField.setPromptText("请输入超时时间（秒）");
         executorTimeoutField.setText("300"); // 默认300秒
         
         // 失败重试次数
-        Label retryLabel = new Label("失败重试次数");
+        Label retryLabel = createFormLabel("失败重试次数", false);
         executorFailRetryCountField = new TextField();
         executorFailRetryCountField.setPrefWidth(350);
         executorFailRetryCountField.setPromptText("请输入重试次数");
@@ -311,12 +308,18 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
     }
     
     /**
-     * 创建必填标签
+     * 创建表单标签
      */
-    private Label createRequiredLabel(String text) {
-        Label label = new Label(text + " *");
+    private Label createFormLabel(String text, boolean required) {
+        String displayText = required ? text + " *" : text;
+        Label label = new Label(displayText);
         label.setStyle("-fx-text-fill: #374151; -fx-font-size: 13;");
-        label.setPrefWidth(120);
+        label.setMinWidth(140);
+        label.setPrefWidth(140);
+        label.setMaxWidth(140);
+        label.setWrapText(false);
+        label.setTextOverrun(OverrunStyle.ELLIPSIS);
+        label.setTooltip(new Tooltip(displayText));
         return label;
     }
     
@@ -480,6 +483,11 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
     private void styleDialog() {
         getDialogPane().setPrefWidth(850);
         getDialogPane().setPrefHeight(650);
+        getDialogPane().setMinWidth(780);
+        getDialogPane().setMinHeight(560);
+        getDialogPane().setMaxWidth(Double.MAX_VALUE);
+        getDialogPane().setMaxHeight(Double.MAX_VALUE);
+        setResizable(true);
         
         getDialogPane().setStyle(
             "-fx-background-color: #F9FAFB; " +
@@ -514,6 +522,15 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
                 "-fx-cursor: hand;"
             );
         }
+        
+        Platform.runLater(() -> {
+            Stage stage = (Stage) getDialogPane().getScene().getWindow();
+            if (stage != null) {
+                stage.setResizable(true);
+                stage.setMinWidth(780);
+                stage.setMinHeight(560);
+            }
+        });
     }
     
     // 枚举类型定义

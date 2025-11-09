@@ -4,11 +4,14 @@ import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.form.JobInfoForm;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
+import javafx.scene.control.OverrunStyle;
+import javafx.scene.control.Tooltip;
 import javafx.scene.control.cell.TextFieldTableCell;
 import javafx.scene.layout.*;
 import javafx.stage.Modality;
@@ -148,7 +151,7 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         grid.setPadding(new Insets(15));
         
         // 执行器
-        Label jobGroupLabel = createRequiredLabel("执行器");
+        Label jobGroupLabel = createFormLabel("执行器", true);
         jobGroupCombo = new ComboBox<>();
         jobGroupCombo.setPrefWidth(300);
         jobGroupCombo.setPromptText("请选择执行器");
@@ -169,19 +172,19 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         });
         
         // 负责人
-        Label authorLabel = createRequiredLabel("负责人");
+        Label authorLabel = createFormLabel("负责人", true);
         authorField = new TextField();
         authorField.setPrefWidth(300);
         authorField.setPromptText("请输入负责人姓名");
         
         // 任务描述
-        Label jobDescLabel = createRequiredLabel("任务描述");
+        Label jobDescLabel = createFormLabel("任务描述", true);
         jobDescField = new TextField();
         jobDescField.setPrefWidth(615);
         jobDescField.setPromptText("请输入任务描述");
         
         // 报警邮件
-        Label alarmEmailLabel = new Label("报警邮件");
+        Label alarmEmailLabel = createFormLabel("报警邮件", false);
         alarmEmailField = new TextField();
         alarmEmailField.setPrefWidth(615);
         alarmEmailField.setPromptText("请输入报警邮件地址，多个用逗号分隔");
@@ -213,7 +216,7 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         grid.setPadding(new Insets(15));
         
         // 运行模式
-        Label glueTypeLabel = createRequiredLabel("运行模式");
+        Label glueTypeLabel = createFormLabel("运行模式", true);
         glueTypeCombo = new ComboBox<>();
         glueTypeCombo.setPrefWidth(300);
         glueTypeCombo.setPromptText("请选择运行模式");
@@ -221,13 +224,13 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         glueTypeCombo.setValue(GlueType.BEAN);
         
         // JobHandler
-        Label executorHandlerLabel = createRequiredLabel("JobHandler");
+        Label executorHandlerLabel = createFormLabel("JobHandler", true);
         executorHandlerField = new TextField();
         executorHandlerField.setPrefWidth(300);
         executorHandlerField.setPromptText("请输入JobHandler名称");
         
         // 任务参数
-        executorParamLabel = new Label("任务参数");
+        executorParamLabel = createFormLabel("任务参数", false);
         executorParamArea = new TextArea();
         executorParamArea.setPrefWidth(615);
         executorParamArea.setPrefRowCount(4);
@@ -258,14 +261,14 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         grid.setPadding(new Insets(15));
         
         // 任务超时时间
-        Label timeoutLabel = new Label("任务超时时间(秒)");
+        Label timeoutLabel = createFormLabel("任务超时时间(秒)", false);
         executorTimeoutField = new TextField();
         executorTimeoutField.setPrefWidth(300);
         executorTimeoutField.setPromptText("单位：秒");
         executorTimeoutField.setText("300");
         
         // 任务失败策略
-        Label blockStrategyLabel = createRequiredLabel("任务失败策略");
+        Label blockStrategyLabel = createFormLabel("任务失败策略", true);
         blockStrategyCombo = new ComboBox<>();
         blockStrategyCombo.setPrefWidth(300);
         blockStrategyCombo.setPromptText("请选择失败策略");
@@ -273,7 +276,7 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         blockStrategyCombo.setValue(BlockStrategy.SERIAL_EXECUTION);
         
         // 任务重试次数
-        Label retryLabel = new Label("任务重试次数");
+        Label retryLabel = createFormLabel("任务重试次数", false);
         executorFailRetryCountSpinner = new Spinner<>(0, 10, 0);
         executorFailRetryCountSpinner.setPrefWidth(300);
         executorFailRetryCountSpinner.setEditable(true);
@@ -312,13 +315,13 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         grid.setVgap(15);
         grid.setPadding(new Insets(15));
 
-        Label reqTypeLabel = createRequiredLabel("请求类型");
+        Label reqTypeLabel = createFormLabel("请求类型", true);
         reqTypeCombo = new ComboBox<>();
         reqTypeCombo.getItems().addAll("GET", "POST", "PUT", "DELETE");
         reqTypeCombo.setValue("GET");
         reqTypeCombo.setPrefWidth(150);
 
-        Label reqUrlLabel = createRequiredLabel("请求地址");
+        Label reqUrlLabel = createFormLabel("请求地址", true);
         reqUrlField = new TextField();
         reqUrlField.setPrefWidth(400);
         reqUrlField.setPromptText("请输入请求地址");
@@ -405,12 +408,18 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
     }
     
     /**
-     * 创建必填标签
+     * 创建表单标签
      */
-    private Label createRequiredLabel(String text) {
-        Label label = new Label(text + " *");
+    private Label createFormLabel(String text, boolean required) {
+        String displayText = required ? text + " *" : text;
+        Label label = new Label(displayText);
         label.setStyle("-fx-text-fill: #374151; -fx-font-size: 13;");
-        label.setPrefWidth(120);
+        label.setMinWidth(140);
+        label.setPrefWidth(140);
+        label.setMaxWidth(140);
+        label.setWrapText(false);
+        label.setTextOverrun(OverrunStyle.ELLIPSIS);
+        label.setTooltip(new Tooltip(displayText));
         return label;
     }
     
@@ -590,6 +599,11 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
     private void styleDialog() {
         getDialogPane().setPrefWidth(750);
         getDialogPane().setPrefHeight(550);
+        getDialogPane().setMinWidth(720);
+        getDialogPane().setMinHeight(520);
+        getDialogPane().setMaxWidth(Double.MAX_VALUE);
+        getDialogPane().setMaxHeight(Double.MAX_VALUE);
+        setResizable(true);
         
         getDialogPane().setStyle(
             "-fx-background-color: #F9FAFB; " +
@@ -624,6 +638,15 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
                 "-fx-cursor: hand;"
             );
         }
+        
+        Platform.runLater(() -> {
+            Stage stage = (Stage) getDialogPane().getScene().getWindow();
+            if (stage != null) {
+                stage.setResizable(true);
+                stage.setMinWidth(720);
+                stage.setMinHeight(520);
+            }
+        });
     }
 
     private static class ParameterTable extends VBox {
