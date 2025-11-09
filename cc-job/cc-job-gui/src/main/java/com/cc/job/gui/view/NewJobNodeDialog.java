@@ -2,15 +2,22 @@ package com.cc.job.gui.view;
 
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.form.JobInfoForm;
-import javafx.application.Platform;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
-import javafx.geometry.Pos;
 import javafx.scene.control.*;
+import javafx.scene.control.cell.TextFieldTableCell;
 import javafx.scene.layout.*;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
+import java.lang.reflect.Type;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 新建/编辑任务节点对话框
@@ -28,15 +35,26 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
     
     private ComboBox<GlueType> glueTypeCombo;
     private TextField executorHandlerField;
+    private Label executorParamLabel;
     private TextArea executorParamArea;
+    private VBox apiSettingContainer;
+    private ComboBox<String> reqTypeCombo;
+    private TextField reqUrlField;
+    private ParameterTable headerTable;
+    private ParameterTable bodyTable;
     
     private TextField executorTimeoutField;
     private ComboBox<BlockStrategy> blockStrategyCombo;
     private Spinner<Integer> executorFailRetryCountSpinner;
+    private VBox glueSettingContainer;
+    private TextArea glueEditorArea;
     
     private ButtonType saveButtonType;
     private ButtonType cancelButtonType;
     
+    private static final Gson GSON = new Gson();
+    private static final Type MAP_TYPE = new TypeToken<LinkedHashMap<String, String>>(){}.getType();
+
     public NewJobNodeDialog(Stage owner, Long parentJobId, JobInfoForm editData, List<JobGroup> jobGroupList) {
         this.parentJobId = parentJobId;
         this.formData = editData != null ? editData : new JobInfoForm();
@@ -108,6 +126,8 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         
         // 高级配置
         formContent.getChildren().add(createAdvancedSection());
+        formContent.getChildren().add(createGlueSection());
+        formContent.getChildren().add(createApiSection());
         
         scrollPane.setContent(formContent);
         VBox.setVgrow(scrollPane, Priority.ALWAYS);
@@ -207,7 +227,7 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         executorHandlerField.setPromptText("请输入JobHandler名称");
         
         // 任务参数
-        Label executorParamLabel = new Label("任务参数");
+        executorParamLabel = new Label("任务参数");
         executorParamArea = new TextArea();
         executorParamArea.setPrefWidth(615);
         executorParamArea.setPrefRowCount(4);
@@ -269,26 +289,95 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         section.getChildren().add(grid);
         return section;
     }
-    
+
+    private VBox createGlueSection() {
+        glueSettingContainer = createSection("🧩 GLUE 脚本");
+        glueSettingContainer.setVisible(false);
+
+        glueEditorArea = new TextArea();
+        glueEditorArea.setPrefRowCount(12);
+        glueEditorArea.setWrapText(true);
+        glueEditorArea.setPromptText("请输入 GLUE 脚本内容");
+
+        glueSettingContainer.getChildren().add(glueEditorArea);
+        return glueSettingContainer;
+    }
+
+    private VBox createApiSection() {
+        apiSettingContainer = createSection("🌐 API 配置");
+        apiSettingContainer.setVisible(false);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(15);
+        grid.setVgap(15);
+        grid.setPadding(new Insets(15));
+
+        Label reqTypeLabel = createRequiredLabel("请求类型");
+        reqTypeCombo = new ComboBox<>();
+        reqTypeCombo.getItems().addAll("GET", "POST", "PUT", "DELETE");
+        reqTypeCombo.setValue("GET");
+        reqTypeCombo.setPrefWidth(150);
+
+        Label reqUrlLabel = createRequiredLabel("请求地址");
+        reqUrlField = new TextField();
+        reqUrlField.setPrefWidth(400);
+        reqUrlField.setPromptText("请输入请求地址");
+
+        grid.add(reqTypeLabel, 0, 0);
+        grid.add(reqTypeCombo, 1, 0);
+        grid.add(reqUrlLabel, 0, 1);
+        grid.add(reqUrlField, 1, 1, 3, 1);
+
+        headerTable = new ParameterTable("请求头");
+        bodyTable = new ParameterTable("请求体参数");
+
+        apiSettingContainer.getChildren().addAll(grid, headerTable, bodyTable);
+        return apiSettingContainer;
+    }
+
+    private void toggleExecutorParamArea(boolean visible) {
+        executorParamLabel.setVisible(visible);
+        executorParamLabel.setManaged(visible);
+        executorParamArea.setVisible(visible);
+        executorParamArea.setManaged(visible);
+    }
+
     /**
      * 根据GlueType更新字段可见性
      */
     private void updateFieldsForGlueType(GlueType glueType) {
-        if (glueType == GlueType.BEAN) {
-            executorHandlerField.setDisable(false);
-            executorHandlerField.setPromptText("请输入JobHandler名称");
-        } else if (glueType == GlueType.SQL) {
-            executorHandlerField.setDisable(true);
-            executorHandlerField.setText("runJobJdbcXxlJob");
-            executorParamArea.setPromptText("请输入SQL语句");
-        } else if (glueType == GlueType.API) {
-            executorHandlerField.setDisable(true);
-            executorHandlerField.setText("runApiHandler");
-            executorParamArea.setPromptText("请输入API请求参数");
-        } else {
-            executorHandlerField.setDisable(true);
-            executorHandlerField.clear();
+        switch (glueType) {
+            case BEAN -> {
+                executorHandlerField.setDisable(false);
+                executorHandlerField.setPromptText("请输入JobHandler名称");
+                executorParamArea.setPromptText("请输入任务参数");
+                toggleExecutorParamArea(true);
+            }
+            case SQL -> {
+                executorHandlerField.setDisable(true);
+                executorHandlerField.setText("runJobJdbcXxlJob");
+                executorParamArea.setPromptText("请输入SQL语句");
+                toggleExecutorParamArea(true);
+            }
+            case API -> {
+                executorHandlerField.setDisable(true);
+                executorHandlerField.setText("runApiHandler");
+                executorParamArea.clear();
+                toggleExecutorParamArea(false);
+                headerTable.ensureAtLeastOneRow();
+                bodyTable.ensureAtLeastOneRow();
+            }
+            default -> {
+                executorHandlerField.setDisable(true);
+                executorHandlerField.clear();
+                executorParamArea.setPromptText("请输入任务参数");
+                toggleExecutorParamArea(true);
+            }
         }
+        glueSettingContainer.setVisible(glueType.requiresGlueSource());
+        glueSettingContainer.setManaged(glueType.requiresGlueSource());
+        apiSettingContainer.setVisible(glueType == GlueType.API);
+        apiSettingContainer.setManaged(glueType == GlueType.API);
     }
     
     /**
@@ -338,17 +427,36 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         if (data.getJobDesc() != null) jobDescField.setText(data.getJobDesc());
         if (data.getAuthor() != null) authorField.setText(data.getAuthor());
         if (data.getAlarmEmail() != null) alarmEmailField.setText(data.getAlarmEmail());
-        
-        if (data.getGlueType() != null) {
-            try {
-                glueTypeCombo.setValue(GlueType.valueOf(data.getGlueType()));
-            } catch (Exception e) {
-                glueTypeCombo.setValue(GlueType.BEAN);
-            }
+
+        GlueType glueType = GlueType.fromType(data.getGlueType());
+        glueTypeCombo.setValue(glueType);
+        updateFieldsForGlueType(glueType);
+
+        if (data.getExecutorHandler() != null) {
+            executorHandlerField.setText(data.getExecutorHandler());
         }
-        if (data.getExecutorHandler() != null) executorHandlerField.setText(data.getExecutorHandler());
-        if (data.getExecutorParam() != null) executorParamArea.setText(data.getExecutorParam());
-        
+
+        if (glueType.requiresGlueSource() && data.getGlueSource() != null) {
+            glueEditorArea.setText(data.getGlueSource());
+        }
+
+        if (glueType == GlueType.API) {
+            if (data.getReqType() != null) {
+                reqTypeCombo.setValue(data.getReqType());
+            }
+            if (data.getReqUrl() != null) {
+                reqUrlField.setText(data.getReqUrl());
+            }
+            headerTable.setData(data.getReqHeader());
+            bodyTable.setData(data.getExecutorParam());
+        } else {
+            if (data.getExecutorParam() != null) {
+                executorParamArea.setText(data.getExecutorParam());
+            }
+            headerTable.setData(null);
+            bodyTable.setData(null);
+        }
+
         if (data.getExecutorBlockStrategy() != null) {
             try {
                 blockStrategyCombo.setValue(BlockStrategy.valueOf(data.getExecutorBlockStrategy()));
@@ -381,16 +489,31 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         GlueType glueType = glueTypeCombo.getValue();
         form.setGlueType(glueType.getType());
         
-        // 根据GlueType设置ExecutorHandler
-        if (glueType == GlueType.SQL) {
-            form.setExecutorHandler("runJobJdbcXxlJob");
-        } else if (glueType == GlueType.API) {
-            form.setExecutorHandler("runApiHandler");
-        } else {
-            form.setExecutorHandler(executorHandlerField.getText().trim());
+        switch (glueType) {
+            case SQL -> form.setExecutorHandler("runJobJdbcXxlJob");
+            case API -> form.setExecutorHandler("runApiHandler");
+            default -> form.setExecutorHandler(executorHandlerField.getText().trim());
         }
-        
-        form.setExecutorParam(executorParamArea.getText().trim());
+
+        if (glueType.requiresGlueSource()) {
+            form.setGlueSource(glueEditorArea.getText());
+        } else {
+            form.setGlueSource(null);
+        }
+
+        if (glueType == GlueType.API) {
+            String reqType = reqTypeCombo.getValue();
+            form.setReqType(reqType != null ? reqType : "GET");
+            String reqUrl = reqUrlField.getText() != null ? reqUrlField.getText().trim() : "";
+            form.setReqUrl(reqUrl);
+            form.setReqHeader(headerTable.toJson());
+            form.setExecutorParam(bodyTable.toJson());
+        } else {
+            form.setReqType(null);
+            form.setReqUrl(null);
+            form.setReqHeader(null);
+            form.setExecutorParam(executorParamArea.getText().trim());
+        }
         
         // 高级配置
         form.setExecutorBlockStrategy(blockStrategyCombo.getValue().getType());
@@ -430,8 +553,20 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         if (glueTypeCombo.getValue() == null) {
             errors.append("• 请选择运行模式\n");
         }
-        if (glueTypeCombo.getValue() == GlueType.BEAN && executorHandlerField.getText().trim().isEmpty()) {
+        GlueType glueType = glueTypeCombo.getValue();
+        if (glueType == GlueType.BEAN && executorHandlerField.getText().trim().isEmpty()) {
             errors.append("• 请输入JobHandler\n");
+        }
+        if (glueType != null && glueType.requiresGlueSource() && (glueEditorArea.getText() == null || glueEditorArea.getText().trim().isEmpty())) {
+            errors.append("• 请填写GLUE脚本内容\n");
+        }
+        if (glueType == GlueType.API) {
+            if (reqUrlField.getText() == null || reqUrlField.getText().trim().isEmpty()) {
+                errors.append("• 请填写API请求地址\n");
+            }
+            if (headerTable.isEmpty() && bodyTable.isEmpty()) {
+                errors.append("• 请至少配置一个请求头或请求参数\n");
+            }
         }
         if (blockStrategyCombo.getValue() == null) {
             errors.append("• 请选择任务失败策略\n");
@@ -490,28 +625,186 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
             );
         }
     }
-    
+
+    private static class ParameterTable extends VBox {
+        private final TableView<ParamItem> tableView;
+        private final ObservableList<ParamItem> items = FXCollections.observableArrayList();
+
+        ParameterTable(String title) {
+            setSpacing(8);
+            setPadding(new Insets(12));
+            setStyle("-fx-background-color: linear-gradient(145deg,#6847FF,#8A6BFF); -fx-border-radius: 10; -fx-background-radius: 10;");
+
+            Label titleLabel = new Label(title);
+            titleLabel.setStyle("-fx-text-fill: rgba(255,255,255,0.9); -fx-font-size: 13; -fx-font-weight: bold;");
+
+            tableView = new TableView<>();
+            tableView.setEditable(true);
+            tableView.setItems(items);
+            tableView.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+            tableView.setPlaceholder(new Label("暂无数据，点击“新增参数”添加"));
+            tableView.setPrefHeight(160);
+
+            TableColumn<ParamItem, String> keyColumn = new TableColumn<>("参数名称");
+            keyColumn.setCellValueFactory(cell -> cell.getValue().keyProperty());
+            keyColumn.setCellFactory(TextFieldTableCell.forTableColumn());
+            keyColumn.setOnEditCommit(event -> event.getRowValue().setKey(event.getNewValue()));
+
+            TableColumn<ParamItem, String> valueColumn = new TableColumn<>("参数值");
+            valueColumn.setCellValueFactory(cell -> cell.getValue().valueProperty());
+            valueColumn.setCellFactory(TextFieldTableCell.forTableColumn());
+            valueColumn.setOnEditCommit(event -> event.getRowValue().setValue(event.getNewValue()));
+
+            TableColumn<ParamItem, Void> actionColumn = new TableColumn<>("操作");
+            actionColumn.setPrefWidth(80);
+            actionColumn.setCellFactory(col -> new TableCell<>() {
+                private final Button deleteButton = new Button("删除");
+                {
+                    deleteButton.setStyle("-fx-background-color: rgba(255,255,255,0.15); -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 4 10; -fx-background-radius: 4; -fx-border-color: rgba(255,255,255,0.3); -fx-border-radius: 4; -fx-cursor: hand;");
+                    deleteButton.setOnAction(e -> {
+                        ParamItem item = getTableView().getItems().get(getIndex());
+                        items.remove(item);
+                        ensureAtLeastOneRow();
+                    });
+                }
+
+                @Override
+                protected void updateItem(Void item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setGraphic(empty ? null : deleteButton);
+                }
+            });
+
+            tableView.getColumns().add(keyColumn);
+            tableView.getColumns().add(valueColumn);
+            tableView.getColumns().add(actionColumn);
+
+            Button addButton = new Button("+ 新增参数");
+            addButton.setStyle("-fx-background-color: rgba(255,255,255,0.2); -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 6 14; -fx-background-radius: 4; -fx-border-color: rgba(255,255,255,0.4); -fx-border-radius: 4; -fx-cursor: hand;");
+            addButton.setOnAction(e -> addRow("", ""));
+
+            getChildren().addAll(titleLabel, tableView, addButton);
+            ensureAtLeastOneRow();
+        }
+
+        void ensureAtLeastOneRow() {
+            if (items.isEmpty()) {
+                addRow("", "");
+            }
+        }
+
+        private void addRow(String key, String value) {
+            items.add(new ParamItem(key, value));
+        }
+
+        void setData(String json) {
+            items.clear();
+            if (json != null && !json.trim().isEmpty()) {
+                try {
+                    Map<String, String> map = GSON.fromJson(json, MAP_TYPE);
+                    if (map != null) {
+                        map.forEach(this::addRow);
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+            ensureAtLeastOneRow();
+        }
+
+        String toJson() {
+            Map<String, String> map = new LinkedHashMap<>();
+            for (ParamItem item : items) {
+                String key = item.getKey().trim();
+                if (!key.isEmpty()) {
+                    map.put(key, item.getValue());
+                }
+            }
+            return map.isEmpty() ? null : GSON.toJson(map);
+        }
+
+        boolean isEmpty() {
+            for (ParamItem item : items) {
+                if (!item.getKey().trim().isEmpty() || !item.getValue().trim().isEmpty()) {
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
+
+    private static class ParamItem {
+        private final SimpleStringProperty key = new SimpleStringProperty("");
+        private final SimpleStringProperty value = new SimpleStringProperty("");
+
+        ParamItem(String key, String value) {
+            this.key.set(key != null ? key : "");
+            this.value.set(value != null ? value : "");
+        }
+
+        String getKey() {
+            return key.get() != null ? key.get() : "";
+        }
+
+        void setKey(String key) {
+            this.key.set(key != null ? key : "");
+        }
+
+        String getValue() {
+            return value.get() != null ? value.get() : "";
+        }
+
+        void setValue(String value) {
+            this.value.set(value != null ? value : "");
+        }
+
+        SimpleStringProperty keyProperty() {
+            return key;
+        }
+
+        SimpleStringProperty valueProperty() {
+            return value;
+        }
+    }
+
     // 枚举类型定义
     public enum GlueType {
-        BEAN("BEAN", "BEAN"),
-        API("API", "API"),
-        SQL("SQL", "SQL"),
-        GLUE_GROOVY("GLUE_GROOVY", "GLUE(Java)"),
-        GLUE_SHELL("GLUE_SHELL", "GLUE(Shell)"),
-        GLUE_PYTHON("GLUE_PYTHON", "GLUE(Python)"),
-        GLUE_PHP("GLUE_PHP", "GLUE(PHP)"),
-        GLUE_NODEJS("GLUE_NODEJS", "GLUE(Nodejs)"),
-        GLUE_POWERSHELL("GLUE_POWERSHELL", "GLUE(PowerShell)");
+        BEAN("BEAN", "BEAN", false, false),
+        API("API", "API", false, true),
+        SQL("SQL", "SQL", false, false),
+        GLUE_GROOVY("GLUE_GROOVY", "GLUE(Java)", true, false),
+        GLUE_SHELL("GLUE_SHELL", "GLUE(Shell)", true, false),
+        GLUE_PYTHON("GLUE_PYTHON", "GLUE(Python)", true, false),
+        GLUE_PHP("GLUE_PHP", "GLUE(PHP)", true, false),
+        GLUE_NODEJS("GLUE_NODEJS", "GLUE(Nodejs)", true, false),
+        GLUE_POWERSHELL("GLUE_POWERSHELL", "GLUE(PowerShell)", true, false);
         
         private final String type;
         private final String title;
+        private final boolean requiresGlueSource;
+        private final boolean apiMode;
         
-        GlueType(String type, String title) {
+        GlueType(String type, String title, boolean requiresGlueSource, boolean apiMode) {
             this.type = type;
             this.title = title;
+            this.requiresGlueSource = requiresGlueSource;
+            this.apiMode = apiMode;
         }
         
         public String getType() { return type; }
+        public boolean requiresGlueSource() { return requiresGlueSource; }
+        public boolean isApi() { return apiMode; }
+        
+        public static GlueType fromType(String type) {
+            if (type != null) {
+                for (GlueType value : values()) {
+                    if (value.type.equalsIgnoreCase(type)) {
+                        return value;
+                    }
+                }
+            }
+            return BEAN;
+        }
+        
         @Override
         public String toString() { return title; }
     }

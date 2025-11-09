@@ -3,10 +3,11 @@ package com.cc.job.gui.model;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.beans.binding.DoubleBinding;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.scene.Group;
 import javafx.scene.paint.Color;
-import javafx.scene.shape.CubicCurve;
 import javafx.scene.shape.Circle;
+import javafx.scene.shape.CubicCurve;
 import javafx.scene.shape.Polygon;
 import javafx.util.Duration;
 
@@ -19,11 +20,13 @@ public class NodeConnection extends Group {
     private Circle sourceConnector;
     private ProcessNode targetNode;
     private Circle targetConnector;
+    private final SimpleObjectProperty<String> edgeId = new SimpleObjectProperty<>();
     
     private CubicCurve curve;
     private Polygon arrowHead;
     private Timeline dashAnimation;
     private boolean isRunning = false; // 是否处于运行状态
+    private Timeline locateAnimation;
     
     /**
      * 创建连接（指定具体的连接点）
@@ -37,6 +40,19 @@ public class NodeConnection extends Group {
         
         initializeUI();
         bindConnection();
+        updateStyle();
+    }
+
+    public void setEdgeId(String edgeId) {
+        this.edgeId.set(edgeId);
+    }
+
+    public String getEdgeId() {
+        return edgeId.get();
+    }
+
+    public SimpleObjectProperty<String> edgeIdProperty() {
+        return edgeId;
     }
     
     private void initializeUI() {
@@ -171,16 +187,16 @@ public class NodeConnection extends Group {
     private void setupHoverEffect() {
         // 整个Group的悬停效果
         this.setOnMouseEntered(e -> {
-            if (!isRunning) {
+            if (!isRunning && !isSelected()) {
                 curve.setStroke(Color.web("#8B5CF6"));
-                curve.setStrokeWidth(3.5);
+                curve.setStrokeWidth(3.0);
                 arrowHead.setFill(Color.web("#8B5CF6"));
                 arrowHead.setStroke(Color.web("#8B5CF6"));
             }
         });
         
         this.setOnMouseExited(e -> {
-            if (!isRunning) {
+            if (!isRunning && !isSelected()) {
                 curve.setStroke(Color.web("#374151"));
                 curve.setStrokeWidth(2.5);
                 arrowHead.setFill(Color.web("#374151"));
@@ -195,33 +211,8 @@ public class NodeConnection extends Group {
      */
     public void setRunning(boolean running) {
         this.isRunning = running;
-        
-        if (running) {
-            // 设置为虚线样式
-            curve.getStrokeDashArray().clear();
-            curve.getStrokeDashArray().addAll(10.0, 5.0); // 虚线样式：10px实线，5px空白
-            curve.setStroke(Color.web("#F59E0B")); // 黄色（运行中）
-            curve.setStrokeWidth(3.0);
-            arrowHead.setFill(Color.web("#F59E0B"));
-            arrowHead.setStroke(Color.web("#F59E0B"));
-            
-            // 创建虚线滚动动画
-            startDashAnimation();
-            
-            System.out.println("▶️ 边开始运行: " + sourceNode.getJobHandlerName() + " → " + targetNode.getJobHandlerName());
-        } else {
-            // 恢复正常样式
-            curve.getStrokeDashArray().clear();
-            curve.setStroke(Color.web("#374151")); // 恢复默认颜色
-            curve.setStrokeWidth(2.5);
-            arrowHead.setFill(Color.web("#374151"));
-            arrowHead.setStroke(Color.web("#374151"));
-            
-            // 停止动画
-            stopDashAnimation();
-            
-            System.out.println("⏹️ 边停止运行: " + sourceNode.getJobHandlerName() + " → " + targetNode.getJobHandlerName());
-        }
+        updateStyle();
+        System.out.println((running ? "▶️" : "⏹️") + " 边" + (running ? "开始" : "停止") + "运行: " + sourceNode.getJobHandlerName() + " → " + targetNode.getJobHandlerName());
     }
     
     /**
@@ -260,6 +251,71 @@ public class NodeConnection extends Group {
             dashAnimation = null;
         }
         curve.setStrokeDashOffset(0); // 重置偏移量
+    }
+
+    private boolean selected = false;
+
+    public void setSelected(boolean selected) {
+        this.selected = selected;
+        updateStyle();
+    }
+
+    public boolean isSelected() {
+        return selected;
+    }
+
+    private void updateStyle() {
+        if (selected) {
+            stopDashAnimation();
+            curve.getStrokeDashArray().clear();
+            curve.setStroke(Color.web("#2563EB"));
+            curve.setStrokeWidth(3.5);
+            arrowHead.setFill(Color.web("#2563EB"));
+            arrowHead.setStroke(Color.web("#2563EB"));
+        } else if (isRunning) {
+            curve.getStrokeDashArray().clear();
+            curve.getStrokeDashArray().addAll(10.0, 5.0);
+            curve.setStroke(Color.web("#F59E0B"));
+            curve.setStrokeWidth(3.0);
+            arrowHead.setFill(Color.web("#F59E0B"));
+            arrowHead.setStroke(Color.web("#F59E0B"));
+            startDashAnimation();
+        } else {
+            stopDashAnimation();
+            curve.getStrokeDashArray().clear();
+            curve.setStroke(Color.web("#374151"));
+            curve.setStrokeWidth(2.5);
+            arrowHead.setFill(Color.web("#374151"));
+            arrowHead.setStroke(Color.web("#374151"));
+        }
+    }
+
+    public void playLocateAnimation() {
+        if (locateAnimation != null) {
+            locateAnimation.stop();
+        }
+        Color originalColor = (Color) curve.getStroke();
+        double originalWidth = curve.getStrokeWidth();
+        Color highlight = Color.web("#2563EB");
+
+        locateAnimation = new Timeline(
+                new KeyFrame(Duration.ZERO, e -> {
+                    curve.setStroke(highlight);
+                    curve.setStrokeWidth(originalWidth + 1.5);
+                    arrowHead.setFill(highlight);
+                    arrowHead.setStroke(highlight);
+                }),
+                new KeyFrame(Duration.millis(250), e -> {
+                    curve.setStroke(originalColor);
+                    curve.setStrokeWidth(originalWidth);
+                    arrowHead.setFill(originalColor);
+                    arrowHead.setStroke(originalColor);
+                })
+        );
+        locateAnimation.setCycleCount(4);
+        locateAnimation.setAutoReverse(true);
+        locateAnimation.setOnFinished(e -> updateStyle());
+        locateAnimation.play();
     }
     
     /**

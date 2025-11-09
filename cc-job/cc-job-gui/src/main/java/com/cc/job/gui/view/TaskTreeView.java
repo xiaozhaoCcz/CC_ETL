@@ -59,6 +59,22 @@ public class TaskTreeView extends VBox {
         void onTaskSelected(Long taskId, String taskName, Integer type);
         void onNewJobGroup(Long partitionId, String partitionName);
         void onNewJobNode(Long taskGroupId, String taskGroupName);
+ 
+        default void onJobNodeAction(Long jobNodeId, Long jobId, String nodeName, JobNodeAction action) {
+        }
+
+        default void onEdgeAction(Long edgeId, EdgeAction action) {
+        }
+
+        enum JobNodeAction {
+            EDIT,
+            LOCATE
+        }
+
+        enum EdgeAction {
+            LOCATE,
+            DELETE
+        }
     }
     
     public TaskTreeView() {
@@ -335,11 +351,11 @@ public class TaskTreeView extends VBox {
                         menu.getItems().add(createDeleteMenuItem(nodeData, treeItem));
                     }
                     
-                } else {
-                    // 三级及以下节点（任务节点）- 基本操作
+                } else if (nodeType != null && nodeType == 4) {
+                    // 任务节点（type=4）
                     MenuItem refreshItem = new MenuItem("刷新");
                     refreshItem.setOnAction(e -> handleRefresh(nodeData, treeItem));
-                    
+
                     MenuItem openItem = new MenuItem("打开");
                     openItem.setOnAction(e -> {
                         System.out.println("📂 打开节点: " + nodeName);
@@ -347,26 +363,53 @@ public class TaskTreeView extends VBox {
                             selectionCallback.onTaskSelected(nodeName);
                         }
                     });
-                    
+
                     MenuItem editItem = new MenuItem("编辑");
                     editItem.setOnAction(e -> {
                         System.out.println("✏️ 编辑节点: " + nodeName);
-                        // TODO: 显示编辑对话框
+                        if (selectionCallback != null) {
+                            selectionCallback.onJobNodeAction(nodeData.getId(), parseJobId(nodeData), nodeName, TaskSelectionCallback.JobNodeAction.EDIT);
+                        }
                     });
-                    
+
+                    MenuItem locateItem = new MenuItem("定位");
+                    locateItem.setOnAction(e -> {
+                        System.out.println("📍 定位节点: " + nodeName);
+                        if (selectionCallback != null) {
+                            selectionCallback.onJobNodeAction(nodeData.getId(), parseJobId(nodeData), nodeName, TaskSelectionCallback.JobNodeAction.LOCATE);
+                        }
+                    });
+
                     MenuItem deleteItem = new MenuItem("删除");
                     deleteItem.setStyle("-fx-text-fill: #EF4444;");
                     deleteItem.setOnAction(e -> {
                         System.out.println("🗑️ 删除节点: " + nodeName);
                         confirmDeleteNode(nodeData, treeItem);
                     });
-                    
+
                     menu.getItems().add(refreshItem);
                     menu.getItems().add(new SeparatorMenuItem());
                     menu.getItems().add(openItem);
                     menu.getItems().add(editItem);
+                    menu.getItems().add(locateItem);
                     menu.getItems().add(new SeparatorMenuItem());
                     menu.getItems().add(deleteItem);
+                } else if (nodeType != null && nodeType == 5) {
+                    // 关系边
+                    MenuItem locateEdgeItem = new MenuItem("定位连接");
+                    locateEdgeItem.setOnAction(e -> handleLocateEdge(nodeData));
+
+                    MenuItem deleteEdgeItem = new MenuItem("删除连接");
+                    deleteEdgeItem.setStyle("-fx-text-fill: #EF4444;");
+                    deleteEdgeItem.setOnAction(e -> confirmDeleteEdge(nodeData, treeItem));
+
+                    menu.getItems().add(locateEdgeItem);
+                    menu.getItems().add(new SeparatorMenuItem());
+                    menu.getItems().add(deleteEdgeItem);
+                } else {
+                    MenuItem refreshItem = new MenuItem("刷新");
+                    refreshItem.setOnAction(e -> handleRefresh(nodeData, treeItem));
+                    menu.getItems().add(refreshItem);
                 }
                 
                 return menu;
@@ -384,7 +427,23 @@ public class TaskTreeView extends VBox {
                 }
             }
         });
-        
+
+        tree.setOnKeyPressed(event -> {
+            if (event.getCode() == javafx.scene.input.KeyCode.DELETE || event.getCode() == javafx.scene.input.KeyCode.BACK_SPACE) {
+                TreeItem<TreeNodeData> selected = tree.getSelectionModel().getSelectedItem();
+                if (selected != null && selected.getValue() != null) {
+                    Integer type = selected.getValue().getType();
+                    if (type != null && type == 5) {
+                        confirmDeleteEdge(selected.getValue(), selected);
+                        event.consume();
+                    } else if (type != null && type == 4) {
+                        confirmDeleteNode(selected.getValue(), selected);
+                        event.consume();
+                    }
+                }
+            }
+        });
+ 
         return tree;
     }
     
@@ -1146,6 +1205,49 @@ public class TaskTreeView extends VBox {
         loadTreeData();
     }
 
+    public void updateJobNode(Long jobId, String newLabel) {
+        if (jobId == null) {
+            return;
+        }
+        TreeItem<TreeNodeData> target = findTreeItemByJobId(rootItem, jobId);
+        if (target != null) {
+            TreeNodeData data = target.getValue();
+            if (data != null) {
+                if (newLabel != null && !newLabel.isBlank()) {
+                    data.setLabel(newLabel);
+                }
+                data.setExt1(String.valueOf(jobId));
+                treeView.refresh();
+            }
+        }
+    }
+
+    private TreeItem<TreeNodeData> findTreeItemByJobId(TreeItem<TreeNodeData> current, Long jobId) {
+        if (current == null) {
+            return null;
+        }
+        TreeNodeData value = current.getValue();
+        if (value != null) {
+            String ext1 = value.getExt1();
+            if (ext1 != null) {
+                try {
+                    long stored = Long.parseLong(ext1.trim());
+                    if (stored == jobId) {
+                        return current;
+                    }
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
+        for (TreeItem<TreeNodeData> child : current.getChildren()) {
+            TreeItem<TreeNodeData> found = findTreeItemByJobId(child, jobId);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
+    }
+ 
     /**
      * 统一弹窗提示
      */
@@ -1155,6 +1257,45 @@ public class TaskTreeView extends VBox {
         alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
+    }
+
+    private Long parseJobId(TreeNodeData nodeData) {
+        if (nodeData == null) {
+            return null;
+        }
+        String ext1 = nodeData.getExt1();
+        if (ext1 != null && !ext1.isBlank()) {
+            try {
+                return Long.parseLong(ext1.trim());
+            } catch (NumberFormatException ex) {
+                System.err.println("解析任务节点 jobId 失败: " + ext1 + ", 错误: " + ex.getMessage());
+            }
+        }
+        return null;
+    }
+
+    private void handleLocateEdge(TreeNodeData nodeData) {
+        if (selectionCallback != null) {
+            selectionCallback.onEdgeAction(nodeData.getId(), TaskSelectionCallback.EdgeAction.LOCATE);
+        }
+    }
+
+    private void confirmDeleteEdge(TreeNodeData nodeData, TreeItem<TreeNodeData> treeItem) {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("删除连接");
+        alert.setHeaderText("删除连接: " + nodeData.getLabel());
+        alert.setContentText("确定要删除该连接吗？删除后需重新保存任务组以生效。");
+
+        Optional<ButtonType> result = alert.showAndWait();
+        if (result.isPresent() && result.get() == ButtonType.OK) {
+            if (selectionCallback != null) {
+                selectionCallback.onEdgeAction(nodeData.getId(), TaskSelectionCallback.EdgeAction.DELETE);
+            }
+            TreeItem<TreeNodeData> parent = treeItem.getParent();
+            if (parent != null) {
+                parent.getChildren().remove(treeItem);
+            }
+        }
     }
 }
 

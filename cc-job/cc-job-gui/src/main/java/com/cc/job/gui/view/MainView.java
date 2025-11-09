@@ -16,6 +16,7 @@ import com.cc.job.gui.util.SnowflakeIdGenerator;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.form.JobInfoForm;
 import javafx.application.Platform;
+import javafx.geometry.Bounds;
 import javafx.geometry.Orientation;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SplitPane;
@@ -1455,6 +1456,53 @@ public class MainView extends BorderPane {
                 System.out.println("新建任务节点 - 任务组ID: " + taskGroupId + ", 任务组名称: " + taskGroupName);
                 showNewJobNodeDialog(taskGroupId, taskGroupName, null);
             }
+
+            @Override
+            public void onJobNodeAction(Long jobNodeId, Long jobId, String nodeName, TaskTreeView.TaskSelectionCallback.JobNodeAction action) {
+                if (jobId == null) {
+                    logPanel.warn("⚠ 该树节点缺少任务ID，无法执行操作: " + nodeName);
+                    return;
+                }
+
+                ProcessNode targetNode = canvas.getNodeByJobId(jobId);
+                if (targetNode == null) {
+                    logPanel.warn("⚠ 在画布上未找到任务节点: " + nodeName + " (jobId=" + jobId + ")");
+                    return;
+                }
+
+                switch (action) {
+                    case EDIT -> editNode(jobId, targetNode);
+                    case LOCATE -> locateNodeOnCanvas(targetNode);
+                    default -> { }
+                }
+            }
+
+            @Override
+            public void onEdgeAction(Long edgeId, TaskTreeView.TaskSelectionCallback.EdgeAction action) {
+                if (edgeId == null) {
+                    logPanel.warn("⚠ 未提供边ID，无法执行操作");
+                    return;
+                }
+
+                String edgeKey = String.valueOf(edgeId);
+                switch (action) {
+                    case DELETE -> {
+                        boolean removed = canvas.removeConnectionByEdgeId(edgeKey);
+                        if (removed) {
+                            logPanel.success("✓ 已删除连接 " + edgeKey + "，请记得保存任务组以持久化修改");
+                        } else {
+                            logPanel.warn("⚠ 画布上未找到ID为 " + edgeKey + " 的连接");
+                        }
+                    }
+                    case LOCATE -> {
+                        boolean located = canvas.locateConnectionByEdgeId(edgeKey);
+                        if (!located) {
+                            logPanel.warn("⚠ 未在画布上找到该连接: " + edgeKey);
+                        }
+                    }
+                    default -> { }
+                }
+            }
         });
     }
 
@@ -2153,6 +2201,10 @@ public class MainView extends BorderPane {
                                             node.updateNodeInfo(updatedFormData.getJobDesc(), newNodeType);
                                             logPanel.info("✓ 画布节点已更新");
 
+                                            if (treeView != null && node.getJobId() != null) {
+                                                treeView.updateJobNode(node.getJobId(), updatedFormData.getJobDesc());
+                                            }
+
                                             // 刷新任务树但保持当前页面
                                             logPanel.info("正在刷新任务树...");
                                             refreshTreeViewWithoutNavigation(currentTaskGroupId);
@@ -2258,5 +2310,49 @@ public class MainView extends BorderPane {
             default:
                 return "BEAN";
         }
+    }
+
+    private void removeNode(ProcessNode node) {
+        if (node == null) {
+            return;
+        }
+
+        canvas.removeNode(node);
+        logPanel.info("🗑️ 已从画布移除节点: " + node.getJobHandlerName());
+    }
+
+    private void locateNodeOnCanvas(ProcessNode node) {
+        if (node == null) {
+            return;
+        }
+
+        Bounds viewport = scrollPane.getViewportBounds();
+        Bounds contentBounds = canvas.getBoundsInLocal();
+
+        double contentWidth = contentBounds.getWidth();
+        double contentHeight = contentBounds.getHeight();
+
+        Bounds nodeBounds = node.getBoundsInParent();
+        double nodeCenterX = nodeBounds.getMinX() + nodeBounds.getWidth() / 2;
+        double nodeCenterY = nodeBounds.getMinY() + nodeBounds.getHeight() / 2;
+
+        double hMax = Math.max(contentWidth - viewport.getWidth(), 1);
+        double vMax = Math.max(contentHeight - viewport.getHeight(), 1);
+
+        double targetH = (nodeCenterX - viewport.getWidth() / 2) / hMax;
+        double targetV = (nodeCenterY - viewport.getHeight() / 2) / vMax;
+
+        scrollPane.setHvalue(clampScrollValue(targetH));
+        scrollPane.setVvalue(clampScrollValue(targetV));
+
+        node.toFront();
+        node.playLocateAnimation();
+    }
+
+    private double clampScrollValue(double value) {
+        if (Double.isNaN(value) || Double.isInfinite(value)) {
+            return 0;
+        }
+        return Math.max(0, Math.min(1, value));
     }
 }

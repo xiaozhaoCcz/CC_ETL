@@ -1,5 +1,8 @@
 package com.cc.job.gui.model;
 
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
@@ -13,6 +16,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import javafx.util.Duration;
 
 /**
  * 流程节点类，支持拖拽、右键菜单等功能
@@ -59,6 +63,7 @@ public class ProcessNode extends StackPane {
     private javafx.scene.shape.Rectangle background;
     private Label typeLabel;    // 类型标签引用
     private Label handlerLabel; // 处理器名称标签引用
+    private Timeline locateAnimation;
     
     private static final double NODE_WIDTH = 180;
     private static final double NODE_HEIGHT = 80;
@@ -499,7 +504,35 @@ public class ProcessNode extends StackPane {
         updateJobHandlerName(newName);
         setType(newType);
     }
-    
+
+    public void playLocateAnimation() {
+        if (background == null) {
+            return;
+        }
+        if (locateAnimation != null) {
+            locateAnimation.stop();
+        }
+
+        Color highlightColor = Color.web("#F97316");
+        Color originalColor = Color.web(currentColor);
+
+        locateAnimation = new Timeline(
+                new KeyFrame(Duration.ZERO,
+                        new KeyValue(background.strokeProperty(), highlightColor),
+                        new KeyValue(background.strokeWidthProperty(), 3)),
+                new KeyFrame(Duration.seconds(0.2),
+                        new KeyValue(background.strokeProperty(), originalColor),
+                        new KeyValue(background.strokeWidthProperty(), 2))
+        );
+        locateAnimation.setAutoReverse(true);
+        locateAnimation.setCycleCount(4);
+        locateAnimation.setOnFinished(e -> {
+            background.setStroke(Color.web(currentColor));
+            background.setStrokeWidth(2);
+        });
+        locateAnimation.play();
+    }
+ 
     public double getX() {
         return getLayoutX();
     }

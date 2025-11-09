@@ -31,13 +31,21 @@ public class TreeNodeData {
     public String getLabel() {
         return label;
     }
-    
+
+    public void setLabel(String label) {
+        this.label = label;
+    }
+
     public Integer getType() {
         return type;
     }
     
     public String getExt1() {
         return ext1;
+    }
+
+    public void setExt1(String ext1) {
+        this.ext1 = ext1;
     }
     
     /**

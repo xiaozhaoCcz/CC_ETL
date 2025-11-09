@@ -5,15 +5,20 @@ import com.cc.job.gui.history.UndoRedoManager;
 import com.cc.job.gui.model.JobComposeData;
 import com.cc.job.gui.model.NodeConnection;
 import com.cc.job.gui.model.ProcessNode;
+import javafx.animation.PauseTransition;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.MenuItem;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Line;
+import javafx.util.Duration;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 
 /**
  * 画布，用于管理节点和连接线
@@ -29,7 +34,6 @@ public class NodeCanvas extends Pane {
 
     // 临时连线相关
     private ProcessNode startNode;
-    private Circle startConnector;
     private Line tempLine;
     
     // 日志回调
@@ -64,6 +68,39 @@ public class NodeCanvas extends Pane {
     
     public List<NodeConnection> getConnections() {
         return connections;
+    }
+
+    public boolean removeConnectionByEdgeId(String edgeId) {
+        if (edgeId == null) {
+            return false;
+        }
+        for (NodeConnection connection : new ArrayList<>(connections)) {
+            if (edgeIdMatches(edgeId, connection.getEdgeId())) {
+                removeConnection(connection);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean locateConnectionByEdgeId(String edgeId) {
+        if (edgeId == null) {
+            return false;
+        }
+        for (NodeConnection connection : connections) {
+            if (edgeIdMatches(edgeId, connection.getEdgeId())) {
+                connection.toFront();
+                connection.setSelected(true);
+                connection.playLocateAnimation();
+                PauseTransition delay = new PauseTransition(Duration.seconds(1.2));
+                delay.setOnFinished(e -> connection.setSelected(false));
+                delay.play();
+                log("📍 定位连接: " + connection.getSourceNode().getJobHandlerName()
+                        + " → " + connection.getTargetNode().getJobHandlerName());
+                return true;
+            }
+        }
+        return false;
     }
 
     public void setUndoRedoManager(UndoRedoManager undoRedoManager) {
@@ -203,6 +240,7 @@ public class NodeCanvas extends Pane {
     public NodeConnection addConnection(ProcessNode source, Circle sourceConnector,
                                         ProcessNode target, Circle targetConnector, boolean recordHistory) {
         NodeConnection connection = new NodeConnection(source, sourceConnector, target, targetConnector);
+        configureConnectionInteractions(connection);
         addConnectionInternal(connection);
         notifyNodeStructureChanged();
         if (recordHistory) {
@@ -259,6 +297,37 @@ public class NodeCanvas extends Pane {
         logConnection("✓ 删除连接", connection);
     }
 
+    private void configureConnectionInteractions(NodeConnection connection) {
+        ContextMenu menu = new ContextMenu();
+
+        MenuItem deleteItem = new MenuItem("删除连接");
+        deleteItem.setStyle("-fx-text-fill: #EF4444;");
+        deleteItem.setOnAction(e -> {
+            log("🗑️ 准备删除连接: " + connection.getSourceNode().getJobHandlerName()
+                    + " → " + connection.getTargetNode().getJobHandlerName());
+            removeConnection(connection);
+            log("提示: 删除后需点击保存按钮以持久化任务组变更");
+        });
+
+        menu.getItems().addAll(deleteItem);
+
+        connection.setOnContextMenuRequested(event -> {
+            connection.toFront();
+            connection.setSelected(true);
+            menu.show(connection, event.getScreenX(), event.getScreenY());
+            event.consume();
+        });
+
+        connection.setOnMousePressed(event -> {
+            if (menu.isShowing()) {
+                menu.hide();
+            }
+            connection.setSelected(false);
+        });
+
+        menu.setOnHidden(event -> connection.setSelected(false));
+    }
+
     private void logConnection(String prefix, NodeConnection connection) {
         if (connection == null) {
             return;
@@ -277,7 +346,6 @@ public class NodeCanvas extends Pane {
     private void setupConnectorHandler(ProcessNode node, Circle connector) {
         // 按下连接点开始连线
         connector.setOnMousePressed(e -> {
-            startConnector = connector;
             startNode = node;
             
             // 创建临时连线
@@ -367,7 +435,6 @@ public class NodeCanvas extends Pane {
         if (tempLine != null) {
             this.getChildren().remove(tempLine);
             tempLine = null;
-            startConnector = null;
             startNode = null;
         }
     }
@@ -605,6 +672,10 @@ public class NodeCanvas extends Pane {
                         }
                     }
 
+                    // 设置节点类型显示
+                    String mappedType = mapNodeType(nodeData.getType(), nodeData.getProperties());
+                    node.setType(mappedType);
+
                     // 添加节点到画布
                     addNode(node, false);
                     nodeMap.put(nodeData.getId(), node);
@@ -630,7 +701,10 @@ public class NodeCanvas extends Pane {
                         Circle targetConnector = getConnectorByAnchor(targetNode, edgeData.getTargetAnchor(), false);
 
                         if (sourceConnector != null && targetConnector != null) {
-                            addConnection(sourceNode, sourceConnector, targetNode, targetConnector, false);
+                            NodeConnection edge = addConnection(sourceNode, sourceConnector, targetNode, targetConnector, false);
+                            if (edge != null) {
+                                edge.setEdgeId(edgeData.getId());
+                            }
                             successCount++;
                         }
                     } else {
@@ -685,7 +759,50 @@ public class NodeCanvas extends Pane {
         }
         return map;
     }
-    
+
+    private String mapNodeType(String rawType, Map<String, Object> properties) {
+        String candidate = rawType;
+        if ((candidate == null || candidate.isBlank()) && properties != null) {
+            Object glueType = properties.get("glueType");
+            if (glueType instanceof String) {
+                candidate = (String) glueType;
+            }
+        }
+        if (candidate == null || candidate.isBlank()) {
+            return "Bean";
+        }
+        String normalized = candidate.trim().toLowerCase(Locale.ROOT);
+        return switch (normalized) {
+            case "bean", "custom-bean" -> "Bean";
+            case "api", "custom-api" -> "API";
+            case "sql", "custom-sql" -> "SQL";
+            case "java", "glue(java)", "custom-java" -> "Java";
+            case "shell", "glue(shell)", "custom-shell" -> "Shell";
+            case "python", "glue(python)", "custom-python" -> "Python";
+            case "php", "glue(php)", "custom-php" -> "PHP";
+            case "node", "nodejs", "glue(nodejs)", "custom-nodejs" -> "Node";
+            case "powershell", "ps", "glue(powershell)", "custom-powershell" -> "PS";
+            default -> {
+                if (normalized.startsWith("glue")) {
+                    String suffix = normalized.replace("glue", "").replace("(", "").replace(")", "").trim();
+                    if (!suffix.isEmpty()) {
+                        String upper = suffix.toUpperCase(Locale.ROOT);
+                        yield switch (upper) {
+                            case "JAVA" -> "Java";
+                            case "SHELL" -> "Shell";
+                            case "PYTHON" -> "Python";
+                            case "PHP" -> "PHP";
+                            case "NODEJS" -> "Node";
+                            case "POWERSHELL" -> "PS";
+                            default -> "Bean";
+                        };
+                    }
+                }
+                yield candidate;
+            }
+        };
+    }
+ 
     /**
      * 设置所有边的运行状态（任务组运行时调用）
      * @param running 是否运行中
@@ -889,6 +1006,30 @@ public class NodeCanvas extends Pane {
             removeConnection(connection, false);
             notifyNodeStructureChanged();
         }
+    }
+
+    private boolean edgeIdMatches(String requestedId, String existingId) {
+        if (existingId == null) {
+            return false;
+        }
+        String normalizedRequested = normalizeEdgeId(requestedId);
+        String normalizedExisting = normalizeEdgeId(existingId);
+        return !normalizedRequested.isEmpty() && normalizedRequested.equals(normalizedExisting);
+    }
+
+    private String normalizeEdgeId(String rawId) {
+        if (rawId == null) {
+            return "";
+        }
+        String result = rawId.trim();
+        int colonIndex = result.lastIndexOf(':');
+        if (colonIndex >= 0 && colonIndex < result.length() - 1) {
+            result = result.substring(colonIndex + 1);
+        }
+        if (result.endsWith(".0")) {
+            result = result.substring(0, result.length() - 2);
+        }
+        return result;
     }
 }
 
