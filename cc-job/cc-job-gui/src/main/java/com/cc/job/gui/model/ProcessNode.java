@@ -4,6 +4,7 @@ import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
 import javafx.geometry.Insets;
+import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.control.ContextMenu;
@@ -18,6 +19,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.util.Duration;
+import java.util.function.Consumer;
 import org.kordamp.ikonli.feather.Feather;
 import org.kordamp.ikonli.javafx.FontIcon;
 
@@ -50,6 +52,9 @@ public class ProcessNode extends StackPane {
     // 拖动回调
     private Runnable onDragged;
     private DragFinishedListener dragFinishedListener;
+    private Runnable onDragStarted;
+    private PositionAdjuster positionAdjuster;
+    private Consumer<ProcessNode> onPositionChanged;
     
     // 编辑/复制/详情回调
     private Runnable onEdit;
@@ -274,6 +279,9 @@ public class ProcessNode extends StackPane {
                 dragStartY = e.getSceneY() - this.getLayoutY();
                 this.setCursor(Cursor.CLOSED_HAND);
                 this.toFront(); // 拖拽时置于顶层
+                if (onDragStarted != null) {
+                    onDragStarted.run();
+                }
                 e.consume();
             }
         });
@@ -283,10 +291,24 @@ public class ProcessNode extends StackPane {
             if (e.isPrimaryButtonDown() && !isConnectorClick(e.getTarget())) {
                 double newX = e.getSceneX() - dragStartX;
                 double newY = e.getSceneY() - dragStartY;
-                
-                // 限制在画布范围内（可选）
-                this.setLayoutX(Math.max(0, newX));
-                this.setLayoutY(Math.max(0, newY));
+
+                double adjustedX = Math.max(0, newX);
+                double adjustedY = Math.max(0, newY);
+
+                if (positionAdjuster != null) {
+                    Point2D adjustedPoint = positionAdjuster.adjust(this, adjustedX, adjustedY);
+                    if (adjustedPoint != null) {
+                        adjustedX = adjustedPoint.getX();
+                        adjustedY = adjustedPoint.getY();
+                    }
+                }
+
+                this.setLayoutX(adjustedX);
+                this.setLayoutY(adjustedY);
+
+                if (onPositionChanged != null) {
+                    onPositionChanged.accept(this);
+                }
                 
                 // 触发拖动回调
                 if (onDragged != null) {
@@ -507,11 +529,23 @@ public class ProcessNode extends StackPane {
     public void setOnDragged(Runnable onDragged) {
         this.onDragged = onDragged;
     }
+
+    public void setOnDragStarted(Runnable onDragStarted) {
+        this.onDragStarted = onDragStarted;
+    }
     
     public void setOnDragFinished(DragFinishedListener listener) {
         this.dragFinishedListener = listener;
     }
+
+    public void setPositionAdjuster(PositionAdjuster positionAdjuster) {
+        this.positionAdjuster = positionAdjuster;
+    }
     
+    public void setOnPositionChanged(Consumer<ProcessNode> onPositionChanged) {
+        this.onPositionChanged = onPositionChanged;
+    }
+
     public void setOnEdit(Runnable onEdit) {
         this.onEdit = onEdit;
     }
@@ -526,6 +560,18 @@ public class ProcessNode extends StackPane {
 
     public interface DragFinishedListener {
         void onDragFinished(double oldX, double oldY, double newX, double newY);
+    }
+
+    @FunctionalInterface
+    public interface PositionAdjuster {
+        /**
+         * 调整节点目标位置，用于在拖拽过程中增加额外逻辑（例如顶部缓冲自动下推其他节点）
+         * @param node 当前拖拽的节点
+         * @param proposedX 经过基础限制后的 X 坐标
+         * @param proposedY 经过基础限制后的 Y 坐标
+         * @return 调整后的坐标，如果返回 null 则保留原值
+         */
+        Point2D adjust(ProcessNode node, double proposedX, double proposedY);
     }
     
     public String getType() {

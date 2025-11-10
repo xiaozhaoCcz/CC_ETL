@@ -6,8 +6,11 @@ import com.cc.job.gui.model.JobComposeData;
 import com.cc.job.gui.model.NodeConnection;
 import com.cc.job.gui.model.ProcessNode;
 import javafx.animation.PauseTransition;
+import javafx.geometry.Bounds;
+import javafx.geometry.Point2D;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
@@ -26,6 +29,8 @@ import java.util.Locale;
 public class NodeCanvas extends Pane {
 
     private static final String NODE_LISTENER_KEY = "nodeCanvasListenersAttached";
+    private static final double TOP_DRAG_MARGIN = 80.0;
+    private static final double AUTO_SCROLL_MARGIN = 120.0;
 
     private List<ProcessNode> nodes = new ArrayList<>();
     private List<NodeConnection> connections = new ArrayList<>();
@@ -39,6 +44,11 @@ public class NodeCanvas extends Pane {
     // 日志回调
     private LogCallback logCallback;
     private Runnable onNodeMoved; // 节点移动回调
+
+    private final Map<ProcessNode, double[]> autoShiftOriginalPositions = new HashMap<>();
+    private ProcessNode currentDraggingNode;
+    private double autoShiftApplied = 0.0;
+    private ScrollPane hostingScrollPane;
 
     public interface LogCallback {
         void log(String message);
@@ -60,6 +70,10 @@ public class NodeCanvas extends Pane {
     
     public void setOnLog(LogCallback callback) {
         this.logCallback = callback;
+    }
+
+    public void setScrollPane(ScrollPane scrollPane) {
+        this.hostingScrollPane = scrollPane;
     }
     
     public List<ProcessNode> getNodes() {
@@ -136,6 +150,141 @@ public class NodeCanvas extends Pane {
             logCallback.log(message);
         }
     }
+
+    private void beginAutoShiftSession(ProcessNode node) {
+        currentDraggingNode = node;
+        autoShiftOriginalPositions.clear();
+        autoShiftApplied = 0.0;
+    }
+
+    private void endAutoShiftSession() {
+        currentDraggingNode = null;
+        autoShiftOriginalPositions.clear();
+        autoShiftApplied = 0.0;
+    }
+
+    private Point2D adjustNodePositionOnDrag(ProcessNode node, double proposedX, double proposedY) {
+        double adjustedX = Math.max(0, proposedX);
+        double adjustedY = Math.max(0, proposedY);
+
+        if (currentDraggingNode == node) {
+            if (adjustedY < TOP_DRAG_MARGIN) {
+                double requiredShift = TOP_DRAG_MARGIN - adjustedY;
+                double incrementalShift = requiredShift - autoShiftApplied;
+                if (incrementalShift > 0) {
+                    shiftOtherNodesVertically(node, incrementalShift);
+                    autoShiftApplied += incrementalShift;
+                }
+                adjustedY = TOP_DRAG_MARGIN;
+            } else if (autoShiftApplied > 0) {
+                double release = Math.min(autoShiftApplied, adjustedY - TOP_DRAG_MARGIN);
+                if (release > 0) {
+                    shiftOtherNodesVertically(node, -release);
+                    autoShiftApplied -= release;
+                }
+            }
+        }
+
+        return new Point2D(adjustedX, adjustedY);
+    }
+
+    private void shiftOtherNodesVertically(ProcessNode sourceNode, double delta) {
+        if (Math.abs(delta) < 1e-3) {
+            return;
+        }
+
+        for (ProcessNode node : nodes) {
+            if (node == sourceNode) {
+                continue;
+            }
+            recordOriginalPosition(node);
+            node.setLayoutY(node.getLayoutY() + delta);
+        }
+
+        notifyNodeStructureChanged();
+    }
+
+    private void recordOriginalPosition(ProcessNode node) {
+        autoShiftOriginalPositions.computeIfAbsent(node,
+                key -> new double[]{node.getLayoutX(), node.getLayoutY()});
+    }
+
+    private void handleNodePositionChanged(ProcessNode node) {
+        if (node == null || node != currentDraggingNode) {
+            return;
+        }
+        autoScrollIfNeeded(node);
+    }
+
+    private void autoScrollIfNeeded(ProcessNode node) {
+        if (hostingScrollPane == null) {
+            return;
+        }
+
+        Bounds viewportBounds = hostingScrollPane.getViewportBounds();
+        if (viewportBounds == null || viewportBounds.getWidth() <= 0 || viewportBounds.getHeight() <= 0) {
+            return;
+        }
+
+        Bounds viewportInScene = hostingScrollPane.localToScene(viewportBounds);
+        if (viewportInScene == null) {
+            return;
+        }
+
+        Bounds viewportInCanvas = sceneToLocal(viewportInScene);
+        if (viewportInCanvas == null) {
+            return;
+        }
+
+        Bounds nodeBounds = node.getBoundsInParent();
+
+        double contentWidth = getBoundsInLocal().getWidth();
+        double contentHeight = getBoundsInLocal().getHeight();
+        double viewportWidth = viewportInCanvas.getWidth();
+        double viewportHeight = viewportInCanvas.getHeight();
+
+        double contentMaxX = Math.max(contentWidth - viewportWidth, 0);
+        double contentMaxY = Math.max(contentHeight - viewportHeight, 0);
+
+        double viewportMinX = viewportInCanvas.getMinX();
+        double viewportMaxX = viewportInCanvas.getMaxX();
+        double viewportMinY = viewportInCanvas.getMinY();
+        double viewportMaxY = viewportInCanvas.getMaxY();
+
+        double newViewportX = viewportMinX;
+        double newViewportY = viewportMinY;
+
+        if (nodeBounds.getMinY() < viewportMinY + AUTO_SCROLL_MARGIN) {
+            newViewportY = Math.max(nodeBounds.getMinY() - AUTO_SCROLL_MARGIN, 0);
+        } else if (nodeBounds.getMaxY() > viewportMaxY - AUTO_SCROLL_MARGIN) {
+            newViewportY = Math.min(nodeBounds.getMaxY() + AUTO_SCROLL_MARGIN - viewportHeight, contentMaxY);
+        }
+
+        if (nodeBounds.getMinX() < viewportMinX + AUTO_SCROLL_MARGIN) {
+            newViewportX = Math.max(nodeBounds.getMinX() - AUTO_SCROLL_MARGIN, 0);
+        } else if (nodeBounds.getMaxX() > viewportMaxX - AUTO_SCROLL_MARGIN) {
+            newViewportX = Math.min(nodeBounds.getMaxX() + AUTO_SCROLL_MARGIN - viewportWidth, contentMaxX);
+        }
+
+        if (contentMaxY > 0 && Math.abs(newViewportY - viewportMinY) > 1e-3) {
+            hostingScrollPane.setVvalue(clamp01(newViewportY / contentMaxY));
+        } else if (contentMaxY <= 0) {
+            hostingScrollPane.setVvalue(0);
+        }
+
+        if (contentMaxX > 0 && Math.abs(newViewportX - viewportMinX) > 1e-3) {
+            hostingScrollPane.setHvalue(clamp01(newViewportX / contentMaxX));
+        } else if (contentMaxX <= 0) {
+            hostingScrollPane.setHvalue(0);
+        }
+    }
+
+    private double clamp01(double value) {
+        if (Double.isNaN(value) || Double.isInfinite(value)) {
+            return 0;
+        }
+        return Math.max(0, Math.min(1, value));
+    }
     
     /**
      * 添加节点
@@ -172,12 +321,38 @@ public class NodeCanvas extends Pane {
             }
         });
 
+        node.setOnDragStarted(() -> beginAutoShiftSession(node));
+        node.setPositionAdjuster((processNode, proposedX, proposedY) ->
+                adjustNodePositionOnDrag(processNode, proposedX, proposedY));
+        node.setOnPositionChanged(this::handleNodePositionChanged);
+
         // 拖拽结束后记录历史
         node.setOnDragFinished((oldX, oldY, newX, newY) -> {
             if (undoRedoManager != null && historyEnabled) {
-                pushAction(new MoveNodeAction(node, oldX, oldY, newX, newY));
+                CanvasAction action;
+                if (!autoShiftOriginalPositions.isEmpty()) {
+                    Map<ProcessNode, NodePositionSnapshot> shiftedNodes = new HashMap<>();
+                    for (Map.Entry<ProcessNode, double[]> entry : autoShiftOriginalPositions.entrySet()) {
+                        ProcessNode shiftedNode = entry.getKey();
+                        double[] original = entry.getValue();
+                        shiftedNodes.put(
+                            shiftedNode,
+                            new NodePositionSnapshot(
+                                original[0],
+                                original[1],
+                                shiftedNode.getLayoutX(),
+                                shiftedNode.getLayoutY()
+                            )
+                        );
+                    }
+                    action = new MoveNodeGroupAction(node, oldX, oldY, newX, newY, shiftedNodes);
+                } else {
+                    action = new MoveNodeAction(node, oldX, oldY, newX, newY);
+                }
+                pushAction(action);
             }
             notifyNodeStructureChanged();
+            endAutoShiftSession();
         });
 
         // 监听节点位置变化，动态调整画布大小（仅注册一次）
@@ -964,6 +1139,69 @@ public class NodeCanvas extends Pane {
         public void redo() {
             node.setLayoutX(newX);
             node.setLayoutY(newY);
+            notifyNodeStructureChanged();
+        }
+    }
+
+    private static class NodePositionSnapshot {
+        final double oldX;
+        final double oldY;
+        final double newX;
+        final double newY;
+
+        NodePositionSnapshot(double oldX, double oldY, double newX, double newY) {
+            this.oldX = oldX;
+            this.oldY = oldY;
+            this.newX = newX;
+            this.newY = newY;
+        }
+    }
+
+    private class MoveNodeGroupAction implements CanvasAction {
+        private final ProcessNode mainNode;
+        private final double mainOldX;
+        private final double mainOldY;
+        private final double mainNewX;
+        private final double mainNewY;
+        private final Map<ProcessNode, NodePositionSnapshot> shiftedNodes;
+
+        MoveNodeGroupAction(ProcessNode mainNode,
+                            double mainOldX,
+                            double mainOldY,
+                            double mainNewX,
+                            double mainNewY,
+                            Map<ProcessNode, NodePositionSnapshot> shiftedNodes) {
+            this.mainNode = mainNode;
+            this.mainOldX = mainOldX;
+            this.mainOldY = mainOldY;
+            this.mainNewX = mainNewX;
+            this.mainNewY = mainNewY;
+            this.shiftedNodes = shiftedNodes;
+        }
+
+        @Override
+        public void undo() {
+            mainNode.setLayoutX(mainOldX);
+            mainNode.setLayoutY(mainOldY);
+            for (Map.Entry<ProcessNode, NodePositionSnapshot> entry : shiftedNodes.entrySet()) {
+                ProcessNode node = entry.getKey();
+                NodePositionSnapshot snapshot = entry.getValue();
+                node.setLayoutX(snapshot.oldX);
+                node.setLayoutY(snapshot.oldY);
+            }
+            notifyNodeStructureChanged();
+        }
+
+        @Override
+        public void redo() {
+            mainNode.setLayoutX(mainNewX);
+            mainNode.setLayoutY(mainNewY);
+            for (Map.Entry<ProcessNode, NodePositionSnapshot> entry : shiftedNodes.entrySet()) {
+                ProcessNode node = entry.getKey();
+                NodePositionSnapshot snapshot = entry.getValue();
+                node.setLayoutX(snapshot.newX);
+                node.setLayoutY(snapshot.newY);
+            }
             notifyNodeStructureChanged();
         }
     }

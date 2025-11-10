@@ -18,6 +18,7 @@ import com.cc.job.admin.task.service.JobEdgeService;
 import com.cc.job.admin.task.service.JobInfoService;
 import com.cc.job.admin.task.service.JobNodeService;
 import com.cc.job.admin.task.websocket.model.Message;
+import com.cc.job.admin.task.enums.ExecutorRouteStrategyEnum;
 import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.biz.model.TriggerParam;
 import com.xxl.job.core.context.XxlJobContext;
@@ -501,11 +502,46 @@ public class JobGroupXxlJob {
      * @param randomId      随机ID
      */
     private void triggerJob(XxlJobContext xxlJobContext, JobInfo jobInfo, String randomId) {
-        logger.debug("[JobGroup] 开始触发任务 - jobId: {}, 执行器处理器: {}, 随机ID: {}",
-                jobInfo.getId(), jobInfo.getExecutorHandler(), randomId);
+         logger.debug("[JobGroup] 开始触发任务 - jobId: {}, 执行器处理器: {}, 随机ID: {}",
+                 jobInfo.getId(), jobInfo.getExecutorHandler(), randomId);
+ 
+         JobGroup group = XxlJobAdminConfig.getAdminConfig().getJobGroupMapper().selectById(jobInfo.getJobGroup());
+         String ip = IpUtil.getIp();
+         String adminAddress = String.format(ADMIN_ADDRESS, ip, port);
 
-        JobGroup group = XxlJobAdminConfig.getAdminConfig().getJobGroupMapper().selectById(jobInfo.getJobGroup());
-        // 2、init trigger-param
+         List<String> registryList = group.getRegistryList();
+         if (registryList == null || registryList.isEmpty()) {
+             logger.error("[JobGroup] 当前执行器组未注册可用实例 - jobId: {}", jobInfo.getId());
+             throw new BusinessException("执行器未注册，无法触发任务");
+         }
+ 
+         ExecutorRouteStrategyEnum routeStrategyEnum = ExecutorRouteStrategyEnum.match(
+                 jobInfo.getExecutorRouteStrategy(), ExecutorRouteStrategyEnum.FIRST);
+
+         if (ExecutorRouteStrategyEnum.SHARDING_BROADCAST == routeStrategyEnum) {
+             for (int i = 0; i < registryList.size(); i++) {
+                 TriggerParam broadcastParam = createTriggerParam(jobInfo, randomId, xxlJobContext, adminAddress, i,
+                         registryList.size());
+                 doTrigger(jobInfo, randomId, xxlJobContext, broadcastParam, registryList.get(i));
+             }
+             return;
+         }
+
+         TriggerParam triggerParam = createTriggerParam(jobInfo, randomId, xxlJobContext, adminAddress, 0, 1);
+         ReturnT<String> routeResult = routeStrategyEnum.getRouter().route(triggerParam, registryList);
+         if (routeResult == null || routeResult.getCode() != ReturnT.SUCCESS_CODE
+                 || routeResult.getContent() == null) {
+             String reason = routeResult != null ? routeResult.getMsg() : "未获取到可用执行器";
+             logger.error("[JobGroup] 触发路由失败 - jobId: {}, route: {}, 原因: {}", jobInfo.getId(), routeStrategyEnum,
+                     reason);
+             throw new BusinessException("触发路由失败: " + reason);
+         }
+
+         doTrigger(jobInfo, randomId, xxlJobContext, triggerParam, routeResult.getContent());
+     }
+
+    private TriggerParam createTriggerParam(JobInfo jobInfo, String randomId, XxlJobContext xxlJobContext,
+            String adminAddress, int broadcastIndex, int broadcastTotal) {
         TriggerParam triggerParam = new TriggerParam();
         triggerParam.setJobId(jobInfo.getId().intValue());
         triggerParam.setExecutorHandler(jobInfo.getExecutorHandler());
@@ -515,21 +551,22 @@ public class JobGroupXxlJob {
         triggerParam.setLogId(-1);
         triggerParam.setGlueType(jobInfo.getGlueType());
         triggerParam.setGlueSource(jobInfo.getGlueSource());
-        triggerParam.setGlueUpdatetime(jobInfo.getGlueUpdatetime().toInstant(ZoneOffset.of("+8")).toEpochMilli());
-        triggerParam.setBroadcastIndex(0);
-        triggerParam.setBroadcastTotal(1);
-        // 设置请求信息
+        if (jobInfo.getGlueUpdatetime() != null) {
+            triggerParam.setGlueUpdatetime(jobInfo.getGlueUpdatetime().toInstant(ZoneOffset.of("+8")).toEpochMilli());
+        }
+        triggerParam.setBroadcastIndex(broadcastIndex);
+        triggerParam.setBroadcastTotal(broadcastTotal);
         triggerParam.setReqBody(jobInfo.getReqBody());
         triggerParam.setReqHeader(jobInfo.getReqHeader());
         triggerParam.setReqType(jobInfo.getReqType());
         triggerParam.setReqUrl(jobInfo.getReqUrl());
         triggerParam.setXxlJobContext(xxlJobContext);
-        // 得到本地的ip和host
-        String ip = IpUtil.getIp();
-        String adminAddress = String.format(ADMIN_ADDRESS, ip, port);
         triggerParam.setAddress(adminAddress);
+        return triggerParam;
+    }
 
-        String address = group.getRegistryList().get(0);
+    private void doTrigger(JobInfo jobInfo, String randomId, XxlJobContext xxlJobContext, TriggerParam triggerParam,
+            String address) {
         logger.debug("[JobGroup] 发送任务到执行器 - jobId: {}, 执行器地址: {}", jobInfo.getId(), address);
 
         ReturnT<String> returnT = XxlJobTrigger.runExecutor(triggerParam, address);
@@ -539,10 +576,11 @@ public class JobGroupXxlJob {
                     "========================================= 任务触发失败 =========================================");
             XxlJobHelper.log(xxlJobContext, "任务ID: {}, 错误信息: {}", jobInfo.getId(), returnT.getMsg());
             JobGroupXxlJob.addJobData(setExecuteJobId(jobInfo.getId(), randomId), false);
-        } else {
-            logger.debug("[JobGroup] 任务触发成功 - jobId: {}", jobInfo.getId());
-            XxlJobHelper.log(xxlJobContext, "任务触发成功 - 任务ID: {}", jobInfo.getId());
+            throw new RuntimeException(returnT.getMsg());
         }
+
+        logger.debug("[JobGroup] 任务触发成功 - jobId: {}", jobInfo.getId());
+        XxlJobHelper.log(xxlJobContext, "任务触发成功 - 任务ID: {}", jobInfo.getId());
     }
 
     /**

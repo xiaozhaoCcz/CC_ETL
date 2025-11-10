@@ -121,6 +121,7 @@ public class MainView extends BorderPane {
         undoRedoManager.setOnChange(this::updateUndoRedoButtons);
         canvas.setUndoRedoManager(undoRedoManager);
         scrollPane = new ScrollPane(canvas);
+        canvas.setScrollPane(scrollPane);
         scrollPane.setFitToWidth(false);
         scrollPane.setFitToHeight(false);
         scrollPane.getStyleClass().add("canvas-scroller");
