@@ -645,6 +645,8 @@ public class JobComposeServiceImpl implements JobComposeService {
             jobNodeVo.setJobName(jobInfo.getJobDesc());
             jobNodeVo.setId(randomId + node.getId());
             jobNodeVo.setIsPause(jobInfo.getIsPause());
+            // 显式传递节点运行状态，避免序列化遗漏
+            jobNodeVo.setTriggerStatus(node.getTriggerStatus());
             if (DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType())) {
                 String children = node.getChildren();
                 List<String> childIds = JSONUtil.parseArray(children).toList(String.class);

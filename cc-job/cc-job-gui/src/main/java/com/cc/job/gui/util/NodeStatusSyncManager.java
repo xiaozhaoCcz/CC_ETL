@@ -1,7 +1,6 @@
 package com.cc.job.gui.util;
 
 import com.cc.job.gui.service.JobInfoService;
-import javafx.application.Platform;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -17,6 +16,9 @@ public class NodeStatusSyncManager {
     
     // 待更新的节点状态 Map<jobId, triggerStatus>
     private final Map<Long, Integer> pendingUpdates = new ConcurrentHashMap<>();
+
+    // 最近一次收到的节点状态缓存（即使未落库也可读取）
+    private final Map<Long, Integer> latestStatusCache = new ConcurrentHashMap<>();
     
     // 线程池
     private final ScheduledExecutorService executorService;
@@ -79,10 +81,11 @@ public class NodeStatusSyncManager {
         if (jobId == null || triggerStatus == null) {
             return;
         }
-        
+
         pendingUpdates.put(jobId, triggerStatus);
-        System.out.println("📝 添加待更新节点状态: jobId=" + jobId + ", triggerStatus=" + triggerStatus + 
-                          " (待更新数量: " + pendingUpdates.size() + ")");
+        latestStatusCache.put(jobId, triggerStatus);
+        System.out.println("📝 添加待更新节点状态: jobId=" + jobId + ", triggerStatus=" + triggerStatus +
+                " (待更新数量: " + pendingUpdates.size() + ")");
     }
     
     /**
@@ -90,7 +93,7 @@ public class NodeStatusSyncManager {
      */
     private void startPeriodicSync() {
         syncTask = executorService.scheduleWithFixedDelay(
-            this::syncPendingUpdates,
+            this::syncPendingUpdatesInternal,
             SYNC_INTERVAL_SECONDS,
             SYNC_INTERVAL_SECONDS,
             TimeUnit.SECONDS
@@ -102,37 +105,34 @@ public class NodeStatusSyncManager {
      * 立即同步所有待更新的节点状态
      */
     public void syncNow() {
-        executorService.execute(this::syncPendingUpdates);
+        executorService.execute(this::syncPendingUpdatesInternal);
+    }
+
+    /**
+     * 立即同步所有待更新的节点状态（阻塞当前线程）
+     */
+    public void syncNowBlocking() {
+        syncPendingUpdatesInternal();
     }
     
     /**
      * 同步待更新的节点状态（批量更新）
      */
-    private void syncPendingUpdates() {
-        if (pendingUpdates.isEmpty()) {
+    private void syncPendingUpdatesInternal() {
+        Map<Long, Integer> updatesToSync = drainPendingUpdates();
+        if (updatesToSync.isEmpty()) {
             return;
         }
-        
-        // 复制当前待更新的状态
-        Map<Long, Integer> updatesToSync = new HashMap<>(pendingUpdates);
-        
-        // 清空待更新列表
-        pendingUpdates.clear();
-        
+
         System.out.println("🔄 开始批量同步节点状态，共 " + updatesToSync.size() + " 个节点");
-        
+
         try {
-            // 调用批量更新API
             jobInfoService.batchUpdateNodeStatus(updatesToSync);
-            
             System.out.println("✅ 批量同步节点状态成功: " + updatesToSync.size() + " 个节点");
-            
         } catch (Exception e) {
             System.err.println("❌ 批量同步节点状态失败: " + e.getMessage());
             e.printStackTrace();
-            
-            // 失败时重新加入待更新列表
-            pendingUpdates.putAll(updatesToSync);
+            requeuePendingUpdates(updatesToSync);
         }
     }
     
@@ -166,7 +166,7 @@ public class NodeStatusSyncManager {
             System.out.println("⏳ 正在同步到数据库...");
             
             // 立即同步（阻塞执行，确保完成）
-            syncPendingUpdates();
+            syncPendingUpdatesInternal();
             
             // 等待一小段时间确保API调用完成
             try {
@@ -179,7 +179,7 @@ public class NodeStatusSyncManager {
             if (!pendingUpdates.isEmpty()) {
                 System.out.println("⚠️ 仍有 " + pendingUpdates.size() + " 个节点状态未同步成功");
                 System.out.println("🔄 进行第二次尝试...");
-                syncPendingUpdates();
+                syncPendingUpdatesInternal();
                 try {
                     Thread.sleep(500);
                 } catch (InterruptedException e) {
@@ -219,6 +219,49 @@ public class NodeStatusSyncManager {
         
         System.out.println("✓ 节点状态同步管理器已关闭");
         System.out.println("════════════════════════════════");
+    }
+
+    private Map<Long, Integer> drainPendingUpdates() {
+        if (pendingUpdates.isEmpty()) {
+            return java.util.Collections.emptyMap();
+        }
+        synchronized (pendingUpdates) {
+            if (pendingUpdates.isEmpty()) {
+                return java.util.Collections.emptyMap();
+            }
+            Map<Long, Integer> snapshot = new HashMap<>(pendingUpdates);
+            pendingUpdates.clear();
+            return snapshot;
+        }
+    }
+
+    private void requeuePendingUpdates(Map<Long, Integer> updates) {
+        if (updates == null || updates.isEmpty()) {
+            return;
+        }
+        synchronized (pendingUpdates) {
+            pendingUpdates.putAll(updates);
+        }
+    }
+
+    /**
+     * 获取缓存中的节点状态（可能尚未落库）
+     */
+    public Integer getCachedStatus(Long jobId) {
+        if (jobId == null) {
+            return null;
+        }
+        return latestStatusCache.get(jobId);
+    }
+
+    /**
+     * 记忆某个节点的运行状态（不会加入待同步队列）
+     */
+    public void rememberStatus(Long jobId, Integer triggerStatus) {
+        if (jobId == null || triggerStatus == null) {
+            return;
+        }
+        latestStatusCache.put(jobId, triggerStatus);
     }
 }
 

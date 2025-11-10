@@ -854,10 +854,23 @@ public class NodeCanvas extends Pane {
                     }
 
                     // ⭐ 恢复节点运行状态（triggerStatus）
-                    if (nodeData.getTriggerStatus() != null && nodeData.getTriggerStatus() > 0) {
-                        node.updateStatusByCode(nodeData.getTriggerStatus());
-                        System.out.println("✅ 恢复节点运行状态: " + text + " -> " + nodeData.getTriggerStatus());
-                        log("✅ 恢复节点运行状态: " + text + " -> " + nodeData.getTriggerStatus());
+                    Integer triggerStatus = nodeData.getTriggerStatus();
+                    Long nodeJobId = nodeData.getJobId();
+                    if (triggerStatus == null && nodeJobId != null) {
+                        triggerStatus = com.cc.job.gui.util.NodeStatusSyncManager.getInstance()
+                                .getCachedStatus(nodeJobId);
+                        if (triggerStatus != null) {
+                            System.out.println("ℹ️ 使用缓存的节点运行状态: " + text + " -> " + triggerStatus);
+                        }
+                    }
+                    if (triggerStatus != null) {
+                        node.updateStatusByCode(triggerStatus);
+                        if (nodeJobId != null) {
+                            com.cc.job.gui.util.NodeStatusSyncManager.getInstance()
+                                    .rememberStatus(nodeJobId, triggerStatus);
+                        }
+                        System.out.println("✅ 恢复节点运行状态: " + text + " -> " + triggerStatus);
+                        log("✅ 恢复节点运行状态: " + text + " -> " + triggerStatus);
                     }
 
                     // 设置位置
@@ -1077,6 +1090,10 @@ public class NodeCanvas extends Pane {
      */
     public void syncPendingNodeStatus() {
         com.cc.job.gui.util.NodeStatusSyncManager.getInstance().syncNow();
+    }
+
+    public void syncPendingNodeStatusBlocking() {
+        com.cc.job.gui.util.NodeStatusSyncManager.getInstance().syncNowBlocking();
     }
     
     /**

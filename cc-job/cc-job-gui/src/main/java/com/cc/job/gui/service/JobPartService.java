@@ -194,12 +194,24 @@ public class JobPartService extends  BaseService {
                     }
                     
                     // 解析节点运行状态
-                    if (nodeMap.get("triggerStatus") != null) {
+                    Object triggerObj = nodeMap.get("triggerStatus");
+                    if (triggerObj != null) {
                         try {
-                            node.setTriggerStatus(((Number) nodeMap.get("triggerStatus")).intValue());
-                            System.out.println("✅ 解析节点运行状态: " + node.getId() + " -> " + node.getTriggerStatus());
+                            if (triggerObj instanceof Number number) {
+                                node.setTriggerStatus(number.intValue());
+                            } else if (triggerObj instanceof String str && !str.isBlank()) {
+                                node.setTriggerStatus(Integer.parseInt(str.trim()));
+                            } else {
+                                node.setTriggerStatus(null);
+                            }
+                            if (node.getTriggerStatus() != null) {
+                                System.out.println("✅ 解析节点运行状态: " + node.getId() + " -> " + node.getTriggerStatus());
+                            } else {
+                                System.out.println("ℹ️ 节点运行状态为空: " + node.getId());
+                            }
                         } catch (Exception e) {
-                            System.err.println("解析节点 triggerStatus 失败: " + e.getMessage());
+                            System.err.println("解析节点 triggerStatus 失败: " + triggerObj + ", 错误: " + e.getMessage());
+                            node.setTriggerStatus(null);
                         }
                     }
                     

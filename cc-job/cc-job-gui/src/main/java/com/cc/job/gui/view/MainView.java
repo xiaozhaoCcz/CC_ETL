@@ -405,13 +405,14 @@ public class MainView extends BorderPane {
         logPanel.info("开始加载任务组: " + taskName);
         logPanel.info("任务组ID: " + taskId);
         
-        // ⭐ 页面切换前，先同步当前页面的节点状态到数据库
-        canvas.syncPendingNodeStatus();
-        logPanel.info("已触发节点状态批量同步");
+        logPanel.info("准备同步当前任务组的节点运行状态...");
 
         // 在后台线程中加载数据
         new Thread(() -> {
             try {
+                canvas.syncPendingNodeStatusBlocking();
+                Platform.runLater(() -> logPanel.info("节点状态同步完成，开始加载最新数据"));
+
                 JobComposeData composeData = jobPartService.getJobCompose(taskId);
 
                 // 在 JavaFX 主线程中更新 UI
