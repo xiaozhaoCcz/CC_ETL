@@ -1,6 +1,7 @@
 package com.cc.job.gui.view;
 
 import com.cc.job.gui.model.RunningJobGroup;
+import com.cc.job.gui.util.StyleUtil;
 import javafx.animation.FadeTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -61,25 +62,30 @@ public class TaskNavigationBar extends HBox {
     
     private void initializeUI() {
         setStyle(
-            "-fx-background-color: #F9FAFB; " +
-            "-fx-border-color: #E5E7EB; " +
+            "-fx-background-color: linear-gradient(to right, rgba(255,255,255,0.98), rgba(243,244,246,0.96)); " +
+            "-fx-border-color: transparent transparent rgba(148,163,184,0.35) transparent; " +
             "-fx-border-width: 0 0 1 0; " +
-            "-fx-padding: 5 10 5 10;"
+            "-fx-padding: 8 16 8 16;"
         );
-        setSpacing(5);
+        setSpacing(8);
         setAlignment(Pos.CENTER_LEFT);
-        setPrefHeight(45);
+        setPrefHeight(54);
         
         // 标签容器
-        tabContainer = new HBox(5);
+        tabContainer = new HBox(8);
         tabContainer.setAlignment(Pos.CENTER_LEFT);
+        tabContainer.setPadding(new Insets(0, 12, 0, 0));
         
         // 滚动面板包装标签容器
         ScrollPane scrollPane = new ScrollPane(tabContainer);
         scrollPane.setFitToHeight(true);
         scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-        scrollPane.setStyle("-fx-background-color: transparent; -fx-border-width: 0;");
+        scrollPane.setStyle(
+            "-fx-background-color: transparent; " +
+            "-fx-border-width: 0; " +
+            "-fx-padding: 0;"
+        );
         scrollPane.setPannable(true);
         
         HBox.setHgrow(scrollPane, Priority.ALWAYS);
@@ -344,10 +350,29 @@ public class TaskNavigationBar extends HBox {
      */
     private static class TaskTab extends StackPane {
         
-        private String taskGroupName;
+        private static final String BASE_STYLE =
+            "-fx-background-radius: 10; " +
+            "-fx-border-radius: 10; " +
+            "-fx-border-width: 1; " +
+            "-fx-cursor: hand; " +
+            "-fx-effect: null;";
+        private static final String NORMAL_STYLE = BASE_STYLE +
+            "-fx-background-color: rgba(255,255,255,0.88); " +
+            "-fx-border-color: rgba(148,163,184,0.45);";
+        private static final String HOVER_STYLE = BASE_STYLE +
+            "-fx-background-color: rgba(241,245,249,0.95); " +
+            "-fx-border-color: rgba(99,102,241,0.35); " +
+            "-fx-effect: dropshadow(gaussian, rgba(99,102,241,0.12), 12, 0, 0, 2);";
+        private static final String ACTIVE_STYLE = BASE_STYLE +
+            "-fx-background-color: linear-gradient(to bottom, rgba(99,102,241,0.2), rgba(79,70,229,0.28)); " +
+            "-fx-border-color: rgba(79,70,229,0.6); " +
+            "-fx-effect: dropshadow(gaussian, rgba(79,70,229,0.32), 20, 0, 0, 4);";
+        
+        private final String taskGroupName;
         private boolean active;
         private Runnable onClickCallback;
         private Runnable onCloseCallback;
+        private Label nameLabel;
         
         // 运行状态指示器
         private Circle runningIndicator;
@@ -360,23 +385,18 @@ public class TaskNavigationBar extends HBox {
         }
         
         private void initializeUI() {
-            setPadding(new Insets(5, 10, 5, 10));
-            setStyle(
-                "-fx-background-color: #FFFFFF; " +
-                "-fx-border-color: #E5E7EB; " +
-                "-fx-border-width: 1; " +
-                "-fx-border-radius: 5 5 0 0; " +
-                "-fx-background-radius: 5 5 0 0; " +
-                "-fx-cursor: hand;"
-            );
+            setPadding(new Insets(6, 14, 6, 14));
+            setStyle(NORMAL_STYLE);
             
-            HBox content = new HBox(8);
+            HBox content = new HBox(10);
             content.setAlignment(Pos.CENTER_LEFT);
             
             // 运行状态指示器（小绿点）
-            runningIndicator = new Circle(4);
-            runningIndicator.setFill(Color.web("#10B981"));
+            runningIndicator = new Circle(4.5);
+            runningIndicator.setFill(Color.web(StyleUtil.SUCCESS));
+            runningIndicator.setStroke(Color.TRANSPARENT);
             runningIndicator.setVisible(false);
+            runningIndicator.setEffect(new javafx.scene.effect.Glow(0.6));
             
             // 设置闪烁动画
             blinkAnimation = new FadeTransition(Duration.millis(800), runningIndicator);
@@ -386,38 +406,47 @@ public class TaskNavigationBar extends HBox {
             blinkAnimation.setAutoReverse(true);
             
             // 任务组名称
-            Label nameLabel = new Label(taskGroupName);
-            nameLabel.setStyle("-fx-font-size: 12; -fx-text-fill: #374151;");
+            nameLabel = new Label(taskGroupName);
+            nameLabel.setStyle(
+                "-fx-font-size: 12.5px; " +
+                "-fx-font-weight: 600; " +
+                "-fx-text-fill: " + StyleUtil.GRAY_600 + ";"
+            );
             
             // 关闭按钮
-            Button closeBtn = new Button("✕");
-            closeBtn.setStyle(
-                "-fx-background-color: transparent; " +
-                "-fx-text-fill: #9CA3AF; " +
-                "-fx-font-size: 12; " +
-                "-fx-padding: 0 4 0 4; " +
-                "-fx-cursor: hand;"
+            Label closeIcon = new Label("×");
+            closeIcon.setStyle(
+                "-fx-text-fill: " + StyleUtil.GRAY_400 + "; " +
+                "-fx-font-size: 13px; " +
+                "-fx-font-weight: 400; " +
+                "-fx-padding: 0;"
             );
-            closeBtn.setOnMouseEntered(e -> closeBtn.setStyle(
-                "-fx-background-color: #FEE2E2; " +
-                "-fx-text-fill: #DC2626; " +
-                "-fx-font-size: 12; " +
-                "-fx-padding: 0 4 0 4; " +
-                "-fx-cursor: hand; " +
-                "-fx-background-radius: 3;"
-            ));
-            closeBtn.setOnMouseExited(e -> closeBtn.setStyle(
-                "-fx-background-color: transparent; " +
-                "-fx-text-fill: #9CA3AF; " +
-                "-fx-font-size: 12; " +
-                "-fx-padding: 0 4 0 4; " +
-                "-fx-cursor: hand;"
-            ));
-            closeBtn.setOnAction(e -> {
+            StackPane closeBtn = new StackPane(closeIcon);
+            closeBtn.setPrefSize(20, 20);
+            closeBtn.setStyle("-fx-background-color: transparent; -fx-background-radius: 10; -fx-cursor: hand;");
+            closeBtn.setOnMouseEntered(e -> {
+                closeBtn.setStyle("-fx-background-color: rgba(239,68,68,0.12); -fx-background-radius: 10; -fx-cursor: hand;");
+                closeIcon.setStyle(
+                    "-fx-text-fill: " + StyleUtil.ERROR + "; " +
+                    "-fx-font-size: 13px; " +
+                    "-fx-font-weight: 500; " +
+                    "-fx-padding: 0;"
+                );
+            });
+            closeBtn.setOnMouseExited(e -> {
+                closeBtn.setStyle("-fx-background-color: transparent; -fx-background-radius: 10; -fx-cursor: hand;");
+                closeIcon.setStyle(
+                    "-fx-text-fill: " + StyleUtil.GRAY_400 + "; " +
+                    "-fx-font-size: 13px; " +
+                    "-fx-font-weight: 400; " +
+                    "-fx-padding: 0;"
+                );
+            });
+            closeBtn.setOnMouseClicked(e -> {
                 if (onCloseCallback != null) {
                     onCloseCallback.run();
                 }
-                e.consume(); // 阻止事件冒泡
+                e.consume();
             });
             
             content.getChildren().addAll(runningIndicator, nameLabel, closeBtn);
@@ -433,20 +462,11 @@ public class TaskNavigationBar extends HBox {
             // 悬停效果
             setOnMouseEntered(e -> {
                 if (!active) {
-                    setStyle(
-                        "-fx-background-color: #F3F4F6; " +
-                        "-fx-border-color: #E5E7EB; " +
-                        "-fx-border-width: 1; " +
-                        "-fx-border-radius: 5 5 0 0; " +
-                        "-fx-background-radius: 5 5 0 0; " +
-                        "-fx-cursor: hand;"
-                    );
+                    setStyle(HOVER_STYLE);
                 }
             });
             
-            setOnMouseExited(e -> {
-                updateStyle();
-            });
+            setOnMouseExited(e -> updateStyle());
         }
         
         public void setActive(boolean active) {
@@ -455,23 +475,28 @@ public class TaskNavigationBar extends HBox {
         }
         
         private void updateStyle() {
+            setStyle(active ? ACTIVE_STYLE : NORMAL_STYLE);
+            updateLabelColor();
+        }
+        
+        private void updateLabelColor() {
             if (active) {
-                setStyle(
-                    "-fx-background-color: #EEF2FF; " +
-                    "-fx-border-color: #8B5CF6; " +
-                    "-fx-border-width: 2 2 0 2; " +
-                    "-fx-border-radius: 5 5 0 0; " +
-                    "-fx-background-radius: 5 5 0 0; " +
-                    "-fx-cursor: hand;"
+                nameLabel.setStyle(
+                    "-fx-font-size: 12.5px; " +
+                    "-fx-font-weight: 700; " +
+                    "-fx-text-fill: " + StyleUtil.PRIMARY_DARK + ";"
+                );
+            } else if (isRunning) {
+                nameLabel.setStyle(
+                    "-fx-font-size: 12.5px; " +
+                    "-fx-font-weight: 600; " +
+                    "-fx-text-fill: " + StyleUtil.SUCCESS_DARK + ";"
                 );
             } else {
-                setStyle(
-                    "-fx-background-color: #FFFFFF; " +
-                    "-fx-border-color: #E5E7EB; " +
-                    "-fx-border-width: 1; " +
-                    "-fx-border-radius: 5 5 0 0; " +
-                    "-fx-background-radius: 5 5 0 0; " +
-                    "-fx-cursor: hand;"
+                nameLabel.setStyle(
+                    "-fx-font-size: 12.5px; " +
+                    "-fx-font-weight: 600; " +
+                    "-fx-text-fill: " + StyleUtil.GRAY_600 + ";"
                 );
             }
         }
@@ -502,6 +527,7 @@ public class TaskNavigationBar extends HBox {
                         runningIndicator.setOpacity(1.0);
                     }
                 }
+                updateLabelColor();
             });
         }
         

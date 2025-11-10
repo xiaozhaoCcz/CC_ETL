@@ -17,6 +17,7 @@ import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.form.JobInfoForm;
 import javafx.application.Platform;
 import javafx.geometry.Bounds;
+import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SplitPane;
@@ -86,6 +87,10 @@ public class MainView extends BorderPane {
     }
 
     private void initializeUI() {
+        this.setStyle(
+            "-fx-background-color: linear-gradient(to bottom right, rgba(248,250,252,0.98), rgba(224,231,255,0.98));"
+        );
+        
         // 顶部工具栏
         toolBar = new TopToolBar();
         this.setTop(toolBar);
@@ -95,6 +100,13 @@ public class MainView extends BorderPane {
 
         // 左侧内容区域：树形导航 + 小地图
         leftArea = new javafx.scene.layout.VBox();
+        leftArea.setSpacing(12);
+        leftArea.setPadding(new Insets(16, 12, 16, 16));
+        leftArea.setStyle(
+            "-fx-background-color: rgba(255,255,255,0.92); " +
+            "-fx-border-color: rgba(148,163,184,0.2); " +
+            "-fx-border-width: 0 1 0 0;"
+        );
 
         // 树形导航
         treeView = new TaskTreeView();
@@ -133,6 +145,16 @@ public class MainView extends BorderPane {
 
         // 创建画布区域容器：导航栏 + 画布
         javafx.scene.layout.VBox canvasArea = new javafx.scene.layout.VBox();
+        canvasArea.setSpacing(0);
+        canvasArea.setPadding(new Insets(10, 10, 0, 10));
+        canvasArea.setStyle(
+            "-fx-background-color: rgba(255,255,255,0.96); " +
+            "-fx-background-radius: 20 20 12 12; " +
+            "-fx-border-radius: 20 20 12 12; " +
+            "-fx-border-color: rgba(148,163,184,0.18); " +
+            "-fx-border-width: 1; " +
+            "-fx-effect: dropshadow(gaussian, rgba(15,23,42,0.08), 18, 0, 0, 6);"
+        );
         canvasArea.getChildren().addAll(navigationBar, scrollPane);
         javafx.scene.layout.VBox.setVgrow(scrollPane, javafx.scene.layout.Priority.ALWAYS);
 
@@ -144,12 +166,16 @@ public class MainView extends BorderPane {
         verticalSplit.setOrientation(Orientation.VERTICAL);
         verticalSplit.getItems().addAll(canvasArea, logPanel);
         verticalSplit.setDividerPositions(0.7); // 初始位置：70% 给画布，30% 给日志
+        verticalSplit.setStyle("-fx-background-color: transparent;");
+        verticalSplit.setPadding(new Insets(12, 12, 12, 4));
 
         // 创建水平分割面板：左侧容器和右侧（画布+日志）
         SplitPane horizontalSplit = new SplitPane();
         horizontalSplit.setOrientation(Orientation.HORIZONTAL);
         horizontalSplit.getItems().addAll(leftContainer, verticalSplit);
         horizontalSplit.setDividerPositions(0.2); // 初始位置：20% 给左侧，80% 给右侧
+        horizontalSplit.setStyle("-fx-background-color: transparent;");
+        horizontalSplit.setPadding(new Insets(12));
 
         // 绑定小地图到画布
         miniMap.bindTo(canvas, scrollPane);
