@@ -27,15 +27,14 @@ public class Async {
      */
     private static final Logger logger = LoggerFactory.getLogger(Async.class);
 
+    // 默认线程池上限配置，可按需覆盖
+    private static final int DEFAULT_MAX_POOL_SIZE = 100;
+    private static final int MAX_QUEUE_CAPACITY = 10_000;
+
     // 建立线程池
-    private static final ThreadPoolExecutor COMMON_POOL = new ThreadPoolExecutor(
-            Runtime.getRuntime().availableProcessors(),
-            100,
-            60,
-            TimeUnit.SECONDS,
-            new LinkedBlockingQueue<>(10000),
-            Executors.defaultThreadFactory(),
-            new ThreadPoolExecutor.AbortPolicy());
+    private static volatile ThreadPoolExecutor COMMON_POOL = buildDefaultExecutor(DEFAULT_MAX_POOL_SIZE);
+
+    private static final ConcurrentHashMap<String, ExecutorService> EXECUTOR_CACHE = new ConcurrentHashMap<>();
 
     private static ExecutorService executorService;
 
@@ -115,6 +114,61 @@ public class Async {
     }
 
     /**
+     * 根据任务组特性获取或创建线程池
+     *
+     * @param resourceKey    任务资源键
+     * @param coreSize       最小线程数
+     * @param maxSize        最大线程数
+     * @param keepAlive      空闲保活时间
+     * @param queueCapacity  队列容量
+     * @return ExecutorService
+     */
+    public static ExecutorService getOrCreateExecutor(String resourceKey, int coreSize, int maxSize, long keepAlive,
+                                                      int queueCapacity) {
+        return EXECUTOR_CACHE.computeIfAbsent(resourceKey,
+                key -> buildExecutor(coreSize, maxSize, keepAlive, queueCapacity));
+    }
+
+    /**
+     * 重设默认公共线程池的最大线程数，可在运维层面动态调整
+     *
+     * @param maxPoolSize 最大线程数
+     */
+    public static synchronized void resizeCommonPool(int maxPoolSize) {
+        if (maxPoolSize <= 0) {
+            throw new IllegalArgumentException("maxPoolSize must be positive");
+        }
+        ThreadPoolExecutor oldPool = COMMON_POOL;
+        ThreadPoolExecutor newPool = buildDefaultExecutor(maxPoolSize);
+        COMMON_POOL = newPool;
+        logger.info("[Async] 重建默认线程池，旧最大线程数: {} -> 新最大线程数: {}", oldPool.getMaximumPoolSize(),
+                newPool.getMaximumPoolSize());
+        oldPool.shutdown();
+    }
+
+    private static ThreadPoolExecutor buildDefaultExecutor(int maxPoolSize) {
+        int coreSize = Math.min(Runtime.getRuntime().availableProcessors(), maxPoolSize);
+        return buildExecutor(coreSize, maxPoolSize, 60L, MAX_QUEUE_CAPACITY);
+    }
+
+    private static ThreadPoolExecutor buildExecutor(int coreSize, int maxSize, long keepAliveSeconds, int queueCapacity) {
+        if (coreSize <= 0 || maxSize <= 0 || queueCapacity <= 0) {
+            throw new IllegalArgumentException("coreSize, maxSize, queueCapacity must be > 0");
+        }
+        if (coreSize > maxSize) {
+            coreSize = maxSize;
+        }
+        return new ThreadPoolExecutor(
+                coreSize,
+                maxSize,
+                keepAliveSeconds,
+                TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(queueCapacity),
+                Executors.defaultThreadFactory(),
+                new ThreadPoolExecutor.AbortPolicy());
+    }
+
+    /**
      * 执行任务调度，拓扑排序依赖调度
      *
      * @param timeout    超时时间
@@ -145,71 +199,92 @@ public class Async {
         }
     }
 
-    private static void doWorkWrappers(Map<String, WorkerWrapper> wrapperMap, Map<String, Integer> inDegree, Set<String> submitted, AtomicLong time) {
-        while (!inDegree.isEmpty()) {
-            List<String> inDegreeZero = new ArrayList<>();
-            for (Map.Entry<String, Integer> entry : inDegree.entrySet()) {
-                if (entry.getValue() == 0) {
-                    inDegreeZero.add(entry.getKey());
-                }
+    private static void doWorkWrappers(Map<String, WorkerWrapper> wrapperMap, Map<String, Integer> inDegree,
+                                       Set<String> submitted, AtomicLong time) {
+        BlockingQueue<String> zeroQueue = new LinkedBlockingQueue<>();
+        AtomicInteger remaining = new AtomicInteger(inDegree.size());
+
+        for (Map.Entry<String, Integer> entry : inDegree.entrySet()) {
+            if (entry.getValue() == 0) {
+                zeroQueue.offer(entry.getKey());
+            }
+        }
+
+        while (remaining.get() > 0) {
+            String id;
+            try {
+                id = zeroQueue.poll(100, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                logger.warn("任务调度线程被中断");
+                break;
             }
 
-            for (String id : inDegreeZero) {
-                if (!submitted.add(id)) {
-                    continue;
-                }
+            if (id == null) {
+                continue;
+            }
+            if (!submitted.add(id)) {
+                continue;
+            }
 
-                logger.info("提交任务: {} 到线程池执行", id);
-                executorService.submit(() -> {
-                    WorkerWrapper workerWrapper = null;
-                    try {
-                        // 当前任务
-                        long beginTime = SystemClock.now();
-                        workerWrapper = wrapperMap.get(id);
-                        logger.debug("开始执行任务: {}", id);
-                        doJob(workerWrapper, wrapperMap);
+            logger.info("提交任务: {} 到线程池执行", id);
+            executorService.submit(() -> {
+                WorkerWrapper workerWrapper = null;
+                try {
+                    long beginTime = SystemClock.now();
+                    workerWrapper = wrapperMap.get(id);
+                    logger.debug("开始执行任务: {}", id);
+                    doJob(workerWrapper, wrapperMap);
 
-                        synchronized (inDegree) {
-                            inDegree.remove(id);
-                            List<WorkerWrapper> nextWrappers = workerWrapper.getNextWrappers();
-                            if (nextWrappers != null && !nextWrappers.isEmpty()) {
-                                List<String> nextIds = nextWrappers.stream().map(WorkerWrapper::getId).toList();
-                                for (String nextId : nextIds) {
-                                    // 安全地减少入度，如果nextId不在inDegree中则跳过
-                                    if (nextId != null && inDegree.containsKey(nextId)) {
-                                        inDegree.compute(nextId, (k, i) -> {
-                                            if (i == null) {
-                                                logger.warn("发现inDegree中值为null的任务ID: {}，重置为0", nextId);
-                                                return 0;
-                                            }
-                                            return i - 1;
-                                        });
-                                    } else {
-                                        logger.warn("发现不在inDegree中的任务ID: {}，跳过入度减少", nextId);
-                                    }
+                    synchronized (inDegree) {
+                        inDegree.remove(id);
+                        remaining.decrementAndGet();
+                        List<WorkerWrapper> nextWrappers = workerWrapper.getNextWrappers();
+                        if (nextWrappers != null && !nextWrappers.isEmpty()) {
+                            List<String> nextIds = nextWrappers.stream().map(WorkerWrapper::getId).toList();
+                            for (String nextId : nextIds) {
+                                if (nextId == null || !inDegree.containsKey(nextId)) {
+                                    logger.warn("发现不在inDegree中的任务ID: {}，跳过入度减少", nextId);
+                                    continue;
                                 }
+                                inDegree.compute(nextId, (k, i) -> {
+                                    if (i == null) {
+                                        logger.warn("发现inDegree中值为null的任务ID: {}，重置为0", nextId);
+                                        return 0;
+                                    }
+                                    if (i <= 0) {
+                                        return i;
+                                    }
+                                    int updated = i - 1;
+                                    if (updated == 0) {
+                                        zeroQueue.offer(nextId);
+                                        return 0;
+                                    }
+                                    return updated;
+                                });
                             }
                         }
-                        // 计算剩余时间
-                        long costTime = time.get() - (SystemClock.now() - beginTime);
-                        if (costTime > 0) {
-                            time.set(costTime);
-                            logger.info("任务组剩余时间{}", costTime);
-                        } else {
-                            logger.error("任务组运行超时异常，任务: {}", id);
-                            throw new RuntimeException("任务组运行超时异常");
-                        }
-                        logger.info("任务: {} 执行完成", id);
-                    } catch (Exception e) {
-                        // 项目运行失败，抛出异常
-                        logger.error("任务: {} 执行失败: {}", id, e.getMessage(), e);
-                        synchronized (inDegree) {
-                            inDegree.clear();
-                        }
-                        throw new RuntimeException(e);
                     }
-                });
-            }
+
+                    long costTime = time.get() - (SystemClock.now() - beginTime);
+                    if (costTime > 0) {
+                        time.set(costTime);
+                        logger.info("任务组剩余时间{}", costTime);
+                    } else {
+                        logger.error("任务组运行超时异常，任务: {}", id);
+                        throw new RuntimeException("任务组运行超时异常");
+                    }
+                    logger.info("任务: {} 执行完成", id);
+                } catch (Exception e) {
+                    logger.error("任务: {} 执行失败: {}", id, e.getMessage(), e);
+                    synchronized (inDegree) {
+                        inDegree.clear();
+                        remaining.set(0);
+                    }
+                    zeroQueue.clear();
+                    throw new RuntimeException(e);
+                }
+            });
         }
     }
 

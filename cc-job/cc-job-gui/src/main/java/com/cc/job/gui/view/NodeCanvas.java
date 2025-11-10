@@ -30,6 +30,7 @@ public class NodeCanvas extends Pane {
 
     private static final String NODE_LISTENER_KEY = "nodeCanvasListenersAttached";
     private static final double TOP_DRAG_MARGIN = 80.0;
+    private static final double LEFT_DRAG_MARGIN = 80.0;
     private static final double AUTO_SCROLL_MARGIN = 120.0;
 
     private List<ProcessNode> nodes = new ArrayList<>();
@@ -48,6 +49,7 @@ public class NodeCanvas extends Pane {
     private final Map<ProcessNode, double[]> autoShiftOriginalPositions = new HashMap<>();
     private ProcessNode currentDraggingNode;
     private double autoShiftApplied = 0.0;
+    private double autoShiftAppliedX = 0.0;
     private ScrollPane hostingScrollPane;
 
     public interface LogCallback {
@@ -155,12 +157,14 @@ public class NodeCanvas extends Pane {
         currentDraggingNode = node;
         autoShiftOriginalPositions.clear();
         autoShiftApplied = 0.0;
+        autoShiftAppliedX = 0.0;
     }
 
     private void endAutoShiftSession() {
         currentDraggingNode = null;
         autoShiftOriginalPositions.clear();
         autoShiftApplied = 0.0;
+        autoShiftAppliedX = 0.0;
     }
 
     private Point2D adjustNodePositionOnDrag(ProcessNode node, double proposedX, double proposedY) {
@@ -181,6 +185,22 @@ public class NodeCanvas extends Pane {
                 if (release > 0) {
                     shiftOtherNodesVertically(node, -release);
                     autoShiftApplied -= release;
+                }
+            }
+
+            if (adjustedX < LEFT_DRAG_MARGIN) {
+                double requiredShiftX = LEFT_DRAG_MARGIN - adjustedX;
+                double incrementalShiftX = requiredShiftX - autoShiftAppliedX;
+                if (incrementalShiftX > 0) {
+                    shiftOtherNodesHorizontally(node, incrementalShiftX);
+                    autoShiftAppliedX += incrementalShiftX;
+                }
+                adjustedX = LEFT_DRAG_MARGIN;
+            } else if (autoShiftAppliedX > 0) {
+                double releaseX = Math.min(autoShiftAppliedX, adjustedX - LEFT_DRAG_MARGIN);
+                if (releaseX > 0) {
+                    shiftOtherNodesHorizontally(node, -releaseX);
+                    autoShiftAppliedX -= releaseX;
                 }
             }
         }
@@ -207,6 +227,22 @@ public class NodeCanvas extends Pane {
     private void recordOriginalPosition(ProcessNode node) {
         autoShiftOriginalPositions.computeIfAbsent(node,
                 key -> new double[]{node.getLayoutX(), node.getLayoutY()});
+    }
+
+    private void shiftOtherNodesHorizontally(ProcessNode sourceNode, double delta) {
+        if (Math.abs(delta) < 1e-3) {
+            return;
+        }
+
+        for (ProcessNode node : nodes) {
+            if (node == sourceNode) {
+                continue;
+            }
+            recordOriginalPosition(node);
+            node.setLayoutX(node.getLayoutX() + delta);
+        }
+
+        notifyNodeStructureChanged();
     }
 
     private void handleNodePositionChanged(ProcessNode node) {

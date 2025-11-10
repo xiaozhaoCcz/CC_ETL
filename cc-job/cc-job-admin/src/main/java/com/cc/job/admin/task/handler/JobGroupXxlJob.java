@@ -679,13 +679,25 @@ public class JobGroupXxlJob {
     private void buildGraph(Long jobId, List<JobNode> nodes, List<JobEdge> edges) {
         logger.debug("[JobGroup] 开始构建任务图 - jobId: {}", jobId);
 
-        List<JobNode> nodeList = nodes.stream().filter(v -> v.getJobParentId().equals(jobId)).toList();
-        getNodeList(jobId, nodes, edges, nodeList);
+        Map<Long, List<JobNode>> nodesByParent = new HashMap<>();
+        for (JobNode node : nodes) {
+            nodesByParent.computeIfAbsent(node.getJobParentId(), k -> new ArrayList<>()).add(node);
+        }
+
+        Map<Long, List<JobEdge>> edgesByFrom = new HashMap<>();
+        Map<Long, List<JobEdge>> edgesByTo = new HashMap<>();
+        for (JobEdge edge : edges) {
+            edgesByFrom.computeIfAbsent(edge.getFromNodeId(), k -> new ArrayList<>()).add(edge);
+            edgesByTo.computeIfAbsent(edge.getEndNodeId(), k -> new ArrayList<>()).add(edge);
+        }
+
+        List<JobNode> nodeList = new ArrayList<>(nodesByParent.getOrDefault(jobId, Collections.emptyList()));
+        getNodeList(jobId, nodes, edges, nodeList, nodesByParent, edgesByFrom, edgesByTo);
 
         // 计算节点的入度和出度
         nodes.forEach(node -> {
-            node.setNodeInDegree(edges.stream().filter(v -> v.getEndNodeId().equals(node.getId())).count());
-            node.setNodeOutDegree(edges.stream().filter(v -> v.getFromNodeId().equals(node.getId())).count());
+            node.setNodeInDegree((long) edgesByTo.getOrDefault(node.getId(), Collections.emptyList()).size());
+            node.setNodeOutDegree((long) edgesByFrom.getOrDefault(node.getId(), Collections.emptyList()).size());
             node.setJobParentId(jobId);
         });
         edges.forEach(edge -> edge.setJobParentId(jobId));
@@ -701,17 +713,19 @@ public class JobGroupXxlJob {
      * @param edges    边列表
      * @param nodeList 待处理的节点列表
      */
-    private void getNodeList(Long jobId, List<JobNode> nodes, List<JobEdge> edges, List<JobNode> nodeList) {
+    private void getNodeList(Long jobId, List<JobNode> nodes, List<JobEdge> edges, List<JobNode> nodeList,
+            Map<Long, List<JobNode>> nodesByParent, Map<Long, List<JobEdge>> edgesByFrom,
+            Map<Long, List<JobEdge>> edgesByTo) {
         logger.debug("[JobGroup] 处理节点列表 - jobId: {}, 节点数量: {}", jobId, nodeList.size());
 
         for (JobNode node : nodeList) {
-            List<Long> preNodeIds = edges.stream().filter(v -> v.getEndNodeId().equals(node.getId()))
+            List<Long> preNodeIds = edgesByTo.getOrDefault(node.getId(), Collections.emptyList()).stream()
                     .map(JobEdge::getFromNodeId).toList();
-            List<Long> nextNodeIds = edges.stream().filter(v -> v.getFromNodeId().equals(node.getId()))
+            List<Long> nextNodeIds = edgesByFrom.getOrDefault(node.getId(), Collections.emptyList()).stream()
                     .map(JobEdge::getEndNodeId).toList();
             logger.debug("[JobGroup] 处理节点 - nodeId: {}, 前置节点数量: {}, 后置节点数量: {}",
                     node.getId(), preNodeIds.size(), nextNodeIds.size());
-            concatNode(jobId, node, preNodeIds, nextNodeIds, nodes, edges);
+            concatNode(jobId, node, preNodeIds, nextNodeIds, nodes, edges, nodesByParent, edgesByFrom, edgesByTo);
         }
     }
 
@@ -728,17 +742,17 @@ public class JobGroupXxlJob {
      * @param edges       边列表
      */
     private void concatNode(Long jobId, JobNode currentNode, List<Long> preNodeIds, List<Long> nextNodeIds,
-            List<JobNode> nodes, List<JobEdge> edges) {
+            List<JobNode> nodes, List<JobEdge> edges, Map<Long, List<JobNode>> nodesByParent,
+            Map<Long, List<JobEdge>> edgesByFrom, Map<Long, List<JobEdge>> edgesByTo) {
         JobInfo jobInfo = jobInfoService.getById(currentNode.getJobId());
         if (jobInfo.getJobType() == 2) {
             // 移除与当前节点相关的边
-            edges.removeIf(v -> preNodeIds.contains(v.getFromNodeId()) && v.getEndNodeId().equals(currentNode.getId()));
-            edges.removeIf(
-                    v -> nextNodeIds.contains(v.getEndNodeId()) && v.getFromNodeId().equals(currentNode.getId()));
+            removeEdges(preNodeIds, currentNode.getId(), edges, edgesByFrom, edgesByTo, true);
+            removeEdges(nextNodeIds, currentNode.getId(), edges, edgesByFrom, edgesByTo, false);
 
             // 获取子任务组的节点
-            List<JobNode> childrenNodes = nodes.stream().filter(v -> v.getJobParentId().equals(jobInfo.getId()))
-                    .toList();
+            List<JobNode> childrenNodes = new ArrayList<>(
+                    nodesByParent.getOrDefault(jobInfo.getId(), Collections.emptyList()));
             // 获取开始节点和结束节点
             List<JobNode> startNodes = childrenNodes.stream().filter(v -> v.getNodeInDegree() == 0).toList();
             List<JobNode> endNodes = childrenNodes.stream().filter(v -> v.getNodeOutDegree() == 0).toList();
@@ -750,7 +764,7 @@ public class JobGroupXxlJob {
                     edge.setFromNodeId(preNodeId);
                     edge.setEndNodeId(startNode.getId());
                     edge.setJobParentId(jobId);
-                    edges.add(edge);
+                    addEdge(edge, edges, edgesByFrom, edgesByTo);
                 }
             }
 
@@ -761,15 +775,71 @@ public class JobGroupXxlJob {
                     edge.setFromNodeId(endNode.getId());
                     edge.setEndNodeId(nextNodeId);
                     edge.setJobParentId(jobId);
-                    edges.add(edge);
+                    addEdge(edge, edges, edgesByFrom, edgesByTo);
                 }
             }
 
-            getNodeList(jobId, nodes, edges, childrenNodes);
+            getNodeList(jobId, nodes, edges, childrenNodes, nodesByParent, edgesByFrom, edgesByTo);
 
             // 移除当前节点
             nodes.removeIf(v -> v.getId().equals(currentNode.getId()));
+            List<JobNode> parentNodes = nodesByParent.get(jobId);
+            if (parentNodes != null) {
+                parentNodes.removeIf(v -> v.getId().equals(currentNode.getId()));
+                if (parentNodes.isEmpty()) {
+                    nodesByParent.remove(jobId);
+                }
+            }
         }
+    }
+
+    private void removeEdges(List<Long> relatedNodeIds, Long currentNodeId, List<JobEdge> edges,
+            Map<Long, List<JobEdge>> edgesByFrom, Map<Long, List<JobEdge>> edgesByTo, boolean removeIncoming) {
+        if (relatedNodeIds == null || relatedNodeIds.isEmpty()) {
+            return;
+        }
+        Set<Long> relatedSet = new HashSet<>(relatedNodeIds);
+        List<JobEdge> candidates = removeIncoming
+                ? new ArrayList<>(edgesByTo.getOrDefault(currentNodeId, Collections.emptyList()))
+                : new ArrayList<>(edgesByFrom.getOrDefault(currentNodeId, Collections.emptyList()));
+        for (JobEdge edge : candidates) {
+            boolean match = removeIncoming ? relatedSet.contains(edge.getFromNodeId())
+                    : relatedSet.contains(edge.getEndNodeId());
+            if (match) {
+                removeEdge(edge, edges, edgesByFrom, edgesByTo);
+            }
+        }
+    }
+
+    private void removeEdge(JobEdge edge, List<JobEdge> edges, Map<Long, List<JobEdge>> edgesByFrom,
+            Map<Long, List<JobEdge>> edgesByTo) {
+        edges.remove(edge);
+        List<JobEdge> fromList = edgesByFrom.get(edge.getFromNodeId());
+        if (fromList != null) {
+            fromList.remove(edge);
+            if (fromList.isEmpty()) {
+                edgesByFrom.remove(edge.getFromNodeId());
+            }
+        }
+        List<JobEdge> toList = edgesByTo.get(edge.getEndNodeId());
+        if (toList != null) {
+            toList.remove(edge);
+            if (toList.isEmpty()) {
+                edgesByTo.remove(edge.getEndNodeId());
+            }
+        }
+    }
+
+    private void addEdge(JobEdge edge, List<JobEdge> edges, Map<Long, List<JobEdge>> edgesByFrom,
+            Map<Long, List<JobEdge>> edgesByTo) {
+        List<JobEdge> fromList = edgesByFrom.computeIfAbsent(edge.getFromNodeId(), k -> new ArrayList<>());
+        boolean exists = fromList.stream().anyMatch(e -> e.getEndNodeId().equals(edge.getEndNodeId()));
+        if (exists) {
+            return;
+        }
+        fromList.add(edge);
+        edgesByTo.computeIfAbsent(edge.getEndNodeId(), k -> new ArrayList<>()).add(edge);
+        edges.add(edge);
     }
 
     /**
@@ -937,6 +1007,13 @@ public class JobGroupXxlJob {
                                 jobInfo.getId(), node.getId(), e.getMessage(), e);
                         throw new RuntimeException(e);
                     }
+                }
+                try {
+                    TimeUnit.MILLISECONDS.sleep(50);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    logger.debug("[JobGroup] 任务监听线程被中断 - jobId: {}", jobInfo.getId());
+                    break;
                 }
             }
             return SUCCESS;
