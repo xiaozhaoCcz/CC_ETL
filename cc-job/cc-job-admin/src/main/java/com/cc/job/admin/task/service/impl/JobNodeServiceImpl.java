@@ -9,6 +9,10 @@ import com.cc.job.admin.task.service.JobNodeService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
 @Slf4j
 @Service
 public class JobNodeServiceImpl extends ServiceImpl<JobNodeMapper, JobNode> implements JobNodeService {
@@ -57,7 +61,7 @@ public class JobNodeServiceImpl extends ServiceImpl<JobNodeMapper, JobNode> impl
     }
     
     /**
-     * 批量更新节点运行状态
+     * 批量更新节点运行状态（优化版本：批量查询，避免N+1问题）
      * @param statusMap 节点状态映射 Map<jobId, triggerStatus>
      * @return 成功更新的数量
      */
@@ -70,43 +74,52 @@ public class JobNodeServiceImpl extends ServiceImpl<JobNodeMapper, JobNode> impl
         
         log.info("批量更新节点状态 - 共 {} 个节点", statusMap.size());
         
-        int successCount = 0;
-        
         try {
+            // 1. 批量查询所有需要更新的节点（一次性查询，避免N+1问题）
+            List<Long> jobIds = new ArrayList<>(statusMap.keySet());
+            List<JobNode> nodes = this.list(
+                new LambdaQueryWrapper<JobNode>().in(JobNode::getJobId, jobIds)
+            );
+            
+            // 2. 构建 jobId -> JobNode 的映射
+            Map<Long, JobNode> nodeMap = nodes.stream()
+                .collect(java.util.stream.Collectors.toMap(JobNode::getJobId, n -> n, (existing, replacement) -> existing));
+            
+            // 3. 批量更新节点状态
+            List<JobNode> updateNodes = new ArrayList<>();
             for (java.util.Map.Entry<Long, Integer> entry : statusMap.entrySet()) {
                 Long jobId = entry.getKey();
                 Integer triggerStatus = entry.getValue();
                 
-                // 根据jobId查找节点
-                LambdaQueryWrapper<JobNode> queryWrapper = new LambdaQueryWrapper<>();
-                queryWrapper.eq(JobNode::getJobId, jobId);
-                JobNode node = this.getOne(queryWrapper);
-                
+                JobNode node = nodeMap.get(jobId);
                 if (node == null) {
                     log.warn("节点不存在 - jobId: {}", jobId);
                     continue;
                 }
                 
-                // 更新triggerStatus
-                LambdaUpdateWrapper<JobNode> updateWrapper = new LambdaUpdateWrapper<>();
-                updateWrapper.eq(JobNode::getId, node.getId());
-                updateWrapper.set(JobNode::getTriggerStatus, triggerStatus);
-                
-                boolean success = this.update(updateWrapper);
+                // 设置新的状态
+                node.setTriggerStatus(triggerStatus);
+                updateNodes.add(node);
+            }
+            
+            // 4. 批量更新（一次性更新所有节点）
+            if (!updateNodes.isEmpty()) {
+                boolean success = this.updateBatchById(updateNodes);
                 if (success) {
-                    successCount++;
+                    log.info("✓ 批量更新节点状态完成 - 成功: {}/{}", updateNodes.size(), statusMap.size());
+                    return updateNodes.size();
                 } else {
-                    log.warn("节点状态更新失败 - jobId: {}", jobId);
+                    log.error("✗ 批量更新节点状态失败");
+                    return 0;
                 }
             }
             
-            log.info("✓ 批量更新节点状态完成 - 成功: {}/{}", successCount, statusMap.size());
-            return successCount;
+            return 0;
             
         } catch (Exception e) {
             log.error("批量更新节点状态异常: {}", e.getMessage());
             e.printStackTrace();
-            return successCount;
+            return 0;
         }
     }
 }

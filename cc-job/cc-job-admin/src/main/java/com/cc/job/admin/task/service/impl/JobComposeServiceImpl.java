@@ -165,10 +165,24 @@ public class JobComposeServiceImpl implements JobComposeService {
         jobEdgeService.saveBatch(jobEdgeList);
 
         List<JobNode> nodeFromDbList = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, jobInfo.getId()));
-        nodeFromDbList.forEach(item -> {
-            item.setNodeInDegree(jobEdgeList.stream().filter(v -> v.getEndNodeId().equals(item.getId())).count());
-            item.setNodeOutDegree(jobEdgeList.stream().filter(v -> v.getFromNodeId().equals(item.getId())).count());
-        });
+        
+        // 优化：预先构建边映射，避免在forEach中重复遍历（O(n²) -> O(n)）
+        Map<Long, Long> inDegreeMap = new HashMap<>();
+        Map<Long, Long> outDegreeMap = new HashMap<>();
+        
+        for (JobEdge edge : jobEdgeList) {
+            // 统计入度
+            inDegreeMap.merge(edge.getEndNodeId(), 1L, Long::sum);
+            // 统计出度
+            outDegreeMap.merge(edge.getFromNodeId(), 1L, Long::sum);
+        }
+        
+        // 批量设置节点的入度和出度
+        for (JobNode item : nodeFromDbList) {
+            item.setNodeInDegree(inDegreeMap.getOrDefault(item.getId(), 0L));
+            item.setNodeOutDegree(outDegreeMap.getOrDefault(item.getId(), 0L));
+        }
+        
         jobNodeService.updateBatchById(nodeFromDbList);
         return nodeIdMap.values().stream().toList();
     }
@@ -312,10 +326,24 @@ public class JobComposeServiceImpl implements JobComposeService {
 
         // 处理边
         List<JobNode> nodeFromDbList2 = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, jobInfo.getId()));
-        nodeFromDbList2.forEach(item -> {
-            item.setNodeInDegree(jobEdgeList.stream().filter(v -> v.getEndNodeId().equals(item.getId())).count());
-            item.setNodeOutDegree(jobEdgeList.stream().filter(v -> v.getFromNodeId().equals(item.getId())).count());
-        });
+        
+        // 优化：预先构建边映射，避免在forEach中重复遍历（O(n²) -> O(n)）
+        Map<Long, Long> inDegreeMap = new HashMap<>();
+        Map<Long, Long> outDegreeMap = new HashMap<>();
+        
+        for (JobEdge edge : jobEdgeList) {
+            // 统计入度
+            inDegreeMap.merge(edge.getEndNodeId(), 1L, Long::sum);
+            // 统计出度
+            outDegreeMap.merge(edge.getFromNodeId(), 1L, Long::sum);
+        }
+        
+        // 批量设置节点的入度和出度
+        for (JobNode item : nodeFromDbList2) {
+            item.setNodeInDegree(inDegreeMap.getOrDefault(item.getId(), 0L));
+            item.setNodeOutDegree(outDegreeMap.getOrDefault(item.getId(), 0L));
+        }
+        
         jobNodeService.updateBatchById(nodeFromDbList2);
         return nodeIdMap.values().stream().toList();
     }
@@ -670,12 +698,18 @@ public class JobComposeServiceImpl implements JobComposeService {
     }
     
     /**
-     * 收集所有任务组ID（包括嵌套的任务组）
+     * 收集所有任务组ID（包括嵌套的任务组）- 优化版本
+     * 一次性查询所有节点，然后在内存中递归，避免多次数据库查询
      * 
      * @param jobId 当前任务组ID
      * @param allJobIds 所有任务组ID集合（输出参数）
      */
     private void collectAllJobIds(Long jobId, Set<Long> allJobIds) {
+        // 如果已经收集过，直接返回（避免重复查询）
+        if (allJobIds.contains(jobId)) {
+            return;
+        }
+        
         List<JobNode> nodes = jobNodeService.list(
             new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, jobId)
         );
@@ -686,6 +720,68 @@ public class JobComposeServiceImpl implements JobComposeService {
                 if (childJobId != null && allJobIds.add(childJobId)) {
                     // 递归收集子任务组的ID
                     collectAllJobIds(childJobId, allJobIds);
+                }
+            }
+        }
+    }
+    
+    /**
+     * 收集所有任务组ID（超级优化版本：一次性查询所有相关节点）
+     * 如果节点数量非常大，可以使用这个版本
+     * 
+     * @param rootJobId 根任务组ID
+     * @param allJobIds 所有任务组ID集合（输出参数）
+     */
+    private void collectAllJobIdsOptimized(Long rootJobId, Set<Long> allJobIds) {
+        // 1. 先查询根任务组的节点
+        List<JobNode> rootNodes = jobNodeService.list(
+            new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, rootJobId)
+        );
+        
+        // 2. 收集所有任务组ID（包括嵌套的）
+        Set<Long> tempJobIds = new HashSet<>();
+        tempJobIds.add(rootJobId);
+        
+        for (JobNode node : rootNodes) {
+            if (DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType())) {
+                Long childJobId = node.getJobId();
+                if (childJobId != null) {
+                    tempJobIds.add(childJobId);
+                }
+            }
+        }
+        
+        // 3. 如果发现嵌套的任务组，批量查询所有相关节点
+        if (tempJobIds.size() > 1) {
+            List<JobNode> allNodes = jobNodeService.list(
+                new LambdaQueryWrapper<JobNode>().in(JobNode::getJobParentId, tempJobIds)
+            );
+            
+            // 4. 构建 parentId -> nodes 的映射
+            Map<Long, List<JobNode>> nodesByParent = allNodes.stream()
+                .collect(Collectors.groupingBy(JobNode::getJobParentId));
+            
+            // 5. 递归收集所有任务组ID（使用内存数据）
+            collectJobIdsRecursive(rootJobId, nodesByParent, allJobIds);
+        } else {
+            allJobIds.addAll(tempJobIds);
+        }
+    }
+    
+    /**
+     * 递归收集任务组ID（使用内存数据，不查询数据库）
+     */
+    private void collectJobIdsRecursive(Long jobId, Map<Long, List<JobNode>> nodesByParent, Set<Long> allJobIds) {
+        if (!allJobIds.add(jobId)) {
+            return; // 已经收集过，避免重复
+        }
+        
+        List<JobNode> nodes = nodesByParent.getOrDefault(jobId, Collections.emptyList());
+        for (JobNode node : nodes) {
+            if (DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType())) {
+                Long childJobId = node.getJobId();
+                if (childJobId != null) {
+                    collectJobIdsRecursive(childJobId, nodesByParent, allJobIds);
                 }
             }
         }
