@@ -279,6 +279,17 @@
     -fx-background-color: #CBD5F5;
 }
 
+/* ScrollPane 内容边距优化 - 确保标签页从最左边开始 */
+.scroll-pane {
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.scroll-pane .content {
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
 /* ============ 工具提示样式 ============ */
 
 .tooltip {
@@ -392,40 +403,52 @@
 /* ============ 日志监控面板样式 ============ */
 
 .log-panel {
-    -fx-background-color: white;
-    -fx-border-color: #E5E7EB;
-    -fx-border-width: 1 0 0 0;
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-padding: 0;
+    -fx-background-insets: 0;
 }
 
 .log-panel .title-bar {
-    -fx-background-color: white;
-    -fx-border-color: #E5E7EB;
-    -fx-border-width: 0 0 1 0;
-    -fx-padding: 12 16;
 }
 
 .log-panel .tab-bar {
-    -fx-background-color: #F9FAFB;
+    -fx-background-color: #F8FAFC;
     -fx-border-color: transparent;
     -fx-border-width: 0;
+    -fx-padding: 0;
+    -fx-background-insets: 0;
+}
+
+.log-panel .tab-bar .scroll-pane {
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.log-panel .tab-bar .scroll-pane .viewport {
+    -fx-background-insets: 0;
+    -fx-padding: 0;
 }
 
 .log-panel .log-tab {
     -fx-background-color: #FFFFFF;
-    -fx-border-color: transparent;
-    -fx-border-width: 0;
+    -fx-border-color: transparent transparent transparent rgba(243,244,246,0.9);
+    -fx-border-width: 0 0 0 1;
     -fx-background-radius: 0;
     -fx-border-radius: 0;
-    -fx-padding: 8 14;
+    -fx-padding: 6 8;
     -fx-cursor: hand;
 }
 
 .log-panel .log-tab:hover {
-    -fx-background-color: #F1F5F9;
+    -fx-background-color: rgba(241,245,249,0.95);
+    -fx-border-color: transparent transparent transparent rgba(243,244,246,0.9);
+    -fx-border-width: 0 0 0 1;
 }
 
 .log-panel .log-tab-active {
-    -fx-background-color: #F3F4F6;
+    -fx-background-color: rgba(243,244,246,0.9);
     -fx-border-color: transparent;
     -fx-border-width: 0;
     -fx-background-radius: 0;
@@ -439,7 +462,6 @@
 }
 
 .log-text-flow {
-    -fx-background-color: white;
     -fx-padding: 12;
     -fx-font-family: "Consolas", "Monaco", "Courier New", monospace;
     -fx-font-size: 13px;

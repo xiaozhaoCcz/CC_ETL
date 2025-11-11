@@ -1,6 +1,7 @@
 package com.cc.job.gui.model;
 
 import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
 import javafx.beans.binding.DoubleBinding;
 import javafx.beans.property.SimpleObjectProperty;
@@ -216,26 +217,18 @@ public class NodeConnection extends Group {
     }
     
     /**
-     * 启动虚线滚动动画
+     * 启动虚线滚动动画（改进版：更流畅的动画效果）
      */
     private void startDashAnimation() {
         if (dashAnimation != null) {
             dashAnimation.stop();
         }
         
-        // 创建动画：每200ms移动一次虚线偏移量
+        // 创建更流畅的动画：虚线沿着路径方向（从源节点到目标节点）向前滚动
+        // 使用负的偏移量变化，让虚线看起来是向前流动的
         dashAnimation = new Timeline(
-            new KeyFrame(Duration.ZERO, e -> curve.setStrokeDashOffset(0)),
-            new KeyFrame(Duration.millis(200), e -> {
-                // 获取当前偏移量并增加
-                double currentOffset = curve.getStrokeDashOffset();
-                curve.setStrokeDashOffset(currentOffset + 5); // 每次移动5px
-                
-                // 重置偏移量以创建循环效果（虚线总长度为15）
-                if (curve.getStrokeDashOffset() >= 15) {
-                    curve.setStrokeDashOffset(0);
-                }
-            })
+            new KeyFrame(Duration.ZERO, new KeyValue(curve.strokeDashOffsetProperty(), 15)),
+            new KeyFrame(Duration.millis(1000), new KeyValue(curve.strokeDashOffsetProperty(), 0))
         );
         
         dashAnimation.setCycleCount(Timeline.INDEFINITE);
@@ -273,12 +266,14 @@ public class NodeConnection extends Group {
             arrowHead.setFill(Color.web("#2563EB"));
             arrowHead.setStroke(Color.web("#2563EB"));
         } else if (isRunning) {
+            // 运行状态：橙色虚线，带滚动动画
             curve.getStrokeDashArray().clear();
             curve.getStrokeDashArray().addAll(10.0, 5.0);
             curve.setStroke(Color.web("#F59E0B"));
-            curve.setStrokeWidth(3.0);
+            curve.setStrokeWidth(3.5); // 稍微加粗，使动画更明显
             arrowHead.setFill(Color.web("#F59E0B"));
             arrowHead.setStroke(Color.web("#F59E0B"));
+            arrowHead.setStrokeWidth(2); // 箭头也加粗
             startDashAnimation();
         } else {
             stopDashAnimation();
@@ -287,6 +282,7 @@ public class NodeConnection extends Group {
             curve.setStrokeWidth(2.5);
             arrowHead.setFill(Color.web("#374151"));
             arrowHead.setStroke(Color.web("#374151"));
+            arrowHead.setStrokeWidth(1); // 恢复正常箭头粗细
         }
     }
 

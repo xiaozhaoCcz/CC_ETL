@@ -83,9 +83,18 @@ public class TaskNavigationBar extends HBox {
         scrollPane.setStyle(
             "-fx-background-color: transparent; " +
             "-fx-border-width: 0; " +
-            "-fx-padding: 0;"
+            "-fx-padding: 0; " +
+            "-fx-background-insets: 0;"
         );
         scrollPane.setPannable(true);
+        
+        // 确保内容从最左边开始，移除默认的内容边距
+        Platform.runLater(() -> {
+            javafx.scene.Node content = scrollPane.getContent();
+            if (content != null) {
+                HBox.setMargin(content, new Insets(0));
+            }
+        });
         
         HBox.setHgrow(scrollPane, Priority.ALWAYS);
         
@@ -350,18 +359,23 @@ public class TaskNavigationBar extends HBox {
     private static class TaskTab extends StackPane {
         
         // 移除圆角和边框，未选中时背景为白色，选中时为浅灰色
+        // 未选中标签右边有分割线，颜色与选中标签背景一致
         private static final String BASE_STYLE =
             "-fx-background-radius: 0; " +
             "-fx-border-radius: 0; " +
-            "-fx-border-width: 0; " +
             "-fx-cursor: hand; " +
             "-fx-effect: null;";
         private static final String NORMAL_STYLE = BASE_STYLE +
-            "-fx-background-color: #FFFFFF;";
+            "-fx-background-color: #FFFFFF; " +
+            "-fx-border-color: transparent transparent transparent rgba(243,244,246,0.9); " +
+            "-fx-border-width: 0 0 0 1;";
         private static final String HOVER_STYLE = BASE_STYLE +
-            "-fx-background-color: rgba(241,245,249,0.95);";
+            "-fx-background-color: rgba(241,245,249,0.95); " +
+            "-fx-border-color: transparent transparent transparent rgba(243,244,246,0.9); " +
+            "-fx-border-width: 0 0 0 1;";
         private static final String ACTIVE_STYLE = BASE_STYLE +
-            "-fx-background-color: rgba(243,244,246,0.9);";
+            "-fx-background-color: rgba(243,244,246,0.9); " +
+            "-fx-border-width: 0;";
         
         private final String taskGroupName;
         private boolean active;

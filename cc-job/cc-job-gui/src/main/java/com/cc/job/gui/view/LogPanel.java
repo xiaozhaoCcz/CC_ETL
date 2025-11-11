@@ -36,11 +36,9 @@ public class LogPanel extends VBox {
     private StackPane logContainer;
     
     // UI组件
-    private Label statusLabel;
     private Label countLabel;
     private Button clearBtn;
     private Button exportBtn;
-    private ComboBox<String> filterCombo;
     private TextField searchField;
     private String currentSearchKeyword = "";
     
@@ -67,7 +65,7 @@ public class LogPanel extends VBox {
         LogTabData() {
             logList = new VBox();
             logList.setSpacing(0);
-            logList.setPadding(new Insets(12, 0, 12, 0));
+            logList.setPadding(new Insets(0));
             logList.setFillWidth(true);
             logList.setStyle("-fx-background-color: transparent;");
             
@@ -163,18 +161,16 @@ public class LogPanel extends VBox {
         
         private Node buildLogRow(LogEntry entry, int rowIndex) {
             boolean isRaw = entry.raw;
-            String background = rowIndex % 2 == 0 ? "rgba(248,250,252,0.9)" : "#FFFFFF";
-
+            // 移除背景颜色设置
             HBox row = new HBox(14);
             row.setAlignment(Pos.CENTER_LEFT);
             row.setPadding(new Insets(8, 20, 8, 20));
             row.setMaxWidth(Double.MAX_VALUE);
-            row.setStyle(String.format(
-                "-fx-background-color: %s; " +
+            row.setStyle(
+                "-fx-background-color: transparent; " +
                 "-fx-border-color: transparent transparent rgba(226,232,240,0.75) transparent; " +
-                "-fx-border-width: 0 0 1 0;",
-                background
-            ));
+                "-fx-border-width: 0 0 1 0;"
+            );
 
             Label timestampLabel = new Label(entry.timestamp != null ? entry.timestamp : "--:--:--");
             timestampLabel.setFont(Font.font("Consolas", FontWeight.NORMAL, 12));
@@ -317,18 +313,23 @@ public class LogPanel extends VBox {
         private Label nameLabel;
         
         // 移除圆角和边框，未选中时背景为白色，选中时为浅灰色
+        // 未选中标签右边有分割线，颜色与选中标签背景一致
         private static final String BASE_STYLE =
             "-fx-background-radius: 0; " +
             "-fx-border-radius: 0; " +
-            "-fx-border-width: 0; " +
             "-fx-cursor: hand; " +
             "-fx-effect: null;";
         private static final String NORMAL_STYLE = BASE_STYLE +
-            "-fx-background-color: #FFFFFF;";
+            "-fx-background-color: #FFFFFF; " +
+            "-fx-border-color: transparent transparent transparent rgba(243,244,246,0.9); " +
+            "-fx-border-width: 0 0 0 1;";
         private static final String HOVER_STYLE = BASE_STYLE +
-            "-fx-background-color: rgba(241,245,249,0.95);";
+            "-fx-background-color: rgba(241,245,249,0.95); " +
+            "-fx-border-color: transparent transparent transparent rgba(243,244,246,0.9); " +
+            "-fx-border-width: 0 0 0 1;";
         private static final String ACTIVE_STYLE = BASE_STYLE +
-            "-fx-background-color: rgba(243,244,246,0.9);";
+            "-fx-background-color: rgba(243,244,246,0.9); " +
+            "-fx-border-width: 0;";
         
         public LogTab(Long taskGroupId, String taskGroupName) {
             this.taskGroupId = taskGroupId;
@@ -337,24 +338,25 @@ public class LogPanel extends VBox {
         }
         
         private void initializeUI() {
-            setPadding(new Insets(6, 16, 6, 16));
+            // 进一步减小 padding，使标签页更窄
+            setPadding(new Insets(6, 8, 6, 8));
             setPrefHeight(38);
             setMinHeight(38);
             setMaxHeight(38);
             setStyle(NORMAL_STYLE);
             
-            HBox content = new HBox(10);
+            HBox content = new HBox(6);
             content.setAlignment(Pos.CENTER_LEFT);
             
-            // 任务组名称
+            // 任务组名称 - 进一步减小宽度
             nameLabel = new Label(taskGroupName);
             nameLabel.setStyle(
-                "-fx-font-size: 12.5px; " +
+                "-fx-font-size: 12px; " +
                 "-fx-text-fill: " + StyleUtil.GRAY_600 + "; " +
                 "-fx-font-weight: 600;"
             );
-            nameLabel.setPrefWidth(150);
-            nameLabel.setMaxWidth(150);
+            nameLabel.setPrefWidth(100);
+            nameLabel.setMaxWidth(100);
             nameLabel.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
             Tooltip.install(nameLabel, new Tooltip(taskGroupName));
             
@@ -472,15 +474,14 @@ public class LogPanel extends VBox {
     }
     
     private void initializeUI() {
-        String radius = StyleUtil.RADIUS_LG;
-        setStyle(String.format(
-            "-fx-background-color: #FFFFFF; " +
-            "-fx-border-color: rgba(148,163,184,0.35); " +
-            "-fx-border-width: 1 0 0 0; " +
-            "-fx-background-radius: 0 0 %1$s %1$s; " +
-            "-fx-border-radius: 0 0 %1$s %1$s;",
-            radius
-        ));
+        // 确保 LogPanel 本身没有任何 padding 和 margin
+        setStyle(
+            "-fx-background-color: transparent; " +
+            "-fx-border-color: transparent; " +
+            "-fx-border-width: 0; " +
+            "-fx-padding: 0; " +
+            "-fx-background-insets: 0;"
+        );
         if (!getStyleClass().contains("log-panel")) {
             getStyleClass().add("log-panel");
         }
@@ -498,7 +499,7 @@ public class LogPanel extends VBox {
         // 日志显示区域容器
         logContainer = new StackPane();
         logContainer.setPadding(new Insets(12, 12, 12, 12));
-        logContainer.setStyle("-fx-background-color: #FFFFFF;");
+        logContainer.setStyle("-fx-background-color: transparent;");
         VBox.setVgrow(logContainer, Priority.ALWAYS);
         
         // 创建默认日志区域（系统日志，不关联任何任务组）
@@ -524,7 +525,8 @@ public class LogPanel extends VBox {
             "-fx-background-color: #F8FAFC; " +
             "-fx-border-color: transparent; " +
             "-fx-border-width: 0; " +
-            "-fx-padding: 0;"
+            "-fx-padding: 0; " +
+            "-fx-background-insets: 0;"
         );
         tabBar.setAlignment(Pos.CENTER_LEFT);
         tabBar.setPrefHeight(36);
@@ -534,6 +536,7 @@ public class LogPanel extends VBox {
         tabContainer = new HBox(0);
         tabContainer.setAlignment(Pos.CENTER_LEFT);
         tabContainer.setPadding(new Insets(0));
+        HBox.setMargin(tabContainer, new Insets(0)); // 确保没有 margin
         
         // 滚动面板包装标签容器
         ScrollPane scrollPane = new ScrollPane(tabContainer);
@@ -543,11 +546,26 @@ public class LogPanel extends VBox {
         scrollPane.setStyle(
             "-fx-background-color: transparent; " +
             "-fx-border-width: 0; " +
-            "-fx-padding: 0;"
+            "-fx-padding: 0; " +
+            "-fx-background-insets: 0;"
         );
         scrollPane.setPannable(true);
         
+        // 确保内容从最左边开始，移除默认的内容边距
+        Platform.runLater(() -> {
+            javafx.scene.Node content = scrollPane.getContent();
+            if (content != null) {
+                HBox.setMargin(content, new Insets(0));
+            }
+            // 确保 ScrollPane 的内容区域没有 insets
+            javafx.scene.Node viewport = scrollPane.lookup(".viewport");
+            if (viewport != null) {
+                viewport.setStyle("-fx-background-insets: 0; -fx-padding: 0;");
+            }
+        });
+        
         HBox.setHgrow(scrollPane, Priority.ALWAYS);
+        HBox.setMargin(scrollPane, new Insets(0)); // 确保 ScrollPane 没有 margin
         
         tabBar.getChildren().add(scrollPane);
         
@@ -558,7 +576,6 @@ public class LogPanel extends VBox {
         HBox titleBar = new HBox(12);
         titleBar.setAlignment(Pos.CENTER_LEFT);
         titleBar.setStyle(
-            "-fx-background-color: #FFFFFF; " +
             "-fx-border-color: transparent; " +
             "-fx-border-width: 0; " +
             "-fx-padding: 14 20;"
@@ -567,48 +584,10 @@ public class LogPanel extends VBox {
         titleBar.setMinHeight(56);
         titleBar.setMaxHeight(56);
         
-        // 标题 - 扁平化设计
+        // 标题 - 减小字体大小
         Label titleLabel = new Label("日志监控");
-        titleLabel.setFont(Font.font("System", FontWeight.SEMI_BOLD, 15));
+        titleLabel.setFont(Font.font("System", FontWeight.SEMI_BOLD, 13));
         titleLabel.setTextFill(Color.web(StyleUtil.GRAY_900));
-        
-        // 状态指示器
-        HBox statusIndicator = new HBox(6);
-        statusIndicator.setAlignment(Pos.CENTER_LEFT);
-        statusIndicator.setPadding(new Insets(0, 0, 0, 0));
-        
-        javafx.scene.shape.Circle indicator = new javafx.scene.shape.Circle(5);
-        indicator.setFill(Color.web(StyleUtil.SUCCESS));
-        indicator.setEffect(new javafx.scene.effect.Glow(0.8));
-        
-        statusLabel = new Label("就绪");
-        statusLabel.setFont(Font.font("System", FontWeight.MEDIUM, 12));
-        statusLabel.setTextFill(Color.web(StyleUtil.SUCCESS_DARK));
-        statusLabel.setStyle("-fx-font-weight: 600;");
-        
-        statusIndicator.getChildren().addAll(indicator, statusLabel);
-        
-        // 分隔线
-        Region separator1 = createInlineSeparator();
-        
-        // 过滤器
-        filterCombo = new ComboBox<>();
-        filterCombo.getItems().addAll("全部", "信息", "警告", "错误", "调试");
-        filterCombo.setValue("全部");
-        filterCombo.setStyle(
-            "-fx-background-color: rgba(255,255,255,0.92); " +
-            "-fx-text-fill: " + StyleUtil.GRAY_600 + "; " +
-            "-fx-font-size: 12px; " +
-            "-fx-font-weight: 500; " +
-            "-fx-pref-width: 96; " +
-            "-fx-pref-height: 30; " +
-            "-fx-border-color: rgba(148,163,184,0.55); " +
-            "-fx-border-width: 1; " +
-            "-fx-border-radius: 8; " +
-            "-fx-background-radius: 8; " +
-            "-fx-padding: 2 10 2 10; " +
-            "-fx-effect: dropshadow(gaussian, rgba(15,23,42,0.05), 4, 0, 0, 1);"
-        );
         
         // 搜索框
         searchField = new TextField();
@@ -642,6 +621,15 @@ public class LogPanel extends VBox {
         // 分隔线
         Region separator2 = createInlineSeparator();
         
+        // 滚动到顶部按钮
+        Button scrollToTopBtn = createToolButton("↑", () -> {
+            LogTabData tabData = getCurrentTabData();
+            if (tabData != null && tabData.scrollPane != null) {
+                Platform.runLater(() -> tabData.scrollPane.setVvalue(0));
+            }
+        });
+        scrollToTopBtn.setTooltip(new Tooltip("滚动到顶部"));
+        
         // 清空按钮 - 扁平化设计，靠右排列
         clearBtn = createToolButton("清空", this::clearLogs);
         
@@ -650,13 +638,11 @@ public class LogPanel extends VBox {
         
         titleBar.getChildren().addAll(
             titleLabel,
-            statusIndicator,
-            separator1,
-            filterCombo,
             searchField,
             spacer,
             countLabel,
             separator2,
+            scrollToTopBtn,
             clearBtn,
             exportBtn
         );
@@ -679,11 +665,6 @@ public class LogPanel extends VBox {
         HBox statusBar = new HBox(12);
         statusBar.setAlignment(Pos.CENTER_LEFT);
         statusBar.setPadding(new Insets(10, 16, 10, 16));
-        statusBar.setStyle(
-            "-fx-background-color: #FFFFFF; " +
-            "-fx-border-color: rgba(148,163,184,0.3) transparent transparent transparent; " +
-            "-fx-border-width: 1 0 0 0;"
-        );
         statusBar.setPrefHeight(36);
         statusBar.setMinHeight(36);
         statusBar.setMaxHeight(36);
@@ -826,8 +807,6 @@ public class LogPanel extends VBox {
             } else {
                 countLabel.setText(tabData.logCount + " 条日志");
             }
-            statusLabel.setText(tabData.status);
-            statusLabel.setTextFill(Color.web(tabData.statusColor));
         }
     }
     

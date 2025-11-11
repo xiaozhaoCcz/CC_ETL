@@ -77,7 +77,7 @@ public class CcJobGuiApplication extends Application {
             }
             
             // 显示主窗口
-            Platform.runLater(() -> showMainWindow());
+            Platform.runLater(this::showMainWindow);
         });
         
         // 设置注册回调
