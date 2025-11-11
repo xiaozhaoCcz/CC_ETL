@@ -406,27 +406,31 @@
 
 .log-panel .tab-bar {
     -fx-background-color: #F9FAFB;
-    -fx-border-color: #E5E7EB;
-    -fx-border-width: 0 0 1 0;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
 }
 
 .log-panel .log-tab {
-    -fx-background-color: #F3F4F6;
-    -fx-border-color: #E5E7EB;
-    -fx-border-width: 0 1 0 0;
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
     -fx-padding: 8 14;
     -fx-cursor: hand;
 }
 
 .log-panel .log-tab:hover {
-    -fx-background-color: #E5E7EB;
+    -fx-background-color: #F1F5F9;
 }
 
 .log-panel .log-tab-active {
-    -fx-background-color: white;
-    -fx-border-color: #6366F1;
-    -fx-border-width: 0 0 2 0;
-    -fx-effect: dropshadow(gaussian, rgba(99, 102, 241, 0.2), 4, 0, 0, 1);
+    -fx-background-color: #F3F4F6;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
+    -fx-effect: none;
 }
 
 .log-panel .status-indicator {

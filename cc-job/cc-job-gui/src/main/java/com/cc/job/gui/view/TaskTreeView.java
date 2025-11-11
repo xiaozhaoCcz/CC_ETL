@@ -85,7 +85,7 @@ public class TaskTreeView extends VBox {
     
     private void initializeUI() {
         // 设置面板样式
-        setStyle("-fx-background-color: transparent;");
+        setStyle("-fx-background-color: transparent;"+"-fx-padding: 0 0 0 8;");
         setMinWidth(240);  // 最小宽度240px
         setSpacing(10);
         

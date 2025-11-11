@@ -316,23 +316,19 @@ public class LogPanel extends VBox {
         private Runnable onCloseCallback;
         private Label nameLabel;
         
+        // 移除圆角和边框，未选中时背景为白色，选中时为浅灰色
         private static final String BASE_STYLE =
-            "-fx-background-radius: 12; " +
-            "-fx-border-radius: 12; " +
-            "-fx-border-width: 1; " +
+            "-fx-background-radius: 0; " +
+            "-fx-border-radius: 0; " +
+            "-fx-border-width: 0; " +
             "-fx-cursor: hand; " +
             "-fx-effect: null;";
         private static final String NORMAL_STYLE = BASE_STYLE +
-            "-fx-background-color: rgba(255,255,255,0.82); " +
-            "-fx-border-color: rgba(148,163,184,0.45);";
+            "-fx-background-color: #FFFFFF;";
         private static final String HOVER_STYLE = BASE_STYLE +
-            "-fx-background-color: rgba(241,245,249,0.9); " +
-            "-fx-border-color: rgba(99,102,241,0.35); " +
-            "-fx-effect: dropshadow(gaussian, rgba(99,102,241,0.12), 12, 0, 0, 2);";
+            "-fx-background-color: rgba(241,245,249,0.95);";
         private static final String ACTIVE_STYLE = BASE_STYLE +
-            "-fx-background-color: linear-gradient(to bottom, rgba(99,102,241,0.18), rgba(79,70,229,0.24)); " +
-            "-fx-border-color: rgba(79,70,229,0.55); " +
-            "-fx-effect: dropshadow(gaussian, rgba(79,70,229,0.28), 18, 0, 0, 4);";
+            "-fx-background-color: rgba(243,244,246,0.9);";
         
         public LogTab(Long taskGroupId, String taskGroupName) {
             this.taskGroupId = taskGroupId;
@@ -526,18 +522,18 @@ public class LogPanel extends VBox {
         HBox tabBar = new HBox(0);
         tabBar.setStyle(
             "-fx-background-color: #F8FAFC; " +
-            "-fx-border-color: transparent transparent rgba(148, 163, 184, 0.3) transparent; " +
-            "-fx-border-width: 0 0 1 0; " +
-            "-fx-padding: 0 16 0 16;"
+            "-fx-border-color: transparent; " +
+            "-fx-border-width: 0; " +
+            "-fx-padding: 0;"
         );
         tabBar.setAlignment(Pos.CENTER_LEFT);
         tabBar.setPrefHeight(36);
         tabBar.setMinHeight(36);
         tabBar.setMaxHeight(36);
         
-        tabContainer = new HBox(8);
+        tabContainer = new HBox(0);
         tabContainer.setAlignment(Pos.CENTER_LEFT);
-        tabContainer.setPadding(new Insets(0, 12, 0, 0));
+        tabContainer.setPadding(new Insets(0));
         
         // 滚动面板包装标签容器
         ScrollPane scrollPane = new ScrollPane(tabContainer);
@@ -563,8 +559,8 @@ public class LogPanel extends VBox {
         titleBar.setAlignment(Pos.CENTER_LEFT);
         titleBar.setStyle(
             "-fx-background-color: #FFFFFF; " +
-            "-fx-border-color: transparent transparent rgba(148, 163, 184, 0.3) transparent; " +
-            "-fx-border-width: 0 0 1 0; " +
+            "-fx-border-color: transparent; " +
+            "-fx-border-width: 0; " +
             "-fx-padding: 14 20;"
         );
         titleBar.setPrefHeight(56);

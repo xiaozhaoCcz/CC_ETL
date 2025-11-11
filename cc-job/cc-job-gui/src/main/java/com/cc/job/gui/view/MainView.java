@@ -100,7 +100,8 @@ public class MainView extends BorderPane {
         // 左侧内容区域：树形导航 + 小地图
         leftArea = new javafx.scene.layout.VBox();
         leftArea.setSpacing(8);
-        leftArea.setPadding(new Insets(0, 0, 0, 2));
+        leftArea.setPadding(new Insets(0)); // 确保没有左边距
+        leftArea.setStyle("-fx-background-color: transparent;");
 
         // 树形导航
         treeView = new TaskTreeView();
@@ -113,8 +114,9 @@ public class MainView extends BorderPane {
 
         // 创建左侧容器：折叠栏 + 内容区域
         HBox leftContainer = new HBox();
-        leftContainer.setSpacing(6);
+        leftContainer.setSpacing(0); // 移除间距，确保分割线紧贴左边
         HBox.setMargin(leftArea, new Insets(0));
+        leftContainer.setPadding(new Insets(0)); // 确保容器没有padding
         leftContainer.getChildren().addAll(collapsedSidebar, leftArea);
 
         // 让 leftArea 能够水平扩展以填充可用空间
@@ -142,16 +144,7 @@ public class MainView extends BorderPane {
         // 创建画布区域容器：导航栏 + 画布
         javafx.scene.layout.VBox canvasArea = new javafx.scene.layout.VBox();
         canvasArea.setSpacing(0);
-        canvasArea.setPadding(new Insets(10, 10, 0, 10));
-        canvasArea.setStyle(String.format(
-            "-fx-background-color: #FFFFFF; " +
-            "-fx-border-color: rgba(148,163,184,0.22); " +
-            "-fx-border-width: 1; " +
-            "-fx-background-radius: %1$s; " +
-            "-fx-border-radius: %1$s; " +
-            "-fx-effect: dropshadow(gaussian, rgba(15,23,42,0.06), 14, 0, 0, 4);",
-            StyleUtil.RADIUS_LG
-        ));
+        canvasArea.setPadding(new Insets(0));
         canvasArea.getChildren().addAll(navigationBar, scrollPane);
         javafx.scene.layout.VBox.setVgrow(scrollPane, javafx.scene.layout.Priority.ALWAYS);
 
@@ -172,7 +165,7 @@ public class MainView extends BorderPane {
         horizontalSplit.getItems().addAll(leftContainer, verticalSplit);
         horizontalSplit.setDividerPositions(0.2); // 初始位置：20% 给左侧，80% 给右侧
         horizontalSplit.setStyle("-fx-background-color: transparent;");
-        horizontalSplit.setPadding(new Insets(0, 12, 12, 12));
+        horizontalSplit.setPadding(new Insets(0, 12, 12, 0)); // 左边距设为0，确保分割线从最左边开始
 
         // 绑定小地图到画布
         miniMap.bindTo(canvas, scrollPane);

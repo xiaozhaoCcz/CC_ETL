@@ -32,9 +32,9 @@ public class CollapsedSidebar extends VBox {
             "-fx-border-width: 0 1 0 0;"
         );
         // 设置固定宽度 - 使用min/max来确保宽度不变
-        setMinWidth(36);
-        setMaxWidth(36);
-        setPrefWidth(36);
+        setMinWidth(40);
+        setMaxWidth(40);
+        setPrefWidth(40);
         setSpacing(12);
         setPadding(new Insets(12, 6, 12, 6));
         setAlignment(Pos.TOP_CENTER);

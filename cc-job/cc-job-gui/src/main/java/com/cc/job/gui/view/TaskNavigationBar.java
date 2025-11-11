@@ -63,18 +63,17 @@ public class TaskNavigationBar extends HBox {
     private void initializeUI() {
         setStyle(
             "-fx-background-color: #FFFFFF; " +
-            "-fx-border-color: transparent transparent rgba(148,163,184,0.35) transparent; " +
-            "-fx-border-width: 0 0 1 0; " +
-            "-fx-padding: 8 16 8 16;"
+            "-fx-border-color: transparent; " +
+            "-fx-border-width: 0;"
         );
-        setSpacing(8);
+        setSpacing(0);
         setAlignment(Pos.CENTER_LEFT);
         setPrefHeight(54);
         
-        // 标签容器
-        tabContainer = new HBox(8);
+        // 标签容器 - 无间距，标签页紧贴
+        tabContainer = new HBox(0);
         tabContainer.setAlignment(Pos.CENTER_LEFT);
-        tabContainer.setPadding(new Insets(0, 12, 0, 0));
+        tabContainer.setPadding(new Insets(0));
         
         // 滚动面板包装标签容器
         ScrollPane scrollPane = new ScrollPane(tabContainer);
@@ -350,26 +349,19 @@ public class TaskNavigationBar extends HBox {
      */
     private static class TaskTab extends StackPane {
         
-        private static final String TAB_RADIUS = StyleUtil.RADIUS_MD;
-        private static final String BASE_STYLE = String.format(
-            "-fx-background-radius: %1$s; " +
-            "-fx-border-radius: %1$s; " +
-            "-fx-border-width: 1; " +
+        // 移除圆角和边框，未选中时背景为白色，选中时为浅灰色
+        private static final String BASE_STYLE =
+            "-fx-background-radius: 0; " +
+            "-fx-border-radius: 0; " +
+            "-fx-border-width: 0; " +
             "-fx-cursor: hand; " +
-            "-fx-effect: null;",
-            TAB_RADIUS
-        );
+            "-fx-effect: null;";
         private static final String NORMAL_STYLE = BASE_STYLE +
-            "-fx-background-color: rgba(255,255,255,0.88); " +
-            "-fx-border-color: rgba(148,163,184,0.45);";
+            "-fx-background-color: #FFFFFF;";
         private static final String HOVER_STYLE = BASE_STYLE +
-            "-fx-background-color: rgba(241,245,249,0.95); " +
-            "-fx-border-color: rgba(99,102,241,0.35); " +
-            "-fx-effect: dropshadow(gaussian, rgba(99,102,241,0.12), 12, 0, 0, 2);";
+            "-fx-background-color: rgba(241,245,249,0.95);";
         private static final String ACTIVE_STYLE = BASE_STYLE +
-            "-fx-background-color: rgba(99,102,241,0.18); " +
-            "-fx-border-color: rgba(79,70,229,0.55); " +
-            "-fx-effect: dropshadow(gaussian, rgba(79,70,229,0.22), 16, 0, 0, 3);";
+            "-fx-background-color: rgba(243,244,246,0.9);";
         
         private final String taskGroupName;
         private boolean active;

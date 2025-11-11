@@ -3,7 +3,6 @@ package com.cc.job.gui.view;
 import com.cc.job.gui.util.IconUtil;
 import com.cc.job.gui.util.StyleUtil;
 import javafx.geometry.Bounds;
-import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
@@ -48,12 +47,13 @@ public class MiniMapView extends VBox {
     }
     
     private void initializeUI() {
+        // 设置样式：顶部边框作为分割线，左边距为0确保分割线从最左边开始
         setStyle(
             "-fx-background-color: transparent; " +
             "-fx-border-color: rgba(148,163,184,0.3) transparent transparent transparent; " +
-            "-fx-border-width: 1 0 0 0;"
+            "-fx-border-width: 1 0 0 0; " +
+            "-fx-padding: 12 12 0 8;"
         );
-        setPadding(new Insets(12, 12, 0, 12));
         setSpacing(12);
         setMinWidth(200);  // 最小宽度200px
         setMinHeight(200); // 最小高度
