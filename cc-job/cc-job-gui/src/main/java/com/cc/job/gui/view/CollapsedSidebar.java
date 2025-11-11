@@ -6,6 +6,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.VBox;
 import javafx.scene.control.ContentDisplay;
+import javafx.scene.layout.StackPane;
 import org.kordamp.ikonli.javafx.FontIcon;
 import com.cc.job.gui.util.IconUtil;
 
@@ -34,8 +35,8 @@ public class CollapsedSidebar extends VBox {
         setMinWidth(36);
         setMaxWidth(36);
         setPrefWidth(36);
-        setSpacing(8);
-        setPadding(new Insets(8, 4, 8, 4));
+        setSpacing(12);
+        setPadding(new Insets(12, 6, 12, 6));
         setAlignment(Pos.TOP_CENTER);
         
         // 任务组图标按钮
@@ -59,28 +60,35 @@ public class CollapsedSidebar extends VBox {
     
     private Button createIconButton(FontIcon icon, String tooltipText) {
         Button button = new Button();
-        button.setGraphic(icon);
+        icon.setIconSize(16);
+        StackPane iconWrapper = new StackPane(icon);
+        iconWrapper.setAlignment(Pos.CENTER);
+        iconWrapper.setPrefSize(18, 18);
+        iconWrapper.setMinSize(18, 18);
+        iconWrapper.setMaxSize(18, 18);
+        StackPane.setAlignment(icon, Pos.CENTER);
+        button.setGraphic(iconWrapper);
         button.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
         button.setAlignment(Pos.CENTER);
         button.setStyle(
             "-fx-background-color: #FFFFFF; " +
-            "-fx-padding: 6; " +
+            "-fx-padding: 4; " +
             "-fx-background-radius: 4; " +
             "-fx-border-color: #E5E7EB; " +
             "-fx-border-width: 1; " +
             "-fx-border-radius: 4; " +
             "-fx-cursor: hand;"
         );
-        button.setPrefSize(30, 30);
-        button.setMaxSize(30, 30);
-        button.setMinSize(30, 30);
+        button.setPrefSize(36, 36);
+        button.setMaxSize(36, 36);
+        button.setMinSize(36, 36);
         
         Tooltip tooltip = new Tooltip(tooltipText);
         button.setTooltip(tooltip);
         
         button.setOnMouseEntered(e -> button.setStyle(
             "-fx-background-color: #EEF2FF; " +
-            "-fx-padding: 6; " +
+            "-fx-padding: 4; " +
             "-fx-background-radius: 4; " +
             "-fx-border-color: #8B5CF6; " +
             "-fx-border-width: 2; " +
@@ -90,7 +98,7 @@ public class CollapsedSidebar extends VBox {
         
         button.setOnMouseExited(e -> button.setStyle(
             "-fx-background-color: #FFFFFF; " +
-            "-fx-padding: 6; " +
+            "-fx-padding: 4; " +
             "-fx-background-radius: 4; " +
             "-fx-border-color: #E5E7EB; " +
             "-fx-border-width: 1; " +

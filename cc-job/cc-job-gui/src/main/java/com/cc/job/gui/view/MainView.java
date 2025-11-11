@@ -100,12 +100,10 @@ public class MainView extends BorderPane {
         // 左侧内容区域：树形导航 + 小地图
         leftArea = new javafx.scene.layout.VBox();
         leftArea.setSpacing(8);
-        leftArea.setPadding(new Insets(12, 8, 0, 8));
-        leftArea.setStyle("-fx-background-color: transparent;");
+        leftArea.setPadding(new Insets(0, 0, 0, 2));
 
         // 树形导航
         treeView = new TaskTreeView();
-        treeView.setStyle("-fx-background-color: transparent; -fx-border-color: transparent;");
         javafx.scene.layout.VBox.setVgrow(treeView, javafx.scene.layout.Priority.ALWAYS);
 
         // 小地图
@@ -115,8 +113,8 @@ public class MainView extends BorderPane {
 
         // 创建左侧容器：折叠栏 + 内容区域
         HBox leftContainer = new HBox();
-        leftContainer.setSpacing(12);
-        HBox.setMargin(leftArea, new Insets(0, 0, 0, 0));
+        leftContainer.setSpacing(6);
+        HBox.setMargin(leftArea, new Insets(0));
         leftContainer.getChildren().addAll(collapsedSidebar, leftArea);
 
         // 让 leftArea 能够水平扩展以填充可用空间
@@ -166,7 +164,7 @@ public class MainView extends BorderPane {
         verticalSplit.getItems().addAll(canvasArea, logPanel);
         verticalSplit.setDividerPositions(0.7); // 初始位置：70% 给画布，30% 给日志
         verticalSplit.setStyle("-fx-background-color: transparent;");
-        verticalSplit.setPadding(new Insets(12, 12, 12, 4));
+        verticalSplit.setPadding(new Insets(0, 12, 12, 4));
 
         // 创建水平分割面板：左侧容器和右侧（画布+日志）
         SplitPane horizontalSplit = new SplitPane();
@@ -174,7 +172,7 @@ public class MainView extends BorderPane {
         horizontalSplit.getItems().addAll(leftContainer, verticalSplit);
         horizontalSplit.setDividerPositions(0.2); // 初始位置：20% 给左侧，80% 给右侧
         horizontalSplit.setStyle("-fx-background-color: transparent;");
-        horizontalSplit.setPadding(new Insets(12));
+        horizontalSplit.setPadding(new Insets(0, 12, 12, 12));
 
         // 绑定小地图到画布
         miniMap.bindTo(canvas, scrollPane);

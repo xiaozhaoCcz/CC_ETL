@@ -106,7 +106,6 @@
 /* ============ 树形视图样式 ============ */
 
 .tree-view {
-    -fx-background-color: white;
     -fx-border-color: transparent;
     -fx-padding: 4;
 }

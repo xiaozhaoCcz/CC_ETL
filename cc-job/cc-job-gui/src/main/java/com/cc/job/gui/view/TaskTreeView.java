@@ -85,16 +85,15 @@ public class TaskTreeView extends VBox {
     
     private void initializeUI() {
         // 设置面板样式
-        setStyle(StyleUtil.sidebar());
+        setStyle("-fx-background-color: transparent;");
         setMinWidth(240);  // 最小宽度240px
-        setPadding(new Insets(16));
-        setSpacing(12);
+        setSpacing(10);
         
         // 标题栏
         HBox titleBar = createTitleBar();
         
         // 搜索框
-        TextField searchBar = createSearchBar();
+        HBox searchBar = createSearchBar();
         
         // 树形视图
         treeView = createTreeView();
@@ -139,18 +138,61 @@ public class TaskTreeView extends VBox {
         return titleBar;
     }
     
-    private TextField createSearchBar() {
+    private HBox createSearchBar() {
+        HBox searchWrapper = new HBox();
+        searchWrapper.setAlignment(Pos.CENTER_LEFT);
+        searchWrapper.setSpacing(0);
+        searchWrapper.setPadding(new Insets(0, 12, 0, 0));
+        
         searchField = new TextField();
         searchField.setPromptText("搜索节点...");
-        searchField.setStyle(StyleUtil.searchField());
-        searchField.setPrefHeight(36);
+        searchField.setPrefHeight(28);
+        searchField.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(searchField, Priority.ALWAYS);
+        
+        // 使用内联样式覆盖 CSS，减小 padding 和字体大小
+        String normalStyle = 
+            "-fx-background-color: #FFFFFF; " +
+            "-fx-text-fill: #111827; " +
+            "-fx-font-size: 12px; " +
+            "-fx-padding: 4 8; " +
+            "-fx-border-color: #D1D5DB; " +
+            "-fx-border-width: 1; " +
+            "-fx-border-radius: 4; " +
+            "-fx-background-radius: 4; " +
+            "-fx-prompt-text-fill: #9CA3AF;";
+        
+        String focusedStyle = 
+            "-fx-background-color: #FFFFFF; " +
+            "-fx-text-fill: #111827; " +
+            "-fx-font-size: 12px; " +
+            "-fx-padding: 4 8; " +
+            "-fx-border-color: #6366F1; " +
+            "-fx-border-width: 1; " +
+            "-fx-border-radius: 4; " +
+            "-fx-background-radius: 4; " +
+            "-fx-prompt-text-fill: #9CA3AF; " +
+            "-fx-effect: dropshadow(gaussian, rgba(99, 102, 241, 0.2), 3, 0, 0, 0);";
+        
+        searchField.setStyle(normalStyle);
+        
+        // 处理聚焦状态
+        searchField.focusedProperty().addListener((obs, wasFocused, isNowFocused) -> {
+            if (isNowFocused) {
+                searchField.setStyle(focusedStyle);
+            } else {
+                searchField.setStyle(normalStyle);
+            }
+        });
+        
+        searchWrapper.getChildren().add(searchField);
         
         // 搜索功能
         searchField.textProperty().addListener((obs, oldVal, newVal) -> {
             filterTree(newVal);
         });
         
-        return searchField;
+        return searchWrapper;
     }
     
     private TreeView<TreeNodeData> createTreeView() {
@@ -162,7 +204,7 @@ public class TaskTreeView extends VBox {
         TreeView<TreeNodeData> tree = new TreeView<>(rootItem);
         tree.setShowRoot(false);
         tree.setStyle(
-            "-fx-background-color: #FFFFFF; " +
+            "-fx-background-color: transparent; " +
             "-fx-border-color: transparent;"
         );
         

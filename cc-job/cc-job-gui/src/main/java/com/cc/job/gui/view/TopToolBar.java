@@ -214,8 +214,6 @@ public class TopToolBar extends VBox {
         userCard.setAlignment(Pos.CENTER);
         userCard.setPadding(new Insets(4, 12, 4, 12));
         userCard.setStyle(
-            "-fx-background-color: #F9FAFB; " +
-            "-fx-background-radius: 8; " +
             "-fx-cursor: hand;"
         );
         userCard.getChildren().addAll(avatar, textArea);
