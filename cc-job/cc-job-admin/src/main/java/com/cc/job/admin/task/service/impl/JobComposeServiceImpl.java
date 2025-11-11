@@ -628,40 +628,125 @@ public class JobComposeServiceImpl implements JobComposeService {
         }
     }
 
+    /**
+     * 优化版本：批量查询所有层级的数据，避免N+1查询问题
+     * 
+     * @param id 根任务组ID
+     * @param nodeVos 节点VO列表（输出参数）
+     * @param edgeVos 边VO列表（输出参数）
+     * @param randomId 随机ID前缀
+     */
     public void getJobCompose(Long id, List<JobNodeVo> nodeVos, List<JobEdgeVo> edgeVos, String randomId) {
-        List<JobNode> jobNodeList = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, id));
-        List<JobEdge> jobEdgeList = jobEdgeService.list(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getJobParentId, id));
-
-        List<Long> jobIds = jobNodeList.stream().map(JobNode::getJobId).toList();
-        if(jobIds.isEmpty()){
+        // 1. 收集所有需要查询的任务组ID（包括嵌套的任务组）
+        Set<Long> allJobIds = new HashSet<>();
+        allJobIds.add(id);
+        collectAllJobIds(id, allJobIds);
+        
+        // 2. 批量查询所有节点和边（一次性查询，避免递归查询）
+        List<JobNode> allJobNodes = jobNodeService.list(
+            new LambdaQueryWrapper<JobNode>().in(JobNode::getJobParentId, allJobIds)
+        );
+        List<JobEdge> allJobEdges = jobEdgeService.list(
+            new LambdaQueryWrapper<JobEdge>().in(JobEdge::getJobParentId, allJobIds)
+        );
+        
+        // 3. 批量查询所有JobInfo
+        Set<Long> jobInfoIds = allJobNodes.stream().map(JobNode::getJobId).collect(Collectors.toSet());
+        if (jobInfoIds.isEmpty()) {
             return;
         }
-        List<JobInfo> jobInfos = jobInfoService.listByIds(jobIds);
-        Map<Long, JobInfo> jobInfoMap = jobInfos.stream().collect(Collectors.toMap(JobInfo::getId, n -> n));
-
-        jobNodeList.forEach(node -> {
+        List<JobInfo> allJobInfos = jobInfoService.listByIds(new ArrayList<>(jobInfoIds));
+        Map<Long, JobInfo> jobInfoMap = allJobInfos.stream()
+            .collect(Collectors.toMap(JobInfo::getId, n -> n, (existing, replacement) -> existing));
+        
+        // 4. 构建层级映射（按父ID分组）
+        Map<Long, List<JobNode>> nodesByParent = allJobNodes.stream()
+            .collect(Collectors.groupingBy(JobNode::getJobParentId));
+        Map<Long, List<JobEdge>> edgesByParent = allJobEdges.stream()
+            .collect(Collectors.groupingBy(JobEdge::getJobParentId));
+        
+        // 5. 递归构建结果（不再查询数据库，只处理内存数据）
+        buildNodeVosRecursive(id, nodesByParent, edgesByParent, jobInfoMap, nodeVos, edgeVos, randomId);
+    }
+    
+    /**
+     * 收集所有任务组ID（包括嵌套的任务组）
+     * 
+     * @param jobId 当前任务组ID
+     * @param allJobIds 所有任务组ID集合（输出参数）
+     */
+    private void collectAllJobIds(Long jobId, Set<Long> allJobIds) {
+        List<JobNode> nodes = jobNodeService.list(
+            new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, jobId)
+        );
+        
+        for (JobNode node : nodes) {
+            if (DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType())) {
+                Long childJobId = node.getJobId();
+                if (childJobId != null && allJobIds.add(childJobId)) {
+                    // 递归收集子任务组的ID
+                    collectAllJobIds(childJobId, allJobIds);
+                }
+            }
+        }
+    }
+    
+    /**
+     * 递归构建节点和边的VO（使用内存数据，不再查询数据库）
+     * 
+     * @param jobId 当前任务组ID
+     * @param nodesByParent 按父ID分组的节点映射
+     * @param edgesByParent 按父ID分组的边映射
+     * @param jobInfoMap JobInfo映射
+     * @param nodeVos 节点VO列表（输出参数）
+     * @param edgeVos 边VO列表（输出参数）
+     * @param randomId 随机ID前缀
+     */
+    private void buildNodeVosRecursive(Long jobId, Map<Long, List<JobNode>> nodesByParent,
+                                      Map<Long, List<JobEdge>> edgesByParent,
+                                      Map<Long, JobInfo> jobInfoMap,
+                                      List<JobNodeVo> nodeVos, List<JobEdgeVo> edgeVos,
+                                      String randomId) {
+        // 获取当前任务组的节点和边
+        List<JobNode> jobNodeList = nodesByParent.getOrDefault(jobId, Collections.emptyList());
+        List<JobEdge> jobEdgeList = edgesByParent.getOrDefault(jobId, Collections.emptyList());
+        
+        // 处理节点
+        for (JobNode node : jobNodeList) {
             JobNodeVo jobNodeVo = BeanUtil.copyProperties(node, JobNodeVo.class, "id");
             JobInfo jobInfo = jobInfoMap.get(node.getJobId());
+            if (jobInfo == null) {
+                continue; // 跳过无效的节点
+            }
+            
             jobNodeVo.setJobName(jobInfo.getJobDesc());
             jobNodeVo.setId(randomId + node.getId());
             jobNodeVo.setIsPause(jobInfo.getIsPause());
             // 显式传递节点运行状态，避免序列化遗漏
             jobNodeVo.setTriggerStatus(node.getTriggerStatus());
+            
             if (DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType())) {
                 String children = node.getChildren();
-                List<String> childIds = JSONUtil.parseArray(children).toList(String.class);
-                List<String> newChildIds = new ArrayList<>();
-                for (String childId : childIds) {
-                    newChildIds.add(randomId + childId);
+                if (StringUtils.isNotBlank(children)) {
+                    List<String> childIds = JSONUtil.parseArray(children).toList(String.class);
+                    List<String> newChildIds = new ArrayList<>();
+                    for (String childId : childIds) {
+                        newChildIds.add(randomId + childId);
+                    }
+                    Map<String, Object> propertiesMap = JSONUtil.toBean(node.getProperties(), Map.class);
+                    propertiesMap.put("children", JSONUtil.toJsonStr(newChildIds));
+                    jobNodeVo.setProperties(JSONUtil.toJsonStr(propertiesMap));
+                    jobNodeVo.setChildren(JSONUtil.toJsonStr(newChildIds));
+                    
+                    // 递归处理子任务组（不再查询数据库）
+                    buildNodeVosRecursive(node.getJobId(), nodesByParent, edgesByParent, 
+                                          jobInfoMap, nodeVos, edgeVos, randomId);
                 }
-                Map<String, Object> propertiesMap = JSONUtil.toBean(node.getProperties(), Map.class);
-                propertiesMap.put("children", JSONUtil.toJsonStr(newChildIds));
-                jobNodeVo.setProperties(JSONUtil.toJsonStr(propertiesMap));
-                jobNodeVo.setChildren(JSONUtil.toJsonStr(newChildIds));
-                getJobCompose(node.getJobId(), nodeVos, edgeVos, randomId);
             }
             nodeVos.add(jobNodeVo);
-        });
+        }
+        
+        // 处理边
         for (JobEdge jobEdge : jobEdgeList) {
             JobEdgeVo jobEdgeVo = BeanUtil.copyProperties(jobEdge, JobEdgeVo.class, "id");
             jobEdgeVo.setId(randomId + jobEdge.getId());

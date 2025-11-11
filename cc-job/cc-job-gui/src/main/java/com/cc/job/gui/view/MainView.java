@@ -630,13 +630,52 @@ public class MainView extends BorderPane {
             return;
         }
 
-        // 检查该任务组是否正在运行
+        // 1. 先检查本地状态（快速检查）
         RunningJobGroup existingJob = runningJobs.get(currentJobId);
         if (existingJob != null && existingJob.isRunning()) {
             logPanel.warn("⚠ 任务组 " + currentJobId + " 正在运行中，请稍后再试");
             return;
         }
 
+        // 2. 【分布式检查】调用后端API检查实际运行状态
+        // 在后台线程中检查，避免阻塞UI
+        new Thread(() -> {
+            try {
+                boolean isRunningOnServer = jobInfoService.getJobStatus(currentJobId);
+                
+                Platform.runLater(() -> {
+                    if (isRunningOnServer) {
+                        String jobName = getJobNameById(currentJobId);
+                        if (jobName == null) {
+                            jobName = "任务组 " + currentJobId;
+                        }
+                        logPanel.warn("⚠ 任务组 \"" + jobName + "\" (ID: " + currentJobId + ") 正在运行中，请稍后再试");
+                        logPanel.info("提示：该任务组可能正在其他客户端或服务器实例上运行");
+                        return;
+                    }
+                    
+                    // 后端检查通过，继续执行任务
+                    continueJobExecution(currentJobId);
+                });
+            } catch (Exception e) {
+                System.err.println("❌ 检查任务组运行状态失败: " + e.getMessage());
+                e.printStackTrace();
+                
+                Platform.runLater(() -> {
+                    logPanel.warn("⚠ 检查任务组运行状态失败: " + e.getMessage());
+                    logPanel.warn("为安全起见，取消本次任务启动");
+                    // 可以选择继续执行或阻止执行，这里选择阻止执行以保证安全
+                });
+            }
+        }).start();
+    }
+
+    /**
+     * 继续执行任务（在确认未运行后调用）
+     * 
+     * @param currentJobId 任务组ID
+     */
+    private void continueJobExecution(Long currentJobId) {
         // 获取任务组名称
         String jobName = getJobNameById(currentJobId);
         if (jobName == null) {
@@ -705,6 +744,7 @@ public class MainView extends BorderPane {
         logPanel.info(currentJobId, "   连接ID: " + currentJobId + ":" + randomId);
         
         SSEService sseService = SSEService.getInstance();
+        final RunningJobGroup finalRunningJob = runningJob; // 用于内部类访问
         sseService.connect(currentJobId, randomId, message -> {
             handleSSEMessage(message, randomId);
         });
@@ -735,7 +775,7 @@ public class MainView extends BorderPane {
             try {
                 // 调用后端API触发任务
                 Long logId = jobInfoService.triggerJob(currentJobId, randomId);
-                runningJob.setLogId(logId);
+                finalRunningJob.setLogId(logId);
 
                 Platform.runLater(() -> {
                     logPanel.success("✓ 任务已提交，日志ID: " + logId);
@@ -743,7 +783,7 @@ public class MainView extends BorderPane {
                 });
 
                 // 启动日志轮询（针对该任务组）
-                startLogPolling(runningJob);
+                startLogPolling(finalRunningJob);
 
             } catch (Exception e) {
                 System.err.println("触发任务执行失败: " + e.getMessage());
@@ -752,7 +792,7 @@ public class MainView extends BorderPane {
                 Platform.runLater(() -> {
                     logPanel.error("✗ 任务执行失败: " + e.getMessage());
                     // 清理失败的任务组
-                    runningJob.cleanup();
+                    finalRunningJob.cleanup();
                     runningJobs.remove(currentJobId);
                     updateToolBarRunningJobs();
                     // 恢复边的正常状态

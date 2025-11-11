@@ -26,7 +26,7 @@ import {
   usePageStoreHook,
 } from "@/store";
 import { ElMessage } from "element-plus";
-import { debounce, throttle, PerformanceMonitor, createLazyComponent } from "@/utils/performance";
+import { debounce, throttle, PerformanceMonitor, createLazyComponent, SimpleCache } from "@/utils/performance";
 
 // LogicFlow 自定义节点组件 - 保持同步导入以确保可用性
 import CustomJava from "./node/CustomJava";
@@ -186,6 +186,9 @@ const pullFailCount = ref(0);
 
 /** 任务组状态管理 */
 const jobStates = ref<Map<number, JobState>>(new Map());
+
+/** 任务组数据缓存（缓存50个任务组的数据） */
+const jobComposeCache = new SimpleCache<number, any>(50);
 
 // ================== 5. 表单与对话框状态 ==================
 
@@ -2161,7 +2164,7 @@ function stopTrigger(): void {
 }
 
 /**
- * 选择任务组
+ * 选择任务组（优化版本：添加了数据缓存）
  * @param id 任务组ID
  */
 async function selectJobCompNode(id: number): Promise<void> {
@@ -2182,15 +2185,25 @@ async function selectJobCompNode(id: number): Promise<void> {
     return;
   }
 
+  // 检查缓存
+  const cachedData = jobComposeCache.get(id);
+  if (cachedData) {
+    console.log(
+      `[流程5] 使用缓存数据: 节点=${cachedData.nodes?.length || 0}, 边=${cachedData.edges?.length || 0}`
+    );
+    const graphModel = currentLf.graphModel;
+    await clearData(currentLf);
+    addJobNodes(cachedData.nodes, graphModel, cachedData.edges, currentLf);
+    return;
+  }
+
   // 原有的数据加载逻辑
   const graphModel = currentLf.graphModel;
 
   // 清空现有数据
-
   await clearData(currentLf);
 
   // 获取任务组数据
-
   const formMap = {
     id: id,
     type: 0,
@@ -2202,16 +2215,19 @@ async function selectJobCompNode(id: number): Promise<void> {
   console.log(
     `[流程5] 获取到数据: 节点=${data.nodes?.length || 0}, 边=${data.edges?.length || 0}`
   );
+  
+  // 缓存数据
+  jobComposeCache.set(id, data);
+  
   const newNodes = data.nodes;
   const newEdges = data.edges;
 
   // 添加节点和边
-
   addJobNodes(newNodes, graphModel, newEdges, currentLf);
 }
 
 /**
- * 增加节点
+ * 增加节点（优化版本：使用批量更新和 requestAnimationFrame）
  * @param newNodes 新的节点
  * @param graphModel 画布模型
  * @param newEdges 新的边
@@ -2227,29 +2243,116 @@ function addJobNodes(
   const instance = lfInstance || lf.value;
   if (!instance) return;
 
-  // 添加节点
-  newNodes.forEach((node: any) => {
-    graphModel.addNode(generateNode(node));
-  });
+  // 如果节点数量较少，使用原来的方式（避免过度优化）
+  if (newNodes.length <= 10) {
+    // 添加节点
+    newNodes.forEach((node: any) => {
+      graphModel.addNode(generateNode(node));
+    });
 
-  // 设置节点样式和子节点
-  newNodes.forEach((n: any) => {
-    const node = instance.getNodeModelById(n.id);
-    if (node) {
-      node.isPause = n.isPause == 1;
-      node.setStyle("fill", n.isPause == 1 ? "#409EEE" : "#fff");
-      // 触发节点重新渲染以更新图标
-      node.setAttributes();
-      if (n.nodeType === DYNAMIC_CUSTOM_GROUP && n.children) {
-        JSON.parse(n.children).forEach((id: string) => node.addChild(id));
+    // 设置节点样式和子节点
+    newNodes.forEach((n: any) => {
+      const node = instance.getNodeModelById(n.id);
+      if (node) {
+        node.isPause = n.isPause == 1;
+        node.setStyle("fill", n.isPause == 1 ? "#409EEE" : "#fff");
+        // 触发节点重新渲染以更新图标
+        node.setAttributes();
+        if (n.nodeType === DYNAMIC_CUSTOM_GROUP && n.children) {
+          try {
+            JSON.parse(n.children).forEach((id: string) => node.addChild(id));
+          } catch (e) {
+            console.error("解析子节点失败:", e);
+          }
+        }
       }
-    }
-  });
+    });
 
-  // 添加边
-  newEdges.forEach((e: any) => {
-    graphModel.addEdge(generateEdge(e));
-  });
+    // 添加边
+    newEdges.forEach((e: any) => {
+      graphModel.addEdge(generateEdge(e));
+    });
+    return;
+  }
+
+  // 大批量节点优化：使用 requestAnimationFrame 分批处理
+  const BATCH_SIZE = 50; // 每批处理50个节点
+  
+  // 1. 批量添加节点（分批处理，避免阻塞主线程）
+  let nodeIndex = 0;
+  const addNodesBatch = () => {
+    const endIndex = Math.min(nodeIndex + BATCH_SIZE, newNodes.length);
+    for (let i = nodeIndex; i < endIndex; i++) {
+      graphModel.addNode(generateNode(newNodes[i]));
+    }
+    nodeIndex = endIndex;
+    
+    if (nodeIndex < newNodes.length) {
+      // 继续处理下一批
+      requestAnimationFrame(addNodesBatch);
+    } else {
+      // 所有节点添加完成，开始设置样式
+      requestAnimationFrame(() => {
+        setNodeStylesBatch();
+      });
+    }
+  };
+  
+  // 2. 批量设置节点样式
+  const setNodeStylesBatch = () => {
+    let styleIndex = 0;
+    const setStyles = () => {
+      const endIndex = Math.min(styleIndex + BATCH_SIZE, newNodes.length);
+      for (let i = styleIndex; i < endIndex; i++) {
+        const n = newNodes[i];
+        const node = instance.getNodeModelById(n.id);
+        if (node) {
+          node.isPause = n.isPause == 1;
+          node.setStyle("fill", n.isPause == 1 ? "#409EEE" : "#fff");
+          // 触发节点重新渲染以更新图标
+          node.setAttributes();
+          if (n.nodeType === DYNAMIC_CUSTOM_GROUP && n.children) {
+            try {
+              JSON.parse(n.children).forEach((id: string) => node.addChild(id));
+            } catch (e) {
+              console.error("解析子节点失败:", e);
+            }
+          }
+        }
+      }
+      styleIndex = endIndex;
+      
+      if (styleIndex < newNodes.length) {
+        requestAnimationFrame(setStyles);
+      } else {
+        // 样式设置完成，开始添加边
+        requestAnimationFrame(() => {
+          addEdgesBatch();
+        });
+      }
+    };
+    setStyles();
+  };
+  
+  // 3. 批量添加边
+  const addEdgesBatch = () => {
+    let edgeIndex = 0;
+    const addEdges = () => {
+      const endIndex = Math.min(edgeIndex + BATCH_SIZE, newEdges.length);
+      for (let i = edgeIndex; i < endIndex; i++) {
+        graphModel.addEdge(generateEdge(newEdges[i]));
+      }
+      edgeIndex = endIndex;
+      
+      if (edgeIndex < newEdges.length) {
+        requestAnimationFrame(addEdges);
+      }
+    };
+    addEdges();
+  };
+  
+  // 开始处理
+  requestAnimationFrame(addNodesBatch);
 }
 
 // ================== 13. WebSocket连接管理 ==================

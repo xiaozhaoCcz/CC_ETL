@@ -34,6 +34,7 @@ public class JobGroupSnapshotServiceImpl extends ServiceImpl<JobGroupSnapshotMap
         snapshot.setEdgesJson(edgesJson);
         snapshot.setTriggerUserId(triggerUserId);
         snapshot.setCreateTime(LocalDateTime.now());
+        snapshot.setUpdateTime(LocalDateTime.now());
 
         this.save(snapshot);
 
