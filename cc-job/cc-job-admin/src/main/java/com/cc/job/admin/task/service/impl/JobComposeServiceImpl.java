@@ -112,38 +112,87 @@ public class JobComposeServiceImpl implements JobComposeService {
 
     private List<Long> operateToSaveJobCompose(JobInfo jobInfo, List<LfNode> nodeList, List<LfEdge> edgeList, List<LfNode> lfNodes, List<LfEdge> lfEdges) {
         Map<String, Long> nodeIdMap = new HashMap<>();
-        for (LfNode node : nodeList) {
-            Map<String, Object> properties = JSONUtil.toBean(node.getProperties(), Map.class);
-            Long jobId = Long.parseLong(String.valueOf(properties.get(JOB_ID)));
-            JobInfo jobInfo1 = jobInfoService.getById(jobId);
-            JobInfo copyJobInfo = BeanUtil.copyProperties(jobInfo1, JobInfo.class, "id");
-            copyJobInfo.setIsNode("Y");
-            copyJobInfo.setParentId(jobInfo.getId());
-            jobInfoService.save(copyJobInfo);
-
-            JobNode jobNode = new JobNode();
-            jobNode.setJobId(copyJobInfo.getId());
-            jobNode.setJobParentId(jobInfo.getId());
-            jobNode.setNodePositionX(node.x);
-            jobNode.setNodePositionY(node.y);
-            jobNode.setNodeType(node.type);
-            Map<String, Object> propertiesMap = JSONUtil.toBean(node.properties, Map.class);
-            propertiesMap.put(JOB_ID, copyJobInfo.getId());
-
-            if (DYNAMIC_GROUP.equalsIgnoreCase(node.getType())) {
-                List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
-                List<LfNode> childNodes = lfNodes.stream().filter(n -> childIds.contains(n.getId())).toList();
-                List<LfEdge> childEdges = lfEdges.stream().filter(e -> childIds.contains(e.getSourceNodeId()) || childIds.contains(e.targetNodeId)).toList();
-                List<Long> childJobIds = operateToSaveJobCompose(copyJobInfo, childNodes, childEdges, lfNodes, lfEdges);
-                propertiesMap.put("children", JSONUtil.toJsonStr(childJobIds));
-                jobNode.setChildren(JSONUtil.toJsonStr(childJobIds));
-                copyJobInfo.setJobType(2);
-                copyJobInfo.setExecutorParam(String.valueOf(copyJobInfo.getId()));
-                jobInfoService.updateById(copyJobInfo);
+        
+        // 优化：批量查询所有需要的JobInfo，避免N+1查询问题
+        List<Long> jobIds = nodeList.stream()
+            .map(node -> {
+                Map<String, Object> properties = JSONUtil.toBean(node.getProperties(), Map.class);
+                return Long.parseLong(String.valueOf(properties.get(JOB_ID)));
+            })
+            .distinct()
+            .toList();
+        
+        if (!jobIds.isEmpty()) {
+            List<JobInfo> jobInfos = jobInfoService.listByIds(jobIds);
+            Map<Long, JobInfo> jobInfoMap = jobInfos.stream()
+                .collect(Collectors.toMap(JobInfo::getId, n -> n, (existing, replacement) -> existing));
+            
+            // 批量保存JobInfo
+            List<JobInfo> newJobInfos = new ArrayList<>();
+            Map<Long, JobInfo> originalToNewMap = new HashMap<>();
+            
+            for (LfNode node : nodeList) {
+                Map<String, Object> properties = JSONUtil.toBean(node.getProperties(), Map.class);
+                Long jobId = Long.parseLong(String.valueOf(properties.get(JOB_ID)));
+                JobInfo jobInfo1 = jobInfoMap.get(jobId);
+                if (jobInfo1 == null) {
+                    continue;
+                }
+                
+                JobInfo copyJobInfo = BeanUtil.copyProperties(jobInfo1, JobInfo.class, "id");
+                copyJobInfo.setIsNode("Y");
+                copyJobInfo.setParentId(jobInfo.getId());
+                newJobInfos.add(copyJobInfo);
+                originalToNewMap.put(jobId, copyJobInfo);
             }
-            jobNode.setProperties(JSONUtil.toJsonStr(propertiesMap));
-            jobNodeService.save(jobNode);
-            nodeIdMap.put(node.getId(), jobNode.getId());
+            
+            // 批量保存JobInfo
+            if (!newJobInfos.isEmpty()) {
+                jobInfoService.saveBatch(newJobInfos);
+            }
+            
+            // 处理节点
+            List<JobNode> newJobNodes = new ArrayList<>();
+            for (LfNode node : nodeList) {
+                Map<String, Object> properties = JSONUtil.toBean(node.getProperties(), Map.class);
+                Long jobId = Long.parseLong(String.valueOf(properties.get(JOB_ID)));
+                JobInfo copyJobInfo = originalToNewMap.get(jobId);
+                if (copyJobInfo == null) {
+                    continue;
+                }
+                
+                JobNode jobNode = new JobNode();
+                jobNode.setJobId(copyJobInfo.getId());
+                jobNode.setJobParentId(jobInfo.getId());
+                jobNode.setNodePositionX(node.x);
+                jobNode.setNodePositionY(node.y);
+                jobNode.setNodeType(node.type);
+                Map<String, Object> propertiesMap = JSONUtil.toBean(node.properties, Map.class);
+                propertiesMap.put(JOB_ID, copyJobInfo.getId());
+
+                if (DYNAMIC_GROUP.equalsIgnoreCase(node.getType())) {
+                    List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
+                    List<LfNode> childNodes = lfNodes.stream().filter(n -> childIds.contains(n.getId())).toList();
+                    List<LfEdge> childEdges = lfEdges.stream().filter(e -> childIds.contains(e.getSourceNodeId()) || childIds.contains(e.targetNodeId)).toList();
+                    List<Long> childJobIds = operateToSaveJobCompose(copyJobInfo, childNodes, childEdges, lfNodes, lfEdges);
+                    propertiesMap.put("children", JSONUtil.toJsonStr(childJobIds));
+                    jobNode.setChildren(JSONUtil.toJsonStr(childJobIds));
+                    copyJobInfo.setJobType(2);
+                    copyJobInfo.setExecutorParam(String.valueOf(copyJobInfo.getId()));
+                    jobInfoService.updateById(copyJobInfo);
+                }
+                jobNode.setProperties(JSONUtil.toJsonStr(propertiesMap));
+                newJobNodes.add(jobNode);
+            }
+            
+            // 批量保存JobNode
+            if (!newJobNodes.isEmpty()) {
+                jobNodeService.saveBatch(newJobNodes);
+                // 更新nodeIdMap
+                for (int i = 0; i < nodeList.size() && i < newJobNodes.size(); i++) {
+                    nodeIdMap.put(nodeList.get(i).getId(), newJobNodes.get(i).getId());
+                }
+            }
         }
 
         // 添加任务组边
@@ -151,15 +200,17 @@ public class JobComposeServiceImpl implements JobComposeService {
         for (LfEdge edge : edgeList) {
             Long sourceJobId = nodeIdMap.get(edge.getSourceNodeId());
             Long targetJobId = nodeIdMap.get(edge.getTargetNodeId());
-            JobEdge jobEdge = new JobEdge();
-            jobEdge.setFromNodeId(sourceJobId);
-            jobEdge.setEndNodeId(targetJobId);
-            jobEdge.setJobParentId(jobInfo.getId());
-            jobEdge.setProperties(edge.properties);
-            jobEdge.setPointsList(edge.pointsList);
-            jobEdge.setStartPoint(edge.startPoint);
-            jobEdge.setEndPoint(edge.endPoint);
-            jobEdgeList.add(jobEdge);
+            if (sourceJobId != null && targetJobId != null) {
+                JobEdge jobEdge = new JobEdge();
+                jobEdge.setFromNodeId(sourceJobId);
+                jobEdge.setEndNodeId(targetJobId);
+                jobEdge.setJobParentId(jobInfo.getId());
+                jobEdge.setProperties(edge.properties);
+                jobEdge.setPointsList(edge.pointsList);
+                jobEdge.setStartPoint(edge.startPoint);
+                jobEdge.setEndPoint(edge.endPoint);
+                jobEdgeList.add(jobEdge);
+            }
         }
 
         jobEdgeService.saveBatch(jobEdgeList);
@@ -511,66 +562,176 @@ public class JobComposeServiceImpl implements JobComposeService {
         Map<Long,Long> nodeIds = new HashMap<>();
         Map<String,Object> result = new HashMap<>();
 
-            Object[] objects = ((ArrayList<?>) nodes).toArray();
-            List<JobNode> jobNodes = new ArrayList<>();
-            for (Object object : objects) {
-                Map<String, Object> objectMap = (Map<String, Object>) object;
-                Object id = objectMap.get("id");
-                Object properties = objectMap.get("properties");
-                Object x = objectMap.get( "x");
-                Object y = objectMap.get("y");
-
-                Map<String, Object> propertiesMap = (Map<String, Object>)properties;
-                Object width = propertiesMap.get("width");
-                Object height = propertiesMap.get("height");
-                Object jobId = propertiesMap.get("jobId");
-                Object glueType = objectMap.get("type");
-                // 添加新的节点
-                JobInfo jobInfo = jobInfoService.getById(String.valueOf(jobId));
-                jobInfo.setJobDesc(jobInfo.getJobDesc()+"_copy");
-                jobInfo.setParentId(Long.parseLong(String.valueOf(parentId)));
-                jobInfo.setIsNode("Y");
-                jobInfo.setIsPause(0);
-                jobInfo.setId(null);
-                jobInfoService.save(jobInfo);
-                JobNode jobNode = new JobNode();
-                jobNode.setJobId(jobInfo.getId());
-                jobNode.setJobParentId(Long.parseLong(String.valueOf(parentId)));
-                jobNode.setNodeType(String.valueOf(glueType));
-                jobNode.setNodePositionX(x==null?(double)0:(Double.parseDouble(String.valueOf(x))+50));
-                jobNode.setNodePositionY(x==null?(double)0:(Double.parseDouble(String.valueOf(y))+50));
-                Map<String,Object> propertieMap = new HashMap<>();
-                propertieMap.put(JOB_ID, jobInfo.getId());
-                propertieMap.put("width",width);
-                propertieMap.put("height",height);
-                jobNode.setProperties(JSONUtil.toJsonStr(propertieMap));
-                jobNodeService.save(jobNode);
-                nodeIds.put(Long.parseLong(String.valueOf(id)),jobNode.getId());
-                jobNodes.add(jobNode);
-
+        Object[] objects = ((ArrayList<?>) nodes).toArray();
+        List<JobNode> jobNodes = new ArrayList<>();
+        List<JobInfo> newJobInfos = new ArrayList<>();
+        
+        // 优化：批量查询所有需要的JobInfo，避免N+1查询问题
+        List<Long> jobIds = new ArrayList<>();
+        List<Map<String, Object>> nodeDataList = new ArrayList<>();
+        
+        for (Object object : objects) {
+            Map<String, Object> objectMap = (Map<String, Object>) object;
+            Map<String, Object> propertiesMap = (Map<String, Object>) objectMap.get("properties");
+            Object jobId = propertiesMap.get("jobId");
+            if (jobId != null) {
+                jobIds.add(Long.parseLong(String.valueOf(jobId)));
+                nodeDataList.add(objectMap);
             }
+        }
+        
+        // 批量查询JobInfo
+        Map<Long, JobInfo> jobInfoMap = new HashMap<>();
+        if (!jobIds.isEmpty()) {
+            List<JobInfo> jobInfos = jobInfoService.listByIds(jobIds);
+            jobInfoMap = jobInfos.stream()
+                .collect(Collectors.toMap(JobInfo::getId, n -> n, (existing, replacement) -> existing));
+        }
+        
+        // 批量创建JobInfo和JobNode
+        for (Map<String, Object> objectMap : nodeDataList) {
+            Object id = objectMap.get("id");
+            Object properties = objectMap.get("properties");
+            Object x = objectMap.get("x");
+            Object y = objectMap.get("y");
 
-
-            Object[] objects2 = ((ArrayList<?>) edges).toArray();;
-            List<JobEdge> jobEdges = new ArrayList<>();
-            for (Object object : objects2) {
-                Map<String, Object> objectMap = (Map<String, Object>) object;
-                Object sourceNodeId = objectMap.get("sourceNodeId");
-                Object targetNodeId = objectMap.get("targetNodeId");
-                JobEdge jobEdge = jobEdgeService.getOne(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getFromNodeId,Long.parseLong(String.valueOf(sourceNodeId))).eq(JobEdge::getEndNodeId,Long.parseLong(String.valueOf(targetNodeId))));
-                Long fromNodeId = jobEdge.getFromNodeId();
-                Long endNodeId = jobEdge.getEndNodeId();
-                JobEdge newjobEdge = new JobEdge();
-                newjobEdge.setFromNodeId(nodeIds.get(fromNodeId));
-                newjobEdge.setEndNodeId(nodeIds.get(endNodeId));
-                newjobEdge.setJobParentId(Long.parseLong(String.valueOf(parentId)));
-                jobEdgeService.save(newjobEdge);
-                jobEdges.add(newjobEdge);
-
+            Map<String, Object> propertiesMap = (Map<String, Object>) properties;
+            Object width = propertiesMap.get("width");
+            Object height = propertiesMap.get("height");
+            Object jobId = propertiesMap.get("jobId");
+            Object glueType = objectMap.get("type");
+            
+            // 添加新的节点
+            Long jobIdLong = Long.parseLong(String.valueOf(jobId));
+            JobInfo originalJobInfo = jobInfoMap.get(jobIdLong);
+            if (originalJobInfo == null) {
+                continue;
             }
-            result.put("nodes",jobNodes);
-            result.put("edges",jobEdges);
-            result.put("nodeIds",nodeIds);
+            
+            JobInfo jobInfo = BeanUtil.copyProperties(originalJobInfo, JobInfo.class);
+            jobInfo.setJobDesc(jobInfo.getJobDesc() + "_copy");
+            jobInfo.setParentId(Long.parseLong(String.valueOf(parentId)));
+            jobInfo.setIsNode("Y");
+            jobInfo.setIsPause(0);
+            jobInfo.setId(null);
+            newJobInfos.add(jobInfo);
+        }
+        
+        // 批量保存JobInfo
+        if (!newJobInfos.isEmpty()) {
+            jobInfoService.saveBatch(newJobInfos);
+        }
+        
+        // 创建JobNode
+        int jobInfoIndex = 0;
+        for (Map<String, Object> objectMap : nodeDataList) {
+            if (jobInfoIndex >= newJobInfos.size()) {
+                break;
+            }
+            
+            Object id = objectMap.get("id");
+            Object properties = objectMap.get("properties");
+            Object x = objectMap.get("x");
+            Object y = objectMap.get("y");
+
+            Map<String, Object> propertiesMap = (Map<String, Object>) properties;
+            Object width = propertiesMap.get("width");
+            Object height = propertiesMap.get("height");
+            Object glueType = objectMap.get("type");
+            
+            JobInfo newJobInfo = newJobInfos.get(jobInfoIndex);
+            JobNode jobNode = new JobNode();
+            jobNode.setJobId(newJobInfo.getId());
+            jobNode.setJobParentId(Long.parseLong(String.valueOf(parentId)));
+            jobNode.setNodeType(String.valueOf(glueType));
+            jobNode.setNodePositionX(x == null ? (double) 0 : (Double.parseDouble(String.valueOf(x)) + 50));
+            jobNode.setNodePositionY(y == null ? (double) 0 : (Double.parseDouble(String.valueOf(y)) + 50));
+            Map<String, Object> propertieMap = new HashMap<>();
+            propertieMap.put(JOB_ID, newJobInfo.getId());
+            propertieMap.put("width", width);
+            propertieMap.put("height", height);
+            jobNode.setProperties(JSONUtil.toJsonStr(propertieMap));
+            jobNodes.add(jobNode);
+            nodeIds.put(Long.parseLong(String.valueOf(id)), null); // 先占位
+            jobInfoIndex++;
+        }
+        
+        // 批量保存JobNode
+        if (!jobNodes.isEmpty()) {
+            jobNodeService.saveBatch(jobNodes);
+            // 更新nodeIds映射
+            int nodeIndex = 0;
+            for (Map<String, Object> objectMap : nodeDataList) {
+                if (nodeIndex < jobNodes.size()) {
+                    Object id = objectMap.get("id");
+                    nodeIds.put(Long.parseLong(String.valueOf(id)), jobNodes.get(nodeIndex).getId());
+                    nodeIndex++;
+                }
+            }
+        }
+
+        // 批量查询和保存JobEdge
+        Object[] objects2 = ((ArrayList<?>) edges).toArray();
+        List<JobEdge> jobEdges = new ArrayList<>();
+        List<Long> sourceNodeIds = new ArrayList<>();
+        List<Long> targetNodeIds = new ArrayList<>();
+        
+        for (Object object : objects2) {
+            Map<String, Object> objectMap = (Map<String, Object>) object;
+            Object sourceNodeId = objectMap.get("sourceNodeId");
+            Object targetNodeId = objectMap.get("targetNodeId");
+            sourceNodeIds.add(Long.parseLong(String.valueOf(sourceNodeId)));
+            targetNodeIds.add(Long.parseLong(String.valueOf(targetNodeId)));
+        }
+        
+        // 批量查询JobEdge
+        Map<String, JobEdge> edgeMap = new HashMap<>();
+        if (!sourceNodeIds.isEmpty() && !targetNodeIds.isEmpty()) {
+            for (int i = 0; i < sourceNodeIds.size() && i < targetNodeIds.size(); i++) {
+                Long fromNodeId = sourceNodeIds.get(i);
+                Long endNodeId = targetNodeIds.get(i);
+                JobEdge jobEdge = jobEdgeService.getOne(
+                    new LambdaQueryWrapper<JobEdge>()
+                        .eq(JobEdge::getFromNodeId, fromNodeId)
+                        .eq(JobEdge::getEndNodeId, endNodeId)
+                );
+                if (jobEdge != null) {
+                    edgeMap.put(fromNodeId + ":" + endNodeId, jobEdge);
+                }
+            }
+        }
+        
+        // 创建新的JobEdge
+        for (Object object : objects2) {
+            Map<String, Object> objectMap = (Map<String, Object>) object;
+            Object sourceNodeId = objectMap.get("sourceNodeId");
+            Object targetNodeId = objectMap.get("targetNodeId");
+            
+            Long fromNodeId = Long.parseLong(String.valueOf(sourceNodeId));
+            Long endNodeId = Long.parseLong(String.valueOf(targetNodeId));
+            JobEdge originalEdge = edgeMap.get(fromNodeId + ":" + endNodeId);
+            
+            if (originalEdge != null) {
+                Long newFromNodeId = nodeIds.get(originalEdge.getFromNodeId());
+                Long newEndNodeId = nodeIds.get(originalEdge.getEndNodeId());
+                if (newFromNodeId != null && newEndNodeId != null) {
+                    JobEdge newJobEdge = new JobEdge();
+                    newJobEdge.setFromNodeId(newFromNodeId);
+                    newJobEdge.setEndNodeId(newEndNodeId);
+                    newJobEdge.setJobParentId(Long.parseLong(String.valueOf(parentId)));
+                    jobEdges.add(newJobEdge);
+                }
+            }
+        }
+        
+        // 批量保存JobEdge
+        if (!jobEdges.isEmpty()) {
+            jobEdgeService.saveBatch(jobEdges);
+        }
+        
+        result.put("nodes", jobNodes);
+        result.put("edges", jobEdges);
+        result.put("nodeIds", nodeIds);
         return result;
     }
 

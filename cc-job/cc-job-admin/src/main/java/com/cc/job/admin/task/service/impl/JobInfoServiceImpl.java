@@ -468,10 +468,21 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         });
 
         //计算节点的出度和人度
-
+        // 优化：预先构建边映射，避免在循环中重复遍历（O(n²) -> O(n)）
+        Map<String, Long> outDegreeMap = new HashMap<>();
+        Map<String, Long> inDegreeMap = new HashMap<>();
+        
+        for (JobEdgeDto edge : taskEdgeDtoList) {
+            // 统计出度
+            outDegreeMap.merge(edge.getFromNodeId(), 1L, Long::sum);
+            // 统计入度
+            inDegreeMap.merge(edge.getEndNodeId(), 1L, Long::sum);
+        }
+        
+        // 批量设置节点的入度和出度
         for (JobNodeDto taskNodeDto : taskNodeDtoList) {
-            taskNodeDto.setNodeOutDegree(taskEdgeDtoList.stream().filter(v -> v.getFromNodeId().equalsIgnoreCase(taskNodeDto.getId())).count());
-            taskNodeDto.setNodeInDegree(taskEdgeDtoList.stream().filter(v -> v.getEndNodeId().equalsIgnoreCase(taskNodeDto.getId())).count());
+            taskNodeDto.setNodeOutDegree(outDegreeMap.getOrDefault(taskNodeDto.getId(), 0L));
+            taskNodeDto.setNodeInDegree(inDegreeMap.getOrDefault(taskNodeDto.getId(), 0L));
         }
 
         addNode(taskNodeDtoList, taskEdgeDtoList, taskInfo);
@@ -480,16 +491,53 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
     private void addNode(List<JobNodeDto> nodeList, List<JobEdgeDto> edgeList, JobInfo parentTask) {
         Map<String, Long> nodeMap = new HashMap<>();
+        
+        // 优化：批量查询所有需要的JobInfo，避免N+1查询问题
+        List<Long> jobIds = nodeList.stream().map(JobNodeDto::getJobId).distinct().toList();
+        if (jobIds.isEmpty()) {
+            return;
+        }
+        List<JobInfo> jobInfos = this.listByIds(jobIds);
+        Map<Long, JobInfo> jobInfoMap = jobInfos.stream()
+            .collect(Collectors.toMap(JobInfo::getId, n -> n, (existing, replacement) -> existing));
 
+        // 批量保存JobInfo和JobNode
+        List<JobInfo> newJobInfos = new ArrayList<>();
+        List<JobNode> newJobNodes = new ArrayList<>();
+        // 用于记录每个taskNode对应的newJobInfo索引
+        Map<JobNodeDto, Integer> nodeToJobInfoIndex = new HashMap<>();
+        
         for (JobNodeDto taskNode : nodeList) {
-            JobInfo taskInfo = this.getById(taskNode.getJobId());
+            JobInfo taskInfo = jobInfoMap.get(taskNode.getJobId());
+            if (taskInfo == null) {
+                continue; // 跳过无效的节点
+            }
 
             JobInfo copyTaskInfo = BeanUtil.copyProperties(taskInfo, JobInfo.class);
             copyTaskInfo.setId(null);
             copyTaskInfo.setIsNode("Y");
             copyTaskInfo.setParentId(parentTask.getId());
-            this.save(copyTaskInfo);
-
+            newJobInfos.add(copyTaskInfo);
+            nodeToJobInfoIndex.put(taskNode, newJobInfos.size() - 1);
+        }
+        
+        // 批量保存JobInfo（MyBatis-Plus会自动回填ID）
+        this.saveBatch(newJobInfos);
+        
+        // 处理嵌套的任务组和创建JobNode
+        for (JobNodeDto taskNode : nodeList) {
+            JobInfo taskInfo = jobInfoMap.get(taskNode.getJobId());
+            if (taskInfo == null) {
+                continue;
+            }
+            
+            // 获取对应的新JobInfo
+            Integer index = nodeToJobInfoIndex.get(taskNode);
+            if (index == null || index >= newJobInfos.size()) {
+                continue;
+            }
+            JobInfo copyTaskInfo = newJobInfos.get(index);
+            
             if (taskInfo.getJobType() == 2) {
                 List<JobNode> childNodes = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, taskInfo.getId()));
                 List<JobEdge> childEdges = jobEdgeService.list(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getJobParentId, taskInfo.getId()));
@@ -505,16 +553,37 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
             copyTaskNode.setId(null);
             copyTaskNode.setJobId(copyTaskInfo.getId());
             copyTaskNode.setJobParentId(parentTask.getId());
-            jobNodeService.save(copyTaskNode);
-            nodeMap.put(String.valueOf(taskNode.getId()), copyTaskNode.getId());
+            newJobNodes.add(copyTaskNode);
+        }
+        
+        // 批量保存JobNode（MyBatis-Plus会自动回填ID）
+        jobNodeService.saveBatch(newJobNodes);
+        
+        // 更新nodeMap，使用保存后的ID
+        int nodeIndex = 0;
+        for (JobNodeDto taskNode : nodeList) {
+            if (nodeIndex < newJobNodes.size()) {
+                JobNode savedNode = newJobNodes.get(nodeIndex);
+                nodeMap.put(String.valueOf(taskNode.getId()), savedNode.getId());
+                nodeIndex++;
+            }
         }
 
+        // 批量保存JobEdge
+        List<JobEdge> newEdges = new ArrayList<>();
         for (JobEdgeDto taskEdge : edgeList) {
-            JobEdge edge = new JobEdge();
-            edge.setJobParentId(parentTask.getId());
-            edge.setFromNodeId(nodeMap.get(String.valueOf(taskEdge.getFromNodeId())));
-            edge.setEndNodeId(nodeMap.get(String.valueOf(taskEdge.getEndNodeId())));
-            jobEdgeService.save(edge);
+            Long fromNodeId = nodeMap.get(String.valueOf(taskEdge.getFromNodeId()));
+            Long endNodeId = nodeMap.get(String.valueOf(taskEdge.getEndNodeId()));
+            if (fromNodeId != null && endNodeId != null) {
+                JobEdge edge = new JobEdge();
+                edge.setJobParentId(parentTask.getId());
+                edge.setFromNodeId(fromNodeId);
+                edge.setEndNodeId(endNodeId);
+                newEdges.add(edge);
+            }
+        }
+        if (!newEdges.isEmpty()) {
+            jobEdgeService.saveBatch(newEdges);
         }
     }
 
@@ -578,27 +647,44 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
         if (formData.getChildJobid() != null && formData.getChildJobid().trim().length() > 0) {
             String[] childJobIds = formData.getChildJobid().split(",");
+            List<Integer> validJobIds = new ArrayList<>();
+            
+            // 优化：批量查询所有子任务，避免N+1查询问题
             for (String childJobIdItem : childJobIds) {
                 if (childJobIdItem != null && childJobIdItem.trim().length() > 0 && isNumeric(childJobIdItem)) {
-                    JobInfo childJobInfo = this.getById(Integer.parseInt(childJobIdItem));
-                    if (childJobInfo == null) {
-                        throw new BusinessException(MessageFormat.format((I18nUtil.getString("jobinfo_field_childJobId") + "({0})" + I18nUtil.getString("system_not_found")), childJobIdItem));
-
-                    }
+                    validJobIds.add(Integer.parseInt(childJobIdItem));
                 } else {
                     throw new BusinessException(
-                            MessageFormat.format((I18nUtil.getString("jobinfo_field_childJobId") + "({0})" + I18nUtil.getString("system_unvalid")), childJobIdItem));
+                        MessageFormat.format((I18nUtil.getString("jobinfo_field_childJobId") + "({0})" + I18nUtil.getString("system_unvalid")), childJobIdItem));
+                }
+            }
+            
+            // 批量查询所有子任务
+            if (!validJobIds.isEmpty()) {
+                List<JobInfo> childJobInfos = this.listByIds(validJobIds.stream().map(Long::valueOf).toList());
+                Map<Long, JobInfo> childJobInfoMap = childJobInfos.stream()
+                    .collect(Collectors.toMap(JobInfo::getId, n -> n));
+                
+                // 验证所有子任务是否存在
+                for (Integer jobId : validJobIds) {
+                    if (!childJobInfoMap.containsKey(Long.valueOf(jobId))) {
+                        throw new BusinessException(MessageFormat.format(
+                            (I18nUtil.getString("jobinfo_field_childJobId") + "({0})" + I18nUtil.getString("system_not_found")), 
+                            String.valueOf(jobId)));
+                    }
                 }
             }
 
-            // join , avoid "xxx,,"
-            String temp = "";
-            for (String item : childJobIds) {
-                temp += item + ",";
+            // 优化：使用StringBuilder替代字符串拼接
+            StringBuilder temp = new StringBuilder();
+            for (int i = 0; i < childJobIds.length; i++) {
+                if (i > 0) {
+                    temp.append(",");
+                }
+                temp.append(childJobIds[i]);
             }
-            temp = temp.substring(0, temp.length() - 1);
 
-            formData.setChildJobid(temp);
+            formData.setChildJobid(temp.toString());
         }
         formData.setGlueUpdatetime(LocalDateTime.now());
         JobInfo taskInfo = BeanUtil.copyProperties(formData, JobInfo.class);
@@ -709,10 +795,24 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
         // 处理边
         List<JobNode> nodeFromDbList2 = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, id));
-        nodeFromDbList2.forEach(item -> {
-            item.setNodeInDegree(taskAddEdgeList.stream().filter(v -> v.getEndNodeId().equals(item.getId())).count());
-            item.setNodeOutDegree(taskAddEdgeList.stream().filter(v -> v.getFromNodeId().equals(item.getId())).count());
-        });
+        
+        // 优化：预先构建边映射，避免在forEach中重复遍历（O(n²) -> O(n)）
+        Map<Long, Long> inDegreeMap = new HashMap<>();
+        Map<Long, Long> outDegreeMap = new HashMap<>();
+        
+        for (JobEdge edge : taskAddEdgeList) {
+            // 统计入度
+            inDegreeMap.merge(edge.getEndNodeId(), 1L, Long::sum);
+            // 统计出度
+            outDegreeMap.merge(edge.getFromNodeId(), 1L, Long::sum);
+        }
+        
+        // 批量设置节点的入度和出度
+        for (JobNode item : nodeFromDbList2) {
+            item.setNodeInDegree(inDegreeMap.getOrDefault(item.getId(), 0L));
+            item.setNodeOutDegree(outDegreeMap.getOrDefault(item.getId(), 0L));
+        }
+        
         return jobNodeService.updateBatchById(nodeFromDbList2);
     }
 
@@ -754,9 +854,15 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     public List<Long> initData() {
         //获取初始化的数据
         long triggerIng = this.count(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getTriggerStatus, 1));
-        List<JobLog> jobLogs = jobLogMapper.selectList(null);
-        long successCount = jobLogs.stream().filter(v -> v.getHandleCode().equals(ReturnT.SUCCESS_CODE)).count();
-        long failCount = jobLogs.stream().filter(v -> v.getHandleCode().equals(ReturnT.FAIL_CODE)).count();
+        
+        // 优化：使用数据库查询替代内存过滤，避免查询所有日志
+        long successCount = jobLogMapper.selectCount(
+            new LambdaQueryWrapper<JobLog>().eq(JobLog::getHandleCode, ReturnT.SUCCESS_CODE)
+        );
+        long failCount = jobLogMapper.selectCount(
+            new LambdaQueryWrapper<JobLog>().eq(JobLog::getHandleCode, ReturnT.FAIL_CODE)
+        );
+        
         return List.of(successCount, failCount, triggerIng);
     }
 
