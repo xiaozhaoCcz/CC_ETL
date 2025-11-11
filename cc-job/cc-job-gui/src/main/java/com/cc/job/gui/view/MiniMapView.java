@@ -49,13 +49,12 @@ public class MiniMapView extends VBox {
     
     private void initializeUI() {
         setStyle(
-            "-fx-background-color: rgba(255, 255, 255, 0.95); " +
-            "-fx-border-color: #D1D5DB; " +
-            "-fx-border-width: 1; " +
-            "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 5, 0, 0, 1);"
+            "-fx-background-color: transparent; " +
+            "-fx-border-color: rgba(148,163,184,0.3) transparent transparent transparent; " +
+            "-fx-border-width: 1 0 0 0;"
         );
-        setPadding(new Insets(8));
-        setSpacing(5);
+        setPadding(new Insets(12, 12, 0, 12));
+        setSpacing(12);
         setMinWidth(200);  // 最小宽度200px
         setMinHeight(200); // 最小高度
         setPrefHeight(MINIMAP_HEIGHT + 40);  // 默认高度
@@ -66,7 +65,7 @@ public class MiniMapView extends VBox {
         
         // 画布容器 - 使用 Pane 支持绝对定位！
         Pane canvasContainer = new Pane();
-        canvasContainer.setStyle("-fx-background-color: #F3F4F6; -fx-border-color: #D1D5DB; -fx-border-width: 1;");
+        canvasContainer.setStyle("-fx-background-color: #F8FAFC;");
         canvasContainer.setMinWidth(150);  // 最小宽度
         canvasContainer.setMinHeight(150); // 最小高度
         canvasContainer.setPrefHeight(MINIMAP_HEIGHT);  // 默认高度

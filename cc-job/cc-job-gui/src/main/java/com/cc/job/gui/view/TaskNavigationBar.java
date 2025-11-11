@@ -62,7 +62,7 @@ public class TaskNavigationBar extends HBox {
     
     private void initializeUI() {
         setStyle(
-            "-fx-background-color: linear-gradient(to right, rgba(255,255,255,0.98), rgba(243,244,246,0.96)); " +
+            "-fx-background-color: #FFFFFF; " +
             "-fx-border-color: transparent transparent rgba(148,163,184,0.35) transparent; " +
             "-fx-border-width: 0 0 1 0; " +
             "-fx-padding: 8 16 8 16;"
@@ -350,12 +350,15 @@ public class TaskNavigationBar extends HBox {
      */
     private static class TaskTab extends StackPane {
         
-        private static final String BASE_STYLE =
-            "-fx-background-radius: 10; " +
-            "-fx-border-radius: 10; " +
+        private static final String TAB_RADIUS = StyleUtil.RADIUS_MD;
+        private static final String BASE_STYLE = String.format(
+            "-fx-background-radius: %1$s; " +
+            "-fx-border-radius: %1$s; " +
             "-fx-border-width: 1; " +
             "-fx-cursor: hand; " +
-            "-fx-effect: null;";
+            "-fx-effect: null;",
+            TAB_RADIUS
+        );
         private static final String NORMAL_STYLE = BASE_STYLE +
             "-fx-background-color: rgba(255,255,255,0.88); " +
             "-fx-border-color: rgba(148,163,184,0.45);";
@@ -364,9 +367,9 @@ public class TaskNavigationBar extends HBox {
             "-fx-border-color: rgba(99,102,241,0.35); " +
             "-fx-effect: dropshadow(gaussian, rgba(99,102,241,0.12), 12, 0, 0, 2);";
         private static final String ACTIVE_STYLE = BASE_STYLE +
-            "-fx-background-color: linear-gradient(to bottom, rgba(99,102,241,0.2), rgba(79,70,229,0.28)); " +
-            "-fx-border-color: rgba(79,70,229,0.6); " +
-            "-fx-effect: dropshadow(gaussian, rgba(79,70,229,0.32), 20, 0, 0, 4);";
+            "-fx-background-color: rgba(99,102,241,0.18); " +
+            "-fx-border-color: rgba(79,70,229,0.55); " +
+            "-fx-effect: dropshadow(gaussian, rgba(79,70,229,0.22), 16, 0, 0, 3);";
         
         private final String taskGroupName;
         private boolean active;

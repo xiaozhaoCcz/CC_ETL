@@ -4,6 +4,7 @@ import com.cc.job.gui.util.StyleUtil;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -13,8 +14,6 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
-import javafx.scene.text.Text;
-import javafx.scene.text.TextFlow;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -58,7 +57,7 @@ public class LogPanel extends VBox {
      */
     private static class LogTabData {
         ScrollPane scrollPane;
-        TextFlow textFlow;
+        VBox logList;
         int logCount = 0;
         int filteredCount = 0;
         String status = "就绪";
@@ -66,17 +65,13 @@ public class LogPanel extends VBox {
         private final List<LogEntry> entries = new ArrayList<>();
         
         LogTabData() {
-            textFlow = new TextFlow();
-            textFlow.setStyle(
-                "-fx-background-color: rgba(255,255,255,0.98); " +
-                "-fx-border-color: rgba(148,163,184,0.18); " +
-                "-fx-border-radius: 12; " +
-                "-fx-background-radius: 12; " +
-                "-fx-padding: 18;"
-            );
-            textFlow.setLineSpacing(3);
+            logList = new VBox();
+            logList.setSpacing(0);
+            logList.setPadding(new Insets(12, 0, 12, 0));
+            logList.setFillWidth(true);
+            logList.setStyle("-fx-background-color: transparent;");
             
-            scrollPane = new ScrollPane(textFlow);
+            scrollPane = new ScrollPane(logList);
             scrollPane.setFitToWidth(true);
             scrollPane.setStyle(
                 "-fx-background-color: transparent; " +
@@ -130,58 +125,146 @@ public class LogPanel extends VBox {
         void render(String keyword) {
             String normalized = keyword == null ? "" : keyword.trim().toLowerCase();
             boolean hasKeyword = !normalized.isEmpty();
-            
-            textFlow.getChildren().clear();
-            int matches = 0;
-            
+
+            logList.getChildren().clear();
+
             if (entries.isEmpty()) {
-                if (hasKeyword) {
-                    textFlow.getChildren().add(createStyledText("暂无日志可供搜索\n", StyleUtil.GRAY_400));
-                } else {
-                    textFlow.getChildren().addAll(createWelcomeTexts());
-                }
                 filteredCount = 0;
                 if (hasKeyword) {
+                    logList.getChildren().add(buildEmptyState("暂无日志可供搜索", "调整关键字或过滤条件后重试。"));
                     Platform.runLater(() -> scrollPane.setVvalue(0));
                 } else {
+                    logList.getChildren().add(buildEmptyState("日志暂未产生", "启动任务组或执行操作后，这里会实时展示运行信息。"));
                     scrollToBottom();
                 }
                 return;
             }
-            
+
+            int matches = 0;
+            int rowIndex = 0;
             for (LogEntry entry : entries) {
                 if (!hasKeyword || entry.matches(normalized)) {
-                    textFlow.getChildren().addAll(entry.toTexts());
+                    logList.getChildren().add(buildLogRow(entry, rowIndex++));
                     matches++;
                 }
             }
-            
-            if (hasKeyword && matches == 0) {
-                textFlow.getChildren().add(createStyledText("未找到匹配的日志记录\n", StyleUtil.GRAY_400));
-            }
-            
-            filteredCount = hasKeyword ? matches : entries.size();
-            
+
             if (hasKeyword) {
+                filteredCount = matches;
+                if (matches == 0) {
+                    logList.getChildren().add(buildEmptyState("未找到匹配的日志记录", "尝试缩短搜索词或更改日志级别筛选条件。"));
+                }
                 Platform.runLater(() -> scrollPane.setVvalue(0));
             } else {
+                filteredCount = entries.size();
                 scrollToBottom();
             }
         }
         
-        private List<Text> createWelcomeTexts() {
-            List<Text> texts = new ArrayList<>();
-            Text headline = createStyledText("日志监控中心 · NodeFx\n", StyleUtil.GRAY_700);
-            headline.setFont(Font.font("Consolas", FontWeight.SEMI_BOLD, 14));
-            texts.add(headline);
-            texts.add(createStyledText("系统已就绪，启动任务后将实时呈现执行情况。\n", StyleUtil.GRAY_500));
-            texts.add(createStyledText("当前暂无日志，您可以从顶部工具栏触发任务或导出历史记录。\n\n", StyleUtil.GRAY_500));
-            texts.add(createStyledText("───────────────────────────────────────────────────────────────\n\n", StyleUtil.GRAY_400));
-            return texts;
+        private Node buildLogRow(LogEntry entry, int rowIndex) {
+            boolean isRaw = entry.raw;
+            String background = rowIndex % 2 == 0 ? "rgba(248,250,252,0.9)" : "#FFFFFF";
+
+            HBox row = new HBox(14);
+            row.setAlignment(Pos.CENTER_LEFT);
+            row.setPadding(new Insets(8, 20, 8, 20));
+            row.setMaxWidth(Double.MAX_VALUE);
+            row.setStyle(String.format(
+                "-fx-background-color: %s; " +
+                "-fx-border-color: transparent transparent rgba(226,232,240,0.75) transparent; " +
+                "-fx-border-width: 0 0 1 0;",
+                background
+            ));
+
+            Label timestampLabel = new Label(entry.timestamp != null ? entry.timestamp : "--:--:--");
+            timestampLabel.setFont(Font.font("Consolas", FontWeight.NORMAL, 12));
+            timestampLabel.setTextFill(Color.web(StyleUtil.GRAY_500));
+            timestampLabel.setMinWidth(140);
+            timestampLabel.setPrefWidth(140);
+            timestampLabel.setMaxWidth(140);
+
+            String levelName = isRaw ? "输出" : resolveLevelName(entry.level);
+            String swatchColor = entry.levelColor != null ? entry.levelColor : StyleUtil.GRAY_500;
+            if (isRaw) {
+                swatchColor = StyleUtil.GRAY_500;
+            }
+
+            Label levelLabel = new Label(levelName);
+            levelLabel.setFont(Font.font("System", FontWeight.BOLD, 11));
+            levelLabel.setTextFill(Color.web("#FFFFFF"));
+            levelLabel.setAlignment(Pos.CENTER);
+            levelLabel.setMinWidth(64);
+            levelLabel.setPrefWidth(64);
+            levelLabel.setMaxWidth(64);
+            levelLabel.setStyle(String.format(
+                "-fx-background-color: %s; " +
+                "-fx-background-radius: 6; " +
+                "-fx-padding: 3 0;",
+                swatchColor
+            ));
+
+            Label messageLabel = new Label(entry.message != null ? entry.message : "");
+            messageLabel.setWrapText(true);
+            messageLabel.setMaxWidth(Double.MAX_VALUE);
+            messageLabel.setTextFill(Color.web(
+                entry.messageColor != null ? entry.messageColor : StyleUtil.GRAY_700
+            ));
+            messageLabel.setFont(isRaw
+                ? Font.font("Consolas", FontWeight.NORMAL, 12)
+                : Font.font("System", FontWeight.NORMAL, 13));
+            HBox.setHgrow(messageLabel, Priority.ALWAYS);
+
+            row.getChildren().addAll(timestampLabel, levelLabel, messageLabel);
+            return row;
+        }
+
+        private Node buildEmptyState(String title, String description) {
+            VBox container = new VBox(6);
+            container.setAlignment(Pos.CENTER_LEFT);
+            container.setPadding(new Insets(24, 28, 24, 28));
+            container.setMaxWidth(Double.MAX_VALUE);
+            String radius = StyleUtil.RADIUS_LG;
+            container.setStyle(String.format(
+                "-fx-background-color: #FFFFFF; " +
+                "-fx-border-color: rgba(226,232,240,0.9); " +
+                "-fx-border-width: 1; " +
+                "-fx-border-radius: %1$s; " +
+                "-fx-background-radius: %1$s;",
+                radius
+            ));
+
+            Label titleLabel = new Label(title);
+            titleLabel.setFont(Font.font("System", FontWeight.SEMI_BOLD, 13));
+            titleLabel.setTextFill(Color.web(StyleUtil.GRAY_700));
+
+            Label descLabel = new Label(description);
+            descLabel.setWrapText(true);
+            descLabel.setFont(Font.font("System", FontWeight.NORMAL, 12));
+            descLabel.setTextFill(Color.web(StyleUtil.GRAY_500));
+
+            container.getChildren().addAll(titleLabel, descLabel);
+
+            StackPane wrapper = new StackPane(container);
+            wrapper.setPadding(new Insets(20, 20, 20, 20));
+            return wrapper;
         }
         
         private void scrollToBottom() {
             Platform.runLater(() -> scrollPane.setVvalue(1.0));
+        }
+
+        private String resolveLevelName(String level) {
+            if (level == null) {
+                return "日志";
+            }
+            return switch (level) {
+                case "INFO" -> "信息";
+                case "WARN" -> "警告";
+                case "ERROR" -> "错误";
+                case "SUCCESS" -> "成功";
+                case "DEBUG" -> "调试";
+                default -> level;
+            };
         }
     }
     
@@ -208,21 +291,6 @@ public class LogPanel extends VBox {
             this.message = message;
             this.messageColor = messageColor;
             this.raw = raw;
-        }
-        
-        List<Text> toTexts() {
-            List<Text> nodes = new ArrayList<>();
-            if (raw) {
-                String content = message.endsWith("\n") ? message : message + "\n";
-                nodes.add(createStyledText(content, messageColor));
-            } else {
-                nodes.add(createStyledText("[" + timestamp + "] ", "#9CA3AF"));
-                nodes.add(createStyledText(icon + " ", levelColor));
-                String levelPadded = String.format("%-7s", level);
-                nodes.add(createStyledText(levelPadded + " │ ", levelColor));
-                nodes.add(createStyledText(message + "\n", messageColor));
-            }
-            return nodes;
         }
         
         boolean matches(String keywordLower) {
@@ -289,6 +357,10 @@ public class LogPanel extends VBox {
                 "-fx-text-fill: " + StyleUtil.GRAY_600 + "; " +
                 "-fx-font-weight: 600;"
             );
+            nameLabel.setPrefWidth(150);
+            nameLabel.setMaxWidth(150);
+            nameLabel.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
+            Tooltip.install(nameLabel, new Tooltip(taskGroupName));
             
             // 关闭按钮 - 使用更现代的样式
             Label closeIcon = new Label("×");
@@ -404,12 +476,15 @@ public class LogPanel extends VBox {
     }
     
     private void initializeUI() {
-        setStyle(
-            "-fx-background-color: linear-gradient(to bottom, rgba(255,255,255,0.97), rgba(248,250,252,0.98)); " +
-            "-fx-border-color: rgba(148, 163, 184, 0.45); " +
+        String radius = StyleUtil.RADIUS_LG;
+        setStyle(String.format(
+            "-fx-background-color: #FFFFFF; " +
+            "-fx-border-color: rgba(148,163,184,0.35); " +
             "-fx-border-width: 1 0 0 0; " +
-            "-fx-effect: dropshadow(gaussian, rgba(15, 23, 42, 0.08), 12, 0, 0, -4);"
-        );
+            "-fx-background-radius: 0 0 %1$s %1$s; " +
+            "-fx-border-radius: 0 0 %1$s %1$s;",
+            radius
+        ));
         if (!getStyleClass().contains("log-panel")) {
             getStyleClass().add("log-panel");
         }
@@ -426,8 +501,8 @@ public class LogPanel extends VBox {
         
         // 日志显示区域容器
         logContainer = new StackPane();
-        logContainer.setPadding(new Insets(12, 20, 16, 20));
-        logContainer.setStyle("-fx-background-color: transparent;");
+        logContainer.setPadding(new Insets(12, 12, 12, 12));
+        logContainer.setStyle("-fx-background-color: #FFFFFF;");
         VBox.setVgrow(logContainer, Priority.ALWAYS);
         
         // 创建默认日志区域（系统日志，不关联任何任务组）
@@ -450,8 +525,8 @@ public class LogPanel extends VBox {
     private HBox createTabBar() {
         HBox tabBar = new HBox(0);
         tabBar.setStyle(
-            "-fx-background-color: rgba(99, 102, 241, 0.06); " +
-            "-fx-border-color: transparent transparent rgba(148, 163, 184, 0.35) transparent; " +
+            "-fx-background-color: #F8FAFC; " +
+            "-fx-border-color: transparent transparent rgba(148, 163, 184, 0.3) transparent; " +
             "-fx-border-width: 0 0 1 0; " +
             "-fx-padding: 0 16 0 16;"
         );
@@ -487,8 +562,8 @@ public class LogPanel extends VBox {
         HBox titleBar = new HBox(12);
         titleBar.setAlignment(Pos.CENTER_LEFT);
         titleBar.setStyle(
-            "-fx-background-color: linear-gradient(to right, rgba(255,255,255,0.98), rgba(241,245,249,0.98)); " +
-            "-fx-border-color: transparent transparent rgba(148, 163, 184, 0.35) transparent; " +
+            "-fx-background-color: #FFFFFF; " +
+            "-fx-border-color: transparent transparent rgba(148, 163, 184, 0.3) transparent; " +
             "-fx-border-width: 0 0 1 0; " +
             "-fx-padding: 14 20;"
         );
@@ -609,7 +684,7 @@ public class LogPanel extends VBox {
         statusBar.setAlignment(Pos.CENTER_LEFT);
         statusBar.setPadding(new Insets(10, 16, 10, 16));
         statusBar.setStyle(
-            "-fx-background-color: linear-gradient(to right, rgba(255,255,255,0.96), rgba(248,250,252,0.95)); " +
+            "-fx-background-color: #FFFFFF; " +
             "-fx-border-color: rgba(148,163,184,0.3) transparent transparent transparent; " +
             "-fx-border-width: 1 0 0 0;"
         );
@@ -907,16 +982,6 @@ public class LogPanel extends VBox {
                 updateStatusBar(tabData);
             }
         });
-    }
-    
-    /**
-     * 创建带样式的文本节点
-     */
-    private static Text createStyledText(String content, String color) {
-        Text text = new Text(content);
-        text.setFill(Color.web(color));
-        text.setFont(Font.font("Consolas", FontWeight.NORMAL, 13));
-        return text;
     }
     
     /**

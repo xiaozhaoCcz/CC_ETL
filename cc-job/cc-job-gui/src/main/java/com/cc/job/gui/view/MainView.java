@@ -11,6 +11,7 @@ import com.cc.job.gui.service.JobLogService;
 import com.cc.job.gui.service.JobPartService;
 import com.cc.job.gui.service.WebSocketService;
 import com.cc.job.gui.util.ApiUtil;
+import com.cc.job.gui.util.StyleUtil;
 import com.cc.job.gui.util.DetachablePanel;
 import com.cc.job.gui.util.SnowflakeIdGenerator;
 import com.cc.job.xo.model.entity.JobGroup;
@@ -87,9 +88,7 @@ public class MainView extends BorderPane {
     }
 
     private void initializeUI() {
-        this.setStyle(
-            "-fx-background-color: linear-gradient(to bottom right, rgba(248,250,252,0.98), rgba(224,231,255,0.98));"
-        );
+        this.setStyle("-fx-background-color: #F1F5F9;");
         
         // 顶部工具栏
         toolBar = new TopToolBar();
@@ -100,16 +99,13 @@ public class MainView extends BorderPane {
 
         // 左侧内容区域：树形导航 + 小地图
         leftArea = new javafx.scene.layout.VBox();
-        leftArea.setSpacing(12);
-        leftArea.setPadding(new Insets(16, 12, 16, 16));
-        leftArea.setStyle(
-            "-fx-background-color: rgba(255,255,255,0.92); " +
-            "-fx-border-color: rgba(148,163,184,0.2); " +
-            "-fx-border-width: 0 1 0 0;"
-        );
+        leftArea.setSpacing(8);
+        leftArea.setPadding(new Insets(12, 8, 0, 8));
+        leftArea.setStyle("-fx-background-color: transparent;");
 
         // 树形导航
         treeView = new TaskTreeView();
+        treeView.setStyle("-fx-background-color: transparent; -fx-border-color: transparent;");
         javafx.scene.layout.VBox.setVgrow(treeView, javafx.scene.layout.Priority.ALWAYS);
 
         // 小地图
@@ -119,6 +115,8 @@ public class MainView extends BorderPane {
 
         // 创建左侧容器：折叠栏 + 内容区域
         HBox leftContainer = new HBox();
+        leftContainer.setSpacing(12);
+        HBox.setMargin(leftArea, new Insets(0, 0, 0, 0));
         leftContainer.getChildren().addAll(collapsedSidebar, leftArea);
 
         // 让 leftArea 能够水平扩展以填充可用空间
@@ -147,14 +145,15 @@ public class MainView extends BorderPane {
         javafx.scene.layout.VBox canvasArea = new javafx.scene.layout.VBox();
         canvasArea.setSpacing(0);
         canvasArea.setPadding(new Insets(10, 10, 0, 10));
-        canvasArea.setStyle(
-            "-fx-background-color: rgba(255,255,255,0.96); " +
-            "-fx-background-radius: 20 20 12 12; " +
-            "-fx-border-radius: 20 20 12 12; " +
-            "-fx-border-color: rgba(148,163,184,0.18); " +
+        canvasArea.setStyle(String.format(
+            "-fx-background-color: #FFFFFF; " +
+            "-fx-border-color: rgba(148,163,184,0.22); " +
             "-fx-border-width: 1; " +
-            "-fx-effect: dropshadow(gaussian, rgba(15,23,42,0.08), 18, 0, 0, 6);"
-        );
+            "-fx-background-radius: %1$s; " +
+            "-fx-border-radius: %1$s; " +
+            "-fx-effect: dropshadow(gaussian, rgba(15,23,42,0.06), 14, 0, 0, 4);",
+            StyleUtil.RADIUS_LG
+        ));
         canvasArea.getChildren().addAll(navigationBar, scrollPane);
         javafx.scene.layout.VBox.setVgrow(scrollPane, javafx.scene.layout.Priority.ALWAYS);
 

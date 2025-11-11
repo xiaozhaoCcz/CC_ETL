@@ -31,11 +31,11 @@ public class CollapsedSidebar extends VBox {
             "-fx-border-width: 0 1 0 0;"
         );
         // 设置固定宽度 - 使用min/max来确保宽度不变
-        setMinWidth(50);
-        setMaxWidth(50);
-        setPrefWidth(50);
-        setSpacing(10);
-        setPadding(new Insets(10, 5, 10, 5));
+        setMinWidth(36);
+        setMaxWidth(36);
+        setPrefWidth(36);
+        setSpacing(8);
+        setPadding(new Insets(8, 4, 8, 4));
         setAlignment(Pos.TOP_CENTER);
         
         // 任务组图标按钮
@@ -61,39 +61,40 @@ public class CollapsedSidebar extends VBox {
         Button button = new Button();
         button.setGraphic(icon);
         button.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+        button.setAlignment(Pos.CENTER);
         button.setStyle(
             "-fx-background-color: #FFFFFF; " +
-            "-fx-padding: 8; " +
-            "-fx-background-radius: 5; " +
+            "-fx-padding: 6; " +
+            "-fx-background-radius: 4; " +
             "-fx-border-color: #E5E7EB; " +
             "-fx-border-width: 1; " +
-            "-fx-border-radius: 5; " +
+            "-fx-border-radius: 4; " +
             "-fx-cursor: hand;"
         );
-        button.setPrefSize(40, 40);
-        button.setMaxSize(40, 40);
-        button.setMinSize(40, 40);
+        button.setPrefSize(30, 30);
+        button.setMaxSize(30, 30);
+        button.setMinSize(30, 30);
         
         Tooltip tooltip = new Tooltip(tooltipText);
         button.setTooltip(tooltip);
         
         button.setOnMouseEntered(e -> button.setStyle(
             "-fx-background-color: #EEF2FF; " +
-            "-fx-padding: 8; " +
-            "-fx-background-radius: 5; " +
+            "-fx-padding: 6; " +
+            "-fx-background-radius: 4; " +
             "-fx-border-color: #8B5CF6; " +
             "-fx-border-width: 2; " +
-            "-fx-border-radius: 5; " +
+            "-fx-border-radius: 4; " +
             "-fx-cursor: hand;"
         ));
         
         button.setOnMouseExited(e -> button.setStyle(
             "-fx-background-color: #FFFFFF; " +
-            "-fx-padding: 8; " +
-            "-fx-background-radius: 5; " +
+            "-fx-padding: 6; " +
+            "-fx-background-radius: 4; " +
             "-fx-border-color: #E5E7EB; " +
             "-fx-border-width: 1; " +
-            "-fx-border-radius: 5; " +
+            "-fx-border-radius: 4; " +
             "-fx-cursor: hand;"
         ));
         

@@ -66,7 +66,11 @@ public class TopToolBar extends VBox {
     }
     
     private void initializeUI() {
-        setStyle(StyleUtil.toolbar());
+        setStyle(
+            "-fx-background-color: #FFFFFF; " +
+            "-fx-border-color: transparent transparent rgba(148,163,184,0.35) transparent; " +
+            "-fx-border-width: 0 0 1 0;"
+        );
         setPadding(new Insets(0));
         
         // 工具栏（移除菜单栏，使用更简洁的设计）
@@ -109,7 +113,7 @@ public class TopToolBar extends VBox {
     private HBox createToolBar() {
         HBox toolBar = new HBox(8);
         toolBar.setAlignment(Pos.CENTER_LEFT);
-        toolBar.setPadding(new Insets(0));
+        toolBar.setPadding(new Insets(8, 12, 8, 12));
         
         // 文件操作组
         HBox fileGroup = createToolGroup(
