@@ -9,7 +9,7 @@ import com.cc.job.admin.task.executor.callback.IWorker;
 import com.cc.job.admin.task.executor.worker.WorkResult;
 import com.cc.job.admin.task.executor.wrapper.WorkerWrapper;
 import com.cc.job.admin.task.trigger.XxlJobTrigger;
-import com.cc.job.admin.task.websocket.WebSocketServer;
+import com.cc.job.admin.task.sse.SSEService;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.admin.config.XxlJobAdminConfig;
 import com.cc.job.xo.mapper.JobInfoMapper;
@@ -66,7 +66,7 @@ public class JobGroupXxlJob {
 
     final JobEdgeService jobEdgeService;
 
-    final WebSocketServer webSocketServer;
+    final SSEService sseService;
 
     final JobInfoMapper jobInfoMapper;
 
@@ -216,9 +216,8 @@ public class JobGroupXxlJob {
         message.setStatus(9);
         message.setRandomId(randomId);
         message.setResult(JSONUtil.toJsonStr(nextRunTime));
-        // 使用消息队列服务发送消息，提高响应速度
-        webSocketServer.sendInfo(message);
-        logger.debug("[JobGroup] 运行时间计算完成并发送消息 - jobId: {}, randomId: {}", jobId, randomId);
+        // 使用SSE服务发送消息
+        sseService.sendMessage(message);
     }
 
     /**
@@ -301,8 +300,8 @@ public class JobGroupXxlJob {
         // 清理资源
         STOP_MAP.remove(setExecuteJobId(jobId, randomId));
 
-        // 关闭WebSocket连接
-        webSocketServer.onClose(setExecuteJobId(jobId, randomId));
+        // 关闭SSE连接
+        sseService.closeConnection(jobId, randomId);
 
         CONTEXT_HOLDER.remove();
 
@@ -318,8 +317,8 @@ public class JobGroupXxlJob {
         message.setParentJobId(jobId);
         message.setStatus(5);
         message.setRandomId(randomId);
-        // 使用Spring WebSocket服务发送消息
-        webSocketServer.sendInfo(message);
+        // 使用SSE服务发送消息
+        sseService.sendMessage(message);
         logger.debug("[JobGroup] 发送任务完成消息 - jobId: {}, randomId: {}", jobId, randomId);
     }
 
@@ -899,13 +898,13 @@ public class JobGroupXxlJob {
                 message.setParentJobId(parentId);
                 
                 String sessionKey = parentId + ":" + randomId;
-                logger.info("[JobGroup] 准备发送WebSocket消息");
+                logger.info("[JobGroup] 准备发送SSE消息");
                 logger.info("[JobGroup] sessionKey: {}", sessionKey);
                 logger.info("[JobGroup] message: jobId={}, status={}, randomId={}, parentJobId={}", 
                         message.getJobId(), message.getStatus(), message.getRandomId(), message.getParentJobId());
                 
-                // 使用消息队列服务发送消息，提高响应速度
-                webSocketServer.sendInfo(message);
+                // 使用SSE服务发送消息
+                sseService.sendMessage(message);
 
                 logger.info("[JobGroup] ✅ 已发送节点状态消息 - jobId: {}, status: {}, randomId: {}, sessionKey: {}", 
                         jobId, status, randomId, sessionKey);

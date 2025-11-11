@@ -779,7 +779,7 @@ function triggerOne() {
     })
     .finally(() => {});
   ElMessage.success("执行任务成功");
-  connectWs(jobId + ":" + randomId.value);
+    connectSSE(jobId + ":" + randomId.value);
   triggerOneVisible.value = true;
   updateEdgeStyle();
 }
@@ -797,6 +797,7 @@ function stopTrigger() {
     return;
   }
   JobInfoAPI.stopJobCompose(jobCompId.value, randomId.value).then(() => {
+    disconnectSSE();
     triggerOneVisible.value = false;
     updateEdgeStyle();
   });
@@ -882,30 +883,61 @@ function updateEdgeStyle() {
   });
 }
 
-//--------------------------------------------------ws------------------
-const ws = ref();
+//--------------------------------------------------sse------------------
+const eventSource = ref<EventSource | null>(null);
 const reconnectAttempts = ref(0);
 const maxReconnectAttempts = 3; // 自定义最大重试次数
 
-const connectWs = (id: string) => {
-  // TODO 后端做多节点部署时，需要修改
-  ws.value = new WebSocket(import.meta.env.VITE_APP_WS_ENDPOINT + id);
-  ws.value.onopen = () => {
+const connectSSE = (id: string) => {
+  // 解析id，格式为 "parentJobId:randomId"
+  const [parentJobId, randomId] = id.split(":");
+  if (!parentJobId || !randomId) {
+    console.error("SSE连接ID格式错误，应为 parentJobId:randomId");
+    return;
+  }
+
+  // 构建SSE URL
+  const baseUrl = import.meta.env.VITE_APP_BASE_API || "";
+  const sseUrl = `${baseUrl}/api/v1/sse/nodeStatus/${parentJobId}/${randomId}`;
+
+  // 如果已有连接，先关闭
+  if (eventSource.value) {
+    eventSource.value.close();
+    eventSource.value = null;
+  }
+
+  console.log("🔌 开始连接SSE");
+  console.log("   连接ID: " + id);
+  console.log("   SSE URL: " + sseUrl);
+
+  eventSource.value = new EventSource(sseUrl);
+
+  eventSource.value.onopen = () => {
     reconnectAttempts.value = 0;
-    console.log("连接成功");
+    console.log("✅ SSE连接成功");
   };
-  ws.value.onclose = () => {
-    console.log("连接断开");
+
+  eventSource.value.onerror = () => {
+    console.error("❌ SSE连接错误");
+    eventSource.value?.close();
+    eventSource.value = null;
+
     reconnectAttempts.value++;
     if (reconnectAttempts.value <= maxReconnectAttempts) {
-      console.log("进行重连");
-      connectWs(id);
+      console.log("进行重连，尝试次数: " + reconnectAttempts.value);
+      setTimeout(() => {
+        connectSSE(id);
+      }, 2000);
     } else {
-      console.log("连接关闭");
+      console.log("SSE连接关闭，已达到最大重试次数");
     }
   };
-  ws.value.onmessage = (e: any) => {
+
+  // 监听nodeStatus事件
+  eventSource.value.addEventListener("nodeStatus", (e: any) => {
     const _message = JSON.parse(e.data);
+    console.log("📨 收到SSE消息", _message);
+
     if (
       _message.jobId == jobCompId.value &&
       _message.randomId == randomId.value &&
@@ -937,7 +969,20 @@ const connectWs = (id: string) => {
       const style = _node.type === DynamicCustomGroup ? "stroke" : "fill";
       _node.setStyle(style, color);
     }
-  };
+  });
+
+  // 监听connected事件
+  eventSource.value.addEventListener("connected", (e: any) => {
+    console.log("✅ SSE连接已确认");
+  });
+};
+
+const disconnectSSE = () => {
+  if (eventSource.value) {
+    eventSource.value.close();
+    eventSource.value = null;
+    console.log("🔌 SSE连接已关闭");
+  }
 };
 
 const getNodeColor = (status: number) => {

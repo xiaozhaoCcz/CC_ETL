@@ -9,7 +9,7 @@ import com.cc.job.gui.service.JobGroupService;
 import com.cc.job.gui.service.JobInfoService;
 import com.cc.job.gui.service.JobLogService;
 import com.cc.job.gui.service.JobPartService;
-import com.cc.job.gui.service.WebSocketService;
+import com.cc.job.gui.service.SSEService;
 import com.cc.job.gui.util.ApiUtil;
 import com.cc.job.gui.util.StyleUtil;
 import com.cc.job.gui.util.DetachablePanel;
@@ -670,8 +670,8 @@ public class MainView extends BorderPane {
         // 设置所有边为运行状态（虚线动画）
         canvas.setAllConnectionsRunning(true);
 
-        // 重置所有节点状态为空闲（紫色），等待WebSocket消息来更新节点状态
-        // 只有实际运行到的节点才会通过WebSocket消息变成黄色
+        // 重置所有节点状态为空闲（紫色），等待SSE消息来更新节点状态
+        // 只有实际运行到的节点才会通过SSE消息变成黄色
         Platform.runLater(() -> {
             System.out.println("════════════════════════════════");
             System.out.println("📋 任务组启动前，检查画布中的节点:");
@@ -693,36 +693,36 @@ public class MainView extends BorderPane {
             logPanel.info(currentJobId, "════════════════════════════════");
         });
 
-        // 连接WebSocket以接收节点状态更新
-        System.out.println("🔌 准备连接WebSocket");
+        // 连接SSE以接收节点状态更新
+        System.out.println("🔌 准备连接SSE");
         System.out.println("   任务组ID: " + currentJobId);
         System.out.println("   randomId: " + randomId);
         System.out.println("   连接ID: " + currentJobId + ":" + randomId);
         
-        logPanel.info(currentJobId, "🔌 准备连接WebSocket");
+        logPanel.info(currentJobId, "🔌 准备连接SSE");
         logPanel.info(currentJobId, "   任务组ID: " + currentJobId);
         logPanel.info(currentJobId, "   randomId: " + randomId);
         logPanel.info(currentJobId, "   连接ID: " + currentJobId + ":" + randomId);
         
-        WebSocketService wsService = WebSocketService.getInstance();
-        wsService.connect(currentJobId, randomId, message -> {
-            handleWebSocketMessage(message, randomId);
+        SSEService sseService = SSEService.getInstance();
+        sseService.connect(currentJobId, randomId, message -> {
+            handleSSEMessage(message, randomId);
         });
         
-        System.out.println("✅ WebSocket连接请求已发送");
-        logPanel.info(currentJobId, "✅ WebSocket连接请求已发送");
+        System.out.println("✅ SSE连接请求已发送");
+        logPanel.info(currentJobId, "✅ SSE连接请求已发送");
         
         // 等待一段时间后检查连接状态
         new Thread(() -> {
             try {
                 Thread.sleep(3000); // 等待3秒
                 javafx.application.Platform.runLater(() -> {
-                    if (!wsService.isConnected(currentJobId, randomId)) {
-                        logPanel.warn(currentJobId, "⚠️ WebSocket连接可能未成功建立");
-                        logPanel.warn(currentJobId, "   请检查后端WebSocket服务是否正常运行");
+                    if (!sseService.isConnected(currentJobId, randomId)) {
+                        logPanel.warn(currentJobId, "⚠️ SSE连接可能未成功建立");
+                        logPanel.warn(currentJobId, "   请检查后端SSE服务是否正常运行");
                         logPanel.warn(currentJobId, "   连接ID: " + currentJobId + ":" + randomId);
                     } else {
-                        logPanel.info(currentJobId, "✅ WebSocket连接状态检查: 已连接");
+                        logPanel.info(currentJobId, "✅ SSE连接状态检查: 已连接");
                     }
                 });
             } catch (InterruptedException e) {
@@ -757,21 +757,21 @@ public class MainView extends BorderPane {
                     updateToolBarRunningJobs();
                     // 恢复边的正常状态
                     canvas.setAllConnectionsRunning(false);
-                    // 断开WebSocket连接
-                    WebSocketService.getInstance().disconnect(currentJobId, randomId);
+                    // 断开SSE连接
+                    SSEService.getInstance().disconnect(currentJobId, randomId);
                 });
             }
         }).start();
     }
 
     /**
-     * 处理WebSocket消息
-     * @param message WebSocket消息
+     * 处理SSE消息
+     * @param message SSE消息
      * @param expectedRandomId 期望的randomId（用于验证消息）
      */
-    private void handleWebSocketMessage(WebSocketService.WebSocketMessage message, String expectedRandomId) {
+    private void handleSSEMessage(SSEService.SSEMessage message, String expectedRandomId) {
         System.out.println("========================================");
-        System.out.println("📨 收到WebSocket消息");
+        System.out.println("📨 收到SSE消息");
         System.out.println("   消息randomId: " + message.getRandomId());
         System.out.println("   期望randomId: " + expectedRandomId);
         System.out.println("   消息jobId: " + message.getJobId());
@@ -779,7 +779,7 @@ public class MainView extends BorderPane {
         System.out.println("   消息result: " + message.getResult());
         
         logPanel.info("========================================");
-        logPanel.info("📨 收到WebSocket消息");
+        logPanel.info("📨 收到SSE消息");
         logPanel.info("   消息randomId: " + message.getRandomId());
         logPanel.info("   期望randomId: " + expectedRandomId);
         logPanel.info("   消息jobId: " + message.getJobId());
@@ -788,7 +788,7 @@ public class MainView extends BorderPane {
         
         // 处理连接错误消息（status=-1表示连接错误）
         if (message.getStatus() != null && message.getStatus() == -1) {
-            String errorMsg = "❌ WebSocket连接错误: " + message.getResult();
+            String errorMsg = "❌ SSE连接错误: " + message.getResult();
             System.err.println(errorMsg);
             logPanel.error(errorMsg);
             return;
@@ -796,7 +796,7 @@ public class MainView extends BorderPane {
         
         // 验证randomId是否匹配
         if (message.getRandomId() != null && !expectedRandomId.equals(message.getRandomId())) {
-            String warnMsg = "⚠️ WebSocket消息randomId不匹配，忽略: " + message.getRandomId() + " != " + expectedRandomId;
+            String warnMsg = "⚠️ SSE消息randomId不匹配，忽略: " + message.getRandomId() + " != " + expectedRandomId;
             System.out.println(warnMsg);
             System.out.println("========================================");
             logPanel.warn(warnMsg);
@@ -966,8 +966,8 @@ public class MainView extends BorderPane {
             // 恢复边的正常状态（停止虚线动画）
             canvas.setAllConnectionsRunning(false);
 
-            // 断开WebSocket连接
-            WebSocketService.getInstance().disconnect(runningJob.getJobId(), runningJob.getRandomId());
+            // 断开SSE连接
+            SSEService.getInstance().disconnect(runningJob.getJobId(), runningJob.getRandomId());
             
             // ⭐ 任务执行完成后，立即同步所有节点状态到数据库
             canvas.syncPendingNodeStatus();
@@ -1043,8 +1043,8 @@ public class MainView extends BorderPane {
                     // 恢复边的正常状态
                     canvas.setAllConnectionsRunning(false);
 
-                    // 断开WebSocket连接
-                    WebSocketService.getInstance().disconnect(jobId, runningJob.getRandomId());
+                    // 断开SSE连接
+                    SSEService.getInstance().disconnect(jobId, runningJob.getRandomId());
 
                     // 重置所有节点状态为空闲
                     for (ProcessNode node : canvas.getNodes()) {
