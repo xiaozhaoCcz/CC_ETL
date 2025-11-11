@@ -17,6 +17,7 @@ import com.cc.job.xo.model.entity.*;
 import com.cc.job.admin.task.service.JobEdgeService;
 import com.cc.job.admin.task.service.JobInfoService;
 import com.cc.job.admin.task.service.JobNodeService;
+import com.cc.job.admin.task.service.JobGroupSnapshotService;
 import com.cc.job.admin.task.websocket.model.Message;
 import com.cc.job.admin.task.enums.ExecutorRouteStrategyEnum;
 import com.xxl.job.core.biz.model.ReturnT;
@@ -71,6 +72,8 @@ public class JobGroupXxlJob {
     final JobInfoMapper jobInfoMapper;
 
     final JobGroupUtils jobGroupUtils;
+
+    final JobGroupSnapshotService jobGroupSnapshotService;
 
     /**
      * 存储WorkerWrapper，用于后续暂停任务操作
@@ -161,12 +164,19 @@ public class JobGroupXxlJob {
             getJobStatusMap(jobId, statusMap);
             logger.debug("[JobGroup] 初始化状态映射 - jobId: {}, 状态映射大小: {}", jobId, statusMap.size());
 
-            // 获取所有节点和边信息
+            // 【快照模式】优先从快照获取节点和边信息，如果没有快照则从数据库获取
             List<JobNode> nodes = new ArrayList<>();
             List<JobEdge> edges = new ArrayList<>();
-            getAllNodesAndEdges(jobId, nodes, edges);
-            logger.info("[JobGroup] 节点和边信息获取完成 - jobId: {}, 节点数量: {}, 边数量: {}",
-                    jobId, nodes.size(), edges.size());
+            boolean useSnapshot = loadNodesAndEdgesFromSnapshot(jobId, randomId, nodes, edges);
+            
+            if (!useSnapshot) {
+                // 如果没有快照，从数据库获取（兼容旧逻辑）
+                logger.info("[JobGroup] 未找到快照，从数据库获取节点和边 - jobId: {}, randomId: {}", jobId, randomId);
+                getAllNodesAndEdges(jobId, nodes, edges);
+            } else {
+                logger.info("[JobGroup] 从快照获取节点和边 - jobId: {}, randomId: {}, 节点数量: {}, 边数量: {}", 
+                        jobId, randomId, nodes.size(), edges.size());
+            }
 
             // 构图
             buildGraph(jobId, nodes, edges);
@@ -302,6 +312,14 @@ public class JobGroupXxlJob {
 
         // 关闭SSE连接
         sseService.closeConnection(jobId, randomId);
+
+        // 【快照模式】清理快照数据
+        try {
+            jobGroupSnapshotService.deleteSnapshot(jobId, randomId);
+            logger.info("[Snapshot] 快照清理成功 - jobId: {}, randomId: {}", jobId, randomId);
+        } catch (Exception e) {
+            logger.error("[Snapshot] 快照清理失败 - jobId: {}, randomId: {}", jobId, randomId, e);
+        }
 
         CONTEXT_HOLDER.remove();
 
@@ -635,7 +653,41 @@ public class JobGroupXxlJob {
     }
 
     /**
-     * 获取所有节点和边信息
+     * 从快照加载节点和边信息
+     *
+     * @param jobId    任务组ID
+     * @param randomId 批次ID
+     * @param nodes    节点列表（输出参数）
+     * @param edges    边列表（输出参数）
+     * @return 是否成功从快照加载
+     */
+    private boolean loadNodesAndEdgesFromSnapshot(Long jobId, String randomId, List<JobNode> nodes, List<JobEdge> edges) {
+        try {
+            com.cc.job.xo.model.entity.JobGroupSnapshot snapshot = jobGroupSnapshotService.getSnapshot(jobId, randomId);
+            if (snapshot == null || StringUtils.isBlank(snapshot.getNodesJson()) || StringUtils.isBlank(snapshot.getEdgesJson())) {
+                logger.debug("[Snapshot] 快照不存在或数据为空 - jobId: {}, randomId: {}", jobId, randomId);
+                return false;
+            }
+
+            // 解析节点JSON
+            List<JobNode> snapshotNodes = JSONUtil.toList(snapshot.getNodesJson(), JobNode.class);
+            nodes.addAll(snapshotNodes);
+
+            // 解析边JSON
+            List<JobEdge> snapshotEdges = JSONUtil.toList(snapshot.getEdgesJson(), JobEdge.class);
+            edges.addAll(snapshotEdges);
+
+            logger.info("[Snapshot] 从快照加载成功 - jobId: {}, randomId: {}, 节点数量: {}, 边数量: {}", 
+                    jobId, randomId, snapshotNodes.size(), snapshotEdges.size());
+            return true;
+        } catch (Exception e) {
+            logger.error("[Snapshot] 从快照加载失败 - jobId: {}, randomId: {}", jobId, randomId, e);
+            return false;
+        }
+    }
+
+    /**
+     * 获取所有节点和边信息（从数据库获取）
      * 
      * @param jobId 任务ID
      * @param nodes 节点列表（输出参数）

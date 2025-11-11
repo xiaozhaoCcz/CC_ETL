@@ -80,6 +80,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
     private final JobLogMapper jobLogMapper;
 
+    private final JobGroupSnapshotService jobGroupSnapshotService;
+
     @Value("${server.port}")
     private int port;
 
@@ -267,24 +269,53 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public String triggerJob(JobInfoTriggerDto taskInfoTriggerDto) {
+        Long jobId = taskInfoTriggerDto.getId();
+        String randomId = taskInfoTriggerDto.getExecutorParam();
 
-        JobInfo taskInfo = this.getById(taskInfoTriggerDto.getId());
+        // 【数据库行锁】使用 FOR UPDATE 查询，防止并发执行
+        JobInfo taskInfo = jobInfoMapper.selectByIdForUpdate(jobId);
         if (taskInfo == null) {
-            return "";
+            throw new BusinessException("任务不存在");
         }
 
+        // 检查是否正在运行（使用行锁后，这里是线程安全的）
         if (taskInfo.getJobType() == 2 && taskInfo.getRankTriggerStatus() == 1) {
-            throw new BusinessException("当前任务正在运行中～");
+            throw new BusinessException("当前任务正在运行中，请等待完成后再运行");
         }
 
         // force cover job param
         if (taskInfoTriggerDto.getExecutorParam() == null) {
             taskInfoTriggerDto.setExecutorParam("");
+            randomId = "";
         }
 
         if (GlueTypeEnum.DATAX.getDesc().equalsIgnoreCase(taskInfo.getGlueType())) {
             taskInfoTriggerDto.setExecutorParam(taskInfo.getExecutorParam());
+            randomId = taskInfo.getExecutorParam();
+        }
+
+        // 【快照模式】如果是任务组，创建快照
+        if (taskInfo.getJobType() == 2 && StringUtils.isNotBlank(randomId)) {
+            try {
+                String nodesJson = getNodesJsonForSnapshot(jobId);
+                String edgesJson = getEdgesJsonForSnapshot(jobId);
+                String triggerUserIdStr = taskInfoTriggerDto.getTriggerUserId() != null 
+                    ? String.valueOf(taskInfoTriggerDto.getTriggerUserId()) 
+                    : null;
+                jobGroupSnapshotService.createSnapshot(
+                    jobId,
+                    randomId,
+                    nodesJson,
+                    edgesJson,
+                    triggerUserIdStr
+                );
+                log.info("[Snapshot] 任务组快照创建成功 - jobId: {}, randomId: {}", jobId, randomId);
+            } catch (Exception e) {
+                log.error("[Snapshot] 创建任务组快照失败 - jobId: {}, randomId: {}", jobId, randomId, e);
+                throw new BusinessException("创建任务组快照失败: " + e.getMessage());
+            }
         }
 
         String ip = IpUtil.getIp();
@@ -294,9 +325,10 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         // 只在任务组（jobType == 2）时记录触发用户ID
         if (taskInfo.getJobType() == 2 && taskInfoTriggerDto.getTriggerUserId() != null) {
             taskInfo.setTriggerUserId(taskInfoTriggerDto.getTriggerUserId());
-            System.out.println("✓ 记录任务组触发用户ID: " + taskInfoTriggerDto.getTriggerUserId());
+            log.info("✓ 记录任务组触发用户ID: " + taskInfoTriggerDto.getTriggerUserId());
         }
         
+        // 原子性设置运行状态（在事务中，行锁保护）
         taskInfo.setRankTriggerStatus(1);
         this.updateById(taskInfo);
 
@@ -843,5 +875,35 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         existsJobInfo.setGlueUpdatetime(LocalDateTime.now());
         existsJobInfo.setTriggerNextTime(nextTriggerTime);
         return existsJobInfo;
+    }
+
+    /**
+     * 获取任务组的节点JSON（用于快照）
+     *
+     * @param jobId 任务组ID
+     * @return 节点JSON字符串
+     */
+    private String getNodesJsonForSnapshot(Long jobId) {
+        List<JobNode> nodes = jobNodeService.list(
+            new LambdaQueryWrapper<JobNode>()
+                .eq(JobNode::getJobParentId, jobId)
+                .eq(JobNode::getIsDeleted, 0)
+        );
+        return JSONUtil.toJsonStr(nodes);
+    }
+
+    /**
+     * 获取任务组的边JSON（用于快照）
+     *
+     * @param jobId 任务组ID
+     * @return 边JSON字符串
+     */
+    private String getEdgesJsonForSnapshot(Long jobId) {
+        List<JobEdge> edges = jobEdgeService.list(
+            new LambdaQueryWrapper<JobEdge>()
+                .eq(JobEdge::getJobParentId, jobId)
+                .eq(JobEdge::getIsDeleted, 0)
+        );
+        return JSONUtil.toJsonStr(edges);
     }
 }
