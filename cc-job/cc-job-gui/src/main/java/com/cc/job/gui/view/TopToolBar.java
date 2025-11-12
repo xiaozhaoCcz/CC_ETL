@@ -17,6 +17,8 @@ import javafx.scene.shape.Circle;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 
@@ -24,6 +26,8 @@ import java.util.Map;
  * 顶部工具栏组件
  */
 public class TopToolBar extends VBox {
+    
+    private static final Logger logger = LoggerFactory.getLogger(TopToolBar.class);
     
     // 回调接口
     public interface ToolBarCallback {
@@ -294,7 +298,7 @@ public class TopToolBar extends VBox {
             MenuItem logoutItem = new MenuItem("退出登录");
             logoutItem.setStyle("-fx-text-fill: #EF4444; -fx-font-weight: bold;");
             logoutItem.setOnAction(e -> {
-                System.out.println("用户点击退出登录");
+                logger.debug("用户点击退出登录");
                 
                 // 确认对话框
                 Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
@@ -316,8 +320,7 @@ public class TopToolBar extends VBox {
                             try {
                                 new com.cc.job.gui.CcJobGuiApplication().start(new javafx.stage.Stage());
                             } catch (Exception ex) {
-                                System.err.println("重新启动失败: " + ex.getMessage());
-                                ex.printStackTrace();
+                                logger.error("重新启动失败: {}", ex.getMessage(), ex);
                             }
                         });
                     }

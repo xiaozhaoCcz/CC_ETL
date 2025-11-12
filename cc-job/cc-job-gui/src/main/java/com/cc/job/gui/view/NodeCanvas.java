@@ -16,6 +16,8 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Line;
 import javafx.util.Duration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,6 +29,8 @@ import java.util.Locale;
  * 画布，用于管理节点和连接线
  */
 public class NodeCanvas extends Pane {
+    
+    private static final Logger logger = LoggerFactory.getLogger(NodeCanvas.class);
 
     private static final String NODE_LISTENER_KEY = "nodeCanvasListenersAttached";
     private static final double TOP_DRAG_MARGIN = 80.0;
@@ -147,7 +151,7 @@ public class NodeCanvas extends Pane {
     }
     
     private void log(String message) {
-        System.out.println(message);
+        logger.debug(message);
         if (logCallback != null) {
             logCallback.log(message);
         }
@@ -659,8 +663,7 @@ public class NodeCanvas extends Pane {
         double x = canvasPoint.getX();
         double y = canvasPoint.getY();
         
-        System.out.println("   → 检测位置: sceneX=" + sceneX + ", sceneY=" + sceneY + 
-                          " -> canvasX=" + x + ", canvasY=" + y);
+        logger.debug("   → 检测位置: sceneX={}, sceneY={} -> canvasX={}, canvasY={}", sceneX, sceneY, x, y);
         
         for (ProcessNode node : nodes) {
             double nodeX = node.getLayoutX();
@@ -668,18 +671,17 @@ public class NodeCanvas extends Pane {
             double nodeWidth = node.getPrefWidth();
             double nodeHeight = node.getPrefHeight();
             
-            System.out.println("   → 检查节点: " + node.getJobHandlerName() + 
-                              " bounds=[" + nodeX + "," + nodeY + " " + nodeWidth + "x" + nodeHeight + "]");
+            logger.debug("   → 检查节点: {} bounds=[{},{}, {}x{}]", node.getJobHandlerName(), nodeX, nodeY, nodeWidth, nodeHeight);
             
             // 扩大检测范围（包括连接点突出部分）
             if (x >= nodeX - 15 && x <= nodeX + nodeWidth + 15 &&
                 y >= nodeY - 15 && y <= nodeY + nodeHeight + 15) {
-                System.out.println("   ✅ 找到目标节点: " + node.getJobHandlerName());
+                logger.debug("   ✅ 找到目标节点: {}", node.getJobHandlerName());
                 return node;
             }
         }
         
-        System.out.println("   ❌ 未找到目标节点");
+        logger.debug("   ❌ 未找到目标节点");
         return null;
     }
     
@@ -846,10 +848,10 @@ public class NodeCanvas extends Pane {
                     // ⭐ 设置任务ID（jobId）
                     if (nodeData.getJobId() != null) {
                         node.setJobId(nodeData.getJobId());
-                        System.out.println("✅ 节点 " + text + " (nodeId: " + nodeData.getId() + ") 已设置jobId: " + nodeData.getJobId());
+                        logger.debug("✅ 节点 {} (nodeId: {}) 已设置jobId: {}", text, nodeData.getId(), nodeData.getJobId());
                         log("✅ 节点已设置jobId: " + text + " -> jobId: " + nodeData.getJobId());
                     } else {
-                        System.out.println("⚠️ 节点 " + text + " (nodeId: " + nodeData.getId() + ") 的jobId为空！");
+                        logger.warn("⚠️ 节点 {} (nodeId: {}) 的jobId为空！", text, nodeData.getId());
                         log("⚠️ 警告: 节点 " + text + " 的jobId为空！");
                     }
 
@@ -860,7 +862,7 @@ public class NodeCanvas extends Pane {
                         triggerStatus = com.cc.job.gui.util.NodeStatusSyncManager.getInstance()
                                 .getCachedStatus(nodeJobId);
                         if (triggerStatus != null) {
-                            System.out.println("ℹ️ 使用缓存的节点运行状态: " + text + " -> " + triggerStatus);
+                            logger.debug("ℹ️ 使用缓存的节点运行状态: {} -> {}", text, triggerStatus);
                         }
                     }
                     if (triggerStatus != null) {
@@ -869,7 +871,7 @@ public class NodeCanvas extends Pane {
                             com.cc.job.gui.util.NodeStatusSyncManager.getInstance()
                                     .rememberStatus(nodeJobId, triggerStatus);
                         }
-                        System.out.println("✅ 恢复节点运行状态: " + text + " -> " + triggerStatus);
+                        logger.debug("✅ 恢复节点运行状态: {} -> {}", text, triggerStatus);
                         log("✅ 恢复节点运行状态: " + text + " -> " + triggerStatus);
                     }
 
@@ -1035,7 +1037,7 @@ public class NodeCanvas extends Pane {
         for (NodeConnection conn : connections) {
             conn.setRunning(running);
         }
-        System.out.println("📊 所有边的运行状态已更新: " + (running ? "运行中" : "停止"));
+        logger.debug("📊 所有边的运行状态已更新: {}", running ? "运行中" : "停止");
     }
     
     /**
@@ -1045,27 +1047,27 @@ public class NodeCanvas extends Pane {
      */
     public void updateNodeStatusByJobId(Long jobId, Integer statusCode) {
         if (jobId == null || statusCode == null) {
-            System.out.println("⚠️ 参数无效: jobId=" + jobId + ", statusCode=" + statusCode);
+            logger.warn("⚠️ 参数无效: jobId={}, statusCode={}", jobId, statusCode);
             return;
         }
         
-        System.out.println("🔍 开始查找节点: jobId=" + jobId + ", statusCode=" + statusCode);
-        System.out.println("📋 画布中共有 " + nodes.size() + " 个节点");
+        logger.debug("🔍 开始查找节点: jobId={}, statusCode={}", jobId, statusCode);
+        logger.debug("📋 画布中共有 {} 个节点", nodes.size());
         
         boolean found = false;
         for (ProcessNode node : nodes) {
             Long nodeJobId = node.getJobId();
-            System.out.println("   → 检查节点: " + node.getJobHandlerName() + ", jobId=" + nodeJobId);
+            logger.debug("   → 检查节点: {}, jobId={}", node.getJobHandlerName(), nodeJobId);
             
             if (nodeJobId != null && nodeJobId.equals(jobId)) {
-                System.out.println("✅ 找到匹配的节点: " + node.getJobHandlerName() + " (jobId=" + jobId + ")");
-                System.out.println("   当前状态: " + node.getStatus());
-                System.out.println("   即将更新为状态码: " + statusCode);
+                logger.debug("✅ 找到匹配的节点: {} (jobId={})", node.getJobHandlerName(), jobId);
+                logger.debug("   当前状态: {}", node.getStatus());
+                logger.debug("   即将更新为状态码: {}", statusCode);
                 
                 node.updateStatusByCode(statusCode);
                 
-                System.out.println("✅ 节点状态已更新: jobId=" + jobId + ", statusCode=" + statusCode);
-                System.out.println("   更新后状态: " + node.getStatus());
+                logger.debug("✅ 节点状态已更新: jobId={}, statusCode={}", jobId, statusCode);
+                logger.debug("   更新后状态: {}", node.getStatus());
                 
                 // ⭐ 添加到批量更新队列（不立即调用后端）
                 com.cc.job.gui.util.NodeStatusSyncManager.getInstance().addPendingUpdate(jobId, statusCode);
@@ -1076,10 +1078,10 @@ public class NodeCanvas extends Pane {
         }
         
         if (!found) {
-            System.out.println("⚠️ 未找到jobId=" + jobId + "的节点");
-            System.out.println("📋 画布中的节点jobId列表:");
+            logger.warn("⚠️ 未找到jobId={}的节点", jobId);
+            logger.debug("📋 画布中的节点jobId列表:");
             for (ProcessNode node : nodes) {
-                System.out.println("   - " + node.getJobHandlerName() + ": jobId=" + node.getJobId());
+                logger.debug("   - {}: jobId={}", node.getJobHandlerName(), node.getJobId());
             }
         }
     }

@@ -2,6 +2,8 @@ package com.cc.job.gui.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URI;
@@ -14,6 +16,8 @@ import java.time.Duration;
  * 登录服务
  */
 public class LoginService extends BaseService {
+    
+    private static final Logger logger = LoggerFactory.getLogger(LoginService.class);
     
     private static final String LOGIN_API = "/api/v1/auth/login";
     private static final String REGISTER_API = "/api/v1/auth/register";
@@ -54,7 +58,7 @@ public class LoginService extends BaseService {
                 .timeout(Duration.ofSeconds(10))
                 .build();
             
-            System.out.println("🔐 发送登录请求: " + url);
+            logger.debug("🔐 发送登录请求: {}", url);
             
             // 发送请求
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -78,24 +82,23 @@ public class LoginService extends BaseService {
                             ? jsonNode.get("data").get("userId").asText() 
                             : "";
                         
-                        System.out.println("✓ 登录成功: " + username);
+                        logger.info("✓ 登录成功: {}", username);
                         return new LoginResult(true, "登录成功", token, userId, username);
                     } else {
                         // 登录失败
-                        System.out.println("✗ 登录失败: " + message);
+                        logger.warn("✗ 登录失败: {}", message);
                         return new LoginResult(false, message, null, null, null);
                     }
                 } else {
                     return new LoginResult(false, "响应格式错误", null, null, null);
                 }
             } else {
-                System.out.println("✗ 登录请求失败，状态码: " + response.statusCode());
+                logger.error("✗ 登录请求失败，状态码: {}", response.statusCode());
                 return new LoginResult(false, "登录请求失败，状态码: " + response.statusCode(), null, null, null);
             }
             
         } catch (Exception e) {
-            System.err.println("✗ 登录异常: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("✗ 登录异常: {}", e.getMessage(), e);
             return new LoginResult(false, "登录失败: " + e.getMessage(), null, null, null);
         }
     }
@@ -126,7 +129,7 @@ public class LoginService extends BaseService {
                 .timeout(Duration.ofSeconds(10))
                 .build();
             
-            System.out.println("📝 发送注册请求: " + url);
+            logger.debug("📝 发送注册请求: {}", url);
             
             // 发送请求
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -150,24 +153,23 @@ public class LoginService extends BaseService {
                             ? jsonNode.get("data").get("userId").asText() 
                             : "";
                         
-                        System.out.println("✓ 注册成功: " + username);
+                        logger.info("✓ 注册成功: {}", username);
                         return new LoginResult(true, "注册成功", token, userId, username);
                     } else {
                         // 注册失败
-                        System.out.println("✗ 注册失败: " + message);
+                        logger.warn("✗ 注册失败: {}", message);
                         return new LoginResult(false, message, null, null, null);
                     }
                 } else {
                     return new LoginResult(false, "响应格式错误", null, null, null);
                 }
             } else {
-                System.out.println("✗ 注册请求失败，状态码: " + response.statusCode());
+                logger.error("✗ 注册请求失败，状态码: {}", response.statusCode());
                 return new LoginResult(false, "注册请求失败，状态码: " + response.statusCode(), null, null, null);
             }
             
         } catch (Exception e) {
-            System.err.println("✗ 注册异常: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("✗ 注册异常: {}", e.getMessage(), e);
             return new LoginResult(false, "注册失败: " + e.getMessage(), null, null, null);
         }
     }

@@ -7,12 +7,16 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 可分离面板工具类
  * 支持将面板弹出为独立窗口，并可以恢复到原位置
  */
 public class DetachablePanel {
+    
+    private static final Logger logger = LoggerFactory.getLogger(DetachablePanel.class);
     
     private Region content;              // 面板内容
     private Pane originalParent;         // 原始父容器
@@ -86,8 +90,8 @@ public class DetachablePanel {
                 if (content instanceof MiniMapView) {
                     javafx.application.Platform.runLater(() -> {
                         ((MiniMapView) content).refresh();
-                        System.out.println("📍 小地图已刷新，Canvas尺寸: " + 
-                            ((MiniMapView) content).getCanvas().getWidth() + " x " +
+                        logger.debug("📍 小地图已刷新，Canvas尺寸: {} x {}", 
+                            ((MiniMapView) content).getCanvas().getWidth(),
                             ((MiniMapView) content).getCanvas().getHeight());
                     });
                 }
@@ -99,7 +103,7 @@ public class DetachablePanel {
             onDetach.run();
         }
         
-        System.out.println("🪟 面板已弹出为独立窗口: " + title);
+        logger.debug("🪟 面板已弹出为独立窗口: {}", title);
     }
     
     /**
@@ -133,7 +137,7 @@ public class DetachablePanel {
             onReattach.run();
         }
         
-        System.out.println("📌 面板已恢复到原位置: " + title);
+        logger.debug("📌 面板已恢复到原位置: {}", title);
     }
     
     /**

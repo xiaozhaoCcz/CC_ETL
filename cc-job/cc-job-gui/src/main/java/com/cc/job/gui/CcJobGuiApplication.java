@@ -10,11 +10,15 @@ import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * JavaFX流程节点编辑器应用程序主入口
  */
 public class CcJobGuiApplication extends Application {
+    
+    private static final Logger logger = LoggerFactory.getLogger(CcJobGuiApplication.class);
     
     private Stage primaryStage;
     private Stage loginStage;
@@ -22,9 +26,9 @@ public class CcJobGuiApplication extends Application {
     @Override
     public void init() throws Exception {
         super.init();
-        System.out.println("=================================");
-        System.out.println("NodeFx 初始化中...");
-        System.out.println("=================================");
+        logger.info("=================================");
+        logger.info("NodeFx 初始化中...");
+        logger.info("=================================");
     }
     
     @Override
@@ -38,7 +42,7 @@ public class CcJobGuiApplication extends Application {
             
             if (sessionLoaded) {
                 // 如果会话加载成功，直接显示主窗口
-                System.out.println("🎉 自动登录成功，跳过登录界面");
+                logger.info("🎉 自动登录成功，跳过登录界面");
                 showMainWindow();
             } else {
                 // 否则显示登录窗口
@@ -46,8 +50,7 @@ public class CcJobGuiApplication extends Application {
             }
             
         } catch (Exception e) {
-            System.err.println("启动失败：" + e.getMessage());
-            e.printStackTrace();
+            logger.error("启动失败：{}", e.getMessage(), e);
             Platform.exit();
             System.exit(1);
         }
@@ -57,7 +60,7 @@ public class CcJobGuiApplication extends Application {
      * 显示登录窗口
      */
     private void showLoginWindow() {
-        System.out.println("正在创建登录界面...");
+        logger.debug("正在创建登录界面...");
         
         // 创建登录视图
         LoginView loginView = new LoginView();
@@ -94,7 +97,7 @@ public class CcJobGuiApplication extends Application {
             String css = getClass().getResource("/styles.css").toExternalForm();
             loginScene.getStylesheets().add(css);
         } catch (Exception e) {
-            System.err.println("⚠ 样式表加载失败: " + e.getMessage());
+            logger.warn("⚠ 样式表加载失败: {}", e.getMessage());
         }
         
         // 创建登录窗口
@@ -106,7 +109,7 @@ public class CcJobGuiApplication extends Application {
         
         // 窗口关闭事件
         loginStage.setOnCloseRequest(event -> {
-            System.out.println("用户取消登录，退出应用");
+            logger.info("用户取消登录，退出应用");
             Platform.exit();
             System.exit(0);
         });
@@ -114,14 +117,14 @@ public class CcJobGuiApplication extends Application {
         // 显示登录窗口
         loginStage.show();
         
-        System.out.println("✓ 登录界面已显示");
+        logger.info("✓ 登录界面已显示");
     }
     
     /**
      * 显示注册窗口
      */
     private void showRegisterWindow() {
-        System.out.println("正在创建注册界面...");
+        logger.debug("正在创建注册界面...");
         
         // 创建注册视图
         RegisterView registerView = new RegisterView();
@@ -158,14 +161,14 @@ public class CcJobGuiApplication extends Application {
             String css = getClass().getResource("/styles.css").toExternalForm();
             registerScene.getStylesheets().add(css);
         } catch (Exception e) {
-            System.err.println("⚠ 样式表加载失败: " + e.getMessage());
+            logger.warn("⚠ 样式表加载失败: {}", e.getMessage());
         }
         
         // 更新窗口内容
         loginStage.setTitle("NodeFx - 用户注册");
         loginStage.setScene(registerScene);
         
-        System.out.println("✓ 注册界面已显示");
+        logger.info("✓ 注册界面已显示");
     }
     
     /**
@@ -173,7 +176,7 @@ public class CcJobGuiApplication extends Application {
      */
     private void showMainWindow() {
         try {
-            System.out.println("正在创建主界面...");
+            logger.debug("正在创建主界面...");
             
             // 创建主视图
             MainView mainView = new MainView();
@@ -185,9 +188,9 @@ public class CcJobGuiApplication extends Application {
             try {
                 String css = getClass().getResource("/styles.css").toExternalForm();
                 scene.getStylesheets().add(css);
-                System.out.println("✓ 样式表加载成功");
+                logger.debug("✓ 样式表加载成功");
             } catch (Exception e) {
-                System.err.println("⚠ 样式表加载失败: " + e.getMessage());
+                logger.warn("⚠ 样式表加载失败: {}", e.getMessage());
             }
             
             // 设置窗口标题，显示用户名
@@ -199,12 +202,12 @@ public class CcJobGuiApplication extends Application {
             
             // 窗口关闭事件
             primaryStage.setOnCloseRequest(event -> {
-                System.out.println("正在关闭应用...");
+                logger.info("正在关闭应用...");
                 
                 // ⭐ 重要：关闭前立即同步所有待更新的节点状态到数据库
-                System.out.println("⏳ 正在同步节点状态到数据库...");
+                logger.info("⏳ 正在同步节点状态到数据库...");
                 com.cc.job.gui.util.NodeStatusSyncManager.getInstance().shutdown();
-                System.out.println("✓ 节点状态已同步");
+                logger.info("✓ 节点状态已同步");
                 
                 // 退出登录
                 SessionManager.getInstance().logout();
@@ -216,22 +219,21 @@ public class CcJobGuiApplication extends Application {
             // 显示窗口
             primaryStage.show();
             
-            System.out.println("=================================");
-            System.out.println("✓ NodeFx 启动成功！");
-            System.out.println("=================================");
-            System.out.println("");
-            System.out.println("功能说明:");
-            System.out.println("  - 拖动节点：左键按住节点拖动");
-            System.out.println("  - 创建连接：按住节点上的连接点拖到另一节点");
-            System.out.println("  - 右键菜单：右键点击节点或连线查看选项");
-            System.out.println("  - 删除节点：右键节点 → 删除节点");
-            System.out.println("  - 删除连线：右键连线 → 删除连线");
-            System.out.println("  - 更改样式：右键连线 → 更改样式");
-            System.out.println("=================================");
+            logger.info("=================================");
+            logger.info("✓ NodeFx 启动成功！");
+            logger.info("=================================");
+            logger.info("");
+            logger.info("功能说明:");
+            logger.info("  - 拖动节点：左键按住节点拖动");
+            logger.info("  - 创建连接：按住节点上的连接点拖到另一节点");
+            logger.info("  - 右键菜单：右键点击节点或连线查看选项");
+            logger.info("  - 删除节点：右键节点 → 删除节点");
+            logger.info("  - 删除连线：右键连线 → 删除连线");
+            logger.info("  - 更改样式：右键连线 → 更改样式");
+            logger.info("=================================");
             
         } catch (Exception e) {
-            System.err.println("主界面创建失败：" + e.getMessage());
-            e.printStackTrace();
+            logger.error("主界面创建失败：{}", e.getMessage(), e);
             Platform.exit();
             System.exit(1);
         }
@@ -239,17 +241,17 @@ public class CcJobGuiApplication extends Application {
     
     @Override
     public void stop() throws Exception {
-        System.out.println("NodeFx 正在停止...");
+        logger.info("NodeFx 正在停止...");
         
         // ⭐ 确保所有待更新的节点状态都已同步到数据库
         try {
             com.cc.job.gui.util.NodeStatusSyncManager.getInstance().shutdown();
-            System.out.println("✓ 节点状态同步完成");
+            logger.info("✓ 节点状态同步完成");
         } catch (Exception e) {
-            System.err.println("⚠ 节点状态同步失败: " + e.getMessage());
+            logger.warn("⚠ 节点状态同步失败: {}", e.getMessage(), e);
         }
         
-        System.out.println("NodeFx 已停止");
+        logger.info("NodeFx 已停止");
         super.stop();
     }
     
@@ -258,18 +260,18 @@ public class CcJobGuiApplication extends Application {
         System.setProperty("javafx.macosx.embedded", "false");
         System.setProperty("glass.accessible.force", "false");
         
-        System.out.println("=================================");
-        System.out.println("启动 NodeFx 应用程序...");
-        System.out.println("Java 版本: " + System.getProperty("java.version"));
-        System.out.println("JavaFX 版本: 21.0.1");
-        System.out.println("操作系统: " + System.getProperty("os.name"));
-        System.out.println("=================================");
+        Logger logger = LoggerFactory.getLogger(CcJobGuiApplication.class);
+        logger.info("=================================");
+        logger.info("启动 NodeFx 应用程序...");
+        logger.info("Java 版本: {}", System.getProperty("java.version"));
+        logger.info("JavaFX 版本: 21.0.1");
+        logger.info("操作系统: {}", System.getProperty("os.name"));
+        logger.info("=================================");
         
         try {
             launch(args);
         } catch (Exception e) {
-            System.err.println("应用启动失败：" + e.getMessage());
-            e.printStackTrace();
+            logger.error("应用启动失败：{}", e.getMessage(), e);
             System.exit(1);
         }
     }

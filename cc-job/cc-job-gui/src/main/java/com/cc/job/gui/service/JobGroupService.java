@@ -5,6 +5,8 @@ import com.cc.job.xo.model.entity.JobGroup;
 import com.google.gson.reflect.TypeToken;
 import okhttp3.Request;
 import okhttp3.Response;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -14,6 +16,8 @@ import java.util.List;
  * JobGroup服务类
  */
 public class JobGroupService extends BaseService {
+    
+    private static final Logger logger = LoggerFactory.getLogger(JobGroupService.class);
     
     /**
      * 获取所有JobGroup列表
@@ -34,7 +38,7 @@ public class JobGroupService extends BaseService {
             }
             
             String responseBody = response.body().string();
-            System.out.println("getAllJobGroupList API 响应: " + responseBody);
+            logger.debug("getAllJobGroupList API 响应: {}", responseBody);
             
             // 解析 JSON 响应
             Type resultType = new TypeToken<Result<List<JobGroup>>>(){}.getType();

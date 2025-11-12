@@ -1,5 +1,8 @@
 package com.cc.job.gui.util;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
@@ -9,6 +12,8 @@ import java.util.Properties;
  */
 public class AppConfig {
     
+    private static final Logger logger = LoggerFactory.getLogger(AppConfig.class);
+    
     private static final Properties properties = new Properties();
     private static final String DEFAULT_BASE_URL = "http://localhost:8080";
     
@@ -17,12 +22,12 @@ public class AppConfig {
         try (InputStream input = AppConfig.class.getClassLoader().getResourceAsStream("application.properties")) {
             if (input != null) {
                 properties.load(input);
-                System.out.println("✓ 配置文件加载成功");
+                logger.info("✓ 配置文件加载成功");
             } else {
-                System.out.println("⚠ 未找到配置文件，使用默认配置");
+                logger.warn("⚠ 未找到配置文件，使用默认配置");
             }
         } catch (IOException e) {
-            System.err.println("⚠ 加载配置文件失败: " + e.getMessage());
+            logger.error("⚠ 加载配置文件失败: {}", e.getMessage(), e);
         }
     }
     

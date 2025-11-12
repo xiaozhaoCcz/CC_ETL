@@ -16,11 +16,15 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 小地图组件 - 显示画布缩略图和当前视图位置
  */
 public class MiniMapView extends VBox {
+    
+    private static final Logger logger = LoggerFactory.getLogger(MiniMapView.class);
     
     private Canvas canvas;
     private GraphicsContext gc;
@@ -81,7 +85,7 @@ public class MiniMapView extends VBox {
             double w = newVal.doubleValue();
             if (w > 0) {
                 canvas.setWidth(w);
-                System.out.println("📐 Canvas宽度调整为: " + w);
+                logger.debug("📐 Canvas宽度调整为: {}", w);
                 updateMiniMap();  // 重绘小地图
             }
         });
@@ -91,7 +95,7 @@ public class MiniMapView extends VBox {
             double h = newVal.doubleValue();
             if (h > 0) {
                 canvas.setHeight(h);
-                System.out.println("📐 Canvas高度调整为: " + h);
+                logger.debug("📐 Canvas高度调整为: {}", h);
                 updateMiniMap();  // 重绘小地图
             }
         });
@@ -159,17 +163,17 @@ public class MiniMapView extends VBox {
         
         // 监听滚动位置变化
         scrollPane.hvalueProperty().addListener((obs, oldVal, newVal) -> {
-            System.out.println("🔄 水平滚动: " + oldVal + " → " + newVal);
+            logger.debug("🔄 水平滚动: {} → {}", oldVal, newVal);
             updateViewport();
         });
         scrollPane.vvalueProperty().addListener((obs, oldVal, newVal) -> {
-            System.out.println("🔄 垂直滚动: " + oldVal + " → " + newVal);
+            logger.debug("🔄 垂直滚动: {} → {}", oldVal, newVal);
             updateViewport();
         });
         
         // 监听视口大小变化
         scrollPane.viewportBoundsProperty().addListener((obs, oldVal, newVal) -> {
-            System.out.println("🔄 视口大小变化: " + newVal);
+            logger.debug("🔄 视口大小变化: {}", newVal);
             updateViewport();
         });
         
@@ -182,7 +186,7 @@ public class MiniMapView extends VBox {
                     double currentH = scrollPane.getHvalue();
                     double currentV = scrollPane.getVvalue();
                     if (lastHValue != currentH || lastVValue != currentV) {
-                        System.out.println("🔄 检测到滚动变化: H=" + currentH + ", V=" + currentV);
+                        logger.debug("🔄 检测到滚动变化: H={}, V={}", currentH, currentV);
                         lastHValue = currentH;
                         lastVValue = currentV;
                         updateViewport();
@@ -278,7 +282,7 @@ public class MiniMapView extends VBox {
     private void updateViewportForPannable() {
         if (nodeCanvas == null || scrollPane == null) return;
         
-        System.out.println("📍 更新视口矩形（Pannable模式）...");
+        logger.debug("📍 更新视口矩形（Pannable模式）...");
         
         double canvasWidth = nodeCanvas.getPrefWidth();
         double canvasHeight = nodeCanvas.getPrefHeight();
@@ -305,8 +309,8 @@ public class MiniMapView extends VBox {
         translateX = Math.max(0, Math.min(translateX, canvasWidth - viewportWidth));
         translateY = Math.max(0, Math.min(translateY, canvasHeight - viewportHeight));
         
-        System.out.println("   平移: X=" + translateX + ", Y=" + translateY);
-        System.out.println("   视口尺寸: " + viewportWidth + " x " + viewportHeight);
+        logger.debug("   平移: X={}, Y={}", translateX, translateY);
+        logger.debug("   视口尺寸: {} x {}", viewportWidth, viewportHeight);
         
         // 计算视口矩形
         double rectX = translateX * scale + offsetX;
@@ -323,15 +327,15 @@ public class MiniMapView extends VBox {
         viewportRect.setWidth(rectW);
         viewportRect.setHeight(rectH);
         
-        System.out.println("   视口矩形: [" + rectX + ", " + rectY + ", " + rectW + ", " + rectH + "]");
+        logger.debug("   视口矩形: [{}, {}, {}, {}]", rectX, rectY, rectW, rectH);
         
         // 如果矩形大小异常，隐藏它
         if (rectW <= 0 || rectH <= 0 || rectW > MINIMAP_WIDTH || rectH > MINIMAP_HEIGHT) {
             viewportRect.setVisible(false);
-            System.out.println("   ❌ 视口矩形隐藏（大小异常）");
+            logger.debug("   ❌ 视口矩形隐藏（大小异常）");
         } else {
             viewportRect.setVisible(true);
-            System.out.println("   ✅ 视口矩形显示");
+            logger.debug("   ✅ 视口矩形显示");
         }
     }
     
@@ -341,12 +345,12 @@ public class MiniMapView extends VBox {
     private void updateViewport() {
         if (nodeCanvas == null || scrollPane == null) return;
         
-        System.out.println("📍 更新视口矩形（标准模式）...");
+        logger.debug("📍 更新视口矩形（标准模式）...");
         
         double canvasWidth = nodeCanvas.getPrefWidth();
         double canvasHeight = nodeCanvas.getPrefHeight();
         
-        System.out.println("   画布尺寸: " + canvasWidth + " x " + canvasHeight);
+        logger.debug("   画布尺寸: {} x {}", canvasWidth, canvasHeight);
         
         // 计算缩放比例
         double scaleX = MINIMAP_WIDTH / canvasWidth;
@@ -366,17 +370,17 @@ public class MiniMapView extends VBox {
         double hValue = scrollPane.getHvalue();
         double vValue = scrollPane.getVvalue();
         
-        System.out.println("   滚动值: H=" + hValue + ", V=" + vValue);
+        logger.debug("   滚动值: H={}, V={}", hValue, vValue);
         
         double contentWidth = canvasWidth - viewportWidth;
         double contentHeight = canvasHeight - viewportHeight;
         
-        System.out.println("   内容尺寸: " + contentWidth + " x " + contentHeight);
+        logger.debug("   内容尺寸: {} x {}", contentWidth, contentHeight);
         
         double scrollX = contentWidth > 0 ? hValue * contentWidth : 0;
         double scrollY = contentHeight > 0 ? vValue * contentHeight : 0;
         
-        System.out.println("   滚动位置: X=" + scrollX + ", Y=" + scrollY);
+        logger.debug("   滚动位置: X={}, Y={}", scrollX, scrollY);
         
         // 更新视口矩形 - 限制在小地图可见范围内
         double rectX = scrollX * scale + offsetX;
@@ -401,15 +405,15 @@ public class MiniMapView extends VBox {
         viewportRect.setWidth(rectW);
         viewportRect.setHeight(rectH);
         
-        System.out.println("   视口矩形: [" + rectX + ", " + rectY + ", " + rectW + ", " + rectH + "]");
+        logger.debug("   视口矩形: [{}, {}, {}, {}]", rectX, rectY, rectW, rectH);
         
         // 如果矩形大小异常，隐藏它
         if (rectW <= 0 || rectH <= 0 || rectW > MINIMAP_WIDTH || rectH > MINIMAP_HEIGHT) {
             viewportRect.setVisible(false);
-            System.out.println("   ❌ 视口矩形隐藏（大小异常）");
+            logger.debug("   ❌ 视口矩形隐藏（大小异常）");
         } else {
             viewportRect.setVisible(true);
-            System.out.println("   ✅ 视口矩形显示");
+            logger.debug("   ✅ 视口矩形显示");
         }
     }
     

@@ -5,6 +5,8 @@ import com.google.gson.Gson;
 import javafx.application.Platform;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.util.Map;
@@ -15,6 +17,8 @@ import java.util.function.Consumer;
  * WebSocket服务类，用于接收后端推送的节点状态更新消息
  */
 public class WebSocketService {
+    
+    private static final Logger logger = LoggerFactory.getLogger(WebSocketService.class);
     
     private static WebSocketService instance;
     private final Map<String, WebSocketClientWrapper> connections = new ConcurrentHashMap<>();
@@ -79,7 +83,7 @@ public class WebSocketService {
         
         public void connect() {
             if (client != null && isConnected) {
-                System.out.println("⚠️ WebSocket已经连接，跳过重复连接: " + connectionId);
+                logger.warn("⚠️ WebSocket已经连接，跳过重复连接: {}", connectionId);
                 return; // 已经连接
             }
             
@@ -94,10 +98,10 @@ public class WebSocketService {
             // 使用正确的WebSocket端点路径（与后端@ServerEndpoint匹配）
             wsUrl += "/ccJobWs/" + connectionId;
             
-            System.out.println("🔌 开始连接WebSocket");
-            System.out.println("   连接ID: " + connectionId);
-            System.out.println("   基础URL: " + baseUrl);
-            System.out.println("   WebSocket URL: " + wsUrl);
+            logger.debug("🔌 开始连接WebSocket");
+            logger.debug("   连接ID: {}", connectionId);
+            logger.debug("   基础URL: {}", baseUrl);
+            logger.debug("   WebSocket URL: {}", wsUrl);
             
             try {
                 URI uri = new URI(wsUrl);
@@ -105,17 +109,17 @@ public class WebSocketService {
                     @Override
                     public void onOpen(ServerHandshake handshake) {
                         isConnected = true;
-                        System.out.println("✅ WebSocket连接已建立: " + connectionId);
-                        System.out.println("   连接URL: " + wsUrl);
-                        System.out.println("   握手状态码: " + handshake.getHttpStatus());
-                        System.out.println("   握手状态消息: " + handshake.getHttpStatusMessage());
+                        logger.info("✅ WebSocket连接已建立: {}", connectionId);
+                        logger.debug("   连接URL: {}", wsUrl);
+                        logger.debug("   握手状态码: {}", handshake.getHttpStatus());
+                        logger.debug("   握手状态消息: {}", handshake.getHttpStatusMessage());
                     }
                     
                     @Override
                     public void onMessage(String message) {
-                        System.out.println("========================================");
-                        System.out.println("📨 WebSocket收到原始消息: " + message);
-                        System.out.println("   连接ID: " + connectionId);
+                        logger.debug("========================================");
+                        logger.debug("📨 WebSocket收到原始消息: {}", message);
+                        logger.debug("   连接ID: {}", connectionId);
                         
                         // 注意：这里不能直接使用logPanel，因为WebSocketService没有logPanel引用
                         // 消息会通过messageHandler传递到MainView，在那里记录到logPanel
@@ -123,40 +127,39 @@ public class WebSocketService {
                         try {
                             WebSocketMessage wsMessage = gson.fromJson(message, WebSocketMessage.class);
                             
-                            System.out.println("✅ 消息解析成功:");
-                            System.out.println("   jobId: " + wsMessage.getJobId());
-                            System.out.println("   status: " + wsMessage.getStatus());
-                            System.out.println("   randomId: " + wsMessage.getRandomId());
-                            System.out.println("   result: " + wsMessage.getResult());
+                            logger.debug("✅ 消息解析成功:");
+                            logger.debug("   jobId: {}", wsMessage.getJobId());
+                            logger.debug("   status: {}", wsMessage.getStatus());
+                            logger.debug("   randomId: {}", wsMessage.getRandomId());
+                            logger.debug("   result: {}", wsMessage.getResult());
                             
                             Platform.runLater(() -> {
                                 if (messageHandler != null) {
-                                    System.out.println("🔄 调用消息处理器");
+                                    logger.debug("🔄 调用消息处理器");
                                     messageHandler.accept(wsMessage);
                                 } else {
-                                    System.err.println("❌ 消息处理器为null！");
+                                    logger.error("❌ 消息处理器为null！");
                                 }
                             });
                         } catch (Exception e) {
-                            System.err.println("❌ 解析WebSocket消息失败: " + e.getMessage());
-                            e.printStackTrace();
+                            logger.error("❌ 解析WebSocket消息失败: {}", e.getMessage(), e);
                         }
                         
-                        System.out.println("========================================");
+                        logger.debug("========================================");
                     }
                     
                     @Override
                     public void onClose(int code, String reason, boolean remote) {
                         isConnected = false;
-                        System.out.println("🔌 WebSocket连接已关闭: " + connectionId + " (code: " + code + ", reason: " + reason + ")");
+                        logger.debug("🔌 WebSocket连接已关闭: {} (code: {}, reason: {})", connectionId, code, reason);
                     }
                     
                     @Override
                     public void onError(Exception ex) {
                         String errorMsg = "❌ WebSocket错误: " + ex.getMessage();
-                        System.err.println(errorMsg);
-                        System.err.println("   连接ID: " + connectionId);
-                        System.err.println("   连接URL: " + wsUrl);
+                        logger.error(errorMsg);
+                        logger.error("   连接ID: {}", connectionId);
+                        logger.error("   连接URL: {}", wsUrl);
                         
                         // 尝试通过messageHandler传递错误信息（如果可能）
                         if (messageHandler != null) {
@@ -171,7 +174,6 @@ public class WebSocketService {
                             });
                         }
                         
-                        ex.printStackTrace();
                         isConnected = false;
                     }
                 };
@@ -179,29 +181,27 @@ public class WebSocketService {
                 // 在后台线程中连接
                 new Thread(() -> {
                     try {
-                        System.out.println("🔄 尝试连接WebSocket: " + wsUrl);
+                        logger.debug("🔄 尝试连接WebSocket: {}", wsUrl);
                         boolean connected = client.connectBlocking();
                         if (connected) {
-                            System.out.println("✅ WebSocket连接成功（connectBlocking返回true）: " + connectionId);
+                            logger.info("✅ WebSocket连接成功（connectBlocking返回true）: {}", connectionId);
                         } else {
-                            System.err.println("❌ WebSocket连接失败（connectBlocking返回false）: " + connectionId);
+                            logger.error("❌ WebSocket连接失败（connectBlocking返回false）: {}", connectionId);
                         }
                     } catch (InterruptedException e) {
-                        System.err.println("❌ WebSocket连接被中断: " + e.getMessage());
-                        System.err.println("   连接ID: " + connectionId);
+                        logger.error("❌ WebSocket连接被中断: {}", e.getMessage());
+                        logger.error("   连接ID: {}", connectionId);
                         Thread.currentThread().interrupt();
                     } catch (Exception e) {
-                        System.err.println("❌ WebSocket连接异常: " + e.getMessage());
-                        System.err.println("   连接ID: " + connectionId);
-                        e.printStackTrace();
+                        logger.error("❌ WebSocket连接异常: {}", e.getMessage(), e);
+                        logger.error("   连接ID: {}", connectionId);
                     }
                 }).start();
                 
             } catch (Exception e) {
-                System.err.println("❌ 创建WebSocket连接失败: " + e.getMessage());
-                System.err.println("   连接ID: " + connectionId);
-                System.err.println("   WebSocket URL: " + wsUrl);
-                e.printStackTrace();
+                logger.error("❌ 创建WebSocket连接失败: {}", e.getMessage(), e);
+                logger.error("   连接ID: {}", connectionId);
+                logger.error("   WebSocket URL: {}", wsUrl);
                 isConnected = false;
             }
         }
@@ -212,11 +212,11 @@ public class WebSocketService {
                 try {
                     client.close();
                 } catch (Exception e) {
-                    System.err.println("关闭WebSocket连接失败: " + e.getMessage());
+                    logger.error("关闭WebSocket连接失败: {}", e.getMessage(), e);
                 }
                 client = null;
             }
-            System.out.println("🔌 断开WebSocket连接: " + connectionId);
+            logger.debug("🔌 断开WebSocket连接: {}", connectionId);
         }
         
         public boolean isConnected() {
@@ -250,16 +250,16 @@ public class WebSocketService {
         connections.put(connectionId, wrapper);
         wrapper.connect();
         
-        System.out.println("🔌 WebSocket连接已创建: " + connectionId);
+        logger.debug("🔌 WebSocket连接已创建: {}", connectionId);
         
         // 等待一段时间后检查连接状态
         new Thread(() -> {
             try {
                 Thread.sleep(2000); // 等待2秒
                 if (!wrapper.isConnected()) {
-                    System.err.println("⚠️ WebSocket连接超时，可能未成功建立: " + connectionId);
-                    System.err.println("   请检查后端WebSocket服务是否正常运行");
-                    System.err.println("   请检查URL是否正确: ws://.../ws/" + connectionId);
+                    logger.warn("⚠️ WebSocket连接超时，可能未成功建立: {}", connectionId);
+                    logger.warn("   请检查后端WebSocket服务是否正常运行");
+                    logger.warn("   请检查URL是否正确: ws://.../ws/{}", connectionId);
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -275,7 +275,7 @@ public class WebSocketService {
         WebSocketClientWrapper wrapper = connections.remove(connectionId);
         if (wrapper != null) {
             wrapper.disconnect();
-            System.out.println("🔌 WebSocket连接已断开: " + connectionId);
+            logger.debug("🔌 WebSocket连接已断开: {}", connectionId);
         }
     }
     
@@ -297,7 +297,7 @@ public class WebSocketService {
     public void disconnectAll() {
         connections.values().forEach(WebSocketClientWrapper::disconnect);
         connections.clear();
-        System.out.println("🔌 所有WebSocket连接已断开");
+        logger.debug("🔌 所有WebSocket连接已断开");
     }
 }
 

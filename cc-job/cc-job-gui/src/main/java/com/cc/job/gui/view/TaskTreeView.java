@@ -17,6 +17,8 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.util.Duration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
@@ -28,6 +30,8 @@ import java.util.Optional;
  * 任务组树形视图组件
  */
 public class TaskTreeView extends VBox {
+    
+    private static final Logger logger = LoggerFactory.getLogger(TaskTreeView.class);
     
     private TextField searchField;
     private TreeView<TreeNodeData> treeView;
@@ -352,7 +356,7 @@ public class TaskTreeView extends VBox {
                         "-fx-text-fill: #2563EB;"
                     );
                     newTaskItem.setOnAction(e -> {
-                        System.out.println("➕ 在分区 " + nodeName + " 中新建任务组, ID: " + nodeData.getId());
+                        logger.debug("➕ 在分区 {} 中新建任务组, ID: {}", nodeName, nodeData.getId());
                         if (selectionCallback != null) {
                             selectionCallback.onNewJobGroup(nodeData.getId(), nodeData.getLabel());
                         }
@@ -377,7 +381,7 @@ public class TaskTreeView extends VBox {
                         "-fx-text-fill: #10B981;"
                     );
                     addNodeItem.setOnAction(e -> {
-                        System.out.println("➕ 在任务组 " + nodeName + " 中新增节点, ID: " + nodeData.getId());
+                        logger.debug("➕ 在任务组 {} 中新增节点, ID: {}", nodeName, nodeData.getId());
                         if (selectionCallback != null) {
                             selectionCallback.onNewJobNode(nodeData.getId(), nodeData.getLabel());
                         }
@@ -400,7 +404,7 @@ public class TaskTreeView extends VBox {
 
                     MenuItem openItem = new MenuItem("打开");
                     openItem.setOnAction(e -> {
-                        System.out.println("📂 打开节点: " + nodeName);
+                        logger.debug("📂 打开节点: {}", nodeName);
                         if (selectionCallback != null) {
                             selectionCallback.onTaskSelected(nodeName);
                         }
@@ -408,7 +412,7 @@ public class TaskTreeView extends VBox {
 
                     MenuItem editItem = new MenuItem("编辑");
                     editItem.setOnAction(e -> {
-                        System.out.println("✏️ 编辑节点: " + nodeName);
+                        logger.debug("✏️ 编辑节点: {}", nodeName);
                         if (selectionCallback != null) {
                             selectionCallback.onJobNodeAction(nodeData.getId(), parseJobId(nodeData), nodeName, TaskSelectionCallback.JobNodeAction.EDIT);
                         }
@@ -416,7 +420,7 @@ public class TaskTreeView extends VBox {
 
                     MenuItem locateItem = new MenuItem("定位");
                     locateItem.setOnAction(e -> {
-                        System.out.println("📍 定位节点: " + nodeName);
+                        logger.debug("📍 定位节点: {}", nodeName);
                         if (selectionCallback != null) {
                             selectionCallback.onJobNodeAction(nodeData.getId(), parseJobId(nodeData), nodeName, TaskSelectionCallback.JobNodeAction.LOCATE);
                         }
@@ -425,7 +429,7 @@ public class TaskTreeView extends VBox {
                     MenuItem deleteItem = new MenuItem("删除");
                     deleteItem.setStyle("-fx-text-fill: #EF4444;");
                     deleteItem.setOnAction(e -> {
-                        System.out.println("🗑️ 删除节点: " + nodeName);
+                        logger.debug("🗑️ 删除节点: {}", nodeName);
                         confirmDeleteNode(nodeData, treeItem);
                     });
 
@@ -462,7 +466,7 @@ public class TaskTreeView extends VBox {
         tree.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null && newVal.getValue() != null) {
                 TreeNodeData nodeData = newVal.getValue();
-                System.out.println("✓ 选择节点: " + nodeData.getLabel() + " [" + nodeData.getTypeName() + "] ID: " + nodeData.getId());
+                logger.debug("✓ 选择节点: {} [{}] ID: {}", nodeData.getLabel(), nodeData.getTypeName(), nodeData.getId());
                 if (selectionCallback != null) {
                     // 调用新的回调方法，传递完整信息
                     selectionCallback.onTaskSelected(nodeData.getId(), nodeData.getLabel(), nodeData.getType());
@@ -496,23 +500,22 @@ public class TaskTreeView extends VBox {
         // 在后台线程中加载数据
         new Thread(() -> {
             try {
-                System.out.println("开始加载树形数据...");
+                logger.debug("开始加载树形数据...");
                 List<JobPartVo> treeData = jobPartService.getTree();
-                System.out.println("成功获取树形数据，数量: " + (treeData != null ? treeData.size() : 0));
+                logger.debug("成功获取树形数据，数量: {}", treeData != null ? treeData.size() : 0);
                 
                 // 在 JavaFX 应用线程中更新 UI
                 Platform.runLater(() -> {
                     buildTreeFromData(treeData);
-                    System.out.println("✓ 树形数据加载完成");
+                    logger.debug("✓ 树形数据加载完成");
                 });
                 
             } catch (IOException e) {
-                System.err.println("加载树形数据失败: " + e.getMessage());
-                e.printStackTrace();
+                logger.error("加载树形数据失败: {}", e.getMessage(), e);
                 
                 // 如果后端服务不可用，加载示例数据
                 Platform.runLater(() -> {
-                    System.out.println("⚠ 后端服务不可用，加载示例数据");
+                    logger.warn("⚠ 后端服务不可用，加载示例数据");
                     loadSampleData();
                 });
             }
@@ -524,7 +527,7 @@ public class TaskTreeView extends VBox {
      */
     private void buildTreeFromData(List<JobPartVo> data) {
         if (data == null || data.isEmpty()) {
-            System.out.println("⚠ 没有数据，加载示例数据");
+            logger.warn("⚠ 没有数据，加载示例数据");
             loadSampleData();
             return;
         }
@@ -574,11 +577,11 @@ public class TaskTreeView extends VBox {
                 if (row >= 0) {
                     treeView.scrollTo(row);
                 }
-                System.out.println("✓ 定位到刷新节点: " + targetId);
+                logger.debug("✓ 定位到刷新节点: {}", targetId);
                 refreshExpandedStateCache();
                 return;
             } else {
-                System.out.println("⚠ 未找到ID为 " + targetId + " 的节点，使用默认选择");
+                logger.warn("⚠ 未找到ID为 {} 的节点，使用默认选择", targetId);
             }
         }
 
@@ -737,12 +740,12 @@ public class TaskTreeView extends VBox {
         if (searchText == null || searchText.trim().isEmpty()) {
             // 清空搜索，恢复所有节点
             restoreAllNodes();
-            System.out.println("✓ 搜索清空，显示所有节点");
+            logger.debug("✓ 搜索清空，显示所有节点");
             return;
         }
         
         String lowerSearchText = searchText.toLowerCase().trim();
-        System.out.println("✓ 搜索: " + searchText);
+        logger.debug("✓ 搜索: {}", searchText);
         
         // 保存原始结构（如果还没保存）
         if (originalChildren.isEmpty()) {
@@ -827,7 +830,7 @@ public class TaskTreeView extends VBox {
             node.setExpanded(true);
         }
         
-        System.out.println("   过滤节点: " + nodeName + " -> " + (shouldShow ? "显示" : "隐藏"));
+        logger.debug("   过滤节点: {} -> {}", nodeName, shouldShow ? "显示" : "隐藏");
         
         return shouldShow;
     }
@@ -892,7 +895,7 @@ public class TaskTreeView extends VBox {
         partitionItem.getChildren().add(taskItem);
         partitionItem.setExpanded(true);
         
-        System.out.println("✓ 添加任务: " + partition + "/" + taskName);
+        logger.debug("✓ 添加任务: {}/{}", partition, taskName);
     }
     
     /**
@@ -1106,13 +1109,13 @@ public class TaskTreeView extends VBox {
      */
     private void handleRefresh(TreeNodeData nodeData, TreeItem<TreeNodeData> treeItem) {
         if (nodeData == null) {
-            System.out.println("🔄 刷新全部树形数据");
+            logger.debug("🔄 刷新全部树形数据");
             reloadTreeWithFocus(null);
             return;
         }
 
         if (!supportsDeletion(nodeData)) {
-            System.out.println("🔄 刷新节点: " + nodeData.getLabel());
+            logger.debug("🔄 刷新节点: {}", nodeData.getLabel());
             reloadTreeWithFocus(nodeData.getId());
             return;
         }
@@ -1183,7 +1186,7 @@ public class TaskTreeView extends VBox {
 
         Long nodeId = nodeData.getId();
         Integer nodeType = nodeData.getType();
-        System.out.println("🗑️ 准备删除节点: " + nodeData.getLabel() + " (ID=" + nodeId + ", type=" + nodeType + ")");
+        logger.debug("🗑️ 准备删除节点: {} (ID={}, type={})", nodeData.getLabel(), nodeId, nodeType);
 
         new Thread(() -> {
             boolean success = false;
@@ -1199,8 +1202,7 @@ public class TaskTreeView extends VBox {
                 }
             } catch (IOException ex) {
                 errorMessage = ex.getMessage();
-                System.err.println("删除节点发生异常: " + ex.getMessage());
-                ex.printStackTrace();
+                logger.error("删除节点发生异常: {}", ex.getMessage(), ex);
             }
 
             boolean finalSuccess = success;
@@ -1310,7 +1312,7 @@ public class TaskTreeView extends VBox {
             try {
                 return Long.parseLong(ext1.trim());
             } catch (NumberFormatException ex) {
-                System.err.println("解析任务节点 jobId 失败: " + ext1 + ", 错误: " + ex.getMessage());
+                logger.error("解析任务节点 jobId 失败: {}, 错误: {}", ext1, ex.getMessage());
             }
         }
         return null;

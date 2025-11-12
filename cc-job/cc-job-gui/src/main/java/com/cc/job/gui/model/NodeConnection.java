@@ -11,11 +11,15 @@ import javafx.scene.shape.Circle;
 import javafx.scene.shape.CubicCurve;
 import javafx.scene.shape.Polygon;
 import javafx.util.Duration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 节点连接线，使用贝塞尔曲线
  */
 public class NodeConnection extends Group {
+    
+    private static final Logger logger = LoggerFactory.getLogger(NodeConnection.class);
     
     private ProcessNode sourceNode;
     private Circle sourceConnector;
@@ -213,7 +217,7 @@ public class NodeConnection extends Group {
     public void setRunning(boolean running) {
         this.isRunning = running;
         updateStyle();
-        System.out.println((running ? "▶️" : "⏹️") + " 边" + (running ? "开始" : "停止") + "运行: " + sourceNode.getJobHandlerName() + " → " + targetNode.getJobHandlerName());
+        logger.debug("{} 边{}运行: {} → {}", running ? "▶️" : "⏹️", running ? "开始" : "停止", sourceNode.getJobHandlerName(), targetNode.getJobHandlerName());
     }
     
     /**

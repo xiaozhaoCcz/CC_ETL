@@ -3,6 +3,8 @@ package com.cc.job.gui.service;
 import com.cc.job.gui.util.AppConfig;
 import com.google.gson.Gson;
 import javafx.application.Platform;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -17,6 +19,8 @@ import java.util.function.Consumer;
  * 替代WebSocket实现
  */
 public class SSEService {
+    
+    private static final Logger logger = LoggerFactory.getLogger(SSEService.class);
     
     private static SSEService instance;
     private final Map<String, SSEConnection> connections = new ConcurrentHashMap<>();
@@ -91,7 +95,7 @@ public class SSEService {
         
         public void connect() {
             if (running) {
-                System.out.println("⚠️ SSE已经连接，跳过重复连接: " + connectionId);
+                logger.warn("⚠️ SSE已经连接，跳过重复连接: {}", connectionId);
                 return;
             }
             
@@ -105,7 +109,7 @@ public class SSEService {
             // 解析连接ID获取parentJobId和randomId
             String[] parts = connectionId.split(":");
             if (parts.length != 2) {
-                System.err.println("❌ 连接ID格式错误，应为 parentJobId:randomId，实际: " + connectionId);
+                logger.error("❌ 连接ID格式错误，应为 parentJobId:randomId，实际: {}", connectionId);
                 return;
             }
             
@@ -113,10 +117,10 @@ public class SSEService {
             String randomId = parts[1];
             sseUrl = baseUrl + "/api/v1/sse/nodeStatus/" + parentJobId + "/" + randomId;
             
-            System.out.println("🔌 开始连接SSE");
-            System.out.println("   连接ID: " + connectionId);
-            System.out.println("   基础URL: " + baseUrl);
-            System.out.println("   SSE URL: " + sseUrl);
+            logger.debug("🔌 开始连接SSE");
+            logger.debug("   连接ID: {}", connectionId);
+            logger.debug("   基础URL: {}", baseUrl);
+            logger.debug("   SSE URL: {}", sseUrl);
             
             running = true;
             connectionThread = new Thread(() -> {
@@ -139,13 +143,13 @@ public class SSEService {
                 
                 int responseCode = connection.getResponseCode();
                 if (responseCode != HttpURLConnection.HTTP_OK) {
-                    System.err.println("❌ SSE连接失败，HTTP状态码: " + responseCode);
+                    logger.error("❌ SSE连接失败，HTTP状态码: {}", responseCode);
                     running = false;
                     return;
                 }
                 
-                System.out.println("✅ SSE连接已建立: " + connectionId);
-                System.out.println("   连接URL: " + sseUrl);
+                logger.info("✅ SSE连接已建立: {}", connectionId);
+                logger.debug("   连接URL: {}", sseUrl);
                 
                 reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), "UTF-8"));
                 String line;
@@ -177,9 +181,9 @@ public class SSEService {
             } catch (Exception e) {
                 if (running) {
                     String errorMsg = "❌ SSE连接错误: " + e.getMessage();
-                    System.err.println(errorMsg);
-                    System.err.println("   连接ID: " + connectionId);
-                    System.err.println("   连接URL: " + sseUrl);
+                    logger.error(errorMsg);
+                    logger.error("   连接ID: {}", connectionId);
+                    logger.error("   连接URL: {}", sseUrl);
                     
                     // 通过messageHandler传递错误信息
                     if (messageHandler != null) {
@@ -195,7 +199,6 @@ public class SSEService {
                             messageHandler.accept(errorMessage);
                         });
                     }
-                    e.printStackTrace();
                 }
             } finally {
                 running = false;
@@ -209,16 +212,16 @@ public class SSEService {
                 if (connection != null) {
                     connection.disconnect();
                 }
-                System.out.println("🔌 SSE连接已关闭: " + connectionId);
+                logger.debug("🔌 SSE连接已关闭: {}", connectionId);
             }
         }
         
         private void processEvent(String eventType, String data) {
-            System.out.println("========================================");
-            System.out.println("📨 SSE收到消息");
-            System.out.println("   事件类型: " + eventType);
-            System.out.println("   连接ID: " + connectionId);
-            System.out.println("   数据: " + data);
+            logger.debug("========================================");
+            logger.debug("📨 SSE收到消息");
+            logger.debug("   事件类型: {}", eventType);
+            logger.debug("   连接ID: {}", connectionId);
+            logger.debug("   数据: {}", data);
             
             try {
                 if ("ping".equals(eventType)) {
@@ -228,33 +231,32 @@ public class SSEService {
                 
                 if ("connected".equals(eventType)) {
                     // 连接成功消息
-                    System.out.println("✅ SSE连接成功确认");
+                    logger.debug("✅ SSE连接成功确认");
                     return;
                 }
                 
                 // 解析JSON消息
                 SSEMessage sseMessage = gson.fromJson(data, SSEMessage.class);
                 
-                System.out.println("✅ 消息解析成功:");
-                System.out.println("   jobId: " + sseMessage.getJobId());
-                System.out.println("   status: " + sseMessage.getStatus());
-                System.out.println("   randomId: " + sseMessage.getRandomId());
-                System.out.println("   result: " + sseMessage.getResult());
+                logger.debug("✅ 消息解析成功:");
+                logger.debug("   jobId: {}", sseMessage.getJobId());
+                logger.debug("   status: {}", sseMessage.getStatus());
+                logger.debug("   randomId: {}", sseMessage.getRandomId());
+                logger.debug("   result: {}", sseMessage.getResult());
                 
                 Platform.runLater(() -> {
                     if (messageHandler != null) {
-                        System.out.println("🔄 调用消息处理器");
+                        logger.debug("🔄 调用消息处理器");
                         messageHandler.accept(sseMessage);
                     } else {
-                        System.err.println("❌ 消息处理器为null！");
+                        logger.error("❌ 消息处理器为null！");
                     }
                 });
             } catch (Exception e) {
-                System.err.println("❌ 解析SSE消息失败: " + e.getMessage());
-                e.printStackTrace();
+                logger.error("❌ 解析SSE消息失败: {}", e.getMessage(), e);
             }
             
-            System.out.println("========================================");
+            logger.debug("========================================");
         }
         
         public void disconnect() {
@@ -265,7 +267,7 @@ public class SSEService {
             if (connectionThread != null && connectionThread.isAlive()) {
                 connectionThread.interrupt();
             }
-            System.out.println("🔌 断开SSE连接: " + connectionId);
+            logger.debug("🔌 断开SSE连接: {}", connectionId);
         }
         
         public boolean isConnected() {
@@ -299,16 +301,16 @@ public class SSEService {
         connections.put(connectionId, sseConnection);
         sseConnection.connect();
         
-        System.out.println("🔌 SSE连接已创建: " + connectionId);
+        logger.debug("🔌 SSE连接已创建: {}", connectionId);
         
         // 等待一段时间后检查连接状态
         new Thread(() -> {
             try {
                 Thread.sleep(2000); // 等待2秒
                 if (!sseConnection.isConnected()) {
-                    System.err.println("⚠️ SSE连接超时，可能未成功建立: " + connectionId);
-                    System.err.println("   请检查后端SSE服务是否正常运行");
-                    System.err.println("   请检查URL是否正确: " + sseConnection.sseUrl);
+                    logger.warn("⚠️ SSE连接超时，可能未成功建立: {}", connectionId);
+                    logger.warn("   请检查后端SSE服务是否正常运行");
+                    logger.warn("   请检查URL是否正确: {}", sseConnection.sseUrl);
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -324,7 +326,7 @@ public class SSEService {
         SSEConnection sseConnection = connections.remove(connectionId);
         if (sseConnection != null) {
             sseConnection.disconnect();
-            System.out.println("🔌 SSE连接已断开: " + connectionId);
+            logger.debug("🔌 SSE连接已断开: {}", connectionId);
         }
     }
     
@@ -346,7 +348,7 @@ public class SSEService {
     public void disconnectAll() {
         connections.values().forEach(SSEConnection::disconnect);
         connections.clear();
-        System.out.println("🔌 所有SSE连接已断开");
+        logger.debug("🔌 所有SSE连接已断开");
     }
 }
 

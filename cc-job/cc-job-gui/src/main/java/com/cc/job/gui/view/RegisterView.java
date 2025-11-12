@@ -10,6 +10,8 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.function.Consumer;
 
@@ -17,6 +19,8 @@ import java.util.function.Consumer;
  * 注册视图 - 现代化设计
  */
 public class RegisterView extends StackPane {
+    
+    private static final Logger logger = LoggerFactory.getLogger(RegisterView.class);
     
     private TextField usernameField;
     private PasswordField passwordField;
@@ -369,7 +373,7 @@ public class RegisterView extends StackPane {
                     
                     if (result.isSuccess()) {
                         // 注册成功
-                        System.out.println("✓ 注册成功！");
+                        logger.info("✓ 注册成功！");
                         if (onRegisterSuccess != null) {
                             onRegisterSuccess.accept(result);
                         }
@@ -380,11 +384,11 @@ public class RegisterView extends StackPane {
                 });
                 
             } catch (Exception ex) {
+                logger.error("注册失败: {}", ex.getMessage(), ex);
                 Platform.runLater(() -> {
                     setLoading(false);
                     showError("注册失败: " + ex.getMessage());
                 });
-                ex.printStackTrace();
             }
         }).start();
     }

@@ -4,6 +4,8 @@ import com.cc.job.xo.common.result.Result;
 import com.cc.job.xo.model.form.JobInfoForm;
 import com.google.gson.reflect.TypeToken;
 import okhttp3.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -14,6 +16,8 @@ import java.util.Map;
  * 任务信息服务
  */
 public class JobInfoService extends BaseService {
+    
+    private static final Logger logger = LoggerFactory.getLogger(JobInfoService.class);
     
     /**
      * 触发任务执行
@@ -36,9 +40,9 @@ public class JobInfoService extends BaseService {
             try {
                 Integer triggerUserId = Integer.parseInt(session.getUserId());
                 requestMap.put("triggerUserId", triggerUserId);
-                System.out.println("✓ 传递触发用户ID: " + triggerUserId);
+                logger.debug("✓ 传递触发用户ID: {}", triggerUserId);
             } catch (NumberFormatException e) {
-                System.err.println("⚠ 用户ID格式错误: " + session.getUserId());
+                logger.warn("⚠ 用户ID格式错误: {}", session.getUserId());
             }
         }
         
@@ -56,7 +60,7 @@ public class JobInfoService extends BaseService {
             }
             
             String responseBody = response.body().string();
-            System.out.println("triggerJob API 响应: " + responseBody);
+            logger.debug("triggerJob API 响应: {}", responseBody);
             
             // 解析 JSON 响应
             Type resultType = new TypeToken<Result<String>>(){}.getType();
@@ -91,7 +95,7 @@ public class JobInfoService extends BaseService {
             }
             
             String responseBody = response.body().string();
-            System.out.println("stopJobCompose API 响应: " + responseBody);
+            logger.debug("stopJobCompose API 响应: {}", responseBody);
             
             // 解析 JSON 响应
             Type resultType = new TypeToken<Result<Void>>(){}.getType();
@@ -123,7 +127,7 @@ public class JobInfoService extends BaseService {
             }
             
             String responseBody = response.body().string();
-            System.out.println("getJobStatus API 响应: " + responseBody);
+            logger.debug("getJobStatus API 响应: {}", responseBody);
             
             // 解析 JSON 响应
             Type resultType = new TypeToken<Result<Boolean>>(){}.getType();
@@ -160,7 +164,7 @@ public class JobInfoService extends BaseService {
             }
             
             String responseBody = response.body().string();
-            System.out.println("saveJobCompose API 响应: " + responseBody);
+            logger.debug("saveJobCompose API 响应: {}", responseBody);
             
             Type resultType = new TypeToken<Result<Void>>(){}.getType();
             Result<Void> result = apiUtil.getGson().fromJson(responseBody, resultType);
@@ -193,7 +197,7 @@ public class JobInfoService extends BaseService {
             }
             
             String responseBody = response.body().string();
-            System.out.println("updateJobCompose API 响应: " + responseBody);
+            logger.debug("updateJobCompose API 响应: {}", responseBody);
             
             Type resultType = new TypeToken<Result<Void>>(){}.getType();
             Result<Void> result = apiUtil.getGson().fromJson(responseBody, resultType);
@@ -225,7 +229,7 @@ public class JobInfoService extends BaseService {
             }
             
             String responseBody = response.body().string();
-            System.out.println("saveJobNode API 响应: " + responseBody);
+            logger.debug("saveJobNode API 响应: {}", responseBody);
             
             Type resultType = new TypeToken<Result<com.cc.job.xo.model.entity.JobNode>>(){}.getType();
             Result<com.cc.job.xo.model.entity.JobNode> result = apiUtil.getGson().fromJson(responseBody, resultType);
@@ -262,7 +266,7 @@ public class JobInfoService extends BaseService {
             }
             
             String responseBody = response.body().string();
-            System.out.println("updateJobNode API 响应: " + responseBody);
+            logger.debug("updateJobNode API 响应: {}", responseBody);
             
             Type resultType = new TypeToken<Result<Void>>(){}.getType();
             Result<Void> result = apiUtil.getGson().fromJson(responseBody, resultType);
@@ -301,7 +305,7 @@ public class JobInfoService extends BaseService {
             }
             
             String responseBody = response.body().string();
-            System.out.println("getJobNodeFormData API 响应: " + responseBody);
+            logger.debug("getJobNodeFormData API 响应: {}", responseBody);
             
             Type resultType = new TypeToken<Result<JobInfoForm>>(){}.getType();
             Result<JobInfoForm> result = apiUtil.getGson().fromJson(responseBody, resultType);
@@ -336,7 +340,7 @@ public class JobInfoService extends BaseService {
             }
             
             String responseBody = response.body().string();
-            System.out.println("updateNodeStatus API 响应: " + responseBody);
+            logger.debug("updateNodeStatus API 响应: {}", responseBody);
             
             Type resultType = new TypeToken<Result<Boolean>>(){}.getType();
             Result<Boolean> result = apiUtil.getGson().fromJson(responseBody, resultType);
@@ -345,7 +349,7 @@ public class JobInfoService extends BaseService {
                 throw new IOException("API 返回错误: " + result.getMsg());
             }
             
-            System.out.println("✓ 节点状态更新成功: jobId=" + jobId + ", triggerStatus=" + triggerStatus);
+            logger.debug("✓ 节点状态更新成功: jobId={}, triggerStatus={}", jobId, triggerStatus);
         }
     }
     
@@ -356,7 +360,7 @@ public class JobInfoService extends BaseService {
      */
     public void batchUpdateNodeStatus(java.util.Map<Long, Integer> statusMap) throws IOException {
         if (statusMap == null || statusMap.isEmpty()) {
-            System.out.println("⚠ 批量更新节点状态 - 参数为空");
+            logger.warn("⚠ 批量更新节点状态 - 参数为空");
             return;
         }
         
@@ -378,7 +382,7 @@ public class JobInfoService extends BaseService {
             }
             
             String responseBody = response.body().string();
-            System.out.println("batchUpdateNodeStatus API 响应: " + responseBody);
+            logger.debug("batchUpdateNodeStatus API 响应: {}", responseBody);
             
             Type resultType = new TypeToken<Result<Integer>>(){}.getType();
             Result<Integer> result = apiUtil.getGson().fromJson(responseBody, resultType);
@@ -387,7 +391,7 @@ public class JobInfoService extends BaseService {
                 throw new IOException("API 返回错误: " + result.getMsg());
             }
             
-            System.out.println("✓ 批量更新节点状态成功: " + result.getData() + "/" + statusMap.size() + " 个节点");
+            logger.debug("✓ 批量更新节点状态成功: {}/{} 个节点", result.getData(), statusMap.size());
         }
     }
 }

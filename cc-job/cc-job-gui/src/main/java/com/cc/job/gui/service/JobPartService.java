@@ -5,12 +5,16 @@ import com.cc.job.xo.model.vo.JobPartVo;
 import com.cc.job.gui.model.JobComposeData;
 import com.google.gson.reflect.TypeToken;
 import okhttp3.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.*;
 
 public class JobPartService extends  BaseService {
+    
+    private static final Logger logger = LoggerFactory.getLogger(JobPartService.class);
 
     /**
      * 获取树形数据
@@ -31,7 +35,7 @@ public class JobPartService extends  BaseService {
             }
 
             String responseBody = response.body().string();
-            System.out.println("API 响应: " + responseBody);
+            logger.debug("API 响应: {}", responseBody);
 
             // 解析 JSON 响应
             Type resultType = new TypeToken<Result<List<JobPartVo>>>(){}.getType();
@@ -66,7 +70,7 @@ public class JobPartService extends  BaseService {
             }
 
             String responseBody = response.body().string();
-            System.out.println("API 响应: " + responseBody);
+            logger.debug("API 响应: {}", responseBody);
 
             // 解析 JSON 响应
             Type resultType = new TypeToken<Result<Object>>() {
@@ -109,7 +113,7 @@ public class JobPartService extends  BaseService {
             }
             
             String responseBody = response.body().string();
-            System.out.println("saveJobPart API 响应: " + responseBody);
+            logger.debug("saveJobPart API 响应: {}", responseBody);
             
             // 解析 JSON 响应
             Type resultType = new TypeToken<Result<Void>>(){}.getType();
@@ -148,7 +152,7 @@ public class JobPartService extends  BaseService {
             }
             
             String responseBody = response.body().string();
-            System.out.println("getJobCompose API 响应: " + responseBody);
+            logger.debug("getJobCompose API 响应: {}", responseBody);
             
             // 解析 JSON 响应
             Type resultType = new TypeToken<Result<Map<String, Object>>>(){}.getType();
@@ -189,7 +193,7 @@ public class JobPartService extends  BaseService {
                         try {
                             node.setJobId(((Number) nodeMap.get("jobId")).longValue());
                         } catch (Exception e) {
-                            System.err.println("解析节点 jobId 失败: " + e.getMessage());
+                            logger.error("解析节点 jobId 失败: {}", e.getMessage(), e);
                         }
                     }
                     
@@ -205,12 +209,12 @@ public class JobPartService extends  BaseService {
                                 node.setTriggerStatus(null);
                             }
                             if (node.getTriggerStatus() != null) {
-                                System.out.println("✅ 解析节点运行状态: " + node.getId() + " -> " + node.getTriggerStatus());
+                                logger.debug("✅ 解析节点运行状态: {} -> {}", node.getId(), node.getTriggerStatus());
                             } else {
-                                System.out.println("ℹ️ 节点运行状态为空: " + node.getId());
+                                logger.debug("ℹ️ 节点运行状态为空: {}", node.getId());
                             }
                         } catch (Exception e) {
-                            System.err.println("解析节点 triggerStatus 失败: " + triggerObj + ", 错误: " + e.getMessage());
+                            logger.error("解析节点 triggerStatus 失败: {}, 错误: {}", triggerObj, e.getMessage(), e);
                             node.setTriggerStatus(null);
                         }
                     }
@@ -234,7 +238,7 @@ public class JobPartService extends  BaseService {
                             );
                             node.setProperties(propsMap);
                         } catch (Exception e) {
-                            System.err.println("解析节点属性失败: " + e.getMessage());
+                            logger.error("解析节点属性失败: {}", e.getMessage(), e);
                         }
                     } else if (propsObj instanceof Map) {
                         node.setProperties((Map<String, Object>) propsObj);
@@ -277,7 +281,7 @@ public class JobPartService extends  BaseService {
                             );
                             edge.setProperties(propsMap);
                         } catch (Exception e) {
-                            System.err.println("解析边属性失败: " + e.getMessage());
+                            logger.error("解析边属性失败: {}", e.getMessage(), e);
                         }
                     } else if (propsObj instanceof Map) {
                         edge.setProperties((Map<String, Object>) propsObj);
@@ -310,7 +314,7 @@ public class JobPartService extends  BaseService {
             }
 
             String responseBody = response.body().string();
-            System.out.println("deleteJobPart API 响应: " + responseBody);
+            logger.debug("deleteJobPart API 响应: {}", responseBody);
 
             Type resultType = new TypeToken<Result<Void>>() {
             }.getType();
@@ -337,7 +341,7 @@ public class JobPartService extends  BaseService {
             }
 
             String responseBody = response.body().string();
-            System.out.println("deleteJobInfo API 响应: " + responseBody);
+            logger.debug("deleteJobInfo API 响应: {}", responseBody);
 
             Type resultType = new TypeToken<Result<Void>>() {
             }.getType();

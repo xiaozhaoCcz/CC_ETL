@@ -3,11 +3,15 @@ package com.cc.job.gui.util;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import okhttp3.OkHttpClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 
 public class ApiUtil {
+    
+    private static final Logger logger = LoggerFactory.getLogger(ApiUtil.class);
 
     private static ApiUtil instance;
 
@@ -47,8 +51,8 @@ public class ApiUtil {
                 .registerTypeAdapter(LocalDateTime.class, new LocalDateTimeAdapter())
                 .create();
 
-        System.out.println("✓ API Service 初始化完成");
-        System.out.println("  后端地址: " + this.baseUrl);
+        logger.info("✓ API Service 初始化完成");
+        logger.debug("  后端地址: {}", this.baseUrl);
     }
 }
 

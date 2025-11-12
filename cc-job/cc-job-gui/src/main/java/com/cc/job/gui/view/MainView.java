@@ -26,6 +26,8 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.transform.Scale;
 import javafx.stage.Stage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
@@ -34,6 +36,8 @@ import java.util.List;
  * 主界面视图
  */
 public class MainView extends BorderPane {
+
+    private static final Logger logger = LoggerFactory.getLogger(MainView.class);
 
     private NodeCanvas canvas;
     private TaskTreeView treeView;
@@ -321,7 +325,7 @@ public class MainView extends BorderPane {
 
             @Override
             public void onRun() {
-                System.out.println("onRun 回调被触发");
+                logger.debug("onRun 回调被触发");
                 logPanel.info("收到运行请求...");
                 triggerJobExecution();
             }
@@ -452,8 +456,7 @@ public class MainView extends BorderPane {
                 });
 
             } catch (IOException e) {
-                System.err.println("加载任务组数据失败: " + e.getMessage());
-                e.printStackTrace();
+                logger.error("加载任务组数据失败: {}", e.getMessage(), e);
 
                 Platform.runLater(() -> {
                     logPanel.error("✗ 加载任务组数据失败: " + e.getMessage());
@@ -567,10 +570,10 @@ public class MainView extends BorderPane {
         logPanelDetachable = new DetachablePanel(logPanel, "日志监控");
         logPanelDetachable.setDefaultSize(1000, 300);
         logPanelDetachable.setOnDetach(() -> {
-            System.out.println("日志面板已弹出为独立窗口");
+            logger.debug("日志面板已弹出为独立窗口");
         });
         logPanelDetachable.setOnReattach(() -> {
-            System.out.println("日志面板已恢复到原位置");
+            logger.debug("日志面板已恢复到原位置");
         });
 
         // 连接弹出按钮
@@ -618,15 +621,15 @@ public class MainView extends BorderPane {
      * 触发任务执行
      */
     private void triggerJobExecution() {
-        System.out.println("triggerJobExecution 开始执行");
+        logger.debug("triggerJobExecution 开始执行");
 
         // 获取当前选中的任务组
         Long currentJobId = usePageStoreHook().getCurrentPage();
-        System.out.println("当前任务组ID: " + currentJobId);
+        logger.debug("当前任务组ID: {}", currentJobId);
 
         if (currentJobId == null || currentJobId == 0) {
             logPanel.warn("⚠ 请先选择一个任务组");
-            System.out.println("错误: 未选择任务组");
+            logger.warn("错误: 未选择任务组");
             return;
         }
 
@@ -658,8 +661,7 @@ public class MainView extends BorderPane {
                     continueJobExecution(currentJobId);
                 });
             } catch (Exception e) {
-                System.err.println("❌ 检查任务组运行状态失败: " + e.getMessage());
-                e.printStackTrace();
+                logger.error("❌ 检查任务组运行状态失败: {}", e.getMessage(), e);
                 
                 Platform.runLater(() -> {
                     logPanel.warn("⚠ 检查任务组运行状态失败: " + e.getMessage());
@@ -712,9 +714,9 @@ public class MainView extends BorderPane {
         // 重置所有节点状态为空闲（紫色），等待SSE消息来更新节点状态
         // 只有实际运行到的节点才会通过SSE消息变成黄色
         Platform.runLater(() -> {
-            System.out.println("════════════════════════════════");
-            System.out.println("📋 任务组启动前，检查画布中的节点:");
-            System.out.println("   画布中共有 " + canvas.getNodes().size() + " 个节点");
+            logger.debug("════════════════════════════════");
+            logger.debug("📋 任务组启动前，检查画布中的节点:");
+            logger.debug("   画布中共有 {} 个节点", canvas.getNodes().size());
             
             logPanel.info(currentJobId, "════════════════════════════════");
             logPanel.info(currentJobId, "📋 任务组启动前，检查画布中的节点:");
@@ -724,19 +726,19 @@ public class MainView extends BorderPane {
                 String nodeInfo = "   - 节点: " + node.getJobHandlerName() + 
                                  ", nodeId: " + node.getNodeId() + 
                                  ", jobId: " + node.getJobId();
-                System.out.println(nodeInfo);
+                logger.debug(nodeInfo);
                 logPanel.info(currentJobId, nodeInfo);
                 node.updateStatus(ProcessNode.NodeStatus.IDLE);
             }
-            System.out.println("════════════════════════════════");
+            logger.debug("════════════════════════════════");
             logPanel.info(currentJobId, "════════════════════════════════");
         });
 
         // 连接SSE以接收节点状态更新
-        System.out.println("🔌 准备连接SSE");
-        System.out.println("   任务组ID: " + currentJobId);
-        System.out.println("   randomId: " + randomId);
-        System.out.println("   连接ID: " + currentJobId + ":" + randomId);
+        logger.debug("🔌 准备连接SSE");
+        logger.debug("   任务组ID: {}", currentJobId);
+        logger.debug("   randomId: {}", randomId);
+        logger.debug("   连接ID: {}:{}", currentJobId, randomId);
         
         logPanel.info(currentJobId, "🔌 准备连接SSE");
         logPanel.info(currentJobId, "   任务组ID: " + currentJobId);
@@ -749,7 +751,7 @@ public class MainView extends BorderPane {
             handleSSEMessage(message, randomId);
         });
         
-        System.out.println("✅ SSE连接请求已发送");
+        logger.debug("✅ SSE连接请求已发送");
         logPanel.info(currentJobId, "✅ SSE连接请求已发送");
         
         // 等待一段时间后检查连接状态
@@ -786,8 +788,7 @@ public class MainView extends BorderPane {
                 startLogPolling(finalRunningJob);
 
             } catch (Exception e) {
-                System.err.println("触发任务执行失败: " + e.getMessage());
-                e.printStackTrace();
+                logger.error("触发任务执行失败: {}", e.getMessage(), e);
 
                 Platform.runLater(() -> {
                     logPanel.error("✗ 任务执行失败: " + e.getMessage());
@@ -810,13 +811,13 @@ public class MainView extends BorderPane {
      * @param expectedRandomId 期望的randomId（用于验证消息）
      */
     private void handleSSEMessage(SSEService.SSEMessage message, String expectedRandomId) {
-        System.out.println("========================================");
-        System.out.println("📨 收到SSE消息");
-        System.out.println("   消息randomId: " + message.getRandomId());
-        System.out.println("   期望randomId: " + expectedRandomId);
-        System.out.println("   消息jobId: " + message.getJobId());
-        System.out.println("   消息status: " + message.getStatus());
-        System.out.println("   消息result: " + message.getResult());
+        logger.debug("========================================");
+        logger.debug("📨 收到SSE消息");
+        logger.debug("   消息randomId: {}", message.getRandomId());
+        logger.debug("   期望randomId: {}", expectedRandomId);
+        logger.debug("   消息jobId: {}", message.getJobId());
+        logger.debug("   消息status: {}", message.getStatus());
+        logger.debug("   消息result: {}", message.getResult());
         
         logPanel.info("========================================");
         logPanel.info("📨 收到SSE消息");
@@ -829,7 +830,7 @@ public class MainView extends BorderPane {
         // 处理连接错误消息（status=-1表示连接错误）
         if (message.getStatus() != null && message.getStatus() == -1) {
             String errorMsg = "❌ SSE连接错误: " + message.getResult();
-            System.err.println(errorMsg);
+            logger.error(errorMsg);
             logPanel.error(errorMsg);
             return;
         }
@@ -837,8 +838,8 @@ public class MainView extends BorderPane {
         // 验证randomId是否匹配
         if (message.getRandomId() != null && !expectedRandomId.equals(message.getRandomId())) {
             String warnMsg = "⚠️ SSE消息randomId不匹配，忽略: " + message.getRandomId() + " != " + expectedRandomId;
-            System.out.println(warnMsg);
-            System.out.println("========================================");
+            logger.warn(warnMsg);
+            logger.debug("========================================");
             logPanel.warn(warnMsg);
             logPanel.info("========================================");
             return;
@@ -847,26 +848,26 @@ public class MainView extends BorderPane {
         Long jobId = message.getJobId();
         Integer status = message.getStatus();
 
-        System.out.println("✅ randomId匹配，开始处理消息");
-        System.out.println("📊 准备更新节点状态: jobId=" + jobId + ", status=" + status);
+        logger.debug("✅ randomId匹配，开始处理消息");
+        logger.debug("📊 准备更新节点状态: jobId={}, status={}", jobId, status);
         
         logPanel.info("✅ randomId匹配，开始处理消息");
         logPanel.info("📊 准备更新节点状态: jobId=" + jobId + ", status=" + status);
 
         // 更新节点状态（必须在JavaFX线程中执行）
         if (jobId != null && status != null) {
-            System.out.println("✅ jobId和status都不为空，准备更新节点状态");
+            logger.debug("✅ jobId和status都不为空，准备更新节点状态");
             logPanel.info("✅ jobId和status都不为空，准备更新节点状态");
             Platform.runLater(() -> {
-                System.out.println("🔄 在JavaFX线程中更新节点状态");
+                logger.debug("🔄 在JavaFX线程中更新节点状态");
                 logPanel.info("🔄 在JavaFX线程中更新节点状态");
                 canvas.updateNodeStatusByJobId(jobId, status);
             });
         } else {
             String warnMsg = "⚠️ jobId或status为null，无法更新节点状态";
-            System.out.println(warnMsg);
-            System.out.println("   jobId: " + jobId);
-            System.out.println("   status: " + status);
+            logger.warn(warnMsg);
+            logger.warn("   jobId: {}", jobId);
+            logger.warn("   status: {}", status);
             logPanel.warn(warnMsg);
             logPanel.warn("   jobId: " + jobId);
             logPanel.warn("   status: " + status);
@@ -874,7 +875,7 @@ public class MainView extends BorderPane {
 
         // 如果状态是5（任务完成），只恢复边的正常状态，但保留节点状态
         if (status != null && status == 5) {
-            System.out.println("🏁 任务完成（status=5），恢复边的正常状态，保留节点状态");
+            logger.debug("🏁 任务完成（status=5），恢复边的正常状态，保留节点状态");
             logPanel.info("🏁 任务完成（status=5），恢复边的正常状态，保留节点状态");
             Platform.runLater(() -> {
                 // 只恢复边的运行状态（停止虚线动画），不重置节点状态
@@ -883,7 +884,7 @@ public class MainView extends BorderPane {
             });
         }
         
-        System.out.println("========================================");
+        logger.debug("========================================");
         logPanel.info("========================================");
     }
 
@@ -971,12 +972,12 @@ public class MainView extends BorderPane {
             } else {
                 runningJob.setPullFailCount(runningJob.getPullFailCount() + 1);
                 if (response != null) {
-                    System.err.println("获取日志失败: " + response.getMsg());
+                    logger.warn("获取日志失败: {}", response.getMsg());
                 }
             }
 
         } catch (Exception e) {
-            System.err.println("获取执行日志失败: " + e.getMessage());
+            logger.error("获取执行日志失败: {}", e.getMessage(), e);
             runningJob.setPullFailCount(runningJob.getPullFailCount() + 1);
         }
     }
@@ -1093,8 +1094,7 @@ public class MainView extends BorderPane {
                 });
 
             } catch (Exception e) {
-                System.err.println("停止任务失败: " + e.getMessage());
-                e.printStackTrace();
+                logger.error("停止任务失败: {}", e.getMessage(), e);
 
                 Platform.runLater(() -> {
                     logPanel.error("✗ 停止任务失败: " + e.getMessage());
@@ -1159,7 +1159,7 @@ public class MainView extends BorderPane {
         new Thread(() -> {
             try {
                 boolean isRunning = jobInfoService.getJobStatus(taskId);
-                System.out.println("📊 任务组 " + taskId + " (" + taskGroupName + ") 运行状态: " + isRunning);
+                logger.debug("📊 任务组 {} ({}) 运行状态: {}", taskId, taskGroupName, isRunning);
                 
                 // 更新导航栏中的小绿点
                 navigationBar.updateTaskGroupRunningStatus(taskGroupName, isRunning);
@@ -1170,7 +1170,7 @@ public class MainView extends BorderPane {
                     logPanel.debug("⚪ 任务组 " + taskGroupName + " 未运行");
                 }
             } catch (Exception e) {
-                System.err.println("❌ 获取任务组运行状态失败: " + e.getMessage());
+                logger.error("❌ 获取任务组运行状态失败: {}", e.getMessage(), e);
                 logPanel.warn("获取任务组运行状态失败: " + e.getMessage());
             }
         }).start();
@@ -1302,8 +1302,8 @@ public class MainView extends BorderPane {
             String edgesJson = apiUtil.getGson().toJson(edgesData);
 
             logPanel.info("✓ 数据转换完成");
-            System.out.println("Nodes JSON: " + nodesJson);
-            System.out.println("Edges JSON: " + edgesJson);
+            logger.debug("Nodes JSON: {}", nodesJson);
+            logger.debug("Edges JSON: {}", edgesJson);
 
             // 5. 在后台线程中保存到数据库
             new Thread(() -> {
@@ -1363,8 +1363,7 @@ public class MainView extends BorderPane {
                     }
 
                 } catch (Exception e) {
-                    System.err.println("保存任务组失败: " + e.getMessage());
-                    e.printStackTrace();
+                    logger.error("保存任务组失败: {}", e.getMessage(), e);
 
                     Platform.runLater(() -> {
                         logPanel.error("✗ 保存失败: " + e.getMessage());
@@ -1375,8 +1374,7 @@ public class MainView extends BorderPane {
             }).start();
 
         } catch (Exception e) {
-            System.err.println("转换数据失败: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("转换数据失败: {}", e.getMessage(), e);
             logPanel.error("✗ 数据转换失败: " + e.getMessage());
             logPanel.info("════════════════════════════════");
         }
@@ -1436,8 +1434,7 @@ public class MainView extends BorderPane {
                         }
 
                     } catch (Exception e) {
-                        System.err.println("保存分区失败: " + e.getMessage());
-                        e.printStackTrace();
+                        logger.error("保存分区失败: {}", e.getMessage(), e);
 
                         Platform.runLater(() -> {
                             logPanel.error("✗ 保存分区失败: " + e.getMessage());
@@ -1452,8 +1449,7 @@ public class MainView extends BorderPane {
             });
 
         } catch (Exception e) {
-            System.err.println("显示新建分区对话框失败: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("显示新建分区对话框失败: {}", e.getMessage(), e);
             logPanel.error("✗ 打开对话框失败: " + e.getMessage());
         }
     }
@@ -1522,13 +1518,13 @@ public class MainView extends BorderPane {
 
             @Override
             public void onNewJobGroup(Long partitionId, String partitionName) {
-                System.out.println("新建任务组 - 分区ID: " + partitionId + ", 分区名称: " + partitionName);
+                logger.debug("新建任务组 - 分区ID: {}, 分区名称: {}", partitionId, partitionName);
                 showNewJobGroupDialog(partitionId, partitionName, null);
             }
 
             @Override
             public void onNewJobNode(Long taskGroupId, String taskGroupName) {
-                System.out.println("新建任务节点 - 任务组ID: " + taskGroupId + ", 任务组名称: " + taskGroupName);
+                logger.debug("新建任务节点 - 任务组ID: {}, 任务组名称: {}", taskGroupId, taskGroupName);
                 showNewJobNodeDialog(taskGroupId, taskGroupName, null);
             }
 
@@ -1633,8 +1629,7 @@ public class MainView extends BorderPane {
                                         }
 
                                     } catch (Exception e) {
-                                        System.err.println("保存任务组失败: " + e.getMessage());
-                                        e.printStackTrace();
+                                        logger.error("保存任务组失败: {}", e.getMessage(), e);
 
                                         Platform.runLater(() -> {
                                             logPanel.error("✗ 保存失败: " + e.getMessage());
@@ -1649,15 +1644,13 @@ public class MainView extends BorderPane {
                             });
 
                         } catch (Exception e) {
-                            System.err.println("显示新建任务组对话框失败: " + e.getMessage());
-                            e.printStackTrace();
+                            logger.error("显示新建任务组对话框失败: {}", e.getMessage(), e);
                             logPanel.error("✗ 打开对话框失败: " + e.getMessage());
                         }
                     });
 
                 } catch (Exception e) {
-                    System.err.println("加载执行器列表失败: " + e.getMessage());
-                    e.printStackTrace();
+                    logger.error("加载执行器列表失败: {}", e.getMessage(), e);
 
                     Platform.runLater(() -> {
                         logPanel.error("✗ 加载执行器列表失败: " + e.getMessage());
@@ -1668,8 +1661,7 @@ public class MainView extends BorderPane {
             }).start();
 
         } catch (Exception e) {
-            System.err.println("显示新建任务组对话框失败: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("显示新建任务组对话框失败: {}", e.getMessage(), e);
             logPanel.error("✗ 打开对话框失败: " + e.getMessage());
             logPanel.info("════════════════════════════════");
         }
@@ -1726,8 +1718,7 @@ public class MainView extends BorderPane {
                                         }
 
                                     } catch (Exception e) {
-                                        System.err.println("保存任务节点失败: " + e.getMessage());
-                                        e.printStackTrace();
+                                        logger.error("保存任务节点失败: {}", e.getMessage(), e);
 
                                         Platform.runLater(() -> {
                                             logPanel.error("✗ 保存失败: " + e.getMessage());
@@ -1742,15 +1733,13 @@ public class MainView extends BorderPane {
                             });
 
                         } catch (Exception e) {
-                            System.err.println("显示新建任务节点对话框失败: " + e.getMessage());
-                            e.printStackTrace();
+                            logger.error("显示新建任务节点对话框失败: {}", e.getMessage(), e);
                             logPanel.error("✗ 打开对话框失败: " + e.getMessage());
                         }
                     });
 
                 } catch (Exception e) {
-                    System.err.println("加载执行器列表失败: " + e.getMessage());
-                    e.printStackTrace();
+                    logger.error("加载执行器列表失败: {}", e.getMessage(), e);
 
                     Platform.runLater(() -> {
                         logPanel.error("✗ 加载执行器列表失败: " + e.getMessage());
@@ -1761,8 +1750,7 @@ public class MainView extends BorderPane {
             }).start();
 
         } catch (Exception e) {
-            System.err.println("显示新建任务节点对话框失败: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("显示新建任务节点对话框失败: {}", e.getMessage(), e);
             logPanel.error("✗ 打开对话框失败: " + e.getMessage());
             logPanel.info("════════════════════════════════");
         }
@@ -1813,8 +1801,7 @@ public class MainView extends BorderPane {
             logPanel.info("节点坐标: (" + x + ", " + y + ")");
 
         } catch (Exception e) {
-            System.err.println("添加节点到画布失败: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("添加节点到画布失败: {}", e.getMessage(), e);
             logPanel.error("✗ 添加节点到画布失败: " + e.getMessage());
         }
     }
@@ -2184,7 +2171,7 @@ public class MainView extends BorderPane {
             String nodeId = nodeData.getId();
             Long jobId = nodeData.getJobId();  // 这是任务ID
 
-            System.out.println("检查节点 - nodeId: " + nodeId + ", jobId: " + jobId);
+            logger.debug("检查节点 - nodeId: {}, jobId: {}", nodeId, jobId);
 
             // 跳过没有 jobId 的节点
             if (nodeId == null || jobId == null) {
@@ -2199,7 +2186,7 @@ public class MainView extends BorderPane {
                     .ifPresent(node -> {
                         node.setJobId(jobId);
                         configureNodeCallbacks(node);
-                        System.out.println("✓ 已为节点 " + nodeId + " (jobId: " + jobId + ") 设置回调");
+                        logger.debug("✓ 已为节点 {} (jobId: {}) 设置回调", nodeId, jobId);
                     });
             callbackSetCount++;
         }
@@ -2291,8 +2278,7 @@ public class MainView extends BorderPane {
                                     }
 
                                 } catch (Exception e) {
-                                    System.err.println("更新任务节点失败: " + e.getMessage());
-                                    e.printStackTrace();
+                                    logger.error("更新任务节点失败: {}", e.getMessage(), e);
 
                                     Platform.runLater(() -> {
                                         logPanel.error("✗ 更新失败: " + e.getMessage());
@@ -2308,8 +2294,7 @@ public class MainView extends BorderPane {
                     });
 
                 } catch (Exception e) {
-                    System.err.println("获取节点数据失败: " + e.getMessage());
-                    e.printStackTrace();
+                    logger.error("获取节点数据失败: {}", e.getMessage(), e);
 
                     Platform.runLater(() -> {
                         logPanel.error("✗ 获取节点数据失败: " + e.getMessage());
@@ -2319,8 +2304,7 @@ public class MainView extends BorderPane {
             }).start();
 
         } catch (Exception e) {
-            System.err.println("打开编辑对话框失败: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("打开编辑对话框失败: {}", e.getMessage(), e);
             logPanel.error("✗ 打开编辑对话框失败: " + e.getMessage());
             logPanel.info("════════════════════════════════");
         }

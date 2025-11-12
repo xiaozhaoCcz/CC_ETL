@@ -4,6 +4,8 @@ import com.cc.job.xo.common.result.Result;
 import com.google.gson.reflect.TypeToken;
 import okhttp3.Request;
 import okhttp3.Response;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -12,6 +14,8 @@ import java.lang.reflect.Type;
  * 任务日志服务
  */
 public class JobLogService extends BaseService {
+    
+    private static final Logger logger = LoggerFactory.getLogger(JobLogService.class);
     
     /**
      * 日志内容数据结构
@@ -190,10 +194,10 @@ public class JobLogService extends BaseService {
             String responseBody = response.body().string();
             
             // 打印完整的响应以便调试
-            System.out.println("getLogDetail API URL: " + url);
-            System.out.println("getLogDetail API 响应状态: " + response.code());
-            System.out.println("getLogDetail API 响应 (截取): " + 
-                (responseBody.length() > 500 ? responseBody.substring(0, 500) + "..." : responseBody));
+            logger.debug("getLogDetail API URL: {}", url);
+            logger.debug("getLogDetail API 响应状态: {}", response.code());
+            logger.debug("getLogDetail API 响应 (截取): {}", 
+                responseBody.length() > 500 ? responseBody.substring(0, 500) + "..." : responseBody);
             
             if (!response.isSuccessful()) {
                 throw new IOException("请求失败: HTTP " + response.code() + " - " + responseBody);

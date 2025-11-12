@@ -2,6 +2,8 @@ package com.cc.job.gui.util;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -13,6 +15,8 @@ import java.nio.file.Paths;
  * 管理用户登录状态和会话信息
  */
 public class SessionManager {
+    
+    private static final Logger logger = LoggerFactory.getLogger(SessionManager.class);
     
     private static SessionManager instance;
     
@@ -53,10 +57,10 @@ public class SessionManager {
         // 保存会话到本地文件
         saveSessionToFile();
         
-        System.out.println("✓ 会话已建立");
-        System.out.println("  用户: " + username);
-        System.out.println("  用户ID: " + userId);
-        System.out.println("  Token: " + (token != null ? token.substring(0, Math.min(20, token.length())) + "..." : "N/A"));
+        logger.info("✓ 会话已建立");
+        logger.debug("  用户: {}", username);
+        logger.debug("  用户ID: {}", userId);
+        logger.debug("  Token: {}", token != null ? token.substring(0, Math.min(20, token.length())) + "..." : "N/A");
     }
     
     /**
@@ -71,7 +75,7 @@ public class SessionManager {
         // 删除本地会话文件
         deleteSessionFile();
         
-        System.out.println("✓ 会话已清除");
+        logger.info("✓ 会话已清除");
     }
     
     /**
@@ -134,10 +138,9 @@ public class SessionManager {
             String json = gson.toJson(sessionData);
             Files.write(Paths.get(SESSION_FILE), json.getBytes("UTF-8"));
             
-            System.out.println("✓ 会话已保存到本地文件: " + SESSION_FILE);
+            logger.debug("✓ 会话已保存到本地文件: {}", SESSION_FILE);
         } catch (Exception e) {
-            System.err.println("⚠ 保存会话文件失败: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("⚠ 保存会话文件失败: {}", e.getMessage(), e);
         }
     }
     
@@ -148,7 +151,7 @@ public class SessionManager {
         try {
             Path sessionPath = Paths.get(SESSION_FILE);
             if (!Files.exists(sessionPath)) {
-                System.out.println("⚠ 未找到本地会话文件");
+                logger.warn("⚠ 未找到本地会话文件");
                 return false;
             }
             
@@ -157,7 +160,7 @@ public class SessionManager {
             SessionData sessionData = gson.fromJson(json, SessionData.class);
             
             if (sessionData == null || sessionData.token == null) {
-                System.out.println("⚠ 会话文件无效");
+                logger.warn("⚠ 会话文件无效");
                 return false;
             }
             
@@ -165,7 +168,7 @@ public class SessionManager {
             long age = System.currentTimeMillis() - sessionData.timestamp;
             long maxAge = 30L * 24 * 60 * 60 * 1000; // 30天
             if (age > maxAge) {
-                System.out.println("⚠ 会话已过期");
+                logger.warn("⚠ 会话已过期");
                 deleteSessionFile();
                 return false;
             }
@@ -176,15 +179,14 @@ public class SessionManager {
             this.username = sessionData.username;
             this.loggedIn = true;
             
-            System.out.println("✓ 会话已从本地文件恢复");
-            System.out.println("  用户: " + username);
-            System.out.println("  用户ID: " + userId);
-            System.out.println("  会话时间: " + (age / (1000 * 60 * 60 * 24)) + " 天前");
+            logger.info("✓ 会话已从本地文件恢复");
+            logger.debug("  用户: {}", username);
+            logger.debug("  用户ID: {}", userId);
+            logger.debug("  会话时间: {} 天前", age / (1000 * 60 * 60 * 24));
             
             return true;
         } catch (Exception e) {
-            System.err.println("⚠ 加载会话文件失败: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("⚠ 加载会话文件失败: {}", e.getMessage(), e);
             return false;
         }
     }
@@ -197,10 +199,10 @@ public class SessionManager {
             Path sessionPath = Paths.get(SESSION_FILE);
             if (Files.exists(sessionPath)) {
                 Files.delete(sessionPath);
-                System.out.println("✓ 本地会话文件已删除");
+                logger.debug("✓ 本地会话文件已删除");
             }
         } catch (Exception e) {
-            System.err.println("⚠ 删除会话文件失败: " + e.getMessage());
+            logger.error("⚠ 删除会话文件失败: {}", e.getMessage(), e);
         }
     }
     
