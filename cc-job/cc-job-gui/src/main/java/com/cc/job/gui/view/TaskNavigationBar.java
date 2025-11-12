@@ -186,88 +186,100 @@ public class TaskNavigationBar extends HBox {
     
     /**
      * 更新按钮状态
+     * 注意：运行/停止按钮已移至 TopToolBar，此方法仅保留用于兼容性
+     * 如果按钮不存在则直接返回，避免 NullPointerException
      */
     private void updateButtonState() {
         Platform.runLater(() -> {
+            // 运行/停止按钮已移至 TopToolBar，这里不再需要更新
+            // 如果按钮不存在（null），直接返回，避免 NullPointerException
+            if (runOrRetryButton == null && runningTasksMenu == null) {
+                return;
+            }
+            
             // 判断当前任务组是否正在运行
             boolean isCurrentRunning = currentTaskGroupId != null && 
                 runningJobs.containsKey(currentTaskGroupId) && 
                 runningJobs.get(currentTaskGroupId).isRunning();
             
-            // 更新运行/重试按钮
-            if (isCurrentRunning) {
-                runOrRetryButton.setText("🔄 重试");
-                runOrRetryButton.setStyle(
-                    "-fx-background-color: #F97316; " +
-                    "-fx-text-fill: white; " +
-                    "-fx-font-size: 12; " +
-                    "-fx-font-weight: bold; " +
-                    "-fx-padding: 4 12 4 12; " +
-                    "-fx-border-radius: 4; " +
-                    "-fx-background-radius: 4; " +
-                    "-fx-cursor: hand;"
-                );
-            } else {
-                runOrRetryButton.setText("▶️ 开始");
-                runOrRetryButton.setStyle(
-                    "-fx-background-color: #10B981; " +
-                    "-fx-text-fill: white; " +
-                    "-fx-font-size: 12; " +
-                    "-fx-font-weight: bold; " +
-                    "-fx-padding: 4 12 4 12; " +
-                    "-fx-border-radius: 4; " +
-                    "-fx-background-radius: 4; " +
-                    "-fx-cursor: hand;"
-                );
+            // 更新运行/重试按钮（如果存在）
+            if (runOrRetryButton != null) {
+                if (isCurrentRunning) {
+                    runOrRetryButton.setText("🔄 重试");
+                    runOrRetryButton.setStyle(
+                        "-fx-background-color: #F97316; " +
+                        "-fx-text-fill: white; " +
+                        "-fx-font-size: 12; " +
+                        "-fx-font-weight: bold; " +
+                        "-fx-padding: 4 12 4 12; " +
+                        "-fx-border-radius: 4; " +
+                        "-fx-background-radius: 4; " +
+                        "-fx-cursor: hand;"
+                    );
+                } else {
+                    runOrRetryButton.setText("▶️ 开始");
+                    runOrRetryButton.setStyle(
+                        "-fx-background-color: #10B981; " +
+                        "-fx-text-fill: white; " +
+                        "-fx-font-size: 12; " +
+                        "-fx-font-weight: bold; " +
+                        "-fx-padding: 4 12 4 12; " +
+                        "-fx-border-radius: 4; " +
+                        "-fx-background-radius: 4; " +
+                        "-fx-cursor: hand;"
+                    );
+                }
             }
             
-            // 更新运行中任务下拉菜单
-            if (runningJobs.isEmpty()) {
-                runningTasksMenu.setVisible(false);
-            } else {
-                runningTasksMenu.setVisible(true);
-                runningTasksMenu.setText("🛑 运行中 (" + runningJobs.size() + ")");
-                runningTasksMenu.getItems().clear();
-                
-                // 添加每个运行中的任务组
-                for (RunningJobGroup job : runningJobs.values()) {
-                    if (job.isRunning()) {
-                        MenuItem menuItem = new MenuItem(
-                            "🛑 " + job.getJobName() + " (ID: " + job.getJobId() + ")"
-                        );
-                        menuItem.setStyle(
+            // 更新运行中任务下拉菜单（如果存在）
+            if (runningTasksMenu != null) {
+                if (runningJobs.isEmpty()) {
+                    runningTasksMenu.setVisible(false);
+                } else {
+                    runningTasksMenu.setVisible(true);
+                    runningTasksMenu.setText("🛑 运行中 (" + runningJobs.size() + ")");
+                    runningTasksMenu.getItems().clear();
+                    
+                    // 添加每个运行中的任务组
+                    for (RunningJobGroup job : runningJobs.values()) {
+                        if (job.isRunning()) {
+                            MenuItem menuItem = new MenuItem(
+                                "🛑 " + job.getJobName() + " (ID: " + job.getJobId() + ")"
+                            );
+                            menuItem.setStyle(
+                                "-fx-text-fill: #EF4444; " +
+                                "-fx-font-weight: bold;"
+                            );
+                            
+                            menuItem.setOnAction(e -> {
+                                if (stopCallback != null) {
+                                    stopCallback.onStop(job.getJobId());
+                                }
+                            });
+                            
+                            runningTasksMenu.getItems().add(menuItem);
+                        }
+                    }
+                    
+                    // 添加分隔线
+                    if (!runningTasksMenu.getItems().isEmpty()) {
+                        runningTasksMenu.getItems().add(new SeparatorMenuItem());
+                        
+                        // 添加"停止所有"选项
+                        MenuItem stopAllItem = new MenuItem("🛑 停止所有");
+                        stopAllItem.setStyle(
                             "-fx-text-fill: #EF4444; " +
                             "-fx-font-weight: bold;"
                         );
-                        
-                        menuItem.setOnAction(e -> {
-                            if (stopCallback != null) {
-                                stopCallback.onStop(job.getJobId());
+                        stopAllItem.setOnAction(e -> {
+                            for (RunningJobGroup job : runningJobs.values()) {
+                                if (job.isRunning() && stopCallback != null) {
+                                    stopCallback.onStop(job.getJobId());
+                                }
                             }
                         });
-                        
-                        runningTasksMenu.getItems().add(menuItem);
+                        runningTasksMenu.getItems().add(stopAllItem);
                     }
-                }
-                
-                // 添加分隔线
-                if (!runningTasksMenu.getItems().isEmpty()) {
-                    runningTasksMenu.getItems().add(new SeparatorMenuItem());
-                    
-                    // 添加"停止所有"选项
-                    MenuItem stopAllItem = new MenuItem("🛑 停止所有");
-                    stopAllItem.setStyle(
-                        "-fx-text-fill: #EF4444; " +
-                        "-fx-font-weight: bold;"
-                    );
-                    stopAllItem.setOnAction(e -> {
-                        for (RunningJobGroup job : runningJobs.values()) {
-                            if (job.isRunning() && stopCallback != null) {
-                                stopCallback.onStop(job.getJobId());
-                            }
-                        }
-                    });
-                    runningTasksMenu.getItems().add(stopAllItem);
                 }
             }
         });

@@ -126,7 +126,15 @@ public class LogPanel extends VBox {
 
             logList.getChildren().clear();
 
-            if (entries.isEmpty()) {
+            // 【过滤】只显示任务组运行日志（isExecutionLog == true）
+            List<LogEntry> executionLogs = new ArrayList<>();
+            for (LogEntry entry : entries) {
+                if (entry.isExecutionLog) {
+                    executionLogs.add(entry);
+                }
+            }
+
+            if (executionLogs.isEmpty()) {
                 filteredCount = 0;
                 if (hasKeyword) {
                     logList.getChildren().add(buildEmptyState("暂无日志可供搜索", "调整关键字或过滤条件后重试。"));
@@ -140,7 +148,7 @@ public class LogPanel extends VBox {
 
             int matches = 0;
             int rowIndex = 0;
-            for (LogEntry entry : entries) {
+            for (LogEntry entry : executionLogs) {
                 if (!hasKeyword || entry.matches(normalized)) {
                     logList.getChildren().add(buildLogRow(entry, rowIndex++));
                     matches++;
@@ -154,7 +162,7 @@ public class LogPanel extends VBox {
                 }
                 Platform.runLater(() -> scrollPane.setVvalue(0));
             } else {
-                filteredCount = entries.size();
+                filteredCount = executionLogs.size();
                 scrollToBottom();
             }
         }
@@ -272,6 +280,7 @@ public class LogPanel extends VBox {
         final String message;
         final String messageColor;
         final boolean raw;
+        final boolean isExecutionLog; // 是否是任务组运行日志
         
         LogEntry(String timestamp,
                  String icon,
@@ -279,7 +288,8 @@ public class LogPanel extends VBox {
                  String levelColor,
                  String message,
                  String messageColor,
-                 boolean raw) {
+                 boolean raw,
+                 boolean isExecutionLog) {
             this.timestamp = timestamp;
             this.icon = icon;
             this.level = level;
@@ -287,6 +297,7 @@ public class LogPanel extends VBox {
             this.message = message;
             this.messageColor = messageColor;
             this.raw = raw;
+            this.isExecutionLog = isExecutionLog;
         }
         
         boolean matches(String keywordLower) {
@@ -946,7 +957,8 @@ public class LogPanel extends VBox {
                 color = "#374151";
             }
             
-            LogEntry entry = new LogEntry(null, null, "TEXT", color, text, color, true);
+            // 标记为任务组运行日志
+            LogEntry entry = new LogEntry(null, null, "TEXT", color, text, color, true, true);
             tabData.addEntry(entry);
             
             tabData.status = "运行中";
@@ -965,6 +977,38 @@ public class LogPanel extends VBox {
      */
     public void appendText(String text) {
         appendText(null, text);
+    }
+    
+    /**
+     * 判断日志消息是否是任务组运行相关的日志
+     * 
+     * @param message 日志消息
+     * @return true 如果是任务运行相关日志，false 否则
+     */
+    private boolean isExecutionRelatedLog(String message) {
+        if (message == null) {
+            return false;
+        }
+        
+        String lowerMessage = message.toLowerCase();
+        
+        // 任务运行相关的关键词
+        return lowerMessage.contains("开始执行任务组") ||
+               lowerMessage.contains("执行任务组") ||
+               (lowerMessage.contains("任务组") && (lowerMessage.contains("执行") || lowerMessage.contains("运行"))) ||
+               lowerMessage.contains("任务执行") ||
+               lowerMessage.contains("任务运行") ||
+               lowerMessage.contains("任务完成") ||
+               lowerMessage.contains("任务失败") ||
+               lowerMessage.contains("任务已提交") ||
+               lowerMessage.contains("任务已停止") ||
+               lowerMessage.contains("执行批次id") ||
+               lowerMessage.contains("sse") ||
+               lowerMessage.contains("收到sse消息") ||
+               lowerMessage.contains("更新节点状态") ||
+               lowerMessage.contains("任务运行完成") ||
+               lowerMessage.contains("日志加载完成") ||
+               (lowerMessage.contains("═══════") && (lowerMessage.contains("执行") || lowerMessage.contains("完成")));
     }
     
     private void appendLog(Long taskGroupId, String level, String message) {
@@ -1014,7 +1058,11 @@ public class LogPanel extends VBox {
                     break;
             }
             
-            LogEntry entry = new LogEntry(timestamp, icon, level, levelColor, message, messageColor, false);
+            // 判断是否是任务组运行相关的日志
+            // 任务运行相关的日志包括：开始执行、执行完成、执行失败、SSE消息、任务状态更新等
+            boolean isExecutionLog = isExecutionRelatedLog(message);
+            
+            LogEntry entry = new LogEntry(timestamp, icon, level, levelColor, message, messageColor, false, isExecutionLog);
             tabData.addEntry(entry);
             
             // 更新状态
