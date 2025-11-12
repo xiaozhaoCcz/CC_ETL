@@ -167,6 +167,8 @@ public class JobComposeServiceImpl implements JobComposeService {
                 jobNode.setNodePositionX(node.x);
                 jobNode.setNodePositionY(node.y);
                 jobNode.setNodeType(node.type);
+                // 修复：新创建的节点，triggerStatus设置为-1表示未运行状态（白色背景）
+                jobNode.setTriggerStatus(-1);
                 Map<String, Object> propertiesMap = JSONUtil.toBean(node.properties, Map.class);
                 propertiesMap.put(JOB_ID, copyJobInfo.getId());
 
@@ -302,6 +304,8 @@ public class JobComposeServiceImpl implements JobComposeService {
                 jobNode.setNodePositionX(node.x);
                 jobNode.setNodePositionY(node.y);
                 jobNode.setNodeType(node.type);
+                // 修复：新创建的节点，triggerStatus设置为-1表示未运行状态（白色背景）
+                jobNode.setTriggerStatus(-1);
                 Map<String, Object> propertiesMap = JSONUtil.toBean(node.properties, Map.class);
                 propertiesMap.put(JOB_ID, copyJobInfo.getId());
 
@@ -507,6 +511,8 @@ public class JobComposeServiceImpl implements JobComposeService {
         jobNode.setNodeType(NODE_TYPE_MAP.get(formData.getGlueType()));
         jobNode.setNodePositionX(formData.getNodePositionX()==null?(double)0:formData.getNodePositionX());
         jobNode.setNodePositionY(formData.getNodePositionY()==null?(double)0:formData.getNodePositionY());
+        // 修复：新创建的节点，triggerStatus设置为-1表示未运行状态（白色背景）
+        jobNode.setTriggerStatus(-1);
         Map<String,Object> properties = new HashMap<>();
         properties.put(JOB_ID, jobInfo.getId());
         properties.put("width",160);
@@ -646,6 +652,8 @@ public class JobComposeServiceImpl implements JobComposeService {
             jobNode.setNodeType(String.valueOf(glueType));
             jobNode.setNodePositionX(x == null ? (double) 0 : (Double.parseDouble(String.valueOf(x)) + 50));
             jobNode.setNodePositionY(y == null ? (double) 0 : (Double.parseDouble(String.valueOf(y)) + 50));
+            // 修复：新创建的节点，triggerStatus设置为-1表示未运行状态（白色背景）
+            jobNode.setTriggerStatus(-1);
             Map<String, Object> propertieMap = new HashMap<>();
             propertieMap.put(JOB_ID, newJobInfo.getId());
             propertieMap.put("width", width);
@@ -979,8 +987,14 @@ public class JobComposeServiceImpl implements JobComposeService {
             jobNodeVo.setJobName(jobInfo.getJobDesc());
             jobNodeVo.setId(randomId + node.getId());
             jobNodeVo.setIsPause(jobInfo.getIsPause());
-            // 显式传递节点运行状态，避免序列化遗漏
-            jobNodeVo.setTriggerStatus(node.getTriggerStatus());
+            // 修复bug：节点运行状态处理
+            // -1 = 未运行（白色背景）
+            // 0 = 失败（红色背景）
+            // 1 = 成功（绿色背景）
+            // 2 = 运行中（蓝色背景）
+            // 如果 triggerStatus 是 null，转换为 -1（兼容历史数据）
+            Integer triggerStatus = node.getTriggerStatus();
+            jobNodeVo.setTriggerStatus(triggerStatus != null ? triggerStatus : -1);
             
             if (DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType())) {
                 String children = node.getChildren();

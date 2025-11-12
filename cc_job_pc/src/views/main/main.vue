@@ -2245,33 +2245,33 @@ function addJobNodes(
 
   // 如果节点数量较少，使用原来的方式（避免过度优化）
   if (newNodes.length <= 10) {
-    // 添加节点
-    newNodes.forEach((node: any) => {
-      graphModel.addNode(generateNode(node));
-    });
+  // 添加节点
+  newNodes.forEach((node: any) => {
+    graphModel.addNode(generateNode(node));
+  });
 
-    // 设置节点样式和子节点
-    newNodes.forEach((n: any) => {
-      const node = instance.getNodeModelById(n.id);
-      if (node) {
-        node.isPause = n.isPause == 1;
-        node.setStyle("fill", n.isPause == 1 ? "#409EEE" : "#fff");
-        // 触发节点重新渲染以更新图标
-        node.setAttributes();
-        if (n.nodeType === DYNAMIC_CUSTOM_GROUP && n.children) {
+  // 设置节点样式和子节点
+  newNodes.forEach((n: any) => {
+    const node = instance.getNodeModelById(n.id);
+    if (node) {
+      node.isPause = n.isPause == 1;
+      node.setStyle("fill", n.isPause == 1 ? "#409EEE" : "#fff");
+      // 触发节点重新渲染以更新图标
+      node.setAttributes();
+      if (n.nodeType === DYNAMIC_CUSTOM_GROUP && n.children) {
           try {
-            JSON.parse(n.children).forEach((id: string) => node.addChild(id));
+        JSON.parse(n.children).forEach((id: string) => node.addChild(id));
           } catch (e) {
             console.error("解析子节点失败:", e);
           }
-        }
       }
-    });
+    }
+  });
 
-    // 添加边
-    newEdges.forEach((e: any) => {
-      graphModel.addEdge(generateEdge(e));
-    });
+  // 添加边
+  newEdges.forEach((e: any) => {
+    graphModel.addEdge(generateEdge(e));
+  });
     return;
   }
 

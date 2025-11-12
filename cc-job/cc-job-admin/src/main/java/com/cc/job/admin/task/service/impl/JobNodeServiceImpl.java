@@ -3,19 +3,27 @@ package com.cc.job.admin.task.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.cc.job.xo.mapper.JobInfoMapper;
 import com.cc.job.xo.mapper.JobNodeMapper;
+import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobNode;
 import com.cc.job.admin.task.service.JobNodeService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class JobNodeServiceImpl extends ServiceImpl<JobNodeMapper, JobNode> implements JobNodeService {
+    
+    private final JobInfoMapper jobInfoMapper;
     
     /**
      * 更新节点运行状态
@@ -120,6 +128,78 @@ public class JobNodeServiceImpl extends ServiceImpl<JobNodeMapper, JobNode> impl
             log.error("批量更新节点状态异常: {}", e.getMessage());
             e.printStackTrace();
             return 0;
+        }
+    }
+    
+    /**
+     * 重置任务组中所有节点的运行状态为未运行状态（-1）
+     * 包括嵌套的子任务组中的节点
+     * 
+     * @param jobParentId 任务组ID（父任务ID）
+     * @return 成功重置的节点数量
+     */
+    @Override
+    public int resetAllNodeStatus(Long jobParentId) {
+        log.info("重置任务组所有节点状态 - jobParentId: {}", jobParentId);
+        
+        try {
+            // 1. 收集所有需要重置的节点ID（包括嵌套的任务组）
+            Set<Long> allJobParentIds = new HashSet<>();
+            allJobParentIds.add(jobParentId);
+            collectAllJobParentIds(jobParentId, allJobParentIds);
+            
+            // 2. 批量查询所有节点
+            List<JobNode> nodes = this.list(
+                new LambdaQueryWrapper<JobNode>().in(JobNode::getJobParentId, allJobParentIds)
+            );
+            
+            if (nodes.isEmpty()) {
+                log.warn("未找到需要重置的节点 - jobParentId: {}", jobParentId);
+                return 0;
+            }
+            
+            // 3. 批量重置所有节点的状态为 -1（未运行状态）
+            for (JobNode node : nodes) {
+                node.setTriggerStatus(-1);
+            }
+            
+            // 4. 批量更新数据库
+            boolean success = this.updateBatchById(nodes);
+            if (success) {
+                log.info("✓ 重置任务组所有节点状态完成 - jobParentId: {}, 节点数量: {}", jobParentId, nodes.size());
+                return nodes.size();
+            } else {
+                log.error("✗ 重置任务组所有节点状态失败 - jobParentId: {}", jobParentId);
+                return 0;
+            }
+            
+        } catch (Exception e) {
+            log.error("重置任务组所有节点状态异常 - jobParentId: {}, 错误: {}", jobParentId, e.getMessage());
+            e.printStackTrace();
+            return 0;
+        }
+    }
+    
+    /**
+     * 递归收集所有任务组ID（包括嵌套的任务组）
+     * 修复：使用 JobInfoMapper 直接查询，避免循环依赖
+     * 
+     * @param jobParentId 当前任务组ID
+     * @param allJobParentIds 所有任务组ID集合（输出参数）
+     */
+    private void collectAllJobParentIds(Long jobParentId, Set<Long> allJobParentIds) {
+        // 查询当前任务组下的所有子任务组（直接使用 Mapper，避免循环依赖）
+        List<JobInfo> childJobInfos = jobInfoMapper.selectList(
+            new LambdaQueryWrapper<JobInfo>()
+                .eq(JobInfo::getParentId, jobParentId)
+                .eq(JobInfo::getJobType, 2)  // 任务组类型
+        );
+        
+        // 递归收集子任务组的ID
+        for (JobInfo childJobInfo : childJobInfos) {
+            if (allJobParentIds.add(childJobInfo.getId())) {
+                collectAllJobParentIds(childJobInfo.getId(), allJobParentIds);
+            }
         }
     }
 }

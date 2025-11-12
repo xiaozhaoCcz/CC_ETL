@@ -506,7 +506,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         List<JobNode> newJobNodes = new ArrayList<>();
         // 用于记录每个taskNode对应的newJobInfo索引
         Map<JobNodeDto, Integer> nodeToJobInfoIndex = new HashMap<>();
-        
+
         for (JobNodeDto taskNode : nodeList) {
             JobInfo taskInfo = jobInfoMap.get(taskNode.getJobId());
             if (taskInfo == null) {
@@ -537,7 +537,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
                 continue;
             }
             JobInfo copyTaskInfo = newJobInfos.get(index);
-            
+
             if (taskInfo.getJobType() == 2) {
                 List<JobNode> childNodes = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, taskInfo.getId()));
                 List<JobEdge> childEdges = jobEdgeService.list(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getJobParentId, taskInfo.getId()));
@@ -575,8 +575,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
             Long fromNodeId = nodeMap.get(String.valueOf(taskEdge.getFromNodeId()));
             Long endNodeId = nodeMap.get(String.valueOf(taskEdge.getEndNodeId()));
             if (fromNodeId != null && endNodeId != null) {
-                JobEdge edge = new JobEdge();
-                edge.setJobParentId(parentTask.getId());
+            JobEdge edge = new JobEdge();
+            edge.setJobParentId(parentTask.getId());
                 edge.setFromNodeId(fromNodeId);
                 edge.setEndNodeId(endNodeId);
                 newEdges.add(edge);
@@ -655,10 +655,10 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
                     validJobIds.add(Integer.parseInt(childJobIdItem));
                 } else {
                     throw new BusinessException(
-                        MessageFormat.format((I18nUtil.getString("jobinfo_field_childJobId") + "({0})" + I18nUtil.getString("system_unvalid")), childJobIdItem));
+                            MessageFormat.format((I18nUtil.getString("jobinfo_field_childJobId") + "({0})" + I18nUtil.getString("system_unvalid")), childJobIdItem));
                 }
             }
-            
+
             // 批量查询所有子任务
             if (!validJobIds.isEmpty()) {
                 List<JobInfo> childJobInfos = this.listByIds(validJobIds.stream().map(Long::valueOf).toList());
@@ -671,7 +671,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
                         throw new BusinessException(MessageFormat.format(
                             (I18nUtil.getString("jobinfo_field_childJobId") + "({0})" + I18nUtil.getString("system_not_found")), 
                             String.valueOf(jobId)));
-                    }
+            }
                 }
             }
 
@@ -737,6 +737,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
                 copyTaskInfo.setIsNode("Y");
                 this.save(copyTaskInfo);
                 node.setJobId(copyTaskInfo.getId());
+                // 修复：新创建的节点，triggerStatus设置为-1表示未运行状态（白色背景）
+                node.setTriggerStatus(-1);
 
                 if (copyTaskInfo.getJobType() == 2) {
                     List<JobNode> taskNodeList = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, taskId));

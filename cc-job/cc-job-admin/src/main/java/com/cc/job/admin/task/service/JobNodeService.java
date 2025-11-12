@@ -19,4 +19,11 @@ public interface JobNodeService extends IService<JobNode> {
      * @return 成功更新的数量
      */
     int batchUpdateNodeStatus(java.util.Map<Long, Integer> statusMap);
+    
+    /**
+     * 重置任务组中所有节点的运行状态为未运行状态（-1）
+     * @param jobParentId 任务组ID（父任务ID）
+     * @return 成功重置的节点数量
+     */
+    int resetAllNodeStatus(Long jobParentId);
 }

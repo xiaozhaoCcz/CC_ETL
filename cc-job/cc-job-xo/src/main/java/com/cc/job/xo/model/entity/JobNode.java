@@ -32,7 +32,10 @@ public class JobNode extends BaseEntity {
 
     private String nodeType;
 
-    private int  triggerStatus;
+    /**
+     * 节点运行状态：-1=未运行, 0=失败, 1=成功, 2=运行中
+     */
+    private Integer triggerStatus;
 
     @Override
     public boolean equals(Object o) {

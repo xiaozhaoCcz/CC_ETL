@@ -178,6 +178,11 @@ public class JobGroupXxlJob {
                         jobId, randomId, nodes.size(), edges.size());
             }
 
+            // 修复：在任务组开始执行前，重置所有节点的运行状态为 -1（未运行状态）
+            // 这样可以确保每次运行任务组时，节点状态都是干净的初始状态
+            int resetCount = jobNodeService.resetAllNodeStatus(jobId);
+            logger.info("[JobGroup] 重置节点状态完成 - jobId: {}, 重置节点数量: {}", jobId, resetCount);
+
             // 构图
             buildGraph(jobId, nodes, edges);
             logger.debug("[JobGroup] 构建任务图完成 - jobId: {}", jobId);
