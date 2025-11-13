@@ -1,5 +1,6 @@
 package com.cc.job.gui.view;
 
+import com.cc.job.gui.util.IconUtil;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.form.JobInfoForm;
 import com.google.gson.Gson;
@@ -9,13 +10,17 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.control.*;
+import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.Tooltip;
 import javafx.scene.control.cell.TextFieldTableCell;
 import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import org.kordamp.ikonli.javafx.FontIcon;
 
 import java.lang.reflect.Type;
 import java.util.LinkedHashMap;
@@ -40,20 +45,24 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
     private TextField executorHandlerField;
     private Label executorParamLabel;
     private TextArea executorParamArea;
-    private VBox apiSettingContainer;
     private ComboBox<String> reqTypeCombo;
     private TextField reqUrlField;
-    private ParameterTable headerTable;
     private ParameterTable bodyTable;
     
     private TextField executorTimeoutField;
+    private ComboBox<RouteStrategy> routeStrategyCombo;
     private ComboBox<BlockStrategy> blockStrategyCombo;
     private Spinner<Integer> executorFailRetryCountSpinner;
-    private VBox glueSettingContainer;
     private TextArea glueEditorArea;
     
     private ButtonType saveButtonType;
     private ButtonType cancelButtonType;
+    
+    // 高级配置容器（包括高级配置、GLUE脚本、API配置）
+    private VBox advancedSection;
+    private VBox glueSection;
+    private VBox apiSection;
+    private boolean advancedSectionVisible = false;
     
     private static final Gson GSON = new Gson();
     private static final Type MAP_TYPE = new TypeToken<LinkedHashMap<String, String>>(){}.getType();
@@ -82,6 +91,12 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         // 填充数据（编辑模式）
         if (editData != null) {
             fillFormData(editData, jobGroupList);
+            // 编辑模式下，如果有高级配置数据，自动展开高级配置
+            if (hasAdvancedConfig(editData)) {
+                Platform.runLater(() -> {
+                    toggleAdvancedSection();
+                });
+            }
         }
         
         // 设置结果转换器
@@ -112,7 +127,8 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         VBox container = new VBox(15);
         container.setPadding(new Insets(20));
         container.setPrefWidth(700);
-        container.setPrefHeight(500);
+        // 初始高度较小，只显示基本信息和执行配置
+        container.setPrefHeight(400);
         
         ScrollPane scrollPane = new ScrollPane();
         scrollPane.setFitToWidth(true);
@@ -124,13 +140,26 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         // 基本信息
         formContent.getChildren().add(createBasicSection(jobGroupList));
         
-        // 执行配置
+        // 执行配置（包含高级配置链接）
         formContent.getChildren().add(createExecutionSection());
         
-        // 高级配置
-        formContent.getChildren().add(createAdvancedSection());
-        formContent.getChildren().add(createGlueSection());
-        formContent.getChildren().add(createApiSection());
+        // 高级配置（默认隐藏）
+        advancedSection = createAdvancedSection();
+        advancedSection.setVisible(false);
+        advancedSection.setManaged(false);
+        formContent.getChildren().add(advancedSection);
+        
+        // GLUE脚本（默认隐藏，根据运行模式动态显示）
+        glueSection = createGlueSection();
+        glueSection.setVisible(false);
+        glueSection.setManaged(false);
+        formContent.getChildren().add(glueSection);
+        
+        // API配置（默认隐藏，根据运行模式动态显示）
+        apiSection = createApiSection();
+        apiSection.setVisible(false);
+        apiSection.setManaged(false);
+        formContent.getChildren().add(apiSection);
         
         scrollPane.setContent(formContent);
         VBox.setVgrow(scrollPane, Priority.ALWAYS);
@@ -143,7 +172,7 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
      * 创建基本信息部分
      */
     private VBox createBasicSection(List<JobGroup> jobGroupList) {
-        VBox section = createSection("📄 基本信息");
+        VBox section = createSection("基本信息", IconUtil.fileIcon());
         
         GridPane grid = new GridPane();
         grid.setHgap(15);
@@ -208,7 +237,7 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
      * 创建执行配置部分
      */
     private VBox createExecutionSection() {
-        VBox section = createSection("⚙️ 执行配置");
+        VBox section = createSection("执行配置", IconUtil.settingsIcon());
         
         GridPane grid = new GridPane();
         grid.setHgap(15);
@@ -245,20 +274,74 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         grid.add(executorParamLabel, 0, 1);
         grid.add(executorParamArea, 1, 1, 3, 1);
         
+        // 添加高级配置链接
+        HBox linkContainer = new HBox(5);
+        linkContainer.setPadding(new Insets(10, 15, 0, 15));
+        linkContainer.setAlignment(Pos.CENTER_LEFT);
+        
+        Hyperlink advancedLink = new Hyperlink("高级配置");
+        advancedLink.setStyle(
+            "-fx-text-fill: #2563EB; " +
+            "-fx-font-size: 13; " +
+            "-fx-underline: true; " +
+            "-fx-cursor: hand;"
+        );
+        advancedLink.setOnAction(e -> toggleAdvancedSection());
+        
+        linkContainer.getChildren().add(advancedLink);
+        
         section.getChildren().add(grid);
+        section.getChildren().add(linkContainer);
         return section;
+    }
+    
+    /**
+     * 切换高级配置显示/隐藏
+     */
+    private void toggleAdvancedSection() {
+        advancedSectionVisible = !advancedSectionVisible;
+        advancedSection.setVisible(advancedSectionVisible);
+        advancedSection.setManaged(advancedSectionVisible);
+        
+        // 动态调整窗口大小
+        Platform.runLater(() -> {
+            Stage stage = (Stage) getDialogPane().getScene().getWindow();
+            if (stage != null) {
+                if (advancedSectionVisible) {
+                    // 展开高级配置时，扩大窗口
+                    getDialogPane().setPrefHeight(600);
+                    stage.setMinHeight(600);
+                } else {
+                    // 收起高级配置时，缩小窗口
+                    getDialogPane().setPrefHeight(450);
+                    stage.setMinHeight(450);
+                }
+                // 让窗口自动适应内容（延迟执行，确保布局已完成）
+                Platform.runLater(() -> {
+                    stage.sizeToScene();
+                });
+            }
+        });
     }
     
     /**
      * 创建高级配置部分
      */
     private VBox createAdvancedSection() {
-        VBox section = createSection("🔧 高级配置");
+        VBox section = createSection("高级配置", IconUtil.wrenchIcon());
         
         GridPane grid = new GridPane();
         grid.setHgap(15);
         grid.setVgap(15);
         grid.setPadding(new Insets(15));
+        
+        // 路由策略
+        Label routeStrategyLabel = createFormLabel("路由策略", true);
+        routeStrategyCombo = new ComboBox<>();
+        routeStrategyCombo.setPrefWidth(300);
+        routeStrategyCombo.setPromptText("请选择路由策略");
+        routeStrategyCombo.getItems().addAll(RouteStrategy.values());
+        routeStrategyCombo.setValue(RouteStrategy.FIRST);
         
         // 任务超时时间
         Label timeoutLabel = createFormLabel("任务超时时间(秒)", false);
@@ -281,34 +364,36 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         executorFailRetryCountSpinner.setPrefWidth(300);
         executorFailRetryCountSpinner.setEditable(true);
         
-        grid.add(timeoutLabel, 0, 0);
-        grid.add(executorTimeoutField, 1, 0);
-        grid.add(blockStrategyLabel, 2, 0);
-        grid.add(blockStrategyCombo, 3, 0);
+        grid.add(routeStrategyLabel, 0, 0);
+        grid.add(routeStrategyCombo, 1, 0);
+        grid.add(timeoutLabel, 2, 0);
+        grid.add(executorTimeoutField, 3, 0);
         
-        grid.add(retryLabel, 0, 1);
-        grid.add(executorFailRetryCountSpinner, 1, 1);
+        grid.add(blockStrategyLabel, 0, 1);
+        grid.add(blockStrategyCombo, 1, 1);
+        grid.add(retryLabel, 2, 1);
+        grid.add(executorFailRetryCountSpinner, 3, 1);
         
         section.getChildren().add(grid);
         return section;
     }
 
     private VBox createGlueSection() {
-        glueSettingContainer = createSection("🧩 GLUE 脚本");
-        glueSettingContainer.setVisible(false);
+        glueSection = createSection("GLUE 脚本", IconUtil.fileIcon());
+        glueSection.setVisible(false);
 
         glueEditorArea = new TextArea();
         glueEditorArea.setPrefRowCount(12);
         glueEditorArea.setWrapText(true);
         glueEditorArea.setPromptText("请输入 GLUE 脚本内容");
 
-        glueSettingContainer.getChildren().add(glueEditorArea);
-        return glueSettingContainer;
+        glueSection.getChildren().add(glueEditorArea);
+        return glueSection;
     }
 
     private VBox createApiSection() {
-        apiSettingContainer = createSection("🌐 API 配置");
-        apiSettingContainer.setVisible(false);
+        apiSection = createSection("API 配置", IconUtil.windowIcon());
+        apiSection.setVisible(false);
 
         GridPane grid = new GridPane();
         grid.setHgap(15);
@@ -331,11 +416,10 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         grid.add(reqUrlLabel, 0, 1);
         grid.add(reqUrlField, 1, 1, 3, 1);
 
-        headerTable = new ParameterTable("请求头");
-        bodyTable = new ParameterTable("请求体参数");
+        bodyTable = new ParameterTable("请求参数");
 
-        apiSettingContainer.getChildren().addAll(grid, headerTable, bodyTable);
-        return apiSettingContainer;
+        apiSection.getChildren().addAll(grid, bodyTable);
+        return apiSection;
     }
 
     private void toggleExecutorParamArea(boolean visible) {
@@ -367,7 +451,6 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
                 executorHandlerField.setText("runApiHandler");
                 executorParamArea.clear();
                 toggleExecutorParamArea(false);
-                headerTable.ensureAtLeastOneRow();
                 bodyTable.ensureAtLeastOneRow();
             }
             default -> {
@@ -377,16 +460,17 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
                 toggleExecutorParamArea(true);
             }
         }
-        glueSettingContainer.setVisible(glueType.requiresGlueSource());
-        glueSettingContainer.setManaged(glueType.requiresGlueSource());
-        apiSettingContainer.setVisible(glueType == GlueType.API);
-        apiSettingContainer.setManaged(glueType == GlueType.API);
+        // GLUE脚本和API配置根据运行模式动态显示，但不影响高级配置的显示状态
+        glueSection.setVisible(glueType.requiresGlueSource());
+        glueSection.setManaged(glueType.requiresGlueSource());
+        apiSection.setVisible(glueType == GlueType.API);
+        apiSection.setManaged(glueType == GlueType.API);
     }
     
     /**
      * 创建section容器
      */
-    private VBox createSection(String title) {
+    private VBox createSection(String title, FontIcon icon) {
         VBox section = new VBox(10);
         section.setStyle(
             "-fx-background-color: white; " +
@@ -396,14 +480,29 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
             "-fx-padding: 10;"
         );
         
+        HBox titleBox = new HBox(8);
+        titleBox.setAlignment(Pos.CENTER_LEFT);
+        titleBox.setPadding(new Insets(0, 0, 5, 0));
+        
+        // 设置图标样式
+        if (icon != null) {
+            icon.setIconSize(18);
+            icon.setIconColor(Color.web("#6B7280"));
+        }
+        
         Label titleLabel = new Label(title);
         titleLabel.setStyle(
-            "-fx-font-size: 14; " +
+            "-fx-font-size: 16; " +
             "-fx-font-weight: bold; " +
             "-fx-text-fill: #1F2937;"
         );
         
-        section.getChildren().add(titleLabel);
+        if (icon != null) {
+            titleBox.getChildren().add(icon);
+        }
+        titleBox.getChildren().add(titleLabel);
+        
+        section.getChildren().add(titleBox);
         return section;
     }
     
@@ -411,16 +510,58 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
      * 创建表单标签
      */
     private Label createFormLabel(String text, boolean required) {
-        String displayText = required ? text + " *" : text;
-        Label label = new Label(displayText);
-        label.setStyle("-fx-text-fill: #374151; -fx-font-size: 13;");
+        Label label = new Label();
         label.setMinWidth(140);
         label.setPrefWidth(140);
         label.setMaxWidth(140);
         label.setWrapText(false);
         label.setTextOverrun(OverrunStyle.ELLIPSIS);
-        label.setTooltip(new Tooltip(displayText));
+        
+        if (required) {
+            // 必填项：使用HBox来组合文本和红色星号
+            HBox labelBox = new HBox(2);
+            labelBox.setAlignment(Pos.CENTER_LEFT);
+            
+            Label textLabel = new Label(text);
+            textLabel.setStyle("-fx-text-fill: #374151; -fx-font-size: 13;");
+            
+            Label starLabel = new Label("*");
+            starLabel.setStyle("-fx-text-fill: #EF4444; -fx-font-size: 13; -fx-font-weight: bold;");
+            
+            labelBox.getChildren().addAll(textLabel, starLabel);
+            
+            // 使用自定义图形节点
+            label.setGraphic(labelBox);
+            label.setText("");
+            label.setContentDisplay(ContentDisplay.LEFT);
+            label.setTooltip(new Tooltip(text + " *"));
+        } else {
+            label.setText(text);
+            label.setStyle("-fx-text-fill: #374151; -fx-font-size: 13;");
+            label.setTooltip(new Tooltip(text));
+        }
+        
         return label;
+    }
+    
+    /**
+     * 检查是否有高级配置数据
+     */
+    private boolean hasAdvancedConfig(JobInfoForm data) {
+        // 检查是否有非默认值的高级配置
+        if (data.getExecutorRouteStrategy() != null && !data.getExecutorRouteStrategy().equals("FIRST")) {
+            return true;
+        }
+        if (data.getExecutorBlockStrategy() != null && !data.getExecutorBlockStrategy().equals("SERIAL_EXECUTION")) {
+            return true;
+        }
+        if (data.getExecutorTimeout() != null && data.getExecutorTimeout() != 300) {
+            return true;
+        }
+        if (data.getExecutorFailRetryCount() != null && data.getExecutorFailRetryCount() != 0) {
+            return true;
+        }
+        return false;
     }
     
     /**
@@ -456,16 +597,26 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
             if (data.getReqUrl() != null) {
                 reqUrlField.setText(data.getReqUrl());
             }
-            headerTable.setData(data.getReqHeader());
-            bodyTable.setData(data.getExecutorParam());
+            // 只使用一个参数表格，优先使用executorParam，如果没有则使用reqHeader
+            String paramData = data.getExecutorParam();
+            if (paramData == null || paramData.trim().isEmpty()) {
+                paramData = data.getReqHeader();
+            }
+            bodyTable.setData(paramData);
         } else {
             if (data.getExecutorParam() != null) {
                 executorParamArea.setText(data.getExecutorParam());
             }
-            headerTable.setData(null);
             bodyTable.setData(null);
         }
 
+        if (data.getExecutorRouteStrategy() != null) {
+            try {
+                routeStrategyCombo.setValue(RouteStrategy.valueOf(data.getExecutorRouteStrategy()));
+            } catch (Exception e) {
+                routeStrategyCombo.setValue(RouteStrategy.FIRST);
+            }
+        }
         if (data.getExecutorBlockStrategy() != null) {
             try {
                 blockStrategyCombo.setValue(BlockStrategy.valueOf(data.getExecutorBlockStrategy()));
@@ -515,7 +666,7 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
             form.setReqType(reqType != null ? reqType : "GET");
             String reqUrl = reqUrlField.getText() != null ? reqUrlField.getText().trim() : "";
             form.setReqUrl(reqUrl);
-            form.setReqHeader(headerTable.toJson());
+            form.setReqHeader(null); // 不再使用请求头表格
             form.setExecutorParam(bodyTable.toJson());
         } else {
             form.setReqType(null);
@@ -525,6 +676,7 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         }
         
         // 高级配置
+        form.setExecutorRouteStrategy(routeStrategyCombo.getValue().getType());
         form.setExecutorBlockStrategy(blockStrategyCombo.getValue().getType());
         
         try {
@@ -539,7 +691,7 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         form.setMisfireStrategy("DO_NOTHING");
         form.setScheduleType("NONE");
         form.setJobType(0); // 普通任务节点
-        form.setExecutorRouteStrategy("FIRST");
+        // 路由策略已经在高级配置部分设置，不需要在这里覆盖
 
         return form;
     }
@@ -573,9 +725,12 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
             if (reqUrlField.getText() == null || reqUrlField.getText().trim().isEmpty()) {
                 errors.append("• 请填写API请求地址\n");
             }
-            if (headerTable.isEmpty() && bodyTable.isEmpty()) {
-                errors.append("• 请至少配置一个请求头或请求参数\n");
+            if (bodyTable.isEmpty()) {
+                errors.append("• 请至少配置一个请求参数\n");
             }
+        }
+        if (routeStrategyCombo.getValue() == null) {
+            errors.append("• 请选择路由策略\n");
         }
         if (blockStrategyCombo.getValue() == null) {
             errors.append("• 请选择任务失败策略\n");
@@ -598,9 +753,10 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
      */
     private void styleDialog() {
         getDialogPane().setPrefWidth(750);
-        getDialogPane().setPrefHeight(550);
+        // 初始高度较小，只显示基本信息和执行配置
+        getDialogPane().setPrefHeight(450);
         getDialogPane().setMinWidth(720);
-        getDialogPane().setMinHeight(520);
+        getDialogPane().setMinHeight(450); // 最小高度也相应减小
         getDialogPane().setMaxWidth(Double.MAX_VALUE);
         getDialogPane().setMaxHeight(Double.MAX_VALUE);
         setResizable(true);
@@ -644,7 +800,8 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
             if (stage != null) {
                 stage.setResizable(true);
                 stage.setMinWidth(720);
-                stage.setMinHeight(520);
+                // 初始最小高度较小
+                stage.setMinHeight(450);
             }
         });
     }
@@ -828,6 +985,31 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
             return BEAN;
         }
         
+        @Override
+        public String toString() { return title; }
+    }
+    
+    public enum RouteStrategy {
+        FIRST("FIRST", "第一个"),
+        LAST("LAST", "最后一个"),
+        ROUND("ROUND", "轮询"),
+        RANDOM("RANDOM", "随机"),
+        CONSISTENT_HASH("CONSISTENT_HASH", "一致性哈希"),
+        LEASTY_FREQUENTY_USED("LEASTY_FREQUENTY_USED", "最不经常使用"),
+        LEASTY_RECENTLY_USED("LEASTY_RECENTLY_USED", "最近最久未使用"),
+        FAILOVER("FAILOVER", "故障转移"),
+        BUSYOVER("BUSYOVER", "忙碌转移"),
+        SHARDING_BORADCAST("SHARDING_BORADCAST", "分片广播");
+        
+        private final String type;
+        private final String title;
+        
+        RouteStrategy(String type, String title) {
+            this.type = type;
+            this.title = title;
+        }
+        
+        public String getType() { return type; }
         @Override
         public String toString() { return title; }
     }

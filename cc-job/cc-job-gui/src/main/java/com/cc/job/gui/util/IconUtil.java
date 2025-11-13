@@ -168,6 +168,20 @@ public final class IconUtil {
     public static FontIcon mapIcon() {
         return createFeatherIcon(Feather.MAP, ACCENT_COLOR, 16);
     }
+    
+    // ============ 表单配置图标 ============
+    
+    public static FontIcon settingsIcon() {
+        return createFeatherIcon(Feather.SETTINGS, MUTED_COLOR, 18);
+    }
+    
+    public static FontIcon clockIcon() {
+        return createFeatherIcon(Feather.CLOCK, MUTED_COLOR, 18);
+    }
+    
+    public static FontIcon wrenchIcon() {
+        return createFeatherIcon(Feather.TOOL, MUTED_COLOR, 18);
+    }
 
     // ============ 辅助方法 ============
 

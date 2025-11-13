@@ -22,6 +22,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SplitPane;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.transform.Scale;
@@ -31,6 +32,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 主界面视图
@@ -1574,9 +1576,173 @@ public class MainView extends BorderPane {
                     default -> { }
                 }
             }
+            
+            @Override
+            public void onPartitionAction(Long partitionId, String partitionName, TaskTreeView.TaskSelectionCallback.PartitionAction action) {
+                switch (action) {
+                    case EDIT -> editPartition(partitionId, partitionName);
+                    case EXPORT -> exportPartition(partitionId, partitionName);
+                    default -> { }
+                }
+            }
+            
+            @Override
+            public void onJobGroupEdit(Long taskGroupId, String taskGroupName) {
+                editJobGroup(taskGroupId, taskGroupName);
+            }
         });
     }
+    
+    /**
+     * 编辑分区
+     */
+    private void editPartition(Long partitionId, String partitionName) {
+        try {
+            logPanel.info("✏️ 编辑分区: " + partitionName);
+            
+            // 创建文本输入对话框
+            TextInputDialog dialog = new TextInputDialog(partitionName);
+            dialog.setTitle("编辑分区");
+            dialog.setHeaderText("请输入新的分区名称");
+            dialog.setContentText("分区名称:");
+            
+            Optional<String> result = dialog.showAndWait();
+            result.ifPresent(newName -> {
+                if (newName.trim().isEmpty()) {
+                    logPanel.warn("⚠ 分区名称不能为空");
+                    return;
+                }
+                
+                if (newName.equals(partitionName)) {
+                    logPanel.info("ℹ 分区名称未更改");
+                    return;
+                }
+                
+                // 在后台线程中更新分区
+                new Thread(() -> {
+                    try {
+                        boolean success = jobPartService.updateJobPart(partitionId, newName.trim());
+                        Platform.runLater(() -> {
+                            if (success) {
+                                logPanel.success("✓ 分区名称已更新: " + partitionName + " → " + newName.trim());
+                                refreshTreeView();
+                            } else {
+                                logPanel.error("✗ 更新分区失败");
+                            }
+                        });
+                    } catch (Exception e) {
+                        Platform.runLater(() -> {
+                            logPanel.error("✗ 更新分区时发生错误: " + e.getMessage());
+                            logger.error("更新分区失败", e);
+                        });
+                    }
+                }).start();
+            });
+        } catch (Exception e) {
+            logPanel.error("✗ 显示编辑对话框失败: " + e.getMessage());
+            logger.error("显示编辑分区对话框失败", e);
+        }
+    }
+    
+    /**
+     * 导出分区数据
+     */
+    private void exportPartition(Long partitionId, String partitionName) {
+        try {
+            logPanel.info("📤 正在导出分区: " + partitionName);
+            
+            // 在后台线程中导出数据
+            new Thread(() -> {
+                try {
+                    byte[] data = jobPartService.exportData(partitionId);
+                    
+                    Platform.runLater(() -> {
+                        // 显示文件保存对话框
+                        javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
+                        fileChooser.setTitle("保存分区数据");
+                        fileChooser.setInitialFileName("encryptedData.cetl");
+                        fileChooser.getExtensionFilters().add(
+                            new javafx.stage.FileChooser.ExtensionFilter("加密数据文件", "*.cetl")
+                        );
+                        
+                        javafx.stage.Window window = this.getScene().getWindow();
+                        java.io.File file = fileChooser.showSaveDialog(window);
+                        
+                        if (file != null) {
+                            try {
+                                java.nio.file.Files.write(file.toPath(), data);
+                                logPanel.success("✓ 分区数据已导出到: " + file.getAbsolutePath());
+                            } catch (java.io.IOException e) {
+                                logPanel.error("✗ 保存文件失败: " + e.getMessage());
+                                logger.error("保存导出文件失败", e);
+                            }
+                        } else {
+                            logPanel.info("ℹ 已取消导出");
+                        }
+                    });
+                } catch (Exception e) {
+                    Platform.runLater(() -> {
+                        logPanel.error("✗ 导出分区数据失败: " + e.getMessage());
+                        logger.error("导出分区数据失败", e);
+                    });
+                }
+            }).start();
+        } catch (Exception e) {
+            logPanel.error("✗ 导出分区失败: " + e.getMessage());
+            logger.error("导出分区失败", e);
+        }
+    }
 
+    /**
+     * 编辑任务组
+     */
+    private void editJobGroup(Long taskGroupId, String taskGroupName) {
+        try {
+            logPanel.info("✏️ 编辑任务组: " + taskGroupName);
+            
+            // 在后台线程中获取任务组数据
+            new Thread(() -> {
+                try {
+                    // 获取任务组表单数据
+                    com.cc.job.xo.model.form.JobInfoForm formData = jobInfoService.getFormData(taskGroupId);
+                    
+                    if (formData == null) {
+                        Platform.runLater(() -> {
+                            logPanel.error("✗ 无法获取任务组数据");
+                        });
+                        return;
+                    }
+                    
+                    // 获取分区ID（从任务组数据中获取）
+                    Integer jobPartId = formData.getJobPartId();
+                    if (jobPartId == null) {
+                        Platform.runLater(() -> {
+                            logPanel.error("✗ 无法获取分区ID");
+                        });
+                        return;
+                    }
+                    Long partitionId = jobPartId.longValue();
+                    
+                    // 获取分区名称（从树中查找）
+                    String partitionName = "未知分区";
+                    
+                    Platform.runLater(() -> {
+                        // 显示编辑对话框
+                        showNewJobGroupDialog(partitionId, partitionName, formData);
+                    });
+                } catch (Exception e) {
+                    Platform.runLater(() -> {
+                        logPanel.error("✗ 获取任务组数据失败: " + e.getMessage());
+                        logger.error("获取任务组数据失败", e);
+                    });
+                }
+            }).start();
+        } catch (Exception e) {
+            logPanel.error("✗ 编辑任务组失败: " + e.getMessage());
+            logger.error("编辑任务组失败", e);
+        }
+    }
+    
     /**
      * 显示新建/编辑任务组对话框
      */

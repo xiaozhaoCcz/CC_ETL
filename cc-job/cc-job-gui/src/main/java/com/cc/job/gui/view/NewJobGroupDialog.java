@@ -1,13 +1,18 @@
 package com.cc.job.gui.view;
 
+import com.cc.job.gui.util.IconUtil;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.form.JobInfoForm;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.control.*;
+import javafx.scene.control.ContentDisplay;
 import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import org.kordamp.ikonli.javafx.FontIcon;
 
 import java.util.List;
 
@@ -38,6 +43,10 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
     private ButtonType saveButtonType;
     private ButtonType cancelButtonType;
     
+    // 高级配置容器
+    private VBox advancedSection;
+    private boolean advancedSectionVisible = false;
+    
     public NewJobGroupDialog(Stage owner, Long jobPartId, JobInfoForm editData, List<JobGroup> jobGroupList) {
         this.jobPartId = jobPartId;
         this.formData = editData != null ? editData : new JobInfoForm();
@@ -62,6 +71,12 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
         // 填充数据（编辑模式）
         if (editData != null) {
             fillFormData(editData, jobGroupList);
+            // 编辑模式下，如果有高级配置数据，自动展开高级配置
+            if (hasAdvancedConfig(editData)) {
+                Platform.runLater(() -> {
+                    toggleAdvancedSection();
+                });
+            }
         }
         
         // 设置结果转换器
@@ -85,7 +100,8 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
         VBox container = new VBox(15);
         container.setPadding(new Insets(20));
         container.setPrefWidth(800);
-        container.setPrefHeight(600);
+        // 初始高度较小，只显示基础配置和调度配置
+        container.setPrefHeight(400);
         
         ScrollPane scrollPane = new ScrollPane();
         scrollPane.setFitToWidth(true);
@@ -97,11 +113,14 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
         // 基础配置
         formContent.getChildren().add(createBasicSection(jobGroupList));
         
-        // 调度配置
+        // 调度配置（包含高级配置链接）
         formContent.getChildren().add(createScheduleSection());
         
-        // 高级配置
-        formContent.getChildren().add(createAdvancedSection());
+        // 高级配置（默认隐藏）
+        advancedSection = createAdvancedSection();
+        advancedSection.setVisible(false);
+        advancedSection.setManaged(false);
+        formContent.getChildren().add(advancedSection);
         
         scrollPane.setContent(formContent);
         VBox.setVgrow(scrollPane, Priority.ALWAYS);
@@ -114,7 +133,7 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
      * 创建基础配置部分
      */
     private VBox createBasicSection(List<JobGroup> jobGroupList) {
-        VBox section = createSection("⚙️ 基础配置");
+        VBox section = createSection("基础配置", IconUtil.settingsIcon());
         
         GridPane grid = new GridPane();
         grid.setHgap(15);
@@ -178,7 +197,7 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
      * 创建调度配置部分
      */
     private VBox createScheduleSection() {
-        VBox section = createSection("🕐 调度配置");
+        VBox section = createSection("调度配置", IconUtil.clockIcon());
         
         GridPane grid = new GridPane();
         grid.setHgap(15);
@@ -205,15 +224,61 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
         grid.add(scheduleConfLabel, 2, 0);
         grid.add(scheduleConfField, 3, 0);
         
+        // 添加高级配置链接
+        HBox linkContainer = new HBox(5);
+        linkContainer.setPadding(new Insets(10, 15, 0, 15));
+        linkContainer.setAlignment(Pos.CENTER_LEFT);
+        
+        Hyperlink advancedLink = new Hyperlink("高级配置");
+        advancedLink.setStyle(
+            "-fx-text-fill: #2563EB; " +
+            "-fx-font-size: 13; " +
+            "-fx-underline: true; " +
+            "-fx-cursor: hand;"
+        );
+        advancedLink.setOnAction(e -> toggleAdvancedSection());
+        
+        linkContainer.getChildren().add(advancedLink);
+        
         section.getChildren().add(grid);
+        section.getChildren().add(linkContainer);
         return section;
+    }
+    
+    /**
+     * 切换高级配置显示/隐藏
+     */
+    private void toggleAdvancedSection() {
+        advancedSectionVisible = !advancedSectionVisible;
+        advancedSection.setVisible(advancedSectionVisible);
+        advancedSection.setManaged(advancedSectionVisible);
+        
+        // 动态调整窗口大小
+        Platform.runLater(() -> {
+            Stage stage = (Stage) getDialogPane().getScene().getWindow();
+            if (stage != null) {
+                if (advancedSectionVisible) {
+                    // 展开高级配置时，扩大窗口
+                    getDialogPane().setPrefHeight(650);
+                    stage.setMinHeight(650);
+                } else {
+                    // 收起高级配置时，缩小窗口
+                    getDialogPane().setPrefHeight(450);
+                    stage.setMinHeight(450);
+                }
+                // 让窗口自动适应内容（延迟执行，确保布局已完成）
+                Platform.runLater(() -> {
+                    stage.sizeToScene();
+                });
+            }
+        });
     }
     
     /**
      * 创建高级配置部分
      */
     private VBox createAdvancedSection() {
-        VBox section = createSection("🔧 高级配置");
+        VBox section = createSection("高级配置", IconUtil.wrenchIcon());
         
         GridPane grid = new GridPane();
         grid.setHgap(15);
@@ -286,7 +351,7 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
     /**
      * 创建section容器
      */
-    private VBox createSection(String title) {
+    private VBox createSection(String title, FontIcon icon) {
         VBox section = new VBox(10);
         section.setStyle(
             "-fx-background-color: white; " +
@@ -296,6 +361,16 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
             "-fx-padding: 10;"
         );
         
+        HBox titleBox = new HBox(8);
+        titleBox.setAlignment(Pos.CENTER_LEFT);
+        titleBox.setPadding(new Insets(0, 0, 5, 0));
+        
+        // 设置图标样式
+        if (icon != null) {
+            icon.setIconSize(18);
+            icon.setIconColor(Color.web("#6B7280"));
+        }
+        
         Label titleLabel = new Label(title);
         titleLabel.setStyle(
             "-fx-font-size: 16; " +
@@ -303,7 +378,12 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
             "-fx-text-fill: #1F2937;"
         );
         
-        section.getChildren().add(titleLabel);
+        if (icon != null) {
+            titleBox.getChildren().add(icon);
+        }
+        titleBox.getChildren().add(titleLabel);
+        
+        section.getChildren().add(titleBox);
         return section;
     }
     
@@ -311,16 +391,64 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
      * 创建表单标签
      */
     private Label createFormLabel(String text, boolean required) {
-        String displayText = required ? text + " *" : text;
-        Label label = new Label(displayText);
-        label.setStyle("-fx-text-fill: #374151; -fx-font-size: 13;");
+        Label label = new Label();
         label.setMinWidth(140);
         label.setPrefWidth(140);
         label.setMaxWidth(140);
         label.setWrapText(false);
         label.setTextOverrun(OverrunStyle.ELLIPSIS);
-        label.setTooltip(new Tooltip(displayText));
+        
+        if (required) {
+            // 必填项：使用HBox来组合文本和红色星号
+            HBox labelBox = new HBox(2);
+            labelBox.setAlignment(Pos.CENTER_LEFT);
+            
+            Label textLabel = new Label(text);
+            textLabel.setStyle("-fx-text-fill: #374151; -fx-font-size: 13;");
+            
+            Label starLabel = new Label("*");
+            starLabel.setStyle("-fx-text-fill: #EF4444; -fx-font-size: 13; -fx-font-weight: bold;");
+            
+            labelBox.getChildren().addAll(textLabel, starLabel);
+            
+            // 使用自定义图形节点
+            label.setGraphic(labelBox);
+            label.setText("");
+            label.setContentDisplay(ContentDisplay.LEFT);
+            label.setTooltip(new Tooltip(text + " *"));
+        } else {
+            label.setText(text);
+            label.setStyle("-fx-text-fill: #374151; -fx-font-size: 13;");
+            label.setTooltip(new Tooltip(text));
+        }
+        
         return label;
+    }
+    
+    /**
+     * 检查是否有高级配置数据
+     */
+    private boolean hasAdvancedConfig(JobInfoForm data) {
+        // 检查是否有非默认值的高级配置
+        if (data.getExecutorRouteStrategy() != null && !data.getExecutorRouteStrategy().equals("FIRST")) {
+            return true;
+        }
+        if (data.getMisfireStrategy() != null && !data.getMisfireStrategy().equals("DO_NOTHING")) {
+            return true;
+        }
+        if (data.getExecutorBlockStrategy() != null && !data.getExecutorBlockStrategy().equals("SERIAL_EXECUTION")) {
+            return true;
+        }
+        if (data.getExecutorTimeout() != null && data.getExecutorTimeout() != 300) {
+            return true;
+        }
+        if (data.getExecutorFailRetryCount() != null && data.getExecutorFailRetryCount() != 0) {
+            return true;
+        }
+        if (data.getChildJobid() != null && !data.getChildJobid().trim().isEmpty()) {
+            return true;
+        }
+        return false;
     }
     
     /**
@@ -482,9 +610,10 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
      */
     private void styleDialog() {
         getDialogPane().setPrefWidth(850);
-        getDialogPane().setPrefHeight(650);
+        // 初始高度较小，只显示基础配置和调度配置
+        getDialogPane().setPrefHeight(450);
         getDialogPane().setMinWidth(780);
-        getDialogPane().setMinHeight(560);
+        getDialogPane().setMinHeight(450); // 最小高度也相应减小
         getDialogPane().setMaxWidth(Double.MAX_VALUE);
         getDialogPane().setMaxHeight(Double.MAX_VALUE);
         setResizable(true);
@@ -528,7 +657,8 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
             if (stage != null) {
                 stage.setResizable(true);
                 stage.setMinWidth(780);
-                stage.setMinHeight(560);
+                // 初始最小高度较小
+                stage.setMinHeight(450);
             }
         });
     }

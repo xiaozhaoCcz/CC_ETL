@@ -349,4 +349,66 @@ public class JobPartService extends  BaseService {
             return Result.isSuccess(result);
         }
     }
+    
+    /**
+     * 导出分区数据
+     * @param partId 分区ID
+     * @return 导出的字节数组
+     * @throws IOException 网络异常
+     */
+    public byte[] exportData(Long partId) throws IOException {
+        String url = apiUtil.getBaseUrl() + "/api/v1/jobParts/exportData/" + partId;
+
+        Request request = new Request.Builder()
+                .url(url)
+                .get()
+                .build();
+
+        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("导出分区数据失败: " + response);
+            }
+
+            return response.body().bytes();
+        }
+    }
+    
+    /**
+     * 更新分区名称
+     * @param partId 分区ID
+     * @param partName 新分区名称
+     * @return 是否更新成功
+     * @throws IOException 网络异常
+     */
+    public boolean updateJobPart(Long partId, String partName) throws IOException {
+        String url = apiUtil.getBaseUrl() + "/api/v1/jobParts/updateJobPart";
+        
+        // 构建请求参数
+        Map<String, Object> requestMap = new HashMap<>();
+        requestMap.put("id", partId);
+        requestMap.put("jobPartName", partName);
+        
+        String jsonBody = apiUtil.getGson().toJson(requestMap);
+        RequestBody body = RequestBody.create(jsonBody, MediaType.get("application/json; charset=utf-8"));
+        
+        Request request = new Request.Builder()
+                .url(url)
+                .post(body)
+                .build();
+        
+        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("更新分区失败: " + response);
+            }
+            
+            String responseBody = response.body().string();
+            logger.debug("updateJobPart API 响应: {}", responseBody);
+            
+            // 解析 JSON 响应
+            Type resultType = new TypeToken<Result<Void>>(){}.getType();
+            Result<Void> result = apiUtil.getGson().fromJson(responseBody, resultType);
+            
+            return Result.isSuccess(result);
+        }
+    }
 }

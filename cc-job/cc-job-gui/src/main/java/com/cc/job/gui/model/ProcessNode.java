@@ -343,8 +343,8 @@ public class ProcessNode extends StackPane {
     private void setupContextMenu() {
         contextMenu = new ContextMenu();
         
-        // 📝 编辑节点
-        MenuItem editItem = new MenuItem("📝 编辑节点");
+        // 编辑节点
+        MenuItem editItem = new MenuItem("编辑节点");
         editItem.setOnAction(e -> {
             logger.debug("✏️ 点击编辑节点: {} (nodeId: {})", jobHandlerName, nodeId);
             if (onEdit != null) {
@@ -355,8 +355,8 @@ public class ProcessNode extends StackPane {
             }
         });
         
-        // 📋 复制节点
-        MenuItem copyItem = new MenuItem("📋 复制节点");
+        // 复制节点
+        MenuItem copyItem = new MenuItem("复制节点");
         copyItem.setOnAction(e -> {
             logger.debug("📋 复制节点: {}", jobHandlerName);
             if (onCopy != null) {
@@ -364,8 +364,8 @@ public class ProcessNode extends StackPane {
             }
         });
         
-        // 📄 节点详情
-        MenuItem detailsItem = new MenuItem("📄 查看详情");
+        // 节点详情
+        MenuItem detailsItem = new MenuItem("查看详情");
         detailsItem.setOnAction(e -> {
             logger.debug("📄 查看详情: {}", jobHandlerName);
             if (onShowDetails != null) {
@@ -376,35 +376,35 @@ public class ProcessNode extends StackPane {
         // 分隔符
         SeparatorMenuItem separator1 = new SeparatorMenuItem();
         
-        // 🎨 更改颜色
-        Menu colorMenu = new Menu("🎨 更改颜色");
+        // 更改颜色
+        Menu colorMenu = new Menu("更改颜色");
         
-        MenuItem purpleItem = new MenuItem("🟣 紫色 (默认)");
+        MenuItem purpleItem = new MenuItem("紫色 (默认)");
         purpleItem.setOnAction(e -> changeNodeColor("#8B5CF6"));
         
-        MenuItem blueItem = new MenuItem("🔵 蓝色");
+        MenuItem blueItem = new MenuItem("蓝色");
         blueItem.setOnAction(e -> changeNodeColor("#3B82F6"));
         
-        MenuItem greenItem = new MenuItem("🟢 绿色");
+        MenuItem greenItem = new MenuItem("绿色");
         greenItem.setOnAction(e -> changeNodeColor("#10B981"));
         
-        MenuItem orangeItem = new MenuItem("🟠 橙色");
+        MenuItem orangeItem = new MenuItem("橙色");
         orangeItem.setOnAction(e -> changeNodeColor("#F59E0B"));
         
-        MenuItem redItem = new MenuItem("🔴 红色");
+        MenuItem redItem = new MenuItem("红色");
         redItem.setOnAction(e -> changeNodeColor("#EF4444"));
         
         colorMenu.getItems().addAll(purpleItem, blueItem, greenItem, orangeItem, redItem);
         
-        // ⚙️ 禁用/启用节点
-        MenuItem toggleItem = new MenuItem("⚙️ 禁用节点");
+        // 禁用/启用节点
+        MenuItem toggleItem = new MenuItem("禁用节点");
         toggleItem.setOnAction(e -> {
             toggleNodeEnabled();
-            toggleItem.setText(isEnabled() ? "⚙️ 禁用节点" : "✅ 启用节点");
+            toggleItem.setText(isEnabled() ? "禁用节点" : "启用节点");
         });
         
-        // 📌 设为起始节点
-        MenuItem startItem = new MenuItem("📌 设为起始节点");
+        // 设为起始节点
+        MenuItem startItem = new MenuItem("设为起始节点");
         startItem.setOnAction(e -> {
             logger.debug("📌 设为起始节点: {}", jobHandlerName);
             // TODO: 标记为起始节点
@@ -413,8 +413,8 @@ public class ProcessNode extends StackPane {
         // 分隔符
         SeparatorMenuItem separator2 = new SeparatorMenuItem();
         
-        // 🗑️ 删除节点
-        MenuItem deleteItem = new MenuItem("🗑️ 删除节点");
+        // 删除节点
+        MenuItem deleteItem = new MenuItem("删除节点");
         deleteItem.setStyle("-fx-text-fill: #EF4444;"); // 红色文字
         deleteItem.setOnAction(e -> {
             if (onDelete != null) {

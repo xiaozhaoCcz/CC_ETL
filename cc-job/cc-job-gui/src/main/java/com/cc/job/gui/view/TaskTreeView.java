@@ -69,6 +69,12 @@ public class TaskTreeView extends VBox {
 
         default void onEdgeAction(Long edgeId, EdgeAction action) {
         }
+        
+        default void onPartitionAction(Long partitionId, String partitionName, PartitionAction action) {
+        }
+        
+        default void onJobGroupEdit(Long taskGroupId, String taskGroupName) {
+        }
 
         enum JobNodeAction {
             EDIT,
@@ -78,6 +84,11 @@ public class TaskTreeView extends VBox {
         enum EdgeAction {
             LOCATE,
             DELETE
+        }
+        
+        enum PartitionAction {
+            EDIT,
+            EXPORT
         }
     }
     
@@ -348,7 +359,7 @@ public class TaskTreeView extends VBox {
                 
                 // type: 0=分区, 1=任务组, 2=任务节点 - 扁平化设计
                 if (nodeType == 0) {
-                    // 一级节点（分区）- 新建任务组 + 刷新/删除
+                    // 一级节点（分区）- 新建任务组 + 刷新/编辑/导出/删除
                     MenuItem newTaskItem = new MenuItem("新建任务组");
                     newTaskItem.setStyle(
                         "-fx-font-size: 13; " +
@@ -363,17 +374,40 @@ public class TaskTreeView extends VBox {
                     });
 
                     MenuItem refreshItem = new MenuItem("刷新");
+                    refreshItem.setStyle("-fx-text-fill: #000000;"); // 黑色字体
                     refreshItem.setOnAction(e -> handleRefresh(nodeData, treeItem));
+                    
+                    MenuItem editItem = new MenuItem("编辑");
+                    editItem.setStyle("-fx-text-fill: #000000;"); // 黑色字体
+                    editItem.setOnAction(e -> {
+                        logger.debug("✏️ 编辑分区: {}, ID: {}", nodeName, nodeData.getId());
+                        if (selectionCallback != null) {
+                            selectionCallback.onPartitionAction(nodeData.getId(), nodeData.getLabel(), 
+                                TaskSelectionCallback.PartitionAction.EDIT);
+                        }
+                    });
+                    
+                    MenuItem exportItem = new MenuItem("导出");
+                    exportItem.setStyle("-fx-text-fill: #000000;"); // 黑色字体
+                    exportItem.setOnAction(e -> {
+                        logger.debug("📤 导出分区: {}, ID: {}", nodeName, nodeData.getId());
+                        if (selectionCallback != null) {
+                            selectionCallback.onPartitionAction(nodeData.getId(), nodeData.getLabel(), 
+                                TaskSelectionCallback.PartitionAction.EXPORT);
+                        }
+                    });
 
                     menu.getItems().add(newTaskItem);
                     menu.getItems().add(refreshItem);
+                    menu.getItems().add(editItem);
+                    menu.getItems().add(exportItem);
                     if (supportsDeletion(nodeData)) {
                         menu.getItems().add(new SeparatorMenuItem());
                         menu.getItems().add(createDeleteMenuItem(nodeData, treeItem));
                     }
                     
                 } else if (nodeType == 1) {
-                    // 二级节点（任务组）- 新增节点和刷新功能
+                    // 二级节点（任务组）- 新增节点、刷新、编辑功能
                     MenuItem addNodeItem = new MenuItem("新增节点");
                     addNodeItem.setStyle(
                         "-fx-font-size: 13; " +
@@ -388,10 +422,21 @@ public class TaskTreeView extends VBox {
                     });
                     
                     MenuItem refreshItem = new MenuItem("刷新");
+                    refreshItem.setStyle("-fx-text-fill: #000000;"); // 黑色字体
                     refreshItem.setOnAction(e -> handleRefresh(nodeData, treeItem));
+                    
+                    MenuItem editItem = new MenuItem("编辑");
+                    editItem.setStyle("-fx-text-fill: #000000;"); // 黑色字体
+                    editItem.setOnAction(e -> {
+                        logger.debug("✏️ 编辑任务组: {}, ID: {}", nodeName, nodeData.getId());
+                        if (selectionCallback != null) {
+                            selectionCallback.onJobGroupEdit(nodeData.getId(), nodeData.getLabel());
+                        }
+                    });
 
                     menu.getItems().add(addNodeItem);
                     menu.getItems().add(refreshItem);
+                    menu.getItems().add(editItem);
                     if (supportsDeletion(nodeData)) {
                         menu.getItems().add(new SeparatorMenuItem());
                         menu.getItems().add(createDeleteMenuItem(nodeData, treeItem));
@@ -400,6 +445,7 @@ public class TaskTreeView extends VBox {
                 } else if (nodeType != null && nodeType == 4) {
                     // 任务节点（type=4）
                     MenuItem refreshItem = new MenuItem("刷新");
+                    refreshItem.setStyle("-fx-text-fill: #000000;"); // 黑色字体
                     refreshItem.setOnAction(e -> handleRefresh(nodeData, treeItem));
 
                     MenuItem openItem = new MenuItem("打开");
@@ -454,6 +500,7 @@ public class TaskTreeView extends VBox {
                     menu.getItems().add(deleteEdgeItem);
                 } else {
                     MenuItem refreshItem = new MenuItem("刷新");
+                    refreshItem.setStyle("-fx-text-fill: #000000;"); // 黑色字体
                     refreshItem.setOnAction(e -> handleRefresh(nodeData, treeItem));
                     menu.getItems().add(refreshItem);
                 }
