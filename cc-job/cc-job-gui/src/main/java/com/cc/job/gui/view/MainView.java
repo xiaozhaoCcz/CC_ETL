@@ -347,6 +347,18 @@ public class MainView extends BorderPane {
             public void onSettings() {
                 logPanel.info("系统设置功能开发中...");
             }
+
+            @Override
+            public void onSelect() {
+                // 切换框选模式
+                boolean currentMode = canvas.isSelectionMode();
+                canvas.setSelectionMode(!currentMode);
+                if (!currentMode) {
+                    logPanel.info("✓ 框选模式已启用，请在画布上拖拽鼠标框选节点和边");
+                } else {
+                    logPanel.info("✓ 框选模式已禁用");
+                }
+            }
         });
 
         // 定期更新工具栏显示运行中的任务组
@@ -1926,6 +1938,16 @@ public class MainView extends BorderPane {
      * 在画布上添加节点
      */
     private void addNodeToCanvas(com.cc.job.xo.model.entity.JobNode jobNode, com.cc.job.xo.model.form.JobInfoForm formData) {
+        addNodeToCanvasAndReturn(jobNode, formData);
+    }
+    
+    /**
+     * 添加节点到画布并返回节点对象
+     * @param jobNode 任务节点实体
+     * @param formData 任务表单数据
+     * @return 创建的ProcessNode对象，如果失败返回null
+     */
+    private ProcessNode addNodeToCanvasAndReturn(com.cc.job.xo.model.entity.JobNode jobNode, com.cc.job.xo.model.form.JobInfoForm formData) {
         try {
             logPanel.info("正在画布上添加节点...");
 
@@ -1965,10 +1987,13 @@ public class MainView extends BorderPane {
 
             logPanel.success("✓ 节点已添加到画布: " + formData.getJobDesc());
             logPanel.info("节点坐标: (" + x + ", " + y + ")");
+            
+            return node;
 
         } catch (Exception e) {
             logger.error("添加节点到画布失败: {}", e.getMessage(), e);
             logPanel.error("✗ 添加节点到画布失败: " + e.getMessage());
+            return null;
         }
     }
 
@@ -2026,8 +2051,20 @@ public class MainView extends BorderPane {
                 copyForm.setJobDesc(generateCopyName(copyForm.getJobDesc()));
                 copyForm.setNodePositionX(sourceNode.getLayoutX() + 60);
                 copyForm.setNodePositionY(sourceNode.getLayoutY() + 40);
+                
+                // 清除不应该复制的字段
+                copyForm.setGlueUpdatetime(null); // GLUE更新时间应该由后端管理
+                // triggerStatus、triggerLastTime、triggerNextTime 字段在JobInfoForm中可能不存在，由后端管理
+                
+                // 确保必填字段不为空
                 if (copyForm.getExecutorParam() == null) {
                     copyForm.setExecutorParam("");
+                }
+                if (copyForm.getExecutorRouteStrategy() == null || copyForm.getExecutorRouteStrategy().isEmpty()) {
+                    copyForm.setExecutorRouteStrategy("FIRST"); // 默认路由策略
+                }
+                if (copyForm.getExecutorBlockStrategy() == null || copyForm.getExecutorBlockStrategy().isEmpty()) {
+                    copyForm.setExecutorBlockStrategy("SERIAL_EXECUTION"); // 默认阻塞策略
                 }
 
                 com.cc.job.xo.model.entity.JobNode newJobNode = jobInfoService.saveJobNode(copyForm);
@@ -2045,10 +2082,20 @@ public class MainView extends BorderPane {
 
                 Platform.runLater(() -> {
                     try {
-                        addNodeToCanvas(newJobNode, copyForm);
+                        // 添加节点到画布
+                        ProcessNode newNode = addNodeToCanvasAndReturn(newJobNode, copyForm);
+                        
+                        // 选中新复制的节点
+                        if (newNode != null) {
+                            canvas.selectNode(newNode);
+                        }
+                        
+                        // 刷新任务树
                         refreshTreeViewWithoutNavigation(currentTaskGroupId);
                         logPanel.success("✓ 节点复制成功: " + copyForm.getJobDesc());
+                        logPanel.info("新节点已自动选中，位置: (" + copyForm.getNodePositionX() + ", " + copyForm.getNodePositionY() + ")");
                     } catch (Exception e) {
+                        logger.error("添加复制节点到画布失败: {}", e.getMessage(), e);
                         logPanel.error("✗ 添加复制节点到画布失败: " + e.getMessage());
                     } finally {
                         logPanel.info("════════════════════════════════");

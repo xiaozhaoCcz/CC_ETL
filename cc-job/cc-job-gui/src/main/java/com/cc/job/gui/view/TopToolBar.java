@@ -43,6 +43,7 @@ public class TopToolBar extends VBox {
         void onStop(Long jobId);
         void onClear();
         void onSettings();
+        void onSelect(); // 框选功能
     }
     
     private ToolBarCallback callback;
@@ -131,9 +132,10 @@ public class TopToolBar extends VBox {
         // 编辑操作组
         undoButton = createIconButton(IconUtil.undoIcon(), "撤销", "撤销上一步操作", () -> safeCall(ToolBarCallback::onUndo));
         redoButton = createIconButton(IconUtil.redoIcon(), "重做", "重做上一步操作", () -> safeCall(ToolBarCallback::onRedo));
+        Button selectButton = createIconButton(IconUtil.selectIcon(), "框选", "框选节点和边", () -> safeCall(ToolBarCallback::onSelect));
         undoButton.setDisable(true);
         redoButton.setDisable(true);
-        HBox editGroup = createToolGroup(undoButton, redoButton);
+        HBox editGroup = createToolGroup(undoButton, redoButton, selectButton);
         
         Region sep2 = createSeparator();
         
