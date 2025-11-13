@@ -59,6 +59,7 @@ public class ProcessNode extends StackPane {
     private Runnable onDragStarted;
     private PositionAdjuster positionAdjuster;
     private Consumer<ProcessNode> onPositionChanged;
+    private Runnable onClicked; // 节点点击回调（非拖拽）
     
     // 编辑/复制/详情回调
     private Runnable onEdit;
@@ -331,8 +332,27 @@ public class ProcessNode extends StackPane {
                 if (dragFinishedListener != null) {
                     double newX = this.getLayoutX();
                     double newY = this.getLayoutY();
-                    if (Math.abs(newX - initialLayoutX) > 0.5 || Math.abs(newY - initialLayoutY) > 0.5) {
+                    double deltaX = Math.abs(newX - initialLayoutX);
+                    double deltaY = Math.abs(newY - initialLayoutY);
+                    
+                    // 检查是否是拖拽还是点击
+                    if (deltaX > 3 || deltaY > 3) {
+                        // 拖拽：触发拖拽结束回调
                         dragFinishedListener.onDragFinished(initialLayoutX, initialLayoutY, newX, newY);
+                    } else {
+                        // 点击：触发点击回调
+                        if (onClicked != null) {
+                            onClicked.run();
+                        }
+                    }
+                } else {
+                    // 如果没有拖拽回调，也检查是否是点击
+                    double newX = this.getLayoutX();
+                    double newY = this.getLayoutY();
+                    double deltaX = Math.abs(newX - initialLayoutX);
+                    double deltaY = Math.abs(newY - initialLayoutY);
+                    if (deltaX <= 3 && deltaY <= 3 && onClicked != null) {
+                        onClicked.run();
                     }
                 }
                 e.consume();
@@ -548,6 +568,10 @@ public class ProcessNode extends StackPane {
     
     public void setOnPositionChanged(Consumer<ProcessNode> onPositionChanged) {
         this.onPositionChanged = onPositionChanged;
+    }
+    
+    public void setOnClicked(Runnable onClicked) {
+        this.onClicked = onClicked;
     }
 
     public void setOnEdit(Runnable onEdit) {

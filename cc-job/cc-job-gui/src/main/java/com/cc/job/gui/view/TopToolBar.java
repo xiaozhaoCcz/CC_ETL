@@ -44,6 +44,8 @@ public class TopToolBar extends VBox {
         void onClear();
         void onSettings();
         void onSelect(); // 框选功能
+        void onLayoutHorizontal(); // 横向布局
+        void onLayoutVertical(); // 纵向布局
     }
     
     private ToolBarCallback callback;
@@ -134,9 +136,11 @@ public class TopToolBar extends VBox {
         undoButton = createIconButton(IconUtil.undoIcon(), "撤销", "撤销上一步操作", () -> safeCall(ToolBarCallback::onUndo));
         redoButton = createIconButton(IconUtil.redoIcon(), "重做", "重做上一步操作", () -> safeCall(ToolBarCallback::onRedo));
         selectButton = createIconButton(IconUtil.selectIcon(), "框选", "框选节点和边", () -> safeCall(ToolBarCallback::onSelect));
+        Button layoutHorizontalButton = createIconButton(IconUtil.layoutHorizontalIcon(), "横向布局", "横向对齐选中的节点", () -> safeCall(ToolBarCallback::onLayoutHorizontal));
+        Button layoutVerticalButton = createIconButton(IconUtil.layoutVerticalIcon(), "纵向布局", "纵向对齐选中的节点", () -> safeCall(ToolBarCallback::onLayoutVertical));
         undoButton.setDisable(true);
         redoButton.setDisable(true);
-        HBox editGroup = createToolGroup(undoButton, redoButton, selectButton);
+        HBox editGroup = createToolGroup(undoButton, redoButton, selectButton, layoutHorizontalButton, layoutVerticalButton);
         
         Region sep2 = createSeparator();
         

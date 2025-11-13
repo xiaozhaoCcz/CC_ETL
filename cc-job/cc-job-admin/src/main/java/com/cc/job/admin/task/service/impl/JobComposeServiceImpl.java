@@ -324,25 +324,75 @@ public class JobComposeServiceImpl implements JobComposeService {
                 jobNodeService.save(jobNode);
                 nodeIdMap.put(node.getId(), jobNode.getId());
             } else {
-                JobNode jobNode = nodeFromDb.stream().filter(n -> n.getId().equals(Long.parseLong(node.getId()))).findFirst().orElse(null);
-                JobInfo copyJobInfo = BeanUtil.copyProperties(jobInfo1, JobInfo.class, "id","parentId","jobPartId");
-                copyJobInfo.setId(jobNode.getJobId());
-                jobInfoService.updateById(copyJobInfo);
-                Map<String, Object> propertiesMap = JSONUtil.toBean(node.properties, Map.class);
-                jobNode.setNodePositionX(node.x);
-                jobNode.setNodePositionY(node.y);
-                jobNode.setNodeType(node.type);
-                if (DYNAMIC_GROUP.equalsIgnoreCase(node.getType())) {
-                    List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
-                    List<LfNode> childNodes = lfNodes.stream().filter(n -> childIds.contains(n.getId())).toList();
-                    List<LfEdge> childEdges = lfEdges.stream().filter(e -> childIds.contains(e.getSourceNodeId()) || childIds.contains(e.targetNodeId)).toList();
-                    List<Long> childJobIds = operateToUpdateJobCompose(jobInfo1, childNodes, childEdges, lfNodes, lfEdges);
-                    jobNode.setChildren(JSONUtil.toJsonStr(childJobIds));
-                    propertiesMap.put("children", JSONUtil.toJsonStr(childJobIds));
+                // ⭐ 修复：尝试通过nodeId查找节点，如果找不到，再尝试通过jobId查找（处理粘贴节点的情况）
+                Long nodeIdLong = Long.parseLong(node.getId());
+                JobNode jobNode = nodeFromDb.stream().filter(n -> n.getId().equals(nodeIdLong)).findFirst().orElse(null);
+                
+                // 如果通过nodeId找不到，尝试通过jobId查找（粘贴的节点可能已经保存，但nodeId可能不匹配）
+                if (jobNode == null) {
+                    Map<String, Object> nodeProperties = JSONUtil.toBean(node.getProperties(), Map.class);
+                    Object nodeJobIdObj = nodeProperties.get(JOB_ID);
+                    if (nodeJobIdObj != null) {
+                        Long nodeJobId = Long.parseLong(String.valueOf(nodeJobIdObj));
+                        // 通过jobId查找节点（粘贴的节点可能已经保存）
+                        jobNode = nodeFromDb.stream().filter(n -> n.getJobId().equals(nodeJobId)).findFirst().orElse(null);
+                    }
                 }
-                jobNode.setProperties(JSONUtil.toJsonStr(propertiesMap));
-                updateNodes.add(jobNode);
-                nodeIdMap.put(node.getId(), jobNode.getId());
+                
+                // ⭐ 修复：如果找不到已存在的节点，可能是新粘贴的节点，需要创建新节点
+                if (jobNode == null) {
+                    // 创建新节点（类似包含"-"的逻辑）
+                    JobInfo copyJobInfo = BeanUtil.copyProperties(jobInfo1, JobInfo.class, "id");
+                    copyJobInfo.setIsNode("Y");
+                    copyJobInfo.setParentId(jobInfo.getId());
+                    jobInfoService.save(copyJobInfo);
+
+                    JobNode newJobNode = new JobNode();
+                    newJobNode.setJobId(copyJobInfo.getId());
+                    newJobNode.setJobParentId(jobInfo.getId());
+                    newJobNode.setNodePositionX(node.x);
+                    newJobNode.setNodePositionY(node.y);
+                    newJobNode.setNodeType(node.type);
+                    // 修复：新创建的节点，triggerStatus设置为-1表示未运行状态（白色背景）
+                    newJobNode.setTriggerStatus(-1);
+                    Map<String, Object> propertiesMap = JSONUtil.toBean(node.properties, Map.class);
+                    propertiesMap.put(JOB_ID, copyJobInfo.getId());
+
+                    if (DYNAMIC_GROUP.equalsIgnoreCase(node.getType())) {
+                        List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
+                        List<LfNode> childNodes = lfNodes.stream().filter(n -> childIds.contains(n.getId())).toList();
+                        List<LfEdge> childEdges = lfEdges.stream().filter(e -> childIds.contains(e.getSourceNodeId()) || childIds.contains(e.targetNodeId)).toList();
+                        List<Long> childJobIds = operateToSaveJobCompose(copyJobInfo, childNodes, childEdges, lfNodes, lfEdges);
+                        propertiesMap.put("children", JSONUtil.toJsonStr(childJobIds));
+                        newJobNode.setChildren(JSONUtil.toJsonStr(childJobIds));
+                        copyJobInfo.setJobType(2);
+                        copyJobInfo.setExecutorParam(String.valueOf(copyJobInfo.getId()));
+                        jobInfoService.updateById(copyJobInfo);
+                    }
+                    newJobNode.setProperties(JSONUtil.toJsonStr(propertiesMap));
+                    jobNodeService.save(newJobNode);
+                    nodeIdMap.put(node.getId(), newJobNode.getId());
+                } else {
+                    // 更新已存在的节点
+                    JobInfo copyJobInfo = BeanUtil.copyProperties(jobInfo1, JobInfo.class, "id","parentId","jobPartId");
+                    copyJobInfo.setId(jobNode.getJobId());
+                    jobInfoService.updateById(copyJobInfo);
+                    Map<String, Object> propertiesMap = JSONUtil.toBean(node.properties, Map.class);
+                    jobNode.setNodePositionX(node.x);
+                    jobNode.setNodePositionY(node.y);
+                    jobNode.setNodeType(node.type);
+                    if (DYNAMIC_GROUP.equalsIgnoreCase(node.getType())) {
+                        List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
+                        List<LfNode> childNodes = lfNodes.stream().filter(n -> childIds.contains(n.getId())).toList();
+                        List<LfEdge> childEdges = lfEdges.stream().filter(e -> childIds.contains(e.getSourceNodeId()) || childIds.contains(e.targetNodeId)).toList();
+                        List<Long> childJobIds = operateToUpdateJobCompose(jobInfo1, childNodes, childEdges, lfNodes, lfEdges);
+                        jobNode.setChildren(JSONUtil.toJsonStr(childJobIds));
+                        propertiesMap.put("children", JSONUtil.toJsonStr(childJobIds));
+                    }
+                    jobNode.setProperties(JSONUtil.toJsonStr(propertiesMap));
+                    updateNodes.add(jobNode);
+                    nodeIdMap.put(node.getId(), jobNode.getId());
+                }
             }
         }
 
@@ -352,15 +402,18 @@ public class JobComposeServiceImpl implements JobComposeService {
         for (LfEdge edge : edgeList) {
             Long sourceJobId = nodeIdMap.get(edge.getSourceNodeId());
             Long targetJobId = nodeIdMap.get(edge.getTargetNodeId());
-            JobEdge jobEdge = new JobEdge();
-            jobEdge.setFromNodeId(sourceJobId);
-            jobEdge.setEndNodeId(targetJobId);
-            jobEdge.setJobParentId(jobInfo.getId());
-            jobEdge.setProperties(edge.properties);
-            jobEdge.setPointsList(edge.pointsList);
-            jobEdge.setStartPoint(edge.startPoint);
-            jobEdge.setEndPoint(edge.endPoint);
-            jobEdgeList.add(jobEdge);
+            // ⭐ 修复：只有当sourceJobId和targetJobId都不为null时才创建边，避免保存无效的边
+            if (sourceJobId != null && targetJobId != null) {
+                JobEdge jobEdge = new JobEdge();
+                jobEdge.setFromNodeId(sourceJobId);
+                jobEdge.setEndNodeId(targetJobId);
+                jobEdge.setJobParentId(jobInfo.getId());
+                jobEdge.setProperties(edge.properties);
+                jobEdge.setPointsList(edge.pointsList);
+                jobEdge.setStartPoint(edge.startPoint);
+                jobEdge.setEndPoint(edge.endPoint);
+                jobEdgeList.add(jobEdge);
+            }
         }
 
         jobEdgeService.saveBatch(jobEdgeList);

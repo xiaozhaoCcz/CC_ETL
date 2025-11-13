@@ -1088,6 +1088,76 @@ public class TaskTreeView extends VBox {
     }
     
     /**
+     * 根据任务组名称选中对应的树节点
+     * @param taskGroupName 任务组名称
+     */
+    public void selectTaskGroupByName(String taskGroupName) {
+        if (taskGroupName == null || taskGroupName.isEmpty()) {
+            return;
+        }
+        
+        // 确保在 JavaFX 应用线程中执行
+        Platform.runLater(() -> {
+            TreeItem<TreeNodeData> foundItem = findTreeItemByName(rootItem, taskGroupName);
+            if (foundItem != null) {
+                // 选中找到的节点
+                treeView.getSelectionModel().select(foundItem);
+                // 确保节点可见（展开父节点）
+                TreeItem<TreeNodeData> parent = foundItem.getParent();
+                while (parent != null && parent != rootItem) {
+                    if (!parent.isExpanded()) {
+                        parent.setExpanded(true);
+                    }
+                    parent = parent.getParent();
+                }
+                // 滚动到选中的节点
+                int row = treeView.getRow(foundItem);
+                if (row >= 0) {
+                    treeView.scrollTo(row);
+                }
+                logger.debug("✓ 已选中树节点: {}", taskGroupName);
+            } else {
+                logger.warn("⚠ 未找到树节点: {}", taskGroupName);
+            }
+        });
+    }
+    
+    /**
+     * 递归查找指定名称的树节点（任务组类型）
+     */
+    private TreeItem<TreeNodeData> findTreeItemByName(TreeItem<TreeNodeData> item, String taskGroupName) {
+        if (item == null || item.getValue() == null) {
+            return null;
+        }
+        
+        TreeNodeData nodeData = item.getValue();
+        // 检查是否是任务组且名称匹配
+        if (nodeData.getType() != null && nodeData.getType() == 1 && 
+            taskGroupName.equals(nodeData.getLabel())) {
+            return item;
+        }
+        
+        // 递归查找子节点
+        for (TreeItem<TreeNodeData> child : item.getChildren()) {
+            TreeItem<TreeNodeData> found = findTreeItemByName(child, taskGroupName);
+            if (found != null) {
+                return found;
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * 清除树形视图的选中状态
+     */
+    public void clearSelection() {
+        Platform.runLater(() -> {
+            treeView.getSelectionModel().clearSelection();
+        });
+    }
+    
+    /**
      * 递归查找指定ID的树节点
      */
     private TreeItem<TreeNodeData> findTreeItemById(TreeItem<TreeNodeData> item, Long targetId) {

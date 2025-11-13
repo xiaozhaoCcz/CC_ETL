@@ -27,6 +27,11 @@ public class TaskNavigationBar extends HBox {
     private Map<String, TaskTab> tabs;
     private String currentTaskGroup;
     private TaskSwitchCallback switchCallback;
+    private TaskCloseCallback closeCallback;
+    
+    public interface TaskCloseCallback {
+        void onTaskClose(String taskGroupName);
+    }
     
     // 运行/停止按钮区域
     private HBox actionButtonArea;
@@ -293,14 +298,30 @@ public class TaskNavigationBar extends HBox {
         if (tab != null) {
             tabContainer.getChildren().remove(tab);
             
+            // 判断是否是关闭当前标签页
+            boolean isClosingCurrentTab = taskGroupName.equals(currentTaskGroup);
+            
+            // 触发关闭回调，通知外部清除树形视图的选中状态
+            // 注意：如果关闭的是当前标签页，会立即切换到新标签页，不需要清除选中状态
+            if (closeCallback != null && !isClosingCurrentTab) {
+                closeCallback.onTaskClose(taskGroupName);
+            }
+            
             // 如果删除的是当前标签，切换到第一个标签
-            if (taskGroupName.equals(currentTaskGroup) && !tabs.isEmpty()) {
+            if (isClosingCurrentTab && !tabs.isEmpty()) {
                 String firstTab = tabs.keySet().iterator().next();
                 switchToTaskGroup(firstTab);
             } else if (tabs.isEmpty()) {
                 currentTaskGroup = null;
             }
         }
+    }
+    
+    /**
+     * 设置关闭回调
+     */
+    public void setOnTaskClose(TaskCloseCallback callback) {
+        this.closeCallback = callback;
     }
     
     /**

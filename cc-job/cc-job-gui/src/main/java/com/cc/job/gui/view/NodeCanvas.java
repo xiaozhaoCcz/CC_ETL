@@ -446,6 +446,14 @@ public class NodeCanvas extends Pane {
                 adjustNodePositionOnDrag(processNode, proposedX, proposedY));
         node.setOnPositionChanged(this::handleNodePositionChanged);
 
+        // 设置节点点击回调（用于选中节点）
+        node.setOnClicked(() -> {
+            if (!isMovingSelection) {
+                // 点击节点时选中它
+                selectNode(node);
+            }
+        });
+        
         // 拖拽结束后记录历史并结束批量移动
         node.setOnDragFinished((oldX, oldY, newX, newY) -> {
             // 如果正在批量移动，先结束批量移动并更新所有选中节点的原始位置
@@ -453,8 +461,13 @@ public class NodeCanvas extends Pane {
                 endSelectionMove();
             }
             
-            // 然后记录历史
-            if (undoRedoManager != null && historyEnabled) {
+            // 检查是否是点击（没有移动）还是拖拽
+            double deltaX = Math.abs(newX - oldX);
+            double deltaY = Math.abs(newY - oldY);
+            boolean isClick = deltaX < 3 && deltaY < 3; // 移动距离小于3像素认为是点击
+            
+            // 然后记录历史（只有实际移动了才记录）
+            if (undoRedoManager != null && historyEnabled && !isClick) {
                 CanvasAction action;
                 if (!autoShiftOriginalPositions.isEmpty()) {
                     Map<ProcessNode, NodePositionSnapshot> shiftedNodes = new HashMap<>();
@@ -1821,6 +1834,44 @@ public class NodeCanvas extends Pane {
     }
     
     /**
+     * 添加节点到选中集合（不清除之前的选择）
+     * @param node 要添加的节点
+     */
+    public void addToSelection(ProcessNode node) {
+        if (node == null || !nodes.contains(node)) {
+            return;
+        }
+        if (!selectedNodes.contains(node)) {
+            selectedNodes.add(node);
+            highlightNode(node, true);
+            // 记录节点的原始位置（用于批量移动）
+            selectionOriginalPositions.put(node, new double[]{node.getLayoutX(), node.getLayoutY()});
+            updateSelectionBoundingBox();
+        }
+    }
+    
+    /**
+     * 选中多个节点（用于程序化选择）
+     * @param nodes 要选中的节点集合
+     */
+    public void selectNodes(java.util.Collection<ProcessNode> nodes) {
+        if (nodes == null || nodes.isEmpty()) {
+            clearSelection();
+            return;
+        }
+        clearSelection();
+        for (ProcessNode node : nodes) {
+            if (node != null && this.nodes.contains(node)) {
+                selectedNodes.add(node);
+                highlightNode(node, true);
+                // 记录节点的原始位置（用于批量移动）
+                selectionOriginalPositions.put(node, new double[]{node.getLayoutX(), node.getLayoutY()});
+            }
+        }
+        updateSelectionBoundingBox();
+    }
+    
+    /**
      * 开始选中节点的批量移动
      */
     private void startSelectionMove(ProcessNode draggedNode) {
@@ -1857,6 +1908,142 @@ public class NodeCanvas extends Pane {
         
         dragStartNode = null;
         notifyNodeStructureChanged();
+    }
+    
+    /**
+     * 横向布局：将所有选中节点的 Y 坐标对齐到同一水平线
+     */
+    public void alignHorizontal() {
+        if (selectedNodes.isEmpty()) {
+            log("⚠ 请先选中要布局的节点");
+            return;
+        }
+        
+        if (selectedNodes.size() < 2) {
+            log("⚠ 需要至少选中 2 个节点才能进行横向布局");
+            return;
+        }
+        
+        // 计算所有选中节点的平均 Y 坐标（或使用最小 Y）
+        double avgY = 0.0;
+        Map<ProcessNode, double[]> originalPositions = new HashMap<>();
+        
+        for (ProcessNode node : selectedNodes) {
+            double y = node.getLayoutY();
+            avgY += y;
+            // 记录原始位置用于历史记录
+            originalPositions.put(node, new double[]{node.getLayoutX(), node.getLayoutY()});
+        }
+        
+        final double finalAvgY = Math.max(0, avgY / selectedNodes.size());
+        
+        // 对齐所有节点的 Y 坐标
+        runWithoutHistory(() -> {
+            for (ProcessNode node : selectedNodes) {
+                node.setLayoutY(finalAvgY);
+            }
+        });
+        
+        // 记录历史
+        if (undoRedoManager != null && historyEnabled) {
+            Map<ProcessNode, NodePositionSnapshot> nodeSnapshots = new HashMap<>();
+            for (Map.Entry<ProcessNode, double[]> entry : originalPositions.entrySet()) {
+                ProcessNode node = entry.getKey();
+                double[] oldPos = entry.getValue();
+                nodeSnapshots.put(node, new NodePositionSnapshot(
+                    oldPos[0], oldPos[1],
+                    node.getLayoutX(), node.getLayoutY()
+                ));
+            }
+            
+            if (!nodeSnapshots.isEmpty()) {
+                // 使用第一个节点作为主要节点（用于 MoveNodeGroupAction）
+                ProcessNode mainNode = nodeSnapshots.keySet().iterator().next();
+                NodePositionSnapshot mainSnapshot = nodeSnapshots.remove(mainNode);
+                nodeSnapshots.put(mainNode, mainSnapshot);
+                
+                pushAction(new MoveNodeGroupAction(
+                    mainNode,
+                    mainSnapshot.oldX, mainSnapshot.oldY,
+                    mainSnapshot.newX, mainSnapshot.newY,
+                    nodeSnapshots
+                ));
+            }
+        }
+        
+        // 更新包围框
+        updateSelectionBoundingBox();
+        notifyNodeStructureChanged();
+        
+        log("✓ 横向布局完成: " + selectedNodes.size() + " 个节点已对齐到 Y=" + String.format("%.1f", finalAvgY));
+    }
+    
+    /**
+     * 纵向布局：将所有选中节点的 X 坐标对齐到同一垂直线
+     */
+    public void alignVertical() {
+        if (selectedNodes.isEmpty()) {
+            log("⚠ 请先选中要布局的节点");
+            return;
+        }
+        
+        if (selectedNodes.size() < 2) {
+            log("⚠ 需要至少选中 2 个节点才能进行纵向布局");
+            return;
+        }
+        
+        // 计算所有选中节点的平均 X 坐标（或使用最小 X）
+        double avgX = 0.0;
+        Map<ProcessNode, double[]> originalPositions = new HashMap<>();
+        
+        for (ProcessNode node : selectedNodes) {
+            double x = node.getLayoutX();
+            avgX += x;
+            // 记录原始位置用于历史记录
+            originalPositions.put(node, new double[]{node.getLayoutX(), node.getLayoutY()});
+        }
+        
+        final double finalAvgX = Math.max(0, avgX / selectedNodes.size());
+        
+        // 对齐所有节点的 X 坐标
+        runWithoutHistory(() -> {
+            for (ProcessNode node : selectedNodes) {
+                node.setLayoutX(finalAvgX);
+            }
+        });
+        
+        // 记录历史
+        if (undoRedoManager != null && historyEnabled) {
+            Map<ProcessNode, NodePositionSnapshot> nodeSnapshots = new HashMap<>();
+            for (Map.Entry<ProcessNode, double[]> entry : originalPositions.entrySet()) {
+                ProcessNode node = entry.getKey();
+                double[] oldPos = entry.getValue();
+                nodeSnapshots.put(node, new NodePositionSnapshot(
+                    oldPos[0], oldPos[1],
+                    node.getLayoutX(), node.getLayoutY()
+                ));
+            }
+            
+            if (!nodeSnapshots.isEmpty()) {
+                // 使用第一个节点作为主要节点（用于 MoveNodeGroupAction）
+                ProcessNode mainNode = nodeSnapshots.keySet().iterator().next();
+                NodePositionSnapshot mainSnapshot = nodeSnapshots.remove(mainNode);
+                nodeSnapshots.put(mainNode, mainSnapshot);
+                
+                pushAction(new MoveNodeGroupAction(
+                    mainNode,
+                    mainSnapshot.oldX, mainSnapshot.oldY,
+                    mainSnapshot.newX, mainSnapshot.newY,
+                    nodeSnapshots
+                ));
+            }
+        }
+        
+        // 更新包围框
+        updateSelectionBoundingBox();
+        notifyNodeStructureChanged();
+        
+        log("✓ 纵向布局完成: " + selectedNodes.size() + " 个节点已对齐到 X=" + String.format("%.1f", finalAvgX));
     }
     
 }

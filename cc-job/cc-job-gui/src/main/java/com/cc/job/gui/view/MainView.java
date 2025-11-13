@@ -82,6 +82,31 @@ public class MainView extends BorderPane {
 
     // 多个任务组的执行状态管理（类似Vue中的logTabs）
     private java.util.Map<Long, RunningJobGroup> runningJobs = new java.util.HashMap<>();
+    
+    // 复制粘贴相关：存储复制的节点数据
+    private com.cc.job.xo.model.form.JobInfoForm copiedNodeForm = null; // 兼容单节点复制
+    
+    // 多节点复制粘贴数据结构
+    private static class CopiedNodesData {
+        List<NodeFormData> nodeForms = new java.util.ArrayList<>();
+        List<ConnectionInfo> connections = new java.util.ArrayList<>();
+        double minX = Double.MAX_VALUE;
+        double minY = Double.MAX_VALUE;
+        
+        static class NodeFormData {
+            com.cc.job.xo.model.form.JobInfoForm form;
+            Long originalJobId; // 原始jobId，用于匹配连接关系
+            String originalNodeId; // 原始节点ID
+        }
+        
+        static class ConnectionInfo {
+            Long sourceJobId; // 源节点jobId
+            Long targetJobId; // 目标节点jobId
+            String sourceAnchor; // 源锚点位置
+            String targetAnchor; // 目标锚点位置
+        }
+    }
+    private CopiedNodesData copiedNodesData = null;
 
     public MainView() {
         this.jobPartService = new JobPartService();
@@ -190,6 +215,9 @@ public class MainView extends BorderPane {
 
         // 初始化左侧边栏状态（重要！确保图标正确显示/隐藏）
         updateLeftSidebar();
+        
+        // 设置键盘快捷键
+        setupKeyboardShortcuts();
     }
 
     private void updateUndoRedoButtons() {
@@ -259,11 +287,31 @@ public class MainView extends BorderPane {
                 usePageStoreHook().setCurrentPage(taskId);
                 loadTaskGroupData(taskId, taskGroupName);
                 
+                // 同步树形视图的选中状态：选中对应的任务组
+                // 使用 Platform.runLater 确保在 UI 更新后执行，避免时序问题
+                javafx.application.Platform.runLater(() -> {
+                    treeView.selectTaskGroupByName(taskGroupName);
+                });
+                
                 // 检查任务运行状态并更新小绿点显示
                 checkAndUpdateTaskGroupRunningStatus(taskId, taskGroupName);
             } else {
                 logPanel.warn("⚠ 未找到任务组ID，无法加载流程图: " + taskGroupName);
                 logPanel.info("提示: 请先在左侧任务树中选择该任务组");
+            }
+        });
+        
+        // 导航栏关闭任务组标签回调
+        navigationBar.setOnTaskClose((TaskNavigationBar.TaskCloseCallback) taskGroupName -> {
+            // 当标签页关闭时，清除树形视图中对应任务组的选中状态
+            // 注意：此回调只在关闭的不是当前标签页时触发（当前标签页关闭时会直接切换到新标签页）
+            Long taskId = taskGroupNameToIdMap.get(taskGroupName);
+            if (taskId != null) {
+                // 如果当前选中的是关闭的任务组，清除选中状态
+                String currentSelectedTask = treeView.getSelectedTask();
+                if (taskGroupName.equals(currentSelectedTask)) {
+                    treeView.clearSelection();
+                }
             }
         });
 
@@ -366,10 +414,253 @@ public class MainView extends BorderPane {
                     logPanel.info("✓ 框选模式已禁用");
                 }
             }
+
+            @Override
+            public void onLayoutHorizontal() {
+                // 横向布局：将所有选中节点的 Y 坐标对齐
+                canvas.alignHorizontal();
+            }
+
+            @Override
+            public void onLayoutVertical() {
+                // 纵向布局：将所有选中节点的 X 坐标对齐
+                canvas.alignVertical();
+            }
         });
 
         // 定期更新工具栏显示运行中的任务组
         updateToolBarRunningJobs();
+    }
+    
+    /**
+     * 设置键盘快捷键
+     */
+    private void setupKeyboardShortcuts() {
+        // 使用场景的键盘事件监听器
+        this.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null) {
+                // 使用事件过滤器监听键盘事件
+                newScene.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, event -> {
+                    // Ctrl+C: 复制选中的节点
+                    if (event.isControlDown() && event.getCode() == javafx.scene.input.KeyCode.C) {
+                        handleCopyShortcut();
+                        event.consume();
+                    }
+                    // Ctrl+V: 粘贴节点
+                    else if (event.isControlDown() && event.getCode() == javafx.scene.input.KeyCode.V) {
+                        handlePasteShortcut();
+                        event.consume();
+                    }
+                });
+            }
+        });
+    }
+    
+    /**
+     * 处理 Ctrl+C 快捷键（复制）
+     */
+    private void handleCopyShortcut() {
+        // 获取选中的节点
+        java.util.Set<ProcessNode> selectedNodes = canvas.getSelectedNodes();
+        
+        if (selectedNodes.isEmpty()) {
+            // 如果没有选中的节点，尝试获取当前鼠标位置下的节点
+            // 或者提示用户先选中节点
+            logPanel.warn("⚠ 请先选中要复制的节点");
+            return;
+        }
+        
+        // 支持多节点复制
+        if (selectedNodes.size() == 1) {
+            // 单个节点：使用原有逻辑
+            ProcessNode nodeToCopy = selectedNodes.iterator().next();
+            if (nodeToCopy == null) {
+                logPanel.warn("⚠ 选中的节点无效");
+                return;
+            }
+            copyNodeToClipboard(nodeToCopy);
+        } else {
+            // 多个节点：使用新的多节点复制逻辑
+            copyNodesToClipboard(selectedNodes);
+        }
+    }
+    
+    /**
+     * 复制多个节点到剪贴板（用于键盘快捷键）
+     */
+    private void copyNodesToClipboard(java.util.Set<ProcessNode> sourceNodes) {
+        if (sourceNodes == null || sourceNodes.isEmpty()) {
+            logPanel.warn("⚠ 没有选中的节点，无法复制");
+            return;
+        }
+        
+        Long currentTaskGroupId = usePageStoreHook().getCurrentTaskGroupId();
+        if (currentTaskGroupId == null) {
+            logPanel.warn("⚠ 请先选择任务组后再复制节点");
+            return;
+        }
+        
+        logPanel.info("════════════════════════════════");
+        logPanel.info("📋 正在复制 " + sourceNodes.size() + " 个节点到剪贴板...");
+        
+        new Thread(() -> {
+            try {
+                CopiedNodesData data = new CopiedNodesData();
+                
+                // 1. 复制所有节点数据
+                for (ProcessNode node : sourceNodes) {
+                    if (node == null) {
+                        continue;
+                    }
+                    Long jobId = node.getJobId();
+                    if (jobId == null) {
+                        logPanel.warn("⚠ 节点 " + node.getJobHandlerName() + " 未绑定后端任务，跳过");
+                        continue;
+                    }
+                    
+                    JobInfoForm originalForm = jobInfoService.getJobNodeFormData(jobId);
+                    if (originalForm == null) {
+                        logPanel.warn("⚠ 获取节点 " + node.getJobHandlerName() + " 数据失败，跳过");
+                        continue;
+                    }
+                    
+                    JobInfoForm copyForm = deepCopyJobInfoForm(originalForm);
+                    if (copyForm == null) {
+                        logPanel.warn("⚠ 复制节点 " + node.getJobHandlerName() + " 数据失败，跳过");
+                        continue;
+                    }
+                    
+                    // 记录节点位置，用于计算偏移量
+                    double nodeX = node.getLayoutX();
+                    double nodeY = node.getLayoutY();
+                    data.minX = Math.min(data.minX, nodeX);
+                    data.minY = Math.min(data.minY, nodeY);
+                    
+                    // 保存节点数据（包含原始jobId和nodeId）
+                    CopiedNodesData.NodeFormData nodeData = new CopiedNodesData.NodeFormData();
+                    nodeData.form = copyForm;
+                    nodeData.originalJobId = jobId;
+                    nodeData.originalNodeId = node.getNodeId();
+                    
+                    data.nodeForms.add(nodeData);
+                }
+                
+                // 2. 复制节点之间的连接关系
+                List<NodeConnection> allConnections = canvas.getConnections();
+                for (NodeConnection conn : allConnections) {
+                    ProcessNode sourceNode = conn.getSourceNode();
+                    ProcessNode targetNode = conn.getTargetNode();
+                    
+                    // 只复制选中节点之间的连接
+                    if (sourceNodes.contains(sourceNode) && sourceNodes.contains(targetNode)) {
+                        CopiedNodesData.ConnectionInfo connInfo = new CopiedNodesData.ConnectionInfo();
+                        connInfo.sourceJobId = sourceNode.getJobId();
+                        connInfo.targetJobId = targetNode.getJobId();
+                        
+                        // 获取锚点位置
+                        connInfo.sourceAnchor = getAnchorPosition(sourceNode, conn.getSourceConnector());
+                        connInfo.targetAnchor = getAnchorPosition(targetNode, conn.getTargetConnector());
+                        
+                        data.connections.add(connInfo);
+                    }
+                }
+                
+                // 保存到剪贴板
+                copiedNodesData = data;
+                copiedNodeForm = null; // 清除单节点复制数据
+                
+                Platform.runLater(() -> {
+                    // 复制时不清除选中状态，保持原始节点的框框显示
+                    logPanel.success("✓ " + data.nodeForms.size() + " 个节点已复制到剪贴板");
+                    if (!data.connections.isEmpty()) {
+                        logPanel.info("包含 " + data.connections.size() + " 条连接关系");
+                    }
+                    logPanel.info("按 Ctrl+V 可以粘贴节点");
+                    logPanel.info("════════════════════════════════");
+                });
+            } catch (Exception e) {
+                e.printStackTrace();
+                Platform.runLater(() -> {
+                    logPanel.error("✗ 节点复制失败: " + e.getMessage());
+                    logPanel.info("════════════════════════════════");
+                });
+            }
+        }, "copy-nodes-clipboard-thread").start();
+    }
+    
+    /**
+     * 复制节点到剪贴板（用于键盘快捷键）- 单节点版本
+     */
+    private void copyNodeToClipboard(ProcessNode sourceNode) {
+        if (sourceNode == null) {
+            logPanel.warn("⚠ 当前节点为空，无法复制");
+            return;
+        }
+        Long sourceJobId = sourceNode.getJobId();
+        if (sourceJobId == null) {
+            logPanel.warn("⚠ 该节点未绑定后端任务，无法复制");
+            return;
+        }
+        Long currentTaskGroupId = usePageStoreHook().getCurrentTaskGroupId();
+        if (currentTaskGroupId == null) {
+            logPanel.warn("⚠ 请先选择任务组后再复制节点");
+            return;
+        }
+
+        logPanel.info("════════════════════════════════");
+        logPanel.info("📋 正在复制节点到剪贴板: " + safeString(sourceNode.getJobHandlerName()));
+
+        new Thread(() -> {
+            try {
+                JobInfoForm originalForm = jobInfoService.getJobNodeFormData(sourceJobId);
+                if (originalForm == null) {
+                    Platform.runLater(() -> logPanel.error("✗ 获取原节点数据失败"));
+                    return;
+                }
+
+                JobInfoForm copyForm = deepCopyJobInfoForm(originalForm);
+                if (copyForm == null) {
+                    Platform.runLater(() -> logPanel.error("✗ 复制节点数据失败"));
+                    return;
+                }
+
+                // 保存到剪贴板（用于粘贴）
+                copiedNodeForm = copyForm;
+                copiedNodesData = null; // 清除多节点复制数据
+                
+                Platform.runLater(() -> {
+                    // 复制时不清除选中状态，保持原始节点的框框显示
+                    logPanel.success("✓ 节点已复制到剪贴板: " + safeString(copyForm.getJobDesc()));
+                    logPanel.info("按 Ctrl+V 可以粘贴节点");
+                    logPanel.info("════════════════════════════════");
+                });
+            } catch (Exception e) {
+                e.printStackTrace();
+                Platform.runLater(() -> {
+                    logPanel.error("✗ 节点复制失败: " + e.getMessage());
+                    logPanel.info("════════════════════════════════");
+                });
+            }
+        }, "copy-node-clipboard-thread").start();
+    }
+    
+    /**
+     * 处理 Ctrl+V 快捷键（粘贴）
+     */
+    private void handlePasteShortcut() {
+        // 优先使用多节点粘贴
+        if (copiedNodesData != null && !copiedNodesData.nodeForms.isEmpty()) {
+            pasteNodes();
+            return;
+        }
+        
+        // 兼容单节点粘贴
+        if (copiedNodeForm != null) {
+            pasteNode();
+            return;
+        }
+        
+        logPanel.warn("⚠ 没有可粘贴的节点，请先复制一个节点");
     }
 
     /**
@@ -1304,16 +1595,18 @@ public class MainView extends BorderPane {
                 String edgeId = String.valueOf(System.currentTimeMillis() + edgesData.size());
                 edgeData.put("id", edgeId);
                 edgeData.put("type", "bezier");
+                // ⭐ LfEdge类使用的字段是sourceNodeId和targetNodeId（不是fromNodeId和endNodeId，那是JobEdge数据库字段）
                 edgeData.put("sourceNodeId", conn.getSourceNode().getNodeId());
                 edgeData.put("targetNodeId", conn.getTargetNode().getNodeId());
 
                 // 锚点信息
+                // ⭐ LfEdge类使用的字段是startPoint和endPoint
                 String sourceAnchor = conn.getSourceConnector() != null ?
                         getAnchorPosition(conn.getSourceNode(), conn.getSourceConnector()) : "right";
                 String targetAnchor = conn.getTargetConnector() != null ?
                         getAnchorPosition(conn.getTargetNode(), conn.getTargetConnector()) : "left";
-                edgeData.put("sourceAnchor", sourceAnchor);
-                edgeData.put("targetAnchor", targetAnchor);
+                edgeData.put("startPoint", sourceAnchor);
+                edgeData.put("endPoint", targetAnchor);
 
                 edgesData.add(edgeData);
             }
@@ -1415,6 +1708,38 @@ public class MainView extends BorderPane {
             return "right";
         }
         return "right"; // 默认右侧
+    }
+    
+    /**
+     * 根据锚点字符串获取对应的连接点
+     * @param node 节点
+     * @param anchor 锚点字符串，可能为 "top", "bottom", "left", "right" 或 null
+     * @param isSource 是否为源节点（true=源节点，false=目标节点）
+     * @return 连接点Circle对象
+     */
+    private javafx.scene.shape.Circle getConnectorByAnchor(ProcessNode node, String anchor, boolean isSource) {
+        if (anchor != null && !anchor.isEmpty()) {
+            // 根据锚点字符串返回对应的连接点（不区分大小写）
+            String anchorLower = anchor.toLowerCase();
+            if ("top".equals(anchorLower)) {
+                return node.getTopConnector();
+            } else if ("bottom".equals(anchorLower)) {
+                return node.getBottomConnector();
+            } else if ("left".equals(anchorLower)) {
+                return node.getLeftConnector();
+            } else if ("right".equals(anchorLower)) {
+                return node.getRightConnector();
+            }
+        }
+        
+        // 如果没有指定锚点，使用默认值
+        // 源节点默认使用右侧（数据流出）
+        // 目标节点默认使用左侧（数据流入）
+        if (isSource) {
+            return node.getRightConnector();
+        } else {
+            return node.getLeftConnector();
+        }
     }
 
     /**
@@ -2053,6 +2378,10 @@ public class MainView extends BorderPane {
                     return;
                 }
 
+                // 保存到剪贴板（用于粘贴）
+                copiedNodeForm = copyForm;
+                
+                // 立即创建新节点（右键菜单行为）
                 copyForm.setId(null);
                 copyForm.setParentId(currentTaskGroupId);
                 copyForm.setJobDesc(generateCopyName(copyForm.getJobDesc()));
@@ -2061,7 +2390,6 @@ public class MainView extends BorderPane {
                 
                 // 清除不应该复制的字段
                 copyForm.setGlueUpdatetime(null); // GLUE更新时间应该由后端管理
-                // triggerStatus、triggerLastTime、triggerNextTime 字段在JobInfoForm中可能不存在，由后端管理
                 
                 // 确保必填字段不为空
                 if (copyForm.getExecutorParam() == null) {
@@ -2116,6 +2444,316 @@ public class MainView extends BorderPane {
                 });
             }
         }, "copy-node-thread").start();
+    }
+    
+    /**
+     * 粘贴节点（从剪贴板）
+     */
+    private void pasteNode() {
+        if (copiedNodeForm == null) {
+            logPanel.warn("⚠ 没有可粘贴的节点，请先复制一个节点");
+            return;
+        }
+        
+        Long currentTaskGroupId = usePageStoreHook().getCurrentTaskGroupId();
+        if (currentTaskGroupId == null) {
+            logPanel.warn("⚠ 请先选择任务组后再粘贴节点");
+            return;
+        }
+        
+        logPanel.info("════════════════════════════════");
+        logPanel.info("📋 正在粘贴节点: " + safeString(copiedNodeForm.getJobDesc()));
+        
+        new Thread(() -> {
+            try {
+                // 创建新的表单数据（深拷贝）
+                JobInfoForm pasteForm = deepCopyJobInfoForm(copiedNodeForm);
+                if (pasteForm == null) {
+                    Platform.runLater(() -> logPanel.error("✗ 粘贴节点数据失败"));
+                    return;
+                }
+                
+                // 设置新节点的属性
+                pasteForm.setId(null);
+                pasteForm.setParentId(currentTaskGroupId);
+                pasteForm.setJobDesc(generateCopyName(copiedNodeForm.getJobDesc()));
+                
+                // 计算粘贴位置：在画布中心或鼠标位置附近
+                // 这里简单处理，放在画布中心附近
+                double[] pastePosition = calculatePastePosition();
+                pasteForm.setNodePositionX(pastePosition[0]);
+                pasteForm.setNodePositionY(pastePosition[1]);
+                
+                // 清除不应该复制的字段
+                pasteForm.setGlueUpdatetime(null);
+                
+                // 确保必填字段不为空
+                if (pasteForm.getExecutorParam() == null) {
+                    pasteForm.setExecutorParam("");
+                }
+                if (pasteForm.getExecutorRouteStrategy() == null || pasteForm.getExecutorRouteStrategy().isEmpty()) {
+                    pasteForm.setExecutorRouteStrategy("FIRST");
+                }
+                if (pasteForm.getExecutorBlockStrategy() == null || pasteForm.getExecutorBlockStrategy().isEmpty()) {
+                    pasteForm.setExecutorBlockStrategy("SERIAL_EXECUTION");
+                }
+                
+                // 保存到后端
+                com.cc.job.xo.model.entity.JobNode newJobNode = jobInfoService.saveJobNode(pasteForm);
+                if (newJobNode == null) {
+                    Platform.runLater(() -> logPanel.error("✗ 粘贴节点失败：后端返回空数据"));
+                    return;
+                }
+                
+                if (pasteForm.getNodePositionX() != null) {
+                    newJobNode.setNodePositionX(pasteForm.getNodePositionX());
+                }
+                if (pasteForm.getNodePositionY() != null) {
+                    newJobNode.setNodePositionY(pasteForm.getNodePositionY());
+                }
+                
+                Platform.runLater(() -> {
+                    try {
+                        // 清除原始节点的选中状态（框框消失）
+                        canvas.clearSelection();
+                        
+                        // 添加节点到画布
+                        ProcessNode newNode = addNodeToCanvasAndReturn(newJobNode, pasteForm);
+                        
+                        // 选中新粘贴的节点（显示红色框框）
+                        if (newNode != null) {
+                            canvas.selectNode(newNode);
+                        }
+                        
+                        // 刷新任务树
+                        refreshTreeViewWithoutNavigation(currentTaskGroupId);
+                        logPanel.success("✓ 节点粘贴成功: " + pasteForm.getJobDesc());
+                        logPanel.info("新节点已自动选中，位置: (" + pasteForm.getNodePositionX() + ", " + pasteForm.getNodePositionY() + ")");
+                        logPanel.info("💡 提示: 请点击保存按钮以持久化节点");
+                    } catch (Exception e) {
+                        logger.error("添加粘贴节点到画布失败: {}", e.getMessage(), e);
+                        logPanel.error("✗ 添加粘贴节点到画布失败: " + e.getMessage());
+                    } finally {
+                        logPanel.info("════════════════════════════════");
+                    }
+                });
+            } catch (Exception e) {
+                e.printStackTrace();
+                Platform.runLater(() -> {
+                    logPanel.error("✗ 节点粘贴失败: " + e.getMessage());
+                    logPanel.info("════════════════════════════════");
+                });
+            }
+        }, "paste-node-thread").start();
+    }
+    
+    /**
+     * 粘贴多个节点（从剪贴板）
+     */
+    private void pasteNodes() {
+        if (copiedNodesData == null || copiedNodesData.nodeForms.isEmpty()) {
+            logPanel.warn("⚠ 没有可粘贴的节点，请先复制节点");
+            return;
+        }
+        
+        Long currentTaskGroupId = usePageStoreHook().getCurrentTaskGroupId();
+        if (currentTaskGroupId == null) {
+            logPanel.warn("⚠ 请先选择任务组后再粘贴节点");
+            return;
+        }
+        
+        logPanel.info("════════════════════════════════");
+        logPanel.info("📋 正在粘贴 " + copiedNodesData.nodeForms.size() + " 个节点...");
+        
+        new Thread(() -> {
+            try {
+                // 计算粘贴位置（画布中心）
+                double[] pastePosition = calculatePastePosition();
+                double offsetX = pastePosition[0] - copiedNodesData.minX;
+                double offsetY = pastePosition[1] - copiedNodesData.minY;
+                
+                // jobId映射：原始jobId -> 新创建的节点
+                java.util.Map<Long, ProcessNode> jobIdToNewNodeMap = new java.util.HashMap<>();
+                java.util.List<ProcessNode> newNodes = new java.util.ArrayList<>();
+                
+                // 1. 创建所有节点
+                for (CopiedNodesData.NodeFormData nodeData : copiedNodesData.nodeForms) {
+                    try {
+                        JobInfoForm originalForm = nodeData.form;
+                        
+                        // 创建新的表单数据（深拷贝）
+                        JobInfoForm pasteForm = deepCopyJobInfoForm(originalForm);
+                        if (pasteForm == null) {
+                            logPanel.warn("⚠ 粘贴节点数据失败: " + safeString(originalForm.getJobDesc()));
+                            continue;
+                        }
+                        
+                        // 设置新节点的属性
+                        pasteForm.setId(null);
+                        pasteForm.setParentId(currentTaskGroupId);
+                        pasteForm.setJobDesc(generateCopyName(originalForm.getJobDesc()));
+                        
+                        // 计算新位置（保持相对位置）
+                        double originalX = originalForm.getNodePositionX() != null ? originalForm.getNodePositionX() : 0;
+                        double originalY = originalForm.getNodePositionY() != null ? originalForm.getNodePositionY() : 0;
+                        pasteForm.setNodePositionX(originalX + offsetX);
+                        pasteForm.setNodePositionY(originalY + offsetY);
+                        
+                        // 清除不应该复制的字段
+                        pasteForm.setGlueUpdatetime(null);
+                        
+                        // 确保必填字段不为空
+                        if (pasteForm.getExecutorParam() == null) {
+                            pasteForm.setExecutorParam("");
+                        }
+                        if (pasteForm.getExecutorRouteStrategy() == null || pasteForm.getExecutorRouteStrategy().isEmpty()) {
+                            pasteForm.setExecutorRouteStrategy("FIRST");
+                        }
+                        if (pasteForm.getExecutorBlockStrategy() == null || pasteForm.getExecutorBlockStrategy().isEmpty()) {
+                            pasteForm.setExecutorBlockStrategy("SERIAL_EXECUTION");
+                        }
+                        
+                        // 保存到后端
+                        com.cc.job.xo.model.entity.JobNode newJobNode = jobInfoService.saveJobNode(pasteForm);
+                        if (newJobNode == null) {
+                            logPanel.warn("⚠ 粘贴节点失败：后端返回空数据: " + safeString(pasteForm.getJobDesc()));
+                            continue;
+                        }
+                        
+                        if (pasteForm.getNodePositionX() != null) {
+                            newJobNode.setNodePositionX(pasteForm.getNodePositionX());
+                        }
+                        if (pasteForm.getNodePositionY() != null) {
+                            newJobNode.setNodePositionY(pasteForm.getNodePositionY());
+                        }
+                        
+                        final Long originalJobId = nodeData.originalJobId;
+                        final Long newJobId = newJobNode.getJobId();
+                        
+                        // 在UI线程中添加节点到画布
+                        Platform.runLater(() -> {
+                            try {
+                                ProcessNode newNode = addNodeToCanvasAndReturn(newJobNode, pasteForm);
+                                if (newNode != null) {
+                                    newNodes.add(newNode);
+                                    // 建立原始jobId到新节点的映射（用于恢复连接）
+                                    if (newJobId != null) {
+                                        jobIdToNewNodeMap.put(newJobId, newNode);
+                                    }
+                                }
+                            } catch (Exception e) {
+                                logger.error("添加粘贴节点到画布失败: {}", e.getMessage(), e);
+                            }
+                        });
+                    } catch (Exception e) {
+                        logger.error("粘贴节点失败: {}", e.getMessage(), e);
+                    }
+                }
+                
+                // 等待所有节点创建完成
+                Thread.sleep(500);
+                
+                // 2. 恢复连接关系
+                Platform.runLater(() -> {
+                    try {
+                        // 建立原始节点索引到新节点的映射（通过节点在列表中的顺序）
+                        java.util.Map<Integer, ProcessNode> indexToNewNodeMap = new java.util.HashMap<>();
+                        for (int i = 0; i < newNodes.size() && i < copiedNodesData.nodeForms.size(); i++) {
+                            indexToNewNodeMap.put(i, newNodes.get(i));
+                        }
+                        
+                        // 建立原始jobId到索引的映射
+                        java.util.Map<Long, Integer> originalJobIdToIndex = new java.util.HashMap<>();
+                        for (int i = 0; i < copiedNodesData.nodeForms.size(); i++) {
+                            CopiedNodesData.NodeFormData nodeData = copiedNodesData.nodeForms.get(i);
+                            if (nodeData.originalJobId != null) {
+                                originalJobIdToIndex.put(nodeData.originalJobId, i);
+                            }
+                        }
+                        
+                        // 恢复连接关系
+                        int connectionCount = 0;
+                        for (CopiedNodesData.ConnectionInfo connInfo : copiedNodesData.connections) {
+                            try {
+                                // 通过原始jobId找到索引，再通过索引找到新节点
+                                Integer sourceIndex = originalJobIdToIndex.get(connInfo.sourceJobId);
+                                Integer targetIndex = originalJobIdToIndex.get(connInfo.targetJobId);
+                                
+                                if (sourceIndex != null && targetIndex != null) {
+                                    ProcessNode sourceNode = indexToNewNodeMap.get(sourceIndex);
+                                    ProcessNode targetNode = indexToNewNodeMap.get(targetIndex);
+                                    
+                                    if (sourceNode != null && targetNode != null) {
+                                        // 根据锚点位置获取连接点
+                                        javafx.scene.shape.Circle sourceConnector = getConnectorByAnchor(
+                                            sourceNode, connInfo.sourceAnchor, true);
+                                        javafx.scene.shape.Circle targetConnector = getConnectorByAnchor(
+                                            targetNode, connInfo.targetAnchor, false);
+                                        
+                                        if (sourceConnector != null && targetConnector != null) {
+                                            canvas.addConnection(sourceNode, sourceConnector, 
+                                                                targetNode, targetConnector, true);
+                                            connectionCount++;
+                                        }
+                                    }
+                                }
+                            } catch (Exception e) {
+                                logger.warn("恢复连接失败: {}", e.getMessage());
+                            }
+                        }
+                        
+                        // 清除原始节点的选中状态（框框消失），然后选中所有新粘贴的节点（显示红色框框）
+                        canvas.clearSelection();
+                        canvas.selectNodes(newNodes);
+                        
+                        // 刷新任务树
+                        refreshTreeViewWithoutNavigation(currentTaskGroupId);
+                        logPanel.success("✓ " + newNodes.size() + " 个节点粘贴成功");
+                        if (connectionCount > 0) {
+                            logPanel.info("✓ 已恢复 " + connectionCount + " 条连接关系");
+                        } else if (!copiedNodesData.connections.isEmpty()) {
+                            logPanel.info("提示: 部分连接关系未能恢复，请手动检查");
+                        }
+                        logPanel.info("💡 提示: 请点击保存按钮以持久化节点和连接关系");
+                    } catch (Exception e) {
+                        logger.error("恢复连接关系失败: {}", e.getMessage(), e);
+                        logPanel.error("✗ 恢复连接关系失败: " + e.getMessage());
+                    } finally {
+                        logPanel.info("════════════════════════════════");
+                    }
+                });
+            } catch (Exception e) {
+                e.printStackTrace();
+                Platform.runLater(() -> {
+                    logPanel.error("✗ 节点粘贴失败: " + e.getMessage());
+                    logPanel.info("════════════════════════════════");
+                });
+            }
+        }, "paste-nodes-thread").start();
+    }
+    
+    /**
+     * 计算粘贴位置
+     * @return [x, y] 坐标数组
+     */
+    private double[] calculatePastePosition() {
+        // 获取画布的视口中心位置
+        if (scrollPane != null) {
+            javafx.geometry.Bounds viewportBounds = scrollPane.getViewportBounds();
+            if (viewportBounds != null) {
+                double centerX = viewportBounds.getWidth() / 2;
+                double centerY = viewportBounds.getHeight() / 2;
+                
+                // 转换为画布坐标
+                javafx.geometry.Point2D canvasPoint = scrollPane.localToParent(centerX, centerY);
+                if (canvasPoint != null) {
+                    return new double[]{canvasPoint.getX(), canvasPoint.getY()};
+                }
+            }
+        }
+        
+        // 如果无法获取视口中心，使用默认位置
+        return new double[]{300, 200};
     }
 
     private void showNodeDetails(ProcessNode node) {
