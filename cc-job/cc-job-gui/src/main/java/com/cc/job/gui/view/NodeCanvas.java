@@ -48,9 +48,8 @@ public class NodeCanvas extends Pane {
     
     // 框选相关
     private boolean selectionMode = false;
-    private javafx.scene.shape.Rectangle selectionRect; // 框选时的临时矩形（蓝色）
-    private javafx.scene.shape.Rectangle selectionBoundingBox; // 选中节点的包围框（红色）
-    private javafx.scene.shape.Rectangle selectionBoundingBoxBlue; // 选中节点的蓝色包围框
+    private javafx.scene.shape.Rectangle selectionRect; // 框选时的临时矩形（蓝色，拖动时显示）
+    private javafx.scene.shape.Rectangle selectionBoundingBox; // 选中节点的包围框（红色，框选完成后显示）
     private double selectionStartX;
     private double selectionStartY;
     private java.util.Set<ProcessNode> selectedNodes = new java.util.HashSet<>();
@@ -64,6 +63,7 @@ public class NodeCanvas extends Pane {
     // 日志回调
     private LogCallback logCallback;
     private Runnable onNodeMoved; // 节点移动回调
+    private java.util.function.Consumer<Boolean> onSelectionModeChanged; // 框选模式改变回调
 
     private final Map<ProcessNode, double[]> autoShiftOriginalPositions = new HashMap<>();
     private ProcessNode currentDraggingNode;
@@ -100,16 +100,6 @@ public class NodeCanvas extends Pane {
         selectionBoundingBox.setMouseTransparent(true); // 不拦截鼠标事件
         this.getChildren().add(selectionBoundingBox);
         
-        // 初始化选中节点的蓝色包围框（框选完成后显示，与红色框一起）
-        selectionBoundingBoxBlue = new javafx.scene.shape.Rectangle();
-        selectionBoundingBoxBlue.setFill(Color.TRANSPARENT); // 无填充
-        selectionBoundingBoxBlue.setStroke(Color.web("#2563EB")); // 蓝色边框
-        selectionBoundingBoxBlue.setStrokeWidth(1.5);
-        selectionBoundingBoxBlue.getStrokeDashArray().addAll(5.0, 5.0); // 虚线样式
-        selectionBoundingBoxBlue.setVisible(false);
-        selectionBoundingBoxBlue.setMouseTransparent(true); // 不拦截鼠标事件
-        this.getChildren().add(selectionBoundingBoxBlue);
-        
         // 设置画布鼠标事件处理（用于框选）
         setupSelectionHandlers();
     }
@@ -124,6 +114,14 @@ public class NodeCanvas extends Pane {
     
     public void setOnLog(LogCallback callback) {
         this.logCallback = callback;
+    }
+    
+    /**
+     * 设置框选模式改变回调
+     * @param callback 回调函数，参数为新的框选模式状态
+     */
+    public void setOnSelectionModeChanged(java.util.function.Consumer<Boolean> callback) {
+        this.onSelectionModeChanged = callback;
     }
 
     public void setScrollPane(ScrollPane scrollPane) {
@@ -1459,57 +1457,65 @@ public class NodeCanvas extends Pane {
     
     /**
      * 设置框选事件处理器
+     * 使用事件过滤器（EventFilter）确保在事件传播到子节点之前处理框选逻辑
      */
     private void setupSelectionHandlers() {
+        // 使用事件过滤器，在事件传播到子节点之前处理
         // 鼠标按下：开始框选或清除选择
-        this.setOnMousePressed(e -> {
-            if (e.isPrimaryButtonDown()) {
-                // 检查是否点击在节点或连接点上
-                javafx.scene.Node target = (javafx.scene.Node) e.getTarget();
-                if (isClickOnNodeOrEdge(target)) {
-                    // 点击在节点或边上，不处理（让节点/边自己处理事件）
-                    return;
-                }
-                
-                // 如果不在框选模式，点击空白区域时清除选择
-                if (!selectionMode) {
-                    clearSelection();
-                    return;
-                }
-                
-                // 框选模式：开始框选
-                // 将场景坐标转换为画布局部坐标
-                javafx.geometry.Point2D localPoint = sceneToLocal(e.getSceneX(), e.getSceneY());
-                selectionStartX = localPoint.getX();
-                selectionStartY = localPoint.getY();
-                
-                selectionRect.setX(selectionStartX);
-                selectionRect.setY(selectionStartY);
-                selectionRect.setWidth(0);
-                selectionRect.setHeight(0);
-                selectionRect.setVisible(true);
-                selectionRect.toFront();
-                
-                e.consume();
+        this.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> {
+            if (!e.isPrimaryButtonDown()) {
+                return;
             }
+            
+            // 检查是否点击在节点或连接点上
+            javafx.scene.Node target = (javafx.scene.Node) e.getTarget();
+            boolean isOnNodeOrEdge = isClickOnNodeOrEdge(target);
+            
+            // 如果不在框选模式
+            if (!selectionMode) {
+                if (!isOnNodeOrEdge) {
+                    // 点击空白区域时清除选择
+                    clearSelection();
+                }
+                return; // 不拦截，让节点/边正常处理
+            }
+            
+            // 框选模式：只有点击在空白区域时才开始框选
+            // 如果点击在节点上，让节点正常处理（允许移动节点）
+            if (isOnNodeOrEdge) {
+                return; // 不拦截，让节点/边正常处理
+            }
+            
+            // 点击空白区域，开始框选
+            javafx.geometry.Point2D localPoint = sceneToLocal(e.getSceneX(), e.getSceneY());
+            selectionStartX = localPoint.getX();
+            selectionStartY = localPoint.getY();
+            
+            // 初始化并显示临时蓝色框选矩形
+            selectionRect.setX(selectionStartX);
+            selectionRect.setY(selectionStartY);
+            selectionRect.setWidth(0);
+            selectionRect.setHeight(0);
+            selectionRect.setVisible(true);
+            
+            // 确保蓝色框在最上层显示
+            this.getChildren().remove(selectionRect);
+            this.getChildren().add(selectionRect);
+            selectionRect.toFront();
+            
+            // 拦截事件，防止其他处理
+            e.consume();
         });
         
-        // 鼠标拖动：更新框选矩形
-        this.setOnMouseDragged(e -> {
-            if (selectionMode && e.isPrimaryButtonDown()) {
-                // 确保临时框选矩形可见（如果还没有显示）
-                if (!selectionRect.isVisible()) {
-                    javafx.geometry.Point2D localPoint = sceneToLocal(e.getSceneX(), e.getSceneY());
-                    selectionStartX = localPoint.getX();
-                    selectionStartY = localPoint.getY();
-                    selectionRect.setX(selectionStartX);
-                    selectionRect.setY(selectionStartY);
-                    selectionRect.setWidth(0);
-                    selectionRect.setHeight(0);
-                    selectionRect.setVisible(true);
-                    selectionRect.toFront();
-                }
-                
+        // 鼠标拖动：更新框选矩形（使用事件过滤器）
+        this.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_DRAGGED, e -> {
+            if (!selectionMode || !e.isPrimaryButtonDown()) {
+                return;
+            }
+            
+            // 如果临时框选矩形可见，说明正在进行框选操作
+            if (selectionRect.isVisible()) {
+                // 获取当前鼠标位置
                 javafx.geometry.Point2D localPoint = sceneToLocal(e.getSceneX(), e.getSceneY());
                 double currentX = localPoint.getX();
                 double currentY = localPoint.getY();
@@ -1520,24 +1526,33 @@ public class NodeCanvas extends Pane {
                 double rectWidth = Math.abs(currentX - selectionStartX);
                 double rectHeight = Math.abs(currentY - selectionStartY);
                 
-                // 更新临时框选矩形（蓝色虚线框）
+                // 更新临时蓝色框选矩形的位置和大小
                 selectionRect.setX(rectX);
                 selectionRect.setY(rectY);
                 selectionRect.setWidth(rectWidth);
                 selectionRect.setHeight(rectHeight);
                 selectionRect.setVisible(true);
-                selectionRect.toFront(); // 确保在最上层
                 
-                // 实时更新选择（高亮选中的节点，但不显示包围框）
+                // 确保蓝色框在最上层
+                selectionRect.toFront();
+                
+                // 实时更新选择：高亮选中的节点（但不显示红色包围框）
                 updateSelectionDuringDrag(rectX, rectY, rectWidth, rectHeight);
                 
+                // 拦截拖动事件，防止节点移动
                 e.consume();
             }
+            // 如果蓝色框不可见，说明不是在框选，让节点正常处理拖动
         });
         
-        // 鼠标释放：完成框选
-        this.setOnMouseReleased(e -> {
-            if (selectionMode && selectionRect.isVisible()) {
+        // 鼠标释放：完成框选（使用事件过滤器）
+        this.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_RELEASED, e -> {
+            if (!selectionMode) {
+                return;
+            }
+            
+            // 如果临时框选矩形可见，说明正在进行框选
+            if (selectionRect.isVisible()) {
                 javafx.geometry.Point2D localPoint = sceneToLocal(e.getSceneX(), e.getSceneY());
                 double currentX = localPoint.getX();
                 double currentY = localPoint.getY();
@@ -1547,26 +1562,26 @@ public class NodeCanvas extends Pane {
                 double rectWidth = Math.abs(currentX - selectionStartX);
                 double rectHeight = Math.abs(currentY - selectionStartY);
                 
+                // 隐藏临时蓝色框选矩形
+                selectionRect.setVisible(false);
+                
                 // 只有当框选区域足够大时才完成选择（避免误触）
                 if (rectWidth > 5 && rectHeight > 5) {
-                    // 完成选择
+                    // 完成选择：更新选中节点并显示红色包围框
                     updateSelection(rectX, rectY, rectWidth, rectHeight);
                     
-                    // 隐藏临时框选矩形
-                    selectionRect.setVisible(false);
-                    
-                    // 确保包围框显示（如果有选中的节点）
+                    // 记录日志
                     if (!selectedNodes.isEmpty()) {
-                        updateSelectionBoundingBox();
                         log("✓ 框选完成: 选中 " + selectedNodes.size() + " 个节点, " + selectedConnections.size() + " 条边");
                     } else {
                         log("⚠ 框选区域未选中任何节点");
                     }
                 } else {
-                    // 框选区域太小，取消框选
-                    selectionRect.setVisible(false);
+                    // 框选区域太小，清除选择
+                    clearSelection();
                 }
                 
+                // 拦截释放事件
                 e.consume();
             }
         });
@@ -1660,17 +1675,16 @@ public class NodeCanvas extends Pane {
             }
         }
         
-        // 更新选中节点的包围框（红色和蓝色）
+        // 更新选中节点的红色包围框
         updateSelectionBoundingBox();
     }
     
     /**
-     * 更新选中节点的包围框（红色和蓝色）
+     * 更新选中节点的红色包围框
      */
     public void updateSelectionBoundingBox() {
         if (selectedNodes.isEmpty()) {
             selectionBoundingBox.setVisible(false);
-            selectionBoundingBoxBlue.setVisible(false);
             return;
         }
         
@@ -1706,19 +1720,8 @@ public class NodeCanvas extends Pane {
         selectionBoundingBox.setHeight(height);
         selectionBoundingBox.setVisible(true);
         
-        // 更新蓝色包围框（稍微大一点，形成双层效果）
-        double bluePadding = 5; // 蓝色框比红色框大5px
-        selectionBoundingBoxBlue.setX(x - bluePadding);
-        selectionBoundingBoxBlue.setY(y - bluePadding);
-        selectionBoundingBoxBlue.setWidth(width + bluePadding * 2);
-        selectionBoundingBoxBlue.setHeight(height + bluePadding * 2);
-        selectionBoundingBoxBlue.setVisible(true);
-        
         // 确保包围框在画布的最上层（在所有节点和边之上）
-        // 蓝色框在最外层，红色框在内层
-        this.getChildren().remove(selectionBoundingBoxBlue);
         this.getChildren().remove(selectionBoundingBox);
-        this.getChildren().add(selectionBoundingBoxBlue);
         this.getChildren().add(selectionBoundingBox);
     }
     
@@ -1752,9 +1755,8 @@ public class NodeCanvas extends Pane {
         for (NodeConnection connection : selectedConnections) {
             connection.setSelected(false);
         }
-        // 隐藏包围框（红色和蓝色）
+        // 隐藏红色包围框
         selectionBoundingBox.setVisible(false);
-        selectionBoundingBoxBlue.setVisible(false);
     }
     
     /**
@@ -1766,7 +1768,6 @@ public class NodeCanvas extends Pane {
         selectedConnections.clear();
         selectionRect.setVisible(false);
         selectionBoundingBox.setVisible(false);
-        selectionBoundingBoxBlue.setVisible(false);
         isMovingSelection = false;
         dragStartNode = null;
         selectionOriginalPositions.clear();
@@ -1782,6 +1783,11 @@ public class NodeCanvas extends Pane {
             clearSelection();
         }
         log(selectionMode ? "✓ 框选模式已启用" : "✓ 框选模式已禁用");
+        
+        // 通知外部组件框选模式已改变
+        if (onSelectionModeChanged != null) {
+            onSelectionModeChanged.accept(enabled);
+        }
     }
     
     /**

@@ -59,6 +59,7 @@ public class TopToolBar extends VBox {
 
     private Button undoButton;
     private Button redoButton;
+    private Button selectButton; // 框选按钮
     
     // 当前任务组ID（用于判断是否正在运行）
     private Long currentTaskGroupId;
@@ -132,7 +133,7 @@ public class TopToolBar extends VBox {
         // 编辑操作组
         undoButton = createIconButton(IconUtil.undoIcon(), "撤销", "撤销上一步操作", () -> safeCall(ToolBarCallback::onUndo));
         redoButton = createIconButton(IconUtil.redoIcon(), "重做", "重做上一步操作", () -> safeCall(ToolBarCallback::onRedo));
-        Button selectButton = createIconButton(IconUtil.selectIcon(), "框选", "框选节点和边", () -> safeCall(ToolBarCallback::onSelect));
+        selectButton = createIconButton(IconUtil.selectIcon(), "框选", "框选节点和边", () -> safeCall(ToolBarCallback::onSelect));
         undoButton.setDisable(true);
         redoButton.setDisable(true);
         HBox editGroup = createToolGroup(undoButton, redoButton, selectButton);
@@ -444,6 +445,62 @@ public class TopToolBar extends VBox {
         if (redoButton != null) {
             redoButton.setDisable(!canRedo);
         }
+    }
+    
+    /**
+     * 更新框选按钮的状态
+     * @param isActive 是否处于框选模式
+     */
+    public void updateSelectionButtonState(boolean isActive) {
+        Platform.runLater(() -> {
+            if (selectButton != null) {
+                if (isActive) {
+                    // 框选模式激活：显示高亮效果（蓝色背景）
+                    selectButton.setStyle(
+                        "-fx-background-color: #2563EB; " +
+                        "-fx-text-fill: white; " +
+                        "-fx-font-size: 12; " +
+                        "-fx-font-weight: bold; " +
+                        "-fx-padding: 6 12 6 12; " +
+                        "-fx-border-radius: 4; " +
+                        "-fx-background-radius: 4; " +
+                        "-fx-cursor: hand;"
+                    );
+                    selectButton.setTooltip(new Tooltip("框选模式已启用，点击可关闭"));
+                    
+                    // 添加悬停效果
+                    selectButton.setOnMouseEntered(e -> {
+                        selectButton.setStyle(
+                            "-fx-background-color: #1D4ED8; " +
+                            "-fx-text-fill: white; " +
+                            "-fx-font-size: 12; " +
+                            "-fx-font-weight: bold; " +
+                            "-fx-padding: 6 12 6 12; " +
+                            "-fx-border-radius: 4; " +
+                            "-fx-background-radius: 4; " +
+                            "-fx-cursor: hand; " +
+                            "-fx-effect: dropshadow(gaussian, rgba(37,99,235,0.3), 4, 0, 0, 2);"
+                        );
+                    });
+                    selectButton.setOnMouseExited(e -> {
+                        selectButton.setStyle(
+                            "-fx-background-color: #2563EB; " +
+                            "-fx-text-fill: white; " +
+                            "-fx-font-size: 12; " +
+                            "-fx-font-weight: bold; " +
+                            "-fx-padding: 6 12 6 12; " +
+                            "-fx-border-radius: 4; " +
+                            "-fx-background-radius: 4; " +
+                            "-fx-cursor: hand;"
+                        );
+                    });
+                } else {
+                    // 框选模式未激活：恢复默认样式
+                    StyleUtil.applyIconButtonHover(selectButton);
+                    selectButton.setTooltip(new Tooltip("框选节点和边"));
+                }
+            }
+        });
     }
     
     /**

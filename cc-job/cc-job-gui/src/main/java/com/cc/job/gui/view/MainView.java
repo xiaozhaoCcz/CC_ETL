@@ -136,6 +136,13 @@ public class MainView extends BorderPane {
         undoRedoManager = new UndoRedoManager();
         undoRedoManager.setOnChange(this::updateUndoRedoButtons);
         canvas.setUndoRedoManager(undoRedoManager);
+        
+        // 设置框选模式改变回调，更新工具栏按钮状态
+        canvas.setOnSelectionModeChanged(isActive -> {
+            if (toolBar != null) {
+                toolBar.updateSelectionButtonState(isActive);
+            }
+        });
         scrollPane = new ScrollPane(canvas);
         canvas.setScrollPane(scrollPane);
         scrollPane.setFitToWidth(false);
