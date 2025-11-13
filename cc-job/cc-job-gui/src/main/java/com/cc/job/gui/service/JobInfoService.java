@@ -394,5 +394,47 @@ public class JobInfoService extends BaseService {
             logger.debug("✓ 批量更新节点状态成功: {}/{} 个节点", result.getData(), statusMap.size());
         }
     }
+    
+    /**
+     * 暂停/启用任务
+     * @param jobId 任务ID
+     * @param isPause 是否暂停：0=启用, 1=禁用
+     * @return 是否成功
+     * @throws IOException 网络异常
+     */
+    public boolean pauseJob(Long jobId, Integer isPause) throws IOException {
+        if (jobId == null) {
+            throw new IllegalArgumentException("任务ID不能为空");
+        }
+        if (isPause == null || (isPause != 0 && isPause != 1)) {
+            throw new IllegalArgumentException("isPause 参数必须为 0（启用）或 1（禁用）");
+        }
+        
+        String url = apiUtil.getBaseUrl() + "/api/v1/jobInfos/pauseJob/" + jobId + "?isPause=" + isPause;
+        
+        Request request = new Request.Builder()
+                .url(url)
+                .get()
+                .build();
+        
+        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("请求失败: " + response);
+            }
+            
+            String responseBody = response.body().string();
+            logger.debug("pauseJob API 响应: {}", responseBody);
+            
+            Type resultType = new TypeToken<Result<Void>>(){}.getType();
+            Result<Void> result = apiUtil.getGson().fromJson(responseBody, resultType);
+            
+            if (!Result.isSuccess(result)) {
+                throw new IOException("API 返回错误: " + result.getMsg());
+            }
+            
+            logger.debug("✓ 任务{}成功: jobId={}, isPause={}", isPause == 1 ? "禁用" : "启用", jobId, isPause);
+            return true;
+        }
+    }
 }
 

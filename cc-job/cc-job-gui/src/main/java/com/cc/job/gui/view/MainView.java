@@ -2343,6 +2343,15 @@ public class MainView extends BorderPane {
         });
         node.setOnCopy(() -> copyNode(node));
         node.setOnShowDetails(() -> showNodeDetails(node));
+        
+        // 设置禁用/启用节点回调
+        node.setOnDisable((Long jobId, boolean isDisabled) -> {
+            if (jobId == null) {
+                logPanel.warn("⚠ 该节点未绑定后端任务，无法禁用/启用");
+                return;
+            }
+            disableNode(jobId, isDisabled, node);
+        });
     }
 
     private void copyNode(ProcessNode sourceNode) {
@@ -2786,6 +2795,59 @@ public class MainView extends BorderPane {
                 });
             }
         }, "detail-node-thread").start();
+    }
+
+    /**
+     * 禁用/启用节点
+     * @param jobId 任务ID
+     * @param isDisabled 是否禁用（true=禁用，false=启用）
+     * @param node 画布上的节点对象
+     */
+    private void disableNode(Long jobId, boolean isDisabled, ProcessNode node) {
+        if (jobId == null) {
+            logPanel.warn("⚠ 任务ID为空，无法禁用/启用节点");
+            // 恢复节点状态
+            if (node != null) {
+                javafx.application.Platform.runLater(() -> {
+                    node.restoreEnabledState(!isDisabled);
+                });
+            }
+            return;
+        }
+        
+        String action = isDisabled ? "禁用" : "启用";
+        boolean originalState = !isDisabled; // 保存原始状态，用于失败时恢复
+        logPanel.info("正在" + action + "节点: " + (node != null ? node.getJobHandlerName() : "未知") + " (ID: " + jobId + ")");
+        
+        // 在后台线程中调用后端API
+        new Thread(() -> {
+            try {
+                // isPause: 0=启用, 1=禁用
+                Integer isPause = isDisabled ? 1 : 0;
+                boolean success = jobInfoService.pauseJob(jobId, isPause);
+                
+                Platform.runLater(() -> {
+                    if (success) {
+                        logPanel.success("✓ 节点已" + action + ": " + (node != null ? node.getJobHandlerName() : "未知"));
+                    } else {
+                        logPanel.error("✗ 节点" + action + "失败: " + (node != null ? node.getJobHandlerName() : "未知"));
+                        // 如果后端调用失败，恢复UI状态
+                        if (node != null) {
+                            node.restoreEnabledState(originalState);
+                        }
+                    }
+                });
+            } catch (Exception e) {
+                logger.error("禁用/启用节点失败: {}", e.getMessage(), e);
+                Platform.runLater(() -> {
+                    logPanel.error("✗ 节点" + action + "失败: " + e.getMessage());
+                    // 如果后端调用失败，恢复UI状态
+                    if (node != null) {
+                        node.restoreEnabledState(originalState);
+                    }
+                });
+            }
+        }, "disable-node-thread").start();
     }
 
     private void showJobNodeDetailDialog(ProcessNode node, JobInfoForm form, List<JobGroup> jobGroups) {

@@ -210,9 +210,27 @@ public class LogPanel extends VBox {
             Label messageLabel = new Label(entry.message != null ? entry.message : "");
             messageLabel.setWrapText(true);
             messageLabel.setMaxWidth(Double.MAX_VALUE);
-            messageLabel.setTextFill(Color.web(
-                entry.messageColor != null ? entry.messageColor : StyleUtil.GRAY_700
-            ));
+            
+            // 设置消息颜色
+            // "输出"类型（raw=true）：默认黑色，错误显示红色，警告显示黄色
+            // 其他类型：使用 entry.messageColor 或默认颜色
+            String finalMessageColor;
+            if (isRaw) {
+                // "输出"类型：如果 messageColor 已设置（错误或警告），使用它；否则使用黑色
+                if (entry.messageColor != null && 
+                    (entry.messageColor.equals("#DC2626") || entry.messageColor.equals("#D97706"))) {
+                    // 错误（红色）或警告（黄色）已设置，使用它
+                    finalMessageColor = entry.messageColor;
+                } else {
+                    // 默认黑色
+                    finalMessageColor = "#000000";
+                }
+            } else {
+                // 非"输出"类型：使用 entry.messageColor 或默认颜色
+                finalMessageColor = entry.messageColor != null ? entry.messageColor : StyleUtil.GRAY_700;
+            }
+            
+            messageLabel.setTextFill(Color.web(finalMessageColor));
             messageLabel.setFont(isRaw
                 ? Font.font("Consolas", FontWeight.NORMAL, 12)
                 : Font.font("System", FontWeight.NORMAL, 13));
@@ -919,7 +937,7 @@ public class LogPanel extends VBox {
     /**
      * 直接追加文本（不添加时间戳和格式）
      * 用于显示原始日志内容（针对特定任务组）
-     * 智能识别错误信息并应用红色样式
+     * "输出"类型的日志只有黑色字体，只有当错误信息时才显示红色，警告信息显示黄色
      */
     public void appendText(Long taskGroupId, String text) {
         Platform.runLater(() -> {
@@ -929,6 +947,7 @@ public class LogPanel extends VBox {
             }
             
             String lowerText = text.toLowerCase();
+            // 检测错误信息
             boolean isError = lowerText.contains("错误") ||
                               lowerText.contains("error") ||
                               lowerText.contains("失败") ||
@@ -938,27 +957,30 @@ public class LogPanel extends VBox {
                               lowerText.contains("执行结果:失败") ||
                               lowerText.contains("任务执行失败") ||
                               lowerText.contains("任务触发失败");
+            // 检测警告信息
             boolean isWarn = lowerText.contains("警告") ||
                              lowerText.contains("warn") ||
                              lowerText.contains("⚠");
-            boolean isSuccess = lowerText.contains("成功") ||
-                                lowerText.contains("success") ||
-                                lowerText.contains("执行结果:成功") ||
-                                lowerText.contains("任务执行成功");
             
-            String color;
+            // "输出"类型的日志默认黑色，只有错误显示红色，警告显示黄色
+            String messageColor;
+            String levelColor;
             if (isError) {
-                color = "#DC2626";
+                // 错误信息：红色
+                messageColor = "#DC2626";
+                levelColor = "#DC2626";
             } else if (isWarn) {
-                color = "#D97706";
-            } else if (isSuccess) {
-                color = "#059669";
+                // 警告信息：黄色
+                messageColor = "#D97706";
+                levelColor = "#D97706";
             } else {
-                color = "#374151";
+                // 默认：黑色
+                messageColor = "#000000";
+                levelColor = StyleUtil.GRAY_500;
             }
             
-            // 标记为任务组运行日志
-            LogEntry entry = new LogEntry(null, null, "TEXT", color, text, color, true, true);
+            // 标记为任务组运行日志（raw = true 表示"输出"类型）
+            LogEntry entry = new LogEntry(null, null, "TEXT", levelColor, text, messageColor, true, true);
             tabData.addEntry(entry);
             
             tabData.status = "运行中";

@@ -66,6 +66,13 @@ public class ProcessNode extends StackPane {
     private Runnable onCopy;
     private Runnable onShowDetails;
     
+    // 禁用/启用节点回调
+    private DisableNodeCallback onDisable;
+    
+    public interface DisableNodeCallback {
+        void onDisableNode(Long jobId, boolean isDisabled);
+    }
+    
     // 节点状态
     private boolean enabled = true;
     private String currentColor = "#8B5CF6"; // 默认紫色
@@ -585,6 +592,10 @@ public class ProcessNode extends StackPane {
     public void setOnShowDetails(Runnable onShowDetails) {
         this.onShowDetails = onShowDetails;
     }
+    
+    public void setOnDisable(DisableNodeCallback callback) {
+        this.onDisable = callback;
+    }
 
     public interface DragFinishedListener {
         void onDragFinished(double oldX, double oldY, double newX, double newY);
@@ -810,7 +821,10 @@ public class ProcessNode extends StackPane {
      * 切换节点启用/禁用状态
      */
     private void toggleNodeEnabled() {
-        enabled = !enabled;
+        boolean newEnabledState = !enabled;
+        
+        // 先更新UI状态（乐观更新）
+        enabled = newEnabledState;
         
         if (enabled) {
             // 启用状态：根据当前状态恢复颜色
@@ -824,6 +838,32 @@ public class ProcessNode extends StackPane {
             background.setStrokeWidth(2);
             this.setOpacity(0.6);
             logger.debug("⚙️ 禁用节点: {}", jobHandlerName);
+        }
+        
+        // 调用回调，通知外部（如调用后端API）
+        // 回调在后台线程中执行，如果失败，会恢复UI状态
+        if (onDisable != null && jobId != null) {
+            onDisable.onDisableNode(jobId, !enabled);
+        }
+    }
+    
+    /**
+     * 恢复节点的启用/禁用状态（用于回调失败时恢复）
+     * @param targetEnabledState 目标启用状态
+     */
+    public void restoreEnabledState(boolean targetEnabledState) {
+        enabled = targetEnabledState;
+        
+        if (enabled) {
+            // 启用状态：根据当前状态恢复颜色
+            changeNodeColor(currentColor);
+            this.setOpacity(1.0);
+        } else {
+            // 禁用状态：灰色半透明
+            background.setFill(Color.web("#F3F4F6"));
+            background.setStroke(Color.web("#9CA3AF"));
+            background.setStrokeWidth(2);
+            this.setOpacity(0.6);
         }
     }
     
