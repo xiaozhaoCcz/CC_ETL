@@ -935,6 +935,36 @@ public class LogPanel extends VBox {
     }
     
     /**
+     * 解析HTML实体，将 &lt; &gt; &amp; 等转换为实际字符
+     * @param text 原始文本
+     * @return 解析后的文本
+     */
+    private String decodeHtmlEntities(String text) {
+        if (text == null) {
+            return null;
+        }
+        // 先解析HTML实体，再处理换行标签
+        // 注意：需要先解析 &amp; 避免将 &amp;lt; 误解析
+        String result = text;
+        // 先处理 &amp;，避免后续替换时出现问题
+        result = result.replace("&amp;", "&");
+        // 然后解析其他HTML实体
+        result = result.replace("&lt;", "<")
+                       .replace("&gt;", ">")
+                       .replace("&quot;", "\"")
+                       .replace("&apos;", "'")
+                       .replace("&nbsp;", " ");
+        // 最后处理换行标签（包括已解析的 <br> 和未解析的 &lt;br&gt;）
+        result = result.replace("&lt;br&gt;", "\n")
+                       .replace("&lt;br/&gt;", "\n")
+                       .replace("&lt;br /&gt;", "\n")
+                       .replace("<br>", "\n")
+                       .replace("<br/>", "\n")
+                       .replace("<br />", "\n");
+        return result;
+    }
+    
+    /**
      * 直接追加文本（不添加时间戳和格式）
      * 用于显示原始日志内容（针对特定任务组）
      * "输出"类型的日志只有黑色字体，只有当错误信息时才显示红色，警告信息显示黄色
@@ -946,17 +976,48 @@ public class LogPanel extends VBox {
                 return;
             }
             
-            String lowerText = text.toLowerCase();
-            // 检测错误信息
-            boolean isError = lowerText.contains("错误") ||
-                              lowerText.contains("error") ||
-                              lowerText.contains("失败") ||
-                              lowerText.contains("fail") ||
-                              lowerText.contains("exception") ||
-                              lowerText.contains("异常") ||
-                              lowerText.contains("执行结果:失败") ||
-                              lowerText.contains("任务执行失败") ||
-                              lowerText.contains("任务触发失败");
+            // 解析HTML实体（如 &lt;br&gt; 转换为换行符）
+            String decodedText = decodeHtmlEntities(text);
+            
+            String lowerText = decodedText.toLowerCase();
+            
+            // 先检测成功信息（优先级最高，避免误判）
+            // 成功的关键词：执行结果:成功、任务执行成功、返回结果: SUCCESS、SUCCESS等
+            boolean isSuccess = lowerText.contains("执行结果:成功") ||
+                                lowerText.contains("任务执行成功") ||
+                                lowerText.contains("返回结果: success") ||
+                                lowerText.contains("返回结果:success") ||
+                                (lowerText.contains("成功") && 
+                                 (lowerText.contains("执行结果") || lowerText.contains("任务执行")) &&
+                                 !lowerText.contains("失败"));
+            
+            // 检测错误信息（需要更精确的匹配，避免误判）
+            // 只有在不是成功的情况下才检测错误
+            boolean isError = false;
+            if (!isSuccess) {
+                // 精确匹配错误关键词，避免误判
+                // 例如："失败重试次数"不应该被识别为错误
+                isError = lowerText.contains("执行结果:失败") ||
+                          lowerText.contains("任务执行失败") ||
+                          lowerText.contains("任务触发失败") ||
+                          (lowerText.contains("错误") && 
+                           !lowerText.contains("成功") && 
+                           !lowerText.contains("失败重试")) ||
+                          (lowerText.contains("error") && 
+                           !lowerText.contains("success") && 
+                           !lowerText.contains("fail retry")) ||
+                          (lowerText.contains("失败") && 
+                           !lowerText.contains("成功") && 
+                           !lowerText.contains("失败重试") &&
+                           !lowerText.contains("executorfailretrycount")) ||
+                          (lowerText.contains("fail") && 
+                           !lowerText.contains("success") && 
+                           !lowerText.contains("fail retry") &&
+                           !lowerText.contains("executorfailretrycount")) ||
+                          (lowerText.contains("exception") && !lowerText.contains("success")) ||
+                          (lowerText.contains("异常") && !lowerText.contains("成功"));
+            }
+            
             // 检测警告信息
             boolean isWarn = lowerText.contains("警告") ||
                              lowerText.contains("warn") ||
@@ -974,23 +1035,76 @@ public class LogPanel extends VBox {
                 messageColor = "#D97706";
                 levelColor = "#D97706";
             } else {
-                // 默认：黑色
+                // 默认：黑色（包括成功信息）
                 messageColor = "#000000";
                 levelColor = StyleUtil.GRAY_500;
             }
             
             // 标记为任务组运行日志（raw = true 表示"输出"类型）
-            LogEntry entry = new LogEntry(null, null, "TEXT", levelColor, text, messageColor, true, true);
+            // 使用解析后的文本（HTML实体已转换）
+            LogEntry entry = new LogEntry(null, null, "TEXT", levelColor, decodedText, messageColor, true, true);
             tabData.addEntry(entry);
             
             tabData.status = "运行中";
             tabData.statusColor = "#10B981";
+            
+            // 检测特定日志，触发通知提示框
+            checkAndShowNotification(decodedText, lowerText, isError, isWarn, isSuccess);
             
             if (isCurrentTab(taskGroupId)) {
                 tabData.render(currentSearchKeyword);
                 updateStatusBar(tabData);
             }
         });
+    }
+    
+    /**
+     * 检测特定日志并显示通知提示框
+     * 只显示警告和错误信息，不显示成功信息
+     * @param originalText 原始日志文本
+     * @param lowerText 小写日志文本
+     * @param isError 是否是错误
+     * @param isWarn 是否是警告
+     * @param isSuccess 是否是成功（不显示）
+     */
+    private void checkAndShowNotification(String originalText, String lowerText, boolean isError, boolean isWarn, boolean isSuccess) {
+        // 检测需要显示提示框的关键词（只显示警告和错误）
+        boolean shouldShowNotification = false;
+        com.cc.job.gui.util.NotificationToast.NotificationType notificationType = null;
+        String notificationMessage = null;
+        
+        // 检测"任务正在运行中"等关键词（警告类型）
+        if (lowerText.contains("任务正在运行中") || 
+            lowerText.contains("任务正在执行") ||
+            lowerText.contains("任务开始执行")) {
+            shouldShowNotification = true;
+            notificationType = com.cc.job.gui.util.NotificationToast.NotificationType.WARNING;
+            notificationMessage = "任务正在运行中，请等待执行完成";
+        } 
+        // 检测错误信息
+        else if (isError && (lowerText.contains("任务执行失败") || 
+                                lowerText.contains("任务触发失败") ||
+                                lowerText.contains("执行结果:失败"))) {
+            shouldShowNotification = true;
+            notificationType = com.cc.job.gui.util.NotificationToast.NotificationType.ERROR;
+            notificationMessage = "任务执行失败，请查看日志详情";
+        } 
+        // 检测警告信息
+        else if (isWarn && lowerText.contains("警告")) {
+            shouldShowNotification = true;
+            notificationType = com.cc.job.gui.util.NotificationToast.NotificationType.WARNING;
+            // 提取警告信息（最多120个字符）
+            if (originalText.length() > 120) {
+                notificationMessage = originalText.substring(0, 117) + "...";
+            } else {
+                notificationMessage = originalText;
+            }
+        }
+        
+        // 显示通知提示框（只显示警告和错误）
+        if (shouldShowNotification && notificationType != null && notificationMessage != null) {
+            com.cc.job.gui.util.NotificationToast.show(notificationMessage, notificationType);
+        }
     }
     
     /**

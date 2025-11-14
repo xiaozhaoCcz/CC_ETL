@@ -99,7 +99,7 @@ public class LoginView extends StackPane {
     }
     
     /**
-     * 创建登录卡片
+     * 创建登录卡片（去掉背景板）
      */
     private VBox createLoginCard() {
         VBox card = new VBox(24);
@@ -108,22 +108,20 @@ public class LoginView extends StackPane {
         card.setMaxHeight(550);
         card.setPadding(new Insets(48, 48, 48, 48));
         card.setStyle(
-            "-fx-background-color: white; " +
-            "-fx-background-radius: 16; " +
-            "-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.25), 32, 0, 0, 8);"
+            "-fx-background-color: transparent;"
         );
         
         // Logo/图标区域
         VBox logoArea = createLogoArea();
         
-        // 标题
+        // 标题（改为深色，提高对比度）
         Label titleLabel = new Label("欢迎回来");
         titleLabel.setFont(Font.font("System", FontWeight.BOLD, 28));
-        titleLabel.setTextFill(Color.web("#1F2937"));
+        titleLabel.setTextFill(Color.web("#1F2937")); // 深灰色，在浅色渐变背景上清晰可见
         
         Label subtitleLabel = new Label("登录以继续使用 NodeFx");
         subtitleLabel.setFont(Font.font("System", FontWeight.NORMAL, 14));
-        subtitleLabel.setTextFill(Color.web("#6B7280"));
+        subtitleLabel.setTextFill(Color.web("#4B5563")); // 中灰色，清晰可读
         
         // 表单区域
         VBox formArea = createFormArea();
@@ -194,11 +192,11 @@ public class LoginView extends StackPane {
         form.setAlignment(Pos.CENTER);
         form.setMaxWidth(320);
         
-        // 用户名输入框
+        // 用户名输入框（标签改为深色）
         VBox usernameBox = new VBox(8);
         Label usernameLabel = new Label("用户名");
         usernameLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
-        usernameLabel.setTextFill(Color.web("#374151"));
+        usernameLabel.setTextFill(Color.web("#374151")); // 深灰色，清晰可读
         
         usernameField = new TextField();
         usernameField.setPromptText("请输入用户名");
@@ -244,11 +242,11 @@ public class LoginView extends StackPane {
         
         usernameBox.getChildren().addAll(usernameLabel, usernameField);
         
-        // 密码输入框
+        // 密码输入框（标签改为深色）
         VBox passwordBox = new VBox(8);
         Label passwordLabel = new Label("密码");
         passwordLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
-        passwordLabel.setTextFill(Color.web("#374151"));
+        passwordLabel.setTextFill(Color.web("#374151")); // 深灰色，清晰可读
         
         passwordField = new PasswordField();
         passwordField.setPromptText("请输入密码");
@@ -413,8 +411,10 @@ public class LoginView extends StackPane {
                 Platform.runLater(() -> {
                     setLoading(false);
                     showError("登录失败: " + e.getMessage());
-                    e.printStackTrace();
+                    passwordField.clear();
+                    passwordField.requestFocus();
                 });
+                e.printStackTrace();
             }
         }).start();
     }
@@ -475,7 +475,7 @@ public class LoginView extends StackPane {
         
         Label text = new Label("还没有账号？");
         text.setFont(Font.font("System", 13));
-        text.setTextFill(Color.web("#6B7280"));
+        text.setTextFill(Color.web("#4B5563")); // 中灰色，清晰可读
         
         registerButton = new Button("立即注册");
         registerButton.setFont(Font.font("System", FontWeight.BOLD, 13));

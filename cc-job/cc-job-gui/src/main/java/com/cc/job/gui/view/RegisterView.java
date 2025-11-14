@@ -73,7 +73,7 @@ public class RegisterView extends StackPane {
     }
     
     /**
-     * 创建注册卡片
+     * 创建注册卡片（去掉背景板）
      */
     private VBox createRegisterCard() {
         VBox card = new VBox(20);
@@ -82,22 +82,20 @@ public class RegisterView extends StackPane {
         card.setMaxWidth(450);
         card.setMaxHeight(650);
         card.setStyle(
-            "-fx-background-color: white; " +
-            "-fx-background-radius: 15; " +
-            "-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.25), 30, 0, 0, 10);"
+            "-fx-background-color: transparent;"
         );
         
         // Logo
         StackPane logo = createLogo();
         
-        // 标题
+        // 标题（改为深色，提高对比度）
         Label titleLabel = new Label("创建新账号");
         titleLabel.setFont(Font.font("System", FontWeight.BOLD, 28));
-        titleLabel.setTextFill(Color.web("#1F2937"));
+        titleLabel.setTextFill(Color.web("#1F2937")); // 深灰色，在浅色渐变背景上清晰可见
         
         Label subtitleLabel = new Label("填写以下信息完成注册");
         subtitleLabel.setFont(Font.font("System", 14));
-        subtitleLabel.setTextFill(Color.web("#6B7280"));
+        subtitleLabel.setTextFill(Color.web("#4B5563")); // 中灰色，清晰可读
         
         // 输入区域
         VBox inputArea = createInputArea();
@@ -201,7 +199,7 @@ public class RegisterView extends StackPane {
         
         Label labelNode = new Label(label);
         labelNode.setFont(Font.font("System", FontWeight.BOLD, 13));
-        labelNode.setTextFill(Color.web("#374151"));
+        labelNode.setTextFill(Color.web("#374151")); // 深灰色，清晰可读
         
         VBox inputWrapper = new VBox();
         inputWrapper.setStyle(
@@ -302,7 +300,7 @@ public class RegisterView extends StackPane {
         
         Label text = new Label("已有账号？");
         text.setFont(Font.font("System", 13));
-        text.setTextFill(Color.web("#6B7280"));
+        text.setTextFill(Color.web("#4B5563")); // 中灰色，清晰可读
         
         backButton = new Button("立即登录");
         backButton.setFont(Font.font("System", FontWeight.BOLD, 13));

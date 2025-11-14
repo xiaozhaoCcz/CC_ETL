@@ -64,36 +64,65 @@ public class LoginService extends BaseService {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             
             // 解析响应
+            logger.debug("登录响应状态码: {}, 响应体: {}", response.statusCode(), response.body());
+            
             if (response.statusCode() == 200) {
                 JsonNode jsonNode = objectMapper.readTree(response.body());
                 
                 // 检查响应结构
                 if (jsonNode.has("code")) {
-                    int code = jsonNode.get("code").asInt();
+                    // 后端返回的code是字符串类型，如 "00000"
+                    String code = jsonNode.get("code").asText();
                     String message = jsonNode.has("msg") ? jsonNode.get("msg").asText() : "未知错误";
                     
-                    if (code == 200 || code == 0) {
-                        // 登录成功
-                        String token = jsonNode.has("data") && jsonNode.get("data").has("token") 
-                            ? jsonNode.get("data").get("token").asText() 
-                            : "";
-                        
-                        String userId = jsonNode.has("data") && jsonNode.get("data").has("userId") 
-                            ? jsonNode.get("data").get("userId").asText() 
-                            : "";
-                        
-                        logger.info("✓ 登录成功: {}", username);
-                        return new LoginResult(true, "登录成功", token, userId, username);
+                    // 成功码是 "00000"
+                    if ("00000".equals(code)) {
+                        // 登录成功，从data中获取LoginResult对象
+                        JsonNode dataNode = jsonNode.get("data");
+                        if (dataNode != null && !dataNode.isNull()) {
+                            // 后端返回的字段是 accessToken，不是 token
+                            String token = dataNode.has("accessToken") 
+                                ? dataNode.get("accessToken").asText() 
+                                : "";
+                            
+                            // userId 是 Long 类型，需要转换为字符串
+                            String userId = null;
+                            if (dataNode.has("userId")) {
+                                JsonNode userIdNode = dataNode.get("userId");
+                                if (userIdNode.isNumber()) {
+                                    userId = String.valueOf(userIdNode.asLong());
+                                } else if (userIdNode.isTextual()) {
+                                    userId = userIdNode.asText();
+                                }
+                            }
+                            
+                            // username 是字符串
+                            String resultUsername = dataNode.has("username") 
+                                ? dataNode.get("username").asText() 
+                                : username;
+                            
+                            if (token != null && !token.isEmpty()) {
+                                logger.info("✓ 登录成功: {}", resultUsername);
+                                return new LoginResult(true, "登录成功", token, userId, resultUsername);
+                            } else {
+                                logger.warn("✗ 登录响应中缺少token");
+                                return new LoginResult(false, "登录响应中缺少token", null, null, null);
+                            }
+                        } else {
+                            logger.warn("✗ 登录响应中缺少data字段");
+                            return new LoginResult(false, "登录响应中缺少data字段", null, null, null);
+                        }
                     } else {
                         // 登录失败
-                        logger.warn("✗ 登录失败: {}", message);
+                        logger.warn("✗ 登录失败: code={}, message={}", code, message);
                         return new LoginResult(false, message, null, null, null);
                     }
                 } else {
-                    return new LoginResult(false, "响应格式错误", null, null, null);
+                    logger.error("✗ 响应格式错误，缺少code字段");
+                    return new LoginResult(false, "响应格式错误，缺少code字段", null, null, null);
                 }
             } else {
-                logger.error("✗ 登录请求失败，状态码: {}", response.statusCode());
+                logger.error("✗ 登录请求失败，状态码: {}, 响应体: {}", response.statusCode(), response.body());
                 return new LoginResult(false, "登录请求失败，状态码: " + response.statusCode(), null, null, null);
             }
             
@@ -135,36 +164,65 @@ public class LoginService extends BaseService {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             
             // 解析响应
+            logger.debug("注册响应状态码: {}, 响应体: {}", response.statusCode(), response.body());
+            
             if (response.statusCode() == 200) {
                 JsonNode jsonNode = objectMapper.readTree(response.body());
                 
                 // 检查响应结构
                 if (jsonNode.has("code")) {
-                    int code = jsonNode.get("code").asInt();
+                    // 后端返回的code是字符串类型，如 "00000"
+                    String code = jsonNode.get("code").asText();
                     String message = jsonNode.has("msg") ? jsonNode.get("msg").asText() : "未知错误";
                     
-                    if (code == 200 || code == 0) {
-                        // 注册成功
-                        String token = jsonNode.has("data") && jsonNode.get("data").has("token") 
-                            ? jsonNode.get("data").get("token").asText() 
-                            : "";
-                        
-                        String userId = jsonNode.has("data") && jsonNode.get("data").has("userId") 
-                            ? jsonNode.get("data").get("userId").asText() 
-                            : "";
-                        
-                        logger.info("✓ 注册成功: {}", username);
-                        return new LoginResult(true, "注册成功", token, userId, username);
+                    // 成功码是 "00000"
+                    if ("00000".equals(code)) {
+                        // 注册成功，从data中获取LoginResult对象
+                        JsonNode dataNode = jsonNode.get("data");
+                        if (dataNode != null && !dataNode.isNull()) {
+                            // 后端返回的字段是 accessToken，不是 token
+                            String token = dataNode.has("accessToken") 
+                                ? dataNode.get("accessToken").asText() 
+                                : "";
+                            
+                            // userId 是 Long 类型，需要转换为字符串
+                            String userId = null;
+                            if (dataNode.has("userId")) {
+                                JsonNode userIdNode = dataNode.get("userId");
+                                if (userIdNode.isNumber()) {
+                                    userId = String.valueOf(userIdNode.asLong());
+                                } else if (userIdNode.isTextual()) {
+                                    userId = userIdNode.asText();
+                                }
+                            }
+                            
+                            // username 是字符串
+                            String resultUsername = dataNode.has("username") 
+                                ? dataNode.get("username").asText() 
+                                : username;
+                            
+                            if (token != null && !token.isEmpty()) {
+                                logger.info("✓ 注册成功: {}", resultUsername);
+                                return new LoginResult(true, "注册成功", token, userId, resultUsername);
+                            } else {
+                                logger.warn("✗ 注册响应中缺少token");
+                                return new LoginResult(false, "注册响应中缺少token", null, null, null);
+                            }
+                        } else {
+                            logger.warn("✗ 注册响应中缺少data字段");
+                            return new LoginResult(false, "注册响应中缺少data字段", null, null, null);
+                        }
                     } else {
                         // 注册失败
-                        logger.warn("✗ 注册失败: {}", message);
+                        logger.warn("✗ 注册失败: code={}, message={}", code, message);
                         return new LoginResult(false, message, null, null, null);
                     }
                 } else {
-                    return new LoginResult(false, "响应格式错误", null, null, null);
+                    logger.error("✗ 响应格式错误，缺少code字段");
+                    return new LoginResult(false, "响应格式错误，缺少code字段", null, null, null);
                 }
             } else {
-                logger.error("✗ 注册请求失败，状态码: {}", response.statusCode());
+                logger.error("✗ 注册请求失败，状态码: {}, 响应体: {}", response.statusCode(), response.body());
                 return new LoginResult(false, "注册请求失败，状态码: " + response.statusCode(), null, null, null);
             }
             

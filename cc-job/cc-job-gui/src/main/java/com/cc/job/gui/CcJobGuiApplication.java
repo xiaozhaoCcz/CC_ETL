@@ -40,12 +40,23 @@ public class CcJobGuiApplication extends Application {
             // 尝试从本地文件加载会话
             boolean sessionLoaded = SessionManager.getInstance().loadSessionFromFile();
             
-            if (sessionLoaded) {
-                // 如果会话加载成功，直接显示主窗口
-                logger.info("🎉 自动登录成功，跳过登录界面");
-                showMainWindow();
+            if (sessionLoaded && SessionManager.getInstance().isLoggedIn()) {
+                // 如果会话加载成功且用户已登录，直接显示主窗口
+                String username = SessionManager.getInstance().getUsername();
+                String token = SessionManager.getInstance().getToken();
+                if (username != null && !username.isEmpty() && token != null && !token.isEmpty()) {
+                    logger.info("🎉 自动登录成功，跳过登录界面");
+                    logger.debug("  用户: {}", username);
+                    showMainWindow();
+                } else {
+                    // 会话数据不完整，显示登录窗口
+                    logger.warn("⚠ 会话数据不完整，需要重新登录");
+                    SessionManager.getInstance().logout();
+                    showLoginWindow();
+                }
             } else {
                 // 否则显示登录窗口
+                logger.debug("未找到有效会话，显示登录界面");
                 showLoginWindow();
             }
             
@@ -67,6 +78,12 @@ public class CcJobGuiApplication extends Application {
         
         // 设置登录成功回调
         loginView.setOnLoginSuccess(result -> {
+            // 验证登录结果
+            if (result == null || !result.isSuccess() || result.getToken() == null || result.getToken().isEmpty()) {
+                logger.error("✗ 登录结果无效，无法进入主页面");
+                return;
+            }
+            
             // 保存会话信息
             SessionManager.getInstance().login(
                 result.getToken(),
@@ -131,6 +148,12 @@ public class CcJobGuiApplication extends Application {
         
         // 设置注册成功回调
         registerView.setOnRegisterSuccess(result -> {
+            // 验证注册结果
+            if (result == null || !result.isSuccess() || result.getToken() == null || result.getToken().isEmpty()) {
+                logger.error("✗ 注册结果无效，无法进入主页面");
+                return;
+            }
+            
             // 保存会话信息
             SessionManager.getInstance().login(
                 result.getToken(),
