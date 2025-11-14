@@ -2,7 +2,7 @@
 
 # JavaFX流程节点编辑器打包脚本
 
-echo "正在打包 NodeFx 流程节点编辑器..."
+echo "正在打包 CC_ETL 流程节点编辑器..."
 echo "================================"
 
 # 清理并编译
@@ -30,7 +30,7 @@ fi
 echo ""
 echo "================================"
 echo "打包成功！"
-echo "JAR文件位置: target/nodeFx-1.0-SNAPSHOT.jar"
+echo "JAR文件位置: target/CC_ETL-1.0-SNAPSHOT.jar"
 echo ""
 echo "运行方式："
 echo "  mvn javafx:run"

@@ -218,7 +218,7 @@ public class CcJobGuiApplication extends Application {
             
             // 设置窗口标题，显示用户名
             String username = SessionManager.getInstance().getUsername();
-            primaryStage.setTitle("NodeFx - 流程节点编辑器 [" + username + "]");
+            primaryStage.setTitle("CC_ETL - 流程节点编辑器 [" + username + "]");
             primaryStage.setScene(scene);
             primaryStage.setMinWidth(1000);
             primaryStage.setMinHeight(700);

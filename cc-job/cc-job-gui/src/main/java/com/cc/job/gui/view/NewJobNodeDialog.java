@@ -1,7 +1,9 @@
 package com.cc.job.gui.view;
 
+import com.cc.job.gui.service.JobJdbcDatasourceService;
 import com.cc.job.gui.util.IconUtil;
 import com.cc.job.xo.model.entity.JobGroup;
+import com.cc.job.xo.model.entity.JobJdbcDatasource;
 import com.cc.job.xo.model.form.JobInfoForm;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -21,6 +23,8 @@ import javafx.scene.paint.Color;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import org.kordamp.ikonli.javafx.FontIcon;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Type;
 import java.util.LinkedHashMap;
@@ -32,6 +36,8 @@ import java.util.Map;
  */
 public class NewJobNodeDialog extends Dialog<JobInfoForm> {
     
+    private static final Logger logger = LoggerFactory.getLogger(NewJobNodeDialog.class);
+    
     private JobInfoForm formData;
     private Long parentJobId; // 父任务组ID
     
@@ -42,13 +48,17 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
     private TextField alarmEmailField;
     
     private ComboBox<GlueType> glueTypeCombo;
+    private Label executorHandlerLabel; // JobHandler/数据库标签
     private TextField executorHandlerField;
+    private ComboBox<JobJdbcDatasource> datasourceCombo; // SQL模式下的数据库下拉框
     private Button glueIdeButton; // GLUE模式下的按钮
     private Label executorParamLabel;
     private TextArea executorParamArea;
     private ComboBox<String> reqTypeCombo;
     private TextField reqUrlField;
     private ParameterTable bodyTable;
+    
+    private JobJdbcDatasourceService datasourceService;
     
     private TextField executorTimeoutField;
     private ComboBox<RouteStrategy> routeStrategyCombo;
@@ -73,6 +83,7 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
     public NewJobNodeDialog(Stage owner, Long parentJobId, JobInfoForm editData, List<JobGroup> jobGroupList) {
         this.parentJobId = parentJobId;
         this.formData = editData != null ? editData : new JobInfoForm();
+        this.datasourceService = new JobJdbcDatasourceService();
 
         // 初始化 glueEditorArea
         glueEditorArea = new TextArea();
@@ -271,11 +282,35 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         glueTypeCombo.getItems().addAll(GlueType.values());
         glueTypeCombo.setValue(GlueType.BEAN);
         
-        // JobHandler
+        // JobHandler/数据库标签（根据运行模式动态切换）
         Label executorHandlerLabel = createFormLabel("JobHandler", true);
         executorHandlerField = new TextField();
         executorHandlerField.setPrefWidth(300);
         executorHandlerField.setPromptText("请输入JobHandler名称");
+        
+        // 数据库下拉框（SQL模式下使用）
+        datasourceCombo = new ComboBox<>();
+        datasourceCombo.setPrefWidth(300);
+        datasourceCombo.setPromptText("请选择数据库");
+        datasourceCombo.setVisible(false);
+        datasourceCombo.setManaged(false);
+        // 设置下拉框显示文本
+        datasourceCombo.setCellFactory(param -> new ListCell<>() {
+            @Override
+            protected void updateItem(JobJdbcDatasource item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item.getDatabaseName());
+            }
+        });
+        datasourceCombo.setButtonCell(new ListCell<>() {
+            @Override
+            protected void updateItem(JobJdbcDatasource item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item.getDatabaseName());
+            }
+        });
+        // 异步加载数据源列表
+        loadDatasourceList();
         
         // GLUE IDE 按钮（GLUE模式下使用）
         glueIdeButton = new Button("GLUE IDE");
@@ -305,10 +340,13 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         grid.add(glueTypeLabel, 0, 0);
         grid.add(glueTypeCombo, 1, 0);
         grid.add(executorHandlerLabel, 2, 0);
-        // 使用 StackPane 来切换显示输入框或按钮
+        // 使用 StackPane 来切换显示输入框、数据库下拉框或按钮
         StackPane handlerContainer = new StackPane();
-        handlerContainer.getChildren().addAll(executorHandlerField, glueIdeButton);
+        handlerContainer.getChildren().addAll(executorHandlerField, datasourceCombo, glueIdeButton);
         grid.add(handlerContainer, 3, 0);
+        
+        // 保存标签引用以便后续更新
+        this.executorHandlerLabel = executorHandlerLabel;
         
         grid.add(executorParamLabel, 0, 1);
         grid.add(executorParamArea, 1, 1, 3, 1);
@@ -480,37 +518,50 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
                 executorHandlerField.setManaged(true);
                 executorHandlerField.setDisable(false);
                 executorHandlerField.setPromptText("请输入JobHandler名称");
+                datasourceCombo.setVisible(false);
+                datasourceCombo.setManaged(false);
                 glueIdeButton.setVisible(false);
                 glueIdeButton.setManaged(false);
                 executorParamArea.setPromptText("请输入任务参数");
                 toggleExecutorParamArea(true);
+                // 更新标签文本
+                updateHandlerLabel("JobHandler");
             }
             case SQL -> {
-                executorHandlerField.setVisible(true);
-                executorHandlerField.setManaged(true);
-                executorHandlerField.setDisable(true);
-                executorHandlerField.setText("runJobJdbcXxlJob");
+                // SQL模式：显示数据库下拉框，隐藏JobHandler输入框
+                executorHandlerField.setVisible(false);
+                executorHandlerField.setManaged(false);
+                datasourceCombo.setVisible(true);
+                datasourceCombo.setManaged(true);
                 glueIdeButton.setVisible(false);
                 glueIdeButton.setManaged(false);
                 executorParamArea.setPromptText("请输入SQL语句");
                 toggleExecutorParamArea(true);
+                // 更新标签文本
+                updateHandlerLabel("数据库");
             }
             case API -> {
                 executorHandlerField.setVisible(true);
                 executorHandlerField.setManaged(true);
                 executorHandlerField.setDisable(true);
                 executorHandlerField.setText("runApiHandler");
+                datasourceCombo.setVisible(false);
+                datasourceCombo.setManaged(false);
                 glueIdeButton.setVisible(false);
                 glueIdeButton.setManaged(false);
                 executorParamArea.clear();
                 toggleExecutorParamArea(false);
                 bodyTable.ensureAtLeastOneRow();
+                // 更新标签文本
+                updateHandlerLabel("JobHandler");
             }
             default -> {
                 // GLUE 模式：显示按钮，隐藏输入框
                 if (isGlueMode) {
                     executorHandlerField.setVisible(false);
                     executorHandlerField.setManaged(false);
+                    datasourceCombo.setVisible(false);
+                    datasourceCombo.setManaged(false);
                     glueIdeButton.setVisible(true);
                     glueIdeButton.setManaged(true);
                     
@@ -529,8 +580,12 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
                     executorHandlerField.setManaged(true);
                     executorHandlerField.setDisable(true);
                     executorHandlerField.clear();
+                    datasourceCombo.setVisible(false);
+                    datasourceCombo.setManaged(false);
                     glueIdeButton.setVisible(false);
                     glueIdeButton.setManaged(false);
+                    // 更新标签文本
+                    updateHandlerLabel("JobHandler");
                 }
                 executorParamArea.setPromptText("请输入任务参数");
                 toggleExecutorParamArea(true);
@@ -541,6 +596,56 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
 //        glueSection.setManaged(glueType.requiresGlueSource());
         apiSection.setVisible(glueType == GlueType.API);
         apiSection.setManaged(glueType == GlueType.API);
+    }
+    
+    /**
+     * 更新JobHandler/数据库标签文本
+     */
+    private void updateHandlerLabel(String text) {
+        if (executorHandlerLabel != null) {
+            executorHandlerLabel.setText(text);
+            // 如果是必填项，添加星号
+            if (text.equals("数据库") || text.equals("JobHandler")) {
+                HBox labelBox = new HBox(2);
+                labelBox.setAlignment(Pos.CENTER_LEFT);
+                
+                Label textLabel = new Label(text);
+                textLabel.setStyle("-fx-text-fill: #374151; -fx-font-size: 13;");
+                
+                Label starLabel = new Label("*");
+                starLabel.setStyle("-fx-text-fill: #EF4444; -fx-font-size: 13; -fx-font-weight: bold;");
+                
+                labelBox.getChildren().addAll(textLabel, starLabel);
+                executorHandlerLabel.setGraphic(labelBox);
+                executorHandlerLabel.setText("");
+                executorHandlerLabel.setContentDisplay(ContentDisplay.LEFT);
+                executorHandlerLabel.setTooltip(new Tooltip(text + " *"));
+            }
+        }
+    }
+    
+    /**
+     * 异步加载数据源列表
+     */
+    private void loadDatasourceList() {
+        new Thread(() -> {
+            try {
+                List<JobJdbcDatasource> datasourceList = datasourceService.getDatasourceList();
+                Platform.runLater(() -> {
+                    datasourceCombo.getItems().clear();
+                    datasourceCombo.getItems().addAll(datasourceList);
+                });
+            } catch (Exception e) {
+                logger.error("加载数据源列表失败: {}", e.getMessage(), e);
+                Platform.runLater(() -> {
+                    Alert alert = new Alert(Alert.AlertType.WARNING);
+                    alert.setTitle("加载失败");
+                    alert.setHeaderText("无法加载数据源列表");
+                    alert.setContentText("请检查网络连接或后端服务是否正常");
+                    alert.showAndWait();
+                });
+            }
+        }).start();
     }
     
     /**
@@ -719,6 +824,17 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         if (data.getExecutorHandler() != null) {
             executorHandlerField.setText(data.getExecutorHandler());
         }
+        
+        // SQL模式：设置数据源下拉框的值
+        if (glueType == GlueType.SQL && data.getJdbcDatasourceId() != null) {
+            // 等待数据源列表加载完成后再设置值
+            Platform.runLater(() -> {
+                datasourceCombo.getItems().stream()
+                    .filter(ds -> ds.getId().equals(data.getJdbcDatasourceId()))
+                    .findFirst()
+                    .ifPresent(datasourceCombo::setValue);
+            });
+        }
 
         if (glueType.requiresGlueSource() && data.getGlueSource() != null) {
             glueEditorArea.setText(data.getGlueSource());
@@ -787,7 +903,13 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         form.setGlueType(glueType.getType());
         
         switch (glueType) {
-            case SQL -> form.setExecutorHandler("runJobJdbcXxlJob");
+            case SQL -> {
+                form.setExecutorHandler("runJobJdbcXxlJob");
+                // 设置数据源ID
+                if (datasourceCombo.getValue() != null) {
+                    form.setJdbcDatasourceId(datasourceCombo.getValue().getId());
+                }
+            }
             case API -> form.setExecutorHandler("runApiHandler");
             default -> form.setExecutorHandler(executorHandlerField.getText().trim());
         }
@@ -859,6 +981,9 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         GlueType glueType = glueTypeCombo.getValue();
         if (glueType == GlueType.BEAN && executorHandlerField.getText().trim().isEmpty()) {
             errors.append("• 请输入JobHandler\n");
+        }
+        if (glueType == GlueType.SQL && datasourceCombo.getValue() == null) {
+            errors.append("• 请选择数据库\n");
         }
         if (glueType != null && glueType.requiresGlueSource() && (glueEditorArea.getText() == null || glueEditorArea.getText().trim().isEmpty())) {
             errors.append("• 请填写GLUE脚本内容\n");

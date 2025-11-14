@@ -85,6 +85,7 @@ public class RegisterView extends StackPane {
             "-fx-background-color: transparent;"
         );
         
+        
         // Logo
         StackPane logo = createLogo();
         
@@ -119,14 +120,20 @@ public class RegisterView extends StackPane {
         // 返回登录链接
         HBox backArea = createBackArea();
         
+        // 创建按钮容器，减小与输入框的间距
+        VBox buttonContainer = new VBox(10);
+        buttonContainer.setAlignment(Pos.CENTER);
+        buttonContainer.getChildren().addAll(errorLabel, loadingIndicator, registerButton);
+        
+        // 设置按钮容器与输入区域之间的间距更小
+        VBox.setMargin(buttonContainer, new Insets(10, 0, 0, 0));
+        
         card.getChildren().addAll(
             logo,
             titleLabel,
             subtitleLabel,
             inputArea,
-            errorLabel,
-            loadingIndicator,
-            registerButton,
+            buttonContainer,
             backArea
         );
         
@@ -209,7 +216,7 @@ public class RegisterView extends StackPane {
             "-fx-border-radius: 8; " +
             "-fx-background-radius: 8;"
         );
-        inputWrapper.setPadding(new Insets(12, 15, 12, 15));
+        inputWrapper.setPadding(new Insets(8, 15, 8, 15));
         
         TextField field;
         if (isPassword) {
@@ -263,7 +270,7 @@ public class RegisterView extends StackPane {
         button.setFont(Font.font("System", FontWeight.BOLD, 15));
         button.setStyle(
             "-fx-background-color: linear-gradient(135deg, #667EEA 0%, #764BA2 100%); " +
-            "-fx-text-fill: white; " +
+            "-fx-text-fill: black; " +
             "-fx-background-radius: 8; " +
             "-fx-cursor: hand; " +
             "-fx-effect: dropshadow(gaussian, rgba(102, 126, 234, 0.3), 8, 0, 0, 3);"
@@ -272,7 +279,7 @@ public class RegisterView extends StackPane {
         // 悬停效果
         button.setOnMouseEntered(e -> button.setStyle(
             "-fx-background-color: linear-gradient(135deg, #5568D3 0%, #63408A 100%); " +
-            "-fx-text-fill: white; " +
+            "-fx-text-fill: black; " +
             "-fx-background-radius: 8; " +
             "-fx-cursor: hand; " +
             "-fx-effect: dropshadow(gaussian, rgba(102, 126, 234, 0.5), 12, 0, 0, 5);"
@@ -280,7 +287,7 @@ public class RegisterView extends StackPane {
         
         button.setOnMouseExited(e -> button.setStyle(
             "-fx-background-color: linear-gradient(135deg, #667EEA 0%, #764BA2 100%); " +
-            "-fx-text-fill: white; " +
+            "-fx-text-fill: black; " +
             "-fx-background-radius: 8; " +
             "-fx-cursor: hand; " +
             "-fx-effect: dropshadow(gaussian, rgba(102, 126, 234, 0.3), 8, 0, 0, 3);"

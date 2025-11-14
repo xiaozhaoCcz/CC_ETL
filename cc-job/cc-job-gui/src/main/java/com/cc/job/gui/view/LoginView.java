@@ -119,7 +119,7 @@ public class LoginView extends StackPane {
         titleLabel.setFont(Font.font("System", FontWeight.BOLD, 28));
         titleLabel.setTextFill(Color.web("#1F2937")); // 深灰色，在浅色渐变背景上清晰可见
         
-        Label subtitleLabel = new Label("登录以继续使用 NodeFx");
+        Label subtitleLabel = new Label("登录以继续使用 CC_ETL");
         subtitleLabel.setFont(Font.font("System", FontWeight.NORMAL, 14));
         subtitleLabel.setTextFill(Color.web("#4B5563")); // 中灰色，清晰可读
         
@@ -315,7 +315,7 @@ public class LoginView extends StackPane {
         HBox.setHgrow(loginButton, Priority.ALWAYS);
         loginButton.setStyle(
             "-fx-background-color: linear-gradient(135deg, #667EEA 0%, #764BA2 100%); " +
-            "-fx-text-fill: white; " +
+            "-fx-text-fill: black; " +
             "-fx-font-size: 15px; " +
             "-fx-font-weight: 600; " +
             "-fx-background-radius: 8; " +
@@ -327,7 +327,7 @@ public class LoginView extends StackPane {
         loginButton.setOnMouseEntered(e -> {
             loginButton.setStyle(
                 "-fx-background-color: linear-gradient(135deg, #5568D3 0%, #6941C6 100%); " +
-                "-fx-text-fill: white; " +
+                "-fx-text-fill: black; " +
                 "-fx-font-size: 15px; " +
                 "-fx-font-weight: 600; " +
                 "-fx-background-radius: 8; " +
@@ -340,7 +340,7 @@ public class LoginView extends StackPane {
             if (!loginButton.isDisabled()) {
                 loginButton.setStyle(
                     "-fx-background-color: linear-gradient(135deg, #667EEA 0%, #764BA2 100%); " +
-                    "-fx-text-fill: white; " +
+                    "-fx-text-fill: black; " +
                     "-fx-font-size: 15px; " +
                     "-fx-font-weight: 600; " +
                     "-fx-background-radius: 8; " +
@@ -446,7 +446,7 @@ public class LoginView extends StackPane {
             loginButton.setText("登录中...");
             loginButton.setStyle(
                 "-fx-background-color: #9CA3AF; " +
-                "-fx-text-fill: white; " +
+                "-fx-text-fill: black; " +
                 "-fx-font-size: 15px; " +
                 "-fx-font-weight: 600; " +
                 "-fx-background-radius: 8; " +
@@ -456,7 +456,7 @@ public class LoginView extends StackPane {
             loginButton.setText("登录");
             loginButton.setStyle(
                 "-fx-background-color: linear-gradient(135deg, #667EEA 0%, #764BA2 100%); " +
-                "-fx-text-fill: white; " +
+                "-fx-text-fill: black; " +
                 "-fx-font-size: 15px; " +
                 "-fx-font-weight: 600; " +
                 "-fx-background-radius: 8; " +
