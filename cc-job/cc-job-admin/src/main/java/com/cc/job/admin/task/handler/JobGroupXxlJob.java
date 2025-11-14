@@ -156,7 +156,7 @@ public class JobGroupXxlJob {
             logger.debug("[JobGroup] 生成随机ID - jobId: {}, randomId: {}", jobId, randomId);
 
             JobInfo jobInfo = getJobInfoById(jobId);
-            logger.info("[JobGroup] 任务信息获取成功 - 任务名称: {}, 任务类型: {}, 执行器超时时间: {}ms",
+            logger.info("[JobGroup] 任务信息获取成功 - 任务名称: {}, 任务类型: {}, 执行器超时时间: {}秒",
                     jobInfo.getJobDesc(), jobInfo.getJobType(), jobInfo.getExecutorTimeout());
 
             Map<Long, List<Long>> statusMap = new HashMap<>();
@@ -215,7 +215,7 @@ public class JobGroupXxlJob {
 
     private void getRuntime(List<WorkerWrapper<Long, String>> workerWrappers, List<JobNode> nodes, long timeout,
             Long jobId, String randomId) throws IOException {
-        logger.debug("[JobGroup] 开始计算任务运行时间 - jobId: {}, 节点数量: {}, 超时时间: {}ms", jobId, nodes.size(), timeout);
+        logger.debug("[JobGroup] 开始计算任务运行时间 - jobId: {}, 节点数量: {}, 超时时间: {}秒", jobId, nodes.size(), timeout);
 
         List<JobInfo> jobInfos = getJobInfos(nodes);
         Map<Long, JobInfo> jobInfoMap = new HashMap<>();
@@ -455,14 +455,14 @@ public class JobGroupXxlJob {
         Thread thread = null;
         JobThreadListener jobThreadListener = null;
         try {
-            logger.debug("[JobGroup] 开始监听任务执行状态 - jobId: {}, nodeId: {}, 超时时间: {}ms",
+            logger.debug("[JobGroup] 开始监听任务执行状态 - jobId: {}, nodeId: {}, 超时时间: {}秒",
                     jobInfo.getId(), node.getId(), jobInfo.getExecutorTimeout());
             jobThreadListener = new JobThreadListener(jobInfo, node, randomId, statusMap, count);
             FutureTask<String> futureTask = new FutureTask<>(jobThreadListener);
             thread = new Thread(futureTask);
             thread.start();
             result = jobInfo.getExecutorTimeout() > 0
-                    ? futureTask.get(jobInfo.getExecutorTimeout(), TimeUnit.MILLISECONDS)
+                    ? futureTask.get(jobInfo.getExecutorTimeout(), TimeUnit.SECONDS)
                     : futureTask.get();
             logger.info("[JobGroup] 任务监听完成 - jobId: {}, nodeId: {}, 执行结果: {}",
                     jobInfo.getId(), node.getId(), result);
@@ -494,7 +494,7 @@ public class JobGroupXxlJob {
                     jobInfo.getId(), jobInfo.getJobDesc());
         }
         // 暂停任务，默认暂停任务5分钟
-        long timeout = jobInfo.getExecutorTimeout() > 0 ? jobInfo.getExecutorTimeout() : 5 * 60 * 1000;
+        long timeout = jobInfo.getExecutorTimeout() > 0 ? jobInfo.getExecutorTimeout()*1000 : 5 * 60 * 1000;
         long startTime = System.currentTimeMillis();
         while (isPause) {
             long elapsed = System.currentTimeMillis() - startTime;
@@ -503,7 +503,7 @@ public class JobGroupXxlJob {
                 break;
             }
             try {
-                TimeUnit.MILLISECONDS.sleep(5000);
+                TimeUnit.SECONDS.sleep(5);
             } catch (InterruptedException e) {
                 logger.error("[JobGroup] 任务暂停等待被中断 - jobId: {}", jobInfo.getId(), e);
                 throw new RuntimeException(e);

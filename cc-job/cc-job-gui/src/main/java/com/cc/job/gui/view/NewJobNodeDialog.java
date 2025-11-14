@@ -56,6 +56,7 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
     private Spinner<Integer> executorFailRetryCountSpinner;
     private TextArea glueEditorArea;
     private String glueRemark; // 存储 GLUE 备注
+    private GlueType lastGlueType = null; // 记录上一次的GLUE类型，用于检测类型变化
     
     private ButtonType saveButtonType;
     private ButtonType cancelButtonType;
@@ -119,11 +120,21 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         
         // 监听GlueType变化
         glueTypeCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
+            // 如果GLUE类型发生变化，且都是需要GLUE源码的类型，则清空旧代码并加载新类型的默认模板
+            if (oldVal != null && newVal != null && 
+                oldVal.requiresGlueSource() && newVal.requiresGlueSource() &&
+                !oldVal.getType().equals(newVal.getType()) &&
+                glueEditorArea != null) {
+                // GLUE类型改变了，清空旧代码
+                glueEditorArea.clear();
+            }
+            lastGlueType = newVal;
             updateFieldsForGlueType(newVal);
         });
         
         // 初始化字段可见性
         if (glueTypeCombo.getValue() != null) {
+            lastGlueType = glueTypeCombo.getValue(); // 初始化时记录GLUE类型
             updateFieldsForGlueType(glueTypeCombo.getValue());
         }
     }
@@ -502,6 +513,17 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
                     executorHandlerField.setManaged(false);
                     glueIdeButton.setVisible(true);
                     glueIdeButton.setManaged(true);
+                    
+                    // 如果代码为空，自动加载默认模板
+                    if (glueEditorArea != null) {
+                        String currentCode = glueEditorArea.getText();
+                        if (currentCode == null || currentCode.trim().isEmpty()) {
+                            String defaultTemplate = com.cc.job.gui.util.GlueTemplateUtil.getDefaultTemplate(glueType.getType());
+                            if (defaultTemplate != null && !defaultTemplate.trim().isEmpty()) {
+                                glueEditorArea.setText(defaultTemplate);
+                            }
+                        }
+                    }
                 } else {
                     executorHandlerField.setVisible(true);
                     executorHandlerField.setManaged(true);
@@ -527,9 +549,34 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
     private void openGlueIdeDialog() {
         Stage ownerStage = (Stage) getDialogPane().getScene().getWindow();
         
+        // 获取当前 GLUE 类型
+        GlueType currentGlueType = glueTypeCombo.getValue();
+        if (currentGlueType == null || !currentGlueType.requiresGlueSource()) {
+            return; // 不是GLUE模式，不打开对话框
+        }
+        
         // 获取当前 GLUE 代码和备注
         String currentCode = glueEditorArea.getText();
         String currentRemark = glueRemark != null ? glueRemark : "";
+        
+        // 检查代码是否与当前GLUE类型匹配
+        // 如果代码为空，或者GLUE类型发生了变化，加载对应类型的默认模板
+        boolean shouldLoadTemplate = false;
+        if (currentCode == null || currentCode.trim().isEmpty()) {
+            shouldLoadTemplate = true;
+        } else if (lastGlueType != null && !lastGlueType.getType().equals(currentGlueType.getType())) {
+            // GLUE类型发生了变化，应该加载新类型的默认模板
+            shouldLoadTemplate = true;
+        }
+        
+        if (shouldLoadTemplate) {
+            String defaultTemplate = com.cc.job.gui.util.GlueTemplateUtil.getDefaultTemplate(currentGlueType.getType());
+            if (defaultTemplate != null && !defaultTemplate.trim().isEmpty()) {
+                currentCode = defaultTemplate;
+                // 同时更新到编辑区域
+                glueEditorArea.setText(defaultTemplate);
+            }
+        }
         
         // 获取任务ID（如果是编辑模式）
         Long taskId = formData.getId();
@@ -546,6 +593,9 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         if (newRemark != null) {
             glueRemark = newRemark;
         }
+        
+        // 更新记录的GLUE类型
+        lastGlueType = currentGlueType;
     }
     
     /**
@@ -661,6 +711,7 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
 
         GlueType glueType = GlueType.fromType(data.getGlueType());
         glueTypeCombo.setValue(glueType);
+        lastGlueType = glueType; // 记录初始的GLUE类型
         updateFieldsForGlueType(glueType);
 
         if (data.getExecutorHandler() != null) {

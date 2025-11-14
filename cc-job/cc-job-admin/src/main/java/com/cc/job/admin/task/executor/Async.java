@@ -41,7 +41,7 @@ public class Async {
     /**
      * 启动任务组执行，使用默认线程池
      *
-     * @param timeout        超时时间（毫秒）
+     * @param timeout        超时时间（秒）
      * @param workerWrappers 任务包装器列表
      * @return 是否成功启动
      * @throws ExecutionException 执行异常
@@ -53,7 +53,7 @@ public class Async {
     /**
      * 启动任务组执行，支持自定义线程池
      *
-     * @param timeout         超时时间（毫秒）
+     * @param timeout         超时时间（秒）
      * @param executorService 线程池
      * @param workerWrappers  任务包装器列表
      * @return 是否成功启动
