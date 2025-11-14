@@ -509,5 +509,41 @@ public class JobInfoService extends BaseService {
             }
         }
     }
+    
+    /**
+     * 保存连线
+     * @param formData 连线表单数据
+     * @return 保存后的连线实体
+     * @throws IOException 网络异常
+     */
+    public com.cc.job.xo.model.entity.JobEdge saveJobEdge(com.cc.job.xo.model.form.JobEdgeForm formData) throws IOException {
+        String url = apiUtil.getBaseUrl() + "/api/v1/jobInfos/saveJobEdge";
+        
+        String jsonBody = apiUtil.getGson().toJson(formData);
+        RequestBody body = RequestBody.create(jsonBody, MediaType.get("application/json; charset=utf-8"));
+        
+        Request request = new Request.Builder()
+                .url(url)
+                .post(body)
+                .build();
+        
+        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("请求失败: " + response);
+            }
+            
+            String responseBody = response.body().string();
+            logger.debug("saveJobEdge API 响应: {}", responseBody);
+            
+            Type resultType = new TypeToken<Result<com.cc.job.xo.model.entity.JobEdge>>(){}.getType();
+            Result<com.cc.job.xo.model.entity.JobEdge> result = apiUtil.getGson().fromJson(responseBody, resultType);
+            
+            if (Result.isSuccess(result)) {
+                return result.getData();
+            } else {
+                throw new IOException("API 返回错误: " + result.getMsg());
+            }
+        }
+    }
 }
 

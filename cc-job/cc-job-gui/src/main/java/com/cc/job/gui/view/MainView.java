@@ -2582,7 +2582,6 @@ public class MainView extends BorderPane {
                 double offsetY = pastePosition[1] - copiedNodesData.minY;
                 
                 // jobId映射：原始jobId -> 新创建的节点
-                java.util.Map<Long, ProcessNode> jobIdToNewNodeMap = new java.util.HashMap<>();
                 java.util.List<ProcessNode> newNodes = new java.util.ArrayList<>();
                 
                 // 1. 创建所有节点
@@ -2645,10 +2644,6 @@ public class MainView extends BorderPane {
                                 ProcessNode newNode = addNodeToCanvasAndReturn(newJobNode, pasteForm);
                                 if (newNode != null) {
                                     newNodes.add(newNode);
-                                    // 建立原始jobId到新节点的映射（用于恢复连接）
-                                    if (newJobId != null) {
-                                        jobIdToNewNodeMap.put(newJobId, newNode);
-                                    }
                                 }
                             } catch (Exception e) {
                                 logger.error("添加粘贴节点到画布失败: {}", e.getMessage(), e);
@@ -2665,7 +2660,7 @@ public class MainView extends BorderPane {
                 // 2. 恢复连接关系
                 Platform.runLater(() -> {
                     try {
-                        // 建立原始节点索引到新节点的映射（通过节点在列表中的顺序）
+                        // 新的节点
                         java.util.Map<Integer, ProcessNode> indexToNewNodeMap = new java.util.HashMap<>();
                         for (int i = 0; i < newNodes.size() && i < copiedNodesData.nodeForms.size(); i++) {
                             indexToNewNodeMap.put(i, newNodes.get(i));
@@ -2682,6 +2677,7 @@ public class MainView extends BorderPane {
                         
                         // 恢复连接关系
                         int connectionCount = 0;
+                        java.util.concurrent.atomic.AtomicInteger savedConnectionCount = new java.util.concurrent.atomic.AtomicInteger(0);
                         for (CopiedNodesData.ConnectionInfo connInfo : copiedNodesData.connections) {
                             try {
                                 // 通过原始jobId找到索引，再通过索引找到新节点
@@ -2700,16 +2696,50 @@ public class MainView extends BorderPane {
                                             targetNode, connInfo.targetAnchor, false);
                                         
                                         if (sourceConnector != null && targetConnector != null) {
-                                            canvas.addConnection(sourceNode, sourceConnector, 
+                                            // 创建连线
+                                            NodeConnection connection = canvas.addConnection(sourceNode, sourceConnector, 
                                                                 targetNode, targetConnector, true);
                                             connectionCount++;
+                                            
+                                            // 保存连线到数据库
+                                            if (connection != null && sourceNode.getNodeId() != null && targetNode.getNodeId() != null) {
+                                                try {
+                                                    com.cc.job.xo.model.form.JobEdgeForm edgeForm = new com.cc.job.xo.model.form.JobEdgeForm();
+                                                    edgeForm.setJobParentId(currentTaskGroupId);
+
+                                                    edgeForm.setFromNodeId(Long.parseLong(sourceNode.getNodeId()));
+                                                    edgeForm.setEndNodeId(Long.parseLong(targetNode.getNodeId()));
+                                                    edgeForm.setStartPoint(connInfo.sourceAnchor);
+                                                    edgeForm.setEndPoint(connInfo.targetAnchor);
+                                                    
+                                                    // 在后台线程中保存连线
+                                                    new Thread(() -> {
+                                                        try {
+                                                            com.cc.job.xo.model.entity.JobEdge savedEdge = jobInfoService.saveJobEdge(edgeForm);
+                                                            if (savedEdge != null) {
+                                                                savedConnectionCount.incrementAndGet();
+                                                                logger.debug("连线已保存到数据库: fromNodeId={}, endNodeId={}", 
+                                                                    savedEdge.getFromNodeId(), savedEdge.getEndNodeId());
+                                                            }
+                                                        } catch (Exception e) {
+                                                            logger.error("保存连线到数据库失败: {}", e.getMessage(), e);
+                                                        }
+                                                    }, "save-edge-thread").start();
+                                                } catch (Exception e) {
+                                                    logger.warn("创建连线表单失败: {}", e.getMessage());
+                                                }
+                                            }
                                         }
                                     }
                                 }
                             } catch (Exception e) {
                                 logger.warn("恢复连接失败: {}", e.getMessage());
+                                throw new Exception(e.getMessage());
                             }
                         }
+                        
+                        // 等待连线保存完成
+                        Thread.sleep(300);
                         
                         // 清除原始节点的选中状态（框框消失），然后选中所有新粘贴的节点（显示红色框框）
                         canvas.clearSelection();
@@ -2720,10 +2750,13 @@ public class MainView extends BorderPane {
                         logPanel.success("✓ " + newNodes.size() + " 个节点粘贴成功");
                         if (connectionCount > 0) {
                             logPanel.info("✓ 已恢复 " + connectionCount + " 条连接关系");
+                            int savedCount = savedConnectionCount.get();
+                            if (savedCount > 0) {
+                                logPanel.info("✓ 已保存 " + savedCount + " 条连线到数据库");
+                            }
                         } else if (!copiedNodesData.connections.isEmpty()) {
                             logPanel.info("提示: 部分连接关系未能恢复，请手动检查");
                         }
-                        logPanel.info("💡 提示: 请点击保存按钮以持久化节点和连接关系");
                     } catch (Exception e) {
                         logger.error("恢复连接关系失败: {}", e.getMessage(), e);
                         logPanel.error("✗ 恢复连接关系失败: " + e.getMessage());

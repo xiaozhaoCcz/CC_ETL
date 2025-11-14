@@ -13,6 +13,7 @@ import com.cc.job.xo.model.entity.JobEdge;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobLogglue;
 import com.cc.job.xo.model.entity.JobNode;
+import com.cc.job.xo.model.form.JobEdgeForm;
 import com.cc.job.xo.model.form.JobGlueForm;
 import com.cc.job.xo.model.form.JobInfoForm;
 import com.cc.job.xo.model.vo.JobEdgeVo;
@@ -1098,6 +1099,39 @@ public class JobComposeServiceImpl implements JobComposeService {
             jobEdgeVo.setProperties(jobEdge.getProperties());
             edgeVos.add(jobEdgeVo);
         }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public JobEdge saveJobEdge(JobEdgeForm formData) {
+        // 检查连线是否已存在
+        JobEdge existingEdge = jobEdgeService.getOne(
+            new LambdaQueryWrapper<JobEdge>()
+                .eq(JobEdge::getJobParentId, formData.getJobParentId())
+                .eq(JobEdge::getFromNodeId, formData.getFromNodeId())
+                .eq(JobEdge::getEndNodeId, formData.getEndNodeId())
+                .eq(JobEdge::getIsDeleted, 0)
+        );
+
+        if (existingEdge != null) {
+            // 如果连线已存在，返回现有连线
+            return existingEdge;
+        }
+
+        // 创建新的连线
+        JobEdge jobEdge = new JobEdge();
+        jobEdge.setJobParentId(formData.getJobParentId());
+        jobEdge.setFromNodeId(formData.getFromNodeId());
+        jobEdge.setEndNodeId(formData.getEndNodeId());
+        jobEdge.setStartPoint(formData.getStartPoint());
+        jobEdge.setEndPoint(formData.getEndPoint());
+        jobEdge.setProperties(formData.getProperties());
+        jobEdge.setPointsList(formData.getPointsList());
+
+        // 保存到数据库
+        jobEdgeService.save(jobEdge);
+
+        return jobEdge;
     }
 }
 

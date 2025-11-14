@@ -209,6 +209,13 @@ public class JobInfoController {
         return Result.success(data);
     }
 
+    @Operation(summary = "保存连线")
+    @PostMapping("saveJobEdge")
+    public Result<com.cc.job.xo.model.entity.JobEdge> saveJobEdge(@RequestBody @Valid com.cc.job.xo.model.form.JobEdgeForm formData) {
+        com.cc.job.xo.model.entity.JobEdge jobEdge = jobComposeService.saveJobEdge(formData);
+        return Result.success(jobEdge);
+    }
+
     @Operation(summary = "任务运行状态")
     @GetMapping("getJobStatus/{id}")
     public Result<Boolean>  getJobStatus(@PathVariable Long id){
