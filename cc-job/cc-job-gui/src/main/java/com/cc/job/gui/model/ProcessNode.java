@@ -429,14 +429,7 @@ public class ProcessNode extends StackPane {
             toggleNodeEnabled();
             toggleItem.setText(isEnabled() ? "禁用节点" : "启用节点");
         });
-        
-        // 设为起始节点
-        MenuItem startItem = new MenuItem("设为起始节点");
-        startItem.setOnAction(e -> {
-            logger.debug("📌 设为起始节点: {}", jobHandlerName);
-            // TODO: 标记为起始节点
-        });
-        
+
         // 分隔符
         SeparatorMenuItem separator2 = new SeparatorMenuItem();
         
@@ -456,7 +449,6 @@ public class ProcessNode extends StackPane {
             separator1,
             colorMenu,
             toggleItem,
-            startItem,
             separator2,
             deleteItem
         );

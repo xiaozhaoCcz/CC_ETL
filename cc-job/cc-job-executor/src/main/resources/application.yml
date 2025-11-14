@@ -49,7 +49,7 @@ cc-job:
       port: 12000
       ### job log path
       #logpath: ./data/applogs/executor/jobhandler
-      logpath: /Users/zhaowenpeng/logs
+      logpath: /Users/xiaozhao/Desktop/xz/logs
       ### job log retention days
       logretentiondays: 30
     ### job, access token
