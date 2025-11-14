@@ -203,6 +203,16 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     public boolean updateJobInfo(Long id, JobInfoForm formData) {
         // valid trigger
         JobInfo existsJobInfo = baseUpdateJobInfo(id, formData);
+
+        if (StringUtils.isNotBlank(formData.getGlueRemark())) {
+            //插入glueSource
+            JobGlueForm glueForm = new JobGlueForm();
+            glueForm.setTaskId(id);
+            glueForm.setGlueSource(formData.getGlueSource());
+            glueForm.setGlueType(formData.getGlueType());
+            glueForm.setGlueRemark(formData.getGlueRemark());
+            this.saveGlueSource(glueForm);
+        }
         updateChild(existsJobInfo);
         JobNode node = jobNodeService.getOne(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobId, id));
         if(node!=null){
@@ -837,12 +847,21 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         taskInfo.setGlueRemark(formData.getGlueRemark());
         taskInfo.setGlueSource(formData.getGlueSource());
         taskInfo.setGlueUpdatetime(LocalDateTime.now());
+        // 如果传入了glueType，则更新taskInfo的glueType
+        if (formData.getGlueType() != null && !formData.getGlueType().isEmpty()) {
+            taskInfo.setGlueType(formData.getGlueType());
+        }
         this.updateById(taskInfo);
         JobLogglue taskLogglue = new JobLogglue();
         taskLogglue.setGlueSource(formData.getGlueSource());
         taskLogglue.setGlueRemark(formData.getGlueRemark());
         taskLogglue.setJobId(formData.getTaskId());
-        taskLogglue.setGlueType(taskInfo.getGlueType());
+        // 优先使用传入的glueType，如果没有则使用taskInfo中的glueType
+        String glueType = formData.getGlueType();
+        if (glueType == null || glueType.isEmpty()) {
+            glueType = taskInfo.getGlueType();
+        }
+        taskLogglue.setGlueType(glueType);
         jobLogglueMapper.insert(taskLogglue);
         return true;
     }

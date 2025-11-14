@@ -11,10 +11,13 @@ import com.cc.job.admin.task.service.JobNodeService;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.xo.model.entity.JobEdge;
 import com.cc.job.xo.model.entity.JobInfo;
+import com.cc.job.xo.model.entity.JobLogglue;
 import com.cc.job.xo.model.entity.JobNode;
+import com.cc.job.xo.model.form.JobGlueForm;
 import com.cc.job.xo.model.form.JobInfoForm;
 import com.cc.job.xo.model.vo.JobEdgeVo;
 import com.cc.job.xo.model.vo.JobNodeVo;
+import com.cc.job.xo.mapper.JobLogglueMapper;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
@@ -37,6 +40,8 @@ public class JobComposeServiceImpl implements JobComposeService {
     final JobNodeService jobNodeService;
 
     final JobEdgeService jobEdgeService;
+    
+    final JobLogglueMapper jobLogglueMapper;
 
     @Data
     public static class LfNode {
@@ -558,6 +563,17 @@ public class JobComposeServiceImpl implements JobComposeService {
         jobInfo.setIsNode("Y");
         jobInfo.setIsPause(0);
         jobInfoService.save(jobInfo);
+
+        if (StringUtils.isNotBlank(formData.getGlueRemark())) {
+            //插入glueSource
+            JobGlueForm glueForm = new JobGlueForm();
+            glueForm.setTaskId(jobInfo.getId());
+            glueForm.setGlueSource(formData.getGlueSource());
+            glueForm.setGlueType(formData.getGlueType());
+            glueForm.setGlueRemark(formData.getGlueRemark());
+            jobInfoService.saveGlueSource(glueForm);
+        }
+        
         JobNode jobNode = new JobNode();
         jobNode.setJobId(jobInfo.getId());
         jobNode.setJobParentId(formData.getParentId());

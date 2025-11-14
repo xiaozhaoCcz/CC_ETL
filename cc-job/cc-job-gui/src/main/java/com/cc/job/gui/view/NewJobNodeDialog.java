@@ -43,6 +43,7 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
     
     private ComboBox<GlueType> glueTypeCombo;
     private TextField executorHandlerField;
+    private Button glueIdeButton; // GLUE模式下的按钮
     private Label executorParamLabel;
     private TextArea executorParamArea;
     private ComboBox<String> reqTypeCombo;
@@ -54,13 +55,14 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
     private ComboBox<BlockStrategy> blockStrategyCombo;
     private Spinner<Integer> executorFailRetryCountSpinner;
     private TextArea glueEditorArea;
+    private String glueRemark; // 存储 GLUE 备注
     
     private ButtonType saveButtonType;
     private ButtonType cancelButtonType;
     
     // 高级配置容器（包括高级配置、GLUE脚本、API配置）
     private VBox advancedSection;
-    private VBox glueSection;
+    //private VBox glueSection;
     private VBox apiSection;
     private boolean advancedSectionVisible = false;
     
@@ -70,7 +72,13 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
     public NewJobNodeDialog(Stage owner, Long parentJobId, JobInfoForm editData, List<JobGroup> jobGroupList) {
         this.parentJobId = parentJobId;
         this.formData = editData != null ? editData : new JobInfoForm();
-        
+
+        // 初始化 glueEditorArea
+        glueEditorArea = new TextArea();
+        glueEditorArea.setPrefRowCount(12);
+        glueEditorArea.setWrapText(true);
+        glueEditorArea.setPromptText("请输入 GLUE 脚本内容");
+
         initOwner(owner);
         initModality(Modality.APPLICATION_MODAL);
         setTitle(editData == null ? "新增任务" : "编辑任务");
@@ -150,10 +158,10 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         formContent.getChildren().add(advancedSection);
         
         // GLUE脚本（默认隐藏，根据运行模式动态显示）
-        glueSection = createGlueSection();
-        glueSection.setVisible(false);
-        glueSection.setManaged(false);
-        formContent.getChildren().add(glueSection);
+//        glueSection = createGlueSection();
+//        glueSection.setVisible(false);
+//        glueSection.setManaged(false);
+//        formContent.getChildren().add(glueSection);
         
         // API配置（默认隐藏，根据运行模式动态显示）
         apiSection = createApiSection();
@@ -258,6 +266,23 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         executorHandlerField.setPrefWidth(300);
         executorHandlerField.setPromptText("请输入JobHandler名称");
         
+        // GLUE IDE 按钮（GLUE模式下使用）
+        glueIdeButton = new Button("GLUE IDE");
+        glueIdeButton.setPrefWidth(300);
+        glueIdeButton.setStyle(
+            "-fx-background-color: #2563EB; " +
+            "-fx-text-fill: white; " +
+            "-fx-font-size: 13; " +
+            "-fx-font-weight: bold; " +
+            "-fx-padding: 8 20 8 20; " +
+            "-fx-border-radius: 4; " +
+            "-fx-background-radius: 4; " +
+            "-fx-cursor: hand;"
+        );
+        glueIdeButton.setOnAction(e -> openGlueIdeDialog());
+        glueIdeButton.setVisible(false);
+        glueIdeButton.setManaged(false);
+        
         // 任务参数
         executorParamLabel = createFormLabel("任务参数", false);
         executorParamArea = new TextArea();
@@ -269,7 +294,10 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         grid.add(glueTypeLabel, 0, 0);
         grid.add(glueTypeCombo, 1, 0);
         grid.add(executorHandlerLabel, 2, 0);
-        grid.add(executorHandlerField, 3, 0);
+        // 使用 StackPane 来切换显示输入框或按钮
+        StackPane handlerContainer = new StackPane();
+        handlerContainer.getChildren().addAll(executorHandlerField, glueIdeButton);
+        grid.add(handlerContainer, 3, 0);
         
         grid.add(executorParamLabel, 0, 1);
         grid.add(executorParamArea, 1, 1, 3, 1);
@@ -378,18 +406,18 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         return section;
     }
 
-    private VBox createGlueSection() {
-        glueSection = createSection("GLUE 脚本", IconUtil.fileIcon());
-        glueSection.setVisible(false);
-
-        glueEditorArea = new TextArea();
-        glueEditorArea.setPrefRowCount(12);
-        glueEditorArea.setWrapText(true);
-        glueEditorArea.setPromptText("请输入 GLUE 脚本内容");
-
-        glueSection.getChildren().add(glueEditorArea);
-        return glueSection;
-    }
+//    private VBox createGlueSection() {
+//        glueSection = createSection("GLUE 脚本", IconUtil.fileIcon());
+//        glueSection.setVisible(false);
+//
+//        glueEditorArea = new TextArea();
+//        glueEditorArea.setPrefRowCount(12);
+//        glueEditorArea.setWrapText(true);
+//        glueEditorArea.setPromptText("请输入 GLUE 脚本内容");
+//
+//        glueSection.getChildren().add(glueEditorArea);
+//        return glueSection;
+//    }
 
     private VBox createApiSection() {
         apiSection = createSection("API 配置", IconUtil.windowIcon());
@@ -433,38 +461,91 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
      * 根据GlueType更新字段可见性
      */
     private void updateFieldsForGlueType(GlueType glueType) {
+        boolean isGlueMode = glueType != null && glueType.requiresGlueSource();
+        
         switch (glueType) {
             case BEAN -> {
+                executorHandlerField.setVisible(true);
+                executorHandlerField.setManaged(true);
                 executorHandlerField.setDisable(false);
                 executorHandlerField.setPromptText("请输入JobHandler名称");
+                glueIdeButton.setVisible(false);
+                glueIdeButton.setManaged(false);
                 executorParamArea.setPromptText("请输入任务参数");
                 toggleExecutorParamArea(true);
             }
             case SQL -> {
+                executorHandlerField.setVisible(true);
+                executorHandlerField.setManaged(true);
                 executorHandlerField.setDisable(true);
                 executorHandlerField.setText("runJobJdbcXxlJob");
+                glueIdeButton.setVisible(false);
+                glueIdeButton.setManaged(false);
                 executorParamArea.setPromptText("请输入SQL语句");
                 toggleExecutorParamArea(true);
             }
             case API -> {
+                executorHandlerField.setVisible(true);
+                executorHandlerField.setManaged(true);
                 executorHandlerField.setDisable(true);
                 executorHandlerField.setText("runApiHandler");
+                glueIdeButton.setVisible(false);
+                glueIdeButton.setManaged(false);
                 executorParamArea.clear();
                 toggleExecutorParamArea(false);
                 bodyTable.ensureAtLeastOneRow();
             }
             default -> {
-                executorHandlerField.setDisable(true);
-                executorHandlerField.clear();
+                // GLUE 模式：显示按钮，隐藏输入框
+                if (isGlueMode) {
+                    executorHandlerField.setVisible(false);
+                    executorHandlerField.setManaged(false);
+                    glueIdeButton.setVisible(true);
+                    glueIdeButton.setManaged(true);
+                } else {
+                    executorHandlerField.setVisible(true);
+                    executorHandlerField.setManaged(true);
+                    executorHandlerField.setDisable(true);
+                    executorHandlerField.clear();
+                    glueIdeButton.setVisible(false);
+                    glueIdeButton.setManaged(false);
+                }
                 executorParamArea.setPromptText("请输入任务参数");
                 toggleExecutorParamArea(true);
             }
         }
         // GLUE脚本和API配置根据运行模式动态显示，但不影响高级配置的显示状态
-        glueSection.setVisible(glueType.requiresGlueSource());
-        glueSection.setManaged(glueType.requiresGlueSource());
+//        glueSection.setVisible(glueType.requiresGlueSource());
+//        glueSection.setManaged(glueType.requiresGlueSource());
         apiSection.setVisible(glueType == GlueType.API);
         apiSection.setManaged(glueType == GlueType.API);
+    }
+    
+    /**
+     * 打开 GLUE IDE 对话框
+     */
+    private void openGlueIdeDialog() {
+        Stage ownerStage = (Stage) getDialogPane().getScene().getWindow();
+        
+        // 获取当前 GLUE 代码和备注
+        String currentCode = glueEditorArea.getText();
+        String currentRemark = glueRemark != null ? glueRemark : "";
+        
+        // 获取任务ID（如果是编辑模式）
+        Long taskId = formData.getId();
+        
+        GlueIdeDialog dialog = new GlueIdeDialog(ownerStage, taskId, currentCode, currentRemark);
+        dialog.showAndWait();
+        
+        // 对话框关闭后，同步代码和备注
+        String newCode = dialog.getCode();
+        String newRemark = dialog.getRemark();
+        if (newCode != null && !newCode.equals(currentCode)) {
+            glueEditorArea.setText(newCode);
+        }
+        if (newRemark != null) {
+            glueRemark = newRemark;
+        }
     }
     
     /**
@@ -589,6 +670,9 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         if (glueType.requiresGlueSource() && data.getGlueSource() != null) {
             glueEditorArea.setText(data.getGlueSource());
         }
+        if (data.getGlueRemark() != null) {
+            glueRemark = data.getGlueRemark();
+        }
 
         if (glueType == GlueType.API) {
             if (data.getReqType() != null) {
@@ -656,9 +740,14 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         }
 
         if (glueType.requiresGlueSource()) {
-            form.setGlueSource(glueEditorArea.getText());
+            String glueSource = glueEditorArea.getText();
+            // 如果为空字符串，设置为 null，避免传递空字符串
+            form.setGlueSource(glueSource != null && !glueSource.trim().isEmpty() ? glueSource : null);
+            // 设置 GLUE 备注
+            form.setGlueRemark(glueRemark != null && !glueRemark.trim().isEmpty() ? glueRemark.trim() : null);
         } else {
             form.setGlueSource(null);
+            form.setGlueRemark(null);
         }
 
         if (glueType == GlueType.API) {

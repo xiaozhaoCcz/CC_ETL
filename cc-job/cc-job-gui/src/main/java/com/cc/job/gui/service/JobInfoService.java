@@ -1,6 +1,8 @@
 package com.cc.job.gui.service;
 
 import com.cc.job.xo.common.result.Result;
+import com.cc.job.xo.model.entity.JobLogglue;
+import com.cc.job.xo.model.form.JobGlueForm;
 import com.cc.job.xo.model.form.JobInfoForm;
 import com.google.gson.reflect.TypeToken;
 import okhttp3.*;
@@ -10,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -434,6 +437,76 @@ public class JobInfoService extends BaseService {
             
             logger.debug("✓ 任务{}成功: jobId={}, isPause={}", isPause == 1 ? "禁用" : "启用", jobId, isPause);
             return true;
+        }
+    }
+    
+    /**
+     * 保存GLUE源代码
+     * @param formData GLUE表单数据
+     * @return 是否保存成功
+     * @throws IOException 网络异常
+     */
+    public boolean saveGlueSource(JobGlueForm formData) throws IOException {
+        String url = apiUtil.getBaseUrl() + "/api/v1/jobInfos/saveGlueSource";
+        
+        String jsonBody = apiUtil.getGson().toJson(formData);
+        RequestBody body = RequestBody.create(jsonBody, MediaType.get("application/json; charset=utf-8"));
+        
+        Request request = new Request.Builder()
+                .url(url)
+                .post(body)
+                .build();
+        
+        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("请求失败: " + response);
+            }
+            
+            String responseBody = response.body().string();
+            logger.debug("saveGlueSource API 响应: {}", responseBody);
+            
+            Type resultType = new TypeToken<Result<Void>>(){}.getType();
+            Result<Void> result = apiUtil.getGson().fromJson(responseBody, resultType);
+            
+            if (!Result.isSuccess(result)) {
+                throw new IOException("API 返回错误: " + result.getMsg());
+            }
+            
+            logger.debug("✓ GLUE源代码保存成功: taskId={}", formData.getTaskId());
+            return true;
+        }
+    }
+    
+    /**
+     * 获取GLUE历史记录列表
+     * @param id 任务ID
+     * @return GLUE历史记录列表
+     * @throws IOException 网络异常
+     */
+    public List<JobLogglue> getGlueList(Long id) throws IOException {
+        String url = apiUtil.getBaseUrl() + "/api/v1/jobInfos/getGlueList/" + id;
+        
+        Request request = new Request.Builder()
+                .url(url)
+                .get()
+                .build();
+        
+        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("请求失败: " + response);
+            }
+            
+            String responseBody = response.body().string();
+            logger.debug("getGlueList API 响应: {}", responseBody);
+            
+            Type resultType = new TypeToken<Result<List<JobLogglue>>>(){}.getType();
+            Result<List<JobLogglue>> result = apiUtil.getGson().fromJson(responseBody, resultType);
+            
+            if (Result.isSuccess(result)) {
+                return result.getData();
+            } else {
+                throw new IOException("API 返回错误: " + result.getMsg());
+            }
         }
     }
 }

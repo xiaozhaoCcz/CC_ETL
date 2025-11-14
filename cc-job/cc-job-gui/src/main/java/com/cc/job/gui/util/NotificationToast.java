@@ -108,40 +108,7 @@ public class NotificationToast {
                 rootPane.setPrefWidth(WIDTH);
                 rootPane.setMinWidth(WIDTH);
                 rootPane.setMaxWidth(WIDTH);
-                
-                // 第一层：白色背景（统一圆角）
-                Region backgroundLayer = new Region();
-                backgroundLayer.setStyle(
-                    "-fx-background-color: #FFFFFF; " +
-                    "-fx-background-radius: " + CORNER_RADIUS + ";"
-                );
-                backgroundLayer.setPrefWidth(WIDTH);
-                backgroundLayer.setMinWidth(WIDTH);
-                backgroundLayer.setMaxWidth(WIDTH);
-                
-                // 第二层：头部背景（上边圆角）
-                Region headerBackground = new Region();
-                headerBackground.setStyle(
-                    "-fx-background-color: " + headerBgColor + "; " +
-                    "-fx-background-radius: " + CORNER_RADIUS + " " + CORNER_RADIUS + " 0 0;"
-                );
-                headerBackground.setPrefWidth(WIDTH);
-                headerBackground.setMinWidth(WIDTH);
-                headerBackground.setMaxWidth(WIDTH);
-                // 设置头部背景的高度（通过prefHeight控制）
-                headerBackground.setPrefHeight(70); // 大约头部高度
-                
-                // 第三层：边框（统一圆角）
-                Region borderLayer = new Region();
-                borderLayer.setStyle(
-                    "-fx-background-color: transparent; " +
-                    "-fx-border-color: " + borderColor + "; " +
-                    "-fx-border-width: 2; " +
-                    "-fx-border-radius: " + CORNER_RADIUS + ";"
-                );
-                borderLayer.setPrefWidth(WIDTH);
-                borderLayer.setMinWidth(WIDTH);
-                borderLayer.setMaxWidth(WIDTH);
+
                 
                 // 第四层：内容容器（透明背景，不设置圆角）
                 VBox contentContainer = new VBox(0);
@@ -159,7 +126,7 @@ public class NotificationToast {
                 headerBox.setPrefWidth(WIDTH);
                 headerBox.setMinWidth(WIDTH);
                 headerBox.setMaxWidth(WIDTH);
-                
+
                 // 图标容器
                 StackPane iconContainer = new StackPane();
                 iconContainer.setMinSize(40, 40);
@@ -256,7 +223,7 @@ public class NotificationToast {
                 contentContainer.getChildren().addAll(headerBox, contentBox);
                 
                 // 组装根容器（按顺序叠加：背景 -> 头部背景 -> 边框 -> 内容）
-                rootPane.getChildren().addAll(backgroundLayer, headerBackground, borderLayer, contentContainer);
+                rootPane.getChildren().addAll(contentContainer);
                 
                 // 添加阴影效果
                 DropShadow shadow = new DropShadow();
