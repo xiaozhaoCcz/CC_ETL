@@ -1015,7 +1015,7 @@ public class LogPanel extends VBox {
                            !lowerText.contains("fail retry") &&
                            !lowerText.contains("executorfailretrycount")) ||
                           (lowerText.contains("exception") && !lowerText.contains("success")) ||
-                          (lowerText.contains("异常") && !lowerText.contains("成功"))
+                          (lowerText.contains("异常") && !lowerText.contains("成功"));
 
             }
             
