@@ -60,6 +60,8 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
     
     private JobJdbcDatasourceService datasourceService;
     
+    private Long pendingDatasourceId; // 待设置的数据源ID（在数据源列表加载完成后设置）
+    
     private TextField executorTimeoutField;
     private ComboBox<RouteStrategy> routeStrategyCombo;
     private ComboBox<BlockStrategy> blockStrategyCombo;
@@ -634,6 +636,12 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
                 Platform.runLater(() -> {
                     datasourceCombo.getItems().clear();
                     datasourceCombo.getItems().addAll(datasourceList);
+                    
+                    // 如果有待设置的数据源ID，现在设置它
+                    if (pendingDatasourceId != null) {
+                        setDatasourceValue(pendingDatasourceId);
+                        pendingDatasourceId = null;
+                    }
                 });
             } catch (Exception e) {
                 logger.error("加载数据源列表失败: {}", e.getMessage(), e);
@@ -646,6 +654,20 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
                 });
             }
         }).start();
+    }
+    
+    /**
+     * 设置数据源下拉框的值
+     */
+    private void setDatasourceValue(Long datasourceId) {
+        if (datasourceId == null || datasourceCombo == null) {
+            return;
+        }
+        
+        datasourceCombo.getItems().stream()
+            .filter(ds -> ds.getId().equals(datasourceId))
+            .findFirst()
+            .ifPresent(datasourceCombo::setValue);
     }
     
     /**
@@ -827,13 +849,14 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         
         // SQL模式：设置数据源下拉框的值
         if (glueType == GlueType.SQL && data.getJdbcDatasourceId() != null) {
-            // 等待数据源列表加载完成后再设置值
-            Platform.runLater(() -> {
-                datasourceCombo.getItems().stream()
-                    .filter(ds -> ds.getId().equals(data.getJdbcDatasourceId()))
-                    .findFirst()
-                    .ifPresent(datasourceCombo::setValue);
-            });
+            // 如果数据源列表已经加载，直接设置值；否则保存待设置的数据源ID
+            if (!datasourceCombo.getItems().isEmpty()) {
+                // 数据源列表已加载，直接设置
+                setDatasourceValue(data.getJdbcDatasourceId());
+            } else {
+                // 数据源列表还未加载，保存待设置的数据源ID
+                pendingDatasourceId = data.getJdbcDatasourceId();
+            }
         }
 
         if (glueType.requiresGlueSource() && data.getGlueSource() != null) {

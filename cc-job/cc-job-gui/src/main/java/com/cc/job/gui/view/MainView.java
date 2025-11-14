@@ -730,6 +730,95 @@ public class MainView extends BorderPane {
     }
 
     /**
+     * 切换到指定任务组并执行定位操作
+     * @param taskGroupId 任务组ID
+     * @param taskGroupName 任务组名称
+     * @param locateCallback 定位回调，在任务组加载完成后执行
+     */
+    private void switchToTaskGroupAndLocate(Long taskGroupId, String taskGroupName, Runnable locateCallback) {
+        // 更新任务组名称到ID的映射
+        taskGroupNameToIdMap.put(taskGroupName, taskGroupId);
+        // 更新当前选中的任务组ID
+        usePageStoreHook().setCurrentPage(taskGroupId);
+        // 更新导航栏当前任务组ID
+        navigationBar.setCurrentTaskGroupId(taskGroupId);
+        // 更新顶部工具栏当前任务组ID
+        toolBar.setCurrentTaskGroupId(taskGroupId);
+        
+        // 添加到导航栏（如果还没有）
+        navigationBar.addOrSelectTask(taskGroupName);
+        
+        // 加载任务组数据，并在加载完成后执行定位
+        loadTaskGroupDataWithCallback(taskGroupId, taskGroupName, locateCallback);
+    }
+    
+    /**
+     * 加载任务组数据（带回调）
+     */
+    private void loadTaskGroupDataWithCallback(Long taskId, String taskName, Runnable callback) {
+        logPanel.info("════════════════════════════════");
+        logPanel.info("开始加载任务组: " + taskName);
+        logPanel.info("任务组ID: " + taskId);
+        
+        // 在后台线程中加载数据
+        new Thread(() -> {
+            try {
+                // 同步节点状态
+                canvas.syncPendingNodeStatusBlocking();
+                Platform.runLater(() -> logPanel.info("节点状态同步完成，开始加载最新数据"));
+                
+                // 加载任务组数据
+                JobComposeData composeData = jobPartService.getJobCompose(taskId);
+                
+                // 在 JavaFX 主线程中更新 UI
+                Platform.runLater(() -> {
+                    // 清空画布
+                    canvas.clear();
+                    
+                    // 加载节点和连接
+                    if (composeData != null) {
+                        canvas.loadFromComposeData(composeData);
+                        // 为所有加载的节点设置编辑回调
+                        setupEditCallbacksForLoadedNodes(composeData);
+                        
+                        int nodeCount = composeData.getNodes() != null ? composeData.getNodes().size() : 0;
+                        int edgeCount = composeData.getEdges() != null ? composeData.getEdges().size() : 0;
+                        
+                        logPanel.success("✓ 任务组加载成功！");
+                        logPanel.info("节点数: " + nodeCount + ", 连接数: " + edgeCount);
+                    } else {
+                        logPanel.warn("⚠ 任务组数据为空");
+                    }
+                    
+                    // 检查任务运行状态并更新小绿点显示
+                    checkAndUpdateTaskGroupRunningStatus(taskId, taskName);
+                    
+                    // 同步树形视图的选中状态
+                    treeView.selectTaskGroupByName(taskName);
+                    
+                    // 延迟执行定位回调，确保画布已经完全渲染
+                    javafx.animation.PauseTransition delay = new javafx.animation.PauseTransition(javafx.util.Duration.millis(300));
+                    delay.setOnFinished(e -> {
+                        if (callback != null) {
+                            callback.run();
+                        }
+                    });
+                    delay.play();
+                    
+                    logPanel.info("════════════════════════════════");
+                });
+                
+            } catch (Exception ex) {
+                logger.error("加载任务组数据失败: {}", ex.getMessage(), ex);
+                Platform.runLater(() -> {
+                    logPanel.error("✗ 加载任务组数据失败: " + ex.getMessage());
+                    logPanel.warn("提示: 请检查后端服务是否正常运行");
+                });
+            }
+        }, "load-task-group-" + taskId).start();
+    }
+    
+    /**
      * 加载任务组数据
      */
     private void loadTaskGroupData(Long taskId, String taskName) {
@@ -1876,32 +1965,95 @@ public class MainView extends BorderPane {
 
             @Override
             public void onJobNodeAction(Long jobNodeId, Long jobId, String nodeName, TaskTreeView.TaskSelectionCallback.JobNodeAction action) {
+                onJobNodeAction(jobNodeId, jobId, nodeName, null, action);
+            }
+            
+            @Override
+            public void onJobNodeAction(Long jobNodeId, Long jobId, String nodeName, Long taskGroupId, TaskTreeView.TaskSelectionCallback.JobNodeAction action) {
                 if (jobId == null) {
                     logPanel.warn("⚠ 该树节点缺少任务ID，无法执行操作: " + nodeName);
                     return;
                 }
 
-                ProcessNode targetNode = canvas.getNodeByJobId(jobId);
-                if (targetNode == null) {
-                    logPanel.warn("⚠ 在画布上未找到任务节点: " + nodeName + " (jobId=" + jobId + ")");
-                    return;
+                // 如果提供了任务组ID，检查是否需要切换任务组
+                if (taskGroupId != null && action == TaskTreeView.TaskSelectionCallback.JobNodeAction.LOCATE) {
+                    Long currentTaskGroupId = usePageStoreHook().getCurrentTaskGroupId();
+                    if (currentTaskGroupId == null || !currentTaskGroupId.equals(taskGroupId)) {
+                        // 需要切换到对应的任务组
+                        String taskGroupName = getJobNameById(taskGroupId);
+                        if (taskGroupName == null) {
+                            taskGroupName = "任务组 " + taskGroupId;
+                        }
+                        // 切换任务组
+                        switchToTaskGroupAndLocate(taskGroupId, taskGroupName, () -> {
+                            ProcessNode targetNode = canvas.getNodeByJobId(jobId);
+                            if (targetNode != null) {
+                                locateNodeOnCanvas(targetNode);
+                            } else {
+                                logPanel.warn("⚠ 在画布上未找到任务节点: " + nodeName + " (jobId=" + jobId + ")");
+                            }
+                        });
+                        return;
+                    }
                 }
 
                 switch (action) {
-                    case EDIT -> editNode(jobId, targetNode);
-                    case LOCATE -> locateNodeOnCanvas(targetNode);
+                    case EDIT -> {
+                        // 编辑操作不依赖画布上的节点，可以直接打开编辑对话框
+                        ProcessNode targetNode = canvas.getNodeByJobId(jobId);
+                        editNode(jobId, targetNode, taskGroupId);
+                    }
+                    case LOCATE -> {
+                        // 定位操作需要画布上有节点
+                        ProcessNode targetNode = canvas.getNodeByJobId(jobId);
+                        if (targetNode == null) {
+                            logPanel.warn("⚠ 在画布上未找到任务节点: " + nodeName + " (jobId=" + jobId + ")");
+                            return;
+                        }
+                        locateNodeOnCanvas(targetNode);
+                    }
+                    case PROPERTIES -> {
+                        // 属性操作不依赖画布上的节点，可以直接显示详情
+                        showNodeDetailsByJobId(jobId, nodeName);
+                    }
                     default -> { }
                 }
             }
 
             @Override
             public void onEdgeAction(Long edgeId, TaskTreeView.TaskSelectionCallback.EdgeAction action) {
+                onEdgeAction(edgeId, null, action);
+            }
+            
+            @Override
+            public void onEdgeAction(Long edgeId, Long taskGroupId, TaskTreeView.TaskSelectionCallback.EdgeAction action) {
                 if (edgeId == null) {
                     logPanel.warn("⚠ 未提供边ID，无法执行操作");
                     return;
                 }
 
                 String edgeKey = String.valueOf(edgeId);
+                
+                // 如果提供了任务组ID，检查是否需要切换任务组
+                if (taskGroupId != null && action == TaskTreeView.TaskSelectionCallback.EdgeAction.LOCATE) {
+                    Long currentTaskGroupId = usePageStoreHook().getCurrentTaskGroupId();
+                    if (currentTaskGroupId == null || !currentTaskGroupId.equals(taskGroupId)) {
+                        // 需要切换到对应的任务组
+                        String taskGroupName = getJobNameById(taskGroupId);
+                        if (taskGroupName == null) {
+                            taskGroupName = "任务组 " + taskGroupId;
+                        }
+                        // 切换任务组
+                        switchToTaskGroupAndLocate(taskGroupId, taskGroupName, () -> {
+                            boolean located = canvas.locateConnectionByEdgeId(edgeKey);
+                            if (!located) {
+                                logPanel.warn("⚠ 未在画布上找到该连接: " + edgeKey);
+                            }
+                        });
+                        return;
+                    }
+                }
+                
                 switch (action) {
                     case DELETE -> {
                         boolean removed = canvas.removeConnectionByEdgeId(edgeKey);
@@ -2816,8 +2968,19 @@ public class MainView extends BorderPane {
             try {
                 JobInfoForm form = jobInfoService.getJobNodeFormData(jobId);
                 List<JobGroup> jobGroups = jobGroupService.getAllJobGroupList();
+                // 如果是SQL模式，获取数据源列表
+                List<com.cc.job.xo.model.entity.JobJdbcDatasource> datasources = null;
+                if (form != null && "SQL".equals(form.getGlueType())) {
+                    try {
+                        com.cc.job.gui.service.JobJdbcDatasourceService datasourceService = new com.cc.job.gui.service.JobJdbcDatasourceService();
+                        datasources = datasourceService.getDatasourceList();
+                    } catch (Exception e) {
+                        logger.warn("获取数据源列表失败: {}", e.getMessage());
+                    }
+                }
+                List<com.cc.job.xo.model.entity.JobJdbcDatasource> finalDatasources = datasources;
                 Platform.runLater(() -> {
-                    showJobNodeDetailDialog(node, form, jobGroups);
+                    showJobNodeDetailDialog(node, form, jobGroups, null, null, finalDatasources);
                     logPanel.info("════════════════════════════════");
                 });
             } catch (Exception e) {
@@ -2883,13 +3046,71 @@ public class MainView extends BorderPane {
         }, "disable-node-thread").start();
     }
 
+    /**
+     * 根据jobId显示节点详情（不依赖画布上的节点）
+     */
+    private void showNodeDetailsByJobId(Long jobId, String nodeName) {
+        if (jobId == null) {
+            logPanel.warn("⚠ 该节点缺少任务ID，无法查看详情: " + nodeName);
+            return;
+        }
+
+        logPanel.info("════════════════════════════════");
+        logPanel.info("🔍 正在获取节点详情: " + nodeName);
+
+        new Thread(() -> {
+            try {
+                JobInfoForm form = jobInfoService.getJobNodeFormData(jobId);
+                List<JobGroup> jobGroups = jobGroupService.getAllJobGroupList();
+                // 如果是SQL模式，获取数据源列表
+                List<com.cc.job.xo.model.entity.JobJdbcDatasource> datasources = null;
+                if (form != null && "SQL".equals(form.getGlueType())) {
+                    try {
+                        com.cc.job.gui.service.JobJdbcDatasourceService datasourceService = new com.cc.job.gui.service.JobJdbcDatasourceService();
+                        datasources = datasourceService.getDatasourceList();
+                    } catch (Exception e) {
+                        logger.warn("获取数据源列表失败: {}", e.getMessage());
+                    }
+                }
+                List<com.cc.job.xo.model.entity.JobJdbcDatasource> finalDatasources = datasources;
+                Platform.runLater(() -> {
+                    showJobNodeDetailDialog(null, form, jobGroups, jobId, nodeName, finalDatasources);
+                    logPanel.info("════════════════════════════════");
+                });
+            } catch (Exception e) {
+                logger.error("获取节点详情失败: {}", e.getMessage(), e);
+                Platform.runLater(() -> {
+                    logPanel.error("✗ 获取节点详情失败: " + e.getMessage());
+                    logPanel.info("════════════════════════════════");
+                });
+            }
+        }, "detail-node-thread").start();
+    }
+
     private void showJobNodeDetailDialog(ProcessNode node, JobInfoForm form, List<JobGroup> jobGroups) {
+        // 兼容旧方法
+        Long jobId = node != null ? node.getJobId() : null;
+        String nodeName = node != null ? node.getJobHandlerName() : null;
+        showJobNodeDetailDialog(node, form, jobGroups, jobId, nodeName, null);
+    }
+    
+    private void showJobNodeDetailDialog(ProcessNode node, JobInfoForm form, List<JobGroup> jobGroups, Long jobId, String nodeName) {
+        showJobNodeDetailDialog(node, form, jobGroups, jobId, nodeName, null);
+    }
+    
+    private void showJobNodeDetailDialog(ProcessNode node, JobInfoForm form, List<JobGroup> jobGroups, Long jobId, String nodeName, List<com.cc.job.xo.model.entity.JobJdbcDatasource> datasources) {
         if (form == null) {
             logPanel.warn("⚠ 未获取到节点详情数据");
             return;
         }
+        
+        // 确定节点名称：优先使用传入的nodeName，其次使用form中的jobDesc，最后使用节点的jobHandlerName
+        String displayName = nodeName != null ? nodeName : 
+                            (form.getJobDesc() != null ? form.getJobDesc() : 
+                            (node != null ? node.getJobHandlerName() : "未知节点"));
+        
         javafx.scene.control.Dialog<Void> dialog = new javafx.scene.control.Dialog<>();
-        dialog.setTitle("节点详情 - " + safeString(node.getJobHandlerName()));
+        dialog.setTitle("节点详情 - " + safeString(displayName));
         dialog.setHeaderText(null);
         dialog.getDialogPane().getButtonTypes().add(javafx.scene.control.ButtonType.CLOSE);
 
@@ -2898,18 +3119,33 @@ public class MainView extends BorderPane {
         grid.setVgap(10);
         grid.setPadding(new javafx.geometry.Insets(20));
 
-        addDetailRow(grid, 0, "任务描述", form.getJobDesc());
-        addDetailRow(grid, 1, "执行器", findJobGroupName(jobGroups, form.getJobGroup()));
-        addDetailRow(grid, 2, "JobHandler", form.getExecutorHandler());
-        addDetailRow(grid, 3, "运行模式", form.getGlueType());
-        addDetailRow(grid, 4, "任务参数", form.getExecutorParam());
-        addDetailRow(grid, 5, "负责人", form.getAuthor());
-        addDetailRow(grid, 6, "报警邮件", form.getAlarmEmail());
-        addDetailRow(grid, 7, "阻塞策略", form.getExecutorBlockStrategy());
-        addDetailRow(grid, 8, "超时时间(秒)", form.getExecutorTimeout());
-        addDetailRow(grid, 9, "失败重试次数", form.getExecutorFailRetryCount());
-        addDetailRow(grid, 10, "所属任务组ID", form.getParentId());
-        addDetailRow(grid, 11, "Job ID", node.getJobId());
+        int rowIndex = 0;
+        addDetailRow(grid, rowIndex++, "任务描述", form.getJobDesc());
+        addDetailRow(grid, rowIndex++, "执行器", findJobGroupName(jobGroups, form.getJobGroup()));
+        addDetailRow(grid, rowIndex++, "JobHandler", form.getExecutorHandler());
+        addDetailRow(grid, rowIndex++, "运行模式", form.getGlueType());
+        
+        // SQL模式：显示数据库信息
+        if ("SQL".equals(form.getGlueType()) && form.getJdbcDatasourceId() != null) {
+            String datasourceName = null;
+            if (datasources != null) {
+                datasourceName = datasources.stream()
+                    .filter(ds -> ds.getId().equals(form.getJdbcDatasourceId()))
+                    .findFirst()
+                    .map(com.cc.job.xo.model.entity.JobJdbcDatasource::getDatabaseName)
+                    .orElse(null);
+            }
+            addDetailRow(grid, rowIndex++, "数据库", datasourceName != null ? datasourceName : ("ID: " + form.getJdbcDatasourceId()));
+        }
+        
+        addDetailRow(grid, rowIndex++, "任务参数", form.getExecutorParam());
+        addDetailRow(grid, rowIndex++, "负责人", form.getAuthor());
+        addDetailRow(grid, rowIndex++, "报警邮件", form.getAlarmEmail());
+        addDetailRow(grid, rowIndex++, "阻塞策略", form.getExecutorBlockStrategy());
+        addDetailRow(grid, rowIndex++, "超时时间(秒)", form.getExecutorTimeout());
+        addDetailRow(grid, rowIndex++, "失败重试次数", form.getExecutorFailRetryCount());
+        addDetailRow(grid, rowIndex++, "所属任务组ID", form.getParentId());
+        addDetailRow(grid, rowIndex++, "Job ID", jobId);
 
         javafx.scene.control.TextArea advancedArea = new javafx.scene.control.TextArea(buildAdvancedDetailText(form));
         advancedArea.setEditable(false);
@@ -3153,23 +3389,34 @@ public class MainView extends BorderPane {
      * @param node 画布上的节点对象
      */
     private void editNode(Long jobId, ProcessNode node) {
+        // 使用当前任务组ID
+        Long currentTaskGroupId = usePageStoreHook().getCurrentTaskGroupId();
+        editNode(jobId, node, currentTaskGroupId);
+    }
+    
+    private void editNode(Long jobId, ProcessNode node, Long taskGroupId) {
         try {
             logPanel.info("════════════════════════════════");
-            logPanel.info("📝 编辑任务节点 - 任务ID: " + jobId + ", 节点ID: " + node.getNodeId());
+            if (node != null) {
+                logPanel.info("📝 编辑任务节点 - 任务ID: " + jobId + ", 节点ID: " + node.getNodeId());
+            } else {
+                logPanel.info("📝 编辑任务节点 - 任务ID: " + jobId);
+            }
 
             if (jobId == null) {
                 logPanel.error("✗ jobId 为 null，无法编辑");
                 return;
             }
 
-            // 获取当前任务组ID
-            Long currentTaskGroupId = usePageStoreHook().getCurrentTaskGroupId();
-            logPanel.info("当前任务组ID: " + currentTaskGroupId);
-
-            if (currentTaskGroupId == null) {
-                logPanel.error("✗ 无法获取当前任务组ID");
+            // 使用传入的任务组ID，如果没有则使用当前任务组ID
+            Long finalTaskGroupId = taskGroupId != null ? taskGroupId : usePageStoreHook().getCurrentTaskGroupId();
+            
+            if (finalTaskGroupId == null) {
+                logPanel.error("✗ 无法获取任务组ID");
                 return;
             }
+            
+            logPanel.info("任务组ID: " + finalTaskGroupId);
 
             // 在后台线程中获取节点数据
             new Thread(() -> {
@@ -3193,7 +3440,7 @@ public class MainView extends BorderPane {
                         // 显示编辑对话框
                         NewJobNodeDialog dialog = new NewJobNodeDialog(
                                 (Stage) getScene().getWindow(),
-                                currentTaskGroupId,
+                                finalTaskGroupId,
                                 formData,  // 传入现有数据进行编辑
                                 jobGroupList
                         );
@@ -3211,18 +3458,18 @@ public class MainView extends BorderPane {
                                         Platform.runLater(() -> {
                                             logPanel.success("✓ 任务节点更新成功");
 
-                                            // 更新画布上的节点显示
-                                            String newNodeType = getNodeTypeIcon(updatedFormData.getGlueType());
-                                            node.updateNodeInfo(updatedFormData.getJobDesc(), newNodeType);
-                                            logPanel.info("✓ 画布节点已更新");
-
-                                            if (treeView != null && node.getJobId() != null) {
-                                                treeView.updateJobNode(node.getJobId(), updatedFormData.getJobDesc());
+                                            // 更新画布上的节点显示（如果节点存在）
+                                            if (node != null) {
+                                                String newNodeType = getNodeTypeIcon(updatedFormData.getGlueType());
+                                                node.updateNodeInfo(updatedFormData.getJobDesc(), newNodeType);
+                                                logPanel.info("✓ 画布节点已更新");
                                             }
 
-                                            // 刷新任务树但保持当前页面
-                                            logPanel.info("正在刷新任务树...");
-                                            refreshTreeViewWithoutNavigation(currentTaskGroupId);
+                                            // 更新树形视图（只更新节点文本，不刷新整个树，避免跳转）
+                                            if (treeView != null && jobId != null) {
+                                                treeView.updateJobNode(jobId, updatedFormData.getJobDesc());
+                                                logPanel.info("✓ 树形视图节点已更新");
+                                            }
                                         });
                                     } else {
                                         Platform.runLater(() -> {

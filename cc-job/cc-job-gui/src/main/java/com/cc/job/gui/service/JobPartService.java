@@ -349,6 +349,33 @@ public class JobPartService extends  BaseService {
             return Result.isSuccess(result);
         }
     }
+
+    /**
+     * 删除任务节点
+     * 对应 admin 服务的 GET /api/v1/jobInfos/deleteJobNode/{nodeId}
+     */
+    public boolean deleteJobNode(Long nodeId) throws IOException {
+        String url = apiUtil.getBaseUrl() + "/api/v1/jobInfos/deleteJobNode/" + nodeId;
+
+        Request request = new Request.Builder()
+                .url(url)
+                .get()
+                .build();
+
+        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("删除任务节点失败: " + response);
+            }
+
+            String responseBody = response.body().string();
+            logger.debug("deleteJobNode API 响应: {}", responseBody);
+
+            Type resultType = new TypeToken<Result<Void>>() {
+            }.getType();
+            Result<Void> result = apiUtil.getGson().fromJson(responseBody, resultType);
+            return Result.isSuccess(result);
+        }
+    }
     
     /**
      * 导出分区数据

@@ -66,8 +66,18 @@ public class TaskTreeView extends VBox {
  
         default void onJobNodeAction(Long jobNodeId, Long jobId, String nodeName, JobNodeAction action) {
         }
+        
+        default void onJobNodeAction(Long jobNodeId, Long jobId, String nodeName, Long taskGroupId, JobNodeAction action) {
+            // 兼容旧方法，调用新方法
+            onJobNodeAction(jobNodeId, jobId, nodeName, action);
+        }
 
         default void onEdgeAction(Long edgeId, EdgeAction action) {
+        }
+        
+        default void onEdgeAction(Long edgeId, Long taskGroupId, EdgeAction action) {
+            // 兼容旧方法，调用新方法
+            onEdgeAction(edgeId, action);
         }
         
         default void onPartitionAction(Long partitionId, String partitionName, PartitionAction action) {
@@ -78,7 +88,8 @@ public class TaskTreeView extends VBox {
 
         enum JobNodeAction {
             EDIT,
-            LOCATE
+            LOCATE,
+            PROPERTIES
         }
 
         enum EdgeAction {
@@ -448,11 +459,12 @@ public class TaskTreeView extends VBox {
                     refreshItem.setStyle("-fx-text-fill: #000000;"); // 黑色字体
                     refreshItem.setOnAction(e -> handleRefresh(nodeData, treeItem));
 
-                    MenuItem openItem = new MenuItem("打开");
-                    openItem.setOnAction(e -> {
-                        logger.debug("📂 打开节点: {}", nodeName);
+                    MenuItem propertiesItem = new MenuItem("属性");
+                    propertiesItem.setOnAction(e -> {
+                        logger.debug("📋 查看节点属性: {}", nodeName);
                         if (selectionCallback != null) {
-                            selectionCallback.onTaskSelected(nodeName);
+                            Long taskGroupId = findTaskGroupIdFromTreeItem(treeItem);
+                            selectionCallback.onJobNodeAction(nodeData.getId(), parseJobId(nodeData), nodeName, taskGroupId, TaskSelectionCallback.JobNodeAction.PROPERTIES);
                         }
                     });
 
@@ -460,7 +472,8 @@ public class TaskTreeView extends VBox {
                     editItem.setOnAction(e -> {
                         logger.debug("✏️ 编辑节点: {}", nodeName);
                         if (selectionCallback != null) {
-                            selectionCallback.onJobNodeAction(nodeData.getId(), parseJobId(nodeData), nodeName, TaskSelectionCallback.JobNodeAction.EDIT);
+                            Long taskGroupId = findTaskGroupIdFromTreeItem(treeItem);
+                            selectionCallback.onJobNodeAction(nodeData.getId(), parseJobId(nodeData), nodeName, taskGroupId, TaskSelectionCallback.JobNodeAction.EDIT);
                         }
                     });
 
@@ -468,7 +481,8 @@ public class TaskTreeView extends VBox {
                     locateItem.setOnAction(e -> {
                         logger.debug("📍 定位节点: {}", nodeName);
                         if (selectionCallback != null) {
-                            selectionCallback.onJobNodeAction(nodeData.getId(), parseJobId(nodeData), nodeName, TaskSelectionCallback.JobNodeAction.LOCATE);
+                            Long taskGroupId = findTaskGroupIdFromTreeItem(treeItem);
+                            selectionCallback.onJobNodeAction(nodeData.getId(), parseJobId(nodeData), nodeName, taskGroupId, TaskSelectionCallback.JobNodeAction.LOCATE);
                         }
                     });
 
@@ -481,7 +495,7 @@ public class TaskTreeView extends VBox {
 
                     menu.getItems().add(refreshItem);
                     menu.getItems().add(new SeparatorMenuItem());
-                    menu.getItems().add(openItem);
+                    menu.getItems().add(propertiesItem);
                     menu.getItems().add(editItem);
                     menu.getItems().add(locateItem);
                     menu.getItems().add(new SeparatorMenuItem());
@@ -489,7 +503,7 @@ public class TaskTreeView extends VBox {
                 } else if (nodeType != null && nodeType == 5) {
                     // 关系边
                     MenuItem locateEdgeItem = new MenuItem("定位连接");
-                    locateEdgeItem.setOnAction(e -> handleLocateEdge(nodeData));
+                    locateEdgeItem.setOnAction(e -> handleLocateEdge(nodeData, treeItem));
 
                     MenuItem deleteEdgeItem = new MenuItem("删除连接");
                     deleteEdgeItem.setStyle("-fx-text-fill: #EF4444;");
@@ -1088,6 +1102,30 @@ public class TaskTreeView extends VBox {
     }
     
     /**
+     * 从树节点向上查找任务组ID
+     * @param treeItem 树节点
+     * @return 任务组ID，如果找不到返回null
+     */
+    private Long findTaskGroupIdFromTreeItem(TreeItem<TreeNodeData> treeItem) {
+        if (treeItem == null) {
+            return null;
+        }
+        
+        // 向上查找父节点，直到找到任务组（type=1）
+        TreeItem<TreeNodeData> current = treeItem;
+        while (current != null) {
+            TreeNodeData nodeData = current.getValue();
+            if (nodeData != null && nodeData.getType() != null && nodeData.getType() == 1) {
+                // 找到任务组
+                return nodeData.getId();
+            }
+            current = current.getParent();
+        }
+        
+        return null;
+    }
+    
+    /**
      * 根据任务组名称选中对应的树节点
      * @param taskGroupName 任务组名称
      */
@@ -1311,9 +1349,14 @@ public class TaskTreeView extends VBox {
 
             try {
                 if (nodeType != null && nodeType == 0) {
+                    // 删除分区
                     success = jobPartService.deleteJobPart(nodeId);
                 } else if (nodeType != null && nodeType == 1) {
+                    // 删除任务组
                     success = jobPartService.deleteJobInfo(nodeId);
+                } else if (nodeType != null && nodeType == 4) {
+                    // 删除任务节点
+                    success = jobPartService.deleteJobNode(nodeId);
                 } else {
                     errorMessage = "暂不支持删除该类型的节点。";
                 }
@@ -1355,7 +1398,8 @@ public class TaskTreeView extends VBox {
         if (nodeData == null || nodeData.getType() == null) {
             return false;
         }
-        return nodeData.getType() == 0 || nodeData.getType() == 1;
+        // 支持删除：0=分区, 1=任务组, 4=任务节点
+        return nodeData.getType() == 0 || nodeData.getType() == 1 || nodeData.getType() == 4;
     }
 
     /**
@@ -1435,9 +1479,10 @@ public class TaskTreeView extends VBox {
         return null;
     }
 
-    private void handleLocateEdge(TreeNodeData nodeData) {
+    private void handleLocateEdge(TreeNodeData nodeData, TreeItem<TreeNodeData> treeItem) {
         if (selectionCallback != null) {
-            selectionCallback.onEdgeAction(nodeData.getId(), TaskSelectionCallback.EdgeAction.LOCATE);
+            Long taskGroupId = findTaskGroupIdFromTreeItem(treeItem);
+            selectionCallback.onEdgeAction(nodeData.getId(), taskGroupId, TaskSelectionCallback.EdgeAction.LOCATE);
         }
     }
 
