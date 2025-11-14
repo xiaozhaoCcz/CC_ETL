@@ -327,7 +327,16 @@ public class Async {
                 resultValue = getResultValue(timeout, worker, param, wrapperMap);
                 workerWrapper.setCount(count);
             }
-            workerWrapper.setWorkResult(new WorkResult(resultValue, ResultState.SUCCESS));
+            
+            // 检查重试后是否仍然失败
+            if (JobConstant.FAIL_RETRY.equals(String.valueOf(resultValue)) || 
+                JobConstant.FAIL_COMPLETE.equals(String.valueOf(resultValue))) {
+                success = false;
+                workerWrapper.setWorkResult(new WorkResult(resultValue, ResultState.EXCEPTION));
+                logger.error("任务: {} 执行失败，重试后仍然失败，结果: {}", workerWrapper.getId(), resultValue);
+            } else {
+                workerWrapper.setWorkResult(new WorkResult(resultValue, ResultState.SUCCESS));
+            }
 
         } catch (Exception e) {
             logger.error("任务: {} 执行异常: {}", workerWrapper.getId(), e.getMessage(), e);

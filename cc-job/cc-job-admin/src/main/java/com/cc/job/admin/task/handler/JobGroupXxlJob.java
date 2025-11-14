@@ -1124,14 +1124,20 @@ public class JobGroupXxlJob {
             XxlJobHelper.log(xxlJobContext, "任务ID: {}, 执行结果: {}, 运行时长: {}ms", param, success ? "成功" : "失败", duration);
             XxlJobHelper.log(xxlJobContext, "返回结果: {}", workResult.getResult());
             runtime = System.currentTimeMillis() - runtime;
-            // 更新数据库
+            
+            Long jobId = this.node.getJobId();
+            // 更新节点状态：成功=1（绿色），失败=0（红色）
             if (success) {
-                Long jobId = this.node.getJobId();
+                setNodeStatus(statusMap, jobId, 1, randomId, node.getJobParentId());
+                logger.info("[JobGroup] 任务执行成功，已更新节点状态为1（成功） - jobId: {}", jobId);
+                // 更新数据库
                 JobInfo jobInfo = jobInfoMapper.selectById(jobId);
                 jobInfo.setRunTime(runtime);
                 jobInfoMapper.updateById(jobInfo);
                 XxlJobHelper.log(xxlJobContext, "任务执行成功，已更新数据库运行时间: {}ms", runtime);
             } else {
+                setNodeStatus(statusMap, jobId, 0, randomId, node.getJobParentId());
+                logger.error("[JobGroup] 任务执行失败，已更新节点状态为0（失败） - jobId: {}", jobId);
                 XxlJobHelper.log(xxlJobContext, "任务执行失败，跳过数据库更新");
             }
         }

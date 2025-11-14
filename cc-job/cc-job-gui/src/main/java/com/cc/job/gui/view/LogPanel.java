@@ -1015,7 +1015,8 @@ public class LogPanel extends VBox {
                            !lowerText.contains("fail retry") &&
                            !lowerText.contains("executorfailretrycount")) ||
                           (lowerText.contains("exception") && !lowerText.contains("success")) ||
-                          (lowerText.contains("异常") && !lowerText.contains("成功"));
+                          (lowerText.contains("异常") && !lowerText.contains("成功"))
+
             }
             
             // 检测警告信息
@@ -1072,17 +1073,9 @@ public class LogPanel extends VBox {
         boolean shouldShowNotification = false;
         com.cc.job.gui.util.NotificationToast.NotificationType notificationType = null;
         String notificationMessage = null;
-        
-        // 检测"任务正在运行中"等关键词（警告类型）
-        if (lowerText.contains("任务正在运行中") || 
-            lowerText.contains("任务正在执行") ||
-            lowerText.contains("任务开始执行")) {
-            shouldShowNotification = true;
-            notificationType = com.cc.job.gui.util.NotificationToast.NotificationType.WARNING;
-            notificationMessage = "任务正在运行中，请等待执行完成";
-        } 
+
         // 检测错误信息
-        else if (isError && (lowerText.contains("任务执行失败") || 
+        if (isError && (lowerText.contains("任务执行失败") ||
                                 lowerText.contains("任务触发失败") ||
                                 lowerText.contains("执行结果:失败"))) {
             shouldShowNotification = true;
