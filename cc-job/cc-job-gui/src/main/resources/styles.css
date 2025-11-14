@@ -501,3 +501,61 @@
     -fx-fill: #374151;
 }
 
+/* ============ 代码编辑器语法高亮样式 ============ */
+
+.code-editor {
+    -fx-font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    -fx-font-size: 14;
+    -fx-background-color: #000000;
+    -fx-text-fill: #FFFFFF;
+}
+
+.code-editor .text {
+    -fx-fill: #FFFFFF;
+}
+
+/* 关键字样式（蓝色） */
+.code-editor .keyword {
+    -fx-fill: #569CD6;
+    -fx-font-weight: bold;
+}
+
+/* 字符串样式（绿色） */
+.code-editor .string {
+    -fx-fill: #CE9178;
+}
+
+/* 数字样式（浅蓝色） */
+.code-editor .number {
+    -fx-fill: #B5CEA8;
+}
+
+/* 注释样式（灰色） */
+.code-editor .comment {
+    -fx-fill: #6A9955;
+    -fx-font-style: italic;
+}
+
+/* 类名样式（黄色） */
+.code-editor .class-name {
+    -fx-fill: #4EC9B0;
+}
+
+/* 行号样式 */
+.code-editor .lineno {
+    -fx-background-color: #1E1E1E;
+    -fx-text-fill: #858585;
+    -fx-font-size: 13;
+    -fx-padding: 0 10 0 10;
+}
+
+/* 选中文本样式 */
+.code-editor .selection {
+    -fx-fill: #264F78;
+}
+
+/* 光标样式 */
+.code-editor .caret {
+    -fx-stroke: #FFFFFF;
+}
+

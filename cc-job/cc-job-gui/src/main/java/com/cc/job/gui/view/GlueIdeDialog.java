@@ -6,16 +6,23 @@ import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
-import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import org.fxmisc.richtext.CodeArea;
+import org.fxmisc.richtext.LineNumberFactory;
+import org.fxmisc.richtext.model.StyleSpans;
+import org.fxmisc.richtext.model.StyleSpansBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * GLUE IDE 对话框
@@ -28,16 +35,28 @@ public class GlueIdeDialog extends Dialog<Void> {
     private final Long taskId;
     private final JobInfoService jobInfoService;
     
-    private TextArea codeEditorArea;
+    private CodeArea codeEditorArea;
     private TextField remarkField;
     private ComboBox<JobLogglue> historyCombo;
     private ObservableList<JobLogglue> historyList;
+    
+    private String initialCode;
+    private String initialRemark;
+    
+    // 语法高亮模式（支持多种语言）
+    private static final Pattern KEYWORD_PATTERN = Pattern.compile("\\b(if|else|for|while|do|switch|case|break|continue|return|class|public|private|protected|static|final|void|int|String|boolean|true|false|null|new|this|super|extends|implements|import|package|try|catch|finally|throw|throws)\\b");
+    private static final Pattern STRING_PATTERN = Pattern.compile("\"([^\"\\\\]|\\\\.)*\"|'([^'\\\\]|\\\\.)*'");
+    private static final Pattern NUMBER_PATTERN = Pattern.compile("\\b\\d+(\\.\\d+)?\\b");
+    private static final Pattern COMMENT_PATTERN = Pattern.compile("//[^\n]*|/\\*(.|\\R)*?\\*/");
+    private static final Pattern CLASS_PATTERN = Pattern.compile("\\b[A-Z][a-zA-Z0-9_]*\\b");
     
     private ButtonType saveButtonType;
     private ButtonType cancelButtonType;
     
     public GlueIdeDialog(Stage owner, Long taskId, String initialCode, String initialRemark) {
         this.taskId = taskId;
+        this.initialCode = initialCode;
+        this.initialRemark = initialRemark;
         this.jobInfoService = new JobInfoService();
         
         initOwner(owner);
@@ -59,7 +78,10 @@ public class GlueIdeDialog extends Dialog<Void> {
         
         // 填充初始数据
         if (initialCode != null) {
-            codeEditorArea.setText(initialCode);
+            codeEditorArea.replaceText(initialCode);
+            Platform.runLater(() -> {
+                codeEditorArea.setStyleSpans(0, computeHighlighting(initialCode));
+            });
         }
         if (initialRemark != null) {
             remarkField.setText(initialRemark);
@@ -82,10 +104,57 @@ public class GlueIdeDialog extends Dialog<Void> {
         // 监听历史记录选择
         historyCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null) {
-                codeEditorArea.setText(newVal.getGlueSource() != null ? newVal.getGlueSource() : "");
+                String code = newVal.getGlueSource() != null ? newVal.getGlueSource() : "";
+                codeEditorArea.replaceText(code);
+                Platform.runLater(() -> {
+                    codeEditorArea.setStyleSpans(0, computeHighlighting(code));
+                });
                 remarkField.setText(newVal.getGlueRemark() != null ? newVal.getGlueRemark() : "");
             }
         });
+    }
+    
+    /**
+     * 计算语法高亮
+     */
+    private StyleSpans<Collection<String>> computeHighlighting(String text) {
+        StyleSpansBuilder<Collection<String>> spansBuilder = new StyleSpansBuilder<>();
+        if (text == null || text.isEmpty()) {
+            spansBuilder.add(Collections.emptyList(), 0);
+            return spansBuilder.create();
+        }
+        
+        Matcher matcher = Pattern.compile(
+            "(?<KEYWORD>" + KEYWORD_PATTERN.pattern() + ")" +
+            "|(?<STRING>" + STRING_PATTERN.pattern() + ")" +
+            "|(?<NUMBER>" + NUMBER_PATTERN.pattern() + ")" +
+            "|(?<COMMENT>" + COMMENT_PATTERN.pattern() + ")" +
+            "|(?<CLASS>" + CLASS_PATTERN.pattern() + ")"
+        ).matcher(text);
+        
+        int lastKwEnd = 0;
+        while (matcher.find()) {
+            String styleClass = null;
+            if (matcher.group("KEYWORD") != null) {
+                styleClass = "keyword";
+            } else if (matcher.group("STRING") != null) {
+                styleClass = "string";
+            } else if (matcher.group("NUMBER") != null) {
+                styleClass = "number";
+            } else if (matcher.group("COMMENT") != null) {
+                styleClass = "comment";
+            } else if (matcher.group("CLASS") != null) {
+                styleClass = "class-name";
+            }
+            
+            if (styleClass != null) {
+                spansBuilder.add(Collections.emptyList(), matcher.start() - lastKwEnd);
+                spansBuilder.add(Collections.singleton(styleClass), matcher.end() - matcher.start());
+                lastKwEnd = matcher.end();
+            }
+        }
+        spansBuilder.add(Collections.emptyList(), text.length() - lastKwEnd);
+        return spansBuilder.create();
     }
     
     /**
@@ -101,19 +170,43 @@ public class GlueIdeDialog extends Dialog<Void> {
         Label codeLabel = new Label("代码编辑区");
         codeLabel.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #1F2937;");
         
-        codeEditorArea = new TextArea();
-        codeEditorArea.setPrefRowCount(20);
+        // 使用 CodeArea 实现语法高亮
+        codeEditorArea = new CodeArea();
+        codeEditorArea.setPrefHeight(500); // 设置高度而不是行数
         codeEditorArea.setWrapText(false);
+        
+        // 设置行号
+        codeEditorArea.setParagraphGraphicFactory(LineNumberFactory.get(codeEditorArea));
+        
+        // 优化代码编辑器样式：黑色背景，白色字体，等宽字体
         codeEditorArea.setStyle(
-            "-fx-font-family: 'Consolas', 'Monaco', monospace; " +
-            "-fx-font-size: 13; " +
-            "-fx-background-color: #1E1E1E; " +
-            "-fx-text-fill: #D4D4D4; " +
-            "-fx-border-color: #3C3C3C; " +
+            "-fx-font-family: 'Consolas', 'Monaco', 'Courier New', monospace; " +
+            "-fx-font-size: 14; " +
+            "-fx-background-color: #000000; " +
+            "-fx-text-fill: #FFFFFF; " +
+            "-fx-border-color: #333333; " +
+            "-fx-border-width: 1; " +
             "-fx-border-radius: 4; " +
             "-fx-background-radius: 4;"
         );
-        codeEditorArea.setPromptText("请输入 GLUE 代码...");
+        
+        // 设置代码区域样式
+        codeEditorArea.getStylesheets().add(getClass().getResource("/styles.css").toExternalForm());
+        codeEditorArea.getStyleClass().add("code-editor");
+        
+        // 监听文本变化，实现语法高亮
+        codeEditorArea.textProperty().addListener((obs, oldText, newText) -> {
+            Platform.runLater(() -> {
+                codeEditorArea.setStyleSpans(0, computeHighlighting(newText));
+            });
+        });
+        
+        // 初始高亮
+        if (initialCode != null && !initialCode.isEmpty()) {
+            Platform.runLater(() -> {
+                codeEditorArea.setStyleSpans(0, computeHighlighting(initialCode));
+            });
+        }
         
         // 备注输入框
         Label remarkLabel = new Label("备注*");
@@ -162,18 +255,25 @@ public class GlueIdeDialog extends Dialog<Void> {
             }
         });
         
-        // 布局
-        HBox remarkBox = new HBox(10);
-        remarkBox.setAlignment(Pos.CENTER_LEFT);
-        remarkBox.getChildren().addAll(remarkLabel, remarkField);
+        // 布局：备注和选择历史在同一行
+        GridPane bottomGrid = new GridPane();
+        bottomGrid.setHgap(15);
+        bottomGrid.setVgap(10);
+        bottomGrid.setPadding(new Insets(10, 0, 0, 0));
         
-        HBox historyBox = new HBox(10);
-        historyBox.setAlignment(Pos.CENTER_LEFT);
-        historyBox.getChildren().addAll(historyLabel, historyCombo);
+        // 备注输入框
+        remarkField.setPrefWidth(350);
+        bottomGrid.add(remarkLabel, 0, 0);
+        bottomGrid.add(remarkField, 1, 0);
+        
+        // 选择历史下拉框
+        historyCombo.setPrefWidth(350);
+        bottomGrid.add(historyLabel, 2, 0);
+        bottomGrid.add(historyCombo, 3, 0);
         
         VBox bottomBox = new VBox(10);
         bottomBox.setPadding(new Insets(10, 0, 0, 0));
-        bottomBox.getChildren().addAll(remarkBox, historyBox);
+        bottomBox.getChildren().add(bottomGrid);
         
         container.getChildren().addAll(codeLabel, codeEditorArea, bottomBox);
         
