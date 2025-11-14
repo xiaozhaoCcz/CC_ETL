@@ -484,7 +484,25 @@ public class JobInfoService extends BaseService {
      * @throws IOException 网络异常
      */
     public List<JobLogglue> getGlueList(Long id) throws IOException {
-        String url = apiUtil.getBaseUrl() + "/api/v1/jobInfos/getGlueList/" + id;
+        return getGlueList(id, null);
+    }
+    
+    /**
+     * 根据任务ID和GLUE类型获取历史记录列表
+     * @param id 任务ID
+     * @param glueType GLUE类型（可选，如果为空则返回所有类型）
+     * @return GLUE历史记录列表
+     * @throws IOException 网络异常
+     */
+    public List<JobLogglue> getGlueList(Long id, String glueType) throws IOException {
+        String url;
+        if (glueType != null && !glueType.trim().isEmpty()) {
+            // 使用带GLUE类型的接口
+            url = apiUtil.getBaseUrl() + "/api/v1/jobInfos/getGlueList/" + id + "/" + java.net.URLEncoder.encode(glueType, java.nio.charset.StandardCharsets.UTF_8);
+        } else {
+            // 使用不带类型的接口（返回所有类型）
+            url = apiUtil.getBaseUrl() + "/api/v1/jobInfos/getGlueList/" + id;
+        }
         
         Request request = new Request.Builder()
                 .url(url)

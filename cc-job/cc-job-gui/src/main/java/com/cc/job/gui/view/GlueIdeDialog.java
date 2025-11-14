@@ -33,6 +33,7 @@ public class GlueIdeDialog extends Dialog<Void> {
     private static final Logger logger = LoggerFactory.getLogger(GlueIdeDialog.class);
     
     private final Long taskId;
+    private final String glueType; // GLUE类型，用于过滤历史记录
     private final JobInfoService jobInfoService;
     
     private CodeArea codeEditorArea;
@@ -54,7 +55,12 @@ public class GlueIdeDialog extends Dialog<Void> {
     private ButtonType cancelButtonType;
     
     public GlueIdeDialog(Stage owner, Long taskId, String initialCode, String initialRemark) {
+        this(owner, taskId, initialCode, initialRemark, null);
+    }
+    
+    public GlueIdeDialog(Stage owner, Long taskId, String initialCode, String initialRemark, String glueType) {
         this.taskId = taskId;
+        this.glueType = glueType;
         this.initialCode = initialCode;
         this.initialRemark = initialRemark;
         this.jobInfoService = new JobInfoService();
@@ -293,7 +299,8 @@ public class GlueIdeDialog extends Dialog<Void> {
         
         new Thread(() -> {
             try {
-                List<JobLogglue> history = jobInfoService.getGlueList(taskId);
+                // 根据GLUE类型过滤历史记录
+                List<JobLogglue> history = jobInfoService.getGlueList(taskId, glueType);
                 Platform.runLater(() -> {
                     historyList.clear();
                     if (history != null && !history.isEmpty()) {

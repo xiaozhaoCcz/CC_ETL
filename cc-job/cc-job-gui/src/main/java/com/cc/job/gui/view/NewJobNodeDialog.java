@@ -581,7 +581,9 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         // 获取任务ID（如果是编辑模式）
         Long taskId = formData.getId();
         
-        GlueIdeDialog dialog = new GlueIdeDialog(ownerStage, taskId, currentCode, currentRemark);
+        // 传递当前GLUE类型，用于过滤历史记录
+        String currentGlueTypeStr = currentGlueType.getType();
+        GlueIdeDialog dialog = new GlueIdeDialog(ownerStage, taskId, currentCode, currentRemark, currentGlueTypeStr);
         dialog.showAndWait();
         
         // 对话框关闭后，同步代码和备注

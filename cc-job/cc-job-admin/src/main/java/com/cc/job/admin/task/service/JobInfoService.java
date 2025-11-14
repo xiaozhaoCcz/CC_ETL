@@ -85,6 +85,14 @@ public interface JobInfoService extends IService<JobInfo> {
     JobInfo baseUpdateJobInfo(Long id, JobInfoForm formData);
 
     List<JobLogglue> getGlueList(Long id);
+    
+    /**
+     * 根据任务ID和GLUE类型获取历史记录
+     * @param id 任务ID
+     * @param glueType GLUE类型（可选，如果为空则返回所有类型）
+     * @return GLUE历史记录列表
+     */
+    List<JobLogglue> getGlueList(Long id, String glueType);
 
     List<Long> initData();
 

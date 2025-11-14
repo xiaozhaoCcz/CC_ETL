@@ -870,6 +870,20 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     public List<JobLogglue> getGlueList(Long id) {
         return jobLogglueMapper.selectList(new LambdaQueryWrapper<JobLogglue>().eq(JobLogglue::getJobId, id));
     }
+    
+    @Override
+    public List<JobLogglue> getGlueList(Long id, String glueType) {
+        LambdaQueryWrapper<JobLogglue> wrapper = new LambdaQueryWrapper<JobLogglue>()
+                .eq(JobLogglue::getJobId, id)
+                .orderByDesc(JobLogglue::getCreateTime); // 按创建时间倒序排列
+        
+        // 如果指定了GLUE类型，则按类型过滤
+        if (glueType != null && !glueType.trim().isEmpty()) {
+            wrapper.eq(JobLogglue::getGlueType, glueType);
+        }
+        
+        return jobLogglueMapper.selectList(wrapper);
+    }
 
     @Override
     public List<Long> initData() {

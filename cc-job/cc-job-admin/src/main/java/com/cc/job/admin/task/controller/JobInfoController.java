@@ -175,6 +175,14 @@ public class JobInfoController {
         List<JobLogglue> list =  jobInfoService.getGlueList(id);
         return Result.success(list);
     }
+    
+    @GetMapping("getGlueList/{id}/{glueType}")
+    public Result<List<JobLogglue>> getGlueListByType(
+            @PathVariable Long id,
+            @PathVariable(required = false) String glueType){
+        List<JobLogglue> list = jobInfoService.getGlueList(id, glueType);
+        return Result.success(list);
+    }
 
     @PostMapping("getJobCompose")
     public Result<Map<String,Object>> getJobCompose(@RequestBody Map<String,Object> formMap){
