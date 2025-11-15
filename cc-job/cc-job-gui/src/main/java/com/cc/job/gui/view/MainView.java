@@ -10,10 +10,7 @@ import com.cc.job.gui.service.JobInfoService;
 import com.cc.job.gui.service.JobLogService;
 import com.cc.job.gui.service.JobPartService;
 import com.cc.job.gui.service.SSEService;
-import com.cc.job.gui.util.ApiUtil;
-import com.cc.job.gui.util.StyleUtil;
-import com.cc.job.gui.util.DetachablePanel;
-import com.cc.job.gui.util.SnowflakeIdGenerator;
+import com.cc.job.gui.util.*;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.form.JobInfoForm;
 import javafx.application.Platform;
@@ -1062,7 +1059,7 @@ public class MainView extends BorderPane {
         // 1. 先检查本地状态（快速检查）
         RunningJobGroup existingJob = runningJobs.get(currentJobId);
         if (existingJob != null && existingJob.isRunning()) {
-            logPanel.warn("⚠ 任务组 " + currentJobId + " 正在运行中，请稍后再试");
+            NotificationToast.show("任务组"+ currentJobId + " 正在运行中，请稍后再试", NotificationToast.NotificationType.WARNING);
             return;
         }
 
@@ -1075,10 +1072,7 @@ public class MainView extends BorderPane {
                 Platform.runLater(() -> {
                     if (isRunningOnServer) {
                         String jobName = getJobNameById(currentJobId);
-                        if (jobName == null) {
-                            jobName = "任务组 " + currentJobId;
-                        }
-                        logPanel.warn("⚠ 任务组 \"" + jobName + "\" (ID: " + currentJobId + ") 正在运行中，请稍后再试");
+                        NotificationToast.show("任务组"+ currentJobId + " 正在运行中，请稍后再试", NotificationToast.NotificationType.WARNING);
                         logPanel.info("提示：该任务组可能正在其他客户端或服务器实例上运行");
                         return;
                     }
