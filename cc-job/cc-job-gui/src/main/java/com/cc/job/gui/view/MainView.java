@@ -54,6 +54,7 @@ public class MainView extends BorderPane {
     private javafx.scene.layout.VBox leftArea;
     private boolean treeViewVisible = true;
     private boolean miniMapVisible = true;
+    private boolean logPanelVisible = true;
     private boolean suppressNextTaskLoad = false;
 
     private ScrollPane scrollPane;
@@ -249,6 +250,15 @@ public class MainView extends BorderPane {
             updateLeftSidebar();
         });
 
+        // 日志面板关闭回调
+        logPanel.setOnClose(() -> {
+            if (logPanelDetachable != null && logPanelDetachable.isDetached()) {
+                logPanelDetachable.reattach();
+            }
+            logPanelVisible = false;
+            updateLeftSidebar();
+        });
+
         // 折叠侧边栏恢复回调
         collapsedSidebar.setOnTreeViewRestore(() -> {
             treeViewVisible = true;
@@ -257,6 +267,11 @@ public class MainView extends BorderPane {
 
         collapsedSidebar.setOnMiniMapRestore(() -> {
             miniMapVisible = true;
+            updateLeftSidebar();
+        });
+
+        collapsedSidebar.setOnLogPanelRestore(() -> {
+            logPanelVisible = true;
             updateLeftSidebar();
         });
 
@@ -992,6 +1007,8 @@ public class MainView extends BorderPane {
         treeView.setManaged(treeViewVisible);
         miniMap.setVisible(miniMapVisible);
         miniMap.setManaged(miniMapVisible);
+        logPanel.setVisible(logPanelVisible);
+        logPanel.setManaged(logPanelVisible);
 
         // 判断是否有任何组件可见
         boolean anyVisible = treeViewVisible || miniMapVisible;
@@ -1004,6 +1021,7 @@ public class MainView extends BorderPane {
         // 只显示已隐藏组件对应的按钮
         collapsedSidebar.showTreeViewButton(!treeViewVisible);
         collapsedSidebar.showMiniMapButton(!miniMapVisible);
+        collapsedSidebar.showLogPanelButton(!logPanelVisible);
     }
 
     public NodeCanvas getCanvas() {
@@ -1306,7 +1324,7 @@ public class MainView extends BorderPane {
             public void run() {
                 fetchExecutionLog(runningJob);
             }
-        }, 1000, 2000); // 1秒后开始，每2秒轮询一次
+        }, 1000, 3000); // 1秒后开始，每3秒轮询一次（从2秒增加到3秒，减少请求频率）
     }
 
     /**

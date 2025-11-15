@@ -383,7 +383,7 @@
 /* ============ 文本区域样式 ============ */
 
 .text-area {
-    -fx-background-color: white;
+    -fx-background-color: transparent;
     -fx-border-color: #D1D5DB;
     -fx-border-width: 1;
     -fx-border-radius: 6;
@@ -397,7 +397,86 @@
 }
 
 .text-area .content {
-    -fx-background-color: white;
+    -fx-background-color: transparent;
+}
+
+/* 日志面板中的 TextArea 特殊样式 - 完全透明，无滚动条，纯黑色字体，无行间距，无空白 */
+.log-panel .text-area,
+.log-message-textarea {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+    -fx-border-width: 0;
+    -fx-control-inner-background: transparent;
+    -fx-text-box-border: transparent;
+    -fx-effect: null;
+    -fx-text-fill: #000000;
+    -fx-line-spacing: 0;
+    -fx-spacing: 0;
+    -fx-font-size: 13px;
+}
+
+.log-panel .text-area .content,
+.log-message-textarea .content {
+    -fx-background-color: transparent;
+    -fx-effect: null;
+    -fx-padding: 0;
+    -fx-background-insets: 0;
+}
+
+.log-panel .text-area .viewport,
+.log-message-textarea .viewport {
+    -fx-background-color: transparent;
+    -fx-effect: null;
+    -fx-padding: 0;
+    -fx-background-insets: 0;
+}
+
+/* 强制隐藏日志面板中 TextArea 内部的滚动条（TextArea 在 ScrollPane 中，不需要自己的滚动条） */
+.log-panel .text-area .scroll-bar,
+.log-message-textarea .scroll-bar {
+    -fx-opacity: 0 !important;
+    -fx-pref-width: 0 !important;
+    -fx-pref-height: 0 !important;
+    -fx-min-width: 0 !important;
+    -fx-min-height: 0 !important;
+    -fx-max-width: 0 !important;
+    -fx-max-height: 0 !important;
+    visibility: hidden;
+}
+
+.log-panel .text-area .scroll-bar:vertical,
+.log-panel .text-area .scroll-bar:horizontal,
+.log-message-textarea .scroll-bar:vertical,
+.log-message-textarea .scroll-bar:horizontal {
+    -fx-opacity: 0 !important;
+    -fx-pref-width: 0 !important;
+    -fx-pref-height: 0 !important;
+    -fx-min-width: 0 !important;
+    -fx-min-height: 0 !important;
+    -fx-max-width: 0 !important;
+    -fx-max-height: 0 !important;
+    visibility: hidden;
+}
+
+/* 确保日志面板中 ScrollPane 的滚动条可见（这是外层 ScrollPane 的滚动条，应该显示） */
+.log-panel .scroll-pane .scroll-bar:vertical {
+    -fx-opacity: 1 !important;
+    visibility: visible !important;
+}
+
+.log-panel .scroll-pane .scroll-bar:vertical .track {
+    -fx-background-color: rgba(226, 232, 240, 0.55);
+    -fx-background-radius: 4;
+}
+
+.log-panel .scroll-pane .scroll-bar:vertical .thumb {
+    -fx-background-color: rgba(148, 163, 184, 0.7);
+    -fx-background-radius: 4;
+}
+
+.log-panel .scroll-pane .scroll-bar:vertical .thumb:hover {
+    -fx-background-color: rgba(148, 163, 184, 0.9);
 }
 
 /* ============ 日志监控面板样式 ============ */
@@ -432,7 +511,7 @@
 }
 
 .log-panel .log-tab {
-    -fx-background-color: #FFFFFF;
+    -fx-background-color: #F1F5F9;
     -fx-border-color: transparent transparent transparent rgba(243,244,246,0.9);
     -fx-border-width: 0 0 0 1;
     -fx-background-radius: 0;
@@ -495,10 +574,17 @@
 
 .log-timestamp {
     -fx-fill: #9CA3AF;
+    -fx-effect: null;
 }
 
 .log-message {
-    -fx-fill: #374151;
+    -fx-fill: #000000;
+    -fx-effect: null;
+}
+
+/* 确保日志面板中的所有 Label 都没有阴影效果 */
+.log-panel .label {
+    -fx-effect: null;
 }
 
 /* ============ 代码编辑器语法高亮样式 ============ */

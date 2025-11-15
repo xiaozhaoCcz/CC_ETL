@@ -40,6 +40,13 @@ public class MiniMapView extends VBox {
     private static final double MINIMAP_HEIGHT = 280; // 与日志面板同高
     private static final double SCALE_FACTOR = 0.1; // 缩放比例
     
+    // 节流机制：避免频繁更新小地图
+    private javafx.animation.Timeline throttledUpdateTimeline;
+    private javafx.animation.Timeline throttledViewportUpdateTimeline;
+    private boolean updatePending = false;
+    private boolean viewportUpdatePending = false;
+    private static final long THROTTLE_DELAY_MS = 200; // 节流延迟200ms
+    
     // 关闭回调
     private Runnable onClose;
     
@@ -86,7 +93,7 @@ public class MiniMapView extends VBox {
             if (w > 0) {
                 canvas.setWidth(w);
                 logger.debug("📐 Canvas宽度调整为: {}", w);
-                updateMiniMap();  // 重绘小地图
+                scheduleThrottledUpdate();  // 使用节流更新
             }
         });
         
@@ -96,7 +103,7 @@ public class MiniMapView extends VBox {
             if (h > 0) {
                 canvas.setHeight(h);
                 logger.debug("📐 Canvas高度调整为: {}", h);
-                updateMiniMap();  // 重绘小地图
+                scheduleThrottledUpdate();  // 使用节流更新
             }
         });
         
@@ -156,36 +163,37 @@ public class MiniMapView extends VBox {
         this.nodeCanvas = nodeCanvas;
         this.scrollPane = scrollPane;
         
-        // 监听画布内容变化
+        // 监听画布内容变化（节流：避免频繁更新）
         nodeCanvas.getChildren().addListener((javafx.collections.ListChangeListener<javafx.scene.Node>) c -> {
-            updateMiniMap();
+            scheduleThrottledUpdate();
         });
         
-        // 监听滚动位置变化
+        // 监听滚动位置变化（使用节流，避免频繁更新）
         scrollPane.hvalueProperty().addListener((obs, oldVal, newVal) -> {
             logger.debug("🔄 水平滚动: {} → {}", oldVal, newVal);
-            updateViewport();
+            scheduleThrottledViewportUpdate();
         });
         scrollPane.vvalueProperty().addListener((obs, oldVal, newVal) -> {
             logger.debug("🔄 垂直滚动: {} → {}", oldVal, newVal);
-            updateViewport();
+            scheduleThrottledViewportUpdate();
         });
         
-        // 监听视口大小变化
+        // 监听视口大小变化（使用节流）
         scrollPane.viewportBoundsProperty().addListener((obs, oldVal, newVal) -> {
             logger.debug("🔄 视口大小变化: {}", newVal);
-            updateViewport();
+            scheduleThrottledViewportUpdate();
         });
         
         // 添加定时器，定期更新视口（解决 pannable 模式下监听器不触发的问题）
+        // 优化：降低更新频率从100ms到300ms，减少CPU占用
         javafx.animation.Timeline timeline = new javafx.animation.Timeline(
             new javafx.animation.KeyFrame(
-                javafx.util.Duration.millis(100),
+                javafx.util.Duration.millis(300), // 从100ms增加到300ms
                 e -> {
                     // 定期检查滚动位置
                     double currentH = scrollPane.getHvalue();
                     double currentV = scrollPane.getVvalue();
-                    if (lastHValue != currentH || lastVValue != currentV) {
+                    if (Math.abs(lastHValue - currentH) > 0.001 || Math.abs(lastVValue - currentV) > 0.001) {
                         logger.debug("🔄 检测到滚动变化: H={}, V={}", currentH, currentV);
                         lastHValue = currentH;
                         lastVValue = currentV;
@@ -469,9 +477,69 @@ public class MiniMapView extends VBox {
     }
     
     /**
-     * 手动触发更新
+     * 节流更新：延迟执行更新，避免频繁重绘
+     */
+    private void scheduleThrottledUpdate() {
+        if (updatePending) {
+            return; // 如果已有待处理的更新，跳过
+        }
+        
+        updatePending = true;
+        
+        // 取消之前的定时器
+        if (throttledUpdateTimeline != null) {
+            throttledUpdateTimeline.stop();
+        }
+        
+        // 创建新的节流定时器
+        throttledUpdateTimeline = new javafx.animation.Timeline(
+            new javafx.animation.KeyFrame(
+                javafx.util.Duration.millis(THROTTLE_DELAY_MS),
+                e -> {
+                    updateMiniMap();
+                    updatePending = false;
+                }
+            )
+        );
+        throttledUpdateTimeline.play();
+    }
+    
+    /**
+     * 节流更新视口：延迟执行视口更新，避免频繁重绘
+     */
+    private void scheduleThrottledViewportUpdate() {
+        if (viewportUpdatePending) {
+            return; // 如果已有待处理的更新，跳过
+        }
+        
+        viewportUpdatePending = true;
+        
+        // 取消之前的定时器
+        if (throttledViewportUpdateTimeline != null) {
+            throttledViewportUpdateTimeline.stop();
+        }
+        
+        // 创建新的节流定时器
+        throttledViewportUpdateTimeline = new javafx.animation.Timeline(
+            new javafx.animation.KeyFrame(
+                javafx.util.Duration.millis(THROTTLE_DELAY_MS),
+                e -> {
+                    updateViewport();
+                    viewportUpdatePending = false;
+                }
+            )
+        );
+        throttledViewportUpdateTimeline.play();
+    }
+    
+    /**
+     * 手动触发更新（立即执行，不使用节流）
      */
     public void refresh() {
+        updatePending = false;
+        if (throttledUpdateTimeline != null) {
+            throttledUpdateTimeline.stop();
+        }
         updateMiniMap();
     }
     

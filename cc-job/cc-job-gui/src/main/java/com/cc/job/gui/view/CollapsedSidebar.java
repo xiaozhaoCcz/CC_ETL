@@ -17,9 +17,11 @@ public class CollapsedSidebar extends VBox {
     
     private Button treeViewButton;
     private Button miniMapButton;
+    private Button logPanelButton;
     
     private Runnable onTreeViewRestore;
     private Runnable onMiniMapRestore;
+    private Runnable onLogPanelRestore;
     
     public CollapsedSidebar() {
         initializeUI();
@@ -55,7 +57,15 @@ public class CollapsedSidebar extends VBox {
             }
         });
         
-        getChildren().addAll(treeViewButton, miniMapButton);
+        // 日志监控图标按钮
+        logPanelButton = createIconButton(IconUtil.infoIcon(), "显示监控");
+        logPanelButton.setOnAction(e -> {
+            if (onLogPanelRestore != null) {
+                onLogPanelRestore.run();
+            }
+        });
+        
+        getChildren().addAll(treeViewButton, miniMapButton, logPanelButton);
     }
     
     private Button createIconButton(FontIcon icon, String tooltipText) {
@@ -125,6 +135,15 @@ public class CollapsedSidebar extends VBox {
     public void showMiniMapButton(boolean show) {
         miniMapButton.setVisible(show);
         miniMapButton.setManaged(show);
+    }
+    
+    public void setOnLogPanelRestore(Runnable callback) {
+        this.onLogPanelRestore = callback;
+    }
+    
+    public void showLogPanelButton(boolean show) {
+        logPanelButton.setVisible(show);
+        logPanelButton.setManaged(show);
     }
 }
 
