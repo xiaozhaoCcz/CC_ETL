@@ -308,8 +308,7 @@ public class MainView extends BorderPane {
                     treeView.selectTaskGroupByName(taskGroupName);
                 });
                 
-                // 检查任务运行状态并更新小绿点显示
-                checkAndUpdateTaskGroupRunningStatus(taskId, taskGroupName);
+                // 注意：checkAndUpdateTaskGroupRunningStatus 现在在 loadTaskGroupData 内部调用
             } else {
                 logPanel.warn("⚠ 未找到任务组ID，无法加载流程图: " + taskGroupName);
                 logPanel.info("提示: 请先在左侧任务树中选择该任务组");
@@ -732,8 +731,7 @@ public class MainView extends BorderPane {
             toolBar.setCurrentTaskGroupId(taskId);
             loadTaskGroupData(taskId, taskName);
             
-            // 检查任务运行状态并更新小绿点显示
-            checkAndUpdateTaskGroupRunningStatus(taskId, taskName);
+            // 注意：checkAndUpdateTaskGroupRunningStatus 现在在 loadTaskGroupData 内部调用
         } else {
             // 如果是分区或其他类型，不显示提示（因为这是正常行为）
             if (type != null && type == 0) {
@@ -774,43 +772,46 @@ public class MainView extends BorderPane {
         logPanel.info("════════════════════════════════");
         logPanel.info("开始加载任务组: " + taskName);
         logPanel.info("任务组ID: " + taskId);
-        
+
         // 在后台线程中加载数据
         new Thread(() -> {
             try {
                 // 同步节点状态
                 canvas.syncPendingNodeStatusBlocking();
                 Platform.runLater(() -> logPanel.info("节点状态同步完成，开始加载最新数据"));
-                
+
                 // 加载任务组数据
                 JobComposeData composeData = jobPartService.getJobCompose(taskId);
-                
+
                 // 在 JavaFX 主线程中更新 UI
                 Platform.runLater(() -> {
+                    // ⚠️ 注意：不再清空缓存，而是使用智能合并策略
+                    // 在 loadFromComposeData 中会智能合并后端状态和缓存状态，避免显示过时的状态
+
                     // 清空画布
                     canvas.clear();
-                    
+
                     // 加载节点和连接
                     if (composeData != null) {
                         canvas.loadFromComposeData(composeData);
                         // 为所有加载的节点设置编辑回调
                         setupEditCallbacksForLoadedNodes(composeData);
-                        
+
                         int nodeCount = composeData.getNodes() != null ? composeData.getNodes().size() : 0;
                         int edgeCount = composeData.getEdges() != null ? composeData.getEdges().size() : 0;
-                        
+
                         logPanel.success("✓ 任务组加载成功！");
                         logPanel.info("节点数: " + nodeCount + ", 连接数: " + edgeCount);
                     } else {
                         logPanel.warn("⚠ 任务组数据为空");
                     }
-                    
+
                     // 检查任务运行状态并更新小绿点显示
                     checkAndUpdateTaskGroupRunningStatus(taskId, taskName);
-                    
+
                     // 同步树形视图的选中状态
                     treeView.selectTaskGroupByName(taskName);
-                    
+
                     // 延迟执行定位回调，确保画布已经完全渲染
                     javafx.animation.PauseTransition delay = new javafx.animation.PauseTransition(javafx.util.Duration.millis(300));
                     delay.setOnFinished(e -> {
@@ -819,10 +820,10 @@ public class MainView extends BorderPane {
                         }
                     });
                     delay.play();
-                    
+
                     logPanel.info("════════════════════════════════");
                 });
-                
+
             } catch (Exception ex) {
                 logger.error("加载任务组数据失败: {}", ex.getMessage(), ex);
                 Platform.runLater(() -> {
@@ -840,7 +841,7 @@ public class MainView extends BorderPane {
         logPanel.info("════════════════════════════════");
         logPanel.info("开始加载任务组: " + taskName);
         logPanel.info("任务组ID: " + taskId);
-        
+
         logPanel.info("准备同步当前任务组的节点运行状态...");
 
         // 在后台线程中加载数据
@@ -853,6 +854,9 @@ public class MainView extends BorderPane {
 
                 // 在 JavaFX 主线程中更新 UI
                 Platform.runLater(() -> {
+                    // ⚠️ 注意：不再清空缓存，而是使用智能合并策略
+                    // 在 loadFromComposeData 中会智能合并后端状态和缓存状态，避免显示过时的状态
+
                     if (composeData != null) {
                         canvas.loadFromComposeData(composeData);
 
@@ -865,6 +869,9 @@ public class MainView extends BorderPane {
                         logPanel.success("✓ 任务组加载成功！");
                         logPanel.info("节点数: " + nodeCount + ", 连接数: " + edgeCount);
                         logPanel.info("════════════════════════════════");
+
+                        // 画布数据加载完成后，检查并恢复任务组的运行状态（包括连接线动画）
+                        checkAndUpdateTaskGroupRunningStatus(taskId, taskName);
                     } else {
                         logPanel.warn("⚠ 任务组数据为空");
                         canvas.clear();
@@ -1583,11 +1590,29 @@ public class MainView extends BorderPane {
                 // 更新导航栏中的小绿点
                 navigationBar.updateTaskGroupRunningStatus(taskGroupName, isRunning);
                 
-                if (isRunning) {
-                    logPanel.debug("✅ 任务组 " + taskGroupName + " 正在运行中");
-                } else {
-                    logPanel.debug("⚪ 任务组 " + taskGroupName + " 未运行");
-                }
+                // 在 JavaFX 主线程中更新连接线的运行状态
+                Platform.runLater(() -> {
+                    if (isRunning) {
+                        logPanel.debug("✅ 任务组 " + taskGroupName + " 正在运行中");
+                        // 恢复连接线的动画状态（如果任务组正在运行）
+                        // 延迟执行，确保画布数据已经加载完成
+                        javafx.animation.PauseTransition delay = new javafx.animation.PauseTransition(javafx.util.Duration.millis(100));
+                        delay.setOnFinished(e -> {
+                            canvas.setAllConnectionsRunning(true);
+                            // 刷新所有节点的状态（从缓存中获取最新状态）
+                            // 这样可以确保切换回来时，节点状态是最新的
+                            canvas.refreshAllNodeStatusFromCache();
+                            logger.debug("🔄 已恢复任务组 {} 的连接线动画状态并刷新节点状态", taskGroupName);
+                        });
+                        delay.play();
+                    } else {
+                        logPanel.debug("⚪ 任务组 " + taskGroupName + " 未运行");
+                        // 确保连接线处于非运行状态
+                        canvas.setAllConnectionsRunning(false);
+                        // 即使任务组未运行，也尝试从缓存中恢复节点状态（可能任务刚完成）
+                        canvas.refreshAllNodeStatusFromCache();
+                    }
+                });
             } catch (Exception e) {
                 logger.error("❌ 获取任务组运行状态失败: {}", e.getMessage(), e);
                 logPanel.warn("获取任务组运行状态失败: " + e.getMessage());

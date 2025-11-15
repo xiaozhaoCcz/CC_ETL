@@ -967,23 +967,52 @@ public class NodeCanvas extends Pane {
                     }
 
                     // ⭐ 恢复节点运行状态（triggerStatus）
-                    Integer triggerStatus = nodeData.getTriggerStatus();
+                    // 智能合并策略：优先使用后端返回的状态，但如果后端状态是运行中（2），而缓存中有最终状态（成功1或失败0），则使用缓存的状态
+                    // 这样可以避免显示过时的运行中状态
+                    Integer triggerStatus = null;
                     Long nodeJobId = nodeData.getJobId();
-                    if (triggerStatus == null && nodeJobId != null) {
-                        triggerStatus = com.cc.job.gui.util.NodeStatusSyncManager.getInstance()
+                    Integer backendStatus = nodeData.getTriggerStatus();
+                    Integer cachedStatus = null;
+                    
+                    if (nodeJobId != null) {
+                        cachedStatus = com.cc.job.gui.util.NodeStatusSyncManager.getInstance()
                                 .getCachedStatus(nodeJobId);
-                        if (triggerStatus != null) {
-                            logger.debug("ℹ️ 使用缓存的节点运行状态: {} -> {}", text, triggerStatus);
-                        }
                     }
+                    
+                    // 智能合并策略
+                    if (backendStatus != null && cachedStatus != null) {
+                        // 如果后端状态是运行中（2），而缓存中有最终状态（成功1或失败0），使用缓存的状态
+                        if (backendStatus == 2 && (cachedStatus == 0 || cachedStatus == 1)) {
+                            triggerStatus = cachedStatus;
+                            logger.debug("ℹ️ 节点 {} 后端状态是运行中（{}），但缓存中有最终状态（{}），使用缓存状态", 
+                                    text, backendStatus, cachedStatus);
+                        } else {
+                            // 否则使用后端返回的状态（后端状态更准确）
+                            triggerStatus = backendStatus;
+                            logger.debug("ℹ️ 使用后端返回的节点运行状态: {} -> {}", text, backendStatus);
+                        }
+                    } else if (cachedStatus != null) {
+                        // 如果只有缓存状态，使用缓存状态
+                        triggerStatus = cachedStatus;
+                        logger.debug("ℹ️ 使用缓存的节点运行状态: {} -> {}", text, cachedStatus);
+                    } else if (backendStatus != null) {
+                        // 如果只有后端状态，使用后端状态
+                        triggerStatus = backendStatus;
+                        logger.debug("ℹ️ 使用后端返回的节点运行状态: {} -> {}", text, backendStatus);
+                    }
+                    
                     if (triggerStatus != null) {
                         node.updateStatusByCode(triggerStatus);
                         if (nodeJobId != null) {
+                            // 更新缓存，确保缓存是最新的
                             com.cc.job.gui.util.NodeStatusSyncManager.getInstance()
                                     .rememberStatus(nodeJobId, triggerStatus);
                         }
                         logger.debug("✅ 恢复节点运行状态: {} -> {}", text, triggerStatus);
                         log("✅ 恢复节点运行状态: " + text + " -> " + triggerStatus);
+                    } else {
+                        // 如果既没有缓存也没有后端状态，保持默认状态（IDLE）
+                        logger.debug("ℹ️ 节点 {} 没有运行状态信息，保持默认状态", text);
                     }
 
                     // 设置位置
@@ -1207,6 +1236,35 @@ public class NodeCanvas extends Pane {
 
     public void syncPendingNodeStatusBlocking() {
         com.cc.job.gui.util.NodeStatusSyncManager.getInstance().syncNowBlocking();
+    }
+    
+    /**
+     * 刷新所有节点的状态（从缓存中获取最新状态）
+     * 用于切换任务组时恢复节点状态
+     */
+    public void refreshAllNodeStatusFromCache() {
+        com.cc.job.gui.util.NodeStatusSyncManager statusManager = com.cc.job.gui.util.NodeStatusSyncManager.getInstance();
+        int updatedCount = 0;
+        
+        for (ProcessNode node : nodes) {
+            Long jobId = node.getJobId();
+            if (jobId != null) {
+                Integer cachedStatus = statusManager.getCachedStatus(jobId);
+                if (cachedStatus != null) {
+                    // 如果缓存中有状态，更新节点状态
+                    node.updateStatusByCode(cachedStatus);
+                    updatedCount++;
+                    logger.debug("🔄 从缓存恢复节点状态: {} (jobId={}) -> {}", 
+                            node.getJobHandlerName(), jobId, cachedStatus);
+                }
+            }
+        }
+        
+        if (updatedCount > 0) {
+            logger.debug("✅ 已从缓存恢复 {} 个节点的状态", updatedCount);
+        } else {
+            logger.debug("ℹ️ 缓存中没有节点状态信息");
+        }
     }
     
     /**

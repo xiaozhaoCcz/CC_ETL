@@ -960,6 +960,23 @@ public class JobGroupXxlJob {
                 logger.info("[JobGroup] message: jobId={}, status={}, randomId={}, parentJobId={}", 
                         message.getJobId(), message.getStatus(), message.getRandomId(), message.getParentJobId());
                 
+                // ⭐ 重要修复：对于最终状态（成功1或失败0），直接更新数据库，确保数据库状态准确
+                // 即使SSE消息丢失，数据库状态也是正确的
+                if (status == 1 || status == 0) {
+                    try {
+                        boolean updateSuccess = jobNodeService.updateNodeStatus(jobId, status);
+                        if (updateSuccess) {
+                            logger.info("[JobGroup] ✅ 已直接更新数据库节点状态 - jobId: {}, status: {}", jobId, status);
+                        } else {
+                            logger.warn("[JobGroup] ⚠️ 更新数据库节点状态失败 - jobId: {}, status: {}", jobId, status);
+                        }
+                    } catch (Exception e) {
+                        logger.error("[JobGroup] ❌ 更新数据库节点状态异常 - jobId: {}, status: {}, 错误: {}", 
+                                jobId, status, e.getMessage(), e);
+                        // 即使数据库更新失败，也继续发送SSE消息，让前端能够更新UI
+                    }
+                }
+                
                 // 使用SSE服务发送消息
                 sseService.sendMessage(message);
 

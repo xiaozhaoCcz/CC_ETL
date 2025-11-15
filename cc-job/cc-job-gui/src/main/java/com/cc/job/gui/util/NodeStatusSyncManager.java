@@ -152,6 +152,14 @@ public class NodeStatusSyncManager {
         pendingUpdates.clear();
         logger.debug("✓ 已清空所有待更新的节点状态");
     }
+
+    /**
+     * 清空缓存（用于任务组切换时，避免不同任务组之间的状态冲突）
+     */
+    public void clearCacheForTaskGroupSwitch() {
+        latestStatusCache.clear();
+        logger.debug("🔄 已清空节点状态缓存（任务组切换）");
+    }
     
     /**
      * 停止同步任务
