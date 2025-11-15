@@ -35,9 +35,8 @@ Cc-ETL 是一款基于 XXL-Job 深度改造的可视化定时任务调度工具�
 
 ## 🔗 项目地址
 
-- **GitHub**：[待补充]
-- **Gitee**：[待补充]
-- **在线文档**：[在线文档](http://175.178.249.190/blog/post/298)
+- **GitHub**：https://github.com/xiaozhaoCcz/CC_ETL
+- **Gitee**：https://gitee.com/xzjsccz/Cc_ETL
 
 ---
 
@@ -45,7 +44,7 @@ Cc-ETL 是一款基于 XXL-Job 深度改造的可视化定时任务调度工具�
 
 - 🖱️ **任务编排前端重构**：可视化编辑与拖拽
 - 🧩 **简洁部署**：仅需数据库，无需其他中间件
-- 💻 **PC端支持**：Electron 实现本地可视化
+- 💻 **PC端支持**：JavaFx和Vue3实现
 - 🔄 **兼容 XXL-Job 全部功能**
 - 🔗 **集成 DataX 数据同步**：
   - 🗄️ 支持 MySQL、Oracle 全量/增量同步
