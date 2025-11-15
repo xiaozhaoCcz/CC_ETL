@@ -12,4 +12,6 @@ public class JobGlueForm implements Serializable {
     private String glueRemark;
 
     private String glueSource;
+    
+    private String glueType;
 }

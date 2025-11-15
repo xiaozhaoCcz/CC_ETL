@@ -9,7 +9,7 @@ import com.cc.job.admin.task.executor.callback.IWorker;
 import com.cc.job.admin.task.executor.worker.WorkResult;
 import com.cc.job.admin.task.executor.wrapper.WorkerWrapper;
 import com.cc.job.admin.task.trigger.XxlJobTrigger;
-import com.cc.job.admin.task.websocket.WebSocketServer;
+import com.cc.job.admin.task.sse.SSEService;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.admin.config.XxlJobAdminConfig;
 import com.cc.job.xo.mapper.JobInfoMapper;
@@ -17,7 +17,9 @@ import com.cc.job.xo.model.entity.*;
 import com.cc.job.admin.task.service.JobEdgeService;
 import com.cc.job.admin.task.service.JobInfoService;
 import com.cc.job.admin.task.service.JobNodeService;
+import com.cc.job.admin.task.service.JobGroupSnapshotService;
 import com.cc.job.admin.task.websocket.model.Message;
+import com.cc.job.admin.task.enums.ExecutorRouteStrategyEnum;
 import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.biz.model.TriggerParam;
 import com.xxl.job.core.context.XxlJobContext;
@@ -65,11 +67,13 @@ public class JobGroupXxlJob {
 
     final JobEdgeService jobEdgeService;
 
-    final WebSocketServer webSocketServer;
+    final SSEService sseService;
 
     final JobInfoMapper jobInfoMapper;
 
     final JobGroupUtils jobGroupUtils;
+
+    final JobGroupSnapshotService jobGroupSnapshotService;
 
     /**
      * 存储WorkerWrapper，用于后续暂停任务操作
@@ -152,7 +156,7 @@ public class JobGroupXxlJob {
             logger.debug("[JobGroup] 生成随机ID - jobId: {}, randomId: {}", jobId, randomId);
 
             JobInfo jobInfo = getJobInfoById(jobId);
-            logger.info("[JobGroup] 任务信息获取成功 - 任务名称: {}, 任务类型: {}, 执行器超时时间: {}ms",
+            logger.info("[JobGroup] 任务信息获取成功 - 任务名称: {}, 任务类型: {}, 执行器超时时间: {}秒",
                     jobInfo.getJobDesc(), jobInfo.getJobType(), jobInfo.getExecutorTimeout());
 
             Map<Long, List<Long>> statusMap = new HashMap<>();
@@ -160,12 +164,24 @@ public class JobGroupXxlJob {
             getJobStatusMap(jobId, statusMap);
             logger.debug("[JobGroup] 初始化状态映射 - jobId: {}, 状态映射大小: {}", jobId, statusMap.size());
 
-            // 获取所有节点和边信息
+            // 【快照模式】优先从快照获取节点和边信息，如果没有快照则从数据库获取
             List<JobNode> nodes = new ArrayList<>();
             List<JobEdge> edges = new ArrayList<>();
-            getAllNodesAndEdges(jobId, nodes, edges);
-            logger.info("[JobGroup] 节点和边信息获取完成 - jobId: {}, 节点数量: {}, 边数量: {}",
-                    jobId, nodes.size(), edges.size());
+            boolean useSnapshot = loadNodesAndEdgesFromSnapshot(jobId, randomId, nodes, edges);
+            
+            if (!useSnapshot) {
+                // 如果没有快照，从数据库获取（兼容旧逻辑）
+                logger.info("[JobGroup] 未找到快照，从数据库获取节点和边 - jobId: {}, randomId: {}", jobId, randomId);
+                getAllNodesAndEdges(jobId, nodes, edges);
+            } else {
+                logger.info("[JobGroup] 从快照获取节点和边 - jobId: {}, randomId: {}, 节点数量: {}, 边数量: {}", 
+                        jobId, randomId, nodes.size(), edges.size());
+            }
+
+            // 修复：在任务组开始执行前，重置所有节点的运行状态为 -1（未运行状态）
+            // 这样可以确保每次运行任务组时，节点状态都是干净的初始状态
+            int resetCount = jobNodeService.resetAllNodeStatus(jobId);
+            logger.info("[JobGroup] 重置节点状态完成 - jobId: {}, 重置节点数量: {}", jobId, resetCount);
 
             // 构图
             buildGraph(jobId, nodes, edges);
@@ -199,7 +215,7 @@ public class JobGroupXxlJob {
 
     private void getRuntime(List<WorkerWrapper<Long, String>> workerWrappers, List<JobNode> nodes, long timeout,
             Long jobId, String randomId) throws IOException {
-        logger.debug("[JobGroup] 开始计算任务运行时间 - jobId: {}, 节点数量: {}, 超时时间: {}ms", jobId, nodes.size(), timeout);
+        logger.debug("[JobGroup] 开始计算任务运行时间 - jobId: {}, 节点数量: {}, 超时时间: {}秒", jobId, nodes.size(), timeout);
 
         List<JobInfo> jobInfos = getJobInfos(nodes);
         Map<Long, JobInfo> jobInfoMap = new HashMap<>();
@@ -215,9 +231,8 @@ public class JobGroupXxlJob {
         message.setStatus(9);
         message.setRandomId(randomId);
         message.setResult(JSONUtil.toJsonStr(nextRunTime));
-        // 使用消息队列服务发送消息，提高响应速度
-        webSocketServer.sendInfo(message);
-        logger.debug("[JobGroup] 运行时间计算完成并发送消息 - jobId: {}, randomId: {}", jobId, randomId);
+        // 使用SSE服务发送消息
+        sseService.sendMessage(message);
     }
 
     /**
@@ -300,8 +315,16 @@ public class JobGroupXxlJob {
         // 清理资源
         STOP_MAP.remove(setExecuteJobId(jobId, randomId));
 
-        // 关闭WebSocket连接
-        webSocketServer.onClose(setExecuteJobId(jobId, randomId));
+        // 关闭SSE连接
+        sseService.closeConnection(jobId, randomId);
+
+        // 【快照模式】清理快照数据
+        try {
+            jobGroupSnapshotService.deleteSnapshot(jobId, randomId);
+            logger.info("[Snapshot] 快照清理成功 - jobId: {}, randomId: {}", jobId, randomId);
+        } catch (Exception e) {
+            logger.error("[Snapshot] 快照清理失败 - jobId: {}, randomId: {}", jobId, randomId, e);
+        }
 
         CONTEXT_HOLDER.remove();
 
@@ -317,8 +340,8 @@ public class JobGroupXxlJob {
         message.setParentJobId(jobId);
         message.setStatus(5);
         message.setRandomId(randomId);
-        // 使用Spring WebSocket服务发送消息
-        webSocketServer.sendInfo(message);
+        // 使用SSE服务发送消息
+        sseService.sendMessage(message);
         logger.debug("[JobGroup] 发送任务完成消息 - jobId: {}, randomId: {}", jobId, randomId);
     }
 
@@ -432,14 +455,14 @@ public class JobGroupXxlJob {
         Thread thread = null;
         JobThreadListener jobThreadListener = null;
         try {
-            logger.debug("[JobGroup] 开始监听任务执行状态 - jobId: {}, nodeId: {}, 超时时间: {}ms",
+            logger.debug("[JobGroup] 开始监听任务执行状态 - jobId: {}, nodeId: {}, 超时时间: {}秒",
                     jobInfo.getId(), node.getId(), jobInfo.getExecutorTimeout());
             jobThreadListener = new JobThreadListener(jobInfo, node, randomId, statusMap, count);
             FutureTask<String> futureTask = new FutureTask<>(jobThreadListener);
             thread = new Thread(futureTask);
             thread.start();
             result = jobInfo.getExecutorTimeout() > 0
-                    ? futureTask.get(jobInfo.getExecutorTimeout(), TimeUnit.MILLISECONDS)
+                    ? futureTask.get(jobInfo.getExecutorTimeout(), TimeUnit.SECONDS)
                     : futureTask.get();
             logger.info("[JobGroup] 任务监听完成 - jobId: {}, nodeId: {}, 执行结果: {}",
                     jobInfo.getId(), node.getId(), result);
@@ -471,7 +494,7 @@ public class JobGroupXxlJob {
                     jobInfo.getId(), jobInfo.getJobDesc());
         }
         // 暂停任务，默认暂停任务5分钟
-        long timeout = jobInfo.getExecutorTimeout() > 0 ? jobInfo.getExecutorTimeout() : 5 * 60 * 1000;
+        long timeout = jobInfo.getExecutorTimeout() > 0 ? jobInfo.getExecutorTimeout()*1000 : 5 * 60 * 1000;
         long startTime = System.currentTimeMillis();
         while (isPause) {
             long elapsed = System.currentTimeMillis() - startTime;
@@ -480,7 +503,7 @@ public class JobGroupXxlJob {
                 break;
             }
             try {
-                TimeUnit.MILLISECONDS.sleep(5000);
+                TimeUnit.SECONDS.sleep(5);
             } catch (InterruptedException e) {
                 logger.error("[JobGroup] 任务暂停等待被中断 - jobId: {}", jobInfo.getId(), e);
                 throw new RuntimeException(e);
@@ -501,11 +524,46 @@ public class JobGroupXxlJob {
      * @param randomId      随机ID
      */
     private void triggerJob(XxlJobContext xxlJobContext, JobInfo jobInfo, String randomId) {
-        logger.debug("[JobGroup] 开始触发任务 - jobId: {}, 执行器处理器: {}, 随机ID: {}",
-                jobInfo.getId(), jobInfo.getExecutorHandler(), randomId);
+         logger.debug("[JobGroup] 开始触发任务 - jobId: {}, 执行器处理器: {}, 随机ID: {}",
+                 jobInfo.getId(), jobInfo.getExecutorHandler(), randomId);
+ 
+         JobGroup group = XxlJobAdminConfig.getAdminConfig().getJobGroupMapper().selectById(jobInfo.getJobGroup());
+         String ip = IpUtil.getIp();
+         String adminAddress = String.format(ADMIN_ADDRESS, ip, port);
 
-        JobGroup group = XxlJobAdminConfig.getAdminConfig().getJobGroupMapper().selectById(jobInfo.getJobGroup());
-        // 2、init trigger-param
+         List<String> registryList = group.getRegistryList();
+         if (registryList == null || registryList.isEmpty()) {
+             logger.error("[JobGroup] 当前执行器组未注册可用实例 - jobId: {}", jobInfo.getId());
+             throw new BusinessException("执行器未注册，无法触发任务");
+         }
+ 
+         ExecutorRouteStrategyEnum routeStrategyEnum = ExecutorRouteStrategyEnum.match(
+                 jobInfo.getExecutorRouteStrategy(), ExecutorRouteStrategyEnum.FIRST);
+
+         if (ExecutorRouteStrategyEnum.SHARDING_BROADCAST == routeStrategyEnum) {
+             for (int i = 0; i < registryList.size(); i++) {
+                 TriggerParam broadcastParam = createTriggerParam(jobInfo, randomId, xxlJobContext, adminAddress, i,
+                         registryList.size());
+                 doTrigger(jobInfo, randomId, xxlJobContext, broadcastParam, registryList.get(i));
+             }
+             return;
+         }
+
+         TriggerParam triggerParam = createTriggerParam(jobInfo, randomId, xxlJobContext, adminAddress, 0, 1);
+         ReturnT<String> routeResult = routeStrategyEnum.getRouter().route(triggerParam, registryList);
+         if (routeResult == null || routeResult.getCode() != ReturnT.SUCCESS_CODE
+                 || routeResult.getContent() == null) {
+             String reason = routeResult != null ? routeResult.getMsg() : "未获取到可用执行器";
+             logger.error("[JobGroup] 触发路由失败 - jobId: {}, route: {}, 原因: {}", jobInfo.getId(), routeStrategyEnum,
+                     reason);
+             throw new BusinessException("触发路由失败: " + reason);
+         }
+
+         doTrigger(jobInfo, randomId, xxlJobContext, triggerParam, routeResult.getContent());
+     }
+
+    private TriggerParam createTriggerParam(JobInfo jobInfo, String randomId, XxlJobContext xxlJobContext,
+            String adminAddress, int broadcastIndex, int broadcastTotal) {
         TriggerParam triggerParam = new TriggerParam();
         triggerParam.setJobId(jobInfo.getId().intValue());
         triggerParam.setExecutorHandler(jobInfo.getExecutorHandler());
@@ -515,21 +573,22 @@ public class JobGroupXxlJob {
         triggerParam.setLogId(-1);
         triggerParam.setGlueType(jobInfo.getGlueType());
         triggerParam.setGlueSource(jobInfo.getGlueSource());
-        triggerParam.setGlueUpdatetime(jobInfo.getGlueUpdatetime().toInstant(ZoneOffset.of("+8")).toEpochMilli());
-        triggerParam.setBroadcastIndex(0);
-        triggerParam.setBroadcastTotal(1);
-        // 设置请求信息
+        if (jobInfo.getGlueUpdatetime() != null) {
+            triggerParam.setGlueUpdatetime(jobInfo.getGlueUpdatetime().toInstant(ZoneOffset.of("+8")).toEpochMilli());
+        }
+        triggerParam.setBroadcastIndex(broadcastIndex);
+        triggerParam.setBroadcastTotal(broadcastTotal);
         triggerParam.setReqBody(jobInfo.getReqBody());
         triggerParam.setReqHeader(jobInfo.getReqHeader());
         triggerParam.setReqType(jobInfo.getReqType());
         triggerParam.setReqUrl(jobInfo.getReqUrl());
         triggerParam.setXxlJobContext(xxlJobContext);
-        // 得到本地的ip和host
-        String ip = IpUtil.getIp();
-        String adminAddress = String.format(ADMIN_ADDRESS, ip, port);
         triggerParam.setAddress(adminAddress);
+        return triggerParam;
+    }
 
-        String address = group.getRegistryList().get(0);
+    private void doTrigger(JobInfo jobInfo, String randomId, XxlJobContext xxlJobContext, TriggerParam triggerParam,
+            String address) {
         logger.debug("[JobGroup] 发送任务到执行器 - jobId: {}, 执行器地址: {}", jobInfo.getId(), address);
 
         ReturnT<String> returnT = XxlJobTrigger.runExecutor(triggerParam, address);
@@ -539,10 +598,11 @@ public class JobGroupXxlJob {
                     "========================================= 任务触发失败 =========================================");
             XxlJobHelper.log(xxlJobContext, "任务ID: {}, 错误信息: {}", jobInfo.getId(), returnT.getMsg());
             JobGroupXxlJob.addJobData(setExecuteJobId(jobInfo.getId(), randomId), false);
-        } else {
-            logger.debug("[JobGroup] 任务触发成功 - jobId: {}", jobInfo.getId());
-            XxlJobHelper.log(xxlJobContext, "任务触发成功 - 任务ID: {}", jobInfo.getId());
+            throw new RuntimeException(returnT.getMsg());
         }
+
+        logger.debug("[JobGroup] 任务触发成功 - jobId: {}", jobInfo.getId());
+        XxlJobHelper.log(xxlJobContext, "任务触发成功 - 任务ID: {}", jobInfo.getId());
     }
 
     /**
@@ -598,7 +658,41 @@ public class JobGroupXxlJob {
     }
 
     /**
-     * 获取所有节点和边信息
+     * 从快照加载节点和边信息
+     *
+     * @param jobId    任务组ID
+     * @param randomId 批次ID
+     * @param nodes    节点列表（输出参数）
+     * @param edges    边列表（输出参数）
+     * @return 是否成功从快照加载
+     */
+    private boolean loadNodesAndEdgesFromSnapshot(Long jobId, String randomId, List<JobNode> nodes, List<JobEdge> edges) {
+        try {
+            com.cc.job.xo.model.entity.JobGroupSnapshot snapshot = jobGroupSnapshotService.getSnapshot(jobId, randomId);
+            if (snapshot == null || StringUtils.isBlank(snapshot.getNodesJson()) || StringUtils.isBlank(snapshot.getEdgesJson())) {
+                logger.debug("[Snapshot] 快照不存在或数据为空 - jobId: {}, randomId: {}", jobId, randomId);
+                return false;
+            }
+
+            // 解析节点JSON
+            List<JobNode> snapshotNodes = JSONUtil.toList(snapshot.getNodesJson(), JobNode.class);
+            nodes.addAll(snapshotNodes);
+
+            // 解析边JSON
+            List<JobEdge> snapshotEdges = JSONUtil.toList(snapshot.getEdgesJson(), JobEdge.class);
+            edges.addAll(snapshotEdges);
+
+            logger.info("[Snapshot] 从快照加载成功 - jobId: {}, randomId: {}, 节点数量: {}, 边数量: {}", 
+                    jobId, randomId, snapshotNodes.size(), snapshotEdges.size());
+            return true;
+        } catch (Exception e) {
+            logger.error("[Snapshot] 从快照加载失败 - jobId: {}, randomId: {}", jobId, randomId, e);
+            return false;
+        }
+    }
+
+    /**
+     * 获取所有节点和边信息（从数据库获取）
      * 
      * @param jobId 任务ID
      * @param nodes 节点列表（输出参数）
@@ -641,13 +735,25 @@ public class JobGroupXxlJob {
     private void buildGraph(Long jobId, List<JobNode> nodes, List<JobEdge> edges) {
         logger.debug("[JobGroup] 开始构建任务图 - jobId: {}", jobId);
 
-        List<JobNode> nodeList = nodes.stream().filter(v -> v.getJobParentId().equals(jobId)).toList();
-        getNodeList(jobId, nodes, edges, nodeList);
+        Map<Long, List<JobNode>> nodesByParent = new HashMap<>();
+        for (JobNode node : nodes) {
+            nodesByParent.computeIfAbsent(node.getJobParentId(), k -> new ArrayList<>()).add(node);
+        }
+
+        Map<Long, List<JobEdge>> edgesByFrom = new HashMap<>();
+        Map<Long, List<JobEdge>> edgesByTo = new HashMap<>();
+        for (JobEdge edge : edges) {
+            edgesByFrom.computeIfAbsent(edge.getFromNodeId(), k -> new ArrayList<>()).add(edge);
+            edgesByTo.computeIfAbsent(edge.getEndNodeId(), k -> new ArrayList<>()).add(edge);
+        }
+
+        List<JobNode> nodeList = new ArrayList<>(nodesByParent.getOrDefault(jobId, Collections.emptyList()));
+        getNodeList(jobId, nodes, edges, nodeList, nodesByParent, edgesByFrom, edgesByTo);
 
         // 计算节点的入度和出度
         nodes.forEach(node -> {
-            node.setNodeInDegree(edges.stream().filter(v -> v.getEndNodeId().equals(node.getId())).count());
-            node.setNodeOutDegree(edges.stream().filter(v -> v.getFromNodeId().equals(node.getId())).count());
+            node.setNodeInDegree((long) edgesByTo.getOrDefault(node.getId(), Collections.emptyList()).size());
+            node.setNodeOutDegree((long) edgesByFrom.getOrDefault(node.getId(), Collections.emptyList()).size());
             node.setJobParentId(jobId);
         });
         edges.forEach(edge -> edge.setJobParentId(jobId));
@@ -663,17 +769,19 @@ public class JobGroupXxlJob {
      * @param edges    边列表
      * @param nodeList 待处理的节点列表
      */
-    private void getNodeList(Long jobId, List<JobNode> nodes, List<JobEdge> edges, List<JobNode> nodeList) {
+    private void getNodeList(Long jobId, List<JobNode> nodes, List<JobEdge> edges, List<JobNode> nodeList,
+            Map<Long, List<JobNode>> nodesByParent, Map<Long, List<JobEdge>> edgesByFrom,
+            Map<Long, List<JobEdge>> edgesByTo) {
         logger.debug("[JobGroup] 处理节点列表 - jobId: {}, 节点数量: {}", jobId, nodeList.size());
 
         for (JobNode node : nodeList) {
-            List<Long> preNodeIds = edges.stream().filter(v -> v.getEndNodeId().equals(node.getId()))
+            List<Long> preNodeIds = edgesByTo.getOrDefault(node.getId(), Collections.emptyList()).stream()
                     .map(JobEdge::getFromNodeId).toList();
-            List<Long> nextNodeIds = edges.stream().filter(v -> v.getFromNodeId().equals(node.getId()))
+            List<Long> nextNodeIds = edgesByFrom.getOrDefault(node.getId(), Collections.emptyList()).stream()
                     .map(JobEdge::getEndNodeId).toList();
             logger.debug("[JobGroup] 处理节点 - nodeId: {}, 前置节点数量: {}, 后置节点数量: {}",
                     node.getId(), preNodeIds.size(), nextNodeIds.size());
-            concatNode(jobId, node, preNodeIds, nextNodeIds, nodes, edges);
+            concatNode(jobId, node, preNodeIds, nextNodeIds, nodes, edges, nodesByParent, edgesByFrom, edgesByTo);
         }
     }
 
@@ -690,17 +798,17 @@ public class JobGroupXxlJob {
      * @param edges       边列表
      */
     private void concatNode(Long jobId, JobNode currentNode, List<Long> preNodeIds, List<Long> nextNodeIds,
-            List<JobNode> nodes, List<JobEdge> edges) {
+            List<JobNode> nodes, List<JobEdge> edges, Map<Long, List<JobNode>> nodesByParent,
+            Map<Long, List<JobEdge>> edgesByFrom, Map<Long, List<JobEdge>> edgesByTo) {
         JobInfo jobInfo = jobInfoService.getById(currentNode.getJobId());
         if (jobInfo.getJobType() == 2) {
             // 移除与当前节点相关的边
-            edges.removeIf(v -> preNodeIds.contains(v.getFromNodeId()) && v.getEndNodeId().equals(currentNode.getId()));
-            edges.removeIf(
-                    v -> nextNodeIds.contains(v.getEndNodeId()) && v.getFromNodeId().equals(currentNode.getId()));
+            removeEdges(preNodeIds, currentNode.getId(), edges, edgesByFrom, edgesByTo, true);
+            removeEdges(nextNodeIds, currentNode.getId(), edges, edgesByFrom, edgesByTo, false);
 
             // 获取子任务组的节点
-            List<JobNode> childrenNodes = nodes.stream().filter(v -> v.getJobParentId().equals(jobInfo.getId()))
-                    .toList();
+            List<JobNode> childrenNodes = new ArrayList<>(
+                    nodesByParent.getOrDefault(jobInfo.getId(), Collections.emptyList()));
             // 获取开始节点和结束节点
             List<JobNode> startNodes = childrenNodes.stream().filter(v -> v.getNodeInDegree() == 0).toList();
             List<JobNode> endNodes = childrenNodes.stream().filter(v -> v.getNodeOutDegree() == 0).toList();
@@ -712,7 +820,7 @@ public class JobGroupXxlJob {
                     edge.setFromNodeId(preNodeId);
                     edge.setEndNodeId(startNode.getId());
                     edge.setJobParentId(jobId);
-                    edges.add(edge);
+                    addEdge(edge, edges, edgesByFrom, edgesByTo);
                 }
             }
 
@@ -723,15 +831,71 @@ public class JobGroupXxlJob {
                     edge.setFromNodeId(endNode.getId());
                     edge.setEndNodeId(nextNodeId);
                     edge.setJobParentId(jobId);
-                    edges.add(edge);
+                    addEdge(edge, edges, edgesByFrom, edgesByTo);
                 }
             }
 
-            getNodeList(jobId, nodes, edges, childrenNodes);
+            getNodeList(jobId, nodes, edges, childrenNodes, nodesByParent, edgesByFrom, edgesByTo);
 
             // 移除当前节点
             nodes.removeIf(v -> v.getId().equals(currentNode.getId()));
+            List<JobNode> parentNodes = nodesByParent.get(jobId);
+            if (parentNodes != null) {
+                parentNodes.removeIf(v -> v.getId().equals(currentNode.getId()));
+                if (parentNodes.isEmpty()) {
+                    nodesByParent.remove(jobId);
+                }
+            }
         }
+    }
+
+    private void removeEdges(List<Long> relatedNodeIds, Long currentNodeId, List<JobEdge> edges,
+            Map<Long, List<JobEdge>> edgesByFrom, Map<Long, List<JobEdge>> edgesByTo, boolean removeIncoming) {
+        if (relatedNodeIds == null || relatedNodeIds.isEmpty()) {
+            return;
+        }
+        Set<Long> relatedSet = new HashSet<>(relatedNodeIds);
+        List<JobEdge> candidates = removeIncoming
+                ? new ArrayList<>(edgesByTo.getOrDefault(currentNodeId, Collections.emptyList()))
+                : new ArrayList<>(edgesByFrom.getOrDefault(currentNodeId, Collections.emptyList()));
+        for (JobEdge edge : candidates) {
+            boolean match = removeIncoming ? relatedSet.contains(edge.getFromNodeId())
+                    : relatedSet.contains(edge.getEndNodeId());
+            if (match) {
+                removeEdge(edge, edges, edgesByFrom, edgesByTo);
+            }
+        }
+    }
+
+    private void removeEdge(JobEdge edge, List<JobEdge> edges, Map<Long, List<JobEdge>> edgesByFrom,
+            Map<Long, List<JobEdge>> edgesByTo) {
+        edges.remove(edge);
+        List<JobEdge> fromList = edgesByFrom.get(edge.getFromNodeId());
+        if (fromList != null) {
+            fromList.remove(edge);
+            if (fromList.isEmpty()) {
+                edgesByFrom.remove(edge.getFromNodeId());
+            }
+        }
+        List<JobEdge> toList = edgesByTo.get(edge.getEndNodeId());
+        if (toList != null) {
+            toList.remove(edge);
+            if (toList.isEmpty()) {
+                edgesByTo.remove(edge.getEndNodeId());
+            }
+        }
+    }
+
+    private void addEdge(JobEdge edge, List<JobEdge> edges, Map<Long, List<JobEdge>> edgesByFrom,
+            Map<Long, List<JobEdge>> edgesByTo) {
+        List<JobEdge> fromList = edgesByFrom.computeIfAbsent(edge.getFromNodeId(), k -> new ArrayList<>());
+        boolean exists = fromList.stream().anyMatch(e -> e.getEndNodeId().equals(edge.getEndNodeId()));
+        if (exists) {
+            return;
+        }
+        fromList.add(edge);
+        edgesByTo.computeIfAbsent(edge.getEndNodeId(), k -> new ArrayList<>()).add(edge);
+        edges.add(edge);
     }
 
     /**
@@ -776,6 +940,9 @@ public class JobGroupXxlJob {
      */
     private void setNodeStatus(Map<Long, List<Long>> statusMap, Long jobId, Integer status, String randomId,
             Long parentId) {
+        logger.info("[JobGroup] ========== 设置节点状态 ==========");
+        logger.info("[JobGroup] jobId: {}, status: {}, randomId: {}, parentId: {}", 
+                jobId, status, randomId, parentId);
         logger.debug("[JobGroup] 设置节点状态 - jobId: {}, status: {}, randomId: {}, parentId: {}",
                 jobId, status, randomId, parentId);
 
@@ -786,9 +953,35 @@ public class JobGroupXxlJob {
                 message.setStatus(status);
                 message.setRandomId(randomId);
                 message.setParentJobId(parentId);
-                // 使用消息队列服务发送消息，提高响应速度
-                webSocketServer.sendInfo(message);
+                
+                String sessionKey = parentId + ":" + randomId;
+                logger.info("[JobGroup] 准备发送SSE消息");
+                logger.info("[JobGroup] sessionKey: {}", sessionKey);
+                logger.info("[JobGroup] message: jobId={}, status={}, randomId={}, parentJobId={}", 
+                        message.getJobId(), message.getStatus(), message.getRandomId(), message.getParentJobId());
+                
+                // ⭐ 重要修复：对于最终状态（成功1或失败0），直接更新数据库，确保数据库状态准确
+                // 即使SSE消息丢失，数据库状态也是正确的
+                if (status == 1 || status == 0) {
+                    try {
+                        boolean updateSuccess = jobNodeService.updateNodeStatus(jobId, status);
+                        if (updateSuccess) {
+                            logger.info("[JobGroup] ✅ 已直接更新数据库节点状态 - jobId: {}, status: {}", jobId, status);
+                        } else {
+                            logger.warn("[JobGroup] ⚠️ 更新数据库节点状态失败 - jobId: {}, status: {}", jobId, status);
+                        }
+                    } catch (Exception e) {
+                        logger.error("[JobGroup] ❌ 更新数据库节点状态异常 - jobId: {}, status: {}, 错误: {}", 
+                                jobId, status, e.getMessage(), e);
+                        // 即使数据库更新失败，也继续发送SSE消息，让前端能够更新UI
+                    }
+                }
+                
+                // 使用SSE服务发送消息
+                sseService.sendMessage(message);
 
+                logger.info("[JobGroup] ✅ 已发送节点状态消息 - jobId: {}, status: {}, randomId: {}, sessionKey: {}", 
+                        jobId, status, randomId, sessionKey);
                 logger.debug("[JobGroup] 发送节点状态消息 - jobId: {}, status: {}, randomId: {}", jobId, status, randomId);
 
                 if (status == 0) {
@@ -888,6 +1081,13 @@ public class JobGroupXxlJob {
                         throw new RuntimeException(e);
                     }
                 }
+                try {
+                    TimeUnit.MILLISECONDS.sleep(50);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    logger.debug("[JobGroup] 任务监听线程被中断 - jobId: {}", jobInfo.getId());
+                    break;
+                }
             }
             return SUCCESS;
         }
@@ -941,14 +1141,20 @@ public class JobGroupXxlJob {
             XxlJobHelper.log(xxlJobContext, "任务ID: {}, 执行结果: {}, 运行时长: {}ms", param, success ? "成功" : "失败", duration);
             XxlJobHelper.log(xxlJobContext, "返回结果: {}", workResult.getResult());
             runtime = System.currentTimeMillis() - runtime;
-            // 更新数据库
+            
+            Long jobId = this.node.getJobId();
+            // 更新节点状态：成功=1（绿色），失败=0（红色）
             if (success) {
-                Long jobId = this.node.getJobId();
+                setNodeStatus(statusMap, jobId, 1, randomId, node.getJobParentId());
+                logger.info("[JobGroup] 任务执行成功，已更新节点状态为1（成功） - jobId: {}", jobId);
+                // 更新数据库
                 JobInfo jobInfo = jobInfoMapper.selectById(jobId);
                 jobInfo.setRunTime(runtime);
                 jobInfoMapper.updateById(jobInfo);
                 XxlJobHelper.log(xxlJobContext, "任务执行成功，已更新数据库运行时间: {}ms", runtime);
             } else {
+                setNodeStatus(statusMap, jobId, 0, randomId, node.getJobParentId());
+                logger.error("[JobGroup] 任务执行失败，已更新节点状态为0（失败） - jobId: {}", jobId);
                 XxlJobHelper.log(xxlJobContext, "任务执行失败，跳过数据库更新");
             }
         }

@@ -34,4 +34,9 @@ public class JobNodeVo implements Serializable {
     private String nodeType;
 
     private Integer isPause;
+
+    /**
+     * 节点运行状态：0=失败, 1=成功, 2=运行中
+     */
+    private Integer triggerStatus;
 }

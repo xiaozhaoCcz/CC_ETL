@@ -80,6 +80,9 @@ public class JobInfoForm implements Serializable {
     @Schema(description = "GLUE源代码")
     private String glueSource;
 
+    @Schema(description = "GLUE备注")
+    private String glueRemark;
+
     @Schema(description = "GLUE更新时间")
     private LocalDateTime glueUpdatetime;
 

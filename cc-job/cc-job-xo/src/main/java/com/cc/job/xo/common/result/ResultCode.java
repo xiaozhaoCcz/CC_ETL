@@ -1,8 +1,5 @@
 package com.cc.job.xo.common.result;
 
-import lombok.AllArgsConstructor;
-import lombok.NoArgsConstructor;
-
 import java.io.Serializable;
 
 /**
@@ -13,8 +10,6 @@ import java.io.Serializable;
  * @author Ray
  * @since 2020/6/23
  **/
-@AllArgsConstructor
-@NoArgsConstructor
 public enum ResultCode implements IResultCode, Serializable {
 
     SUCCESS("00000", "一切ok"),
@@ -82,6 +77,15 @@ public enum ResultCode implements IResultCode, Serializable {
     DATABASE_DEADLOCK("C0331", "数据库死锁"),
     DATABASE_PRIMARY_KEY_CONFLICT("C0341", "主键冲突");
 
+    private final String code;
+
+    private final String msg;
+
+    ResultCode(String code, String msg) {
+        this.code = code;
+        this.msg = msg;
+    }
+
     @Override
     public String getCode() {
         return code;
@@ -91,10 +95,6 @@ public enum ResultCode implements IResultCode, Serializable {
     public String getMsg() {
         return msg;
     }
-
-    private String code;
-
-    private String msg;
 
     @Override
     public String toString() {

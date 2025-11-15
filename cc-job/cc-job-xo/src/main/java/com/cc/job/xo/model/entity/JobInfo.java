@@ -130,4 +130,6 @@ public class JobInfo extends BaseEntity {
     private Integer isPause;
 
     private Integer jobPartId;
+
+    private Integer triggerUserId;
 }

@@ -1,6 +1,8 @@
 package com.cc.job.admin.task.service;
 
+import com.cc.job.xo.model.entity.JobEdge;
 import com.cc.job.xo.model.entity.JobNode;
+import com.cc.job.xo.model.form.JobEdgeForm;
 import com.cc.job.xo.model.form.JobGlueForm;
 import com.cc.job.xo.model.form.JobInfoForm;
 import jakarta.validation.Valid;
@@ -27,4 +29,11 @@ public interface JobComposeService {
     void deleteJobNode(Long nodeId);
 
     Map<String, Object> saveJobNodeAndJobEdges(Map<String, Object> formMap);
+
+    /**
+     * 保存连线
+     * @param formData 连线表单数据
+     * @return 保存后的连线实体
+     */
+    JobEdge saveJobEdge(JobEdgeForm formData);
 }

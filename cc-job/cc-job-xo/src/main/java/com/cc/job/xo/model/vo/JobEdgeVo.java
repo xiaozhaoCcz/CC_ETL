@@ -14,4 +14,10 @@ public class JobEdgeVo implements Serializable {
     private String fromNodeId;
 
     private String endNodeId;
+    
+    private String startPoint;  // 起始锚点
+    
+    private String endPoint;    // 结束锚点
+    
+    private String properties;  // 边属性
 }

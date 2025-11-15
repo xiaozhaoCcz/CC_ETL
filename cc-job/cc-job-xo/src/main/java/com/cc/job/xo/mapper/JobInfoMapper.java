@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.cc.job.xo.model.entity.JobInfo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
 
@@ -21,4 +22,13 @@ public interface JobInfoMapper extends BaseMapper<JobInfo> {
     int stopJobCompose(@Param("id") Long id);
 
     int pauseJob(@Param("id")Long id, @Param("isPause")Integer isPause);
+
+    /**
+     * 使用行锁查询任务信息（防止并发执行）
+     * 
+     * @param id 任务ID
+     * @return 任务信息
+     */
+    @Select("SELECT * FROM job_info WHERE id = #{id} AND is_deleted = 0 FOR UPDATE")
+    JobInfo selectByIdForUpdate(@Param("id") Long id);
 }

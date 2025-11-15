@@ -1,0 +1,647 @@
+/* NodeFx - 流程节点编辑器样式表 */
+
+/* ============ 全局样式 ============ */
+
+.root {
+    -fx-font-family: "Inter", "Segoe UI", "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+    -fx-font-size: 13px;
+    -fx-background-color: #F1F5F9;
+}
+
+/* ============ 画布节点样式 ============ */
+
+.canvas-node {
+    -fx-background-color: linear-gradient(to bottom, #8B5CF6, #7C3AED);
+    -fx-background-radius: 8;
+    -fx-effect: dropshadow(gaussian, rgba(139, 92, 246, 0.4), 8, 0, 0, 2);
+    -fx-padding: 12 20;
+    -fx-cursor: hand;
+}
+
+.canvas-node:hover {
+    -fx-background-color: linear-gradient(to bottom, #7C3AED, #6D28D9);
+    -fx-effect: dropshadow(gaussian, rgba(139, 92, 246, 0.6), 12, 0, 0, 4);
+}
+
+.canvas-node-selected {
+    -fx-background-color: linear-gradient(to bottom, #6D28D9, #5B21B6);
+    -fx-effect: dropshadow(gaussian, rgba(139, 92, 246, 0.8), 16, 0, 0, 4);
+    -fx-border-color: #A78BFA;
+    -fx-border-width: 2;
+    -fx-border-radius: 8;
+}
+
+.canvas-node-label {
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: 600;
+}
+
+.canvas-node-id {
+    -fx-text-fill: rgba(255, 255, 255, 0.9);
+    -fx-font-size: 12px;
+    -fx-font-weight: 400;
+}
+
+/* ============ 画布背景网格 ============ */
+
+.canvas-pane {
+    -fx-background-color: 
+        linear-gradient(to right, #E5E7EB 1px, transparent 1px),
+        linear-gradient(to bottom, #E5E7EB 1px, transparent 1px),
+        #F1F5F9;
+    -fx-background-size: 20px 20px, 20px 20px, 100% 100%;
+    -fx-background-position: 0 0, 0 0, 0 0;
+}
+
+/* ============ 连接线样式 ============ */
+
+.connection-line {
+    -fx-stroke: #8B5CF6;
+    -fx-stroke-width: 2.5;
+    -fx-effect: dropshadow(gaussian, rgba(139, 92, 246, 0.3), 4, 0, 0, 1);
+}
+
+.connection-line:hover {
+    -fx-stroke: #7C3AED;
+    -fx-stroke-width: 3;
+    -fx-effect: dropshadow(gaussian, rgba(139, 92, 246, 0.5), 6, 0, 0, 2);
+}
+
+.connection-arrow {
+    -fx-fill: #8B5CF6;
+    -fx-effect: dropshadow(gaussian, rgba(139, 92, 246, 0.3), 3, 0, 0, 1);
+}
+
+/* ============ 滚动条样式 ============ */
+
+.scroll-bar {
+    -fx-background-color: transparent;
+}
+
+.scroll-bar .track {
+    -fx-background-color: #F3F4F6;
+    -fx-background-radius: 4;
+}
+
+.scroll-bar .thumb {
+    -fx-background-color: #D1D5DB;
+    -fx-background-radius: 4;
+}
+
+.scroll-bar .thumb:hover {
+    -fx-background-color: #9CA3AF;
+}
+
+.scroll-bar .thumb:pressed {
+    -fx-background-color: #6B7280;
+}
+
+/* 隐藏水平滚动条的箭头 */
+.scroll-bar:horizontal .increment-button,
+.scroll-bar:horizontal .decrement-button {
+    -fx-padding: 0;
+}
+
+/* ============ 树形视图样式 ============ */
+
+.tree-view {
+    -fx-border-color: transparent;
+    -fx-padding: 4;
+}
+
+.tree-cell {
+    -fx-background-color: transparent;
+    -fx-padding: 4 8;
+}
+
+.tree-cell:hover {
+    -fx-background-color: #F3F4F6;
+    -fx-background-radius: 6;
+}
+
+.tree-cell:selected {
+    -fx-background-color: #EDE9FE;
+    -fx-text-fill: #6366F1;
+    -fx-background-radius: 6;
+}
+
+.tree-cell > .tree-disclosure-node {
+    -fx-background-color: transparent;
+    -fx-padding: 4;
+}
+
+.tree-cell > .tree-disclosure-node > .arrow {
+    -fx-background-color: #6B7280;
+    -fx-padding: 3;
+    -fx-shape: "M 0 0 L 6 4 L 0 8 Z";
+}
+
+.tree-cell:expanded > .tree-disclosure-node > .arrow {
+    -fx-rotate: 90;
+}
+
+/* ============ 文本输入框样式 ============ */
+
+.text-field {
+    -fx-background-color: white;
+    -fx-border-color: #D1D5DB;
+    -fx-border-width: 1;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 8 12;
+    -fx-font-size: 13px;
+    -fx-text-fill: #111827;
+    -fx-prompt-text-fill: #9CA3AF;
+}
+
+.text-field:focused {
+    -fx-border-color: #6366F1;
+    -fx-effect: dropshadow(gaussian, rgba(99, 102, 241, 0.3), 4, 0, 0, 0);
+}
+
+/* ============ 按钮样式 ============ */
+
+.button {
+    -fx-cursor: hand;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-padding: 8 16;
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+}
+
+.button:hover {
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.1), 4, 0, 0, 2);
+}
+
+.button:pressed {
+    -fx-effect: innershadow(gaussian, rgba(0, 0, 0, 0.2), 2, 0, 0, 1);
+}
+
+/* ============ 标签页样式 ============ */
+
+.tab-pane {
+    -fx-background-color: white;
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 0 0 1 0;
+}
+
+.tab-pane .tab-header-area {
+    -fx-padding: 0;
+    -fx-background-color: #F9FAFB;
+}
+
+.tab-pane .tab {
+    -fx-background-color: transparent;
+    -fx-background-radius: 0;
+    -fx-border-color: transparent transparent #E5E7EB transparent;
+    -fx-border-width: 0 0 2 0;
+    -fx-padding: 8 16;
+}
+
+.tab-pane .tab:hover {
+    -fx-background-color: #F3F4F6;
+}
+
+.tab-pane .tab:selected {
+    -fx-background-color: white;
+    -fx-border-color: transparent transparent #6366F1 transparent;
+    -fx-text-fill: #6366F1;
+}
+
+.tab-pane .tab .tab-label {
+    -fx-text-fill: #6B7280;
+    -fx-font-size: 13px;
+    -fx-font-weight: 500;
+}
+
+.tab-pane .tab:selected .tab-label {
+    -fx-text-fill: #6366F1;
+    -fx-font-weight: 600;
+}
+
+/* ============ 上下文菜单样式 ============ */
+
+.context-menu {
+    -fx-background-color: white;
+    -fx-background-radius: 8;
+    -fx-padding: 4;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.15), 12, 0, 0, 4);
+}
+
+.menu-item {
+    -fx-background-color: transparent;
+    -fx-background-radius: 4;
+    -fx-padding: 8 12;
+}
+
+.menu-item:hover {
+    -fx-background-color: #F3F4F6;
+}
+
+.menu-item .label {
+    -fx-text-fill: #374151;
+    -fx-font-size: 13px;
+}
+
+/* ============ 分隔符样式 ============ */
+
+.separator {
+    -fx-background-color: #E2E8F0;
+    -fx-opacity: 1;
+}
+
+.separator:horizontal {
+    -fx-pref-height: 1;
+    -fx-background-color: #E2E8F0;
+}
+
+.separator:vertical {
+    -fx-pref-width: 1;
+    -fx-background-color: #E2E8F0;
+}
+
+/* SplitPane 分割线优化 */
+.split-pane-divider {
+    -fx-background-color: #E2E8F0;
+    -fx-pref-width: 3;
+    -fx-pref-height: 3;
+    -fx-background-radius: 2;
+}
+
+.split-pane-divider:horizontal,
+.split-pane-divider:vertical {
+    -fx-background-color: #E2E8F0;
+}
+
+.split-pane-divider:hover {
+    -fx-background-color: #CBD5F5;
+}
+
+/* ScrollPane 内容边距优化 - 确保标签页从最左边开始 */
+.scroll-pane {
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.scroll-pane .content {
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+/* ============ 工具提示样式 ============ */
+
+.tooltip {
+    -fx-background-color: #1F2937;
+    -fx-background-radius: 6;
+    -fx-padding: 6 10;
+    -fx-text-fill: white;
+    -fx-font-size: 12px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 8, 0, 0, 2);
+}
+
+/* ============ 下拉菜单样式 ============ */
+
+.combo-box {
+    -fx-background-color: white;
+    -fx-border-color: #D1D5DB;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+}
+
+.combo-box:hover {
+    -fx-border-color: #9CA3AF;
+}
+
+.combo-box:focused {
+    -fx-border-color: #6366F1;
+}
+
+/* ============ 选择框样式 ============ */
+
+.check-box {
+    -fx-text-fill: #374151;
+}
+
+.check-box .box {
+    -fx-background-color: white;
+    -fx-border-color: #D1D5DB;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+}
+
+.check-box:selected .box {
+    -fx-background-color: #6366F1;
+    -fx-border-color: #6366F1;
+}
+
+/* ============ 进度条样式 ============ */
+
+.progress-bar {
+    -fx-background-color: #E5E7EB;
+    -fx-background-radius: 8;
+}
+
+.progress-bar .bar {
+    -fx-background-color: #6366F1;
+    -fx-background-radius: 8;
+    -fx-padding: 4;
+}
+
+/* ============ 表格样式 ============ */
+
+.table-view {
+    -fx-background-color: white;
+    -fx-border-color: #E5E7EB;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+
+.table-view .column-header {
+    -fx-background-color: #F9FAFB;
+    -fx-text-fill: #6B7280;
+    -fx-font-weight: 600;
+    -fx-padding: 12 16;
+}
+
+.table-row-cell {
+    -fx-background-color: white;
+    -fx-border-color: #F3F4F6;
+    -fx-border-width: 0 0 1 0;
+}
+
+.table-row-cell:hover {
+    -fx-background-color: #F9FAFB;
+}
+
+.table-row-cell:selected {
+    -fx-background-color: #EDE9FE;
+    -fx-text-fill: #6366F1;
+}
+
+/* ============ 文本区域样式 ============ */
+
+.text-area {
+    -fx-background-color: transparent;
+    -fx-border-color: #D1D5DB;
+    -fx-border-width: 1;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 8;
+}
+
+.text-area:focused {
+    -fx-border-color: #6366F1;
+    -fx-effect: dropshadow(gaussian, rgba(99, 102, 241, 0.3), 4, 0, 0, 0);
+}
+
+.text-area .content {
+    -fx-background-color: transparent;
+}
+
+/* 日志面板中的 TextArea 特殊样式 - 完全透明，无滚动条，纯黑色字体，无行间距，无空白 */
+.log-panel .text-area,
+.log-message-textarea {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+    -fx-border-width: 0;
+    -fx-control-inner-background: transparent;
+    -fx-text-box-border: transparent;
+    -fx-effect: null;
+    -fx-text-fill: #000000;
+    -fx-line-spacing: 0;
+    -fx-spacing: 0;
+    -fx-font-size: 13px;
+}
+
+.log-panel .text-area .content,
+.log-message-textarea .content {
+    -fx-background-color: transparent;
+    -fx-effect: null;
+    -fx-padding: 0;
+    -fx-background-insets: 0;
+}
+
+.log-panel .text-area .viewport,
+.log-message-textarea .viewport {
+    -fx-background-color: transparent;
+    -fx-effect: null;
+    -fx-padding: 0;
+    -fx-background-insets: 0;
+}
+
+/* 强制隐藏日志面板中 TextArea 内部的滚动条（TextArea 在 ScrollPane 中，不需要自己的滚动条） */
+.log-panel .text-area .scroll-bar,
+.log-message-textarea .scroll-bar {
+    -fx-opacity: 0 !important;
+    -fx-pref-width: 0 !important;
+    -fx-pref-height: 0 !important;
+    -fx-min-width: 0 !important;
+    -fx-min-height: 0 !important;
+    -fx-max-width: 0 !important;
+    -fx-max-height: 0 !important;
+    visibility: hidden;
+}
+
+.log-panel .text-area .scroll-bar:vertical,
+.log-panel .text-area .scroll-bar:horizontal,
+.log-message-textarea .scroll-bar:vertical,
+.log-message-textarea .scroll-bar:horizontal {
+    -fx-opacity: 0 !important;
+    -fx-pref-width: 0 !important;
+    -fx-pref-height: 0 !important;
+    -fx-min-width: 0 !important;
+    -fx-min-height: 0 !important;
+    -fx-max-width: 0 !important;
+    -fx-max-height: 0 !important;
+    visibility: hidden;
+}
+
+/* 确保日志面板中 ScrollPane 的滚动条可见（这是外层 ScrollPane 的滚动条，应该显示） */
+.log-panel .scroll-pane .scroll-bar:vertical {
+    -fx-opacity: 1 !important;
+    visibility: visible !important;
+}
+
+.log-panel .scroll-pane .scroll-bar:vertical .track {
+    -fx-background-color: rgba(226, 232, 240, 0.55);
+    -fx-background-radius: 4;
+}
+
+.log-panel .scroll-pane .scroll-bar:vertical .thumb {
+    -fx-background-color: rgba(148, 163, 184, 0.7);
+    -fx-background-radius: 4;
+}
+
+.log-panel .scroll-pane .scroll-bar:vertical .thumb:hover {
+    -fx-background-color: rgba(148, 163, 184, 0.9);
+}
+
+/* ============ 日志监控面板样式 ============ */
+
+.log-panel {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-padding: 0;
+    -fx-background-insets: 0;
+}
+
+.log-panel .title-bar {
+}
+
+.log-panel .tab-bar {
+    -fx-background-color: #F8FAFC;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-padding: 0;
+    -fx-background-insets: 0;
+}
+
+.log-panel .tab-bar .scroll-pane {
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.log-panel .tab-bar .scroll-pane .viewport {
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.log-panel .log-tab {
+    -fx-background-color: #F1F5F9;
+    -fx-border-color: transparent transparent transparent rgba(243,244,246,0.9);
+    -fx-border-width: 0 0 0 1;
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
+    -fx-padding: 6 8;
+    -fx-cursor: hand;
+}
+
+.log-panel .log-tab:hover {
+    -fx-background-color: rgba(241,245,249,0.95);
+    -fx-border-color: transparent transparent transparent rgba(243,244,246,0.9);
+    -fx-border-width: 0 0 0 1;
+}
+
+.log-panel .log-tab-active {
+    -fx-background-color: rgba(243,244,246,0.9);
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
+    -fx-effect: none;
+}
+
+.log-panel .status-indicator {
+    -fx-background-radius: 50%;
+    -fx-effect: dropshadow(gaussian, rgba(16, 185, 129, 0.5), 4, 0, 0, 0);
+}
+
+.log-text-flow {
+    -fx-padding: 12;
+    -fx-font-family: "Consolas", "Monaco", "Courier New", monospace;
+    -fx-font-size: 13px;
+    -fx-line-spacing: 2;
+}
+
+.log-level-info {
+    -fx-fill: #2563EB;
+    -fx-font-weight: 600;
+}
+
+.log-level-warn {
+    -fx-fill: #D97706;
+    -fx-font-weight: 600;
+}
+
+.log-level-error {
+    -fx-fill: #DC2626;
+    -fx-font-weight: 600;
+}
+
+.log-level-success {
+    -fx-fill: #059669;
+    -fx-font-weight: 600;
+}
+
+.log-level-debug {
+    -fx-fill: #7C3AED;
+    -fx-font-weight: 600;
+}
+
+.log-timestamp {
+    -fx-fill: #9CA3AF;
+    -fx-effect: null;
+}
+
+.log-message {
+    -fx-fill: #000000;
+    -fx-effect: null;
+}
+
+/* 确保日志面板中的所有 Label 都没有阴影效果 */
+.log-panel .label {
+    -fx-effect: null;
+}
+
+/* ============ 代码编辑器语法高亮样式 ============ */
+
+.code-editor {
+    -fx-font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    -fx-font-size: 14;
+    -fx-background-color: #000000;
+    -fx-text-fill: #FFFFFF;
+}
+
+.code-editor .text {
+    -fx-fill: #FFFFFF;
+}
+
+/* 关键字样式（蓝色） */
+.code-editor .keyword {
+    -fx-fill: #569CD6;
+    -fx-font-weight: bold;
+}
+
+/* 字符串样式（绿色） */
+.code-editor .string {
+    -fx-fill: #CE9178;
+}
+
+/* 数字样式（浅蓝色） */
+.code-editor .number {
+    -fx-fill: #B5CEA8;
+}
+
+/* 注释样式（灰色） */
+.code-editor .comment {
+    -fx-fill: #6A9955;
+    -fx-font-style: italic;
+}
+
+/* 类名样式（黄色） */
+.code-editor .class-name {
+    -fx-fill: #4EC9B0;
+}
+
+/* 行号样式 */
+.code-editor .lineno {
+    -fx-background-color: #1E1E1E;
+    -fx-text-fill: #858585;
+    -fx-font-size: 13;
+    -fx-padding: 0 10 0 10;
+}
+
+/* 选中文本样式 */
+.code-editor .selection {
+    -fx-fill: #264F78;
+}
+
+/* 光标样式 */
+.code-editor .caret {
+    -fx-stroke: #FFFFFF;
+}
+

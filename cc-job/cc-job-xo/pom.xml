@@ -23,7 +23,7 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <version>1.18.24</version>
+            <version>1.18.34</version>
         </dependency>
 
         <!-- 允许使用Lombok的Java Bean类中使用MapStruct注解 (Lombok 1.18.20+) -->
@@ -61,13 +61,20 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.8.1</version> <!-- 使用合适的版本 -->
+                <version>3.11.0</version>
                 <configuration>
-                    <source>17</source> <!-- 或者更高的版本 -->
-                    <target>17</target> <!-- 或者更高的版本 -->
+                    <release>17</release>
                     <compilerArgs>
                         <arg>-parameters</arg>
                     </compilerArgs>
+                    <fork>true</fork>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>1.18.34</version>
+                        </path>
+                    </annotationProcessorPaths>
                 </configuration>
             </plugin>
         </plugins>

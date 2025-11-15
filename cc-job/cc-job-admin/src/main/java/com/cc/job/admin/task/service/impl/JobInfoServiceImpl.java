@@ -80,6 +80,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
     private final JobLogMapper jobLogMapper;
 
+    private final JobGroupSnapshotService jobGroupSnapshotService;
+
     @Value("${server.port}")
     private int port;
 
@@ -201,6 +203,16 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     public boolean updateJobInfo(Long id, JobInfoForm formData) {
         // valid trigger
         JobInfo existsJobInfo = baseUpdateJobInfo(id, formData);
+
+        if (StringUtils.isNotBlank(formData.getGlueRemark())) {
+            //插入glueSource
+            JobGlueForm glueForm = new JobGlueForm();
+            glueForm.setTaskId(id);
+            glueForm.setGlueSource(formData.getGlueSource());
+            glueForm.setGlueType(formData.getGlueType());
+            glueForm.setGlueRemark(formData.getGlueRemark());
+            this.saveGlueSource(glueForm);
+        }
         updateChild(existsJobInfo);
         JobNode node = jobNodeService.getOne(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobId, id));
         if(node!=null){
@@ -267,30 +279,66 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public String triggerJob(JobInfoTriggerDto taskInfoTriggerDto) {
+        Long jobId = taskInfoTriggerDto.getId();
+        String randomId = taskInfoTriggerDto.getExecutorParam();
 
-        JobInfo taskInfo = this.getById(taskInfoTriggerDto.getId());
+        // 【数据库行锁】使用 FOR UPDATE 查询，防止并发执行
+        JobInfo taskInfo = jobInfoMapper.selectByIdForUpdate(jobId);
         if (taskInfo == null) {
-            return "";
+            throw new BusinessException("任务不存在");
         }
 
+        // 检查是否正在运行（使用行锁后，这里是线程安全的）
         if (taskInfo.getJobType() == 2 && taskInfo.getRankTriggerStatus() == 1) {
-            throw new BusinessException("当前任务正在运行中～");
+            throw new BusinessException("当前任务正在运行中，请等待完成后再运行");
         }
 
         // force cover job param
         if (taskInfoTriggerDto.getExecutorParam() == null) {
             taskInfoTriggerDto.setExecutorParam("");
+            randomId = "";
         }
 
         if (GlueTypeEnum.DATAX.getDesc().equalsIgnoreCase(taskInfo.getGlueType())) {
             taskInfoTriggerDto.setExecutorParam(taskInfo.getExecutorParam());
+            randomId = taskInfo.getExecutorParam();
+        }
+
+        // 【快照模式】如果是任务组，创建快照
+        if (taskInfo.getJobType() == 2 && StringUtils.isNotBlank(randomId)) {
+            try {
+                String nodesJson = getNodesJsonForSnapshot(jobId);
+                String edgesJson = getEdgesJsonForSnapshot(jobId);
+                String triggerUserIdStr = taskInfoTriggerDto.getTriggerUserId() != null 
+                    ? String.valueOf(taskInfoTriggerDto.getTriggerUserId()) 
+                    : null;
+                jobGroupSnapshotService.createSnapshot(
+                    jobId,
+                    randomId,
+                    nodesJson,
+                    edgesJson,
+                    triggerUserIdStr
+                );
+                log.info("[Snapshot] 任务组快照创建成功 - jobId: {}, randomId: {}", jobId, randomId);
+            } catch (Exception e) {
+                log.error("[Snapshot] 创建任务组快照失败 - jobId: {}, randomId: {}", jobId, randomId, e);
+                throw new BusinessException("创建任务组快照失败: " + e.getMessage());
+            }
         }
 
         String ip = IpUtil.getIp();
         String adminAddress = String.format(ADMIN_ADDRESS, ip, port);
         JobTriggerPoolHelper.trigger(taskInfoTriggerDto.getId().intValue(), TriggerTypeEnum.MANUAL, -1, null, taskInfoTriggerDto.getExecutorParam(), taskInfoTriggerDto.getAddressList(), 1, adminAddress);
 
+        // 只在任务组（jobType == 2）时记录触发用户ID
+        if (taskInfo.getJobType() == 2 && taskInfoTriggerDto.getTriggerUserId() != null) {
+            taskInfo.setTriggerUserId(taskInfoTriggerDto.getTriggerUserId());
+            log.info("✓ 记录任务组触发用户ID: " + taskInfoTriggerDto.getTriggerUserId());
+        }
+        
+        // 原子性设置运行状态（在事务中，行锁保护）
         taskInfo.setRankTriggerStatus(1);
         this.updateById(taskInfo);
 
@@ -430,10 +478,21 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         });
 
         //计算节点的出度和人度
-
+        // 优化：预先构建边映射，避免在循环中重复遍历（O(n²) -> O(n)）
+        Map<String, Long> outDegreeMap = new HashMap<>();
+        Map<String, Long> inDegreeMap = new HashMap<>();
+        
+        for (JobEdgeDto edge : taskEdgeDtoList) {
+            // 统计出度
+            outDegreeMap.merge(edge.getFromNodeId(), 1L, Long::sum);
+            // 统计入度
+            inDegreeMap.merge(edge.getEndNodeId(), 1L, Long::sum);
+        }
+        
+        // 批量设置节点的入度和出度
         for (JobNodeDto taskNodeDto : taskNodeDtoList) {
-            taskNodeDto.setNodeOutDegree(taskEdgeDtoList.stream().filter(v -> v.getFromNodeId().equalsIgnoreCase(taskNodeDto.getId())).count());
-            taskNodeDto.setNodeInDegree(taskEdgeDtoList.stream().filter(v -> v.getEndNodeId().equalsIgnoreCase(taskNodeDto.getId())).count());
+            taskNodeDto.setNodeOutDegree(outDegreeMap.getOrDefault(taskNodeDto.getId(), 0L));
+            taskNodeDto.setNodeInDegree(inDegreeMap.getOrDefault(taskNodeDto.getId(), 0L));
         }
 
         addNode(taskNodeDtoList, taskEdgeDtoList, taskInfo);
@@ -442,15 +501,52 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
     private void addNode(List<JobNodeDto> nodeList, List<JobEdgeDto> edgeList, JobInfo parentTask) {
         Map<String, Long> nodeMap = new HashMap<>();
+        
+        // 优化：批量查询所有需要的JobInfo，避免N+1查询问题
+        List<Long> jobIds = nodeList.stream().map(JobNodeDto::getJobId).distinct().toList();
+        if (jobIds.isEmpty()) {
+            return;
+        }
+        List<JobInfo> jobInfos = this.listByIds(jobIds);
+        Map<Long, JobInfo> jobInfoMap = jobInfos.stream()
+            .collect(Collectors.toMap(JobInfo::getId, n -> n, (existing, replacement) -> existing));
+
+        // 批量保存JobInfo和JobNode
+        List<JobInfo> newJobInfos = new ArrayList<>();
+        List<JobNode> newJobNodes = new ArrayList<>();
+        // 用于记录每个taskNode对应的newJobInfo索引
+        Map<JobNodeDto, Integer> nodeToJobInfoIndex = new HashMap<>();
 
         for (JobNodeDto taskNode : nodeList) {
-            JobInfo taskInfo = this.getById(taskNode.getJobId());
+            JobInfo taskInfo = jobInfoMap.get(taskNode.getJobId());
+            if (taskInfo == null) {
+                continue; // 跳过无效的节点
+            }
 
             JobInfo copyTaskInfo = BeanUtil.copyProperties(taskInfo, JobInfo.class);
             copyTaskInfo.setId(null);
             copyTaskInfo.setIsNode("Y");
             copyTaskInfo.setParentId(parentTask.getId());
-            this.save(copyTaskInfo);
+            newJobInfos.add(copyTaskInfo);
+            nodeToJobInfoIndex.put(taskNode, newJobInfos.size() - 1);
+        }
+        
+        // 批量保存JobInfo（MyBatis-Plus会自动回填ID）
+        this.saveBatch(newJobInfos);
+        
+        // 处理嵌套的任务组和创建JobNode
+        for (JobNodeDto taskNode : nodeList) {
+            JobInfo taskInfo = jobInfoMap.get(taskNode.getJobId());
+            if (taskInfo == null) {
+                continue;
+            }
+            
+            // 获取对应的新JobInfo
+            Integer index = nodeToJobInfoIndex.get(taskNode);
+            if (index == null || index >= newJobInfos.size()) {
+                continue;
+            }
+            JobInfo copyTaskInfo = newJobInfos.get(index);
 
             if (taskInfo.getJobType() == 2) {
                 List<JobNode> childNodes = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, taskInfo.getId()));
@@ -467,16 +563,37 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
             copyTaskNode.setId(null);
             copyTaskNode.setJobId(copyTaskInfo.getId());
             copyTaskNode.setJobParentId(parentTask.getId());
-            jobNodeService.save(copyTaskNode);
-            nodeMap.put(String.valueOf(taskNode.getId()), copyTaskNode.getId());
+            newJobNodes.add(copyTaskNode);
+        }
+        
+        // 批量保存JobNode（MyBatis-Plus会自动回填ID）
+        jobNodeService.saveBatch(newJobNodes);
+        
+        // 更新nodeMap，使用保存后的ID
+        int nodeIndex = 0;
+        for (JobNodeDto taskNode : nodeList) {
+            if (nodeIndex < newJobNodes.size()) {
+                JobNode savedNode = newJobNodes.get(nodeIndex);
+                nodeMap.put(String.valueOf(taskNode.getId()), savedNode.getId());
+                nodeIndex++;
+            }
         }
 
+        // 批量保存JobEdge
+        List<JobEdge> newEdges = new ArrayList<>();
         for (JobEdgeDto taskEdge : edgeList) {
+            Long fromNodeId = nodeMap.get(String.valueOf(taskEdge.getFromNodeId()));
+            Long endNodeId = nodeMap.get(String.valueOf(taskEdge.getEndNodeId()));
+            if (fromNodeId != null && endNodeId != null) {
             JobEdge edge = new JobEdge();
             edge.setJobParentId(parentTask.getId());
-            edge.setFromNodeId(nodeMap.get(String.valueOf(taskEdge.getFromNodeId())));
-            edge.setEndNodeId(nodeMap.get(String.valueOf(taskEdge.getEndNodeId())));
-            jobEdgeService.save(edge);
+                edge.setFromNodeId(fromNodeId);
+                edge.setEndNodeId(endNodeId);
+                newEdges.add(edge);
+            }
+        }
+        if (!newEdges.isEmpty()) {
+            jobEdgeService.saveBatch(newEdges);
         }
     }
 
@@ -540,27 +657,44 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
         if (formData.getChildJobid() != null && formData.getChildJobid().trim().length() > 0) {
             String[] childJobIds = formData.getChildJobid().split(",");
+            List<Integer> validJobIds = new ArrayList<>();
+            
+            // 优化：批量查询所有子任务，避免N+1查询问题
             for (String childJobIdItem : childJobIds) {
                 if (childJobIdItem != null && childJobIdItem.trim().length() > 0 && isNumeric(childJobIdItem)) {
-                    JobInfo childJobInfo = this.getById(Integer.parseInt(childJobIdItem));
-                    if (childJobInfo == null) {
-                        throw new BusinessException(MessageFormat.format((I18nUtil.getString("jobinfo_field_childJobId") + "({0})" + I18nUtil.getString("system_not_found")), childJobIdItem));
-
-                    }
+                    validJobIds.add(Integer.parseInt(childJobIdItem));
                 } else {
                     throw new BusinessException(
                             MessageFormat.format((I18nUtil.getString("jobinfo_field_childJobId") + "({0})" + I18nUtil.getString("system_unvalid")), childJobIdItem));
                 }
             }
 
-            // join , avoid "xxx,,"
-            String temp = "";
-            for (String item : childJobIds) {
-                temp += item + ",";
+            // 批量查询所有子任务
+            if (!validJobIds.isEmpty()) {
+                List<JobInfo> childJobInfos = this.listByIds(validJobIds.stream().map(Long::valueOf).toList());
+                Map<Long, JobInfo> childJobInfoMap = childJobInfos.stream()
+                    .collect(Collectors.toMap(JobInfo::getId, n -> n));
+                
+                // 验证所有子任务是否存在
+                for (Integer jobId : validJobIds) {
+                    if (!childJobInfoMap.containsKey(Long.valueOf(jobId))) {
+                        throw new BusinessException(MessageFormat.format(
+                            (I18nUtil.getString("jobinfo_field_childJobId") + "({0})" + I18nUtil.getString("system_not_found")), 
+                            String.valueOf(jobId)));
             }
-            temp = temp.substring(0, temp.length() - 1);
+                }
+            }
 
-            formData.setChildJobid(temp);
+            // 优化：使用StringBuilder替代字符串拼接
+            StringBuilder temp = new StringBuilder();
+            for (int i = 0; i < childJobIds.length; i++) {
+                if (i > 0) {
+                    temp.append(",");
+                }
+                temp.append(childJobIds[i]);
+            }
+
+            formData.setChildJobid(temp.toString());
         }
         formData.setGlueUpdatetime(LocalDateTime.now());
         JobInfo taskInfo = BeanUtil.copyProperties(formData, JobInfo.class);
@@ -613,6 +747,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
                 copyTaskInfo.setIsNode("Y");
                 this.save(copyTaskInfo);
                 node.setJobId(copyTaskInfo.getId());
+                // 修复：新创建的节点，triggerStatus设置为-1表示未运行状态（白色背景）
+                node.setTriggerStatus(-1);
 
                 if (copyTaskInfo.getJobType() == 2) {
                     List<JobNode> taskNodeList = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, taskId));
@@ -671,10 +807,24 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
         // 处理边
         List<JobNode> nodeFromDbList2 = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, id));
-        nodeFromDbList2.forEach(item -> {
-            item.setNodeInDegree(taskAddEdgeList.stream().filter(v -> v.getEndNodeId().equals(item.getId())).count());
-            item.setNodeOutDegree(taskAddEdgeList.stream().filter(v -> v.getFromNodeId().equals(item.getId())).count());
-        });
+        
+        // 优化：预先构建边映射，避免在forEach中重复遍历（O(n²) -> O(n)）
+        Map<Long, Long> inDegreeMap = new HashMap<>();
+        Map<Long, Long> outDegreeMap = new HashMap<>();
+        
+        for (JobEdge edge : taskAddEdgeList) {
+            // 统计入度
+            inDegreeMap.merge(edge.getEndNodeId(), 1L, Long::sum);
+            // 统计出度
+            outDegreeMap.merge(edge.getFromNodeId(), 1L, Long::sum);
+        }
+        
+        // 批量设置节点的入度和出度
+        for (JobNode item : nodeFromDbList2) {
+            item.setNodeInDegree(inDegreeMap.getOrDefault(item.getId(), 0L));
+            item.setNodeOutDegree(outDegreeMap.getOrDefault(item.getId(), 0L));
+        }
+        
         return jobNodeService.updateBatchById(nodeFromDbList2);
     }
 
@@ -697,12 +847,21 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         taskInfo.setGlueRemark(formData.getGlueRemark());
         taskInfo.setGlueSource(formData.getGlueSource());
         taskInfo.setGlueUpdatetime(LocalDateTime.now());
+        // 如果传入了glueType，则更新taskInfo的glueType
+        if (formData.getGlueType() != null && !formData.getGlueType().isEmpty()) {
+            taskInfo.setGlueType(formData.getGlueType());
+        }
         this.updateById(taskInfo);
         JobLogglue taskLogglue = new JobLogglue();
         taskLogglue.setGlueSource(formData.getGlueSource());
         taskLogglue.setGlueRemark(formData.getGlueRemark());
         taskLogglue.setJobId(formData.getTaskId());
-        taskLogglue.setGlueType(taskInfo.getGlueType());
+        // 优先使用传入的glueType，如果没有则使用taskInfo中的glueType
+        String glueType = formData.getGlueType();
+        if (glueType == null || glueType.isEmpty()) {
+            glueType = taskInfo.getGlueType();
+        }
+        taskLogglue.setGlueType(glueType);
         jobLogglueMapper.insert(taskLogglue);
         return true;
     }
@@ -711,14 +870,34 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     public List<JobLogglue> getGlueList(Long id) {
         return jobLogglueMapper.selectList(new LambdaQueryWrapper<JobLogglue>().eq(JobLogglue::getJobId, id));
     }
+    
+    @Override
+    public List<JobLogglue> getGlueList(Long id, String glueType) {
+        LambdaQueryWrapper<JobLogglue> wrapper = new LambdaQueryWrapper<JobLogglue>()
+                .eq(JobLogglue::getJobId, id)
+                .orderByDesc(JobLogglue::getCreateTime); // 按创建时间倒序排列
+        
+        // 如果指定了GLUE类型，则按类型过滤
+        if (glueType != null && !glueType.trim().isEmpty()) {
+            wrapper.eq(JobLogglue::getGlueType, glueType);
+        }
+        
+        return jobLogglueMapper.selectList(wrapper);
+    }
 
     @Override
     public List<Long> initData() {
         //获取初始化的数据
         long triggerIng = this.count(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getTriggerStatus, 1));
-        List<JobLog> jobLogs = jobLogMapper.selectList(null);
-        long successCount = jobLogs.stream().filter(v -> v.getHandleCode().equals(ReturnT.SUCCESS_CODE)).count();
-        long failCount = jobLogs.stream().filter(v -> v.getHandleCode().equals(ReturnT.FAIL_CODE)).count();
+        
+        // 优化：使用数据库查询替代内存过滤，避免查询所有日志
+        long successCount = jobLogMapper.selectCount(
+            new LambdaQueryWrapper<JobLog>().eq(JobLog::getHandleCode, ReturnT.SUCCESS_CODE)
+        );
+        long failCount = jobLogMapper.selectCount(
+            new LambdaQueryWrapper<JobLog>().eq(JobLog::getHandleCode, ReturnT.FAIL_CODE)
+        );
+        
         return List.of(successCount, failCount, triggerIng);
     }
 
@@ -837,5 +1016,35 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         existsJobInfo.setGlueUpdatetime(LocalDateTime.now());
         existsJobInfo.setTriggerNextTime(nextTriggerTime);
         return existsJobInfo;
+    }
+
+    /**
+     * 获取任务组的节点JSON（用于快照）
+     *
+     * @param jobId 任务组ID
+     * @return 节点JSON字符串
+     */
+    private String getNodesJsonForSnapshot(Long jobId) {
+        List<JobNode> nodes = jobNodeService.list(
+            new LambdaQueryWrapper<JobNode>()
+                .eq(JobNode::getJobParentId, jobId)
+                .eq(JobNode::getIsDeleted, 0)
+        );
+        return JSONUtil.toJsonStr(nodes);
+    }
+
+    /**
+     * 获取任务组的边JSON（用于快照）
+     *
+     * @param jobId 任务组ID
+     * @return 边JSON字符串
+     */
+    private String getEdgesJsonForSnapshot(Long jobId) {
+        List<JobEdge> edges = jobEdgeService.list(
+            new LambdaQueryWrapper<JobEdge>()
+                .eq(JobEdge::getJobParentId, jobId)
+                .eq(JobEdge::getIsDeleted, 0)
+        );
+        return JSONUtil.toJsonStr(edges);
     }
 }

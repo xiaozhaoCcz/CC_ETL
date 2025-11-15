@@ -156,6 +156,17 @@ public class WebSocketServer {
      */
     public void sendInfo(Message message) {
         String sessionKey = message.getParentJobId() + ":" + message.getRandomId();
+        log.info("[WebSocket] ========== 发送消息 ==========");
+        log.info("[WebSocket] sessionKey: {}", sessionKey);
+        log.info("[WebSocket] message: jobId={}, status={}, randomId={}, parentJobId={}", 
+                message.getJobId(), message.getStatus(), message.getRandomId(), message.getParentJobId());
+        log.info("[WebSocket] 当前连接池大小: {}", SESSION_POOLS.size());
+        log.info("[WebSocket] 当前在线连接数: {}", ONLINE_NUM.get());
+        
+        // 打印所有连接ID
+        log.info("[WebSocket] 所有连接ID列表:");
+        SESSION_POOLS.keySet().forEach(key -> log.info("[WebSocket]   - {}", key));
+        
         WebSocketSession webSocketSession = SESSION_POOLS.get(sessionKey);
         
         // 如果找到精确匹配的Session（多连接模式），直接发送
@@ -164,12 +175,14 @@ public class WebSocketServer {
                 String messageJson = OBJECT_MAPPER.writeValueAsString(message);
                 webSocketSession.enqueueMessage(messageJson);
                 MESSAGE_COUNT.incrementAndGet();
-                log.debug("[WebSocket] 消息已发送（精确匹配） - key: {}", sessionKey);
+                log.info("[WebSocket] ✅ 消息已发送（精确匹配） - key: {}", sessionKey);
             } catch (Exception e) {
-                log.error("[WebSocket] 消息发送失败: {}", message, e);
+                log.error("[WebSocket] ❌ 消息发送失败: {}", message, e);
                 removeSession(webSocketSession.getSession());
             }
         } else {
+            log.warn("[WebSocket] ⚠️ 未找到精确匹配的连接，尝试广播模式");
+            log.warn("[WebSocket]   查找的sessionKey: {}", sessionKey);
             // 如果没有找到精确匹配，说明可能是单连接模式
             // 广播给所有活跃连接，由前端路由过滤
             boolean sent = false;
@@ -190,11 +203,12 @@ public class WebSocketServer {
             
             if (sent) {
                 MESSAGE_COUNT.incrementAndGet();
-                log.debug("[WebSocket] 消息已广播（单连接模式） - key: {}, 广播数: {}", sessionKey, broadcastCount);
+                log.info("[WebSocket] ✅ 消息已广播（单连接模式） - key: {}, 广播数: {}", sessionKey, broadcastCount);
             } else {
-                log.warn("[WebSocket] 没有活跃连接接收消息 - key: {}, 在线连接数: {}", sessionKey, ONLINE_NUM.get());
+                log.warn("[WebSocket] ❌ 没有活跃连接接收消息 - key: {}, 在线连接数: {}", sessionKey, ONLINE_NUM.get());
             }
         }
+        log.info("[WebSocket] ==========================================");
     }
 
     /**
@@ -233,7 +247,13 @@ public class WebSocketServer {
         SESSION_POOLS.put(id, webSocketSession);
         ONLINE_NUM.incrementAndGet();
 
-        log.info("{} joined WebSocket! Current online count: {}", id, ONLINE_NUM.get());
+        log.info("[WebSocket] ========== 新连接建立 ==========");
+        log.info("[WebSocket] 连接ID: {}", id);
+        log.info("[WebSocket] 当前在线连接数: {}", ONLINE_NUM.get());
+        log.info("[WebSocket] 连接池大小: {}", SESSION_POOLS.size());
+        log.info("[WebSocket] 所有连接ID列表:");
+        SESSION_POOLS.keySet().forEach(key -> log.info("[WebSocket]   - {}", key));
+        log.info("[WebSocket] ==========================================");
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.cc.job.admin.task.controller;
 
 
+import com.cc.job.admin.task.service.JobUserService;
 import com.cc.job.xo.common.result.Result;
 import com.cc.job.xo.model.dto.LoginResult;
 import io.swagger.v3.oas.annotations.Operation;
@@ -23,22 +24,47 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 public class AuthController {
 
+    private final JobUserService jobUserService;
+
     @Operation(summary = "登录")
     @PostMapping("/login")
     public Result<LoginResult> login(
             @Parameter(description = "用户名", example = "admin") @RequestParam String username,
             @Parameter(description = "密码", example = "123456") @RequestParam String password
     ) {
+        try {
+            log.info("收到登录请求 - 用户名: {}", username);
+            LoginResult loginResult = jobUserService.login(username, password);
+            log.info("登录成功 - 用户名: {}", username);
+            return Result.success(loginResult);
+        } catch (Exception e) {
+            log.error("登录失败 - 用户名: {}, 错误: {}", username, e.getMessage());
+            return Result.failed(e.getMessage());
+        }
+    }
 
-        return Result.success(LoginResult.builder()
-                .tokenType("Bearer")
-                .accessToken("default_token")
-                .build());
+    @Operation(summary = "注册")
+    @PostMapping("/register")
+    public Result<LoginResult> register(
+            @Parameter(description = "用户名", example = "newuser") @RequestParam String username,
+            @Parameter(description = "密码", example = "123456") @RequestParam String password
+    ) {
+        try {
+            log.info("收到注册请求 - 用户名: {}", username);
+            LoginResult loginResult = jobUserService.register(username, password);
+            log.info("注册成功 - 用户名: {}", username);
+            return Result.success(loginResult);
+        } catch (Exception e) {
+            log.error("注册失败 - 用户名: {}, 错误: {}", username, e.getMessage());
+            return Result.failed(e.getMessage());
+        }
     }
 
     @Operation(summary = "注销")
     @DeleteMapping("/logout")
     public Result<?> logout() {
-        return Result.success();
+        log.info("用户注销");
+        // TODO: 可以在这里清理session、token黑名单等
+        return Result.success("注销成功");
     }
 }
