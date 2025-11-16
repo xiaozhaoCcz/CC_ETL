@@ -70,6 +70,10 @@ public class JobGroupUtils {
                             nodeIds.removeAll(removeIds);
 
                             final long[] maxTime = {0};
+                            // 如果移除后已无依赖，则视为起始节点（使用当前时间作为开始时间）
+                            if (nodeIds.isEmpty()) {
+                                return new Long[]{currentTime, currentTime + jobInfo.getRunTime()};
+                            }
                             allWrappers.entrySet().stream().filter(v -> nodeIds.contains(v.getKey())).forEach(entry -> {
                                 WorkerWrapper worker = entry.getValue();
                                 WorkResult workResult = worker.getWorkResult();
@@ -79,7 +83,9 @@ public class JobGroupUtils {
                                 }
                             });
 
-                            return new Long[]{maxTime[0], maxTime[0] + jobInfo.getRunTime()};
+                            // 防御：如果依赖结果异常导致maxTime仍为0，也按起始节点处理
+                            long startTs = (maxTime[0] == 0L) ? currentTime : maxTime[0];
+                            return new Long[]{startTs, startTs + jobInfo.getRunTime()};
                         }
 
                         @Override

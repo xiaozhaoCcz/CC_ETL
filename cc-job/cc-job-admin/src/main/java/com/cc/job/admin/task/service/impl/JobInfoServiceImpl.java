@@ -165,6 +165,12 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         if(jobNode != null) {
             taskInfoForm.setNodePositionX(jobNode.getNodePositionX());
             taskInfoForm.setNodePositionY(jobNode.getNodePositionY());
+            // 返回节点ID供前端展示
+            taskInfoForm.setNodeId(String.valueOf(jobNode.getId()));
+        }
+        // 补充运行时长（毫秒）
+        if (entity != null) {
+            taskInfoForm.setRunTime(entity.getRunTime());
         }
         return taskInfoForm;
     }

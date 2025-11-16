@@ -23,6 +23,11 @@ public class JobInfoForm implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
+    /**
+     * 画布节点ID（前端需要显示的节点唯一标识）
+     */
+    private String nodeId;
+
     private Long id;
 
     @Schema(description = "执行器主键ID")
@@ -118,4 +123,9 @@ public class JobInfoForm implements Serializable {
     private Double nodePositionX;
 
     private Double nodePositionY;
+
+    /**
+     * 最近一次运行耗时（毫秒），来自 job_info.run_time
+     */
+    private Long runTime;
 }

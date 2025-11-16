@@ -1268,6 +1268,26 @@ public class MainView extends BorderPane {
         Long jobId = message.getJobId();
         Integer status = message.getStatus();
 
+        // 当status为9时，表示后端发送了所有节点的预测开始/结束时间
+        if (status != null && status == 9 && message.getResult() != null) {
+            try {
+                // 结果是 String[][]，每项为 [nodeId, startTime, endTime]
+                String[][] times = apiUtil.getGson().fromJson(message.getResult(), String[][].class);
+                if (times != null) {
+                    // 缓存到内存映射中，供“节点详情”展示
+                    ensurePredictedTimeCache();
+                    for (String[] row : times) {
+                        if (row != null && row.length >= 3 && row[0] != null) {
+                            predictedNodeTimes.put(row[0], new String[]{row[1], row[2]});
+                        }
+                    }
+                    logger.debug("✓ 已缓存 {} 条节点预测时间", times.length);
+                }
+            } catch (Exception e) {
+                logger.warn("解析预测时间失败: {}", e.getMessage());
+            }
+        }
+
         logger.debug("✅ randomId匹配，开始处理消息");
         logger.debug("📊 准备更新节点状态: jobId={}, status={}", jobId, status);
         
@@ -1306,6 +1326,15 @@ public class MainView extends BorderPane {
         
         logger.debug("========================================");
         logPanel.info("========================================");
+    }
+
+    // 预测时间缓存：key=nodeId, value=[startTime, endTime]
+    private java.util.Map<String, String[]> predictedNodeTimes;
+
+    private void ensurePredictedTimeCache() {
+        if (predictedNodeTimes == null) {
+            predictedNodeTimes = new java.util.concurrent.ConcurrentHashMap<>();
+        }
     }
 
     /**
@@ -3183,6 +3212,28 @@ public class MainView extends BorderPane {
         addDetailRow(grid, rowIndex++, "失败重试次数", form.getExecutorFailRetryCount());
         addDetailRow(grid, rowIndex++, "所属任务组ID", form.getParentId());
         addDetailRow(grid, rowIndex++, "Job ID", jobId);
+
+        // 节点ID优先取表单返回，其次取画布节点
+        String nodeIdStr = form.getNodeId() != null ? form.getNodeId()
+                : (node != null ? node.getNodeId() : null);
+        addDetailRow(grid, rowIndex++, "节点ID", nodeIdStr);
+
+        // 运行时长（毫秒）
+        addDetailRow(grid, rowIndex++, "运行时长(ms)", form.getRunTime());
+
+        // 运行开始时间 / 预测结束时间（来自SSE缓存）
+        String startTime = "无";
+        String endTime = "无";
+        if (nodeIdStr != null) {
+            ensurePredictedTimeCache();
+            String[] pair = predictedNodeTimes != null ? predictedNodeTimes.get(nodeIdStr) : null;
+            if (pair != null && pair.length >= 2) {
+                startTime = pair[0];
+                endTime = pair[1];
+            }
+        }
+        addDetailRow(grid, rowIndex++, "运行开始时间", startTime);
+        addDetailRow(grid, rowIndex++, "预测任务结束时间", endTime);
 
         javafx.scene.control.TextArea advancedArea = new javafx.scene.control.TextArea(buildAdvancedDetailText(form));
         advancedArea.setEditable(false);
