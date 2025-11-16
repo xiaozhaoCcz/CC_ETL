@@ -53,6 +53,8 @@ public class MainView extends BorderPane {
     private boolean miniMapVisible = true;
     private boolean logPanelVisible = true;
     private boolean suppressNextTaskLoad = false;
+    // 一次性抑制树选中同步（用于容器点击但希望维持容器节点高亮）
+    private boolean suppressNextTreeSelectionSync = false;
 
     private ScrollPane scrollPane;
     private double currentZoom = 1.0;
@@ -514,7 +516,12 @@ public class MainView extends BorderPane {
                 // 同步树形视图的选中状态：选中对应的任务组
                 // 使用 Platform.runLater 确保在 UI 更新后执行，避免时序问题
                 javafx.application.Platform.runLater(() -> {
-                    treeView.selectTaskGroupByName(taskGroupName);
+                    if (!suppressNextTreeSelectionSync) {
+                        treeView.selectTaskGroupByName(taskGroupName);
+                    } else {
+                        // 仅抑制一次
+                        suppressNextTreeSelectionSync = false;
+                    }
                 });
                 
                 // 注意：checkAndUpdateTaskGroupRunningStatus 现在在 loadTaskGroupData 内部调用
@@ -912,6 +919,8 @@ public class MainView extends BorderPane {
      * 任务选择回调（带详细信息）
      */
     private void onTaskSelectedWithDetails(Long taskId, String taskName, Integer type) {
+        // 若设置了抑制树同步的标志，则在处理完一次后清除
+        // 注意：此标志仅控制“树的选中同步”，不影响数据加载
         if (suppressNextTaskLoad) {
             suppressNextTaskLoad = false;
             Long currentTaskGroupId = usePageStoreHook().getCurrentTaskGroupId();
@@ -1018,8 +1027,12 @@ public class MainView extends BorderPane {
                     // 检查任务运行状态并更新小绿点显示
                     checkAndUpdateTaskGroupRunningStatus(taskId, taskName);
 
-                    // 同步树形视图的选中状态
-                    treeView.selectTaskGroupByName(taskName);
+                    // 同步树形视图的选中状态（可一次性抑制）
+                    if (!suppressNextTreeSelectionSync) {
+                        treeView.selectTaskGroupByName(taskName);
+                    } else {
+                        suppressNextTreeSelectionSync = false;
+                    }
 
                     // 延迟执行定位回调，确保画布已经完全渲染
                     javafx.animation.PauseTransition delay = new javafx.animation.PauseTransition(javafx.util.Duration.millis(300));
@@ -2223,6 +2236,10 @@ public class MainView extends BorderPane {
      */
     private void setupTreeViewCallback() {
         treeView.setSelectionCallback(new TaskTreeView.TaskSelectionCallback() {
+            @Override
+            public void onSuppressTreeSelectionOnce() {
+                suppressNextTreeSelectionSync = true;
+            }
             @Override
             public void onTaskSelected(String taskName) {
                 // 兼容旧的回调

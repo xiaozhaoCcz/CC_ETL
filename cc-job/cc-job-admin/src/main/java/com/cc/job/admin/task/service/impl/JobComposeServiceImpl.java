@@ -518,13 +518,13 @@ public class JobComposeServiceImpl implements JobComposeService {
         properties.put("isRestrict", true);
         properties.put("autoResize", true);
         //计算最大高度和最大宽度
-        double[] styleArr = getMaxWidthHeight(nodeVos);
-        //！！！设置节点的位置，一定要除2，前端真的巨难
-        jobNodeVo.setNodePositionX(styleArr[3] + (styleArr[1] - styleArr[3]) / 2);
-        jobNodeVo.setNodePositionY(styleArr[0] + (styleArr[2] - styleArr[0]) / 2);
-        properties.put("height", styleArr[2] - styleArr[0] + 10);
-        properties.put("width", styleArr[1] - styleArr[3] + 10);
-        jobNodeVo.setProperties(JSONUtil.toJsonStr(properties));
+//        double[] styleArr = getMaxWidthHeight(nodeVos);
+//        //！！！设置节点的位置，一定要除2，前端真的巨难
+//        jobNodeVo.setNodePositionX(styleArr[3] + (styleArr[1] - styleArr[3]) / 2);
+//        jobNodeVo.setNodePositionY(styleArr[0] + (styleArr[2] - styleArr[0]) / 2);
+//        properties.put("height", styleArr[2] - styleArr[0] + 10);
+//        properties.put("width", styleArr[1] - styleArr[3] + 10);
+//        jobNodeVo.setProperties(JSONUtil.toJsonStr(properties));
 
         if (type == 1) {
             nodeVos.add(jobNodeVo);
