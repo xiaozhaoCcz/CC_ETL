@@ -336,7 +336,7 @@ public class MainView extends BorderPane {
                                     Thread.sleep(120);
                                     Platform.runLater(() -> {
                                         com.cc.job.gui.model.GroupContainer container =
-                                                new com.cc.job.gui.model.GroupContainer(sel.taskGroupId, sel.taskGroupName);
+                                                new com.cc.job.gui.model.GroupContainer("group:" + sel.taskGroupId, sel.taskGroupId, sel.taskGroupName);
                                         container.bindCanvasNodes(newNodes);
                                         container.bindConnections(newConnections);
                                         canvas.getChildren().add(0, container);
@@ -1943,14 +1943,44 @@ public class MainView extends BorderPane {
 
                 nodesData.add(nodeData);
             }
+            // 3.1.1 追加任务组容器作为节点（CustomGroup）
+            for (com.cc.job.gui.model.GroupContainer group : canvas.getGroupContainers()) {
+                java.util.Map<String, Object> nodeData = new java.util.HashMap<>();
+                nodeData.put("id", group.getNodeId());
+                nodeData.put("type", "CustomGroup");
+                java.util.Map<String, Object> position = new java.util.HashMap<>();
+                position.put("x", group.getLayoutX());
+                position.put("y", group.getLayoutY());
+                nodeData.put("position", position);
+                java.util.Map<String, Object> data = new java.util.HashMap<>();
+                data.put("jobId", group.getGroupId());
+                nodeData.put("data", data);
+                nodesData.add(nodeData);
+            }
 
             // 3.2 转换连接数据（格式必须与后端 updateJobCompose 期望的一致）
             List<java.util.Map<String, Object>> edgesData = new java.util.ArrayList<>();
             for (NodeConnection conn : connections) {
                 java.util.Map<String, Object> edgeData = new java.util.HashMap<>();
                 // ⭐ 后端期望 source 和 target（不是 sourceNodeId/targetNodeId）
-                edgeData.put("source", conn.getSourceNode().getNodeId());
-                edgeData.put("target", conn.getTargetNode().getNodeId());
+                String sourceId;
+                if (conn.getSourceNode() != null) {
+                    sourceId = conn.getSourceNode().getNodeId();
+                } else if (conn.getSourceOwner() instanceof com.cc.job.gui.model.GroupContainer g) {
+                    sourceId = g.getNodeId();
+                } else {
+                    continue;
+                }
+                String targetId;
+                if (conn.getTargetNode() != null) {
+                    targetId = conn.getTargetNode().getNodeId();
+                } else if (conn.getTargetOwner() instanceof com.cc.job.gui.model.GroupContainer g2) {
+                    targetId = g2.getNodeId();
+                } else {
+                    continue;
+                }
+                edgeData.put("source", sourceId);
+                edgeData.put("target", targetId);
                 edgesData.add(edgeData);
             }
 

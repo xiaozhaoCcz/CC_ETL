@@ -6,7 +6,9 @@ import com.cc.job.gui.model.GroupContainer;
 import com.cc.job.gui.model.JobComposeData;
 import com.cc.job.gui.model.NodeConnection;
 import com.cc.job.gui.model.ProcessNode;
+import com.cc.job.gui.service.JobPartService;
 import javafx.animation.PauseTransition;
+import javafx.application.Platform;
 import javafx.geometry.Bounds;
 import javafx.geometry.Point2D;
 import javafx.scene.control.ContextMenu;
@@ -39,6 +41,7 @@ public class NodeCanvas extends Pane {
     private static final double AUTO_SCROLL_MARGIN = 120.0;
 
     private List<ProcessNode> nodes = new ArrayList<>();
+    private List<com.cc.job.gui.model.GroupContainer> groupContainers = new ArrayList<>();
     private List<NodeConnection> connections = new ArrayList<>();
     private UndoRedoManager undoRedoManager;
     private boolean historyEnabled = true;
@@ -50,7 +53,7 @@ public class NodeCanvas extends Pane {
     private Runnable onRequestClearCanvas;
 
     // 临时连线相关
-    private ProcessNode startNode;
+    private Object startOwner; // ProcessNode 或 GroupContainer
     private Line tempLine;
     
     // 框选相关
@@ -208,6 +211,10 @@ public class NodeCanvas extends Pane {
         if (onNodeMoved != null) {
             onNodeMoved.run();
         }
+    }
+    
+    public List<com.cc.job.gui.model.GroupContainer> getGroupContainers() {
+        return new ArrayList<>(groupContainers);
     }
 
     private void runWithoutHistory(Runnable runnable) {
@@ -696,7 +703,7 @@ public class NodeCanvas extends Pane {
     private void setupConnectorHandler(ProcessNode node, Circle connector) {
         // 按下连接点开始连线
         connector.setOnMousePressed(e -> {
-            startNode = node;
+            startOwner = node;
             
             // 创建临时连线
             tempLine = new Line();
@@ -742,29 +749,50 @@ public class NodeCanvas extends Pane {
             if (tempLine != null) {
                 log("📍 释放鼠标，检查目标节点...");
                 
-                // 检查鼠标释放位置是否在某个节点上
-                ProcessNode targetNode = findNodeAtPosition(e.getSceneX(), e.getSceneY());
-                
-                if (targetNode != null && targetNode != startNode) {
+            // 检查鼠标释放位置是否在某个节点或任务组上
+            ProcessNode targetNode = findNodeAtPosition(e.getSceneX(), e.getSceneY());
+            com.cc.job.gui.model.GroupContainer targetGroup = findGroupAtPosition(e.getSceneX(), e.getSceneY());
+            
+            if (targetNode != null && startOwner instanceof ProcessNode && targetNode != startOwner) {
                     // 找到最近的目标连接点
                     Circle targetConnector = findNearestConnector(targetNode, e.getSceneX(), e.getSceneY());
                     
                     // 检查是否已经存在相同的连接
                     boolean exists = connections.stream().anyMatch(conn ->
-                        (conn.getSourceNode() == startNode && conn.getTargetNode() == targetNode &&
+                    (conn.getSourceNode() == startOwner && conn.getTargetNode() == targetNode &&
                          conn.getSourceConnector() == connector && conn.getTargetConnector() == targetConnector) ||
-                        (conn.getSourceNode() == targetNode && conn.getTargetNode() == startNode &&
+                    (conn.getSourceNode() == targetNode && conn.getTargetNode() == startOwner &&
                          conn.getSourceConnector() == targetConnector && conn.getTargetConnector() == connector)
                     );
                     
                     if (!exists) {
                         // 创建连接，指定具体的连接点
-                        addConnection(startNode, connector, targetNode, targetConnector, true);
+                    addConnection((ProcessNode) startOwner, connector, targetNode, targetConnector, true);
                     } else {
                         log("⚠️ 连接已存在");
                     }
+            } else if (targetGroup != null) {
+                // 与任务组容器相连（无论起点是节点还是容器）
+                Circle targetConnector = findNearestConnector(targetGroup, e.getSceneX(), e.getSceneY());
+                if (startOwner instanceof ProcessNode) {
+                    NodeConnection edge = new NodeConnection(
+                            (ProcessNode) startOwner, ((ProcessNode) startOwner).getConnectorPane(), connector,
+                            targetGroup, targetGroup.getConnectorPane(), targetConnector
+                    );
+                    connections.add(edge);
+                    getChildren().add(edge);
+                } else if (startOwner instanceof com.cc.job.gui.model.GroupContainer) {
+                    // 任务组 -> 任务组
+                    Circle startConn = findNearestConnector((com.cc.job.gui.model.GroupContainer) startOwner, e.getSceneX(), e.getSceneY());
+                    NodeConnection edge = new NodeConnection(
+                            ((com.cc.job.gui.model.GroupContainer) startOwner), ((com.cc.job.gui.model.GroupContainer) startOwner).getConnectorPane(), startConn,
+                            targetGroup, targetGroup.getConnectorPane(), targetConnector
+                    );
+                    connections.add(edge);
+                    getChildren().add(edge);
+                }
                 } else {
-                    if (targetNode == startNode) {
+                if (targetNode != null && targetNode == startOwner) {
                         log("⚠️ 不能连接到自己");
                     } else {
                         log("❌ 取消连线（未找到目标节点）");
@@ -785,8 +813,74 @@ public class NodeCanvas extends Pane {
         if (tempLine != null) {
             this.getChildren().remove(tempLine);
             tempLine = null;
-            startNode = null;
+            startOwner = null;
         }
+    }
+
+    // 为任务组容器的连接点挂接同样的行为
+    private void setupConnectorHandler(com.cc.job.gui.model.GroupContainer group, Circle connector) {
+        connector.setOnMousePressed(e -> {
+            startOwner = group;
+            
+            tempLine = new Line();
+            tempLine.setStroke(Color.web("#8B5CF6"));
+            tempLine.setStrokeWidth(2);
+            tempLine.getStrokeDashArray().addAll(5.0, 5.0);
+            
+            javafx.geometry.Point2D connectorCenter = new javafx.geometry.Point2D(
+                connector.getLayoutX(),
+                connector.getLayoutY()
+            );
+            javafx.geometry.Point2D nodeLocal = group.getConnectorPane().localToParent(connectorCenter);
+            javafx.geometry.Point2D canvasLocal = group.localToParent(nodeLocal);
+            
+            tempLine.setStartX(canvasLocal.getX());
+            tempLine.setStartY(canvasLocal.getY());
+            
+            this.getChildren().add(tempLine);
+            e.consume();
+        });
+        
+        connector.setOnMouseDragged(e -> {
+            if (tempLine != null) {
+                javafx.geometry.Point2D localPoint = sceneToLocal(e.getSceneX(), e.getSceneY());
+                tempLine.setEndX(localPoint.getX());
+                tempLine.setEndY(localPoint.getY());
+            }
+            e.consume();
+        });
+        
+        connector.setOnMouseReleased(e -> {
+            if (tempLine != null) {
+                ProcessNode targetNode = findNodeAtPosition(e.getSceneX(), e.getSceneY());
+                com.cc.job.gui.model.GroupContainer targetGroup = findGroupAtPosition(e.getSceneX(), e.getSceneY());
+                
+                if (targetNode != null) {
+                    Circle targetConnector = findNearestConnector(targetNode, e.getSceneX(), e.getSceneY());
+                    Circle startConn = findNearestConnector(group, e.getSceneX(), e.getSceneY());
+                    NodeConnection edge = new NodeConnection(
+                            group, group.getConnectorPane(), startConn,
+                            targetNode, targetNode.getConnectorPane(), targetConnector
+                    );
+                    connections.add(edge);
+                    getChildren().add(edge);
+                } else if (targetGroup != null && targetGroup != group) {
+                    Circle targetConnector = findNearestConnector(targetGroup, e.getSceneX(), e.getSceneY());
+                    Circle startConn = findNearestConnector(group, e.getSceneX(), e.getSceneY());
+                    NodeConnection edge = new NodeConnection(
+                            group, group.getConnectorPane(), startConn,
+                            targetGroup, targetGroup.getConnectorPane(), targetConnector
+                    );
+                    connections.add(edge);
+                    getChildren().add(edge);
+                } else {
+                    log("❌ 取消连线（未找到目标节点）");
+                }
+                
+                cancelTempLine();
+            }
+            e.consume();
+        });
     }
     
     /**
@@ -817,6 +911,22 @@ public class NodeCanvas extends Pane {
         }
         
         logger.debug("   ❌ 未找到目标节点");
+        return null;
+    }
+    
+    private com.cc.job.gui.model.GroupContainer findGroupAtPosition(double sceneX, double sceneY) {
+        javafx.geometry.Point2D canvasPoint = sceneToLocal(sceneX, sceneY);
+        double x = canvasPoint.getX();
+        double y = canvasPoint.getY();
+        for (com.cc.job.gui.model.GroupContainer g : groupContainers) {
+            double gx = g.getLayoutX();
+            double gy = g.getLayoutY();
+            double gw = g.getWidth() > 0 ? g.getWidth() : 320;
+            double gh = g.getHeight() > 0 ? g.getHeight() : 160;
+            if (x >= gx && x <= gx + gw && y >= gy && y <= gy + gh) {
+                return g;
+            }
+        }
         return null;
     }
     
@@ -874,6 +984,33 @@ public class NodeCanvas extends Pane {
         if (connector == node.getLeftConnector()) return "左侧";
         if (connector == node.getRightConnector()) return "右侧";
         return "未知";
+    }
+    
+    // 重载：任务组容器
+    private Circle findNearestConnector(com.cc.job.gui.model.GroupContainer group, double sceneX, double sceneY) {
+        javafx.geometry.Point2D canvasPoint = sceneToLocal(sceneX, sceneY);
+        double x = canvasPoint.getX();
+        double y = canvasPoint.getY();
+        Circle[] connectors = new Circle[] {
+            group.getTopConnector(),
+            group.getBottomConnector(),
+            group.getLeftConnector(),
+            group.getRightConnector()
+        };
+        Circle nearest = connectors[0];
+        double minDist = Double.MAX_VALUE;
+        for (Circle c : connectors) {
+            javafx.geometry.Point2D nodeLocal = group.getConnectorPane().localToParent(new javafx.geometry.Point2D(c.getLayoutX(), c.getLayoutY()));
+            javafx.geometry.Point2D parentLocal = group.localToParent(nodeLocal);
+            double dx = parentLocal.getX() - x;
+            double dy = parentLocal.getY() - y;
+            double dist = dx * dx + dy * dy;
+            if (dist < minDist) {
+                minDist = dist;
+                nearest = c;
+            }
+        }
+        return nearest;
     }
     
     /**
@@ -1209,6 +1346,8 @@ public class NodeCanvas extends Pane {
                                 }
                             }
                         }
+                        // 注意：不要从 composeData.jobNode 派生子节点。jobNode 表示根聚合，并非某个具体任务组容器的子集。
+                        // 当 groupNodeData 未提供 children 时，认为该容器当前无显式子节点，仅渲染容器本身。
                         
                         // 找到子节点和连线
                         List<ProcessNode> childNodes = new ArrayList<>();
@@ -1246,7 +1385,7 @@ public class NodeCanvas extends Pane {
                         }
                         
                         // 创建 GroupContainer
-                        GroupContainer container = new GroupContainer(groupJobId, groupName);
+                        GroupContainer container = new GroupContainer(groupNodeData.getId(), groupJobId, groupName);
                         
                         // 设置位置
                         if (hasValidCoordinates(groupNodeData.getX(), groupNodeData.getY())) {
@@ -1255,16 +1394,86 @@ public class NodeCanvas extends Pane {
                         }
                         
                         // 绑定子节点和连线
-                        if (!childNodes.isEmpty()) {
-                            container.bindCanvasNodes(childNodes);
-                            container.bindConnections(childConnections);
-                            // 默认展开
-                            container.expand();
-                            // 添加到画布（在最底层，这样其他节点可以在上面）
-                            getChildren().add(0, container);
-                            log("✓ 加载任务组节点: " + groupName + " (包含 " + childNodes.size() + " 个子节点)");
-                        } else {
-                            log("⚠ 任务组节点 " + groupName + " 没有子节点");
+                        container.bindCanvasNodes(childNodes);
+                        container.bindConnections(childConnections);
+                        // 默认收起：只显示任务组节点，不显示子节点
+                        container.collapse();
+                        // 添加到画布（在最底层，这样其他节点可以在上面）
+                        getChildren().add(0, container);
+                        groupContainers.add(container);
+                        // 连接事件
+                        setupConnectorHandler(container, container.getTopConnector());
+                        setupConnectorHandler(container, container.getBottomConnector());
+                        setupConnectorHandler(container, container.getLeftConnector());
+                        setupConnectorHandler(container, container.getRightConnector());
+                        log("✓ 加载任务组节点: " + groupName + " (子节点数: " + childNodes.size() + ")");
+
+                        // 不创建任何代理节点，组节点仅以容器形式存在
+
+                        // 如果当前未绑定任何子节点，则在展开时按需懒加载：根据 groupJobId 拉取该任务组下的节点与连线
+                        if (childNodes.isEmpty()) {
+                            final boolean[] loadedOnce = { false };
+                            container.setOnExpand(() -> {
+                                if (loadedOnce[0]) {
+                                    // 已经加载过，直接返回（由 GroupContainer 控制显示/隐藏）
+                                    return;
+                                }
+                                new Thread(() -> {
+                                    try {
+                                        JobPartService svc = new JobPartService();
+                                        JobComposeData subCompose = svc.getJobCompose(groupJobId);
+                                        if (subCompose == null || subCompose.getNodes() == null) {
+                                            return;
+                                        }
+                                        List<ProcessNode> loadedNodes = new ArrayList<>();
+                                        Map<String, ProcessNode> localMap = new HashMap<>();
+                                        List<NodeConnection> loadedConns = new ArrayList<>();
+                                        for (JobComposeData.NodeData nd : subCompose.getNodes()) {
+                                            String text = nd.getJobName() != null ? nd.getJobName() : "Node";
+                                            ProcessNode pn = new ProcessNode(nd.getId(), text);
+                                            if (nd.getJobId() != null) {
+                                                pn.setJobId(nd.getJobId());
+                                            }
+                                            if (hasValidCoordinates(nd.getX(), nd.getY())) {
+                                                pn.setLayoutX(nd.getX());
+                                                pn.setLayoutY(nd.getY());
+                                            }
+                                            String mappedType = mapNodeType(nd.getType(), nd.getProperties());
+                                            pn.setType(mappedType);
+                                            Platform.runLater(() -> addNode(pn, false));
+                                            loadedNodes.add(pn);
+                                            localMap.put(nd.getId(), pn);
+                                        }
+                                        if (subCompose.getEdges() != null) {
+                                            for (JobComposeData.EdgeData ed : subCompose.getEdges()) {
+                                                ProcessNode s2 = localMap.get(ed.getSourceNodeId());
+                                                ProcessNode t2 = localMap.get(ed.getTargetNodeId());
+                                                if (s2 != null && t2 != null) {
+                                                    Circle sc = getConnectorByAnchor(s2, ed.getSourceAnchor(), true);
+                                                    Circle tc = getConnectorByAnchor(t2, ed.getTargetAnchor(), false);
+                                                    if (sc != null && tc != null) {
+                                                        Platform.runLater(() -> {
+                                                            NodeConnection nc = addConnection(s2, sc, t2, tc, false);
+                                                            if (nc != null) {
+                                                                nc.setEdgeId(ed.getId());
+                                                                loadedConns.add(nc);
+                                                            }
+                                                        });
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        Platform.runLater(() -> {
+                                            container.bindCanvasNodes(loadedNodes);
+                                            container.bindConnections(loadedConns);
+                                            loadedOnce[0] = true;
+                                            log("✓ 懒加载任务组子节点完成: " + loadedNodes.size());
+                                        });
+                                    } catch (Exception ex) {
+                                        logger.warn("懒加载任务组子节点失败: {}", ex.getMessage());
+                                    }
+                                }).start();
+                            });
                         }
                     } catch (Exception e) {
                         logger.error("加载任务组节点失败: {}", e.getMessage(), e);

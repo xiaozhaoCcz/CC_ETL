@@ -10,6 +10,8 @@ public class JobComposeData {
     
     private List<NodeData> nodes;
     private List<EdgeData> edges;
+    // 后端返回的根任务组“聚合节点”，包含 children 列表与总体尺寸/位置等
+    private NodeData jobNode;
     
     public JobComposeData() {
     }
@@ -28,6 +30,14 @@ public class JobComposeData {
     
     public void setEdges(List<EdgeData> edges) {
         this.edges = edges;
+    }
+    
+    public NodeData getJobNode() {
+        return jobNode;
+    }
+    
+    public void setJobNode(NodeData jobNode) {
+        this.jobNode = jobNode;
     }
     
     /**

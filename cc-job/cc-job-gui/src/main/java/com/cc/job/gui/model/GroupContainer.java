@@ -23,6 +23,7 @@ public class GroupContainer extends StackPane {
     
     private final String groupName;
     private final Long groupId;
+    private final String nodeId;
     
     private final Rectangle frame;
     private final Label titleLabel;
@@ -30,8 +31,15 @@ public class GroupContainer extends StackPane {
     private final Label toggleBtn;
     private final Label zoomLabel; // 缩放比例显示
     private final Pane contentLayer;
+    // 新增：用于承载四个连接点的层
+    private final Pane connectorPane = new Pane();
+    private final javafx.scene.shape.Circle topConnector = new javafx.scene.shape.Circle(5, Color.web("#E0E7FF"));
+    private final javafx.scene.shape.Circle bottomConnector = new javafx.scene.shape.Circle(5, Color.web("#E0E7FF"));
+    private final javafx.scene.shape.Circle leftConnector = new javafx.scene.shape.Circle(5, Color.web("#E0E7FF"));
+    private final javafx.scene.shape.Circle rightConnector = new javafx.scene.shape.Circle(5, Color.web("#E0E7FF"));
     private boolean expanded = true;
     private ContextMenu contextMenu;
+    private Runnable onExpand; // 扩展回调（用于懒加载）
     
     private final List<ProcessNode> innerNodes = new ArrayList<>();
     private final List<ProcessNode> managedCanvasNodes = new ArrayList<>();
@@ -41,7 +49,8 @@ public class GroupContainer extends StackPane {
     private double originY = 0;
     private double zoom = 1.0;  // 缩放倍数（针对受管节点的相对定位）
     
-    public GroupContainer(Long groupId, String groupName) {
+    public GroupContainer(String nodeId, Long groupId, String groupName) {
+        this.nodeId = nodeId;
         this.groupId = groupId;
         this.groupName = groupName;
         
@@ -50,13 +59,20 @@ public class GroupContainer extends StackPane {
         frame = new Rectangle(320, 200);
         frame.setArcWidth(12);
         frame.setArcHeight(12);
-        frame.setFill(Color.web("#FFFFFF", 0.70));
+        frame.setFill(Color.web("#FFFFFF", 0.85));
         frame.setStroke(Color.web("#6366F1"));
         frame.setStrokeWidth(2);
+        // 柔和阴影，提升层次
+        javafx.scene.effect.DropShadow ds = new javafx.scene.effect.DropShadow();
+        ds.setRadius(8);
+        ds.setOffsetX(0);
+        ds.setOffsetY(2);
+        ds.setColor(Color.web("#C7D2FE", 0.55));
+        frame.setEffect(ds);
         
         header = new VBox();
         header.setPadding(new Insets(6, 10, 6, 10));
-        header.setStyle("-fx-background-color: rgba(99,102,241,0.08); -fx-background-radius: 10 10 0 0;");
+        header.setStyle("-fx-background-color: rgba(99,102,241,0.10); -fx-background-radius: 10 10 0 0;");
         
         // 顶部栏：左标题 + 右上角 +/- 按钮
         javafx.scene.layout.HBox headerBar = new javafx.scene.layout.HBox();
@@ -78,7 +94,7 @@ public class GroupContainer extends StackPane {
         
         // 缩放比例显示标签
         zoomLabel = new Label("100%");
-        zoomLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #6366F1; -fx-background-color: rgba(99,102,241,0.08); -fx-padding: 2 6 2 6; -fx-background-radius: 4;");
+        zoomLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #6366F1; -fx-background-color: rgba(99,102,241,0.12); -fx-padding: 2 6 2 6; -fx-background-radius: 4;");
         
         headerBar.getChildren().addAll(titleLabel, spacer, zoomLabel, toggleBtn);
         header.getChildren().add(headerBar);
@@ -87,11 +103,34 @@ public class GroupContainer extends StackPane {
         contentLayer.setPickOnBounds(false);
         contentLayer.setStyle("-fx-background-color: transparent;");
         
+        // 连接点层置顶、不可拦截事件
+        connectorPane.setPickOnBounds(false);
+        connectorPane.setMouseTransparent(false);
+        for (javafx.scene.shape.Circle c : new javafx.scene.shape.Circle[]{topConnector, bottomConnector, leftConnector, rightConnector}) {
+            c.setRadius(5); // 与普通节点一致
+            c.setFill(Color.web("#8B5CF6")); // 与普通节点默认紫色一致
+            c.setStroke(Color.WHITE);
+            c.setStrokeWidth(2);
+            c.setVisible(false); // 初始隐藏，悬停显示
+            c.setMouseTransparent(false);
+            c.setCursor(javafx.scene.Cursor.CROSSHAIR);
+            // 轻微投影
+            c.setStyle("-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 2, 0, 0, 0.5);");
+            c.setOnMouseEntered(ev -> {
+                c.setFill(Color.web("#A78BFA")); // 浅紫
+                c.setCursor(javafx.scene.Cursor.CROSSHAIR);
+            });
+            c.setOnMouseExited(ev -> {
+                c.setFill(Color.web("#8B5CF6"));
+            });
+        }
+        
         VBox container = new VBox();
         container.getChildren().addAll(header, contentLayer);
         container.setPickOnBounds(false);
         
-        getChildren().addAll(frame, container);
+        // 作为顶层叠加：frame < container < connectorPane（与普通节点一致的覆盖顺序）
+        getChildren().addAll(frame, container, connectorPane);
         
         // 拖拽移动容器
         enableDrag();
@@ -125,6 +164,51 @@ public class GroupContainer extends StackPane {
         setupContextMenu();
         
         updateFrameSize();
+        
+        // 初始化连接点位置绑定到外框
+        layoutConnectors();
+        // 默认隐藏，悬停显示（与普通节点一致）
+        setConnectorVisible(false);
+        this.setOnMouseEntered(e -> setConnectorVisible(true));
+        this.setOnMouseExited(e -> setConnectorVisible(false));
+    }
+    
+    private void layoutConnectors() {
+        // connectorPane 尺寸与 frame 一致覆盖
+        connectorPane.prefWidthProperty().bind(frame.widthProperty());
+        connectorPane.prefHeightProperty().bind(frame.heightProperty());
+        connectorPane.minWidthProperty().bind(frame.widthProperty());
+        connectorPane.minHeightProperty().bind(frame.heightProperty());
+        connectorPane.maxWidthProperty().bind(frame.widthProperty());
+        connectorPane.maxHeightProperty().bind(frame.heightProperty());
+        
+        // 连接点相对 frame 四边定位（与普通节点一致：位于边缘正中）
+        topConnector.layoutXProperty().bind(frame.widthProperty().divide(2));
+        topConnector.layoutYProperty().set(0);
+        
+        bottomConnector.layoutXProperty().bind(frame.widthProperty().divide(2));
+        bottomConnector.layoutYProperty().bind(frame.heightProperty());
+        
+        leftConnector.layoutXProperty().set(0);
+        leftConnector.layoutYProperty().bind(frame.heightProperty().divide(2));
+        
+        rightConnector.layoutXProperty().bind(frame.widthProperty());
+        rightConnector.layoutYProperty().bind(frame.heightProperty().divide(2));
+        
+        if (!connectorPane.getChildren().contains(topConnector)) {
+            connectorPane.getChildren().addAll(topConnector, bottomConnector, leftConnector, rightConnector);
+        }
+    }
+    
+    private void setConnectorVisible(boolean visible) {
+        topConnector.setVisible(visible);
+        bottomConnector.setVisible(visible);
+        leftConnector.setVisible(visible);
+        rightConnector.setVisible(visible);
+        topConnector.setManaged(visible);
+        bottomConnector.setManaged(visible);
+        leftConnector.setManaged(visible);
+        rightConnector.setManaged(visible);
     }
     
     private void setupContextMenu() {
@@ -268,6 +352,9 @@ public class GroupContainer extends StackPane {
             }
             updateFrameSize();
             toggleBtn.setText("-"); // 展开时显示“-”（点击收起）
+            if (onExpand != null) {
+                onExpand.run();
+            }
         }
     }
     
@@ -294,6 +381,10 @@ public class GroupContainer extends StackPane {
     
     public void toggle() {
         if (expanded) collapse(); else expand();
+    }
+    
+    public void setOnExpand(Runnable onExpand) {
+        this.onExpand = onExpand;
     }
     
     private void updateFrameSize() {
@@ -381,6 +472,19 @@ public class GroupContainer extends StackPane {
     public String getGroupName() {
         return groupName;
     }
+    
+    public String getNodeId() {
+        return nodeId;
+    }
+    
+    // 暴露连接点与承载层，供 NodeCanvas 统一处理
+    public Pane getConnectorPane() {
+        return connectorPane;
+    }
+    public javafx.scene.shape.Circle getTopConnector() { return topConnector; }
+    public javafx.scene.shape.Circle getBottomConnector() { return bottomConnector; }
+    public javafx.scene.shape.Circle getLeftConnector() { return leftConnector; }
+    public javafx.scene.shape.Circle getRightConnector() { return rightConnector; }
 }
 
 
