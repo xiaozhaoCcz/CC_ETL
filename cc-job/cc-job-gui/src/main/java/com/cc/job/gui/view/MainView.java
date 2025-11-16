@@ -105,6 +105,9 @@ public class MainView extends BorderPane {
         }
     }
     private CopiedNodesData copiedNodesData = null;
+    
+    // 任务组克隆过程中防重入标识（防止重复创建两遍）
+    private final java.util.concurrent.atomic.AtomicBoolean cloningTaskGroupInProgress = new java.util.concurrent.atomic.AtomicBoolean(false);
 
     public MainView() {
         this.jobPartService = new JobPartService();
@@ -159,6 +162,215 @@ public class MainView extends BorderPane {
         undoRedoManager = new UndoRedoManager();
         undoRedoManager.setOnChange(this::updateUndoRedoButtons);
         canvas.setUndoRedoManager(undoRedoManager);
+        // 注册页面右键菜单回调
+        canvas.setOnRequestAddNode(() -> {
+            Long taskGroupId = usePageStoreHook().getCurrentTaskGroupId();
+            if (taskGroupId == null || taskGroupId == 0) {
+                logPanel.warn("⚠ 请先选择任务组，再新增节点");
+                return;
+            }
+            String taskGroupName = getJobNameById(taskGroupId);
+            showNewJobNodeDialog(taskGroupId, taskGroupName != null ? taskGroupName : ("任务组 " + taskGroupId), null);
+        });
+        canvas.setOnRequestSelectTaskGroup(() -> {
+            try {
+                // 打开级联弹窗：分区 -> 任务组
+                javafx.stage.Window window = this.getScene().getWindow();
+                javafx.stage.Stage ownerStage = (javafx.stage.Stage) window;
+                java.util.Optional<SelectTaskGroupDialog.Selection> result = SelectTaskGroupDialog.showDialog(ownerStage);
+                result.ifPresent(sel -> {
+                    // 拉取该任务组的流程数据，作为子任务渲染到任务组容器中
+                    new Thread(() -> {
+                        try {
+                            // 防重入：正在克隆则直接忽略本次请求
+                            if (!cloningTaskGroupInProgress.compareAndSet(false, true)) {
+                                Platform.runLater(() -> logPanel.warn("⚠ 正在处理上一次“选择任务组”，请稍候..."));
+                                return;
+                            }
+                            JobComposeData compose = jobPartService.getJobCompose(sel.taskGroupId);
+                            // 在后台执行：复制每个子任务为数据库新节点，并保存连线
+                            new Thread(() -> {
+                                try {
+                                    Long currentTaskGroupId = usePageStoreHook().getCurrentTaskGroupId();
+                                    if (currentTaskGroupId == null) {
+                                        Platform.runLater(() -> logPanel.error("✗ 未选择当前任务组，无法保存"));
+                                        return;
+                                    }
+                                    // 0) 先创建“任务组容器节点”（jobType=2，isNode=Y），作为一个特殊的组节点
+                                    final Long[] groupContainerJobIdRef = new Long[1];
+                                    try {
+                                        JobInfoForm parentForm = jobInfoService.getFormData(currentTaskGroupId);
+                                        if (parentForm != null) {
+                                            JobInfoForm groupNodeForm = new JobInfoForm();
+                                            groupNodeForm.setParentId(currentTaskGroupId);
+                                            groupNodeForm.setJobGroup(parentForm.getJobGroup());
+                                            groupNodeForm.setJobDesc(sel.taskGroupName);
+                                            groupNodeForm.setAuthor(parentForm.getAuthor());
+                                            groupNodeForm.setAlarmEmail(parentForm.getAlarmEmail());
+                                            groupNodeForm.setScheduleType(parentForm.getScheduleType());
+                                            groupNodeForm.setScheduleConf(parentForm.getScheduleConf());
+                                            groupNodeForm.setMisfireStrategy(parentForm.getMisfireStrategy());
+                                            groupNodeForm.setExecutorRouteStrategy(
+                                                parentForm.getExecutorRouteStrategy() != null ? parentForm.getExecutorRouteStrategy() : "FIRST");
+                                            groupNodeForm.setExecutorBlockStrategy(
+                                                parentForm.getExecutorBlockStrategy() != null ? parentForm.getExecutorBlockStrategy() : "SERIAL_EXECUTION");
+                                            groupNodeForm.setExecutorTimeout(parentForm.getExecutorTimeout());
+                                            groupNodeForm.setExecutorFailRetryCount(parentForm.getExecutorFailRetryCount());
+                                            groupNodeForm.setJobType(2);
+                                            double[] basePos = calculateNewNodePosition();
+                                            groupNodeForm.setNodePositionX(basePos[0]);
+                                            groupNodeForm.setNodePositionY(basePos[1]);
+                                            // 设为 CUSTOM_GROUP，后端 NODE_TYPE_MAP 映射为 custom-group
+                                            groupNodeForm.setGlueType("CUSTOM_GROUP");
+                                            groupNodeForm.setExecutorHandler("runJobGroupXxlJob");
+                                            groupNodeForm.setGlueUpdatetime(null);
+                                            com.cc.job.xo.model.entity.JobNode savedGroupNode = jobInfoService.saveJobNode(groupNodeForm);
+                                            if (savedGroupNode != null) {
+                                                groupContainerJobIdRef[0] = savedGroupNode.getJobId();
+                                            }
+                                        }
+                                    } catch (Exception e) {
+                                        logger.warn("创建任务组容器节点失败：{}", e.getMessage());
+                                    }
+                                    
+                                    // 1) 先创建节点（持久化），记录 oldNodeId -> new ProcessNode
+                                    java.util.Map<String, ProcessNode> idToNode = new java.util.HashMap<>();
+                                    java.util.List<ProcessNode> newNodes = new java.util.ArrayList<>();
+                                    if (compose != null && compose.getNodes() != null) {
+                                        java.util.Set<Long> processedOriginalJobIds = new java.util.HashSet<>();
+                                        int index = 0;
+                                        for (JobComposeData.NodeData nd : compose.getNodes()) {
+                                            Long originalJobId = nd.getJobId();
+                                            if (originalJobId == null) {
+                                                continue;
+                                            }
+                                            // 去重：同一次克隆中，原jobId只处理一次
+                                            if (!processedOriginalJobIds.add(originalJobId)) {
+                                                continue;
+                                            }
+                                            // 拉取原节点表单并克隆
+                                            JobInfoForm originalForm = jobInfoService.getJobNodeFormData(originalJobId);
+                                            if (originalForm == null) {
+                                                continue;
+                                            }
+                                            JobInfoForm copyForm = deepCopyJobInfoForm(originalForm);
+                                            if (copyForm == null) {
+                                                continue;
+                                            }
+                                            // 设置归属与基础信息
+                                            copyForm.setId(null);
+                                            // 子节点父ID：优先挂到“任务组节点”jobId；若组节点创建失败，则退化为当前任务组ID
+                                            Long effectiveParentId = groupContainerJobIdRef[0] != null ? groupContainerJobIdRef[0] : currentTaskGroupId;
+                                            copyForm.setParentId(effectiveParentId);
+                                            String label = nd.getJobName() != null ? nd.getJobName() : originalForm.getJobDesc();
+                                            copyForm.setJobDesc(label);
+                                            // 位置
+                                            double[] base = calculateNewNodePosition();
+                                            double nx = nd.getX() != null ? nd.getX() : 60 + index * 20;
+                                            double ny = nd.getY() != null ? nd.getY() : 60 + index * 14;
+                                            copyForm.setNodePositionX(base[0] + (nx % 220));
+                                            copyForm.setNodePositionY(base[1] + (ny % 140));
+                                            // 其他必填默认
+                                            if (copyForm.getExecutorRouteStrategy() == null || copyForm.getExecutorRouteStrategy().isEmpty()) {
+                                                copyForm.setExecutorRouteStrategy("FIRST");
+                                            }
+                                            // 避免 LocalDateTime 反序列化格式错误（后端自行维护该时间）
+                                            copyForm.setGlueUpdatetime(null);
+                                            
+                                            // 保存为新节点
+                                            com.cc.job.xo.model.entity.JobNode saved = jobInfoService.saveJobNode(copyForm);
+                                            if (saved != null) {
+                                                // 在UI线程添加到画布
+                                                final String nodeIdStr = String.valueOf(saved.getId());
+                                                final Long newJobId = saved.getJobId();
+                                                final String title = label;
+                                                final double px = copyForm.getNodePositionX() != null ? copyForm.getNodePositionX() : base[0];
+                                                final double py = copyForm.getNodePositionY() != null ? copyForm.getNodePositionY() : base[1];
+                                                Platform.runLater(() -> {
+                                                    ProcessNode node = new ProcessNode(nodeIdStr, title, px, py);
+                                                    node.setJobId(newJobId);
+                                                    node.setType("Bean");
+                                                    canvas.addNode(node, true);
+                                                    configureNodeCallbacks(node);
+                                                    idToNode.put(nd.getId(), node);
+                                                    newNodes.add(node);
+                                                });
+                                            }
+                                            index++;
+                                        }
+                                    }
+                                    
+                                    // 等待UI线程把节点渲染完成
+                                    Thread.sleep(200);
+                                    
+                                    // 2) 创建连线（持久化 + 画布）
+                                    java.util.List<NodeConnection> newConnections = new java.util.ArrayList<>();
+                                    if (compose != null && compose.getEdges() != null) {
+                                        for (JobComposeData.EdgeData ed : compose.getEdges()) {
+                                            ProcessNode s = idToNode.get(ed.getSourceNodeId());
+                                            ProcessNode t = idToNode.get(ed.getTargetNodeId());
+                                            if (s != null && t != null && s.getNodeId() != null && t.getNodeId() != null) {
+                                                // 保存到数据库
+                                                try {
+                                                    com.cc.job.xo.model.form.JobEdgeForm edgeForm = new com.cc.job.xo.model.form.JobEdgeForm();
+                                                    Long effectiveParentId = groupContainerJobIdRef[0] != null ? groupContainerJobIdRef[0] : currentTaskGroupId;
+                                                    edgeForm.setJobParentId(effectiveParentId);
+                                                    edgeForm.setFromNodeId(Long.parseLong(s.getNodeId()));
+                                                    edgeForm.setEndNodeId(Long.parseLong(t.getNodeId()));
+                                                    edgeForm.setStartPoint("right");
+                                                    edgeForm.setEndPoint("left");
+                                                    jobInfoService.saveJobEdge(edgeForm);
+                                                } catch (Exception ignore) {}
+                                                // 添加到画布
+                                                Platform.runLater(() -> {
+                                                    NodeConnection c = canvas.addConnection(s, t);
+                                                    if (c != null) {
+                                                        newConnections.add(c);
+                                                    }
+                                                });
+                                            }
+                                        }
+                                    }
+                                    
+                                    // 3) UI上创建容器并绑定“节点+连线”，支持收起隐藏连线
+                                    Thread.sleep(120);
+                                    Platform.runLater(() -> {
+                                        com.cc.job.gui.model.GroupContainer container =
+                                                new com.cc.job.gui.model.GroupContainer(sel.taskGroupId, sel.taskGroupName);
+                                        container.bindCanvasNodes(newNodes);
+                                        container.bindConnections(newConnections);
+                                        canvas.getChildren().add(0, container);
+                                        container.expand();
+                                        canvas.selectNodes(newNodes);
+                                        logPanel.success("✓ 已复制并持久化任务组: " + sel.taskGroupName);
+                                    });
+                                } catch (Exception ex) {
+                                    logger.error("复制并保存任务组合失败: {}", ex.getMessage(), ex);
+                                    Platform.runLater(() -> logPanel.error("✗ 复制并保存任务组失败: " + ex.getMessage()));
+                                } finally {
+                                    cloningTaskGroupInProgress.set(false);
+                                    // ⚠️ 注意：不再自动保存，因为我们已经手动保存了每个节点和连线
+                                    // 再次调用 saveOrUpdateJob() 会导致重复创建节点（后端 updateJobCompose 会重新创建）
+                                }
+                            }, "clone-and-save-taskgroup-thread").start();
+                        } catch (Exception ex) {
+                            logger.error("加载任务组流程失败: {}", ex.getMessage(), ex);
+                            javafx.application.Platform.runLater(() ->
+                                logPanel.error("✗ 加载任务组流程失败: " + ex.getMessage())
+                            );
+                        }
+                    }).start();
+                });
+            } catch (Exception e) {
+                logger.error("选择任务组失败: {}", e.getMessage(), e);
+                logPanel.error("✗ 选择任务组失败: " + e.getMessage());
+            }
+        });
+        canvas.setOnRequestClearCanvas(() -> {
+            canvas.clearViewOnly();
+            logPanel.warn("已清空页面（仅视图）。如需同步数据库，请点击保存。");
+        });
+        canvas.setOnRequestRunTaskGroup(this::triggerJobExecution);
         
         // 设置框选模式改变回调，更新工具栏按钮状态
         canvas.setOnSelectionModeChanged(isActive -> {
@@ -1707,62 +1919,38 @@ public class MainView extends BorderPane {
 
         // 3. 转换为后端需要的格式
         try {
-            // 3.1 转换节点数据
+            // 3.1 转换节点数据（格式必须与后端 updateJobCompose 期望的一致）
             List<java.util.Map<String, Object>> nodesData = new java.util.ArrayList<>();
             for (ProcessNode node : nodes) {
                 java.util.Map<String, Object> nodeData = new java.util.HashMap<>();
-                nodeData.put("id", node.getNodeId());
+                // ⭐ 节点ID：如果已存在数据库，使用数字字符串；否则使用 "node:" 前缀表示新节点
+                String nodeId = node.getNodeId();
+                nodeData.put("id", nodeId);
                 nodeData.put("type", node.getType() != null ? node.getType() : "rect");
-                nodeData.put("x", node.getX());
-                nodeData.put("y", node.getY());
+                
+                // ⭐ 位置信息：后端期望 position.x 和 position.y
+                java.util.Map<String, Object> position = new java.util.HashMap<>();
+                position.put("x", node.getX());
+                position.put("y", node.getY());
+                nodeData.put("position", position);
 
-                // text字段
-                java.util.Map<String, Object> text = new java.util.HashMap<>();
-                text.put("value", node.getJobHandlerName());
-                nodeData.put("text", text);
-
-                // properties字段
-                java.util.Map<String, Object> properties = new java.util.HashMap<>();
-                // ⭐ 传递jobId，后端需要这个字段
+                // ⭐ 数据信息：后端期望 data.jobId（不是 properties.jobId）
+                java.util.Map<String, Object> data = new java.util.HashMap<>();
                 if (node.getJobId() != null) {
-                    properties.put("jobId", node.getJobId());
+                    data.put("jobId", node.getJobId());
                 }
-
-                // ⭐ 添加节点宽度和高度（后端需要这些字段）
-                properties.put("width", (int) node.getWidth());
-                properties.put("height", (int) node.getHeight());
-
-                // ⭐ 将显示类型转换为后端GlueType（如 "Bean" -> "BEAN"）
-                String glueType = convertNodeTypeToGlueType(node.getType());
-                properties.put("glueType", glueType);
-
-                nodeData.put("properties", properties);
+                nodeData.put("data", data);
 
                 nodesData.add(nodeData);
             }
 
-            // 3.2 转换连接数据
+            // 3.2 转换连接数据（格式必须与后端 updateJobCompose 期望的一致）
             List<java.util.Map<String, Object>> edgesData = new java.util.ArrayList<>();
             for (NodeConnection conn : connections) {
                 java.util.Map<String, Object> edgeData = new java.util.HashMap<>();
-
-                // 为每条边生成一个唯一ID
-                String edgeId = String.valueOf(System.currentTimeMillis() + edgesData.size());
-                edgeData.put("id", edgeId);
-                edgeData.put("type", "bezier");
-                // ⭐ LfEdge类使用的字段是sourceNodeId和targetNodeId（不是fromNodeId和endNodeId，那是JobEdge数据库字段）
-                edgeData.put("sourceNodeId", conn.getSourceNode().getNodeId());
-                edgeData.put("targetNodeId", conn.getTargetNode().getNodeId());
-
-                // 锚点信息
-                // ⭐ LfEdge类使用的字段是startPoint和endPoint
-                String sourceAnchor = conn.getSourceConnector() != null ?
-                        getAnchorPosition(conn.getSourceNode(), conn.getSourceConnector()) : "right";
-                String targetAnchor = conn.getTargetConnector() != null ?
-                        getAnchorPosition(conn.getTargetNode(), conn.getTargetConnector()) : "left";
-                edgeData.put("startPoint", sourceAnchor);
-                edgeData.put("endPoint", targetAnchor);
-
+                // ⭐ 后端期望 source 和 target（不是 sourceNodeId/targetNodeId）
+                edgeData.put("source", conn.getSourceNode().getNodeId());
+                edgeData.put("target", conn.getTargetNode().getNodeId());
                 edgesData.add(edgeData);
             }
 

@@ -472,16 +472,37 @@ public class JobComposeServiceImpl implements JobComposeService {
         String randomId = type == 0 ? "" : UUID.fastUUID() + ":";
         getJobCompose(id, nodeVos, edgeVos, randomId);
         //创建一个父亲节点
-        Map<String, List<JobNodeVo>> groupNodeMap = nodeVos.stream().collect(Collectors.groupingBy(JobNodeVo::getNodeType));
-        List<JobNodeVo> dynamicGroupNodes = groupNodeMap.get(DYNAMIC_GROUP);
-        List<String> nodeIds = new ArrayList<>();
-        if (dynamicGroupNodes != null) {
-            dynamicGroupNodes.forEach(node -> {
-                List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
-                nodeIds.addAll(childIds);
-            });
+        // 修复：使用忽略大小写的匹配来查找任务组节点（因为数据库中的node_type可能是custom-group小写）
+        List<JobNodeVo> dynamicGroupNodes = nodeVos.stream()
+            .filter(node -> node.getNodeType() != null && 
+                           DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType()))
+            .collect(Collectors.toList());
+        
+        // 收集所有任务组节点的子节点ID（需要过滤掉，因为它们属于任务组节点，不属于根任务组）
+        Set<String> childNodeIdsToFilter = new HashSet<>();
+        if (dynamicGroupNodes != null && !dynamicGroupNodes.isEmpty()) {
+            for (JobNodeVo groupNode : dynamicGroupNodes) {
+                String children = groupNode.getChildren();
+                if (StringUtils.isNotBlank(children)) {
+                    List<String> childIds = JSONUtil.parseArray(children).toList(String.class);
+                    childNodeIdsToFilter.addAll(childIds);
+                }
+            }
         }
-        List<JobNodeVo> nodeList = nodeVos.stream().filter(n -> !nodeIds.contains(n.getId())).toList();
+        
+        // 过滤掉任务组节点的子节点，但保留任务组节点本身
+        // 注意：任务组节点的子节点的job_parent_id应该是任务组节点的jobId，而不是根任务组的jobId
+        // 所以我们需要通过children字段来识别哪些节点是任务组节点的子节点
+        List<JobNodeVo> nodeList = nodeVos.stream()
+            .filter(n -> {
+                // 保留任务组节点本身
+                if (n.getNodeType() != null && DYNAMIC_GROUP.equalsIgnoreCase(n.getNodeType())) {
+                    return true;
+                }
+                // 过滤掉任务组节点的子节点
+                return !childNodeIdsToFilter.contains(n.getId());
+            })
+            .collect(Collectors.toList());
         List<String> firstNodes = nodeList.stream().map(JobNodeVo::getId).toList();
 
         JobInfo jobInfo = jobInfoService.getById(id);
@@ -917,6 +938,30 @@ public class JobComposeServiceImpl implements JobComposeService {
             new LambdaQueryWrapper<JobEdge>().in(JobEdge::getJobParentId, allJobIds)
         );
         
+        // 2.1 修复：如果发现任务组节点，需要将它们的jobId也添加到allJobIds中，以便查询它们的子节点
+        // 因为任务组节点的子节点的job_parent_id是任务组节点的jobId，而不是任务组节点的job_parent_id
+        Set<Long> groupJobIds = new HashSet<>();
+        for (JobNode node : allJobNodes) {
+            if (DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType())) {
+                Long groupJobId = node.getJobId();
+                if (groupJobId != null && !allJobIds.contains(groupJobId)) {
+                    groupJobIds.add(groupJobId);
+                }
+            }
+        }
+        // 如果发现新的任务组节点，需要查询它们的子节点
+        if (!groupJobIds.isEmpty()) {
+            allJobIds.addAll(groupJobIds);
+            List<JobNode> additionalNodes = jobNodeService.list(
+                new LambdaQueryWrapper<JobNode>().in(JobNode::getJobParentId, groupJobIds)
+            );
+            List<JobEdge> additionalEdges = jobEdgeService.list(
+                new LambdaQueryWrapper<JobEdge>().in(JobEdge::getJobParentId, groupJobIds)
+            );
+            allJobNodes.addAll(additionalNodes);
+            allJobEdges.addAll(additionalEdges);
+        }
+        
         // 3. 批量查询所有JobInfo
         Set<Long> jobInfoIds = allJobNodes.stream().map(JobNode::getJobId).collect(Collectors.toSet());
         if (jobInfoIds.isEmpty()) {
@@ -1068,18 +1113,39 @@ public class JobComposeServiceImpl implements JobComposeService {
             
             if (DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType())) {
                 String children = node.getChildren();
+                List<String> childIds = new ArrayList<>();
+                
+                // 如果children字段不为空，使用它
                 if (StringUtils.isNotBlank(children)) {
-                    List<String> childIds = JSONUtil.parseArray(children).toList(String.class);
-                    List<String> newChildIds = new ArrayList<>();
-                    for (String childId : childIds) {
-                        newChildIds.add(randomId + childId);
+                    childIds = JSONUtil.parseArray(children).toList(String.class);
+                } else {
+                    // 如果children字段为空，从nodesByParent中查找子节点
+                    // 任务组节点的子节点的job_parent_id应该等于任务组节点的jobId
+                    List<JobNode> childNodes = nodesByParent.getOrDefault(node.getJobId(), Collections.emptyList());
+                    for (JobNode childNode : childNodes) {
+                        // 排除任务组节点本身（避免循环）
+                        if (!DYNAMIC_GROUP.equalsIgnoreCase(childNode.getNodeType())) {
+                            childIds.add(String.valueOf(childNode.getId()));
+                        }
                     }
-                    Map<String, Object> propertiesMap = JSONUtil.toBean(node.getProperties(), Map.class);
-                    propertiesMap.put("children", JSONUtil.toJsonStr(newChildIds));
-                    jobNodeVo.setProperties(JSONUtil.toJsonStr(propertiesMap));
-                    jobNodeVo.setChildren(JSONUtil.toJsonStr(newChildIds));
                     
-                    // 递归处理子任务组（不再查询数据库）
+                }
+                
+                // 修复：即使childIds为空，也要设置children字段（为空数组），以便前端能够识别任务组节点
+                List<String> newChildIds = new ArrayList<>();
+                for (String childId : childIds) {
+                    newChildIds.add(randomId + childId);
+                }
+                Map<String, Object> propertiesMap = JSONUtil.toBean(node.getProperties(), Map.class);
+                if (propertiesMap == null) {
+                    propertiesMap = new HashMap<>();
+                }
+                propertiesMap.put("children", JSONUtil.toJsonStr(newChildIds));
+                jobNodeVo.setProperties(JSONUtil.toJsonStr(propertiesMap));
+                jobNodeVo.setChildren(JSONUtil.toJsonStr(newChildIds));
+                
+                // 递归处理子任务组（不再查询数据库）
+                if (!childIds.isEmpty()) {
                     buildNodeVosRecursive(node.getJobId(), nodesByParent, edgesByParent, 
                                           jobInfoMap, nodeVos, edgeVos, randomId);
                 }

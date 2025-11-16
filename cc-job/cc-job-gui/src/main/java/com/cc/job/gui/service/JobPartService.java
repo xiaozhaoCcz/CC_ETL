@@ -229,20 +229,33 @@ public class JobPartService extends  BaseService {
                     
                     // 解析属性 - properties可能是JSON字符串或Map对象
                     Object propsObj = nodeMap.get("properties");
+                    Map<String, Object> propsMap = null;
                     if (propsObj instanceof String) {
                         // 如果是字符串，需要解析为Map
                         try {
-                            Map<String, Object> propsMap = apiUtil.getGson().fromJson(
+                            propsMap = apiUtil.getGson().fromJson(
                                 (String) propsObj, 
                                 new TypeToken<Map<String, Object>>(){}.getType()
                             );
-                            node.setProperties(propsMap);
                         } catch (Exception e) {
                             logger.error("解析节点属性失败: {}", e.getMessage(), e);
+                            propsMap = new HashMap<>();
                         }
                     } else if (propsObj instanceof Map) {
-                        node.setProperties((Map<String, Object>) propsObj);
+                        propsMap = (Map<String, Object>) propsObj;
+                    } else {
+                        propsMap = new HashMap<>();
                     }
+                    
+                    // ⭐ 关键修复：如果节点有children字段，将其添加到properties中
+                    // 因为任务组节点的children信息在JobNodeVo的children字段中，不在properties中
+                    Object childrenObj = nodeMap.get("children");
+                    if (childrenObj != null && propsMap != null) {
+                        propsMap.put("children", childrenObj);
+                        logger.debug("节点 {} 的children字段: {}", node.getId(), childrenObj);
+                    }
+                    
+                    node.setProperties(propsMap);
                     
                     nodeList.add(node);
                 }

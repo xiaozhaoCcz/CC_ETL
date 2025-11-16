@@ -95,6 +95,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         put("GLUE_PHP","custom-php");
         put("GLUE_NODEJS","custom-nodejs");
         put("GLUE_POWERSHELL","custom-powershell");
+        // 自定义：任务组容器节点
+        put("CUSTOM_GROUP","custom-group");
     }};
 
 

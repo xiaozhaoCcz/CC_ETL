@@ -2,6 +2,7 @@ package com.cc.job.gui.view;
 
 import com.cc.job.gui.history.CanvasAction;
 import com.cc.job.gui.history.UndoRedoManager;
+import com.cc.job.gui.model.GroupContainer;
 import com.cc.job.gui.model.JobComposeData;
 import com.cc.job.gui.model.NodeConnection;
 import com.cc.job.gui.model.ProcessNode;
@@ -41,6 +42,12 @@ public class NodeCanvas extends Pane {
     private List<NodeConnection> connections = new ArrayList<>();
     private UndoRedoManager undoRedoManager;
     private boolean historyEnabled = true;
+
+    // 页面级右键菜单回调
+    private Runnable onRequestAddNode;
+    private Runnable onRequestSelectTaskGroup;
+    private Runnable onRequestRunTaskGroup;
+    private Runnable onRequestClearCanvas;
 
     // 临时连线相关
     private ProcessNode startNode;
@@ -102,6 +109,9 @@ public class NodeCanvas extends Pane {
         
         // 设置画布鼠标事件处理（用于框选）
         setupSelectionHandlers();
+        
+        // 设置页面级右键菜单（空白区域）
+        setupCanvasContextMenu();
     }
     
     public void setLogCallback(LogCallback callback) {
@@ -126,6 +136,20 @@ public class NodeCanvas extends Pane {
 
     public void setScrollPane(ScrollPane scrollPane) {
         this.hostingScrollPane = scrollPane;
+    }
+    
+    // 页面级右键菜单回调 setter
+    public void setOnRequestAddNode(Runnable runnable) {
+        this.onRequestAddNode = runnable;
+    }
+    public void setOnRequestSelectTaskGroup(Runnable runnable) {
+        this.onRequestSelectTaskGroup = runnable;
+    }
+    public void setOnRequestRunTaskGroup(Runnable runnable) {
+        this.onRequestRunTaskGroup = runnable;
+    }
+    public void setOnRequestClearCanvas(Runnable runnable) {
+        this.onRequestClearCanvas = runnable;
     }
     
     public List<ProcessNode> getNodes() {
@@ -896,6 +920,24 @@ public class NodeCanvas extends Pane {
     }
     
     /**
+     * 仅清空页面内容（不删除辅助UI元素、不触发持久化），用于“清空页面”功能
+     */
+    public void clearViewOnly() {
+        // 移除所有连接与节点，但保留辅助矩形
+        for (NodeConnection conn : new ArrayList<>(connections)) {
+            removeConnectionInternal(conn);
+        }
+        for (ProcessNode node : new ArrayList<>(nodes)) {
+            nodes.remove(node);
+            this.getChildren().remove(node);
+        }
+        // 隐藏选择框
+        clearSelection();
+        updateCanvasSize();
+        log("✓ 已清空页面（仅视图，不影响数据库，保存后才生效）");
+    }
+    
+    /**
      * 动态更新画布大小以包含所有节点
      */
     private void updateCanvasSize() {
@@ -945,15 +987,52 @@ public class NodeCanvas extends Pane {
 
             // 用于存储节点ID到节点对象的映射
             Map<String, ProcessNode> nodeMap = new HashMap<>();
+            // 用于存储任务组节点数据（延迟处理）
+            List<JobComposeData.NodeData> groupNodeDataList = new ArrayList<>();
 
             // 加载节点
             List<JobComposeData.NodeData> nodeDataList = composeData.getNodes();
             if (nodeDataList != null && !nodeDataList.isEmpty()) {
+                logger.info("开始加载节点，总数: {}", nodeDataList.size());
                 for (JobComposeData.NodeData nodeData : nodeDataList) {
+                    // 检查是否是任务组节点（CustomGroup 或 custom-group）
+                    String nodeType = nodeData.getType();
+                    String jobName = nodeData.getJobName();
+                    Long jobId = nodeData.getJobId();
+                    logger.debug("节点: name={}, type={}, jobId={}", jobName, nodeType, jobId);
+                    
+                    // 检查是否是任务组节点：CustomGroup、custom-group，或者通过jobId查询JobInfo判断job_type=2
+                    boolean isGroupNode = false;
+                    if (nodeType != null) {
+                        String normalizedType = nodeType.trim();
+                        isGroupNode = normalizedType.equals("CustomGroup") || 
+                                     normalizedType.equalsIgnoreCase("custom-group");
+                    }
+                    
+                    // 如果通过type无法识别，尝试通过properties中的信息判断
+                    if (!isGroupNode && nodeData.getProperties() != null) {
+                        Map<String, Object> props = nodeData.getProperties();
+                        Object childrenObj = props.get("children");
+                        // 如果有children属性，可能是任务组节点
+                        if (childrenObj != null) {
+                            logger.debug("节点 {} 有children属性，可能是任务组节点", jobName);
+                            // 进一步检查：如果jobId不为null，可以查询JobInfo确认
+                            // 但这里先标记为可能的任务组节点
+                            isGroupNode = true;
+                        }
+                    }
+                    
+                    if (isGroupNode) {
+                        logger.info("识别到任务组节点: name={}, type={}, jobId={}", jobName, nodeType, jobId);
+                        // 任务组节点延迟处理
+                        groupNodeDataList.add(nodeData);
+                        continue;
+                    }
+                    
                     // 获取节点显示文本
                     String text = nodeData.getJobName() != null ? nodeData.getJobName() : "Node";
 
-                    // 创建节点
+                    // 创建普通节点
                     ProcessNode node = new ProcessNode(nodeData.getId(), text);
 
                     // ⭐ 设置任务ID（jobId）
@@ -1079,6 +1158,119 @@ public class NodeCanvas extends Pane {
                 }
 
                 log("✓ 加载了 " + successCount + " 条连接");
+            }
+
+            // 处理任务组节点
+            logger.info("准备处理任务组节点，数量: {}", groupNodeDataList.size());
+            if (!groupNodeDataList.isEmpty()) {
+                for (JobComposeData.NodeData groupNodeData : groupNodeDataList) {
+                    try {
+                        // 获取任务组名称和ID
+                        String groupName = groupNodeData.getJobName() != null ? groupNodeData.getJobName() : "任务组";
+                        Long groupJobId = groupNodeData.getJobId();
+                        String groupNodeId = groupNodeData.getId();
+                        logger.info("处理任务组节点: name={}, jobId={}, nodeId={}, type={}", 
+                                groupName, groupJobId, groupNodeId, groupNodeData.getType());
+                        
+                        // 从 properties 中解析子节点ID列表
+                        List<String> childNodeIds = new ArrayList<>();
+                        Map<String, Object> properties = groupNodeData.getProperties();
+                        logger.debug("任务组节点 properties: {}", properties);
+                        if (properties != null) {
+                            Object childrenObj = properties.get("children");
+                            logger.debug("任务组节点 children 对象: {}, 类型: {}", childrenObj, 
+                                    childrenObj != null ? childrenObj.getClass().getName() : "null");
+                            if (childrenObj instanceof String) {
+                                // 解析JSON字符串数组
+                                String childrenStr = (String) childrenObj;
+                                try {
+                                    // 简单的JSON数组解析（去除方括号和引号）
+                                    childrenStr = childrenStr.trim();
+                                    if (childrenStr.startsWith("[") && childrenStr.endsWith("]")) {
+                                        childrenStr = childrenStr.substring(1, childrenStr.length() - 1);
+                                    }
+                                    String[] parts = childrenStr.split(",");
+                                    for (String part : parts) {
+                                        String trimmed = part.trim().replace("\"", "").replace("'", "");
+                                        if (!trimmed.isEmpty()) {
+                                            childNodeIds.add(trimmed);
+                                        }
+                                    }
+                                } catch (Exception e) {
+                                    logger.warn("解析任务组子节点ID失败: {}", e.getMessage());
+                                }
+                            } else if (childrenObj instanceof List) {
+                                @SuppressWarnings("unchecked")
+                                List<Object> childrenList = (List<Object>) childrenObj;
+                                for (Object child : childrenList) {
+                                    if (child != null) {
+                                        childNodeIds.add(child.toString());
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // 找到子节点和连线
+                        List<ProcessNode> childNodes = new ArrayList<>();
+                        List<NodeConnection> childConnections = new ArrayList<>();
+                        
+                        logger.info("任务组节点 {} 的子节点ID列表: {}", groupName, childNodeIds);
+                        for (String childId : childNodeIds) {
+                            ProcessNode childNode = nodeMap.get(childId);
+                            if (childNode != null) {
+                                childNodes.add(childNode);
+                                logger.debug("找到子节点: id={}, name={}", childId, childNode.getJobHandlerName());
+                            } else {
+                                logger.warn("未找到子节点: id={}", childId);
+                            }
+                        }
+                        logger.info("任务组节点 {} 找到 {} 个子节点", groupName, childNodes.size());
+                        
+                        // 找到子节点之间的连线
+                        List<JobComposeData.EdgeData> allEdgeDataList = composeData.getEdges();
+                        if (allEdgeDataList != null) {
+                            for (JobComposeData.EdgeData edgeData : allEdgeDataList) {
+                                ProcessNode sourceNode = nodeMap.get(edgeData.getSourceNodeId());
+                                ProcessNode targetNode = nodeMap.get(edgeData.getTargetNodeId());
+                                if (sourceNode != null && targetNode != null && 
+                                    childNodes.contains(sourceNode) && childNodes.contains(targetNode)) {
+                                    // 找到对应的连线对象
+                                    for (NodeConnection conn : connections) {
+                                        if (conn.getSourceNode() == sourceNode && conn.getTargetNode() == targetNode) {
+                                            childConnections.add(conn);
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // 创建 GroupContainer
+                        GroupContainer container = new GroupContainer(groupJobId, groupName);
+                        
+                        // 设置位置
+                        if (hasValidCoordinates(groupNodeData.getX(), groupNodeData.getY())) {
+                            container.setLayoutX(groupNodeData.getX());
+                            container.setLayoutY(groupNodeData.getY());
+                        }
+                        
+                        // 绑定子节点和连线
+                        if (!childNodes.isEmpty()) {
+                            container.bindCanvasNodes(childNodes);
+                            container.bindConnections(childConnections);
+                            // 默认展开
+                            container.expand();
+                            // 添加到画布（在最底层，这样其他节点可以在上面）
+                            getChildren().add(0, container);
+                            log("✓ 加载任务组节点: " + groupName + " (包含 " + childNodes.size() + " 个子节点)");
+                        } else {
+                            log("⚠ 任务组节点 " + groupName + " 没有子节点");
+                        }
+                    } catch (Exception e) {
+                        logger.error("加载任务组节点失败: {}", e.getMessage(), e);
+                        log("✗ 加载任务组节点失败: " + e.getMessage());
+                    }
+                }
             }
 
             // 更新画布大小
@@ -1654,6 +1846,85 @@ public class NodeCanvas extends Pane {
                 
                 // 拦截释放事件
                 e.consume();
+            }
+        });
+    }
+    
+    /**
+     * 页面（空白区域）右键菜单
+     */
+    private void setupCanvasContextMenu() {
+        ContextMenu menu = new ContextMenu();
+        
+        MenuItem addNodeItem = new MenuItem("新增节点");
+        addNodeItem.setOnAction(e -> {
+            if (onRequestAddNode != null) {
+                onRequestAddNode.run();
+            } else {
+                log("ℹ 新增节点回调未设置");
+            }
+        });
+        
+        MenuItem chooseGroupItem = new MenuItem("选择任务组");
+        chooseGroupItem.setOnAction(e -> {
+            if (onRequestSelectTaskGroup != null) {
+                onRequestSelectTaskGroup.run();
+            } else {
+                log("ℹ 选择任务组回调未设置");
+            }
+        });
+        
+        MenuItem clearItem = new MenuItem("清空页面");
+        clearItem.setOnAction(e -> {
+            if (onRequestClearCanvas != null) {
+                onRequestClearCanvas.run();
+            } else {
+                // 默认行为：仅清空视图
+                clearViewOnly();
+            }
+        });
+        
+        MenuItem runGroupItem = new MenuItem("运行任务组");
+        // 为“运行任务组”添加一个小三角图标
+        {
+            javafx.scene.text.Text playIcon = new javafx.scene.text.Text("▶");
+            playIcon.setStyle("-fx-fill: #10B981; -fx-font-size: 12px; -fx-font-weight: bold;");
+            runGroupItem.setGraphic(playIcon);
+        }
+        runGroupItem.setOnAction(e -> {
+            if (onRequestRunTaskGroup != null) {
+                onRequestRunTaskGroup.run();
+            } else {
+                log("ℹ 运行任务组回调未设置");
+            }
+        });
+        
+        menu.getItems().addAll(addNodeItem, chooseGroupItem, clearItem, runGroupItem);
+        
+        this.setOnContextMenuRequested(e -> {
+            // 仅在空白区域展示页面级菜单
+            javafx.scene.Node target = (javafx.scene.Node) e.getTarget();
+            boolean isOnNodeOrEdge = isClickOnNodeOrEdge(target);
+            if (!isOnNodeOrEdge) {
+                menu.show(this, e.getScreenX(), e.getScreenY());
+                e.consume();
+            }
+        });
+        
+        // 点击、拖动或滚动其他区域时自动隐藏菜单（避免与右键触发冲突）
+        this.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> {
+            if (menu.isShowing() && !e.isSecondaryButtonDown()) {
+                menu.hide();
+            }
+        });
+        this.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_DRAGGED, e -> {
+            if (menu.isShowing()) {
+                menu.hide();
+            }
+        });
+        this.addEventFilter(javafx.scene.input.ScrollEvent.SCROLL, e -> {
+            if (menu.isShowing()) {
+                menu.hide();
             }
         });
     }
