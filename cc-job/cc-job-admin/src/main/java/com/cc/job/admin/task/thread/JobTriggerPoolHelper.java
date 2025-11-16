@@ -25,31 +25,46 @@ public class JobTriggerPoolHelper {
     private ThreadPoolExecutor slowTriggerPool = null;
 
     public void start(){
+        int fastMax = XxlJobAdminConfig.getAdminConfig().getTriggerPoolFastMax();
+        int fastCore = Math.min(Math.max(4, Runtime.getRuntime().availableProcessors() * 2), fastMax);
         fastTriggerPool = new ThreadPoolExecutor(
-                10,
-                XxlJobAdminConfig.getAdminConfig().getTriggerPoolFastMax(),
+                fastCore,
+                fastMax,
                 60L,
                 TimeUnit.SECONDS,
-                new LinkedBlockingQueue<Runnable>(1000),
+                new LinkedBlockingQueue<Runnable>(2048),
                 new ThreadFactory() {
                     @Override
                     public Thread newThread(Runnable r) {
-                        return new Thread(r, "xxl-job, admin JobTriggerPoolHelper-fastTriggerPool-" + r.hashCode());
+                        Thread t = new Thread(r, "xxl-job, admin JobTriggerPoolHelper-fast-" + r.hashCode());
+                        t.setDaemon(true);
+                        return t;
                     }
-                });
+                },
+                // 背压优先，避免拒绝直接失败；触发线程偶尔同步执行可平滑峰值
+                new ThreadPoolExecutor.CallerRunsPolicy()
+        );
+        fastTriggerPool.allowCoreThreadTimeOut(true);
 
+        int slowMax = XxlJobAdminConfig.getAdminConfig().getTriggerPoolSlowMax();
+        int slowCore = Math.min(Math.max(2, Runtime.getRuntime().availableProcessors()), slowMax);
         slowTriggerPool = new ThreadPoolExecutor(
-                10,
-                XxlJobAdminConfig.getAdminConfig().getTriggerPoolSlowMax(),
+                slowCore,
+                slowMax,
                 60L,
                 TimeUnit.SECONDS,
-                new LinkedBlockingQueue<Runnable>(2000),
+                new LinkedBlockingQueue<Runnable>(4096),
                 new ThreadFactory() {
                     @Override
                     public Thread newThread(Runnable r) {
-                        return new Thread(r, "xxl-job, admin JobTriggerPoolHelper-slowTriggerPool-" + r.hashCode());
+                        Thread t = new Thread(r, "xxl-job, admin JobTriggerPoolHelper-slow-" + r.hashCode());
+                        t.setDaemon(true);
+                        return t;
                     }
-                });
+                },
+                new ThreadPoolExecutor.CallerRunsPolicy()
+        );
+        slowTriggerPool.allowCoreThreadTimeOut(true);
     }
 
 

@@ -158,14 +158,27 @@ public class Async {
         if (coreSize > maxSize) {
             coreSize = maxSize;
         }
-        return new ThreadPoolExecutor(
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(
                 coreSize,
                 maxSize,
                 keepAliveSeconds,
                 TimeUnit.SECONDS,
                 new LinkedBlockingQueue<>(queueCapacity),
-                Executors.defaultThreadFactory(),
-                new ThreadPoolExecutor.AbortPolicy());
+                new ThreadFactory() {
+                    private final ThreadFactory delegate = Executors.defaultThreadFactory();
+                    @Override
+                    public Thread newThread(Runnable r) {
+                        Thread t = delegate.newThread(r);
+                        t.setName("cc-async-exec-" + t.getId());
+                        t.setDaemon(true);
+                        return t;
+                    }
+                },
+                // 使用 CallerRunsPolicy 以提供背压，避免直接拒绝导致上游失败
+                new ThreadPoolExecutor.CallerRunsPolicy());
+        // 允许核心线程超时以在低峰时回收资源
+        executor.allowCoreThreadTimeOut(true);
+        return executor;
     }
 
     /**
@@ -315,12 +328,18 @@ public class Async {
             resultValue = getResultValue(timeout, worker, param, wrapperMap);
 
             while (JobConstant.FAIL_RETRY.equals(String.valueOf(resultValue)) && retryCount != null
-                    && count++ <= retryCount) {
-                // 睡眠5秒重试任务
-                logger.warn("任务: {} 执行失败，进行第{}次重试", workerWrapper.getId(), count);
+                    && count < retryCount) {
+                count++;
+                // 指数退避 + 抖动，避免重试风暴；基于秒为单位
+                long baseDelayMillis = 300L;
+                long backoffMillis = Math.min(10_000L, baseDelayMillis * (1L << Math.min(count, 5))); // 封顶10s
+                long jitter = ThreadLocalRandom.current().nextLong(100L, 400L);
+                long sleepMillis = backoffMillis + jitter;
+                logger.warn("任务: {} 执行失败，准备第{}次重试，等待 {} ms", workerWrapper.getId(), count, sleepMillis);
                 try {
-                    TimeUnit.SECONDS.sleep(5);
+                    TimeUnit.MILLISECONDS.sleep(sleepMillis);
                 } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                     logger.error("重试等待被中断: {}", e.getMessage(), e);
                     throw new RuntimeException(e);
                 }
