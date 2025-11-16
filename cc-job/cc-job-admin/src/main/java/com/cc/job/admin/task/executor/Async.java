@@ -361,24 +361,24 @@ public class Async {
                                          Map<String, WorkerWrapper> wrapperMap) {
 
         Object resultValue = null;
-        if (timeout > 0) {
-            Thread thread = null;
-            try {
-                FutureTask<Object> futureTask = new FutureTask<>(() -> worker.action(param, wrapperMap));
-                thread = new Thread(futureTask);
-                thread.start();
-                resultValue = futureTask.get(timeout, TimeUnit.SECONDS);
-            } catch (Exception e) {
-                logger.error("任务执行超时或异常: {}", e.getMessage(), e);
-                throw new RuntimeException(e);
-            } finally {
-                if (thread != null) {
-                    thread.interrupt();
-                }
-            }
-        } else {
+//        if (timeout > 0) {
+//            Thread thread = null;
+//            try {
+//                FutureTask<Object> futureTask = new FutureTask<>(() -> worker.action(param, wrapperMap));
+//                thread = new Thread(futureTask);
+//                thread.start();
+//                resultValue = futureTask.get(timeout, TimeUnit.SECONDS);
+//            } catch (Exception e) {
+//                logger.error("任务执行超时或异常: {}", e.getMessage(), e);
+//                throw new RuntimeException(e);
+//            } finally {
+//                if (thread != null) {
+//                    thread.interrupt();
+//                }
+//            }
+//        } else {
             resultValue = worker.action(param, wrapperMap);
-        }
+        //}
         return resultValue;
     }
 

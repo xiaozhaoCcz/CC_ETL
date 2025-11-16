@@ -451,7 +451,7 @@ public class JobGroupXxlJob {
      */
     private String listenerJob(JobNode node, JobInfo jobInfo, String randomId, Map<Long, List<Long>> statusMap,
             int count) {
-        String result;
+        String result=null;
         Thread thread = null;
         JobThreadListener jobThreadListener = null;
         try {
@@ -469,7 +469,11 @@ public class JobGroupXxlJob {
         } catch (Exception e) {
             logger.error("[JobGroup] 任务监听异常 - jobId: {}, nodeId: {}, 异常信息: {}",
                     jobInfo.getId(), node.getId(), e.getMessage(), e);
-            throw new RuntimeException(e);
+            // 这里只有设置超时时间失败是才会报错
+            setNodeStatus(statusMap, jobInfo.getId(), 0, randomId, node.getJobParentId());
+            if(!DO_NOTHING.equalsIgnoreCase(jobInfo.getExecutorBlockStrategy())){
+                throw new RuntimeException(e);
+            }
         } finally {
             if (jobThreadListener != null) {
                 jobThreadListener.toStop();
@@ -598,7 +602,10 @@ public class JobGroupXxlJob {
                     "========================================= 任务触发失败 =========================================");
             XxlJobHelper.log(xxlJobContext, "任务ID: {}, 错误信息: {}", jobInfo.getId(), returnT.getMsg());
             JobGroupXxlJob.addJobData(setExecuteJobId(jobInfo.getId(), randomId), false);
-            throw new RuntimeException(returnT.getMsg());
+            if(!DO_NOTHING.equalsIgnoreCase(jobInfo.getExecutorBlockStrategy())){
+                throw new RuntimeException(returnT.getMsg());
+            }
+            return;
         }
 
         logger.debug("[JobGroup] 任务触发成功 - jobId: {}", jobInfo.getId());
@@ -996,7 +1003,7 @@ public class JobGroupXxlJob {
                     } else {
                         logger.info("[JobGroup] 任务执行失败，策略为忽略 - jobId: {}, 策略: {}",
                                 jobId, jobInfo.getExecutorBlockStrategy());
-                        executeSuccessOrFailJob(statusMap, jobId, 1, randomId, parentId, entry);
+                        executeSuccessOrFailJob(statusMap, jobId, 0, randomId, parentId, entry);
                     }
                 } else if (status == 1) {
                     logger.debug("[JobGroup] 任务执行成功 - jobId: {}", jobId);
