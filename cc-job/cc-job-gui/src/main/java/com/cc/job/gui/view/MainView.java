@@ -1927,8 +1927,22 @@ public class MainView extends BorderPane {
         // 2. 获取画布上的所有节点和连接
         List<ProcessNode> nodes = canvas.getNodes();
         List<NodeConnection> connections = canvas.getConnections();
+        List<com.cc.job.gui.model.GroupContainer> groups = canvas.getGroupContainers();
 
-        logPanel.info(String.format("节点数量: %d, 连接数量: %d", nodes.size(), connections.size()));
+        logPanel.info(String.format("节点数量: %d, 连接数量: %d, 任务组数量: %d", nodes.size(), connections.size(), groups.size()));
+
+        // ⭐ 新增：构建节点ID到任务组的映射，用于识别哪些节点属于哪个任务组
+        java.util.Map<String, com.cc.job.gui.model.GroupContainer> nodeToGroupMap = new java.util.HashMap<>();
+        for (com.cc.job.gui.model.GroupContainer group : groups) {
+            java.util.List<ProcessNode> managedNodes = group.getManagedCanvasNodes();
+            if (managedNodes != null) {
+                for (ProcessNode managedNode : managedNodes) {
+                    if (managedNode.getNodeId() != null) {
+                        nodeToGroupMap.put(managedNode.getNodeId(), group);
+                    }
+                }
+            }
+        }
 
         // 3. 转换为后端需要的格式
         try {
@@ -1945,6 +1959,7 @@ public class MainView extends BorderPane {
                 nodeData.put("type", node.getType() != null ? node.getType() : "rect");
                 
                 // ⭐ 位置信息：后端期望 x 和 y 作为直接字段（不是 position.x/y）
+                // ⭐ 重要：保存节点的实际位置，包括任务组内的节点位置
                 nodeData.put("x", node.getX());
                 nodeData.put("y", node.getY());
 
@@ -1959,7 +1974,7 @@ public class MainView extends BorderPane {
 
                 nodesData.add(nodeData);
             }
-            // 3.1.1 追加任务组容器作为节点（CustomGroup）
+            // 3.1.1 追加任务组容器作为节点（CustomGroup），并包含其子节点信息
             for (com.cc.job.gui.model.GroupContainer group : canvas.getGroupContainers()) {
                 java.util.Map<String, Object> nodeData = new java.util.HashMap<>();
                 nodeData.put("id", group.getNodeId());
@@ -1967,11 +1982,47 @@ public class MainView extends BorderPane {
                 nodeData.put("x", group.getLayoutX());
                 nodeData.put("y", group.getLayoutY());
                 
-                // properties 包含 jobId
+                // properties 包含 jobId 和 children（子节点ID列表）
                 java.util.Map<String, Object> propertiesMap = new java.util.HashMap<>();
                 if (group.getGroupId() != null) {
                     propertiesMap.put("jobId", group.getGroupId());
                 }
+                
+                // ⭐ 新增：收集任务组内的子节点ID（包括嵌套的任务组）
+                java.util.List<String> childNodeIds = new java.util.ArrayList<>();
+                java.util.List<ProcessNode> managedNodes = group.getManagedCanvasNodes();
+                if (managedNodes != null) {
+                    for (ProcessNode childNode : managedNodes) {
+                        if (childNode.getNodeId() != null) {
+                            childNodeIds.add(childNode.getNodeId());
+                        }
+                    }
+                }
+                
+                // ⭐ 新增：检查是否有嵌套的任务组容器
+                for (com.cc.job.gui.model.GroupContainer otherGroup : canvas.getGroupContainers()) {
+                    if (otherGroup != group) {
+                        // 简单判断：如果嵌套任务组的位置在父任务组范围内，认为是子任务组
+                        double groupX = group.getLayoutX();
+                        double groupY = group.getLayoutY();
+                        double groupWidth = group.getFrame().getWidth();
+                        double groupHeight = group.getFrame().getHeight();
+                        
+                        double nestedX = otherGroup.getLayoutX();
+                        double nestedY = otherGroup.getLayoutY();
+                        
+                        // 检查嵌套任务组是否在父任务组范围内
+                        if (nestedX >= groupX && nestedX <= groupX + groupWidth &&
+                            nestedY >= groupY && nestedY <= groupY + groupHeight) {
+                            childNodeIds.add(otherGroup.getNodeId());
+                        }
+                    }
+                }
+                
+                if (!childNodeIds.isEmpty()) {
+                    propertiesMap.put("children", childNodeIds);
+                }
+                
                 String propertiesJson = apiUtil.getGson().toJson(propertiesMap);
                 nodeData.put("properties", propertiesJson);
                 

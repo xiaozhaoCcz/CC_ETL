@@ -229,7 +229,13 @@ public class JobPartService extends  BaseService {
                     JobComposeData.NodeData node = new JobComposeData.NodeData();
                     
                     node.setId(String.valueOf(nodeMap.get("id")));
-                    node.setType(String.valueOf(nodeMap.get("nodeType")));  // 后端字段是nodeType
+                    // ⭐ 修复：正确处理 nodeType，避免 null 被转换为字符串 "null"
+                    Object nodeTypeObj = nodeMap.get("nodeType");
+                    if (nodeTypeObj != null && !"null".equals(String.valueOf(nodeTypeObj))) {
+                        node.setType(String.valueOf(nodeTypeObj));
+                    } else {
+                        node.setType(null);  // 设置为 null 而不是字符串 "null"
+                    }
                     node.setJobName(String.valueOf(nodeMap.get("jobName")));  // 节点显示名称
                     
                     // ⭐ 关键修复：解析 jobId 字段

@@ -1136,14 +1136,16 @@ public class NodeCanvas extends Pane {
                     String nodeType = nodeData.getType();
                     String jobName = nodeData.getJobName();
                     Long jobId = nodeData.getJobId();
-                    logger.debug("节点: name={}, type={}, jobId={}", jobName, nodeType, jobId);
+                    String nodeId = nodeData.getId();
+                    logger.debug("节点: id={}, name={}, type={}, jobId={}", nodeId, jobName, nodeType, jobId);
                     
                     // 检查是否是任务组节点：CustomGroup、custom-group，或者通过jobId查询JobInfo判断job_type=2
                     boolean isGroupNode = false;
-                    if (nodeType != null) {
+                    if (nodeType != null && !nodeType.trim().isEmpty() && !"null".equals(nodeType)) {
                         String normalizedType = nodeType.trim();
                         isGroupNode = normalizedType.equals("CustomGroup") || 
                                      normalizedType.equalsIgnoreCase("custom-group");
+                        logger.debug("节点 {} 的 type={}, 匹配结果: {}", nodeId, normalizedType, isGroupNode);
                     }
                     
                     // 如果通过type无法识别，尝试通过properties中的信息判断
@@ -1160,10 +1162,12 @@ public class NodeCanvas extends Pane {
                     }
                     
                     if (isGroupNode) {
-                        logger.info("识别到任务组节点: name={}, type={}, jobId={}", jobName, nodeType, jobId);
+                        logger.info("✅ 识别到任务组节点: id={}, name={}, type={}, jobId={}", nodeId, jobName, nodeType, jobId);
                         // 任务组节点延迟处理
                         groupNodeDataList.add(nodeData);
                         continue;
+                    } else {
+                        logger.debug("普通节点: id={}, name={}, type={}", nodeId, jobName, nodeType);
                     }
                     
                     // 获取节点显示文本
@@ -1297,187 +1301,25 @@ public class NodeCanvas extends Pane {
                 log("✓ 加载了 " + successCount + " 条连接");
             }
 
-            // 处理任务组节点
+            // ⭐ 修改：递归处理任务组节点（支持嵌套结构）
             logger.info("准备处理任务组节点，数量: {}", groupNodeDataList.size());
             if (!groupNodeDataList.isEmpty()) {
+                // 构建任务组节点映射（用于快速查找）
+                Map<String, JobComposeData.NodeData> groupNodeMap = new HashMap<>();
+                for (JobComposeData.NodeData groupNodeData : groupNodeDataList) {
+                    groupNodeMap.put(groupNodeData.getId(), groupNodeData);
+                }
+                
+                // 存储已创建的任务组容器映射
+                Map<String, GroupContainer> containerMap = new HashMap<>();
+                
+                // 递归处理任务组节点（从最外层到最内层）
                 for (JobComposeData.NodeData groupNodeData : groupNodeDataList) {
                     try {
-                        // 获取任务组名称和ID
-                        String groupName = groupNodeData.getJobName() != null ? groupNodeData.getJobName() : "任务组";
-                        Long groupJobId = groupNodeData.getJobId();
-                        String groupNodeId = groupNodeData.getId();
-                        logger.info("处理任务组节点: name={}, jobId={}, nodeId={}, type={}", 
-                                groupName, groupJobId, groupNodeId, groupNodeData.getType());
-                        
-                        // 从 properties 中解析子节点ID列表
-                        List<String> childNodeIds = new ArrayList<>();
-                        Map<String, Object> properties = groupNodeData.getProperties();
-                        logger.debug("任务组节点 properties: {}", properties);
-                        if (properties != null) {
-                            Object childrenObj = properties.get("children");
-                            logger.debug("任务组节点 children 对象: {}, 类型: {}", childrenObj, 
-                                    childrenObj != null ? childrenObj.getClass().getName() : "null");
-                            if (childrenObj instanceof String) {
-                                // 解析JSON字符串数组
-                                String childrenStr = (String) childrenObj;
-                                try {
-                                    // 简单的JSON数组解析（去除方括号和引号）
-                                    childrenStr = childrenStr.trim();
-                                    if (childrenStr.startsWith("[") && childrenStr.endsWith("]")) {
-                                        childrenStr = childrenStr.substring(1, childrenStr.length() - 1);
-                                    }
-                                    String[] parts = childrenStr.split(",");
-                                    for (String part : parts) {
-                                        String trimmed = part.trim().replace("\"", "").replace("'", "");
-                                        if (!trimmed.isEmpty()) {
-                                            childNodeIds.add(trimmed);
-                                        }
-                                    }
-                                } catch (Exception e) {
-                                    logger.warn("解析任务组子节点ID失败: {}", e.getMessage());
-                                }
-                            } else if (childrenObj instanceof List) {
-                                @SuppressWarnings("unchecked")
-                                List<Object> childrenList = (List<Object>) childrenObj;
-                                for (Object child : childrenList) {
-                                    if (child != null) {
-                                        childNodeIds.add(child.toString());
-                                    }
-                                }
-                            }
-                        }
-                        // 注意：不要从 composeData.jobNode 派生子节点。jobNode 表示根聚合，并非某个具体任务组容器的子集。
-                        // 当 groupNodeData 未提供 children 时，认为该容器当前无显式子节点，仅渲染容器本身。
-                        
-                        // 找到子节点和连线
-                        List<ProcessNode> childNodes = new ArrayList<>();
-                        List<NodeConnection> childConnections = new ArrayList<>();
-                        
-                        logger.info("任务组节点 {} 的子节点ID列表: {}", groupName, childNodeIds);
-                        for (String childId : childNodeIds) {
-                            ProcessNode childNode = nodeMap.get(childId);
-                            if (childNode != null) {
-                                childNodes.add(childNode);
-                                logger.debug("找到子节点: id={}, name={}", childId, childNode.getJobHandlerName());
-                            } else {
-                                logger.warn("未找到子节点: id={}", childId);
-                            }
-                        }
-                        logger.info("任务组节点 {} 找到 {} 个子节点", groupName, childNodes.size());
-                        
-                        // 找到子节点之间的连线
-                        List<JobComposeData.EdgeData> allEdgeDataList = composeData.getEdges();
-                        if (allEdgeDataList != null) {
-                            for (JobComposeData.EdgeData edgeData : allEdgeDataList) {
-                                ProcessNode sourceNode = nodeMap.get(edgeData.getSourceNodeId());
-                                ProcessNode targetNode = nodeMap.get(edgeData.getTargetNodeId());
-                                if (sourceNode != null && targetNode != null && 
-                                    childNodes.contains(sourceNode) && childNodes.contains(targetNode)) {
-                                    // 找到对应的连线对象
-                                    for (NodeConnection conn : connections) {
-                                        if (conn.getSourceNode() == sourceNode && conn.getTargetNode() == targetNode) {
-                                            childConnections.add(conn);
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        
-                        // 创建 GroupContainer
-                        GroupContainer container = new GroupContainer(groupNodeData.getId(), groupJobId, groupName);
-                        
-                        // 设置位置
-                        if (hasValidCoordinates(groupNodeData.getX(), groupNodeData.getY())) {
-                            container.setLayoutX(groupNodeData.getX());
-                            container.setLayoutY(groupNodeData.getY());
-                        }
-                        
-                        // 绑定子节点和连线
-                        container.bindCanvasNodes(childNodes);
-                        container.bindConnections(childConnections);
-                        // 默认收起：只显示任务组节点，不显示子节点
-                        container.collapse();
-                        // 添加到画布（在最底层，这样其他节点可以在上面）
-                        getChildren().add(0, container);
-                        groupContainers.add(container);
-                        // 连接事件
-                        setupConnectorHandler(container, container.getTopConnector());
-                        setupConnectorHandler(container, container.getBottomConnector());
-                        setupConnectorHandler(container, container.getLeftConnector());
-                        setupConnectorHandler(container, container.getRightConnector());
-                        log("✓ 加载任务组节点: " + groupName + " (子节点数: " + childNodes.size() + ")");
-
-                        // 不创建任何代理节点，组节点仅以容器形式存在
-
-                        // 如果当前未绑定任何子节点，则在展开时按需懒加载：根据 groupJobId 拉取该任务组下的节点与连线
-                        if (childNodes.isEmpty()) {
-                            final boolean[] loadedOnce = { false };
-                            container.setOnExpand(() -> {
-                                if (loadedOnce[0]) {
-                                    // 已经加载过，直接返回（由 GroupContainer 控制显示/隐藏）
-                                    return;
-                                }
-                                new Thread(() -> {
-                                    try {
-                                        JobPartService svc = new JobPartService();
-                                        JobComposeData subCompose = svc.getJobCompose(groupJobId);
-                                        if (subCompose == null || subCompose.getNodes() == null) {
-                                            return;
-                                        }
-                                        List<ProcessNode> loadedNodes = new ArrayList<>();
-                                        Map<String, ProcessNode> localMap = new HashMap<>();
-                                        List<NodeConnection> loadedConns = new ArrayList<>();
-                                        for (JobComposeData.NodeData nd : subCompose.getNodes()) {
-                                            String text = nd.getJobName() != null ? nd.getJobName() : "Node";
-                                            ProcessNode pn = new ProcessNode(nd.getId(), text);
-                                            if (nd.getJobId() != null) {
-                                                pn.setJobId(nd.getJobId());
-                                            }
-                                            if (hasValidCoordinates(nd.getX(), nd.getY())) {
-                                                pn.setLayoutX(nd.getX());
-                                                pn.setLayoutY(nd.getY());
-                                            }
-                                            String mappedType = mapNodeType(nd.getType(), nd.getProperties());
-                                            pn.setType(mappedType);
-                                            Platform.runLater(() -> addNode(pn, false));
-                                            loadedNodes.add(pn);
-                                            localMap.put(nd.getId(), pn);
-                                        }
-                                        if (subCompose.getEdges() != null) {
-                                            for (JobComposeData.EdgeData ed : subCompose.getEdges()) {
-                                                ProcessNode s2 = localMap.get(ed.getSourceNodeId());
-                                                ProcessNode t2 = localMap.get(ed.getTargetNodeId());
-                                                if (s2 != null && t2 != null) {
-                                                    Circle sc = getConnectorByAnchor(s2, ed.getSourceAnchor(), true);
-                                                    Circle tc = getConnectorByAnchor(t2, ed.getTargetAnchor(), false);
-                                                    if (sc != null && tc != null) {
-                                                        Platform.runLater(() -> {
-                                                            NodeConnection nc = addConnection(s2, sc, t2, tc, false);
-                                                            if (nc != null) {
-                                                                nc.setEdgeId(ed.getId());
-                                                                loadedConns.add(nc);
-                                                            }
-                                                        });
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        Platform.runLater(() -> {
-                                            container.bindCanvasNodes(loadedNodes);
-                                            container.bindConnections(loadedConns);
-                                            loadedOnce[0] = true;
-                                            log("✓ 懒加载任务组子节点完成: " + loadedNodes.size());
-                                        });
-                                    } catch (Exception ex) {
-                                        logger.warn("懒加载任务组子节点失败: {}", ex.getMessage());
-                                    }
-                                }).start();
-                            });
-                        }
+                        createGroupContainerRecursive(groupNodeData, composeData, nodeMap, containerMap, groupNodeMap);
                     } catch (Exception e) {
-                        logger.error("加载任务组节点失败: {}", e.getMessage(), e);
-                        log("✗ 加载任务组节点失败: " + e.getMessage());
+                        logger.error("创建任务组容器失败: {}", e.getMessage(), e);
+                        log("✗ 创建任务组容器失败: " + e.getMessage());
                     }
                 }
             }
@@ -1525,6 +1367,156 @@ public class NodeCanvas extends Pane {
             }
         }
         return map;
+    }
+
+    /**
+     * ⭐ 新增：递归创建任务组容器（支持嵌套结构）
+     * 
+     * @param groupNodeData 任务组节点数据
+     * @param composeData 完整的任务组合数据
+     * @param nodeMap 节点ID到ProcessNode的映射
+     * @param containerMap 已创建的任务组容器映射（用于避免重复创建）
+     * @param groupNodeMap 所有任务组节点数据的映射
+     */
+    private void createGroupContainerRecursive(JobComposeData.NodeData groupNodeData,
+                                              JobComposeData composeData,
+                                              Map<String, ProcessNode> nodeMap,
+                                              Map<String, GroupContainer> containerMap,
+                                              Map<String, JobComposeData.NodeData> groupNodeMap) {
+        // 如果已经创建过，直接返回
+        if (containerMap.containsKey(groupNodeData.getId())) {
+            return;
+        }
+        
+        // 获取任务组名称和ID
+        String groupName = groupNodeData.getJobName() != null ? groupNodeData.getJobName() : "任务组";
+        Long groupJobId = groupNodeData.getJobId();
+        String groupNodeId = groupNodeData.getId();
+        logger.info("处理任务组节点: name={}, jobId={}, nodeId={}", groupName, groupJobId, groupNodeId);
+        
+        // 从 properties 中解析子节点ID列表
+        List<String> childNodeIds = new ArrayList<>();
+        Map<String, Object> properties = groupNodeData.getProperties();
+        if (properties != null) {
+            Object childrenObj = properties.get("children");
+            if (childrenObj instanceof String) {
+                // 解析JSON字符串数组
+                String childrenStr = (String) childrenObj;
+                try {
+                    childrenStr = childrenStr.trim();
+                    if (childrenStr.startsWith("[") && childrenStr.endsWith("]")) {
+                        childrenStr = childrenStr.substring(1, childrenStr.length() - 1);
+                    }
+                    String[] parts = childrenStr.split(",");
+                    for (String part : parts) {
+                        String trimmed = part.trim().replace("\"", "").replace("'", "");
+                        if (!trimmed.isEmpty()) {
+                            childNodeIds.add(trimmed);
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.warn("解析任务组子节点ID失败: {}", e.getMessage());
+                }
+            } else if (childrenObj instanceof List) {
+                @SuppressWarnings("unchecked")
+                List<Object> childrenList = (List<Object>) childrenObj;
+                for (Object child : childrenList) {
+                    if (child != null) {
+                        childNodeIds.add(child.toString());
+                    }
+                }
+            }
+        }
+        
+        // 找到子节点和连线
+        List<ProcessNode> childNodes = new ArrayList<>();
+        List<GroupContainer> childContainers = new ArrayList<>();  // 嵌套的任务组容器
+        List<NodeConnection> childConnections = new ArrayList<>();
+        
+        // 先处理嵌套的任务组节点
+        for (String childId : childNodeIds) {
+            // 检查是否是任务组节点
+            JobComposeData.NodeData childGroupData = groupNodeMap.get(childId);
+            if (childGroupData != null) {
+                // 递归创建嵌套的任务组容器
+                createGroupContainerRecursive(childGroupData, composeData, nodeMap, containerMap, groupNodeMap);
+                GroupContainer childContainer = containerMap.get(childId);
+                if (childContainer != null) {
+                    childContainers.add(childContainer);
+                }
+            } else {
+                // 普通节点
+                ProcessNode childNode = nodeMap.get(childId);
+                if (childNode != null) {
+                    childNodes.add(childNode);
+                }
+            }
+        }
+        
+        // 找到子节点之间的连线（包括嵌套任务组内的连线）
+        List<JobComposeData.EdgeData> allEdgeDataList = composeData.getEdges();
+        if (allEdgeDataList != null) {
+            for (JobComposeData.EdgeData edgeData : allEdgeDataList) {
+                ProcessNode sourceNode = nodeMap.get(edgeData.getSourceNodeId());
+                ProcessNode targetNode = nodeMap.get(edgeData.getTargetNodeId());
+                if (sourceNode != null && targetNode != null && 
+                    childNodes.contains(sourceNode) && childNodes.contains(targetNode)) {
+                    // 找到对应的连线对象
+                    for (NodeConnection conn : connections) {
+                        if (conn.getSourceNode() == sourceNode && conn.getTargetNode() == targetNode) {
+                            childConnections.add(conn);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 创建 GroupContainer
+        GroupContainer container = new GroupContainer(groupNodeData.getId(), groupJobId, groupName);
+        
+        // 设置位置
+        if (hasValidCoordinates(groupNodeData.getX(), groupNodeData.getY())) {
+            container.setLayoutX(groupNodeData.getX());
+            container.setLayoutY(groupNodeData.getY());
+        }
+        
+        // 绑定子节点和连线（包括嵌套的任务组容器）
+        List<ProcessNode> allChildNodes = new ArrayList<>(childNodes);
+        // ⭐ 将嵌套的任务组容器内的节点也添加到子节点列表，以便父容器能够正确计算边界
+        for (GroupContainer childContainer : childContainers) {
+            // 获取嵌套容器管理的所有节点
+            List<ProcessNode> nestedNodes = childContainer.getManagedCanvasNodes();
+            if (nestedNodes != null) {
+                allChildNodes.addAll(nestedNodes);
+            }
+        }
+        
+        container.bindCanvasNodes(allChildNodes);
+        container.bindConnections(childConnections);
+        
+        // ⭐ 将嵌套的任务组容器也添加到画布（如果还没有添加）
+        for (GroupContainer childContainer : childContainers) {
+            if (!getChildren().contains(childContainer)) {
+                getChildren().add(0, childContainer);
+            }
+        }
+        
+        // 默认展开，显示所有子节点（包括嵌套的任务组）
+        container.expand();
+        
+        // 添加到画布（在最底层，这样其他节点可以在上面）
+        getChildren().add(0, container);
+        groupContainers.add(container);
+        containerMap.put(groupNodeId, container);
+        
+        // 连接事件
+        setupConnectorHandler(container, container.getTopConnector());
+        setupConnectorHandler(container, container.getBottomConnector());
+        setupConnectorHandler(container, container.getLeftConnector());
+        setupConnectorHandler(container, container.getRightConnector());
+        
+        log("✓ 加载任务组节点: " + groupName + " (子节点数: " + childNodes.size() + ", 嵌套任务组数: " + childContainers.size() + ")");
     }
 
     private String mapNodeType(String rawType, Map<String, Object> properties) {

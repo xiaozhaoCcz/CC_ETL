@@ -172,7 +172,12 @@ public class JobComposeServiceImpl implements JobComposeService {
                 jobNode.setJobParentId(jobInfo.getId());
                 jobNode.setNodePositionX(node.x);
                 jobNode.setNodePositionY(node.y);
-                jobNode.setNodeType(node.type);
+                // ⭐ 修复：统一规范化节点类型，确保任务组节点类型为 "CustomGroup"（大写）
+                String normalizedType = node.type;
+                if (DYNAMIC_GROUP.equalsIgnoreCase(node.type) || "custom-group".equalsIgnoreCase(node.type)) {
+                    normalizedType = DYNAMIC_GROUP;  // 统一使用 "CustomGroup"
+                }
+                jobNode.setNodeType(normalizedType);
                 // 修复：新创建的节点，triggerStatus设置为-1表示未运行状态（白色背景）
                 jobNode.setTriggerStatus(-1);
                 Map<String, Object> propertiesMap = JSONUtil.toBean(node.properties, Map.class);
@@ -188,6 +193,22 @@ public class JobComposeServiceImpl implements JobComposeService {
                     copyJobInfo.setJobType(2);
                     copyJobInfo.setExecutorParam(String.valueOf(copyJobInfo.getId()));
                     jobInfoService.updateById(copyJobInfo);
+                    
+                    // ⭐ 修复：确保任务组节点有 width 和 height 属性
+                    if (!propertiesMap.containsKey("width")) {
+                        propertiesMap.put("width", 300.0);
+                    }
+                    if (!propertiesMap.containsKey("height")) {
+                        propertiesMap.put("height", 200.0);
+                    }
+                } else {
+                    // ⭐ 修复：确保普通节点也有 width 和 height 属性（如果缺失）
+                    if (!propertiesMap.containsKey("width")) {
+                        propertiesMap.put("width", 160.0);
+                    }
+                    if (!propertiesMap.containsKey("height")) {
+                        propertiesMap.put("height", 90.0);
+                    }
                 }
                 jobNode.setProperties(JSONUtil.toJsonStr(propertiesMap));
                 newJobNodes.add(jobNode);
@@ -266,6 +287,9 @@ public class JobComposeServiceImpl implements JobComposeService {
         // 添加任务组
         List<LfNode> lfNodes = JSONUtil.parseArray(formData.getNodes()).toList(LfNode.class);
         List<LfEdge> lfEdges = JSONUtil.parseArray(formData.getEdges()).toList(LfEdge.class);
+        
+        // ⭐ 调试日志：记录前端发送的节点和边数量
+        System.out.println("【updateJobCompose】前端发送的节点数量: " + lfNodes.size() + ", 边数量: " + lfEdges.size());
 
         Map<String, List<LfNode>> groupNodeMap = lfNodes.stream().collect(Collectors.groupingBy(LfNode::getType));
         List<LfNode> dynamicGroupNodes = groupNodeMap.get(DYNAMIC_GROUP);
@@ -289,17 +313,30 @@ public class JobComposeServiceImpl implements JobComposeService {
         Map<String, Long> nodeIdMap = new HashMap<>();
         List<JobNode> nodeFromDb = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, jobInfo.getId()));
         List<JobNode> updateNodes = new ArrayList<>();
+        
+        // ⭐ 调试日志：记录数据库中的节点数量和前端发送的节点数量
+        System.out.println("【operateToUpdateJobCompose】数据库中的节点数量: " + nodeFromDb.size() + ", 前端发送的节点数量: " + nodeList.size());
 
         for (LfNode node : nodeList) {
             Map<String, Object> properties = JSONUtil.toBean(node.getProperties(), Map.class);
             Object jobIdObj = properties.get(JOB_ID);
             if (jobIdObj == null) {
-                throw new BusinessException("存在未选择任务的节点");
+                System.out.println("【operateToUpdateJobCompose】警告：节点 " + node.getId() + " 没有 jobId，跳过该节点");
+                continue;  // 跳过没有 jobId 的节点
             }
             Long jobId = Long.parseLong(String.valueOf(jobIdObj));
             JobInfo jobInfo1 = jobInfoService.getById(jobId);
+            // ⭐ 修复：如果 jobInfo1 为 null，跳过该节点并记录警告（而不是抛出异常）
+            if (jobInfo1 == null) {
+                System.out.println("【operateToUpdateJobCompose】警告：节点关联的任务不存在，jobId: " + jobId + ", nodeId: " + node.getId() + "，跳过该节点");
+                continue;  // 跳过关联任务不存在的节点，避免整个保存失败
+            }
             if (node.getId().contains("-")) {
                 JobInfo copyJobInfo = BeanUtil.copyProperties(jobInfo1, JobInfo.class, "id");
+                // ⭐ 修复：检查 copyJobInfo 是否为 null
+                if (copyJobInfo == null) {
+                    throw new BusinessException("复制任务信息失败，jobId: " + jobId);
+                }
                 copyJobInfo.setIsNode("Y");
                 copyJobInfo.setParentId(jobInfo.getId());
                 jobInfoService.save(copyJobInfo);
@@ -334,6 +371,13 @@ public class JobComposeServiceImpl implements JobComposeService {
                 Long nodeIdLong = Long.parseLong(node.getId());
                 JobNode jobNode = nodeFromDb.stream().filter(n -> n.getId().equals(nodeIdLong)).findFirst().orElse(null);
                 
+                // ⭐ 调试日志：记录节点查找情况
+                if (jobNode == null) {
+                    System.out.println("【operateToUpdateJobCompose】通过nodeId未找到节点: nodeId=" + nodeIdLong);
+                } else {
+                    System.out.println("【operateToUpdateJobCompose】通过nodeId找到节点: nodeId=" + nodeIdLong + ", jobId=" + jobNode.getJobId());
+                }
+                
                 // 如果通过nodeId找不到，尝试通过jobId查找（粘贴的节点可能已经保存，但nodeId可能不匹配）
                 if (jobNode == null) {
                     Map<String, Object> nodeProperties = JSONUtil.toBean(node.getProperties(), Map.class);
@@ -342,13 +386,23 @@ public class JobComposeServiceImpl implements JobComposeService {
                         Long nodeJobId = Long.parseLong(String.valueOf(nodeJobIdObj));
                         // 通过jobId查找节点（粘贴的节点可能已经保存）
                         jobNode = nodeFromDb.stream().filter(n -> n.getJobId().equals(nodeJobId)).findFirst().orElse(null);
+                        if (jobNode != null) {
+                            System.out.println("【operateToUpdateJobCompose】通过jobId找到节点: jobId=" + nodeJobId + ", nodeId=" + jobNode.getId());
+                        } else {
+                            System.out.println("【operateToUpdateJobCompose】通过jobId未找到节点: jobId=" + nodeJobId);
+                        }
                     }
                 }
                 
                 // ⭐ 修复：如果找不到已存在的节点，可能是新粘贴的节点，需要创建新节点
                 if (jobNode == null) {
+                    System.out.println("【operateToUpdateJobCompose】创建新节点: nodeId=" + node.getId() + ", jobId=" + jobId);
                     // 创建新节点（类似包含"-"的逻辑）
                     JobInfo copyJobInfo = BeanUtil.copyProperties(jobInfo1, JobInfo.class, "id");
+                    // ⭐ 修复：检查 copyJobInfo 是否为 null
+                    if (copyJobInfo == null) {
+                        throw new BusinessException("复制任务信息失败，jobId: " + jobId);
+                    }
                     copyJobInfo.setIsNode("Y");
                     copyJobInfo.setParentId(jobInfo.getId());
                     jobInfoService.save(copyJobInfo);
@@ -358,7 +412,12 @@ public class JobComposeServiceImpl implements JobComposeService {
                     newJobNode.setJobParentId(jobInfo.getId());
                     newJobNode.setNodePositionX(node.x);
                     newJobNode.setNodePositionY(node.y);
-                    newJobNode.setNodeType(node.type);
+                    // ⭐ 修复：统一规范化节点类型，确保任务组节点类型为 "CustomGroup"（大写）
+                    String normalizedType = node.type;
+                    if (DYNAMIC_GROUP.equalsIgnoreCase(node.type) || "custom-group".equalsIgnoreCase(node.type)) {
+                        normalizedType = DYNAMIC_GROUP;  // 统一使用 "CustomGroup"
+                    }
+                    newJobNode.setNodeType(normalizedType);
                     // 修复：新创建的节点，triggerStatus设置为-1表示未运行状态（白色背景）
                     newJobNode.setTriggerStatus(-1);
                     Map<String, Object> propertiesMap = JSONUtil.toBean(node.properties, Map.class);
@@ -374,6 +433,22 @@ public class JobComposeServiceImpl implements JobComposeService {
                         copyJobInfo.setJobType(2);
                         copyJobInfo.setExecutorParam(String.valueOf(copyJobInfo.getId()));
                         jobInfoService.updateById(copyJobInfo);
+                        
+                        // ⭐ 修复：确保任务组节点有 width 和 height 属性
+                        if (!propertiesMap.containsKey("width")) {
+                            propertiesMap.put("width", 300.0);
+                        }
+                        if (!propertiesMap.containsKey("height")) {
+                            propertiesMap.put("height", 200.0);
+                        }
+                    } else {
+                        // ⭐ 修复：确保普通节点也有 width 和 height 属性（如果缺失）
+                        if (!propertiesMap.containsKey("width")) {
+                            propertiesMap.put("width", 160.0);
+                        }
+                        if (!propertiesMap.containsKey("height")) {
+                            propertiesMap.put("height", 90.0);
+                        }
                     }
                     newJobNode.setProperties(JSONUtil.toJsonStr(propertiesMap));
                     jobNodeService.save(newJobNode);
@@ -381,12 +456,21 @@ public class JobComposeServiceImpl implements JobComposeService {
                 } else {
                     // 更新已存在的节点
                     JobInfo copyJobInfo = BeanUtil.copyProperties(jobInfo1, JobInfo.class, "id","parentId","jobPartId");
+                    // ⭐ 修复：检查 copyJobInfo 是否为 null
+                    if (copyJobInfo == null) {
+                        throw new BusinessException("复制任务信息失败，jobId: " + jobId);
+                    }
                     copyJobInfo.setId(jobNode.getJobId());
                     jobInfoService.updateById(copyJobInfo);
                     Map<String, Object> propertiesMap = JSONUtil.toBean(node.properties, Map.class);
                     jobNode.setNodePositionX(node.x);
                     jobNode.setNodePositionY(node.y);
-                    jobNode.setNodeType(node.type);
+                    // ⭐ 修复：统一规范化节点类型，确保任务组节点类型为 "CustomGroup"（大写）
+                    String normalizedType = node.type;
+                    if (DYNAMIC_GROUP.equalsIgnoreCase(node.type) || "custom-group".equalsIgnoreCase(node.type)) {
+                        normalizedType = DYNAMIC_GROUP;  // 统一使用 "CustomGroup"
+                    }
+                    jobNode.setNodeType(normalizedType);
                     if (DYNAMIC_GROUP.equalsIgnoreCase(node.getType())) {
                         List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
                         List<LfNode> childNodes = lfNodes.stream().filter(n -> childIds.contains(n.getId())).toList();
@@ -394,6 +478,22 @@ public class JobComposeServiceImpl implements JobComposeService {
                         List<Long> childJobIds = operateToUpdateJobCompose(jobInfo1, childNodes, childEdges, lfNodes, lfEdges);
                         jobNode.setChildren(JSONUtil.toJsonStr(childJobIds));
                         propertiesMap.put("children", JSONUtil.toJsonStr(childJobIds));
+                        
+                        // ⭐ 修复：确保任务组节点有 width 和 height 属性
+                        if (!propertiesMap.containsKey("width")) {
+                            propertiesMap.put("width", 300.0);
+                        }
+                        if (!propertiesMap.containsKey("height")) {
+                            propertiesMap.put("height", 200.0);
+                        }
+                    } else {
+                        // ⭐ 修复：确保普通节点也有 width 和 height 属性（如果缺失）
+                        if (!propertiesMap.containsKey("width")) {
+                            propertiesMap.put("width", 160.0);
+                        }
+                        if (!propertiesMap.containsKey("height")) {
+                            propertiesMap.put("height", 90.0);
+                        }
                     }
                     jobNode.setProperties(JSONUtil.toJsonStr(propertiesMap));
                     updateNodes.add(jobNode);
@@ -465,73 +565,61 @@ public class JobComposeServiceImpl implements JobComposeService {
     @Override
     public Map<String, Object> getJobCompose(Map<String, Object> formMap) {
         Map<String, Object> res = new HashMap<>();
-        List<JobNodeVo> nodeVos = new ArrayList<>();
-        List<JobEdgeVo> edgeVos = new ArrayList<>();
         Long id = Long.parseLong(String.valueOf(formMap.get("id")));
         int type = Integer.parseInt(String.valueOf(formMap.get("type")));
         String randomId = type == 0 ? "" : UUID.fastUUID() + ":";
-        getJobCompose(id, nodeVos, edgeVos, randomId);
-        //创建一个父亲节点
-        // 修复：使用忽略大小写的匹配来查找任务组节点（因为数据库中的node_type可能是custom-group小写）
-//        List<JobNodeVo> dynamicGroupNodes = nodeVos.stream()
-//            .filter(node -> node.getNodeType() != null &&
-//                           DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType()))
-//            .toList();
         
-        // 收集所有任务组节点的子节点ID（需要过滤掉，因为它们属于任务组节点，不属于根任务组）
-//        Set<String> childNodeIdsToFilter = new HashSet<>();
-//        if (dynamicGroupNodes != null && !dynamicGroupNodes.isEmpty()) {
-//            for (JobNodeVo groupNode : dynamicGroupNodes) {
-//                String children = groupNode.getChildren();
-//                if (StringUtils.isNotBlank(children)) {
-//                    List<String> childIds = JSONUtil.parseArray(children).toList(String.class);
-//                    childNodeIdsToFilter.addAll(childIds);
-//                }
-//            }
-//        }
+        // ⭐ 重写：返回所有节点（包括任务组节点和普通节点），支持嵌套结构
+        List<JobNodeVo> allNodeVos = new ArrayList<>();
+        List<JobEdgeVo> allEdgeVos = new ArrayList<>();
         
-        // 过滤掉任务组节点的子节点，但保留任务组节点本身
-        // 注意：任务组节点的子节点的job_parent_id应该是任务组节点的jobId，而不是根任务组的jobId
-        // 所以我们需要通过children字段来识别哪些节点是任务组节点的子节点
-//        List<JobNodeVo> nodeList = nodeVos.stream()
-//            .filter(n -> {
-//                // 保留任务组节点本身
-//                if (n.getNodeType() != null && DYNAMIC_GROUP.equalsIgnoreCase(n.getNodeType())) {
-//                    return true;
-//                }
-//                // 过滤掉任务组节点的子节点
-//                return !childNodeIdsToFilter.contains(n.getId());
-//            })
-//            .collect(Collectors.toList());
-        //List<String> firstNodes = nodeList.stream().map(JobNodeVo::getId).toList();
-
+        // 递归构建所有节点和边（包括嵌套的任务组）
+        buildAllNodesAndEdgesRecursive(id, allNodeVos, allEdgeVos, randomId, null);
+        
+        // 获取根任务组信息
         JobInfo jobInfo = jobInfoService.getById(id);
-        JobNodeVo jobNodeVo = new JobNodeVo();
-        jobNodeVo.setId(randomId + DYNAMIC_GROUP);
-        jobNodeVo.setJobId(jobInfo.getId());
-        jobNodeVo.setChildren(JSONUtil.toJsonStr(nodeVos));
-        jobNodeVo.setNodeType(DYNAMIC_GROUP);
-        jobNodeVo.setJobName(jobInfo.getJobDesc());
-        Map<String, Object> properties = new HashMap<>();
-        properties.put(JOB_ID, String.valueOf(jobInfo.getId()));
-        properties.put("children", JSONUtil.toJsonStr(nodeVos));
-//        properties.put("isRestrict", true);
-//        properties.put("autoResize", true);
-        //计算最大高度和最大宽度
-        double[] styleArr = getMaxWidthHeight(nodeVos);
-        //！！！设置节点的位置，一定要除2，前端真的巨难
-        jobNodeVo.setNodePositionX(styleArr[3] + (styleArr[1] - styleArr[3]) / 2);
-        jobNodeVo.setNodePositionY(styleArr[0] + (styleArr[2] - styleArr[0]) / 2);
-        properties.put("height", styleArr[2] - styleArr[0] + 10);
-        properties.put("width", styleArr[1] - styleArr[3] + 10);
-        jobNodeVo.setProperties(JSONUtil.toJsonStr(properties));
-
-        if (type == 1) {
-            nodeVos.add(jobNodeVo);
+        if (jobInfo == null) {
+            throw new BusinessException("任务组不存在，id: " + id);
+        }
+        
+        // 创建根任务组节点（用于前端展示）
+        JobNodeVo rootJobNodeVo = new JobNodeVo();
+        rootJobNodeVo.setId(randomId + DYNAMIC_GROUP);
+        rootJobNodeVo.setJobId(jobInfo.getId());
+        rootJobNodeVo.setNodeType(DYNAMIC_GROUP);
+        rootJobNodeVo.setJobName(jobInfo.getJobDesc());
+        rootJobNodeVo.setIsPause(jobInfo.getIsPause());
+        
+        // 计算根任务组的边界（包含所有直接子节点）
+        List<JobNodeVo> rootLevelNodes = allNodeVos.stream()
+            .filter(node -> {
+                // 只包含直接属于根任务组的节点（不包括嵌套任务组内的节点）
+                // 通过检查节点的jobParentId来判断
+                return node.getJobParentId() != null && node.getJobParentId().equals(id);
+            })
+            .toList();
+        
+        if (!rootLevelNodes.isEmpty()) {
+            double[] styleArr = getMaxWidthHeight(rootLevelNodes);
+            rootJobNodeVo.setNodePositionX(styleArr[3] + (styleArr[1] - styleArr[3]) / 2);
+            rootJobNodeVo.setNodePositionY(styleArr[0] + (styleArr[2] - styleArr[0]) / 2);
+            Map<String, Object> properties = new HashMap<>();
+            properties.put(JOB_ID, String.valueOf(jobInfo.getId()));
+            properties.put("height", styleArr[2] - styleArr[0] + 10);
+            properties.put("width", styleArr[1] - styleArr[3] + 10);
+            rootJobNodeVo.setProperties(JSONUtil.toJsonStr(properties));
+        } else {
+            // 如果没有子节点，设置默认位置和大小
+            rootJobNodeVo.setNodePositionX(0.0);
+            rootJobNodeVo.setNodePositionY(0.0);
+            Map<String, Object> properties = new HashMap<>();
+            properties.put(JOB_ID, String.valueOf(jobInfo.getId()));
+            properties.put("height", 200.0);
+            properties.put("width", 300.0);
+            rootJobNodeVo.setProperties(JSONUtil.toJsonStr(properties));
         }
         
         // 只有 type=1 (运行时模式) 才需要调整节点位置
-        // type=0 (普通查看模式) 直接返回数据库中的原始位置
         if (type == 1) {
             Object xObj = formMap.get("x");
             Object yObj = formMap.get("y");
@@ -539,14 +627,194 @@ public class JobComposeServiceImpl implements JobComposeService {
                 double x = Double.parseDouble(String.valueOf(xObj));
                 double y = Double.parseDouble(String.valueOf(yObj));
                 double[] nodeXY = new double[]{x, y};
-                updateNodeXY(nodeVos, nodeXY, new double[]{jobNodeVo.getNodePositionX(), jobNodeVo.getNodePositionY()});
+                updateNodeXY(allNodeVos, nodeXY, new double[]{rootJobNodeVo.getNodePositionX(), rootJobNodeVo.getNodePositionY()});
             }
         }
         
-        res.put("jobNode", jobNodeVo);
-        res.put("nodes", nodeVos);
-        res.put("edges", edgeVos);
+        res.put("jobNode", rootJobNodeVo);
+        res.put("nodes", allNodeVos);  // 返回所有节点（包括嵌套的任务组节点）
+        res.put("edges", allEdgeVos);  // 返回所有边（包括嵌套任务组内的边）
         return res;
+    }
+    
+    /**
+     * ⭐ 新增：递归构建所有节点和边（包括嵌套的任务组）
+     * 
+     * @param jobId 当前任务组ID
+     * @param allNodeVos 所有节点VO列表（输出参数）
+     * @param allEdgeVos 所有边VO列表（输出参数）
+     * @param randomId 随机ID前缀
+     * @param parentJobId 父任务组ID（用于过滤，null表示根任务组）
+     */
+    private void buildAllNodesAndEdgesRecursive(Long jobId, List<JobNodeVo> allNodeVos, 
+                                                List<JobEdgeVo> allEdgeVos, String randomId, 
+                                                Long parentJobId) {
+        // 查询当前任务组的所有节点和边
+        List<JobNode> jobNodes = jobNodeService.list(
+            new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, jobId)
+        );
+        List<JobEdge> jobEdges = jobEdgeService.list(
+            new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getJobParentId, jobId)
+        );
+        
+        // 批量查询JobInfo
+        Set<Long> jobInfoIds = jobNodes.stream().map(JobNode::getJobId).collect(Collectors.toSet());
+        if (jobInfoIds.isEmpty()) {
+            return;
+        }
+        List<JobInfo> jobInfos = jobInfoService.listByIds(new ArrayList<>(jobInfoIds));
+        Map<Long, JobInfo> jobInfoMap = jobInfos.stream()
+            .collect(Collectors.toMap(JobInfo::getId, n -> n, (existing, replacement) -> existing));
+        
+        // 构建边的映射（用于计算入度和出度）
+        Map<Long, Long> inDegreeMap = new HashMap<>();
+        Map<Long, Long> outDegreeMap = new HashMap<>();
+        for (JobEdge edge : jobEdges) {
+            inDegreeMap.merge(edge.getEndNodeId(), 1L, Long::sum);
+            outDegreeMap.merge(edge.getFromNodeId(), 1L, Long::sum);
+        }
+        
+        // 处理当前任务组的所有节点
+        for (JobNode node : jobNodes) {
+            JobInfo jobInfo = jobInfoMap.get(node.getJobId());
+            if (jobInfo == null) {
+                continue;
+            }
+            
+            JobNodeVo nodeVo = BeanUtil.copyProperties(node, JobNodeVo.class, "id");
+            nodeVo.setJobName(jobInfo.getJobDesc());
+            nodeVo.setId(randomId + node.getId());
+            nodeVo.setJobParentId(node.getJobParentId());  // ⭐ 设置父任务组ID
+            nodeVo.setIsPause(jobInfo.getIsPause());
+            nodeVo.setNodeInDegree(inDegreeMap.getOrDefault(node.getId(), 0L));
+            nodeVo.setNodeOutDegree(outDegreeMap.getOrDefault(node.getId(), 0L));
+            
+            // ⭐ 修复：规范化节点类型，确保任务组节点类型统一为 "CustomGroup"（大写）
+            String nodeType = node.getNodeType();
+            if (nodeType != null && (DYNAMIC_GROUP.equalsIgnoreCase(nodeType) || "custom-group".equalsIgnoreCase(nodeType))) {
+                nodeType = DYNAMIC_GROUP;  // 统一使用 "CustomGroup"
+            }
+            nodeVo.setNodeType(nodeType);
+            
+            // 设置节点运行状态
+            Integer triggerStatus = node.getTriggerStatus();
+            nodeVo.setTriggerStatus(triggerStatus != null ? triggerStatus : -1);
+            
+            // 如果properties为空，初始化一个
+            Map<String, Object> propertiesMap;
+            if (StringUtils.isNotBlank(node.getProperties())) {
+                propertiesMap = JSONUtil.toBean(node.getProperties(), Map.class);
+            } else {
+                propertiesMap = new HashMap<>();
+            }
+            propertiesMap.put(JOB_ID, node.getJobId());
+            
+            // ⭐ 修复：确保所有节点都有 width 和 height 属性（如果缺失）
+            if (!propertiesMap.containsKey("width")) {
+                if (DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType())) {
+                    propertiesMap.put("width", 300.0);
+                } else {
+                    propertiesMap.put("width", 160.0);
+                }
+            }
+            if (!propertiesMap.containsKey("height")) {
+                if (DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType())) {
+                    propertiesMap.put("height", 200.0);
+                } else {
+                    propertiesMap.put("height", 90.0);
+                }
+            }
+            
+            nodeVo.setProperties(JSONUtil.toJsonStr(propertiesMap));
+            
+            // 如果是任务组节点，递归处理其子节点
+            if (DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType())) {
+                List<JobNodeVo> childNodeVos = new ArrayList<>();
+                List<JobEdgeVo> childEdgeVos = new ArrayList<>();
+                
+                // 递归构建子任务组的节点和边
+                buildAllNodesAndEdgesRecursive(node.getJobId(), childNodeVos, childEdgeVos, randomId, jobId);
+                
+                // 设置子节点列表
+                nodeVo.setChildrenNodes(childNodeVos);
+                
+                // 计算任务组的边界（包含所有子节点）
+                if (!childNodeVos.isEmpty()) {
+                    double[] styleArr = getMaxWidthHeight(childNodeVos);
+                    double groupX = styleArr[3] + (styleArr[1] - styleArr[3]) / 2;
+                    double groupY = styleArr[0] + (styleArr[2] - styleArr[0]) / 2;
+                    double groupWidth = styleArr[1] - styleArr[3] + 10;
+                    double groupHeight = styleArr[2] - styleArr[0] + 10;
+                    
+                    // 如果节点有位置信息，使用节点的位置；否则使用计算的位置
+                    if (node.getNodePositionX() != null && node.getNodePositionY() != null) {
+                        nodeVo.setNodePositionX(node.getNodePositionX());
+                        nodeVo.setNodePositionY(node.getNodePositionY());
+                    } else {
+                        nodeVo.setNodePositionX(groupX);
+                        nodeVo.setNodePositionY(groupY);
+                    }
+                    
+                    propertiesMap.put("height", groupHeight);
+                    propertiesMap.put("width", groupWidth);
+                    // ⭐ 修复：确保 children 属性包含所有子节点的ID（包括嵌套的任务组节点）
+                    List<String> allChildIds = new ArrayList<>();
+                    for (JobNodeVo childVo : childNodeVos) {
+                        allChildIds.add(childVo.getId());
+                    }
+                    propertiesMap.put("children", JSONUtil.toJsonStr(allChildIds));
+                    nodeVo.setProperties(JSONUtil.toJsonStr(propertiesMap));
+                    
+                    // ⭐ 调试日志：输出任务组节点的信息
+                    System.out.println("✅ 任务组节点已构建: nodeId=" + nodeVo.getId() + ", jobId=" + nodeVo.getJobId() + 
+                                     ", nodeType=" + nodeVo.getNodeType() + ", childrenCount=" + allChildIds.size());
+                } else {
+                    // 如果没有子节点，使用节点的位置或默认值
+                    if (node.getNodePositionX() != null && node.getNodePositionY() != null) {
+                        nodeVo.setNodePositionX(node.getNodePositionX());
+                        nodeVo.setNodePositionY(node.getNodePositionY());
+                    } else {
+                        nodeVo.setNodePositionX(0.0);
+                        nodeVo.setNodePositionY(0.0);
+                    }
+                    propertiesMap.put("height", 200.0);
+                    propertiesMap.put("width", 300.0);
+                    propertiesMap.put("children", "[]");
+                    nodeVo.setProperties(JSONUtil.toJsonStr(propertiesMap));
+                    
+                    // ⭐ 调试日志：输出空任务组节点的信息
+                    System.out.println("✅ 空任务组节点已构建: nodeId=" + nodeVo.getId() + ", jobId=" + nodeVo.getJobId() + 
+                                     ", nodeType=" + nodeVo.getNodeType());
+                }
+                
+                // 将子节点和边添加到总列表（前端需要这些信息来展示嵌套结构）
+                allNodeVos.addAll(childNodeVos);
+                allEdgeVos.addAll(childEdgeVos);
+            } else {
+                // 普通节点，直接使用数据库中的位置
+                nodeVo.setNodePositionX(node.getNodePositionX());
+                nodeVo.setNodePositionY(node.getNodePositionY());
+            }
+            
+            // ⭐ 修复：确保任务组节点被添加到总列表（必须在子节点之后添加，以便前端能正确识别）
+            allNodeVos.add(nodeVo);
+            
+            // ⭐ 调试日志：输出所有节点的信息
+            System.out.println("✅ 节点已添加到列表: nodeId=" + nodeVo.getId() + ", jobId=" + nodeVo.getJobId() + 
+                             ", nodeType=" + nodeVo.getNodeType() + ", jobParentId=" + nodeVo.getJobParentId());
+        }
+        
+        // 处理当前任务组的所有边
+        for (JobEdge edge : jobEdges) {
+            JobEdgeVo edgeVo = BeanUtil.copyProperties(edge, JobEdgeVo.class, "id");
+            edgeVo.setId(randomId + edge.getId());
+            edgeVo.setFromNodeId(randomId + edge.getFromNodeId());
+            edgeVo.setEndNodeId(randomId + edge.getEndNodeId());
+            edgeVo.setStartPoint(edge.getStartPoint());
+            edgeVo.setEndPoint(edge.getEndPoint());
+            edgeVo.setProperties(edge.getProperties());
+            allEdgeVos.add(edgeVo);
+        }
     }
 
     @Override
@@ -883,10 +1151,48 @@ public class JobComposeServiceImpl implements JobComposeService {
         double right = 0;
 
         for (JobNodeVo nodeVo : nodeVos) {
+            // ⭐ 修复：添加 null 检查，防止 NumberFormatException
+            if (nodeVo.getNodePositionX() == null || nodeVo.getNodePositionY() == null) {
+                continue; // 跳过没有位置的节点
+            }
+            
             String properties = nodeVo.getProperties();
-            Map<String, Object> propertiesMap = JSONUtil.toBean(properties, Map.class);
-            double width = Double.parseDouble(String.valueOf(propertiesMap.get("width")));
-            double height = Double.parseDouble(String.valueOf(propertiesMap.get("height")));
+            Map<String, Object> propertiesMap = null;
+            if (StringUtils.isNotBlank(properties)) {
+                try {
+                    propertiesMap = JSONUtil.toBean(properties, Map.class);
+                } catch (Exception e) {
+                    // 如果解析失败，使用默认值
+                    propertiesMap = new HashMap<>();
+                }
+            } else {
+                propertiesMap = new HashMap<>();
+            }
+            
+            // ⭐ 修复：安全地获取 width 和 height，如果为 null 则使用默认值
+            double width = 160.0; // 默认宽度
+            double height = 90.0; // 默认高度
+            
+            Object widthObj = propertiesMap.get("width");
+            if (widthObj != null && !"null".equals(String.valueOf(widthObj))) {
+                try {
+                    width = Double.parseDouble(String.valueOf(widthObj));
+                } catch (NumberFormatException e) {
+                    // 解析失败，使用默认值
+                    width = 160.0;
+                }
+            }
+            
+            Object heightObj = propertiesMap.get("height");
+            if (heightObj != null && !"null".equals(String.valueOf(heightObj))) {
+                try {
+                    height = Double.parseDouble(String.valueOf(heightObj));
+                } catch (NumberFormatException e) {
+                    // 解析失败，使用默认值
+                    height = 90.0;
+                }
+            }
+            
             if (nodeVo.getNodePositionY() - height / 2 < top) {
                 top = nodeVo.getNodePositionY() - height / 2;
             }
@@ -900,6 +1206,12 @@ public class JobComposeServiceImpl implements JobComposeService {
                 right = nodeVo.getNodePositionX() + width / 2;
             }
         }
+        
+        // ⭐ 修复：如果没有有效节点，返回默认值
+        if (top == Double.MAX_VALUE || left == Double.MAX_VALUE) {
+            return new double[]{0, 300, 200, 0}; // 默认值：top, right, bottom, left
+        }
+        
         return new double[]{top, right, bottom, left};
     }
 
