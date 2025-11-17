@@ -1933,6 +1933,9 @@ public class MainView extends BorderPane {
         // 3. 转换为后端需要的格式
         try {
             // 3.1 转换节点数据（格式必须与后端 updateJobCompose 期望的一致）
+            // ⚠️ 重要：后端 LfNode 类期望的格式是：
+            // - id, type, x, y (直接字段)
+            // - properties (JSON字符串，包含 jobId)
             List<java.util.Map<String, Object>> nodesData = new java.util.ArrayList<>();
             for (ProcessNode node : nodes) {
                 java.util.Map<String, Object> nodeData = new java.util.HashMap<>();
@@ -1941,18 +1944,18 @@ public class MainView extends BorderPane {
                 nodeData.put("id", nodeId);
                 nodeData.put("type", node.getType() != null ? node.getType() : "rect");
                 
-                // ⭐ 位置信息：后端期望 position.x 和 position.y
-                java.util.Map<String, Object> position = new java.util.HashMap<>();
-                position.put("x", node.getX());
-                position.put("y", node.getY());
-                nodeData.put("position", position);
+                // ⭐ 位置信息：后端期望 x 和 y 作为直接字段（不是 position.x/y）
+                nodeData.put("x", node.getX());
+                nodeData.put("y", node.getY());
 
-                // ⭐ 数据信息：后端期望 data.jobId（不是 properties.jobId）
-                java.util.Map<String, Object> data = new java.util.HashMap<>();
+                // ⭐ properties：后端期望 properties 是 JSON 字符串，包含 jobId
+                java.util.Map<String, Object> propertiesMap = new java.util.HashMap<>();
                 if (node.getJobId() != null) {
-                    data.put("jobId", node.getJobId());
+                    propertiesMap.put("jobId", node.getJobId());
                 }
-                nodeData.put("data", data);
+                // 将 properties 转换为 JSON 字符串
+                String propertiesJson = apiUtil.getGson().toJson(propertiesMap);
+                nodeData.put("properties", propertiesJson);
 
                 nodesData.add(nodeData);
             }
@@ -1961,21 +1964,27 @@ public class MainView extends BorderPane {
                 java.util.Map<String, Object> nodeData = new java.util.HashMap<>();
                 nodeData.put("id", group.getNodeId());
                 nodeData.put("type", "CustomGroup");
-                java.util.Map<String, Object> position = new java.util.HashMap<>();
-                position.put("x", group.getLayoutX());
-                position.put("y", group.getLayoutY());
-                nodeData.put("position", position);
-                java.util.Map<String, Object> data = new java.util.HashMap<>();
-                data.put("jobId", group.getGroupId());
-                nodeData.put("data", data);
+                nodeData.put("x", group.getLayoutX());
+                nodeData.put("y", group.getLayoutY());
+                
+                // properties 包含 jobId
+                java.util.Map<String, Object> propertiesMap = new java.util.HashMap<>();
+                if (group.getGroupId() != null) {
+                    propertiesMap.put("jobId", group.getGroupId());
+                }
+                String propertiesJson = apiUtil.getGson().toJson(propertiesMap);
+                nodeData.put("properties", propertiesJson);
+                
                 nodesData.add(nodeData);
             }
 
             // 3.2 转换连接数据（格式必须与后端 updateJobCompose 期望的一致）
+            // ⚠️ 重要：后端 LfEdge 类期望的格式是：
+            // - sourceNodeId, targetNodeId (不是 source/target)
             List<java.util.Map<String, Object>> edgesData = new java.util.ArrayList<>();
             for (NodeConnection conn : connections) {
                 java.util.Map<String, Object> edgeData = new java.util.HashMap<>();
-                // ⭐ 后端期望 source 和 target（不是 sourceNodeId/targetNodeId）
+                // ⭐ 后端期望 sourceNodeId 和 targetNodeId
                 String sourceId;
                 if (conn.getSourceNode() != null) {
                     sourceId = conn.getSourceNode().getNodeId();
@@ -1992,8 +2001,8 @@ public class MainView extends BorderPane {
                 } else {
                     continue;
                 }
-                edgeData.put("source", sourceId);
-                edgeData.put("target", targetId);
+                edgeData.put("sourceNodeId", sourceId);
+                edgeData.put("targetNodeId", targetId);
                 edgesData.add(edgeData);
             }
 
