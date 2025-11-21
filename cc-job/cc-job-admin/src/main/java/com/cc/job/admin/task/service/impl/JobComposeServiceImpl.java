@@ -725,8 +725,6 @@ public class JobComposeServiceImpl implements JobComposeService {
                 }
             }
             
-            nodeVo.setProperties(JSONUtil.toJsonStr(propertiesMap));
-            
             // 如果是任务组节点，递归处理其子节点
             if (DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType())) {
                 List<JobNodeVo> childNodeVos = new ArrayList<>();
@@ -738,38 +736,45 @@ public class JobComposeServiceImpl implements JobComposeService {
                 // 设置子节点列表
                 nodeVo.setChildrenNodes(childNodeVos);
                 
+                // ⭐ 关键修复：收集所有直接子节点的ID（用于前端识别任务组的children）
+                List<JobNode> directChildNodes = jobNodeService.list(
+                    new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, node.getJobId())
+                );
+                List<String> directChildIds = new ArrayList<>();
+                for (JobNode childNode : directChildNodes) {
+                    directChildIds.add(randomId + childNode.getId());
+                }
+                
                 // 计算任务组的边界（包含所有子节点）
                 if (!childNodeVos.isEmpty()) {
                     double[] styleArr = getMaxWidthHeight(childNodeVos);
-                    double groupX = styleArr[3] + (styleArr[1] - styleArr[3]) / 2;
-                    double groupY = styleArr[0] + (styleArr[2] - styleArr[0]) / 2;
-                    double groupWidth = styleArr[1] - styleArr[3] + 10;
-                    double groupHeight = styleArr[2] - styleArr[0] + 10;
+                    double groupWidth = styleArr[1] - styleArr[3] + 40;  // 增加padding
+                    double groupHeight = styleArr[2] - styleArr[0] + 40;  // 增加padding
                     
-                    // 如果节点有位置信息，使用节点的位置；否则使用计算的位置
+                    // 使用数据库中保存的位置信息（如果有的话）
                     if (node.getNodePositionX() != null && node.getNodePositionY() != null) {
                         nodeVo.setNodePositionX(node.getNodePositionX());
                         nodeVo.setNodePositionY(node.getNodePositionY());
                     } else {
+                        // 否则使用计算的中心位置
+                        double groupX = styleArr[3] + (styleArr[1] - styleArr[3]) / 2;
+                        double groupY = styleArr[0] + (styleArr[2] - styleArr[0]) / 2;
                         nodeVo.setNodePositionX(groupX);
                         nodeVo.setNodePositionY(groupY);
                     }
                     
-                    propertiesMap.put("height", groupHeight);
                     propertiesMap.put("width", groupWidth);
-                    // ⭐ 修复：确保 children 属性包含所有子节点的ID（包括嵌套的任务组节点）
-                    List<String> allChildIds = new ArrayList<>();
-                    for (JobNodeVo childVo : childNodeVos) {
-                        allChildIds.add(childVo.getId());
-                    }
-                    propertiesMap.put("children", JSONUtil.toJsonStr(allChildIds));
-                    nodeVo.setProperties(JSONUtil.toJsonStr(propertiesMap));
+                    propertiesMap.put("height", groupHeight);
+                    propertiesMap.put("children", directChildIds);  // ⭐ 直接使用List，不转JSON字符串
                     
                     // ⭐ 调试日志：输出任务组节点的信息
-                    System.out.println("✅ 任务组节点已构建: nodeId=" + nodeVo.getId() + ", jobId=" + nodeVo.getJobId() + 
-                                     ", nodeType=" + nodeVo.getNodeType() + ", childrenCount=" + allChildIds.size());
+                    System.out.println("✅ 任务组节点已构建: nodeId=" + nodeVo.getId() + 
+                                     ", jobId=" + nodeVo.getJobId() + 
+                                     ", nodeType=" + nodeVo.getNodeType() + 
+                                     ", childrenCount=" + directChildIds.size() +
+                                     ", width=" + groupWidth + ", height=" + groupHeight);
                 } else {
-                    // 如果没有子节点，使用节点的位置或默认值
+                    // 如果没有子节点，使用默认值
                     if (node.getNodePositionX() != null && node.getNodePositionY() != null) {
                         nodeVo.setNodePositionX(node.getNodePositionX());
                         nodeVo.setNodePositionY(node.getNodePositionY());
@@ -777,31 +782,38 @@ public class JobComposeServiceImpl implements JobComposeService {
                         nodeVo.setNodePositionX(0.0);
                         nodeVo.setNodePositionY(0.0);
                     }
-                    propertiesMap.put("height", 200.0);
                     propertiesMap.put("width", 300.0);
-                    propertiesMap.put("children", "[]");
-                    nodeVo.setProperties(JSONUtil.toJsonStr(propertiesMap));
+                    propertiesMap.put("height", 200.0);
+                    propertiesMap.put("children", directChildIds);  // ⭐ 空列表而不是字符串"[]"
                     
                     // ⭐ 调试日志：输出空任务组节点的信息
-                    System.out.println("✅ 空任务组节点已构建: nodeId=" + nodeVo.getId() + ", jobId=" + nodeVo.getJobId() + 
+                    System.out.println("✅ 空任务组节点已构建: nodeId=" + nodeVo.getId() + 
+                                     ", jobId=" + nodeVo.getJobId() + 
                                      ", nodeType=" + nodeVo.getNodeType());
                 }
                 
-                // 将子节点和边添加到总列表（前端需要这些信息来展示嵌套结构）
+                nodeVo.setProperties(JSONUtil.toJsonStr(propertiesMap));
+                
+                // 将所有子节点和边添加到总列表（前端需要这些信息来展示嵌套结构）
                 allNodeVos.addAll(childNodeVos);
                 allEdgeVos.addAll(childEdgeVos);
             } else {
                 // 普通节点，直接使用数据库中的位置
                 nodeVo.setNodePositionX(node.getNodePositionX());
                 nodeVo.setNodePositionY(node.getNodePositionY());
+                nodeVo.setProperties(JSONUtil.toJsonStr(propertiesMap));
             }
             
-            // ⭐ 修复：确保任务组节点被添加到总列表（必须在子节点之后添加，以便前端能正确识别）
+            // ⭐ 将当前节点添加到总列表（任务组节点在子节点之后添加）
             allNodeVos.add(nodeVo);
             
             // ⭐ 调试日志：输出所有节点的信息
-            System.out.println("✅ 节点已添加到列表: nodeId=" + nodeVo.getId() + ", jobId=" + nodeVo.getJobId() + 
-                             ", nodeType=" + nodeVo.getNodeType() + ", jobParentId=" + nodeVo.getJobParentId());
+            System.out.println("✅ 节点已添加到列表: nodeId=" + nodeVo.getId() + 
+                             ", jobId=" + nodeVo.getJobId() + 
+                             ", nodeType=" + nodeVo.getNodeType() + 
+                             ", jobParentId=" + nodeVo.getJobParentId() +
+                             ", x=" + nodeVo.getNodePositionX() + 
+                             ", y=" + nodeVo.getNodePositionY());
         }
         
         // 处理当前任务组的所有边
@@ -814,6 +826,11 @@ public class JobComposeServiceImpl implements JobComposeService {
             edgeVo.setEndPoint(edge.getEndPoint());
             edgeVo.setProperties(edge.getProperties());
             allEdgeVos.add(edgeVo);
+            
+            // ⭐ 调试日志：输出边的信息
+            System.out.println("✅ 边已添加: edgeId=" + edgeVo.getId() + 
+                             ", from=" + edgeVo.getFromNodeId() + 
+                             ", to=" + edgeVo.getEndNodeId());
         }
     }
 
