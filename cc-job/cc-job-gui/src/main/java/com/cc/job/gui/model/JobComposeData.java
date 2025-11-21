@@ -52,6 +52,8 @@ public class JobComposeData {
         private Double y;
         private Integer triggerStatus; // 节点运行状态：0=失败, 1=成功, 2=运行中
         private Map<String, Object> properties;
+        private List<NodeData> childrenNodes;  // ⭐ 新增：子节点列表（用于任务组节点的嵌套展示）
+        private Long jobParentId;  // ⭐ 新增：父任务组ID
         
         public String getId() {
             return id;
@@ -117,6 +119,22 @@ public class JobComposeData {
             this.properties = properties;
         }
         
+        public List<NodeData> getChildrenNodes() {
+            return childrenNodes;
+        }
+        
+        public void setChildrenNodes(List<NodeData> childrenNodes) {
+            this.childrenNodes = childrenNodes;
+        }
+        
+        public Long getJobParentId() {
+            return jobParentId;
+        }
+        
+        public void setJobParentId(Long jobParentId) {
+            this.jobParentId = jobParentId;
+        }
+        
         @Override
         public String toString() {
             return "NodeData{" +
@@ -127,6 +145,8 @@ public class JobComposeData {
                     ", x=" + x +
                     ", y=" + y +
                     ", properties=" + properties +
+                    ", childrenNodesCount=" + (childrenNodes != null ? childrenNodes.size() : 0) +
+                    ", jobParentId=" + jobParentId +
                     '}';
         }
     }
