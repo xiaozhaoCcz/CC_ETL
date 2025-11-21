@@ -906,8 +906,14 @@ public class JobComposeServiceImpl implements JobComposeService {
     public void getJobCompose(Long id, List<JobNodeVo> nodeVos, List<JobEdgeVo> edgeVos, String randomId) {
         // 1. 收集所有需要查询的任务组ID（包括嵌套的任务组）
         Set<Long> allJobIds = new HashSet<>();
-        allJobIds.add(id);
+        // ⭐ 修复bug：不要在调用collectAllJobIds之前就把id加入集合
+        // 否则collectAllJobIds方法第一次调用时会因为已包含该id而直接返回，导致无法收集子任务组ID
         collectAllJobIds(id, allJobIds);
+        
+        // ⭐ 修复bug：如果没有收集到任何任务组ID，说明出现了异常情况，直接返回空结果
+        if (allJobIds.isEmpty()) {
+            return;
+        }
         
         // 2. 批量查询所有节点和边（一次性查询，避免递归查询）
         List<JobNode> allJobNodes = jobNodeService.list(
@@ -944,20 +950,24 @@ public class JobComposeServiceImpl implements JobComposeService {
      * @param allJobIds 所有任务组ID集合（输出参数）
      */
     private void collectAllJobIds(Long jobId, Set<Long> allJobIds) {
-        // 如果已经收集过，直接返回（避免重复查询）
-        if (allJobIds.contains(jobId)) {
+        // ⭐ 修复bug：先将当前任务组ID加入集合，然后再判断是否已处理
+        // 如果已经收集过，直接返回（避免重复查询和死循环）
+        if (!allJobIds.add(jobId)) {
+            // add()返回false表示该ID已存在，直接返回
             return;
         }
         
+        // 查询当前任务组下的所有节点
         List<JobNode> nodes = jobNodeService.list(
             new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, jobId)
         );
         
+        // 遍历节点，收集嵌套的子任务组ID
         for (JobNode node : nodes) {
             if (DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType())) {
                 Long childJobId = node.getJobId();
-                if (childJobId != null && allJobIds.add(childJobId)) {
-                    // 递归收集子任务组的ID
+                if (childJobId != null) {
+                    // 递归收集子任务组的ID（add()方法会在递归调用中判断是否重复）
                     collectAllJobIds(childJobId, allJobIds);
                 }
             }
