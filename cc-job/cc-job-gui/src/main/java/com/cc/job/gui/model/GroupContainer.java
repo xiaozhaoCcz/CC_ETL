@@ -393,13 +393,12 @@ public class GroupContainer extends StackPane {
     public void setOnExpand(Runnable onExpand) {
         this.onExpand = onExpand;
     }
-    
+
     private void updateFrameSize() {
         if (!expanded) {
             collapse();
             return;
         }
-        // 根据内部节点范围调整外框大小
         double minX = Double.MAX_VALUE, minY = Double.MAX_VALUE, maxX = 0, maxY = 0;
         for (ProcessNode n : innerNodes) {
             minX = Math.min(minX, n.getLayoutX());
@@ -408,7 +407,6 @@ public class GroupContainer extends StackPane {
             maxY = Math.max(maxY, n.getLayoutY() + n.getPrefHeight());
         }
         if (innerNodes.isEmpty()) {
-            // 如果没有内部子节点，尝试用受管画布节点来决定边界
             if (!updateFrameFromManagedNodes()) {
                 frame.setWidth(320);
                 frame.setHeight(200);
@@ -419,51 +417,42 @@ public class GroupContainer extends StackPane {
             frame.setHeight(Math.max(160, (maxY - minY) + padding * 2 + header.getHeight()));
         }
     }
-    
+
+
     private boolean updateFrameFromManagedNodes() {
         if (managedCanvasNodes.isEmpty()) {
             return false;
         }
         double minX = Double.MAX_VALUE, minY = Double.MAX_VALUE, maxX = 0, maxY = 0;
-        
-        // ⭐ 修改：计算所有受管节点的边界（包括嵌套的任务组容器）
+
         for (ProcessNode n : managedCanvasNodes) {
             minX = Math.min(minX, n.getLayoutX());
             minY = Math.min(minY, n.getLayoutY());
-            maxX = Math.max(maxX, n.getLayoutX() + n.getPrefWidth());
-            maxY = Math.max(maxY, n.getLayoutY() + n.getPrefHeight());
-        }
-        
-        // ⭐ 新增：检查是否有嵌套的任务组容器，如果有，也要考虑它们的边界
-        // 通过检查画布上的其他 GroupContainer 来判断
+            maxX = Math.max(maxX, n.getLayoutX() + n.getPrefWidth()); maxY = Math.max(maxY, n.getLayoutY() + n.getPrefHeight()); }
+
         javafx.scene.Parent parent = getParent();
-        if (parent != null && parent instanceof javafx.scene.layout.Pane) {
-            javafx.scene.layout.Pane pane = (javafx.scene.layout.Pane) parent;
+        if (parent instanceof javafx.scene.layout.Pane pane) {
             for (javafx.scene.Node child : pane.getChildren()) {
-                if (child instanceof GroupContainer && child != this) {
-                    GroupContainer nestedContainer = (GroupContainer) child;
-                    // 检查嵌套容器是否在受管节点范围内（简单判断：是否有重叠）
+                if (child instanceof GroupContainer nestedContainer && child != this) {
                     double nestedX = nestedContainer.getLayoutX();
                     double nestedY = nestedContainer.getLayoutY();
                     double nestedWidth = nestedContainer.getFrame().getWidth();
                     double nestedHeight = nestedContainer.getFrame().getHeight();
-                    
-                    // 如果嵌套容器在受管节点的范围内，考虑它的边界
+
                     boolean isNested = false;
                     for (ProcessNode n : managedCanvasNodes) {
                         double nodeX = n.getLayoutX();
                         double nodeY = n.getLayoutY();
                         double nodeWidth = n.getPrefWidth();
                         double nodeHeight = n.getPrefHeight();
-                        
-                        // 检查嵌套容器是否与节点重叠或接近
+
                         if (nestedX >= nodeX - 50 && nestedX <= nodeX + nodeWidth + 50 &&
-                            nestedY >= nodeY - 50 && nestedY <= nodeY + nodeHeight + 50) {
+                                nestedY >= nodeY - 50 && nestedY <= nodeY + nodeHeight + 50) {
                             isNested = true;
                             break;
                         }
                     }
-                    
+
                     if (isNested) {
                         minX = Math.min(minX, nestedX);
                         minY = Math.min(minY, nestedY);
@@ -473,11 +462,10 @@ public class GroupContainer extends StackPane {
                 }
             }
         }
-        
+
         double padding = 24;
         frame.setWidth(Math.max(320, (maxX - minX) + padding * 2));
         frame.setHeight(Math.max(160, (maxY - minY) + padding * 2 + header.getHeight()));
-        // 将容器定位到节点左上方留出内边距
         setLayoutX(Math.max(0, minX - padding));
         setLayoutY(Math.max(0, minY - (padding + header.getHeight())));
         return true;

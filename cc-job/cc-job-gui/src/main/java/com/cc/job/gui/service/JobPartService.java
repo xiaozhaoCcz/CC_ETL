@@ -166,14 +166,10 @@ public class JobPartService extends  BaseService {
             }
         }
     }
-    
-    /**
-     * 解析任务组合数据
-     */
+
     private JobComposeData parseJobComposeData(Map<String, Object> data) {
         JobComposeData composeData = new JobComposeData();
-        
-        // 解析 jobNode（根任务组的聚合信息，含 children）
+
         Object jobNodeObj = data.get("jobNode");
         if (jobNodeObj instanceof Map) {
             Map<?, ?> jnMap = (Map<?, ?>) jobNodeObj;
@@ -192,14 +188,13 @@ public class JobPartService extends  BaseService {
             if (jnMap.get("nodePositionY") != null) {
                 jobNode.setY(((Number) jnMap.get("nodePositionY")).doubleValue());
             }
-            // properties 可能是JSON字符串
             Map<String, Object> jnProps = new HashMap<>();
             Object jnPropsObj = jnMap.get("properties");
             if (jnPropsObj instanceof String) {
                 try {
                     jnProps = apiUtil.getGson().fromJson(
-                        (String) jnPropsObj,
-                        new TypeToken<Map<String, Object>>(){}.getType()
+                            (String) jnPropsObj,
+                            new TypeToken<Map<String, Object>>(){}.getType()
                     );
                 } catch (Exception e) {
                     logger.error("解析 jobNode.properties 失败: {}", e.getMessage(), e);
@@ -208,7 +203,6 @@ public class JobPartService extends  BaseService {
                 //noinspection unchecked
                 jnProps = (Map<String, Object>) jnPropsObj;
             }
-            // 补充 children 字段
             Object jnChildren = jnMap.get("children");
             if (jnChildren != null) {
                 jnProps.put("children", jnChildren);
@@ -216,200 +210,166 @@ public class JobPartService extends  BaseService {
             jobNode.setProperties(jnProps);
             composeData.setJobNode(jobNode);
         }
-        
-        // 解析节点
+
         Object nodesObj = data.get("nodes");
         if (nodesObj instanceof List) {
             List<JobComposeData.NodeData> nodeList = new ArrayList<>();
             List<?> nodes = (List<?>) nodesObj;
-            
+
             for (Object nodeObj : nodes) {
-                if (nodeObj instanceof Map) {
-                    Map<?, ?> nodeMap = (Map<?, ?>) nodeObj;
-                    JobComposeData.NodeData node = new JobComposeData.NodeData();
-                    
-                    node.setId(String.valueOf(nodeMap.get("id")));
-                    // ⭐ 修复：正确处理 nodeType，避免 null 被转换为字符串 "null"
-                    Object nodeTypeObj = nodeMap.get("nodeType");
-                    if (nodeTypeObj != null && !"null".equals(String.valueOf(nodeTypeObj))) {
-                        node.setType(String.valueOf(nodeTypeObj));
-                    } else {
-                        node.setType(null);  // 设置为 null 而不是字符串 "null"
+                if (!(nodeObj instanceof Map nodeMap)) {
+                    continue;
+                }
+                JobComposeData.NodeData node = new JobComposeData.NodeData();
+                node.setId(String.valueOf(nodeMap.get("id")));
+                Object nodeTypeObj = nodeMap.get("nodeType");
+                if (nodeTypeObj != null && !"null".equals(String.valueOf(nodeTypeObj))) {
+                    node.setType(String.valueOf(nodeTypeObj));
+                } else {
+                    node.setType(null);
+                }
+                node.setJobName(String.valueOf(nodeMap.get("jobName")));
+
+                if (nodeMap.get("jobId") != null) {
+                    try {
+                        node.setJobId(((Number) nodeMap.get("jobId")).longValue());
+                    } catch (Exception e) {
+                        logger.error("解析节点 jobId 失败: {}", e.getMessage(), e);
                     }
-                    node.setJobName(String.valueOf(nodeMap.get("jobName")));  // 节点显示名称
-                    
-                    // ⭐ 关键修复：解析 jobId 字段
-                    if (nodeMap.get("jobId") != null) {
-                        try {
-                            node.setJobId(((Number) nodeMap.get("jobId")).longValue());
-                        } catch (Exception e) {
-                            logger.error("解析节点 jobId 失败: {}", e.getMessage(), e);
-                        }
+                }
+
+                if (nodeMap.get("jobParentId") != null) {
+                    try {
+                        node.setJobParentId(((Number) nodeMap.get("jobParentId")).longValue());
+                    } catch (Exception e) {
+                        logger.error("解析节点 jobParentId 失败: {}", e.getMessage(), e);
                     }
-                    
-                    // ⭐ 新增：解析 jobParentId 字段
-                    if (nodeMap.get("jobParentId") != null) {
-                        try {
-                            node.setJobParentId(((Number) nodeMap.get("jobParentId")).longValue());
-                        } catch (Exception e) {
-                            logger.error("解析节点 jobParentId 失败: {}", e.getMessage(), e);
-                        }
-                    }
-                    
-                    // 解析节点运行状态
-                    Object triggerObj = nodeMap.get("triggerStatus");
-                    if (triggerObj != null) {
-                        try {
-                            if (triggerObj instanceof Number number) {
-                                node.setTriggerStatus(number.intValue());
-                            } else if (triggerObj instanceof String str && !str.isBlank()) {
-                                node.setTriggerStatus(Integer.parseInt(str.trim()));
-                            } else {
-                                node.setTriggerStatus(null);
-                            }
-                            if (node.getTriggerStatus() != null) {
-                                logger.debug("✅ 解析节点运行状态: {} -> {}", node.getId(), node.getTriggerStatus());
-                            } else {
-                                logger.debug("ℹ️ 节点运行状态为空: {}", node.getId());
-                            }
-                        } catch (Exception e) {
-                            logger.error("解析节点 triggerStatus 失败: {}, 错误: {}", triggerObj, e.getMessage(), e);
+                }
+
+                Object triggerObj = nodeMap.get("triggerStatus");
+                if (triggerObj != null) {
+                    try {
+                        if (triggerObj instanceof Number number) {
+                            node.setTriggerStatus(number.intValue());
+                        } else if (triggerObj instanceof String str && !str.isBlank()) {
+                            node.setTriggerStatus(Integer.parseInt(str.trim()));
+                        } else {
                             node.setTriggerStatus(null);
                         }
+                    } catch (Exception e) {
+                        logger.error("解析节点 triggerStatus 失败: {}, 错误: {}", triggerObj, e.getMessage(), e);
+                        node.setTriggerStatus(null);
                     }
-                    
-                    // 解析坐标 - 后端字段是nodePositionX和nodePositionY
-                    if (nodeMap.get("nodePositionX") != null) {
-                        node.setX(((Number) nodeMap.get("nodePositionX")).doubleValue());
-                    }
-                    if (nodeMap.get("nodePositionY") != null) {
-                        node.setY(((Number) nodeMap.get("nodePositionY")).doubleValue());
-                    }
-                    
-                    // 解析属性 - properties可能是JSON字符串或Map对象
-                    Object propsObj = nodeMap.get("properties");
-                    Map<String, Object> propsMap = null;
-                    if (propsObj instanceof String) {
-                        // 如果是字符串，需要解析为Map
-                        try {
-                            propsMap = apiUtil.getGson().fromJson(
-                                (String) propsObj, 
+                }
+
+                if (nodeMap.get("nodePositionX") != null) {
+                    node.setX(((Number) nodeMap.get("nodePositionX")).doubleValue());
+                }
+                if (nodeMap.get("nodePositionY") != null) {
+                    node.setY(((Number) nodeMap.get("nodePositionY")).doubleValue());
+                }
+
+                Object propsObj = nodeMap.get("properties");
+                Map<String, Object> propsMap;
+                if (propsObj instanceof String) {
+                    try {
+                        propsMap = apiUtil.getGson().fromJson(
+                                (String) propsObj,
                                 new TypeToken<Map<String, Object>>(){}.getType()
-                            );
-                        } catch (Exception e) {
-                            logger.error("解析节点属性失败: {}", e.getMessage(), e);
-                            propsMap = new HashMap<>();
-                        }
-                    } else if (propsObj instanceof Map) {
-                        propsMap = (Map<String, Object>) propsObj;
-                    } else {
+                        );
+                    } catch (Exception e) {
+                        logger.error("解析节点属性失败: {}", e.getMessage(), e);
                         propsMap = new HashMap<>();
                     }
-                    
-                    // ⭐ 关键修复：如果节点有children字段，将其添加到properties中
-                    // 因为任务组节点的children信息在JobNodeVo的children字段中，不在properties中
-                    Object childrenObj = nodeMap.get("children");
-                    if (childrenObj != null && propsMap != null) {
-                        propsMap.put("children", childrenObj);
-                        logger.debug("节点 {} 的children字段: {}", node.getId(), childrenObj);
-                    }
-                    
-                    // ⭐ 新增：解析嵌套的子节点列表 childrenNodes（用于任务组节点）
-                    Object childrenNodesObj = nodeMap.get("childrenNodes");
-                    if (childrenNodesObj instanceof List) {
-                        List<JobComposeData.NodeData> childrenNodesList = new ArrayList<>();
-                        List<?> childrenNodesList0 = (List<?>) childrenNodesObj;
-                        for (Object childNodeObj : childrenNodesList0) {
-                            if (childNodeObj instanceof Map) {
-                                Map<?, ?> childNodeMap = (Map<?, ?>) childNodeObj;
-                                // 递归解析子节点（使用相同的逻辑）
-                                JobComposeData.NodeData childNode = parseNodeData(childNodeMap);
-                                if (childNode != null) {
-                                    childrenNodesList.add(childNode);
-                                }
+                } else if (propsObj instanceof Map) {
+                    propsMap = (Map<String, Object>) propsObj;
+                } else {
+                    propsMap = new HashMap<>();
+                }
+
+                Object childrenObj = nodeMap.get("children");
+                if (childrenObj != null) {
+                    propsMap.put("children", childrenObj);
+                }
+
+                Object childrenNodesObj = nodeMap.get("childrenNodes");
+                if (childrenNodesObj instanceof List childrenNodesList0) {
+                    List<JobComposeData.NodeData> childrenNodesList = new ArrayList<>();
+                    for (Object childNodeObj : childrenNodesList0) {
+                        if (childNodeObj instanceof Map childNodeMap) {
+                            JobComposeData.NodeData childNode = parseNodeData(childNodeMap);
+                            if (childNode != null) {
+                                childrenNodesList.add(childNode);
                             }
                         }
-                        node.setChildrenNodes(childrenNodesList);
-                        logger.debug("✅ 节点 {} 包含 {} 个子节点", node.getId(), childrenNodesList.size());
                     }
-                    
-                    node.setProperties(propsMap);
-                    
-                    nodeList.add(node);
+                    node.setChildrenNodes(childrenNodesList);
                 }
+
+                node.setProperties(propsMap);
+                nodeList.add(node);
             }
             composeData.setNodes(nodeList);
         }
-        
-        // 解析边
+
         Object edgesObj = data.get("edges");
         if (edgesObj instanceof List) {
             List<JobComposeData.EdgeData> edgeList = new ArrayList<>();
             List<?> edges = (List<?>) edgesObj;
-            
+
             for (Object edgeObj : edges) {
-                if (edgeObj instanceof Map) {
-                    Map<?, ?> edgeMap = (Map<?, ?>) edgeObj;
-                    JobComposeData.EdgeData edge = new JobComposeData.EdgeData();
-                    
-                    edge.setId(String.valueOf(edgeMap.get("id")));
-                    // 后端字段是fromNodeId和endNodeId，不是sourceNodeId和targetNodeId
-                    edge.setSourceNodeId(String.valueOf(edgeMap.get("fromNodeId")));
-                    edge.setTargetNodeId(String.valueOf(edgeMap.get("endNodeId")));
-                    // 后端字段是startPoint和endPoint，不是sourceAnchor和targetAnchor
-                    edge.setSourceAnchor(String.valueOf(edgeMap.get("startPoint")));
-                    edge.setTargetAnchor(String.valueOf(edgeMap.get("endPoint")));
-                    edge.setType(String.valueOf(edgeMap.get("type")));
-                    
-                    // 解析属性 - properties可能是JSON字符串或Map对象
-                    Object propsObj = edgeMap.get("properties");
-                    if (propsObj instanceof String) {
-                        // 如果是字符串，需要解析为Map
-                        try {
-                            Map<String, Object> propsMap = apiUtil.getGson().fromJson(
-                                (String) propsObj, 
-                                new TypeToken<Map<String, Object>>(){}.getType()
-                            );
-                            edge.setProperties(propsMap);
-                        } catch (Exception e) {
-                            logger.error("解析边属性失败: {}", e.getMessage(), e);
-                        }
-                    } else if (propsObj instanceof Map) {
-                        edge.setProperties((Map<String, Object>) propsObj);
-                    }
-                    
-                    edgeList.add(edge);
+                if (!(edgeObj instanceof Map edgeMap)) {
+                    continue;
                 }
+                JobComposeData.EdgeData edge = new JobComposeData.EdgeData();
+                edge.setId(String.valueOf(edgeMap.get("id")));
+                edge.setSourceNodeId(String.valueOf(edgeMap.get("fromNodeId")));
+                edge.setTargetNodeId(String.valueOf(edgeMap.get("endNodeId")));
+                edge.setSourceAnchor(String.valueOf(edgeMap.get("startPoint")));
+                edge.setTargetAnchor(String.valueOf(edgeMap.get("endPoint")));
+                edge.setType(String.valueOf(edgeMap.get("type")));
+
+                Object propsObj = edgeMap.get("properties");
+                if (propsObj instanceof String) {
+                    try {
+                        Map<String, Object> propsMap = apiUtil.getGson().fromJson(
+                                (String) propsObj,
+                                new TypeToken<Map<String, Object>>(){}.getType()
+                        );
+                        edge.setProperties(propsMap);
+                    } catch (Exception e) {
+                        logger.error("解析边属性失败: {}", e.getMessage(), e);
+                    }
+                } else if (propsObj instanceof Map) {
+                    edge.setProperties((Map<String, Object>) propsObj);
+                }
+
+                edgeList.add(edge);
             }
             composeData.setEdges(edgeList);
         }
-        
+
         return composeData;
     }
-    
+
     /**
-     * ⭐ 新增：递归解析节点数据（用于解析嵌套的任务组节点）
-     * 
-     * @param nodeMap 节点数据Map
-     * @return 解析后的NodeData对象
+     * 递归解析节点数据（用于嵌套任务组）
      */
     private JobComposeData.NodeData parseNodeData(Map<?, ?> nodeMap) {
         JobComposeData.NodeData node = new JobComposeData.NodeData();
-        
+
         try {
             node.setId(String.valueOf(nodeMap.get("id")));
-            
-            // 解析 nodeType
+
             Object nodeTypeObj = nodeMap.get("nodeType");
             if (nodeTypeObj != null && !"null".equals(String.valueOf(nodeTypeObj))) {
                 node.setType(String.valueOf(nodeTypeObj));
             } else {
                 node.setType(null);
             }
-            
+
             node.setJobName(String.valueOf(nodeMap.get("jobName")));
-            
-            // 解析 jobId
+
             if (nodeMap.get("jobId") != null) {
                 try {
                     node.setJobId(((Number) nodeMap.get("jobId")).longValue());
@@ -417,8 +377,7 @@ public class JobPartService extends  BaseService {
                     logger.error("解析节点 jobId 失败: {}", e.getMessage(), e);
                 }
             }
-            
-            // 解析 jobParentId
+
             if (nodeMap.get("jobParentId") != null) {
                 try {
                     node.setJobParentId(((Number) nodeMap.get("jobParentId")).longValue());
@@ -426,8 +385,7 @@ public class JobPartService extends  BaseService {
                     logger.error("解析节点 jobParentId 失败: {}", e.getMessage(), e);
                 }
             }
-            
-            // 解析节点运行状态
+
             Object triggerObj = nodeMap.get("triggerStatus");
             if (triggerObj != null) {
                 try {
@@ -443,23 +401,21 @@ public class JobPartService extends  BaseService {
                     node.setTriggerStatus(null);
                 }
             }
-            
-            // 解析坐标
+
             if (nodeMap.get("nodePositionX") != null) {
                 node.setX(((Number) nodeMap.get("nodePositionX")).doubleValue());
             }
             if (nodeMap.get("nodePositionY") != null) {
                 node.setY(((Number) nodeMap.get("nodePositionY")).doubleValue());
             }
-            
-            // 解析属性
+
             Object propsObj = nodeMap.get("properties");
-            Map<String, Object> propsMap = null;
+            Map<String, Object> propsMap;
             if (propsObj instanceof String) {
                 try {
                     propsMap = apiUtil.getGson().fromJson(
-                        (String) propsObj, 
-                        new TypeToken<Map<String, Object>>(){}.getType()
+                            (String) propsObj,
+                            new TypeToken<Map<String, Object>>(){}.getType()
                     );
                 } catch (Exception e) {
                     logger.error("解析节点属性失败: {}", e.getMessage(), e);
@@ -470,22 +426,18 @@ public class JobPartService extends  BaseService {
             } else {
                 propsMap = new HashMap<>();
             }
-            
-            // 将 children 字段添加到 properties 中
+
             Object childrenObj = nodeMap.get("children");
-            if (childrenObj != null && propsMap != null) {
+            if (childrenObj != null) {
                 propsMap.put("children", childrenObj);
             }
-            
-            // 递归解析子节点列表
+
             Object childrenNodesObj = nodeMap.get("childrenNodes");
-            if (childrenNodesObj instanceof List) {
+            if (childrenNodesObj instanceof List childrenNodesList0) {
                 List<JobComposeData.NodeData> childrenNodesList = new ArrayList<>();
-                List<?> childrenNodesList0 = (List<?>) childrenNodesObj;
                 for (Object childNodeObj : childrenNodesList0) {
-                    if (childNodeObj instanceof Map) {
-                        Map<?, ?> childNodeMap = (Map<?, ?>) childNodeObj;
-                        JobComposeData.NodeData childNode = parseNodeData(childNodeMap);  // 递归调用
+                    if (childNodeObj instanceof Map childNodeMap) {
+                        JobComposeData.NodeData childNode = parseNodeData(childNodeMap);
                         if (childNode != null) {
                             childrenNodesList.add(childNode);
                         }
@@ -493,10 +445,10 @@ public class JobPartService extends  BaseService {
                 }
                 node.setChildrenNodes(childrenNodesList);
             }
-            
+
             node.setProperties(propsMap);
             return node;
-            
+
         } catch (Exception e) {
             logger.error("解析节点数据失败: {}", e.getMessage(), e);
             return null;

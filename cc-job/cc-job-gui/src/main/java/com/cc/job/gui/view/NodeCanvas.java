@@ -1101,11 +1101,7 @@ public class NodeCanvas extends Pane {
         
         setPrefSize(maxX, maxY);
     }
-    
-    /**
-     * 从 JobComposeData 加载节点和边
-     * @param composeData 任务组合数据
-     */
+
     public void loadFromComposeData(JobComposeData composeData) {
         if (composeData == null) {
             log("⚠ 没有数据可加载");
@@ -1119,123 +1115,77 @@ public class NodeCanvas extends Pane {
             Map<Long, double[]> previousPositionsByJobId = snapshotNodePositionsByJobId();
             Map<String, double[]> previousPositionsByNodeId = snapshotNodePositionsByNodeId();
 
-            // 清空现有内容
             clear();
 
-            // 用于存储节点ID到节点对象的映射
             Map<String, ProcessNode> nodeMap = new HashMap<>();
-            // 用于存储任务组节点数据（延迟处理）
             List<JobComposeData.NodeData> groupNodeDataList = new ArrayList<>();
 
-            // 加载节点
             List<JobComposeData.NodeData> nodeDataList = composeData.getNodes();
             if (nodeDataList != null && !nodeDataList.isEmpty()) {
                 logger.info("开始加载节点，总数: {}", nodeDataList.size());
                 for (JobComposeData.NodeData nodeData : nodeDataList) {
-                    // 检查是否是任务组节点（CustomGroup 或 custom-group）
                     String nodeType = nodeData.getType();
                     String jobName = nodeData.getJobName();
                     Long jobId = nodeData.getJobId();
                     String nodeId = nodeData.getId();
                     logger.debug("节点: id={}, name={}, type={}, jobId={}", nodeId, jobName, nodeType, jobId);
-                    
-                    // 检查是否是任务组节点：CustomGroup、custom-group，或者通过jobId查询JobInfo判断job_type=2
+
                     boolean isGroupNode = false;
                     if (nodeType != null && !nodeType.trim().isEmpty() && !"null".equals(nodeType)) {
                         String normalizedType = nodeType.trim();
-                        isGroupNode = normalizedType.equals("CustomGroup") || 
-                                     normalizedType.equalsIgnoreCase("custom-group");
-                        logger.debug("节点 {} 的 type={}, 匹配结果: {}", nodeId, normalizedType, isGroupNode);
+                        isGroupNode = normalizedType.equals("CustomGroup") ||
+                                normalizedType.equalsIgnoreCase("custom-group");
                     }
-                    
-                    // 如果通过type无法识别，尝试通过properties中的信息判断
+
                     if (!isGroupNode && nodeData.getProperties() != null) {
                         Map<String, Object> props = nodeData.getProperties();
                         Object childrenObj = props.get("children");
-                        // 如果有children属性，可能是任务组节点
                         if (childrenObj != null) {
-                            logger.debug("节点 {} 有children属性，可能是任务组节点", jobName);
-                            // 进一步检查：如果jobId不为null，可以查询JobInfo确认
-                            // 但这里先标记为可能的任务组节点
                             isGroupNode = true;
                         }
                     }
-                    
+
                     if (isGroupNode) {
-                        logger.info("✅ 识别到任务组节点: id={}, name={}, type={}, jobId={}", nodeId, jobName, nodeType, jobId);
-                        // 任务组节点延迟处理
                         groupNodeDataList.add(nodeData);
                         continue;
-                    } else {
-                        logger.debug("普通节点: id={}, name={}, type={}", nodeId, jobName, nodeType);
                     }
-                    
-                    // 获取节点显示文本
-                    String text = nodeData.getJobName() != null ? nodeData.getJobName() : "Node";
 
-                    // 创建普通节点
+                    String text = nodeData.getJobName() != null ? nodeData.getJobName() : "Node";
                     ProcessNode node = new ProcessNode(nodeData.getId(), text);
 
-                    // ⭐ 设置任务ID（jobId）
                     if (nodeData.getJobId() != null) {
                         node.setJobId(nodeData.getJobId());
-                        logger.debug("✅ 节点 {} (nodeId: {}) 已设置jobId: {}", text, nodeData.getId(), nodeData.getJobId());
-                        log("✅ 节点已设置jobId: " + text + " -> jobId: " + nodeData.getJobId());
-                    } else {
-                        logger.warn("⚠️ 节点 {} (nodeId: {}) 的jobId为空！", text, nodeData.getId());
-                        log("⚠️ 警告: 节点 " + text + " 的jobId为空！");
+                        com.cc.job.gui.util.NodeStatusSyncManager.getInstance()
+                                .rememberStatus(nodeData.getJobId(), nodeData.getTriggerStatus());
                     }
 
-                    // ⭐ 恢复节点运行状态（triggerStatus）
-                    // 智能合并策略：优先使用后端返回的状态，但如果后端状态是运行中（2），而缓存中有最终状态（成功1或失败0），则使用缓存的状态
-                    // 这样可以避免显示过时的运行中状态
                     Integer triggerStatus = null;
                     Long nodeJobId = nodeData.getJobId();
                     Integer backendStatus = nodeData.getTriggerStatus();
-                    Integer cachedStatus = null;
-                    
-                    if (nodeJobId != null) {
-                        cachedStatus = com.cc.job.gui.util.NodeStatusSyncManager.getInstance()
-                                .getCachedStatus(nodeJobId);
-                    }
-                    
-                    // 智能合并策略
+                    Integer cachedStatus = nodeJobId != null
+                            ? com.cc.job.gui.util.NodeStatusSyncManager.getInstance().getCachedStatus(nodeJobId)
+                            : null;
+
                     if (backendStatus != null && cachedStatus != null) {
-                        // 如果后端状态是运行中（2），而缓存中有最终状态（成功1或失败0），使用缓存的状态
                         if (backendStatus == 2 && (cachedStatus == 0 || cachedStatus == 1)) {
                             triggerStatus = cachedStatus;
-                            logger.debug("ℹ️ 节点 {} 后端状态是运行中（{}），但缓存中有最终状态（{}），使用缓存状态", 
-                                    text, backendStatus, cachedStatus);
                         } else {
-                            // 否则使用后端返回的状态（后端状态更准确）
                             triggerStatus = backendStatus;
-                            logger.debug("ℹ️ 使用后端返回的节点运行状态: {} -> {}", text, backendStatus);
                         }
                     } else if (cachedStatus != null) {
-                        // 如果只有缓存状态，使用缓存状态
                         triggerStatus = cachedStatus;
-                        logger.debug("ℹ️ 使用缓存的节点运行状态: {} -> {}", text, cachedStatus);
                     } else if (backendStatus != null) {
-                        // 如果只有后端状态，使用后端状态
                         triggerStatus = backendStatus;
-                        logger.debug("ℹ️ 使用后端返回的节点运行状态: {} -> {}", text, backendStatus);
                     }
-                    
+
                     if (triggerStatus != null) {
                         node.updateStatusByCode(triggerStatus);
                         if (nodeJobId != null) {
-                            // 更新缓存，确保缓存是最新的
                             com.cc.job.gui.util.NodeStatusSyncManager.getInstance()
                                     .rememberStatus(nodeJobId, triggerStatus);
                         }
-                        logger.debug("✅ 恢复节点运行状态: {} -> {}", text, triggerStatus);
-                        log("✅ 恢复节点运行状态: " + text + " -> " + triggerStatus);
-                    } else {
-                        // 如果既没有缓存也没有后端状态，保持默认状态（IDLE）
-                        logger.debug("ℹ️ 节点 {} 没有运行状态信息，保持默认状态", text);
                     }
 
-                    // 设置位置
                     if (hasValidCoordinates(nodeData.getX(), nodeData.getY())) {
                         node.setLayoutX(nodeData.getX());
                         node.setLayoutY(nodeData.getY());
@@ -1251,18 +1201,15 @@ public class NodeCanvas extends Pane {
                             node.setLayoutX(previous[0]);
                             node.setLayoutY(previous[1]);
                         } else {
-                            // 如果没有位置信息，使用默认布局
                             int index = nodeDataList.indexOf(nodeData);
                             node.setLayoutX(100 + (index % 3) * 250);
                             node.setLayoutY(100 + (index / 3) * 200);
                         }
                     }
 
-                    // 设置节点类型显示
                     String mappedType = mapNodeType(nodeData.getType(), nodeData.getProperties());
                     node.setType(mappedType);
 
-                    // 添加节点到画布
                     addNode(node, false);
                     nodeMap.put(nodeData.getId(), node);
                 }
@@ -1270,20 +1217,15 @@ public class NodeCanvas extends Pane {
                 log("✓ 加载了 " + nodeDataList.size() + " 个节点");
             }
 
-            // 加载边（连接线）
             List<JobComposeData.EdgeData> edgeDataList = composeData.getEdges();
             if (edgeDataList != null && !edgeDataList.isEmpty()) {
                 int successCount = 0;
                 for (JobComposeData.EdgeData edgeData : edgeDataList) {
-                    // 查找源节点和目标节点
                     ProcessNode sourceNode = nodeMap.get(edgeData.getSourceNodeId());
                     ProcessNode targetNode = nodeMap.get(edgeData.getTargetNodeId());
-                
+
                     if (sourceNode != null && targetNode != null) {
-                        // 根据锚点确定连接点
-                        // 源节点：如果没有指定锚点，默认使用右侧（数据流出）
                         Circle sourceConnector = getConnectorByAnchor(sourceNode, edgeData.getSourceAnchor(), true);
-                        // 目标节点：如果没有指定锚点，默认使用左侧（数据流入）
                         Circle targetConnector = getConnectorByAnchor(targetNode, edgeData.getTargetAnchor(), false);
 
                         if (sourceConnector != null && targetConnector != null) {
@@ -1301,19 +1243,15 @@ public class NodeCanvas extends Pane {
                 log("✓ 加载了 " + successCount + " 条连接");
             }
 
-            // ⭐ 修改：递归处理任务组节点（支持嵌套结构）
             logger.info("准备处理任务组节点，数量: {}", groupNodeDataList.size());
             if (!groupNodeDataList.isEmpty()) {
-                // 构建任务组节点映射（用于快速查找）
                 Map<String, JobComposeData.NodeData> groupNodeMap = new HashMap<>();
                 for (JobComposeData.NodeData groupNodeData : groupNodeDataList) {
                     groupNodeMap.put(groupNodeData.getId(), groupNodeData);
                 }
-                
-                // 存储已创建的任务组容器映射
+
                 Map<String, GroupContainer> containerMap = new HashMap<>();
-                
-                // 递归处理任务组节点（从最外层到最内层）
+
                 for (JobComposeData.NodeData groupNodeData : groupNodeDataList) {
                     try {
                         createGroupContainerRecursive(groupNodeData, composeData, nodeMap, containerMap, groupNodeMap);
@@ -1324,9 +1262,7 @@ public class NodeCanvas extends Pane {
                 }
             }
 
-            // 更新画布大小
             updateCanvasSize();
-
             log("✓ 任务组数据加载完成");
         });
 
@@ -1369,57 +1305,37 @@ public class NodeCanvas extends Pane {
         return map;
     }
 
-    /**
-     * ⭐ 新增：递归创建任务组容器（支持嵌套结构）
-     * 
-     * @param groupNodeData 任务组节点数据
-     * @param composeData 完整的任务组合数据
-     * @param nodeMap 节点ID到ProcessNode的映射
-     * @param containerMap 已创建的任务组容器映射（用于避免重复创建）
-     * @param groupNodeMap 所有任务组节点数据的映射
-     */
     private void createGroupContainerRecursive(JobComposeData.NodeData groupNodeData,
-                                              JobComposeData composeData,
-                                              Map<String, ProcessNode> nodeMap,
-                                              Map<String, GroupContainer> containerMap,
-                                              Map<String, JobComposeData.NodeData> groupNodeMap) {
-        // 如果已经创建过，直接返回
+                                               JobComposeData composeData,
+                                               Map<String, ProcessNode> nodeMap,
+                                               Map<String, GroupContainer> containerMap,
+                                               Map<String, JobComposeData.NodeData> groupNodeMap) {
         if (containerMap.containsKey(groupNodeData.getId())) {
             return;
         }
-        
-        // 获取任务组名称和ID
+
         String groupName = groupNodeData.getJobName() != null ? groupNodeData.getJobName() : "任务组";
         Long groupJobId = groupNodeData.getJobId();
         String groupNodeId = groupNodeData.getId();
-        logger.info("处理任务组节点: name={}, jobId={}, nodeId={}", groupName, groupJobId, groupNodeId);
-        
-        // 从 properties 中解析子节点ID列表
+
         List<String> childNodeIds = new ArrayList<>();
         Map<String, Object> properties = groupNodeData.getProperties();
         if (properties != null) {
             Object childrenObj = properties.get("children");
-            if (childrenObj instanceof String) {
-                // 解析JSON字符串数组
-                String childrenStr = (String) childrenObj;
-                try {
-                    childrenStr = childrenStr.trim();
-                    if (childrenStr.startsWith("[") && childrenStr.endsWith("]")) {
-                        childrenStr = childrenStr.substring(1, childrenStr.length() - 1);
-                    }
-                    String[] parts = childrenStr.split(",");
-                    for (String part : parts) {
+            if (childrenObj instanceof String childrenStr) {
+                childrenStr = childrenStr.trim();
+                if (childrenStr.startsWith("[") && childrenStr.endsWith("]")) {
+                    childrenStr = childrenStr.substring(1, childrenStr.length() - 1);
+                }
+                if (!childrenStr.isBlank()) {
+                    for (String part : childrenStr.split(",")) {
                         String trimmed = part.trim().replace("\"", "").replace("'", "");
                         if (!trimmed.isEmpty()) {
                             childNodeIds.add(trimmed);
                         }
                     }
-                } catch (Exception e) {
-                    logger.warn("解析任务组子节点ID失败: {}", e.getMessage());
                 }
-            } else if (childrenObj instanceof List) {
-                @SuppressWarnings("unchecked")
-                List<Object> childrenList = (List<Object>) childrenObj;
+            } else if (childrenObj instanceof List<?> childrenList) {
                 for (Object child : childrenList) {
                     if (child != null) {
                         childNodeIds.add(child.toString());
@@ -1427,41 +1343,34 @@ public class NodeCanvas extends Pane {
                 }
             }
         }
-        
-        // 找到子节点和连线
+
         List<ProcessNode> childNodes = new ArrayList<>();
-        List<GroupContainer> childContainers = new ArrayList<>();  // 嵌套的任务组容器
+        List<GroupContainer> childContainers = new ArrayList<>();
         List<NodeConnection> childConnections = new ArrayList<>();
-        
-        // 先处理嵌套的任务组节点
+
         for (String childId : childNodeIds) {
-            // 检查是否是任务组节点
             JobComposeData.NodeData childGroupData = groupNodeMap.get(childId);
             if (childGroupData != null) {
-                // 递归创建嵌套的任务组容器
                 createGroupContainerRecursive(childGroupData, composeData, nodeMap, containerMap, groupNodeMap);
                 GroupContainer childContainer = containerMap.get(childId);
                 if (childContainer != null) {
                     childContainers.add(childContainer);
                 }
             } else {
-                // 普通节点
                 ProcessNode childNode = nodeMap.get(childId);
                 if (childNode != null) {
                     childNodes.add(childNode);
                 }
             }
         }
-        
-        // 找到子节点之间的连线（包括嵌套任务组内的连线）
+
         List<JobComposeData.EdgeData> allEdgeDataList = composeData.getEdges();
         if (allEdgeDataList != null) {
             for (JobComposeData.EdgeData edgeData : allEdgeDataList) {
                 ProcessNode sourceNode = nodeMap.get(edgeData.getSourceNodeId());
                 ProcessNode targetNode = nodeMap.get(edgeData.getTargetNodeId());
-                if (sourceNode != null && targetNode != null && 
-                    childNodes.contains(sourceNode) && childNodes.contains(targetNode)) {
-                    // 找到对应的连线对象
+                if (sourceNode != null && targetNode != null &&
+                        childNodes.contains(sourceNode) && childNodes.contains(targetNode)) {
                     for (NodeConnection conn : connections) {
                         if (conn.getSourceNode() == sourceNode && conn.getTargetNode() == targetNode) {
                             childConnections.add(conn);
@@ -1471,52 +1380,42 @@ public class NodeCanvas extends Pane {
                 }
             }
         }
-        
-        // 创建 GroupContainer
+
         GroupContainer container = new GroupContainer(groupNodeData.getId(), groupJobId, groupName);
-        
-        // 设置位置
         if (hasValidCoordinates(groupNodeData.getX(), groupNodeData.getY())) {
             container.setLayoutX(groupNodeData.getX());
             container.setLayoutY(groupNodeData.getY());
         }
-        
-        // 绑定子节点和连线（包括嵌套的任务组容器）
+
         List<ProcessNode> allChildNodes = new ArrayList<>(childNodes);
-        // ⭐ 将嵌套的任务组容器内的节点也添加到子节点列表，以便父容器能够正确计算边界
         for (GroupContainer childContainer : childContainers) {
-            // 获取嵌套容器管理的所有节点
             List<ProcessNode> nestedNodes = childContainer.getManagedCanvasNodes();
             if (nestedNodes != null) {
                 allChildNodes.addAll(nestedNodes);
             }
         }
-        
+
         container.bindCanvasNodes(allChildNodes);
         container.bindConnections(childConnections);
-        
-        // ⭐ 将嵌套的任务组容器也添加到画布（如果还没有添加）
+
         for (GroupContainer childContainer : childContainers) {
             if (!getChildren().contains(childContainer)) {
                 getChildren().add(0, childContainer);
             }
         }
-        
-        // 默认展开，显示所有子节点（包括嵌套的任务组）
+
         container.expand();
-        
-        // 添加到画布（在最底层，这样其他节点可以在上面）
         getChildren().add(0, container);
         groupContainers.add(container);
         containerMap.put(groupNodeId, container);
-        
-        // 连接事件
+
         setupConnectorHandler(container, container.getTopConnector());
         setupConnectorHandler(container, container.getBottomConnector());
         setupConnectorHandler(container, container.getLeftConnector());
         setupConnectorHandler(container, container.getRightConnector());
-        
-        log("✓ 加载任务组节点: " + groupName + " (子节点数: " + childNodes.size() + ", 嵌套任务组数: " + childContainers.size() + ")");
+
+        log("✓ 加载任务组节点: " + groupName +
+                " (子节点数: " + childNodes.size() + ", 嵌套任务组数: " + childContainers.size() + ")");
     }
 
     private String mapNodeType(String rawType, Map<String, Object> properties) {

@@ -1,10 +1,7 @@
 package com.cc.job.gui.view;
 
 import com.cc.job.gui.history.UndoRedoManager;
-import com.cc.job.gui.model.JobComposeData;
-import com.cc.job.gui.model.NodeConnection;
-import com.cc.job.gui.model.ProcessNode;
-import com.cc.job.gui.model.RunningJobGroup;
+import com.cc.job.gui.model.*;
 import com.cc.job.gui.service.JobGroupService;
 import com.cc.job.gui.service.JobInfoService;
 import com.cc.job.gui.service.JobLogService;
@@ -28,8 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * 主界面视图
@@ -1913,7 +1909,6 @@ public class MainView extends BorderPane {
         logPanel.info("════════════════════════════════");
         logPanel.info("💾 开始保存任务组数据...");
 
-        // 1. 获取当前任务组ID
         Long currentTaskGroupId = usePageStoreHook().getCurrentTaskGroupId();
         if (currentTaskGroupId == null || currentTaskGroupId == 0) {
             logPanel.error("✗ 无法保存：未选择任务组");
@@ -1922,19 +1917,15 @@ public class MainView extends BorderPane {
             return;
         }
 
-        logPanel.info("当前任务组ID: " + currentTaskGroupId);
-
-        // 2. 获取画布上的所有节点和连接
         List<ProcessNode> nodes = canvas.getNodes();
         List<NodeConnection> connections = canvas.getConnections();
-        List<com.cc.job.gui.model.GroupContainer> groups = canvas.getGroupContainers();
+        List<GroupContainer> groups = canvas.getGroupContainers();
 
         logPanel.info(String.format("节点数量: %d, 连接数量: %d, 任务组数量: %d", nodes.size(), connections.size(), groups.size()));
 
-        // ⭐ 新增：构建节点ID到任务组的映射，用于识别哪些节点属于哪个任务组
-        java.util.Map<String, com.cc.job.gui.model.GroupContainer> nodeToGroupMap = new java.util.HashMap<>();
-        for (com.cc.job.gui.model.GroupContainer group : groups) {
-            java.util.List<ProcessNode> managedNodes = group.getManagedCanvasNodes();
+        Map<String, GroupContainer> nodeToGroupMap = new HashMap<>();
+        for (GroupContainer group : groups) {
+            List<ProcessNode> managedNodes = group.getManagedCanvasNodes();
             if (managedNodes != null) {
                 for (ProcessNode managedNode : managedNodes) {
                     if (managedNode.getNodeId() != null) {
@@ -1944,53 +1935,40 @@ public class MainView extends BorderPane {
             }
         }
 
-        // 3. 转换为后端需要的格式
         try {
-            // 3.1 转换节点数据（格式必须与后端 updateJobCompose 期望的一致）
-            // ⚠️ 重要：后端 LfNode 类期望的格式是：
-            // - id, type, x, y (直接字段)
-            // - properties (JSON字符串，包含 jobId)
-            List<java.util.Map<String, Object>> nodesData = new java.util.ArrayList<>();
+            List<Map<String, Object>> nodesData = new ArrayList<>();
             for (ProcessNode node : nodes) {
-                java.util.Map<String, Object> nodeData = new java.util.HashMap<>();
-                // ⭐ 节点ID：如果已存在数据库，使用数字字符串；否则使用 "node:" 前缀表示新节点
+                Map<String, Object> nodeData = new HashMap<>();
                 String nodeId = node.getNodeId();
                 nodeData.put("id", nodeId);
                 nodeData.put("type", node.getType() != null ? node.getType() : "rect");
-                
-                // ⭐ 位置信息：后端期望 x 和 y 作为直接字段（不是 position.x/y）
-                // ⭐ 重要：保存节点的实际位置，包括任务组内的节点位置
                 nodeData.put("x", node.getX());
                 nodeData.put("y", node.getY());
 
-                // ⭐ properties：后端期望 properties 是 JSON 字符串，包含 jobId
-                java.util.Map<String, Object> propertiesMap = new java.util.HashMap<>();
+                Map<String, Object> propertiesMap = new HashMap<>();
                 if (node.getJobId() != null) {
                     propertiesMap.put("jobId", node.getJobId());
                 }
-                // 将 properties 转换为 JSON 字符串
                 String propertiesJson = apiUtil.getGson().toJson(propertiesMap);
                 nodeData.put("properties", propertiesJson);
 
                 nodesData.add(nodeData);
             }
-            // 3.1.1 追加任务组容器作为节点（CustomGroup），并包含其子节点信息
-            for (com.cc.job.gui.model.GroupContainer group : canvas.getGroupContainers()) {
-                java.util.Map<String, Object> nodeData = new java.util.HashMap<>();
+
+            for (GroupContainer group : canvas.getGroupContainers()) {
+                Map<String, Object> nodeData = new HashMap<>();
                 nodeData.put("id", group.getNodeId());
                 nodeData.put("type", "CustomGroup");
                 nodeData.put("x", group.getLayoutX());
                 nodeData.put("y", group.getLayoutY());
-                
-                // properties 包含 jobId 和 children（子节点ID列表）
-                java.util.Map<String, Object> propertiesMap = new java.util.HashMap<>();
+
+                Map<String, Object> propertiesMap = new HashMap<>();
                 if (group.getGroupId() != null) {
                     propertiesMap.put("jobId", group.getGroupId());
                 }
-                
-                // ⭐ 新增：收集任务组内的子节点ID（包括嵌套的任务组）
-                java.util.List<String> childNodeIds = new java.util.ArrayList<>();
-                java.util.List<ProcessNode> managedNodes = group.getManagedCanvasNodes();
+
+                List<String> childNodeIds = new ArrayList<>();
+                List<ProcessNode> managedNodes = group.getManagedCanvasNodes();
                 if (managedNodes != null) {
                     for (ProcessNode childNode : managedNodes) {
                         if (childNode.getNodeId() != null) {
@@ -1998,48 +1976,41 @@ public class MainView extends BorderPane {
                         }
                     }
                 }
-                
-                // ⭐ 新增：检查是否有嵌套的任务组容器
-                for (com.cc.job.gui.model.GroupContainer otherGroup : canvas.getGroupContainers()) {
+
+                for (GroupContainer otherGroup : canvas.getGroupContainers()) {
                     if (otherGroup != group) {
-                        // 简单判断：如果嵌套任务组的位置在父任务组范围内，认为是子任务组
                         double groupX = group.getLayoutX();
                         double groupY = group.getLayoutY();
                         double groupWidth = group.getFrame().getWidth();
                         double groupHeight = group.getFrame().getHeight();
-                        
+
                         double nestedX = otherGroup.getLayoutX();
                         double nestedY = otherGroup.getLayoutY();
-                        
-                        // 检查嵌套任务组是否在父任务组范围内
+
                         if (nestedX >= groupX && nestedX <= groupX + groupWidth &&
-                            nestedY >= groupY && nestedY <= groupY + groupHeight) {
+                                nestedY >= groupY && nestedY <= groupY + groupHeight) {
                             childNodeIds.add(otherGroup.getNodeId());
                         }
                     }
                 }
-                
+
                 if (!childNodeIds.isEmpty()) {
                     propertiesMap.put("children", childNodeIds);
                 }
-                
+
                 String propertiesJson = apiUtil.getGson().toJson(propertiesMap);
                 nodeData.put("properties", propertiesJson);
-                
+
                 nodesData.add(nodeData);
             }
 
-            // 3.2 转换连接数据（格式必须与后端 updateJobCompose 期望的一致）
-            // ⚠️ 重要：后端 LfEdge 类期望的格式是：
-            // - sourceNodeId, targetNodeId (不是 source/target)
-            List<java.util.Map<String, Object>> edgesData = new java.util.ArrayList<>();
+            List<Map<String, Object>> edgesData = new ArrayList<>();
             for (NodeConnection conn : connections) {
-                java.util.Map<String, Object> edgeData = new java.util.HashMap<>();
-                // ⭐ 后端期望 sourceNodeId 和 targetNodeId
+                Map<String, Object> edgeData = new HashMap<>();
                 String sourceId;
                 if (conn.getSourceNode() != null) {
                     sourceId = conn.getSourceNode().getNodeId();
-                } else if (conn.getSourceOwner() instanceof com.cc.job.gui.model.GroupContainer g) {
+                } else if (conn.getSourceOwner() instanceof GroupContainer g) {
                     sourceId = g.getNodeId();
                 } else {
                     continue;
@@ -2047,7 +2018,7 @@ public class MainView extends BorderPane {
                 String targetId;
                 if (conn.getTargetNode() != null) {
                     targetId = conn.getTargetNode().getNodeId();
-                } else if (conn.getTargetOwner() instanceof com.cc.job.gui.model.GroupContainer g2) {
+                } else if (conn.getTargetOwner() instanceof GroupContainer g2) {
                     targetId = g2.getNodeId();
                 } else {
                     continue;
@@ -2057,22 +2028,14 @@ public class MainView extends BorderPane {
                 edgesData.add(edgeData);
             }
 
-            // 4. 将节点和边转换为JSON字符串
             String nodesJson = apiUtil.getGson().toJson(nodesData);
             String edgesJson = apiUtil.getGson().toJson(edgesData);
 
-            logPanel.info("✓ 数据转换完成");
-            logger.debug("Nodes JSON: {}", nodesJson);
-            logger.debug("Edges JSON: {}", edgesJson);
-
-            // 5. 在后台线程中保存到数据库
             new Thread(() -> {
                 try {
                     logPanel.info("正在获取任务组表单数据...");
 
-                    // 获取当前任务组的表单数据
-                    com.cc.job.xo.model.form.JobInfoForm formData =
-                            jobInfoService.getFormData(currentTaskGroupId);
+                    JobInfoForm formData = jobInfoService.getFormData(currentTaskGroupId);
 
                     if (formData == null) {
                         Platform.runLater(() -> {
@@ -2082,26 +2045,17 @@ public class MainView extends BorderPane {
                         return;
                     }
 
-                    // 更新nodes和edges字段
                     formData.setNodes(nodesJson);
                     formData.setEdges(edgesJson);
-
-                    // 设置任务组必需的字段（参考Vue代码）
                     formData.setGlueType("BEAN");
                     formData.setExecutorHandler("runJobGroupXxlJob");
-
-                    // 确保必填字段不为空
                     if (formData.getExecutorRouteStrategy() == null || formData.getExecutorRouteStrategy().isEmpty()) {
-                        formData.setExecutorRouteStrategy("FIRST"); // 默认路由策略
+                        formData.setExecutorRouteStrategy("FIRST");
                     }
-
-                    // 清除时间字段，避免格式不匹配错误
-                    // 这些字段由后端自动管理，不需要前端设置
                     formData.setGlueUpdatetime(null);
 
                     logPanel.info("正在保存到数据库...");
 
-                    // 调用更新接口
                     boolean success = jobInfoService.updateJobCompose(currentTaskGroupId, formData);
 
                     if (success) {
@@ -2109,10 +2063,7 @@ public class MainView extends BorderPane {
                             logPanel.success("✓ 保存成功！");
                             logPanel.info("节点: " + nodes.size() + ", 连接: " + connections.size());
                             logPanel.info("正在刷新任务树...");
-
-                            // 刷新任务树
                             refreshTreeView();
-
                             logPanel.info("════════════════════════════════");
                         });
                     } else {
