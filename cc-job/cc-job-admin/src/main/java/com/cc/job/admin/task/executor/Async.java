@@ -327,8 +327,7 @@ public class Async {
         try {
             resultValue = getResultValue(timeout, worker, param, wrapperMap);
 
-            while (JobConstant.FAIL_RETRY.equals(String.valueOf(resultValue)) && retryCount != null
-                    && count < retryCount) {
+            while (retryCount != null && count < retryCount) {
                 count++;
                 // 指数退避 + 抖动，避免重试风暴；基于秒为单位
                 long baseDelayMillis = 300L;
