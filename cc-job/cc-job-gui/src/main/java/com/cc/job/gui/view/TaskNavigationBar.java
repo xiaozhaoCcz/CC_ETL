@@ -24,13 +24,16 @@ import java.util.function.Consumer;
 public class TaskNavigationBar extends HBox {
     
     private HBox tabContainer;
-    private Map<String, TaskTab> tabs;
-    private String currentTaskGroup;
+    // ⚠️ 关键修复：使用ID作为key，支持同名任务组
+    private Map<Long, TaskTab> tabs;
+    // 存储ID到名称的映射（用于显示）
+    private Map<Long, String> taskGroupIdToNameMap = new HashMap<>();
+    private Long currentTaskGroupId;
     private TaskSwitchCallback switchCallback;
     private TaskCloseCallback closeCallback;
     
     public interface TaskCloseCallback {
-        void onTaskClose(String taskGroupName);
+        void onTaskClose(Long taskGroupId, String taskGroupName);
     }
     
     // 运行/停止按钮区域
@@ -50,14 +53,12 @@ public class TaskNavigationBar extends HBox {
     private RunCallback runCallback;
     private StopCallback stopCallback;
     
-    // 当前任务组ID（用于判断是否正在运行）
-    private Long currentTaskGroupId;
     
     // 运行中的任务组列表
     private Map<Long, RunningJobGroup> runningJobs = new HashMap<>();
     
     public interface TaskSwitchCallback {
-        void onTaskSwitch(String taskGroupName);
+        void onTaskSwitch(String taskGroupName, Long taskGroupId);
     }
     
     public TaskNavigationBar() {
@@ -109,50 +110,63 @@ public class TaskNavigationBar extends HBox {
     
     /**
      * 添加任务组标签
+     * @param taskGroupName 任务组名称
+     * @param taskGroupId 任务组ID（必须，用于唯一标识）
      */
-    public void addTaskGroup(String taskGroupName) {
-        if (tabs.containsKey(taskGroupName)) {
-            // 如果已存在，直接切换到该标签
-            switchToTaskGroup(taskGroupName);
+    public void addTaskGroup(String taskGroupName, Long taskGroupId) {
+        if (taskGroupId == null) {
+            throw new IllegalArgumentException("任务组ID不能为null");
+        }
+        
+        // ⚠️ 关键修复：使用ID作为key，支持同名任务组
+        if (tabs.containsKey(taskGroupId)) {
+            // 如果已存在该ID的标签，直接切换到该标签
+            switchToTaskGroup(taskGroupId);
             return;
         }
         
-        TaskTab tab = new TaskTab(taskGroupName);
-        tab.setOnClick(() -> switchToTaskGroup(taskGroupName));
-        tab.setOnClose(() -> removeTaskGroup(taskGroupName));
+        TaskTab tab = new TaskTab(taskGroupName, taskGroupId);
+        tab.setOnClick(() -> switchToTaskGroup(taskGroupId));
+        tab.setOnClose(() -> removeTaskGroup(taskGroupId));
         
-        tabs.put(taskGroupName, tab);
+        tabs.put(taskGroupId, tab);
+        taskGroupIdToNameMap.put(taskGroupId, taskGroupName);
         tabContainer.getChildren().add(tab);
         
         // 自动切换到新添加的标签
-        switchToTaskGroup(taskGroupName);
+        switchToTaskGroup(taskGroupId);
     }
     
     /**
      * 添加或选择任务组标签（别名方法）
+     * @param taskGroupName 任务组名称
+     * @param taskGroupId 任务组ID（必须）
      */
-    public void addOrSelectTask(String taskGroupName) {
-        addTaskGroup(taskGroupName);
+    public void addOrSelectTask(String taskGroupName, Long taskGroupId) {
+        addTaskGroup(taskGroupName, taskGroupId);
     }
     
     /**
-     * 切换到指定任务组
+     * 切换到指定任务组（使用ID）
      */
-    public void switchToTaskGroup(String taskGroupName) {
-        if (!tabs.containsKey(taskGroupName)) {
+    public void switchToTaskGroup(Long taskGroupId) {
+        if (taskGroupId == null || !tabs.containsKey(taskGroupId)) {
             return;
         }
         
         // 更新所有标签的激活状态
-        tabs.forEach((name, tab) -> {
-            tab.setActive(name.equals(taskGroupName));
+        tabs.forEach((id, tab) -> {
+            tab.setActive(id.equals(taskGroupId));
         });
         
-        currentTaskGroup = taskGroupName;
+        currentTaskGroupId = taskGroupId;
         
-        // 触发切换回调
+        // 获取任务组名称
+        String taskGroupName = taskGroupIdToNameMap.get(taskGroupId);
+        
+        // 触发切换回调，传递名称和ID
         if (switchCallback != null) {
-            switchCallback.onTaskSwitch(taskGroupName);
+            switchCallback.onTaskSwitch(taskGroupName != null ? taskGroupName : ("任务组 " + taskGroupId), taskGroupId);
         }
         
         // 更新按钮状态
@@ -163,7 +177,13 @@ public class TaskNavigationBar extends HBox {
      * 设置当前任务组ID
      */
     public void setCurrentTaskGroupId(Long taskGroupId) {
-        this.currentTaskGroupId = taskGroupId;
+        if (taskGroupId != null && tabs.containsKey(taskGroupId)) {
+            this.currentTaskGroupId = taskGroupId;
+            // 更新标签激活状态
+            tabs.forEach((id, tab) -> {
+                tab.setActive(id.equals(taskGroupId));
+            });
+        }
         updateButtonState();
     }
     
@@ -291,30 +311,46 @@ public class TaskNavigationBar extends HBox {
     }
     
     /**
-     * 移除任务组标签
+     * 移除任务组标签（使用ID）
      */
-    public void removeTaskGroup(String taskGroupName) {
-        TaskTab tab = tabs.remove(taskGroupName);
+    public void removeTaskGroup(Long taskGroupId) {
+        if (taskGroupId == null) {
+            return;
+        }
+        
+        TaskTab tab = tabs.remove(taskGroupId);
+        String taskGroupName = taskGroupIdToNameMap.remove(taskGroupId);
+        
         if (tab != null) {
             tabContainer.getChildren().remove(tab);
             
             // 判断是否是关闭当前标签页
-            boolean isClosingCurrentTab = taskGroupName.equals(currentTaskGroup);
+            boolean isClosingCurrentTab = taskGroupId.equals(currentTaskGroupId);
             
             // 触发关闭回调，通知外部清除树形视图的选中状态
             // 注意：如果关闭的是当前标签页，会立即切换到新标签页，不需要清除选中状态
-            if (closeCallback != null && !isClosingCurrentTab) {
-                closeCallback.onTaskClose(taskGroupName);
+            if (closeCallback != null && !isClosingCurrentTab && taskGroupName != null) {
+                closeCallback.onTaskClose(taskGroupId, taskGroupName);
             }
             
             // 如果删除的是当前标签，切换到第一个标签
             if (isClosingCurrentTab && !tabs.isEmpty()) {
-                String firstTab = tabs.keySet().iterator().next();
-                switchToTaskGroup(firstTab);
+                Long firstTabId = tabs.keySet().iterator().next();
+                switchToTaskGroup(firstTabId);
             } else if (tabs.isEmpty()) {
-                currentTaskGroup = null;
+                currentTaskGroupId = null;
             }
         }
+    }
+    
+    /**
+     * 清除所有任务组标签
+     */
+    public void clearAllTasks() {
+        tabs.clear();
+        tabContainer.getChildren().clear();
+        taskGroupIdToNameMap.clear(); // ⚠️ 关键修复：清除ID到名称的映射
+        currentTaskGroupId = null;
     }
     
     /**
@@ -325,10 +361,17 @@ public class TaskNavigationBar extends HBox {
     }
     
     /**
-     * 获取当前任务组
+     * 获取当前任务组名称
      */
     public String getCurrentTaskGroup() {
-        return currentTaskGroup;
+        return currentTaskGroupId != null ? taskGroupIdToNameMap.get(currentTaskGroupId) : null;
+    }
+    
+    /**
+     * 获取当前任务组ID
+     */
+    public Long getCurrentTaskGroupId() {
+        return currentTaskGroupId;
     }
     
     /**
@@ -350,10 +393,10 @@ public class TaskNavigationBar extends HBox {
     }
     
     /**
-     * 设置切换回调（重载方法，接受 Consumer）
+     * 设置切换回调（重载方法，接受 Consumer<String>，兼容旧代码）
      */
     public void setOnTaskSwitch(Consumer<String> callback) {
-        this.switchCallback = callback::accept;
+        this.switchCallback = (name, id) -> callback.accept(name);
     }
     
     /**
@@ -366,9 +409,9 @@ public class TaskNavigationBar extends HBox {
     /**
      * 更新指定任务组的运行状态（显示/隐藏小绿点）
      */
-    public void updateTaskGroupRunningStatus(String taskGroupName, boolean isRunning) {
+    public void updateTaskGroupRunningStatus(Long taskGroupId, boolean isRunning) {
         Platform.runLater(() -> {
-            TaskTab tab = tabs.get(taskGroupName);
+            TaskTab tab = tabs.get(taskGroupId);
             if (tab != null) {
                 tab.setRunning(isRunning);
             }
@@ -411,6 +454,7 @@ public class TaskNavigationBar extends HBox {
             "-fx-border-width: 0;";
         
         private final String taskGroupName;
+        private final Long taskGroupId; // ⚠️ 关键修复：存储任务组ID
         private boolean active;
         private Runnable onClickCallback;
         private Runnable onCloseCallback;
@@ -421,8 +465,9 @@ public class TaskNavigationBar extends HBox {
         private FadeTransition blinkAnimation;
         private boolean isRunning = false;
         
-        public TaskTab(String taskGroupName) {
+        public TaskTab(String taskGroupName, Long taskGroupId) {
             this.taskGroupName = taskGroupName;
+            this.taskGroupId = taskGroupId;
             initializeUI();
         }
         
@@ -578,6 +623,13 @@ public class TaskNavigationBar extends HBox {
          */
         public String getTaskGroupName() {
             return taskGroupName;
+        }
+        
+        /**
+         * 获取任务组ID
+         */
+        public Long getTaskGroupId() {
+            return taskGroupId;
         }
     }
 }

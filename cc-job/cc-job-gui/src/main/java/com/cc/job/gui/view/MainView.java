@@ -324,22 +324,16 @@ public class MainView extends BorderPane {
                                             copyForm.setParentId(effectiveParentId);
                                             String label = nd.getJobName() != null ? nd.getJobName() : originalForm.getJobDesc();
                                             copyForm.setJobDesc(label);
-                                            // ⭐ 修复：保持子节点相对于任务组节点的相对位置
-                                            // 跳过任务组节点本身（只处理子节点）
-                                            boolean isGroupNode = false;
+                                            // ⭐ 修复：判断是否是任务组节点（声明为final以便在lambda中使用）
+                                            final boolean isGroupNode;
                                             if (nd.getType() != null && 
                                                 (nd.getType().equals("CustomGroup") || nd.getType().equalsIgnoreCase("custom-group"))) {
                                                 isGroupNode = true;
                                             } else if (nd.getProperties() != null) {
                                                 // properties 已经是 Map 类型，直接使用
-                                                if (nd.getProperties().containsKey("children")) {
-                                                    isGroupNode = true;
-                                                }
-                                            }
-                                            
-                                            if (isGroupNode) {
-                                                // 跳过任务组节点本身，只处理子节点
-                                                continue;
+                                                isGroupNode = nd.getProperties().containsKey("children");
+                                            } else {
+                                                isGroupNode = false;
                                             }
                                             
                                             // 计算新任务组节点的位置
@@ -356,6 +350,15 @@ public class MainView extends BorderPane {
                                             // 保持相对位置
                                             copyForm.setNodePositionX(newGroupX + offsetX);
                                             copyForm.setNodePositionY(newGroupY + offsetY);
+                                            
+                                            // ⭐ 修复：如果是任务组节点，需要设置任务组相关属性
+                                            if (isGroupNode) {
+                                                // 设置为任务组类型
+                                                copyForm.setJobType(2);
+                                                copyForm.setGlueType("CUSTOM_GROUP");
+                                                copyForm.setExecutorHandler("runJobGroupXxlJob");
+                                            }
+                                            
                                             // 其他必填默认
                                             if (copyForm.getExecutorRouteStrategy() == null || copyForm.getExecutorRouteStrategy().isEmpty()) {
                                                 copyForm.setExecutorRouteStrategy("FIRST");
@@ -363,8 +366,39 @@ public class MainView extends BorderPane {
                                             // 避免 LocalDateTime 反序列化格式错误（后端自行维护该时间）
                                             copyForm.setGlueUpdatetime(null);
                                             
-                                            // 保存为新节点
+                                            // 保存为新节点（包括任务组节点本身）
                                             com.cc.job.xo.model.entity.JobNode saved = jobInfoService.saveJobNode(copyForm);
+                                            
+                                            // ⭐ 修复：如果是任务组节点，递归处理子节点（在保存节点之后）
+                                            if (isGroupNode && saved != null) {
+                                                // 递归获取并保存嵌套的任务组节点的子节点
+                                                try {
+                                                    // 获取嵌套任务组的数据
+                                                    JobComposeData nestedCompose = jobPartService.getJobCompose(originalJobId);
+                                                    if (nestedCompose != null && nestedCompose.getNodes() != null) {
+                                                        // 递归处理嵌套任务组的子节点
+                                                        java.util.Map<String, ProcessNode> nestedIdToNode = new java.util.HashMap<>();
+                                                        java.util.List<ProcessNode> nestedNewNodes = new java.util.ArrayList<>();
+                                                        
+                                                        // 递归复制嵌套任务组的子节点
+                                                        copyNestedTaskGroupNodes(
+                                                            nestedCompose, 
+                                                            saved.getJobId(), 
+                                                            newGroupX + offsetX, 
+                                                            newGroupY + offsetY,
+                                                            nestedIdToNode,
+                                                            nestedNewNodes,
+                                                            new java.util.HashSet<>() // 用于去重的已处理jobId集合
+                                                        );
+                                                        
+                                                        // 将嵌套的节点也添加到主节点映射中
+                                                        idToNode.putAll(nestedIdToNode);
+                                                        newNodes.addAll(nestedNewNodes);
+                                                    }
+                                                } catch (Exception e) {
+                                                    logger.error("递归复制嵌套任务组节点失败: jobId={}, error={}", originalJobId, e.getMessage(), e);
+                                                }
+                                            }
                                             if (saved != null) {
                                                 // 在UI线程添加到画布
                                                 final String nodeIdStr = String.valueOf(saved.getId());
@@ -375,7 +409,12 @@ public class MainView extends BorderPane {
                                                 Platform.runLater(() -> {
                                                     ProcessNode node = new ProcessNode(nodeIdStr, title, px, py);
                                                     node.setJobId(newJobId);
-                                                    node.setType("Bean");
+                                                    // ⭐ 修复：如果是任务组节点，设置正确的类型
+                                                    if (isGroupNode) {
+                                                        node.setType("CustomGroup");
+                                                    } else {
+                                                        node.setType("Bean");
+                                                    }
                                                     canvas.addNode(node, true);
                                                     configureNodeCallbacks(node);
                                                     idToNode.put(nd.getId(), node);
@@ -579,31 +618,101 @@ public class MainView extends BorderPane {
         setupTreeViewCallback();
 
         // 导航栏切换任务组回调
-        navigationBar.setOnTaskSwitch((TaskNavigationBar.TaskSwitchCallback) taskGroupName -> {
+        navigationBar.setOnTaskSwitch((taskGroupName, taskGroupId) -> {
             logPanel.info("导航栏切换到任务组: " + taskGroupName);
-            // 根据任务组名称查找对应的ID并加载流程图
-            Long taskId = taskGroupNameToIdMap.get(taskGroupName);
-            if (taskId == null) {
-                // 如果映射中没有，尝试从树形视图中查找
-                taskId = findTaskGroupIdByName(taskGroupName);
-                if (taskId != null) {
-                    taskGroupNameToIdMap.put(taskGroupName, taskId);
+            
+            Long resolvedTaskId = null;
+            
+            // ⚠️ 关键修复：优先使用导航栏存储的ID（这是最准确的，因为它是在添加任务组时从树形视图直接获取的）
+            if (taskGroupId != null) {
+                // 验证导航栏存储的ID是否在树形视图中存在且名称匹配
+                javafx.scene.control.TreeItem<TreeNodeData> taskGroupItem = treeView.findTreeItemById(taskGroupId);
+                if (taskGroupItem != null) {
+                    TreeNodeData nodeData = taskGroupItem.getValue();
+                    if (nodeData != null && taskGroupName.equals(nodeData.getLabel()) && 
+                        nodeData.getType() != null && nodeData.getType() == 1) {
+                        // ID存在且名称匹配，使用这个ID
+                        resolvedTaskId = taskGroupId;
+                        logger.info("🔍 [DEBUG] 导航栏切换 - 使用导航栏存储的ID: {} (ID: {})", taskGroupName, resolvedTaskId);
+                    } else {
+                        // ID存在但名称不匹配，说明可能是旧的ID
+                        logPanel.warn("⚠ 导航栏存储的ID和名称不匹配，重新查找...");
+                    }
+                } else {
+                    // ID在树形视图中不存在，说明可能是旧的ID
+                    logPanel.warn("⚠ 导航栏存储的ID在树形视图中不存在，重新查找...");
                 }
             }
-            if (taskId != null) {
-                // 更新导航栏当前任务组ID
-                navigationBar.setCurrentTaskGroupId(taskId);
+            
+            // 如果导航栏没有存储ID或验证失败，从树形视图中查找ID
+            if (resolvedTaskId == null) {
+                Long foundId = findTaskGroupIdByName(taskGroupName);
+                
+                // 验证从树形视图中找到的ID
+                if (foundId != null) {
+                    javafx.scene.control.TreeItem<TreeNodeData> taskGroupItem = treeView.findTreeItemById(foundId);
+                    if (taskGroupItem != null) {
+                        TreeNodeData nodeData = taskGroupItem.getValue();
+                        if (nodeData != null && taskGroupName.equals(nodeData.getLabel()) && 
+                            nodeData.getType() != null && nodeData.getType() == 1) {
+                            // ID存在且名称匹配，使用这个ID
+                            resolvedTaskId = foundId;
+                            logger.info("🔍 [DEBUG] 导航栏切换 - 从树形视图找到任务组: {} (ID: {})", taskGroupName, resolvedTaskId);
+                        } else {
+                            // ID存在但名称不匹配，说明可能是旧的ID，清除它并重新查找
+                            logPanel.warn("⚠ 检测到任务组ID和名称不匹配，重新查找...");
+                        }
+                    } else {
+                        // ID在树形视图中不存在，说明可能是旧的ID，清除它
+                        logPanel.warn("⚠ 检测到任务组ID在树形视图中不存在，重新查找...");
+                    }
+                }
+            }
+            
+            // 如果从树形视图中找不到或验证失败，尝试从缓存中查找（兼容旧逻辑）
+            if (resolvedTaskId == null) {
+                Long cachedId = taskGroupNameToIdMap.get(taskGroupName);
+                if (cachedId != null) {
+                    // 验证缓存的ID是否在树形视图中存在且名称匹配
+                    javafx.scene.control.TreeItem<TreeNodeData> cachedItem = treeView.findTreeItemById(cachedId);
+                    if (cachedItem != null) {
+                        TreeNodeData nodeData = cachedItem.getValue();
+                        if (nodeData != null && taskGroupName.equals(nodeData.getLabel()) && 
+                            nodeData.getType() != null && nodeData.getType() == 1) {
+                            // 缓存的ID有效，使用它
+                            resolvedTaskId = cachedId;
+                            logger.info("🔍 [DEBUG] 导航栏切换 - 使用缓存的ID: {} (ID: {})", taskGroupName, resolvedTaskId);
+                        } else {
+                            // 缓存的ID无效，清除它
+                            logPanel.warn("⚠ 缓存的ID无效，已清除");
+                            taskGroupNameToIdMap.remove(taskGroupName);
+                        }
+                    } else {
+                        // 缓存的ID在树形视图中不存在，清除它
+                        logPanel.warn("⚠ 缓存的ID在树形视图中不存在，已清除");
+                        taskGroupNameToIdMap.remove(taskGroupName);
+                    }
+                }
+            }
+            
+            final Long finalTaskId = resolvedTaskId; // 创建final变量用于lambda
+            
+            if (finalTaskId != null) {
+                // 更新缓存（使用验证过的ID）
+                taskGroupNameToIdMap.put(taskGroupName, finalTaskId);
+                // 更新导航栏当前任务组ID（确保导航栏也存储了正确的ID）
+                navigationBar.setCurrentTaskGroupId(finalTaskId);
                 // 更新顶部工具栏当前任务组ID
-                toolBar.setCurrentTaskGroupId(taskId);
+                toolBar.setCurrentTaskGroupId(finalTaskId);
                 // 更新页面Store
-                usePageStoreHook().setCurrentPage(taskId);
-                loadTaskGroupData(taskId, taskGroupName);
+                usePageStoreHook().setCurrentPage(finalTaskId);
+                loadTaskGroupData(finalTaskId, taskGroupName);
                 
                 // 同步树形视图的选中状态：选中对应的任务组
                 // 使用 Platform.runLater 确保在 UI 更新后执行，避免时序问题
                 javafx.application.Platform.runLater(() -> {
                     if (!suppressNextTreeSelectionSync) {
-                        treeView.selectTaskGroupByName(taskGroupName);
+                        treeView.selectTaskGroupById(finalTaskId); // ⚠️ 关键修复：使用ID而不是名称来选择，避免同名问题
                     } else {
                         // 仅抑制一次
                         suppressNextTreeSelectionSync = false;
@@ -618,16 +727,17 @@ public class MainView extends BorderPane {
         });
         
         // 导航栏关闭任务组标签回调
-        navigationBar.setOnTaskClose((TaskNavigationBar.TaskCloseCallback) taskGroupName -> {
+        navigationBar.setOnTaskClose((taskGroupId, taskGroupName) -> {
             // 当标签页关闭时，清除树形视图中对应任务组的选中状态
             // 注意：此回调只在关闭的不是当前标签页时触发（当前标签页关闭时会直接切换到新标签页）
-            Long taskId = taskGroupNameToIdMap.get(taskGroupName);
-            if (taskId != null) {
+            if (taskGroupId != null) {
                 // 如果当前选中的是关闭的任务组，清除选中状态
-                String currentSelectedTask = treeView.getSelectedTask();
-                if (taskGroupName.equals(currentSelectedTask)) {
+                Long currentTaskGroupId = usePageStoreHook().getCurrentTaskGroupId();
+                if (taskGroupId.equals(currentTaskGroupId)) {
                     treeView.clearSelection();
                 }
+                // 清除缓存中的映射
+                taskGroupNameToIdMap.remove(taskGroupName);
             }
         });
 
@@ -657,7 +767,7 @@ public class MainView extends BorderPane {
 
             @Override
             public void onOpen() {
-                logPanel.info("打开流程图功能开发中...");
+                openPartitionFile();
             }
 
             @Override
@@ -1017,7 +1127,7 @@ public class MainView extends BorderPane {
      */
     private void onTaskSelectedWithDetails(Long taskId, String taskName, Integer type) {
         // 若设置了抑制树同步的标志，则在处理完一次后清除
-        // 注意：此标志仅控制“树的选中同步”，不影响数据加载
+        // 注意：此标志仅控制"树的选中同步"，不影响数据加载
         if (suppressNextTaskLoad) {
             suppressNextTaskLoad = false;
             Long currentTaskGroupId = usePageStoreHook().getCurrentTaskGroupId();
@@ -1028,15 +1138,55 @@ public class MainView extends BorderPane {
         }
 
         logPanel.info("选择节点: " + taskName + " [类型: " + getTypeNameByType(type) + "]");
+        logPanel.info("任务组ID: " + taskId); // 添加ID日志，便于调试
 
         // ⚠️ 重要：只有任务组（type=1）才添加到导航栏，过滤掉分区（type=0）等其他节点
         if (type != null && type == 1) {
-            navigationBar.addOrSelectTask(taskName);
+            // ⚠️ 关键修复：传递任务组ID，确保导航栏存储正确的ID映射
+            navigationBar.addOrSelectTask(taskName, taskId);
         }
 
         // 只有任务组（type=1）才加载流程图
         if (type != null && type == 1 && taskId != null) {
-            // 更新任务组名称到ID的映射
+            // ⚠️ 关键修复1：验证ID是否在缓存中，如果缓存中的ID与传入的ID不同，说明可能是旧缓存，清除它
+            Long cachedId = taskGroupNameToIdMap.get(taskName);
+            if (cachedId != null && !cachedId.equals(taskId)) {
+                logPanel.warn("⚠ 检测到任务组ID不一致！缓存ID: " + cachedId + ", 实际ID: " + taskId);
+                logPanel.warn("⚠ 清除旧缓存，使用新的ID: " + taskId);
+                taskGroupNameToIdMap.remove(taskName);
+                // 同时清除所有同名任务组的缓存（可能存在多个同名任务组）
+                taskGroupNameToIdMap.entrySet().removeIf(entry -> entry.getKey().equals(taskName));
+            }
+            
+            // ⚠️ 关键修复2：验证taskId是否真的存在，如果不存在可能是旧ID
+            // 通过检查树形视图中是否存在该ID来验证
+            javafx.scene.control.TreeItem<TreeNodeData> taskGroupItem = treeView.findTreeItemById(taskId);
+            if (taskGroupItem == null) {
+                logPanel.error("✗ 错误：任务组ID " + taskId + " 在树形视图中不存在！");
+                logPanel.warn("⚠ 这可能是因为使用了旧的ID，请刷新树形视图后重试");
+                logger.error("🔍 [DEBUG] 任务组ID {} 在树形视图中不存在，taskName: {}", taskId, taskName);
+                return;
+            }
+            
+            // 验证节点名称和类型是否匹配
+            TreeNodeData nodeData = taskGroupItem.getValue();
+            if (nodeData != null) {
+                // ⚠️ 关键修复：如果名称不匹配，说明ID和名称不一致，可能是使用了错误的ID，直接返回
+                if (!taskName.equals(nodeData.getLabel())) {
+                    logPanel.error("✗ 错误：任务组名称不匹配！期望: " + taskName + ", 实际: " + nodeData.getLabel());
+                    logPanel.warn("⚠ 这可能是因为使用了错误的ID，请刷新树形视图后重试");
+                    logger.error("🔍 [DEBUG] 任务组名称不匹配 - 期望: {}, 实际: {}, ID: {}", taskName, nodeData.getLabel(), taskId);
+                    return;
+                }
+                // 验证节点类型
+                if (nodeData.getType() == null || nodeData.getType() != 1) {
+                    logPanel.error("✗ 错误：节点类型不正确！期望: 1(任务组), 实际: " + nodeData.getType());
+                    logger.error("🔍 [DEBUG] 节点类型不正确 - ID: {}, type: {}", taskId, nodeData.getType());
+                    return;
+                }
+            }
+            
+            // 更新任务组名称到ID的映射（使用最新的ID）
             taskGroupNameToIdMap.put(taskName, taskId);
             // 更新当前选中的任务组ID
             usePageStoreHook().setCurrentPage(taskId);
@@ -1044,6 +1194,9 @@ public class MainView extends BorderPane {
             navigationBar.setCurrentTaskGroupId(taskId);
             // 更新顶部工具栏当前任务组ID
             toolBar.setCurrentTaskGroupId(taskId);
+            
+            logPanel.info("开始加载任务组数据，ID: " + taskId + ", 名称: " + taskName);
+            logger.info("🔍 [DEBUG] onTaskSelectedWithDetails - 准备加载任务组，taskId: {}, taskName: {}", taskId, taskName);
             loadTaskGroupData(taskId, taskName);
             
             // 注意：checkAndUpdateTaskGroupRunningStatus 现在在 loadTaskGroupData 内部调用
@@ -1073,8 +1226,8 @@ public class MainView extends BorderPane {
         // 更新顶部工具栏当前任务组ID
         toolBar.setCurrentTaskGroupId(taskGroupId);
         
-        // 添加到导航栏（如果还没有）
-        navigationBar.addOrSelectTask(taskGroupName);
+        // 添加到导航栏（如果还没有），传递任务组ID
+        navigationBar.addOrSelectTask(taskGroupName, taskGroupId);
         
         // 加载任务组数据，并在加载完成后执行定位
         loadTaskGroupDataWithCallback(taskGroupId, taskGroupName, locateCallback);
@@ -1160,6 +1313,7 @@ public class MainView extends BorderPane {
         logPanel.info("════════════════════════════════");
         logPanel.info("开始加载任务组: " + taskName);
         logPanel.info("任务组ID: " + taskId);
+        logger.info("🔍 [DEBUG] loadTaskGroupData - taskId: {}, taskName: {}", taskId, taskName);
 
         logPanel.info("准备同步当前任务组的节点运行状态...");
 
@@ -1169,14 +1323,29 @@ public class MainView extends BorderPane {
                 canvas.syncPendingNodeStatusBlocking();
                 Platform.runLater(() -> logPanel.info("节点状态同步完成，开始加载最新数据"));
 
+                logger.info("🔍 [DEBUG] 调用 getJobCompose，taskId: {}", taskId);
                 JobComposeData composeData = jobPartService.getJobCompose(taskId);
+                logger.info("🔍 [DEBUG] getJobCompose 返回，composeData: {}", composeData != null ? "非空" : "空");
 
                 // 在 JavaFX 主线程中更新 UI
                 Platform.runLater(() -> {
-                    // ⚠️ 注意：不再清空缓存，而是使用智能合并策略
-                    // 在 loadFromComposeData 中会智能合并后端状态和缓存状态，避免显示过时的状态
+                    // ⚠️ 关键修复：在加载新任务组数据前，清除节点状态缓存
+                    // 这样可以避免使用旧任务组的节点状态缓存
+                    com.cc.job.gui.util.NodeStatusSyncManager.getInstance().clearCacheForTaskGroupSwitch();
+                    logger.info("🔍 [DEBUG] 已清除节点状态缓存，准备加载任务组ID: {}", taskId);
 
                     if (composeData != null) {
+                        logger.info("🔍 [DEBUG] 开始加载任务组数据，任务组ID: {}, 节点数量: {}", 
+                            taskId, composeData.getNodes() != null ? composeData.getNodes().size() : 0);
+                        // 记录所有节点的jobId，用于调试
+                        if (composeData.getNodes() != null) {
+                            for (com.cc.job.gui.model.JobComposeData.NodeData nodeData : composeData.getNodes()) {
+                                if (nodeData.getJobId() != null) {
+                                    logger.info("🔍 [DEBUG] 节点: {}, jobId: {}, 任务组ID: {}", 
+                                        nodeData.getJobName(), nodeData.getJobId(), taskId);
+                                }
+                            }
+                        }
                         canvas.loadFromComposeData(composeData);
 
                         // 为所有加载的节点设置编辑回调
@@ -1445,7 +1614,7 @@ public class MainView extends BorderPane {
         logPanel.info(currentJobId, "════════════════════════════════");
 
         // 更新导航栏中的小绿点（任务开始运行）
-        navigationBar.updateTaskGroupRunningStatus(jobName, true);
+        navigationBar.updateTaskGroupRunningStatus(currentJobId, true);
 
         // 更新工具栏显示
         updateToolBarRunningJobs();
@@ -1768,10 +1937,7 @@ public class MainView extends BorderPane {
             runningJobs.remove(runningJob.getJobId());
             
             // 更新导航栏中的小绿点（任务完成）
-            String jobNameStr = getJobNameById(runningJob.getJobId());
-            if (jobNameStr != null) {
-                navigationBar.updateTaskGroupRunningStatus(jobNameStr, false);
-            }
+            navigationBar.updateTaskGroupRunningStatus(runningJob.getJobId(), false);
             
             updateToolBarRunningJobs();
 
@@ -1844,10 +2010,7 @@ public class MainView extends BorderPane {
                     runningJobs.remove(jobId);
                     
                     // 更新导航栏中的小绿点（任务停止）
-                    String jobNameStr = getJobNameById(jobId);
-                    if (jobNameStr != null) {
-                        navigationBar.updateTaskGroupRunningStatus(jobNameStr, false);
-                    }
+                    navigationBar.updateTaskGroupRunningStatus(jobId, false);
 
                     // 更新工具栏显示
                     updateToolBarRunningJobs();
@@ -1933,7 +2096,7 @@ public class MainView extends BorderPane {
                 logger.debug("📊 任务组 {} ({}) 运行状态: {}", taskId, taskGroupName, isRunning);
                 
                 // 更新导航栏中的小绿点
-                navigationBar.updateTaskGroupRunningStatus(taskGroupName, isRunning);
+                navigationBar.updateTaskGroupRunningStatus(taskId, isRunning);
                 
                 // 在 JavaFX 主线程中更新连接线的运行状态
                 Platform.runLater(() -> {
@@ -2727,6 +2890,105 @@ public class MainView extends BorderPane {
         } catch (Exception e) {
             logPanel.error("✗ 显示编辑对话框失败: " + e.getMessage());
             logger.error("显示编辑分区对话框失败", e);
+        }
+    }
+    
+    /**
+     * 打开分区文件并导入
+     */
+    private void openPartitionFile() {
+        try {
+            logPanel.info("📂 正在打开分区文件...");
+            
+            Platform.runLater(() -> {
+                // 显示文件选择对话框
+                javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
+                fileChooser.setTitle("选择要导入的分区文件");
+                fileChooser.getExtensionFilters().add(
+                    new javafx.stage.FileChooser.ExtensionFilter("加密数据文件", "*.cetl")
+                );
+                
+                javafx.stage.Window window = this.getScene().getWindow();
+                java.io.File file = fileChooser.showOpenDialog(window);
+                
+                if (file != null) {
+                    // 在后台线程中导入数据
+                    new Thread(() -> {
+                        try {
+                            logPanel.info("📥 正在导入分区数据: " + file.getName());
+                            boolean success = jobPartService.importData(file);
+                            
+                            if (success) {
+                                // 等待一小段时间，确保后端数据已完全保存
+                                try {
+                                    Thread.sleep(500);
+                                } catch (InterruptedException e) {
+                                    Thread.currentThread().interrupt();
+                                }
+                                
+                                Platform.runLater(() -> {
+                                    logPanel.success("✓ 分区数据导入成功");
+                                    
+                                    // ⚠️ 关键修复1：清除所有任务组名称到ID的映射缓存，避免使用旧的ID
+                                    taskGroupNameToIdMap.clear();
+                                    logPanel.info("ℹ 已清除任务组ID缓存");
+                                    
+                                    // ⚠️ 关键修复2：清除节点状态缓存，避免使用旧的jobId状态
+                                    com.cc.job.gui.util.NodeStatusSyncManager.getInstance().clearCacheForTaskGroupSwitch();
+                                    logPanel.info("ℹ 已清除节点状态缓存");
+                                    
+                                    // ⚠️ 关键修复3：清空画布，避免显示旧的节点
+                                    canvas.clear();
+                                    logPanel.info("ℹ 已清空画布");
+                                    
+                                    // ⚠️ 关键修复4：清空当前页面存储，避免使用旧的任务组ID
+                                    usePageStoreHook().setCurrentPage(0L);
+                                    navigationBar.setCurrentTaskGroupId(null);
+                                    toolBar.setCurrentTaskGroupId(null);
+                                    logPanel.info("ℹ 已清空页面存储");
+                                    
+                                    // ⚠️ 关键修复5：清空导航栏的所有任务组标签，避免使用旧的任务组ID
+                                    navigationBar.clearAllTasks();
+                                    logPanel.info("ℹ 已清空导航栏任务组标签");
+                                    
+                                    // 刷新树形视图（这会重新从后端获取最新数据，包括新的任务组ID）
+                                    if (treeView != null) {
+                                        logPanel.info("🔄 正在刷新树形视图，获取最新的任务组数据...");
+                                        // 先清空树形视图，确保完全重新加载
+                                        treeView.clearSelection();
+                                        // 刷新树形数据（异步操作）
+                                        treeView.refreshTreeData();
+                                        
+                                        // ⚠️ 关键修复6：等待树形视图刷新完成后再提示用户
+                                        // 使用延迟确保树形视图数据已完全加载
+                                        javafx.animation.PauseTransition delay = new javafx.animation.PauseTransition(javafx.util.Duration.millis(800));
+                                        delay.setOnFinished(e -> {
+                                            logPanel.info("ℹ 已刷新树形视图，请查看导入的分区");
+                                            logPanel.warn("⚠ 重要提示：导入后的任务组是全新的，ID已更新，请点击新导入的任务组查看");
+                                            logPanel.info("💡 提示：如果点击后还是跳转到旧页面，请检查日志中的任务组ID是否正确");
+                                        });
+                                        delay.play();
+                                    }
+                                });
+                            } else {
+                                Platform.runLater(() -> {
+                                    logPanel.error("✗ 分区数据导入失败");
+                                });
+                            }
+                        } catch (Exception e) {
+                            Platform.runLater(() -> {
+                                logPanel.error("✗ 导入分区数据失败: " + e.getMessage());
+                                logger.error("导入分区数据失败", e);
+                            });
+                        }
+                    }, "import-partition-thread").start();
+                } else {
+                    logPanel.info("ℹ 已取消打开文件");
+                }
+            });
+        } catch (Exception e) {
+            logPanel.error("✗ 打开文件失败: " + e.getMessage());
+            logger.error("打开文件失败", e);
         }
     }
     
@@ -4270,6 +4532,174 @@ public class MainView extends BorderPane {
                 }
             });
         }, "delete-group-container-" + nodeId).start();
+    }
+
+    /**
+     * 递归复制嵌套任务组的子节点
+     * 
+     * @param nestedCompose 嵌套任务组的数据
+     * @param parentJobId 父任务组ID（新创建的任务组节点ID）
+     * @param baseX 基础X坐标（任务组节点的X坐标）
+     * @param baseY 基础Y坐标（任务组节点的Y坐标）
+     * @param idToNode 节点ID到ProcessNode的映射（输出参数）
+     * @param newNodes 新创建的节点列表（输出参数）
+     * @param processedJobIds 已处理的jobId集合（用于去重）
+     */
+    private void copyNestedTaskGroupNodes(
+            JobComposeData nestedCompose,
+            Long parentJobId,
+            double baseX,
+            double baseY,
+            java.util.Map<String, ProcessNode> idToNode,
+            java.util.List<ProcessNode> newNodes,
+            java.util.Set<Long> processedJobIds) {
+        
+        if (nestedCompose == null || nestedCompose.getNodes() == null) {
+            return;
+        }
+        
+        // 找到嵌套任务组节点的位置（用于计算相对位置）
+        double nestedGroupX = baseX;
+        double nestedGroupY = baseY;
+        boolean foundNestedGroupNode = false;
+        
+        if (nestedCompose.getJobNode() != null) {
+            JobComposeData.NodeData jobNode = nestedCompose.getJobNode();
+            if (jobNode.getX() != null && jobNode.getY() != null) {
+                nestedGroupX = jobNode.getX();
+                nestedGroupY = jobNode.getY();
+                foundNestedGroupNode = true;
+            }
+        }
+        
+        // 遍历嵌套任务组的所有子节点
+        for (JobComposeData.NodeData nd : nestedCompose.getNodes()) {
+            Long originalJobId = nd.getJobId();
+            if (originalJobId == null) {
+                continue;
+            }
+            
+            // 去重：同一次克隆中，原jobId只处理一次
+            if (!processedJobIds.add(originalJobId)) {
+                continue;
+            }
+            
+            try {
+                // 拉取原节点表单并克隆
+                JobInfoForm originalForm = jobInfoService.getJobNodeFormData(originalJobId);
+                if (originalForm == null) {
+                    continue;
+                }
+                
+                JobInfoForm copyForm = deepCopyJobInfoForm(originalForm);
+                if (copyForm == null) {
+                    continue;
+                }
+                
+                // 设置归属与基础信息
+                copyForm.setId(null);
+                copyForm.setParentId(parentJobId);
+                String label = nd.getJobName() != null ? nd.getJobName() : originalForm.getJobDesc();
+                copyForm.setJobDesc(label);
+                
+                // 判断是否是任务组节点
+                boolean isNestedGroupNode = false;
+                if (nd.getType() != null && 
+                    (nd.getType().equals("CustomGroup") || nd.getType().equalsIgnoreCase("custom-group"))) {
+                    isNestedGroupNode = true;
+                } else if (nd.getProperties() != null && nd.getProperties().containsKey("children")) {
+                    isNestedGroupNode = true;
+                }
+                
+                // 计算子节点相对于嵌套任务组节点的偏移量
+                double nx = nd.getX() != null ? nd.getX() : 0;
+                double ny = nd.getY() != null ? nd.getY() : 0;
+                double offsetX = foundNestedGroupNode ? (nx - nestedGroupX) : 0;
+                double offsetY = foundNestedGroupNode ? (ny - nestedGroupY) : 0;
+                
+                // 保持相对位置
+                copyForm.setNodePositionX(baseX + offsetX);
+                copyForm.setNodePositionY(baseY + offsetY);
+                
+                // 如果是嵌套的任务组节点，递归处理
+                if (isNestedGroupNode) {
+                    copyForm.setJobType(2);
+                    copyForm.setGlueType("CUSTOM_GROUP");
+                    copyForm.setExecutorHandler("runJobGroupXxlJob");
+                    
+                    if (copyForm.getExecutorRouteStrategy() == null || copyForm.getExecutorRouteStrategy().isEmpty()) {
+                        copyForm.setExecutorRouteStrategy("FIRST");
+                    }
+                    copyForm.setGlueUpdatetime(null);
+                    
+                    // 先保存当前任务组节点
+                    com.cc.job.xo.model.entity.JobNode savedNestedGroup = jobInfoService.saveJobNode(copyForm);
+                    if (savedNestedGroup != null) {
+                        // 递归获取并保存更深层的嵌套任务组节点
+                        try {
+                            JobComposeData deeperNestedCompose = jobPartService.getJobCompose(originalJobId);
+                            if (deeperNestedCompose != null && deeperNestedCompose.getNodes() != null) {
+                                // 递归处理更深层的子节点
+                                copyNestedTaskGroupNodes(
+                                    deeperNestedCompose,
+                                    savedNestedGroup.getJobId(),
+                                    copyForm.getNodePositionX(),
+                                    copyForm.getNodePositionY(),
+                                    idToNode,
+                                    newNodes,
+                                    processedJobIds
+                                );
+                            }
+                        } catch (Exception e) {
+                            logger.error("递归复制更深层嵌套任务组节点失败: jobId={}, error={}", originalJobId, e.getMessage(), e);
+                        }
+                        
+                        // 添加到UI
+                        final String nodeIdStr = String.valueOf(savedNestedGroup.getId());
+                        final Long newJobId = savedNestedGroup.getJobId();
+                        final String title = label;
+                        final double px = copyForm.getNodePositionX();
+                        final double py = copyForm.getNodePositionY();
+                        Platform.runLater(() -> {
+                            ProcessNode node = new ProcessNode(nodeIdStr, title, px, py);
+                            node.setJobId(newJobId);
+                            node.setType("CustomGroup");
+                            canvas.addNode(node, true);
+                            configureNodeCallbacks(node);
+                            idToNode.put(nd.getId(), node);
+                            newNodes.add(node);
+                        });
+                    }
+                } else {
+                    // 普通节点，直接保存
+                    if (copyForm.getExecutorRouteStrategy() == null || copyForm.getExecutorRouteStrategy().isEmpty()) {
+                        copyForm.setExecutorRouteStrategy("FIRST");
+                    }
+                    copyForm.setGlueUpdatetime(null);
+                    
+                    com.cc.job.xo.model.entity.JobNode saved = jobInfoService.saveJobNode(copyForm);
+                    if (saved != null) {
+                        final String nodeIdStr = String.valueOf(saved.getId());
+                        final Long newJobId = saved.getJobId();
+                        final String title = label;
+                        final double px = copyForm.getNodePositionX();
+                        final double py = copyForm.getNodePositionY();
+                        Platform.runLater(() -> {
+                            ProcessNode node = new ProcessNode(nodeIdStr, title, px, py);
+                            node.setJobId(newJobId);
+                            node.setType("Bean");
+                            canvas.addNode(node, true);
+                            configureNodeCallbacks(node);
+                            idToNode.put(nd.getId(), node);
+                            newNodes.add(node);
+                        });
+                    }
+                }
+            } catch (Exception e) {
+                logger.error("复制嵌套任务组子节点失败: nodeId={}, jobId={}, error={}", 
+                    nd.getId(), originalJobId, e.getMessage(), e);
+            }
+        }
     }
 
     private void locateNodeOnCanvas(ProcessNode node) {

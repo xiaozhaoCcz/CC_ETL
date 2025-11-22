@@ -597,4 +597,50 @@ public class JobPartService extends  BaseService {
             return Result.isSuccess(result);
         }
     }
+    
+    /**
+     * 导入分区数据
+     * @param file 导入的文件
+     * @return 是否导入成功
+     * @throws IOException 网络异常
+     */
+    public boolean importData(java.io.File file) throws IOException {
+        String url = apiUtil.getBaseUrl() + "/api/v1/jobParts/importData";
+        
+        // 读取文件内容
+        byte[] fileBytes = java.nio.file.Files.readAllBytes(file.toPath());
+        
+        // 构建multipart请求
+        okhttp3.MultipartBody.Builder builder = new okhttp3.MultipartBody.Builder()
+                .setType(okhttp3.MultipartBody.FORM);
+        
+        okhttp3.RequestBody fileBody = okhttp3.RequestBody.create(
+            fileBytes, 
+            okhttp3.MediaType.parse("application/octet-stream")
+        );
+        
+        builder.addFormDataPart("file", file.getName(), fileBody);
+        okhttp3.RequestBody requestBody = builder.build();
+        
+        Request request = new Request.Builder()
+                .url(url)
+                .post(requestBody)
+                .build();
+        
+        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                String errorBody = response.body() != null ? response.body().string() : "";
+                throw new IOException("导入分区数据失败: " + response.code() + " - " + errorBody);
+            }
+            
+            String responseBody = response.body().string();
+            logger.debug("importData API 响应: {}", responseBody);
+            
+            // 解析 JSON 响应
+            Type resultType = new TypeToken<Result<Void>>(){}.getType();
+            Result<Void> result = apiUtil.getGson().fromJson(responseBody, resultType);
+            
+            return Result.isSuccess(result);
+        }
+    }
 }

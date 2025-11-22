@@ -72,6 +72,64 @@ public class JobComposeServiceImpl implements JobComposeService {
     private final String DYNAMIC_GROUP = "CustomGroup";
 
     private final String JOB_ID = "jobId";
+    
+    /**
+     * 递归收集所有层级的任务组节点ID和子节点ID
+     * 
+     * @param lfNodes 当前层级的节点列表
+     * @param allNodes 所有节点列表（用于查找子节点）
+     * @param allGroupNodeIds 输出参数：所有层级的任务组节点ID集合
+     * @param allChildNodeIds 输出参数：所有层级的子节点ID集合（不包括任务组节点本身）
+     */
+    private void collectGroupNodeIdsRecursively(List<LfNode> lfNodes, Map<String, LfNode> allNodes, Set<String> allGroupNodeIds, Set<String> allChildNodeIds) {
+        if (lfNodes == null || lfNodes.isEmpty()) {
+            return;
+        }
+        
+        // 找到所有任务组节点（当前层级）
+        List<LfNode> groupNodes = lfNodes.stream()
+            .filter(n -> DYNAMIC_GROUP.equalsIgnoreCase(n.getType()) || "custom-group".equalsIgnoreCase(n.getType()))
+            .toList();
+        
+        // 递归处理每个任务组节点
+        for (LfNode groupNode : groupNodes) {
+            // 如果已经处理过，跳过（避免重复处理）
+            if (allGroupNodeIds.contains(groupNode.getId())) {
+                continue;
+            }
+            
+            // 添加到任务组节点集合
+            allGroupNodeIds.add(groupNode.getId());
+            
+            // 获取子节点ID列表
+            String childrenStr = groupNode.getChildren();
+            if (StringUtils.isNotBlank(childrenStr)) {
+                try {
+                    List<String> childIds = JSONUtil.parseArray(childrenStr).toList(String.class);
+                    
+                    // 收集子节点ID（不包括任务组节点本身）
+                    for (String childId : childIds) {
+                        if (!allGroupNodeIds.contains(childId)) {
+                            allChildNodeIds.add(childId);
+                        }
+                    }
+                    
+                    // 从所有节点中查找子节点（包括嵌套的任务组节点）
+                    List<LfNode> childNodes = childIds.stream()
+                        .map(allNodes::get)
+                        .filter(Objects::nonNull)
+                        .toList();
+                    
+                    if (!childNodes.isEmpty()) {
+                        // 递归收集嵌套的任务组节点和子节点
+                        collectGroupNodeIdsRecursively(childNodes, allNodes, allGroupNodeIds, allChildNodeIds);
+                    }
+                } catch (Exception e) {
+                    System.out.println("【collectGroupNodeIdsRecursively】解析子节点ID失败: " + childrenStr + ", 错误: " + e.getMessage());
+                }
+            }
+        }
+    }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -302,22 +360,23 @@ public class JobComposeServiceImpl implements JobComposeService {
         // ⭐ 调试日志：记录去重前后的节点数量
         System.out.println("【updateJobCompose】前端发送的节点数量（去重后）: " + lfNodes.size() + ", 边数量: " + lfEdges.size());
 
-        Map<String, List<LfNode>> groupNodeMap = lfNodes.stream().collect(Collectors.groupingBy(LfNode::getType));
-        List<LfNode> dynamicGroupNodes = groupNodeMap.get(DYNAMIC_GROUP);
-        List<String> nodeIds = new ArrayList<>();
-        Set<String> groupNodeIds = new HashSet<>(); // ⭐ 修复：记录所有任务组节点的ID
-        if (dynamicGroupNodes != null) {
-            dynamicGroupNodes.forEach(node -> {
-                groupNodeIds.add(node.getId()); // ⭐ 修复：记录任务组节点ID
-                List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
-                nodeIds.addAll(childIds);
-            });
-        }
+        // ⭐ 修复：递归收集所有层级的任务组节点ID和子节点ID，确保嵌套的任务组节点也能被正确处理
+        Set<String> allGroupNodeIds = new HashSet<>(); // 所有层级的任务组节点ID
+        Set<String> allChildNodeIds = new HashSet<>(); // 所有层级的子节点ID（不包括任务组节点本身）
+        
+        // 创建所有节点的映射，用于查找子节点
+        Map<String, LfNode> allNodesMap = lfNodes.stream()
+            .collect(Collectors.toMap(LfNode::getId, n -> n, (existing, replacement) -> existing));
+        
+        // 递归收集任务组节点ID和子节点ID
+        collectGroupNodeIdsRecursively(lfNodes, allNodesMap, allGroupNodeIds, allChildNodeIds);
+        
+        System.out.println("【updateJobCompose】收集到的任务组节点数量: " + allGroupNodeIds.size() + ", 子节点数量: " + allChildNodeIds.size());
 
-        // ⭐ 修复：过滤掉任务组节点的子节点，但保留任务组节点本身
+        // ⭐ 修复：过滤掉任务组节点的子节点，但保留所有层级的任务组节点本身
         // 子节点会通过任务组节点的children属性传递，后端会递归处理
         List<LfNode> nodeList = lfNodes.stream()
-            .filter(n -> !nodeIds.contains(n.getId()) || groupNodeIds.contains(n.getId()))
+            .filter(n -> !allChildNodeIds.contains(n.getId()) || allGroupNodeIds.contains(n.getId()))
             .toList();
         List<String> firstNodes = nodeList.stream().map(LfNode::getId).toList();
         List<LfEdge> edgeList = lfEdges.stream().filter(e -> firstNodes.contains(e.getSourceNodeId()) || firstNodes.contains(e.getTargetNodeId())).toList();

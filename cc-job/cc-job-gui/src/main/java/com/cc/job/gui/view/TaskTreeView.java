@@ -534,6 +534,7 @@ public class TaskTreeView extends VBox {
         tree.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null && newVal.getValue() != null) {
                 TreeNodeData nodeData = newVal.getValue();
+                logger.info("🔍 [DEBUG] 树形视图选择节点: {} [{}] ID: {}", nodeData.getLabel(), nodeData.getTypeName(), nodeData.getId());
                 logger.debug("✓ 选择节点: {} [{}] ID: {}", nodeData.getLabel(), nodeData.getTypeName(), nodeData.getId());
                 if (selectionCallback != null) {
                     // 当点击“任务”(type=2) 或 “关系”(type=3) 容器时，也跳转到对应任务组
@@ -633,6 +634,18 @@ public class TaskTreeView extends VBox {
         
         // 清空现有数据
         rootItem.getChildren().clear();
+        
+        // ⚠️ 调试：记录所有任务组的ID和名称
+        logger.info("🔍 [DEBUG] buildTreeFromData - 开始构建树形结构，分区数量: {}", data.size());
+        for (JobPartVo partVo : data) {
+            if (partVo.getChildren() != null) {
+                for (JobPartVo child : partVo.getChildren()) {
+                    if (child.getType() != null && child.getType() == 1) {
+                        logger.info("🔍 [DEBUG] 任务组 - 名称: {}, ID: {}", child.getLabel(), child.getId());
+                    }
+                }
+            }
+        }
         
         // 构建树形结构：显示完整的层级结构（分区 -> 任务组）
         for (JobPartVo partVo : data) {
@@ -1086,6 +1099,8 @@ public class TaskTreeView extends VBox {
     
     /**
      * 递归查找任务组ID
+     * ⚠️ 注意：如果存在同名任务组，此方法会返回第一个找到的ID
+     * 建议使用 selectTaskGroupById 或直接使用节点数据中的ID
      */
     private Long findTaskGroupIdRecursive(TreeItem<TreeNodeData> item, String taskGroupName) {
         if (item == null || item.getValue() == null) {
@@ -1096,6 +1111,7 @@ public class TaskTreeView extends VBox {
         // 检查是否是任务组且名称匹配
         if (nodeData.getType() != null && nodeData.getType() == 1 && 
             taskGroupName.equals(nodeData.getLabel())) {
+            logger.info("🔍 [DEBUG] findTaskGroupIdRecursive 找到任务组: {} (ID: {})", taskGroupName, nodeData.getId());
             return nodeData.getId();
         }
         
@@ -1223,6 +1239,16 @@ public class TaskTreeView extends VBox {
         Platform.runLater(() -> {
             treeView.getSelectionModel().clearSelection();
         });
+    }
+    
+    /**
+     * 根据任务组ID查找树节点（公共方法）
+     */
+    public TreeItem<TreeNodeData> findTreeItemById(Long targetId) {
+        if (targetId == null || rootItem == null) {
+            return null;
+        }
+        return findTreeItemById(rootItem, targetId);
     }
     
     /**

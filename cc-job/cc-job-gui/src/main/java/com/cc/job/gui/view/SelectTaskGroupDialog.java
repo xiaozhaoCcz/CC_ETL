@@ -137,7 +137,7 @@ public class SelectTaskGroupDialog extends Dialog<SelectTaskGroupDialog.Selectio
         grid.add(partLabel, 0, 0);
         grid.add(partCombo, 1, 0);
         grid.add(groupLabel, 0, 1);
-        grid.add(groupCombo, 1, 1);
+        //grid.add(groupCombo, 1, 1);
         
         form.getChildren().add(grid);
         sp.setContent(form);

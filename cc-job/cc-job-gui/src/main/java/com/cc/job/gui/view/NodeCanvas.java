@@ -2733,15 +2733,15 @@ public class NodeCanvas extends Pane {
                 log("ℹ 新增节点回调未设置");
             }
         });
-        
-        MenuItem chooseGroupItem = new MenuItem("选择任务组");
-        chooseGroupItem.setOnAction(e -> {
-            if (onRequestSelectTaskGroup != null) {
-                onRequestSelectTaskGroup.run();
-            } else {
-                log("ℹ 选择任务组回调未设置");
-            }
-        });
+        // TODO 选择任务组功能需要优化
+//        MenuItem chooseGroupItem = new MenuItem("选择任务组");
+//        chooseGroupItem.setOnAction(e -> {
+//            if (onRequestSelectTaskGroup != null) {
+//                onRequestSelectTaskGroup.run();
+//            } else {
+//                log("ℹ 选择任务组回调未设置");
+//            }
+//        });
         
         MenuItem clearItem = new MenuItem("清空页面");
         clearItem.setOnAction(e -> {
@@ -2768,7 +2768,7 @@ public class NodeCanvas extends Pane {
             }
         });
         
-        menu.getItems().addAll(addNodeItem, chooseGroupItem, clearItem, runGroupItem);
+        menu.getItems().addAll(addNodeItem, clearItem, runGroupItem);
         
         this.setOnContextMenuRequested(e -> {
             // 仅在空白区域展示页面级菜单
