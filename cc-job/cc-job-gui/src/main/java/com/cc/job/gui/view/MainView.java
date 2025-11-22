@@ -2021,6 +2021,19 @@ public class MainView extends BorderPane {
         List<GroupContainer> groups = canvas.getGroupContainers();
 
         logPanel.info(String.format("节点数量: %d, 连接数量: %d, 任务组数量: %d", nodes.size(), connections.size(), groups.size()));
+        
+        // ⭐ 修复：调试日志，检查任务组节点信息
+        if (groups.isEmpty()) {
+            logPanel.warn("⚠️ 警告：没有找到任务组容器！");
+        } else {
+            for (GroupContainer group : groups) {
+                String groupNodeId = group.getNodeId();
+                Long groupId = group.getGroupId();
+                String groupName = group.getGroupName();
+                logPanel.info(String.format("任务组: name=%s, nodeId=%s, groupId=%s", 
+                    groupName, groupNodeId, groupId != null ? groupId.toString() : "null"));
+            }
+        }
 
         // 构建节点到任务组的映射，用于识别哪些节点属于任务组容器
         Map<String, GroupContainer> nodeToGroupMap = new HashMap<>();
@@ -2069,9 +2082,72 @@ public class MainView extends BorderPane {
             // 2. 添加任务组节点（每个任务组节点只添加一次）
             for (GroupContainer group : canvas.getGroupContainers()) {
                 String groupNodeId = group.getNodeId();
-                if (groupNodeId == null || addedNodeIds.contains(groupNodeId)) {
-                    continue; // 跳过已添加的任务组节点
+                if (groupNodeId == null) {
+                    logPanel.warn("⚠️ 警告：任务组节点ID为空，跳过: " + group.getGroupName());
+                    continue; // 跳过nodeId为null的任务组节点
                 }
+                // ⭐ 修复：如果任务组节点的nodeId已经在普通节点循环中被添加，需要更新为任务组节点类型
+                if (addedNodeIds.contains(groupNodeId)) {
+                    logPanel.info("⚠️ 任务组节点ID已存在，更新为任务组节点类型: " + groupNodeId);
+                    // 查找并更新已存在的节点数据
+                    for (Map<String, Object> existingNode : nodesData) {
+                        if (groupNodeId.equals(existingNode.get("id"))) {
+                            // 更新为任务组节点类型
+                            existingNode.put("type", "CustomGroup");
+                            // 更新位置
+                            existingNode.put("x", group.getLayoutX());
+                            existingNode.put("y", group.getLayoutY());
+                            
+                            // 更新properties，添加children属性
+                            Map<String, Object> propertiesMap = new HashMap<>();
+                            if (group.getGroupId() != null) {
+                                propertiesMap.put("jobId", group.getGroupId());
+                            }
+                            
+                            // 收集子节点ID
+                            Set<String> childNodeIdSet = new HashSet<>();
+                            List<ProcessNode> managedNodes = group.getManagedCanvasNodes();
+                            if (managedNodes != null) {
+                                for (ProcessNode childNode : managedNodes) {
+                                    if (childNode.getNodeId() != null) {
+                                        childNodeIdSet.add(childNode.getNodeId());
+                                    }
+                                }
+                            }
+                            
+                            // 添加嵌套的任务组节点
+                            for (GroupContainer otherGroup : canvas.getGroupContainers()) {
+                                if (otherGroup != group) {
+                                    double groupX = group.getLayoutX();
+                                    double groupY = group.getLayoutY();
+                                    double groupWidth = group.getFrame().getWidth();
+                                    double groupHeight = group.getFrame().getHeight();
+                                    double nestedX = otherGroup.getLayoutX();
+                                    double nestedY = otherGroup.getLayoutY();
+                                    if (nestedX >= groupX && nestedX <= groupX + groupWidth &&
+                                            nestedY >= groupY && nestedY <= groupY + groupHeight) {
+                                        String nestedGroupId = otherGroup.getNodeId();
+                                        if (nestedGroupId != null) {
+                                            childNodeIdSet.add(nestedGroupId);
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            List<String> childNodeIds = new ArrayList<>(childNodeIdSet);
+                            propertiesMap.put("children", childNodeIds);
+                            String propertiesJson = apiUtil.getGson().toJson(propertiesMap);
+                            existingNode.put("properties", propertiesJson);
+                            
+                            logPanel.info("✓ 已更新任务组节点数据: " + group.getGroupName() + 
+                                " (id: " + groupNodeId + ", children: " + childNodeIds.size() + ")");
+                            break;
+                        }
+                    }
+                    continue; // 已经处理过，跳过
+                }
+                
+                logPanel.info("✓ 添加任务组节点: " + group.getGroupName() + " (nodeId: " + groupNodeId + ")");
                 
                 Map<String, Object> nodeData = new HashMap<>();
                 nodeData.put("id", groupNodeId);
@@ -2131,7 +2207,15 @@ public class MainView extends BorderPane {
 
                 nodesData.add(nodeData);
                 addedNodeIds.add(groupNodeId);
+                logPanel.info("✓ 任务组节点已添加到nodesData: " + group.getGroupName() + 
+                    " (id: " + groupNodeId + ", children: " + childNodeIds.size() + ")");
             }
+            
+            // ⭐ 修复：检查任务组节点是否成功添加到nodesData
+            long groupNodeCount = nodesData.stream()
+                .filter(node -> "CustomGroup".equals(node.get("type")))
+                .count();
+            logPanel.info("✓ nodesData中的任务组节点数量: " + groupNodeCount + " / 总节点数: " + nodesData.size());
 
             List<Map<String, Object>> edgesData = new ArrayList<>();
             // ⭐ 修复：使用Set去重，确保每个连线只添加一次
@@ -2184,6 +2268,16 @@ public class MainView extends BorderPane {
                 edgesData.add(edgeData);
             }
 
+            // ⭐ 修复：调试日志，检查JSON中是否包含任务组节点
+            long finalGroupNodeCount = nodesData.stream()
+                .filter(node -> "CustomGroup".equals(node.get("type")))
+                .count();
+            logPanel.info("✓ 准备发送到后端 - 节点总数: " + nodesData.size() + ", 任务组节点数: " + finalGroupNodeCount);
+            if (finalGroupNodeCount == 0 && !groups.isEmpty()) {
+                logPanel.error("✗ 错误：有任务组容器但JSON中没有任务组节点数据！");
+                logPanel.error("✗ 请检查任务组节点的nodeId是否正确设置");
+            }
+            
             String nodesJson = apiUtil.getGson().toJson(nodesData);
             String edgesJson = apiUtil.getGson().toJson(edgesData);
 
