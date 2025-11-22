@@ -245,7 +245,22 @@ public class NodeConnection extends Group {
     public void setRunning(boolean running) {
         this.isRunning = running;
         updateStyle();
-        logger.debug("{} 边{}运行: {} → {}", running ? "▶️" : "⏹️", running ? "开始" : "停止", sourceNode.getJobHandlerName(), targetNode.getJobHandlerName());
+        // ⭐ 修复：使用 getSourceOwner() 和 getTargetOwner()，支持任务组容器
+        String sourceName = getOwnerName(sourceOwner);
+        String targetName = getOwnerName(targetOwner);
+        logger.debug("{} 边{}运行: {} → {}", running ? "▶️" : "⏹️", running ? "开始" : "停止", sourceName, targetName);
+    }
+    
+    /**
+     * 获取所有者名称（支持 ProcessNode 和 GroupContainer）
+     */
+    private String getOwnerName(javafx.scene.Node owner) {
+        if (owner instanceof ProcessNode) {
+            return ((ProcessNode) owner).getJobHandlerName();
+        } else if (owner instanceof com.cc.job.gui.model.GroupContainer) {
+            return ((com.cc.job.gui.model.GroupContainer) owner).getGroupName();
+        }
+        return "未知";
     }
     
     /**

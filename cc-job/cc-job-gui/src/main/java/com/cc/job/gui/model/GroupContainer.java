@@ -40,6 +40,7 @@ public class GroupContainer extends StackPane {
     private boolean expanded = true;
     private ContextMenu contextMenu;
     private Runnable onExpand; // 扩展回调（用于懒加载）
+    private Runnable onDelete; // 删除回调
     
     private final List<ProcessNode> innerNodes = new ArrayList<>();
     private final List<ProcessNode> managedCanvasNodes = new ArrayList<>();
@@ -230,8 +231,20 @@ public class GroupContainer extends StackPane {
         MenuItem resetZoomItem = new MenuItem("重置缩放 (100%)");
         resetZoomItem.setOnAction(e -> setZoom(1.0));
         
+        // 分隔符
+        SeparatorMenuItem separator2 = new SeparatorMenuItem();
+        
+        // 删除节点
+        MenuItem deleteItem = new MenuItem("删除节点");
+        deleteItem.setStyle("-fx-text-fill: #EF4444;"); // 红色文字
+        deleteItem.setOnAction(e -> {
+            if (onDelete != null) {
+                onDelete.run();
+            }
+        });
+        
         contextMenu.getItems().addAll(expandItem, new SeparatorMenuItem(), 
-                zoomInItem, zoomOutItem, resetZoomItem);
+                zoomInItem, zoomOutItem, resetZoomItem, separator2, deleteItem);
         
         // 右键显示菜单时更新展开/收起文本
         setOnContextMenuRequested(e -> {
@@ -392,6 +405,10 @@ public class GroupContainer extends StackPane {
     
     public void setOnExpand(Runnable onExpand) {
         this.onExpand = onExpand;
+    }
+    
+    public void setOnDelete(Runnable onDelete) {
+        this.onDelete = onDelete;
     }
 
     private void updateFrameSize() {

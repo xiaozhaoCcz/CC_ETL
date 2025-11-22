@@ -253,14 +253,41 @@ public class MiniMapView extends VBox {
         gc.setLineWidth(1);
         
         nodeCanvas.getConnections().forEach(conn -> {
-            double x1 = conn.getSourceNode().getLayoutX() * scale + offsetX + 
-                       conn.getSourceNode().getPrefWidth() * scale / 2;
-            double y1 = conn.getSourceNode().getLayoutY() * scale + offsetY + 
-                       conn.getSourceNode().getPrefHeight() * scale / 2;
-            double x2 = conn.getTargetNode().getLayoutX() * scale + offsetX + 
-                       conn.getTargetNode().getPrefWidth() * scale / 2;
-            double y2 = conn.getTargetNode().getLayoutY() * scale + offsetY + 
-                       conn.getTargetNode().getPrefHeight() * scale / 2;
+            // ⭐ 修复：使用 getSourceOwner() 和 getTargetOwner()，支持任务组容器
+            javafx.scene.Node sourceOwner = conn.getSourceOwner();
+            javafx.scene.Node targetOwner = conn.getTargetOwner();
+            
+            if (sourceOwner == null || targetOwner == null) {
+                return; // 跳过无效的连接
+            }
+            
+            double x1, y1, x2, y2;
+            
+            // 获取源节点/容器的位置
+            if (sourceOwner instanceof com.cc.job.gui.model.ProcessNode) {
+                com.cc.job.gui.model.ProcessNode sourceNode = (com.cc.job.gui.model.ProcessNode) sourceOwner;
+                x1 = sourceNode.getLayoutX() * scale + offsetX + sourceNode.getPrefWidth() * scale / 2;
+                y1 = sourceNode.getLayoutY() * scale + offsetY + sourceNode.getPrefHeight() * scale / 2;
+            } else if (sourceOwner instanceof com.cc.job.gui.model.GroupContainer) {
+                com.cc.job.gui.model.GroupContainer sourceContainer = (com.cc.job.gui.model.GroupContainer) sourceOwner;
+                x1 = sourceContainer.getLayoutX() * scale + offsetX + sourceContainer.getFrame().getWidth() * scale / 2;
+                y1 = sourceContainer.getLayoutY() * scale + offsetY + sourceContainer.getFrame().getHeight() * scale / 2;
+            } else {
+                return; // 跳过未知类型的连接
+            }
+            
+            // 获取目标节点/容器的位置
+            if (targetOwner instanceof com.cc.job.gui.model.ProcessNode) {
+                com.cc.job.gui.model.ProcessNode targetNode = (com.cc.job.gui.model.ProcessNode) targetOwner;
+                x2 = targetNode.getLayoutX() * scale + offsetX + targetNode.getPrefWidth() * scale / 2;
+                y2 = targetNode.getLayoutY() * scale + offsetY + targetNode.getPrefHeight() * scale / 2;
+            } else if (targetOwner instanceof com.cc.job.gui.model.GroupContainer) {
+                com.cc.job.gui.model.GroupContainer targetContainer = (com.cc.job.gui.model.GroupContainer) targetOwner;
+                x2 = targetContainer.getLayoutX() * scale + offsetX + targetContainer.getFrame().getWidth() * scale / 2;
+                y2 = targetContainer.getLayoutY() * scale + offsetY + targetContainer.getFrame().getHeight() * scale / 2;
+            } else {
+                return; // 跳过未知类型的连接
+            }
             
             gc.strokeLine(x1, y1, x2, y2);
         });

@@ -288,8 +288,19 @@ public class JobComposeServiceImpl implements JobComposeService {
         List<LfNode> lfNodes = JSONUtil.parseArray(formData.getNodes()).toList(LfNode.class);
         List<LfEdge> lfEdges = JSONUtil.parseArray(formData.getEdges()).toList(LfEdge.class);
         
-        // ⭐ 调试日志：记录前端发送的节点和边数量
-        System.out.println("【updateJobCompose】前端发送的节点数量: " + lfNodes.size() + ", 边数量: " + lfEdges.size());
+        // ⭐ 修复：去重处理，确保每个节点只出现一次（基于节点ID）
+        Map<String, LfNode> nodeMap = new HashMap<>();
+        for (LfNode node : lfNodes) {
+            if (node.getId() != null) {
+                // 如果节点已存在，保留第一个（或者可以根据需要保留最新的）
+                nodeMap.putIfAbsent(node.getId(), node);
+            }
+        }
+        // 将去重后的节点列表重新赋值
+        lfNodes = new ArrayList<>(nodeMap.values());
+        
+        // ⭐ 调试日志：记录去重前后的节点数量
+        System.out.println("【updateJobCompose】前端发送的节点数量（去重后）: " + lfNodes.size() + ", 边数量: " + lfEdges.size());
 
         Map<String, List<LfNode>> groupNodeMap = lfNodes.stream().collect(Collectors.groupingBy(LfNode::getType));
         List<LfNode> dynamicGroupNodes = groupNodeMap.get(DYNAMIC_GROUP);
@@ -301,6 +312,8 @@ public class JobComposeServiceImpl implements JobComposeService {
             });
         }
 
+        // ⭐ 修复：过滤掉任务组节点的子节点，只保留顶层节点和任务组节点本身
+        // 子节点会通过任务组节点的children属性传递，后端会递归处理
         List<LfNode> nodeList = lfNodes.stream().filter(n -> !nodeIds.contains(n.getId())).toList();
         List<String> firstNodes = nodeList.stream().map(LfNode::getId).toList();
         List<LfEdge> edgeList = lfEdges.stream().filter(e -> firstNodes.contains(e.getSourceNodeId()) || firstNodes.contains(e.getTargetNodeId())).toList();
@@ -308,7 +321,7 @@ public class JobComposeServiceImpl implements JobComposeService {
         return true;
     }
 
-
+    //TODO 需要优化，里面的代码是匹配了旧的任务组逻辑，需要重新写
     private List<Long> operateToUpdateJobCompose(JobInfo jobInfo, List<LfNode> nodeList, List<LfEdge> edgeList, List<LfNode> lfNodes, List<LfEdge> lfEdges) {
         Map<String, Long> nodeIdMap = new HashMap<>();
         List<JobNode> nodeFromDb = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, jobInfo.getId()));
@@ -317,7 +330,8 @@ public class JobComposeServiceImpl implements JobComposeService {
         // ⭐ 调试日志：记录数据库中的节点数量和前端发送的节点数量
         System.out.println("【operateToUpdateJobCompose】数据库中的节点数量: " + nodeFromDb.size() + ", 前端发送的节点数量: " + nodeList.size());
 
-        for (LfNode node : nodeList) {
+        List<LfNode> filterNodelList = nodeList.stream().filter(f -> nodeFromDb.stream().map(JobNode::getId).toList().contains(Long.parseLong(f.getId()))).toList();
+        for (LfNode node : filterNodelList) {
             Map<String, Object> properties = JSONUtil.toBean(node.getProperties(), Map.class);
             Object jobIdObj = properties.get(JOB_ID);
             if (jobIdObj == null) {
@@ -370,15 +384,8 @@ public class JobComposeServiceImpl implements JobComposeService {
                 // ⭐ 修复：尝试通过nodeId查找节点，如果找不到，再尝试通过jobId查找（处理粘贴节点的情况）
                 Long nodeIdLong = Long.parseLong(node.getId());
                 JobNode jobNode = nodeFromDb.stream().filter(n -> n.getId().equals(nodeIdLong)).findFirst().orElse(null);
-                
-                // ⭐ 调试日志：记录节点查找情况
-                if (jobNode == null) {
-                    System.out.println("【operateToUpdateJobCompose】通过nodeId未找到节点: nodeId=" + nodeIdLong);
-                } else {
-                    System.out.println("【operateToUpdateJobCompose】通过nodeId找到节点: nodeId=" + nodeIdLong + ", jobId=" + jobNode.getJobId());
-                }
-                
-                // 如果通过nodeId找不到，尝试通过jobId查找（粘贴的节点可能已经保存，但nodeId可能不匹配）
+
+                // 如果通过nodeId找不到，尝试通过jobId查找（粘贴的节点可能已经保存，但nodeId可能不匹配）！！！！废弃代码
                 if (jobNode == null) {
                     Map<String, Object> nodeProperties = JSONUtil.toBean(node.getProperties(), Map.class);
                     Object nodeJobIdObj = nodeProperties.get(JOB_ID);
@@ -394,7 +401,7 @@ public class JobComposeServiceImpl implements JobComposeService {
                     }
                 }
                 
-                // ⭐ 修复：如果找不到已存在的节点，可能是新粘贴的节点，需要创建新节点
+                // ⭐ 修复：如果找不到已存在的节点，可能是新粘贴的节点，需要创建新节点 ！！！！废弃代码
                 if (jobNode == null) {
                     System.out.println("【operateToUpdateJobCompose】创建新节点: nodeId=" + node.getId() + ", jobId=" + jobId);
                     // 创建新节点（类似包含"-"的逻辑）
@@ -472,13 +479,12 @@ public class JobComposeServiceImpl implements JobComposeService {
                     }
                     jobNode.setNodeType(normalizedType);
                     if (DYNAMIC_GROUP.equalsIgnoreCase(node.getType())) {
-                        List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
+                        //得到孩子节点
+                        List<String> childIds = JSONUtil.parseArray(JSONUtil.toBean(node.getProperties(),Map.class).get("children")).toList(String.class);
                         List<LfNode> childNodes = lfNodes.stream().filter(n -> childIds.contains(n.getId())).toList();
                         List<LfEdge> childEdges = lfEdges.stream().filter(e -> childIds.contains(e.getSourceNodeId()) || childIds.contains(e.targetNodeId)).toList();
-                        List<Long> childJobIds = operateToUpdateJobCompose(jobInfo1, childNodes, childEdges, lfNodes, lfEdges);
-                        jobNode.setChildren(JSONUtil.toJsonStr(childJobIds));
-                        propertiesMap.put("children", JSONUtil.toJsonStr(childJobIds));
-                        
+                        operateToUpdateJobCompose(jobInfo1, childNodes, childEdges, lfNodes, lfEdges);
+
                         // ⭐ 修复：确保任务组节点有 width 和 height 属性
                         if (!propertiesMap.containsKey("width")) {
                             propertiesMap.put("width", 300.0);
@@ -563,20 +569,29 @@ public class JobComposeServiceImpl implements JobComposeService {
     }
 
     @Override
-    public Map<String, Object> getJobCompose(Map<String, Object> formMap) {
+    public Map<String, Object>  getJobCompose(Map<String, Object> formMap) {
         Map<String, Object> res = new HashMap<>();
         Long id = Long.parseLong(String.valueOf(formMap.get("id")));
         int type = Integer.parseInt(String.valueOf(formMap.get("type")));
-        String randomId = type == 0 ? "" : UUID.fastUUID() + ":";
-
-        List<JobNodeVo> allNodeVos = new ArrayList<>();
-        List<JobEdgeVo> allEdgeVos = new ArrayList<>();
-        buildAllNodesAndEdgesRecursive(id, allNodeVos, allEdgeVos, randomId, null);
-
+        //重写方法
         JobInfo jobInfo = jobInfoService.getById(id);
         if (jobInfo == null) {
             throw new BusinessException("任务组不存在，id: " + id);
         }
+
+
+
+        String randomId = type == 0 ? "" : UUID.fastUUID() + ":";
+
+        // 使用Map存储节点，以节点ID为key，避免重复
+        Map<String, JobNodeVo> nodeVoMap = new HashMap<>();
+        List<JobEdgeVo> allEdgeVos = new ArrayList<>();
+        //得到当前节点的孩子节点
+        buildAllNodesAndEdgesRecursive(id, nodeVoMap, allEdgeVos, null);
+        
+        // 将Map转换为List，确保没有重复节点
+        List<JobNodeVo> allNodeVos = new ArrayList<>(nodeVoMap.values());
+
 
         JobNodeVo rootJobNodeVo = new JobNodeVo();
         rootJobNodeVo.setId(randomId + DYNAMIC_GROUP);
@@ -628,11 +643,14 @@ public class JobComposeServiceImpl implements JobComposeService {
 
     /**
      * 递归构建所有节点和边（包括嵌套的任务组）
+     * @param jobId 当前任务组ID
+     * @param nodeVoMap 节点Map，以节点ID为key，用于去重
+     * @param allEdgeVos 边列表
+     * @param parentJobId 父任务组ID
      */
     private void buildAllNodesAndEdgesRecursive(Long jobId,
-                                                List<JobNodeVo> allNodeVos,
+                                                Map<String, JobNodeVo> nodeVoMap,
                                                 List<JobEdgeVo> allEdgeVos,
-                                                String randomId,
                                                 Long parentJobId) {
         List<JobNode> jobNodes = jobNodeService.list(
                 new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, jobId));
@@ -661,7 +679,7 @@ public class JobComposeServiceImpl implements JobComposeService {
 
             JobNodeVo nodeVo = BeanUtil.copyProperties(node, JobNodeVo.class, "id");
             nodeVo.setJobName(jobInfo.getJobDesc());
-            nodeVo.setId(randomId + node.getId());
+            nodeVo.setId(node.getId().toString());
             nodeVo.setJobParentId(node.getJobParentId());
             nodeVo.setIsPause(jobInfo.getIsPause());
             nodeVo.setNodeInDegree(inDegreeMap.getOrDefault(node.getId(), 0L));
@@ -692,19 +710,60 @@ public class JobComposeServiceImpl implements JobComposeService {
                 propertiesMap.put("height", DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType()) ? 200.0 : 90.0);
             }
 
-            if (DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType())) {
-                List<JobNodeVo> childNodeVos = new ArrayList<>();
+            if (DYNAMIC_GROUP.equalsIgnoreCase(nodeType)) {
+                // 递归获取所有子节点和边（包括嵌套的子节点）
+                // 使用新的Map来收集子节点，避免与父级节点Map冲突
+                Map<String, JobNodeVo> childNodeVoMap = new HashMap<>();
                 List<JobEdgeVo> childEdgeVos = new ArrayList<>();
-                buildAllNodesAndEdgesRecursive(node.getJobId(), childNodeVos, childEdgeVos, randomId, jobId);
-                nodeVo.setChildrenNodes(childNodeVos);
+                buildAllNodesAndEdgesRecursive(node.getJobId(), childNodeVoMap, childEdgeVos, jobId);
+                
+                // 将子节点添加到主Map中（自动去重）
+                nodeVoMap.putAll(childNodeVoMap);
+                
+                // 转换为List用于后续处理
+                List<JobNodeVo> allChildNodeVos = new ArrayList<>(childNodeVoMap.values());
 
+                // 获取直接子节点（只包含第一层子节点）
                 List<JobNode> directChildNodes = jobNodeService.list(
                         new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, node.getJobId()));
-                List<String> directChildIds = directChildNodes.stream()
-                        .map(child -> randomId + child.getId()).toList();
+                
+                // 构建直接子节点ID到VO的映射（从allChildNodeVos中查找）
+                Map<Long, JobNodeVo> directChildNodeVoMap = new HashMap<>();
+                for (JobNodeVo childNodeVo : allChildNodeVos) {
+                    // 提取原始节点ID
+                    String childIdStr = childNodeVo.getId();
+                    try {
+                        Long childNodeId = Long.parseLong(childIdStr);
+                        directChildNodeVoMap.put(childNodeId, childNodeVo);
+                    } catch (NumberFormatException e) {
+                        // 忽略无法解析的ID
+                    }
+                }
+                
+                // 构建直接子节点的VO列表（用于childrenNodes字段）
+                List<JobNodeVo> directChildNodeVos = new ArrayList<>();
+                List<String> directChildIds = new ArrayList<>();
+                
+                for (JobNode directChildNode : directChildNodes) {
+                    // 添加子节点ID到列表
+                    directChildIds.add(directChildNode.getId().toString());
+                    
+                    // 从映射中获取对应的VO（应该总是能找到，因为allChildNodeVos包含了所有子节点）
+                    JobNodeVo directChildVo = directChildNodeVoMap.get(directChildNode.getId());
+                    if (directChildVo != null) {
+                        directChildNodeVos.add(directChildVo);
+                    }
+                    // 注意：如果映射中没有找到，说明数据不一致，跳过该节点
+                }
+                
+                // 设置childrenNodes为直接子节点列表
+                nodeVo.setChildrenNodes(directChildNodeVos);
 
-                if (!childNodeVos.isEmpty()) {
-                    double[] styleArr = getMaxWidthHeight(childNodeVos);
+                // 设置children字段为JSON字符串格式
+                nodeVo.setChildren(JSONUtil.toJsonStr(directChildIds));
+
+                if (!allChildNodeVos.isEmpty()) {
+                    double[] styleArr = getMaxWidthHeight(allChildNodeVos);
                     double groupWidth = styleArr[1] - styleArr[3] + 40;
                     double groupHeight = styleArr[2] - styleArr[0] + 40;
 
@@ -735,7 +794,6 @@ public class JobComposeServiceImpl implements JobComposeService {
                 }
 
                 nodeVo.setProperties(JSONUtil.toJsonStr(propertiesMap));
-                allNodeVos.addAll(childNodeVos);
                 allEdgeVos.addAll(childEdgeVos);
             } else {
                 nodeVo.setNodePositionX(node.getNodePositionX());
@@ -743,14 +801,15 @@ public class JobComposeServiceImpl implements JobComposeService {
                 nodeVo.setProperties(JSONUtil.toJsonStr(propertiesMap));
             }
 
-            allNodeVos.add(nodeVo);
+            // 使用节点ID作为key添加到Map中，自动去重
+            nodeVoMap.put(nodeVo.getId(), nodeVo);
         }
 
         for (JobEdge edge : jobEdges) {
             JobEdgeVo edgeVo = BeanUtil.copyProperties(edge, JobEdgeVo.class, "id");
-            edgeVo.setId(randomId + edge.getId());
-            edgeVo.setFromNodeId(randomId + edge.getFromNodeId());
-            edgeVo.setEndNodeId(randomId + edge.getEndNodeId());
+            edgeVo.setId(edge.getId().toString());
+            edgeVo.setFromNodeId(edge.getFromNodeId().toString());
+            edgeVo.setEndNodeId(edge.getEndNodeId().toString());
             edgeVo.setStartPoint(edge.getStartPoint());
             edgeVo.setEndPoint(edge.getEndPoint());
             edgeVo.setProperties(edge.getProperties());
