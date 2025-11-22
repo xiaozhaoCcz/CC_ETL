@@ -57,10 +57,6 @@ public class SessionManager {
         // 保存会话到本地文件
         saveSessionToFile();
         
-        logger.info("✓ 会话已建立");
-        logger.debug("  用户: {}", username);
-        logger.debug("  用户ID: {}", userId);
-        logger.debug("  Token: {}", token != null ? token.substring(0, Math.min(20, token.length())) + "..." : "N/A");
     }
     
     /**
@@ -75,7 +71,6 @@ public class SessionManager {
         // 删除本地会话文件
         deleteSessionFile();
         
-        logger.info("✓ 会话已清除");
     }
     
     /**
@@ -138,7 +133,6 @@ public class SessionManager {
             String json = gson.toJson(sessionData);
             Files.write(Paths.get(SESSION_FILE), json.getBytes("UTF-8"));
             
-            logger.debug("✓ 会话已保存到本地文件: {}", SESSION_FILE);
         } catch (Exception e) {
             logger.error("⚠ 保存会话文件失败: {}", e.getMessage(), e);
         }
@@ -151,7 +145,6 @@ public class SessionManager {
         try {
             Path sessionPath = Paths.get(SESSION_FILE);
             if (!Files.exists(sessionPath)) {
-                logger.warn("⚠ 未找到本地会话文件");
                 return false;
             }
             
@@ -160,7 +153,6 @@ public class SessionManager {
             SessionData sessionData = gson.fromJson(json, SessionData.class);
             
             if (sessionData == null || sessionData.token == null) {
-                logger.warn("⚠ 会话文件无效");
                 return false;
             }
             
@@ -168,7 +160,6 @@ public class SessionManager {
             long age = System.currentTimeMillis() - sessionData.timestamp;
             long maxAge = 30L * 24 * 60 * 60 * 1000; // 30天
             if (age > maxAge) {
-                logger.warn("⚠ 会话已过期");
                 deleteSessionFile();
                 return false;
             }
@@ -179,10 +170,6 @@ public class SessionManager {
             this.username = sessionData.username;
             this.loggedIn = true;
             
-            logger.info("✓ 会话已从本地文件恢复");
-            logger.debug("  用户: {}", username);
-            logger.debug("  用户ID: {}", userId);
-            logger.debug("  会话时间: {} 天前", age / (1000 * 60 * 60 * 24));
             
             return true;
         } catch (Exception e) {
@@ -199,7 +186,6 @@ public class SessionManager {
             Path sessionPath = Paths.get(SESSION_FILE);
             if (Files.exists(sessionPath)) {
                 Files.delete(sessionPath);
-                logger.debug("✓ 本地会话文件已删除");
             }
         } catch (Exception e) {
             logger.error("⚠ 删除会话文件失败: {}", e.getMessage(), e);

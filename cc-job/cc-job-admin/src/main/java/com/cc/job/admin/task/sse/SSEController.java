@@ -38,8 +38,6 @@ public class SSEController {
             @Parameter(description = "父任务ID") @PathVariable Long parentJobId,
             @Parameter(description = "随机ID") @PathVariable String randomId) {
         
-        log.info("[SSE] 收到连接请求 - parentJobId: {}, randomId: {}", parentJobId, randomId);
-        
         SseEmitter emitter = sseService.createConnection(parentJobId, randomId);
         
         // 发送初始连接成功消息
@@ -66,7 +64,6 @@ public class SSEController {
             @Parameter(description = "父任务ID") @PathVariable Long parentJobId,
             @Parameter(description = "随机ID") @PathVariable String randomId) {
         
-        log.info("[SSE] 收到关闭连接请求 - parentJobId: {}, randomId: {}", parentJobId, randomId);
         sseService.closeConnection(parentJobId, randomId);
     }
 }

@@ -204,7 +204,6 @@ public class ProcessNode extends StackPane {
         // 初始时隐藏
         showConnectors(false);
         
-        logger.debug("✅ 连接点已创建并定位在边界: {}", jobHandlerName);
     }
     
     private Circle createConnector() {
@@ -261,19 +260,16 @@ public class ProcessNode extends StackPane {
     private void setupDragHandlers() {
         // 鼠标进入节点
         this.setOnMouseEntered(e -> {
-            logger.debug("✅ 鼠标进入节点: {}", jobHandlerName);
             // 只有当鼠标不在按下状态时才改变光标和显示连接点
             if (!e.isPrimaryButtonDown()) {
                 this.setCursor(Cursor.MOVE);
                 showConnectors(true);
-                logger.debug("   → 连接点应该显示");
             }
             e.consume();
         });
         
         // 鼠标离开节点
         this.setOnMouseExited(e -> {
-            logger.debug("❌ 鼠标离开节点: {}", jobHandlerName);
             // 只有当鼠标不在按下状态时才隐藏连接点
             if (!e.isPrimaryButtonDown()) {
                 this.setCursor(Cursor.DEFAULT);
@@ -373,19 +369,15 @@ public class ProcessNode extends StackPane {
         // 编辑节点
         MenuItem editItem = new MenuItem("编辑节点");
         editItem.setOnAction(e -> {
-            logger.debug("✏️ 点击编辑节点: {} (nodeId: {})", jobHandlerName, nodeId);
             if (onEdit != null) {
-                logger.debug("✓ 触发 onEdit 回调");
                 onEdit.run();
             } else {
-                logger.warn("✗ onEdit 回调为 null！");
             }
         });
         
         // 复制节点
         MenuItem copyItem = new MenuItem("复制节点");
         copyItem.setOnAction(e -> {
-            logger.debug("📋 复制节点: {}", jobHandlerName);
             if (onCopy != null) {
                 onCopy.run();
             }
@@ -394,7 +386,6 @@ public class ProcessNode extends StackPane {
         // 节点详情
         MenuItem detailsItem = new MenuItem("查看详情");
         detailsItem.setOnAction(e -> {
-            logger.debug("📄 查看详情: {}", jobHandlerName);
             if (onShowDetails != null) {
                 onShowDetails.run();
             }
@@ -479,11 +470,6 @@ public class ProcessNode extends StackPane {
         }
         
         // 调试信息
-        logger.debug("   🔵 连接点{}: {}", show ? "显示" : "隐藏", jobHandlerName);
-        logger.debug("      顶部: visible={}, layoutX={}, layoutY={}", topConnector.isVisible(), topConnector.getLayoutX(), topConnector.getLayoutY());
-        logger.debug("      底部: visible={}, layoutX={}, layoutY={}", bottomConnector.isVisible(), bottomConnector.getLayoutX(), bottomConnector.getLayoutY());
-        logger.debug("      左侧: visible={}, layoutX={}, layoutY={}", leftConnector.isVisible(), leftConnector.getLayoutX(), leftConnector.getLayoutY());
-        logger.debug("      右侧: visible={}, layoutX={}, layoutY={}", rightConnector.isVisible(), rightConnector.getLayoutX(), rightConnector.getLayoutY());
     }
     
     // 强制显示连接点（用于测试）
@@ -776,7 +762,6 @@ public class ProcessNode extends StackPane {
         leftConnector.setFill(Color.web(color));
         rightConnector.setFill(Color.web(color));
         
-        logger.debug("🎨 更改节点颜色: {} → {} (状态: {})", jobHandlerName, color, status);
     }
     
     /**
@@ -788,23 +773,19 @@ public class ProcessNode extends StackPane {
             case RUNNING:
                 // 运行中：黄色背景
                 background.setFill(Color.web("#F59E0B"));
-                logger.debug("🟡 节点背景设为黄色（运行中）: {}", jobHandlerName);
                 break;
             case SUCCESS:
                 // 成功：绿色背景
                 background.setFill(Color.web("#10B981"));
-                logger.debug("🟢 节点背景设为绿色（成功）: {}", jobHandlerName);
                 break;
             case FAILED:
                 // 失败：红色背景
                 background.setFill(Color.web("#EF4444"));
-                logger.debug("🔴 节点背景设为红色（失败）: {}", jobHandlerName);
                 break;
             case IDLE:
             default:
                 // 空闲：白色背景
                 background.setFill(Color.WHITE);
-                logger.debug("⚪ 节点背景设为白色（空闲）: {}", jobHandlerName);
                 break;
         }
     }
@@ -822,14 +803,12 @@ public class ProcessNode extends StackPane {
             // 启用状态：根据当前状态恢复颜色
             changeNodeColor(currentColor);
             this.setOpacity(1.0);
-            logger.debug("✅ 启用节点: {}", jobHandlerName);
         } else {
             // 禁用状态：灰色半透明
             background.setFill(Color.web("#F3F4F6"));
             background.setStroke(Color.web("#9CA3AF"));
             background.setStrokeWidth(2);
             this.setOpacity(0.6);
-            logger.debug("⚙️ 禁用节点: {}", jobHandlerName);
         }
         
         // 调用回调，通知外部（如调用后端API）
@@ -928,7 +907,6 @@ public class ProcessNode extends StackPane {
         // 更新当前颜色
         this.currentColor = statusColor;
         
-        logger.debug("📊 节点状态更新: {} [{} → {}] (边框颜色: {})", jobHandlerName, oldStatus, newStatus, statusColor);
     }
     
     /**

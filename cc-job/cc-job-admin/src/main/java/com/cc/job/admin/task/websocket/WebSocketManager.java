@@ -110,9 +110,6 @@ public class WebSocketManager {
             log.warn("WebSocket message success rate is low: {}%", successRate);
         }
 
-        // 记录性能统计
-        log.info("WebSocket Health Check - Online: {}, Messages: {}, Success Rate: {}%",
-                stats.getOnlineCount(), stats.getMessageCount(), successRate);
     }
 
     /**
@@ -124,7 +121,6 @@ public class WebSocketManager {
         totalMessagesFailed.set(0);
         totalConnections.set(0);
         totalDisconnections.set(0);
-        log.info("WebSocket daily statistics reset");
     }
 
     /**

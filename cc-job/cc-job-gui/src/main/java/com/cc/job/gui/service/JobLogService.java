@@ -194,10 +194,6 @@ public class JobLogService extends BaseService {
             String responseBody = response.body().string();
             
             // 打印完整的响应以便调试
-            logger.debug("getLogDetail API URL: {}", url);
-            logger.debug("getLogDetail API 响应状态: {}", response.code());
-            logger.debug("getLogDetail API 响应 (截取): {}", 
-                responseBody.length() > 500 ? responseBody.substring(0, 500) + "..." : responseBody);
             
             if (!response.isSuccessful()) {
                 throw new IOException("请求失败: HTTP " + response.code() + " - " + responseBody);

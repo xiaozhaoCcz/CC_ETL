@@ -92,7 +92,6 @@ public class MiniMapView extends VBox {
             double w = newVal.doubleValue();
             if (w > 0) {
                 canvas.setWidth(w);
-                logger.debug("📐 Canvas宽度调整为: {}", w);
                 scheduleThrottledUpdate();  // 使用节流更新
             }
         });
@@ -102,7 +101,6 @@ public class MiniMapView extends VBox {
             double h = newVal.doubleValue();
             if (h > 0) {
                 canvas.setHeight(h);
-                logger.debug("📐 Canvas高度调整为: {}", h);
                 scheduleThrottledUpdate();  // 使用节流更新
             }
         });
@@ -170,17 +168,14 @@ public class MiniMapView extends VBox {
         
         // 监听滚动位置变化（使用节流，避免频繁更新）
         scrollPane.hvalueProperty().addListener((obs, oldVal, newVal) -> {
-            logger.debug("🔄 水平滚动: {} → {}", oldVal, newVal);
             scheduleThrottledViewportUpdate();
         });
         scrollPane.vvalueProperty().addListener((obs, oldVal, newVal) -> {
-            logger.debug("🔄 垂直滚动: {} → {}", oldVal, newVal);
             scheduleThrottledViewportUpdate();
         });
         
         // 监听视口大小变化（使用节流）
         scrollPane.viewportBoundsProperty().addListener((obs, oldVal, newVal) -> {
-            logger.debug("🔄 视口大小变化: {}", newVal);
             scheduleThrottledViewportUpdate();
         });
         
@@ -194,7 +189,6 @@ public class MiniMapView extends VBox {
                     double currentH = scrollPane.getHvalue();
                     double currentV = scrollPane.getVvalue();
                     if (Math.abs(lastHValue - currentH) > 0.001 || Math.abs(lastVValue - currentV) > 0.001) {
-                        logger.debug("🔄 检测到滚动变化: H={}, V={}", currentH, currentV);
                         lastHValue = currentH;
                         lastVValue = currentV;
                         updateViewport();
@@ -253,14 +247,41 @@ public class MiniMapView extends VBox {
         gc.setLineWidth(1);
         
         nodeCanvas.getConnections().forEach(conn -> {
-            double x1 = conn.getSourceNode().getLayoutX() * scale + offsetX + 
-                       conn.getSourceNode().getPrefWidth() * scale / 2;
-            double y1 = conn.getSourceNode().getLayoutY() * scale + offsetY + 
-                       conn.getSourceNode().getPrefHeight() * scale / 2;
-            double x2 = conn.getTargetNode().getLayoutX() * scale + offsetX + 
-                       conn.getTargetNode().getPrefWidth() * scale / 2;
-            double y2 = conn.getTargetNode().getLayoutY() * scale + offsetY + 
-                       conn.getTargetNode().getPrefHeight() * scale / 2;
+            // ⭐ 修复：使用 getSourceOwner() 和 getTargetOwner()，支持任务组容器
+            javafx.scene.Node sourceOwner = conn.getSourceOwner();
+            javafx.scene.Node targetOwner = conn.getTargetOwner();
+            
+            if (sourceOwner == null || targetOwner == null) {
+                return; // 跳过无效的连接
+            }
+            
+            double x1, y1, x2, y2;
+            
+            // 获取源节点/容器的位置
+            if (sourceOwner instanceof com.cc.job.gui.model.ProcessNode) {
+                com.cc.job.gui.model.ProcessNode sourceNode = (com.cc.job.gui.model.ProcessNode) sourceOwner;
+                x1 = sourceNode.getLayoutX() * scale + offsetX + sourceNode.getPrefWidth() * scale / 2;
+                y1 = sourceNode.getLayoutY() * scale + offsetY + sourceNode.getPrefHeight() * scale / 2;
+            } else if (sourceOwner instanceof com.cc.job.gui.model.GroupContainer) {
+                com.cc.job.gui.model.GroupContainer sourceContainer = (com.cc.job.gui.model.GroupContainer) sourceOwner;
+                x1 = sourceContainer.getLayoutX() * scale + offsetX + sourceContainer.getFrame().getWidth() * scale / 2;
+                y1 = sourceContainer.getLayoutY() * scale + offsetY + sourceContainer.getFrame().getHeight() * scale / 2;
+            } else {
+                return; // 跳过未知类型的连接
+            }
+            
+            // 获取目标节点/容器的位置
+            if (targetOwner instanceof com.cc.job.gui.model.ProcessNode) {
+                com.cc.job.gui.model.ProcessNode targetNode = (com.cc.job.gui.model.ProcessNode) targetOwner;
+                x2 = targetNode.getLayoutX() * scale + offsetX + targetNode.getPrefWidth() * scale / 2;
+                y2 = targetNode.getLayoutY() * scale + offsetY + targetNode.getPrefHeight() * scale / 2;
+            } else if (targetOwner instanceof com.cc.job.gui.model.GroupContainer) {
+                com.cc.job.gui.model.GroupContainer targetContainer = (com.cc.job.gui.model.GroupContainer) targetOwner;
+                x2 = targetContainer.getLayoutX() * scale + offsetX + targetContainer.getFrame().getWidth() * scale / 2;
+                y2 = targetContainer.getLayoutY() * scale + offsetY + targetContainer.getFrame().getHeight() * scale / 2;
+            } else {
+                return; // 跳过未知类型的连接
+            }
             
             gc.strokeLine(x1, y1, x2, y2);
         });
@@ -290,7 +311,6 @@ public class MiniMapView extends VBox {
     private void updateViewportForPannable() {
         if (nodeCanvas == null || scrollPane == null) return;
         
-        logger.debug("📍 更新视口矩形（Pannable模式）...");
         
         double canvasWidth = nodeCanvas.getPrefWidth();
         double canvasHeight = nodeCanvas.getPrefHeight();
@@ -317,8 +337,6 @@ public class MiniMapView extends VBox {
         translateX = Math.max(0, Math.min(translateX, canvasWidth - viewportWidth));
         translateY = Math.max(0, Math.min(translateY, canvasHeight - viewportHeight));
         
-        logger.debug("   平移: X={}, Y={}", translateX, translateY);
-        logger.debug("   视口尺寸: {} x {}", viewportWidth, viewportHeight);
         
         // 计算视口矩形
         double rectX = translateX * scale + offsetX;
@@ -335,15 +353,12 @@ public class MiniMapView extends VBox {
         viewportRect.setWidth(rectW);
         viewportRect.setHeight(rectH);
         
-        logger.debug("   视口矩形: [{}, {}, {}, {}]", rectX, rectY, rectW, rectH);
         
         // 如果矩形大小异常，隐藏它
         if (rectW <= 0 || rectH <= 0 || rectW > MINIMAP_WIDTH || rectH > MINIMAP_HEIGHT) {
             viewportRect.setVisible(false);
-            logger.debug("   ❌ 视口矩形隐藏（大小异常）");
         } else {
             viewportRect.setVisible(true);
-            logger.debug("   ✅ 视口矩形显示");
         }
     }
     
@@ -353,12 +368,10 @@ public class MiniMapView extends VBox {
     private void updateViewport() {
         if (nodeCanvas == null || scrollPane == null) return;
         
-        logger.debug("📍 更新视口矩形（标准模式）...");
         
         double canvasWidth = nodeCanvas.getPrefWidth();
         double canvasHeight = nodeCanvas.getPrefHeight();
         
-        logger.debug("   画布尺寸: {} x {}", canvasWidth, canvasHeight);
         
         // 计算缩放比例
         double scaleX = MINIMAP_WIDTH / canvasWidth;
@@ -378,17 +391,14 @@ public class MiniMapView extends VBox {
         double hValue = scrollPane.getHvalue();
         double vValue = scrollPane.getVvalue();
         
-        logger.debug("   滚动值: H={}, V={}", hValue, vValue);
         
         double contentWidth = canvasWidth - viewportWidth;
         double contentHeight = canvasHeight - viewportHeight;
         
-        logger.debug("   内容尺寸: {} x {}", contentWidth, contentHeight);
         
         double scrollX = contentWidth > 0 ? hValue * contentWidth : 0;
         double scrollY = contentHeight > 0 ? vValue * contentHeight : 0;
         
-        logger.debug("   滚动位置: X={}, Y={}", scrollX, scrollY);
         
         // 更新视口矩形 - 限制在小地图可见范围内
         double rectX = scrollX * scale + offsetX;
@@ -413,15 +423,12 @@ public class MiniMapView extends VBox {
         viewportRect.setWidth(rectW);
         viewportRect.setHeight(rectH);
         
-        logger.debug("   视口矩形: [{}, {}, {}, {}]", rectX, rectY, rectW, rectH);
         
         // 如果矩形大小异常，隐藏它
         if (rectW <= 0 || rectH <= 0 || rectW > MINIMAP_WIDTH || rectH > MINIMAP_HEIGHT) {
             viewportRect.setVisible(false);
-            logger.debug("   ❌ 视口矩形隐藏（大小异常）");
         } else {
             viewportRect.setVisible(true);
-            logger.debug("   ✅ 视口矩形显示");
         }
     }
     

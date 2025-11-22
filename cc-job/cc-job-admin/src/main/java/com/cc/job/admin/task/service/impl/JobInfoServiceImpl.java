@@ -95,6 +95,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         put("GLUE_PHP","custom-php");
         put("GLUE_NODEJS","custom-nodejs");
         put("GLUE_POWERSHELL","custom-powershell");
+        // 自定义：任务组容器节点
+        put("CUSTOM_GROUP","custom-group");
     }};
 
 
@@ -165,6 +167,12 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         if(jobNode != null) {
             taskInfoForm.setNodePositionX(jobNode.getNodePositionX());
             taskInfoForm.setNodePositionY(jobNode.getNodePositionY());
+            // 返回节点ID供前端展示
+            taskInfoForm.setNodeId(String.valueOf(jobNode.getId()));
+        }
+        // 补充运行时长（毫秒）
+        if (entity != null) {
+            taskInfoForm.setRunTime(entity.getRunTime());
         }
         return taskInfoForm;
     }
@@ -321,7 +329,6 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
                     edgesJson,
                     triggerUserIdStr
                 );
-                log.info("[Snapshot] 任务组快照创建成功 - jobId: {}, randomId: {}", jobId, randomId);
             } catch (Exception e) {
                 log.error("[Snapshot] 创建任务组快照失败 - jobId: {}, randomId: {}", jobId, randomId, e);
                 throw new BusinessException("创建任务组快照失败: " + e.getMessage());
@@ -335,7 +342,6 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         // 只在任务组（jobType == 2）时记录触发用户ID
         if (taskInfo.getJobType() == 2 && taskInfoTriggerDto.getTriggerUserId() != null) {
             taskInfo.setTriggerUserId(taskInfoTriggerDto.getTriggerUserId());
-            log.info("✓ 记录任务组触发用户ID: " + taskInfoTriggerDto.getTriggerUserId());
         }
         
         // 原子性设置运行状态（在事务中，行锁保护）

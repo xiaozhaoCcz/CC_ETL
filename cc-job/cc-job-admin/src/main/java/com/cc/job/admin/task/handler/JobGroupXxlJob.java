@@ -816,33 +816,85 @@ public class JobGroupXxlJob {
             // 获取子任务组的节点
             List<JobNode> childrenNodes = new ArrayList<>(
                     nodesByParent.getOrDefault(jobInfo.getId(), Collections.emptyList()));
-            // 获取开始节点和结束节点
-            List<JobNode> startNodes = childrenNodes.stream().filter(v -> v.getNodeInDegree() == 0).toList();
-            List<JobNode> endNodes = childrenNodes.stream().filter(v -> v.getNodeOutDegree() == 0).toList();
-
-            // 连接前置节点到开始节点
-            for (JobNode startNode : startNodes) {
-                for (Long preNodeId : preNodeIds) {
-                    JobEdge edge = new JobEdge();
-                    edge.setFromNodeId(preNodeId);
-                    edge.setEndNodeId(startNode.getId());
-                    edge.setJobParentId(jobId);
-                    addEdge(edge, edges, edgesByFrom, edgesByTo);
-                }
+            
+            // ⭐ 修复：基于 edgesByFrom 和 edgesByTo 实时计算子节点的入度和出度，而不是使用节点对象中可能过期的值
+            // 因为子节点可能属于不同的任务组，它们的入度和出度应该基于当前图中的边来计算
+            List<Long> childrenNodeIds = childrenNodes.stream().map(JobNode::getId).toList();
+            Map<Long, Long> childrenInDegree = new HashMap<>();
+            Map<Long, Long> childrenOutDegree = new HashMap<>();
+            
+            // 计算子节点的入度和出度（只考虑子节点之间的边）
+            for (Long childNodeId : childrenNodeIds) {
+                // 计算入度：有多少条边指向这个子节点（来源节点也在子节点列表中）
+                long inDegree = edgesByTo.getOrDefault(childNodeId, Collections.emptyList()).stream()
+                        .filter(edge -> childrenNodeIds.contains(edge.getFromNodeId()))
+                        .count();
+                // 计算出度：有多少条边从这个子节点出发（目标节点也在子节点列表中）
+                long outDegree = edgesByFrom.getOrDefault(childNodeId, Collections.emptyList()).stream()
+                        .filter(edge -> childrenNodeIds.contains(edge.getEndNodeId()))
+                        .count();
+                childrenInDegree.put(childNodeId, inDegree);
+                childrenOutDegree.put(childNodeId, outDegree);
             }
-
-            // 连接结束节点到后置节点
-            for (JobNode endNode : endNodes) {
-                for (Long nextNodeId : nextNodeIds) {
-                    JobEdge edge = new JobEdge();
-                    edge.setFromNodeId(endNode.getId());
-                    edge.setEndNodeId(nextNodeId);
-                    edge.setJobParentId(jobId);
-                    addEdge(edge, edges, edgesByFrom, edgesByTo);
+            
+            // 获取开始节点（入度为0的子节点）和结束节点（出度为0的子节点）
+            List<JobNode> startNodes = childrenNodes.stream()
+                    .filter(v -> childrenInDegree.getOrDefault(v.getId(), 0L) == 0)
+                    .toList();
+            List<JobNode> endNodes = childrenNodes.stream()
+                    .filter(v -> childrenOutDegree.getOrDefault(v.getId(), 0L) == 0)
+                    .toList();
+            
+            logger.debug("[JobGroup] 处理任务组节点 - jobId: {}, 子节点数量: {}, 开始节点数量: {}, 结束节点数量: {}", 
+                    jobInfo.getId(), childrenNodes.size(), startNodes.size(), endNodes.size());
+            
+            // ⭐ 修复：如果子节点列表为空，记录警告并跳过处理
+            if (childrenNodes.isEmpty()) {
+                logger.warn("[JobGroup] 任务组节点没有子节点 - jobId: {}, jobName: {}", 
+                        jobInfo.getId(), jobInfo.getJobDesc());
+                // 即使没有子节点，也要移除当前任务组节点，以避免阻塞执行
+            } else {
+                // ⭐ 修复：如果没有开始节点，记录警告并使用所有子节点作为开始节点
+                if (startNodes.isEmpty()) {
+                    logger.warn("[JobGroup] 任务组节点没有找到开始节点（入度为0的节点），使用所有子节点作为开始节点 - jobId: {}", 
+                            jobInfo.getId());
+                    startNodes = new ArrayList<>(childrenNodes);
                 }
-            }
+                
+                // ⭐ 修复：如果没有结束节点，记录警告并使用所有子节点作为结束节点
+                if (endNodes.isEmpty()) {
+                    logger.warn("[JobGroup] 任务组节点没有找到结束节点（出度为0的节点），使用所有子节点作为结束节点 - jobId: {}", 
+                            jobInfo.getId());
+                    endNodes = new ArrayList<>(childrenNodes);
+                }
+                
+                // 连接前置节点到开始节点
+                for (JobNode startNode : startNodes) {
+                    for (Long preNodeId : preNodeIds) {
+                        JobEdge edge = new JobEdge();
+                        edge.setFromNodeId(preNodeId);
+                        edge.setEndNodeId(startNode.getId());
+                        edge.setJobParentId(jobId);
+                        addEdge(edge, edges, edgesByFrom, edgesByTo);
+                        logger.debug("[JobGroup] 添加边: {} -> {} (前置节点到开始节点)", preNodeId, startNode.getId());
+                    }
+                }
 
-            getNodeList(jobId, nodes, edges, childrenNodes, nodesByParent, edgesByFrom, edgesByTo);
+                // 连接结束节点到后置节点
+                for (JobNode endNode : endNodes) {
+                    for (Long nextNodeId : nextNodeIds) {
+                        JobEdge edge = new JobEdge();
+                        edge.setFromNodeId(endNode.getId());
+                        edge.setEndNodeId(nextNodeId);
+                        edge.setJobParentId(jobId);
+                        addEdge(edge, edges, edgesByFrom, edgesByTo);
+                        logger.debug("[JobGroup] 添加边: {} -> {} (结束节点到后置节点)", endNode.getId(), nextNodeId);
+                    }
+                }
+
+                // ⭐ 修复：递归处理子节点（可能包含嵌套的任务组节点）
+                getNodeList(jobId, nodes, edges, childrenNodes, nodesByParent, edgesByFrom, edgesByTo);
+            }
 
             // 移除当前节点
             nodes.removeIf(v -> v.getId().equals(currentNode.getId()));

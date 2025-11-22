@@ -84,9 +84,25 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
             if (buttonType == saveButtonType) {
                 if (validateForm()) {
                     return collectFormData();
+                } else {
+                    // 验证失败，返回null并阻止对话框关闭
+                    return null;
                 }
             }
             return null;
+        });
+        
+        // 拦截保存按钮的点击事件，验证失败时阻止对话框关闭
+        Platform.runLater(() -> {
+            Button saveButton = (Button) getDialogPane().lookupButton(saveButtonType);
+            if (saveButton != null) {
+                // 拦截ActionEvent（按钮的默认行为），验证失败时阻止对话框关闭
+                saveButton.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+                    if (!validateForm()) {
+                        event.consume(); // 验证失败，阻止事件传播，防止对话框关闭
+                    }
+                });
+            }
         });
         
         // 设置验证
@@ -547,7 +563,7 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
         // 固定字段
         form.setGlueType("BEAN");
         form.setExecutorHandler("runJobGroupXxlJob"); // 任务组的固定Handler
-        form.setJobType(1); // 任务组类型
+        form.setJobType(2); // 任务组类型（jobType=2 表示任务组）
         
         return form;
     }

@@ -219,14 +219,115 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
     private static final String SECRET_KEY = "1234567890abcdef"; // 256-bit key
     private static final String ALGORITHM = "AES";
 
-    // TODO 后修修改
+    /**
+     * 导出分区数据
+     * 导出分区下的所有任务组、任务节点和边的关系
+     */
     @Override
     public byte[] exportData(Long id) {
-        List<JobPartVo> treeList = this.getTree();
-        JobPartVo jobPartVo = treeList.stream().filter(e -> e.getId().equals(id) ).findFirst().orElseThrow();
+        // 1. 获取分区信息
+        JobPart jobPart = this.getById(id);
+        if (jobPart == null) {
+            throw new RuntimeException("分区不存在: " + id);
+        }
+
+        // 2. 构建导出数据结构
+        com.cc.job.xo.model.dto.PartitionExportData exportData = new com.cc.job.xo.model.dto.PartitionExportData();
+        
+        // 2.1 设置分区信息
+        com.cc.job.xo.model.dto.PartitionExportData.PartitionInfo partitionInfo = 
+            new com.cc.job.xo.model.dto.PartitionExportData.PartitionInfo();
+        partitionInfo.setId(jobPart.getId());
+        partitionInfo.setJobPartName(jobPart.getJobPartName());
+        partitionInfo.setSort(jobPart.getSort());
+        exportData.setPartition(partitionInfo);
+
+        // 2.2 获取分区下的所有任务组（jobType=2, isNode="N"）
+        List<JobInfo> taskGroupList = jobInfoService.list(
+            new LambdaQueryWrapper<JobInfo>()
+                .eq(JobInfo::getJobPartId, id)
+                .eq(JobInfo::getJobType, 2)
+                .eq(JobInfo::getIsNode, "N")
+        );
+
+        List<com.cc.job.xo.model.dto.PartitionExportData.TaskGroupInfo> taskGroupInfoList = new ArrayList<>();
+
+        // 2.3 遍历每个任务组，获取其节点和边
+        for (JobInfo taskGroup : taskGroupList) {
+            com.cc.job.xo.model.dto.PartitionExportData.TaskGroupInfo taskGroupInfo = 
+                new com.cc.job.xo.model.dto.PartitionExportData.TaskGroupInfo();
+
+            // 2.3.1 设置任务组基本信息
+            com.cc.job.xo.model.dto.PartitionExportData.TaskInfoData taskGroupData = 
+                convertToTaskInfoData(taskGroup);
+            taskGroupInfo.setTaskGroupData(taskGroupData);
+
+            // 2.3.2 获取任务组下的所有节点（JobNode）
+            List<JobNode> jobNodeList = jobNodeService.list(
+                new LambdaQueryWrapper<JobNode>()
+                    .eq(JobNode::getJobParentId, taskGroup.getId())
+            );
+
+            List<com.cc.job.xo.model.dto.PartitionExportData.NodeInfo> nodeInfoList = new ArrayList<>();
+            for (JobNode jobNode : jobNodeList) {
+                com.cc.job.xo.model.dto.PartitionExportData.NodeInfo nodeInfo = 
+                    new com.cc.job.xo.model.dto.PartitionExportData.NodeInfo();
+                
+                // 设置JobNode信息
+                nodeInfo.setNodeId(jobNode.getId());
+                nodeInfo.setJobId(jobNode.getJobId());
+                nodeInfo.setJobParentId(jobNode.getJobParentId());
+                nodeInfo.setNodePositionX(jobNode.getNodePositionX());
+                nodeInfo.setNodePositionY(jobNode.getNodePositionY());
+                nodeInfo.setNodeInDegree(jobNode.getNodeInDegree());
+                nodeInfo.setNodeOutDegree(jobNode.getNodeOutDegree());
+                nodeInfo.setSort(jobNode.getSort());
+                nodeInfo.setChildren(jobNode.getChildren());
+                nodeInfo.setProperties(jobNode.getProperties());
+                nodeInfo.setNodeType(jobNode.getNodeType());
+                nodeInfo.setTriggerStatus(jobNode.getTriggerStatus());
+
+                // 获取节点对应的JobInfo信息
+                JobInfo nodeJobInfo = jobInfoService.getById(jobNode.getJobId());
+                if (nodeJobInfo != null) {
+                    nodeInfo.setTaskInfo(convertToTaskInfoData(nodeJobInfo));
+                }
+
+                nodeInfoList.add(nodeInfo);
+            }
+            taskGroupInfo.setNodes(nodeInfoList);
+
+            // 2.3.3 获取任务组下的所有边（JobEdge）
+            List<JobEdge> jobEdgeList = jobEdgeService.list(
+                new LambdaQueryWrapper<JobEdge>()
+                    .eq(JobEdge::getJobParentId, taskGroup.getId())
+            );
+
+            List<com.cc.job.xo.model.dto.PartitionExportData.EdgeInfo> edgeInfoList = new ArrayList<>();
+            for (JobEdge jobEdge : jobEdgeList) {
+                com.cc.job.xo.model.dto.PartitionExportData.EdgeInfo edgeInfo = 
+                    new com.cc.job.xo.model.dto.PartitionExportData.EdgeInfo();
+                edgeInfo.setId(jobEdge.getId());
+                edgeInfo.setJobParentId(jobEdge.getJobParentId());
+                edgeInfo.setFromNodeId(jobEdge.getFromNodeId());
+                edgeInfo.setEndNodeId(jobEdge.getEndNodeId());
+                edgeInfo.setPointsList(jobEdge.getPointsList());
+                edgeInfo.setProperties(jobEdge.getProperties());
+                edgeInfo.setStartPoint(jobEdge.getStartPoint());
+                edgeInfo.setEndPoint(jobEdge.getEndPoint());
+                edgeInfoList.add(edgeInfo);
+            }
+            taskGroupInfo.setEdges(edgeInfoList);
+
+            taskGroupInfoList.add(taskGroupInfo);
+        }
+
+        exportData.setTaskGroups(taskGroupInfoList);
+
+        // 3. 序列化为JSON并加密
         Gson gson = new Gson();
-        System.out.println(gson.toJson(jobPartVo));
-        String json = gson.toJson(jobPartVo);
+        String json = gson.toJson(exportData);
+        
         Cipher cipher = null;
         try {
             cipher = Cipher.getInstance(ALGORITHM);
@@ -252,9 +353,59 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
         return encryptedBytes;
     }
 
+    /**
+     * 将JobInfo转换为TaskInfoData
+     */
+    private com.cc.job.xo.model.dto.PartitionExportData.TaskInfoData convertToTaskInfoData(JobInfo jobInfo) {
+        com.cc.job.xo.model.dto.PartitionExportData.TaskInfoData taskInfoData = 
+            new com.cc.job.xo.model.dto.PartitionExportData.TaskInfoData();
+        taskInfoData.setId(jobInfo.getId());
+        taskInfoData.setJobGroup(jobInfo.getJobGroup());
+        taskInfoData.setJobDesc(jobInfo.getJobDesc());
+        taskInfoData.setAuthor(jobInfo.getAuthor());
+        taskInfoData.setAlarmEmail(jobInfo.getAlarmEmail());
+        taskInfoData.setScheduleType(jobInfo.getScheduleType());
+        taskInfoData.setScheduleConf(jobInfo.getScheduleConf());
+        taskInfoData.setMisfireStrategy(jobInfo.getMisfireStrategy());
+        taskInfoData.setExecutorRouteStrategy(jobInfo.getExecutorRouteStrategy());
+        taskInfoData.setExecutorHandler(jobInfo.getExecutorHandler());
+        taskInfoData.setExecutorParam(jobInfo.getExecutorParam());
+        taskInfoData.setExecutorBlockStrategy(jobInfo.getExecutorBlockStrategy());
+        taskInfoData.setExecutorTimeout(jobInfo.getExecutorTimeout());
+        taskInfoData.setExecutorFailRetryCount(jobInfo.getExecutorFailRetryCount());
+        taskInfoData.setGlueType(jobInfo.getGlueType());
+        taskInfoData.setGlueSource(jobInfo.getGlueSource());
+        taskInfoData.setGlueRemark(jobInfo.getGlueRemark());
+        taskInfoData.setChildJobid(jobInfo.getChildJobid());
+        taskInfoData.setTriggerStatus(jobInfo.getTriggerStatus());
+        taskInfoData.setTriggerLastTime(jobInfo.getTriggerLastTime());
+        taskInfoData.setTriggerNextTime(jobInfo.getTriggerNextTime());
+        taskInfoData.setJobType(jobInfo.getJobType());
+        taskInfoData.setParentId(jobInfo.getParentId());
+        taskInfoData.setReqType(jobInfo.getReqType());
+        taskInfoData.setReqHeader(jobInfo.getReqHeader());
+        taskInfoData.setReqBody(jobInfo.getReqBody());
+        taskInfoData.setReqUrl(jobInfo.getReqUrl());
+        taskInfoData.setIsNode(jobInfo.getIsNode());
+        taskInfoData.setRankTriggerStatus(jobInfo.getRankTriggerStatus());
+        taskInfoData.setJdbcDatasourceId(jobInfo.getJdbcDatasourceId());
+        taskInfoData.setIncrType(jobInfo.getIncrType());
+        taskInfoData.setIncrContent(jobInfo.getIncrContent());
+        taskInfoData.setRunTime(jobInfo.getRunTime());
+        taskInfoData.setIsPause(jobInfo.getIsPause());
+        taskInfoData.setJobPartId(jobInfo.getJobPartId());
+        taskInfoData.setTriggerUserId(jobInfo.getTriggerUserId());
+        return taskInfoData;
+    }
+
+    /**
+     * 导入分区数据
+     * 从文件中读取数据并重新创建所有节点和边（不依赖已有数据库）
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void importData(MultipartFile file) {
+        // 1. 解密文件
         Cipher cipher = null;
         SecretKeySpec keySpec = new SecretKeySpec(SECRET_KEY.getBytes(), "AES");
         byte[] decryptedBytes = null;
@@ -266,124 +417,162 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
             json = new String(decryptedBytes, "UTF-8");
         } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | IllegalBlockSizeException |
                  BadPaddingException | IOException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("解密文件失败", e);
         }
+
+        // 2. 解析JSON数据
         Gson gson = new Gson();
-        JobPartVo jobPartVo = gson.fromJson(json, JobPartVo.class);
-        //添加数据
-        //1.往jabpart中插入数据
-        JobPart jobPart = this.getById(jobPartVo.getId());
-        JobPart copyJobPart = BeanUtil.copyProperties(jobPart, JobPart.class, "id");
-        this.save(copyJobPart);
-        //2.往jobinfo中插入数据
-        List<JobInfo> jobInfoList = jobInfoService.list(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getJobPartId, jobPartVo.getId()));
-        if(jobInfoList==null||jobInfoList.isEmpty()){
-            return;
+        com.cc.job.xo.model.dto.PartitionExportData exportData = 
+            gson.fromJson(json, com.cc.job.xo.model.dto.PartitionExportData.class);
+        
+        if (exportData == null || exportData.getPartition() == null) {
+            throw new RuntimeException("导入数据格式错误");
         }
-        Map<Long, JobInfo> jobInfoMap = new HashMap<>();
-        Map<Long,Long> jobParentIdMap = new HashMap<>();
-        getAllJobInfoMap(jobInfoList, jobInfoMap,jobParentIdMap);
 
-        Map<Long,Long> jobParentIdMap2 = new HashMap<>();
+        // 3. 创建新分区（不依赖原有数据）
+        JobPart newPartition = new JobPart();
+        newPartition.setJobPartName(exportData.getPartition().getJobPartName());
+        newPartition.setSort(exportData.getPartition().getSort());
+        this.save(newPartition);
+        Long newPartitionId = newPartition.getId();
 
-        List<JobInfo> copyJobInfoList = new ArrayList<>();
-        jobInfoMap.values().forEach(jobInfo -> {
-            JobInfo copyJobInfo = BeanUtil.copyProperties(jobInfo, JobInfo.class, "id");
-            if("N".equalsIgnoreCase(copyJobInfo.getIsNode())&&copyJobInfo.getJobType()==2){
-                copyJobInfo.setJobPartId(Integer.parseInt(String.valueOf(copyJobPart.getId())));
-            }
-            jobInfoService.save(copyJobInfo);
-            copyJobInfo.setExecutorParam(String.valueOf(copyJobInfo.getId()));
-            jobInfoService.updateById(copyJobInfo);
-            copyJobInfoList.add(copyJobInfo);
-            //新id与原id的比较
-            jobParentIdMap2.put(copyJobInfo.getId(),jobInfo.getId());
-        });
+        // 4. ID映射表：原ID -> 新ID
+        Map<Long, Long> oldToNewJobInfoIdMap = new HashMap<>(); // JobInfo ID映射
+        Map<Long, Long> oldToNewNodeIdMap = new HashMap<>(); // JobNode ID映射
+        Map<Long, Long> oldToNewEdgeIdMap = new HashMap<>(); // JobEdge ID映射
 
-        for (JobInfo jobInfo : copyJobInfoList) {
-            if(jobInfo.getParentId()==0){
-                continue;
-            }
-            Long preJobId = jobParentIdMap2.get(jobInfo.getId());
-            JobInfo preJobInfo = jobInfoMap.get(preJobId);
-            Long parentId = preJobInfo.getParentId();
-            Long newParentId = 0L;
-            for (Map.Entry<Long, Long> entry : jobParentIdMap2.entrySet()) {
-                if(entry.getValue().equals(parentId)){
-                    newParentId = entry.getKey();
-                    break;
+        // 5. 遍历所有任务组，重新创建
+        if (exportData.getTaskGroups() != null) {
+            for (com.cc.job.xo.model.dto.PartitionExportData.TaskGroupInfo taskGroupInfo : exportData.getTaskGroups()) {
+                // 5.1 创建任务组（JobInfo，jobType=2, isNode="N"）
+                JobInfo newTaskGroup = convertToJobInfo(taskGroupInfo.getTaskGroupData());
+                newTaskGroup.setId(null); // 清除ID，让数据库自动生成
+                newTaskGroup.setJobPartId(Integer.parseInt(String.valueOf(newPartitionId)));
+                newTaskGroup.setJobType(2);
+                newTaskGroup.setIsNode("N");
+                newTaskGroup.setTriggerStatus(0); // 默认停止状态
+                jobInfoService.save(newTaskGroup);
+                
+                // 获取新生成的任务组ID
+                Long newTaskGroupId = newTaskGroup.getId();
+                if (newTaskGroupId == null) {
+                    throw new RuntimeException("创建任务组失败：未生成ID");
                 }
-            }
-            jobInfo.setParentId(newParentId);
-            jobInfoService.updateById(jobInfo);
-        }
-        //3.往jobnode中插入数据
-        List<Long> ids = jobInfoMap.keySet().stream().toList();
-        List<JobNode> jobNodes = jobNodeService.list(new LambdaQueryWrapper<JobNode>().in(JobNode::getJobId, ids));
+                
+                // 更新executorParam为新的ID
+                newTaskGroup.setExecutorParam(String.valueOf(newTaskGroupId));
+                jobInfoService.updateById(newTaskGroup);
+                
+                Long oldTaskGroupId = taskGroupInfo.getTaskGroupData().getId();
+                oldToNewJobInfoIdMap.put(oldTaskGroupId, newTaskGroupId);
 
-        Map<Long,Long> jobNodeIdMap = new HashMap<>();
-        List<JobNode> copyJobNodeList = new ArrayList<>();
-        for (JobNode jobNode : jobNodes) {
-            //TODO 保存子节点
-            for (Map.Entry<Long, Long> entry : jobParentIdMap2.entrySet()) {
-                if(entry.getValue().equals(jobNode.getJobId())){
-                    jobNode.setJobId(entry.getKey());
-                    JobNode jobNode1 = BeanUtil.copyProperties(jobNode, JobNode.class, "id");
-                    jobNodeService.save(jobNode1);
-                    copyJobNodeList.add(jobNode1);
-                    jobNodeIdMap.put(jobNode.getId(),jobNode1.getId());
-                    break;
-                }
-            }
-        }
+                // 5.2 创建任务组下的所有节点
+                if (taskGroupInfo.getNodes() != null) {
+                    for (com.cc.job.xo.model.dto.PartitionExportData.NodeInfo nodeInfo : taskGroupInfo.getNodes()) {
+                        // 5.2.1 创建节点对应的JobInfo
+                        JobInfo newNodeJobInfo = convertToJobInfo(nodeInfo.getTaskInfo());
+                        newNodeJobInfo.setId(null);
+                        newNodeJobInfo.setParentId(newTaskGroupId); // 设置父任务组ID
+                        newNodeJobInfo.setTriggerStatus(0); // 默认停止状态
+                        jobInfoService.save(newNodeJobInfo);
+                        
+                        Long newJobInfoId = newNodeJobInfo.getId();
+                        Long oldJobInfoId = nodeInfo.getTaskInfo().getId();
+                        oldToNewJobInfoIdMap.put(oldJobInfoId, newJobInfoId);
 
-        for (JobNode jobNode : copyJobNodeList) {
-            Map<String, Object> propertiesMap = JSONUtil.toBean(jobNode.getProperties(), Map.class);
-            if(jobNode.getNodeType().equalsIgnoreCase("CustomGroup")){
-                //修改孩子节点
-                String children = jobNode.getChildren();
-                List<Long> newIds = new ArrayList<>();
-                if(children!=null){
-                    long[] childrenArr = Arrays.stream(children.substring(1, children.length() - 1).split(","))
-                            .map(String::trim)
-                            .mapToLong(Long::parseLong)
-                            .toArray();
-                    for (long id : childrenArr) {
-                        Long nid = jobNodeIdMap.get(id);
-                        newIds.add(nid);
+                        // 5.2.2 创建JobNode
+                        JobNode newJobNode = new JobNode();
+                        newJobNode.setJobId(newJobInfoId);
+                        newJobNode.setJobParentId(newTaskGroupId);
+                        newJobNode.setNodePositionX(nodeInfo.getNodePositionX());
+                        newJobNode.setNodePositionY(nodeInfo.getNodePositionY());
+                        newJobNode.setNodeInDegree(nodeInfo.getNodeInDegree());
+                        newJobNode.setNodeOutDegree(nodeInfo.getNodeOutDegree());
+                        newJobNode.setSort(nodeInfo.getSort());
+                        newJobNode.setChildren(nodeInfo.getChildren());
+                        newJobNode.setProperties(nodeInfo.getProperties());
+                        newJobNode.setNodeType(nodeInfo.getNodeType());
+                        newJobNode.setTriggerStatus(nodeInfo.getTriggerStatus());
+                        jobNodeService.save(newJobNode);
+
+                        Long newNodeId = newJobNode.getId();
+                        Long oldNodeId = nodeInfo.getNodeId();
+                        oldToNewNodeIdMap.put(oldNodeId, newNodeId);
                     }
                 }
-                jobNode.setChildren(JSONUtil.toJsonStr(newIds));
-                propertiesMap.put("children", JSONUtil.toJsonStr(newIds));
-            }
-            propertiesMap.put("jobId",jobNode.getJobId());
-            jobNode.setProperties(JSONUtil.toJsonStr(propertiesMap));
-            for (Map.Entry<Long, Long> entry : jobParentIdMap2.entrySet()) {
-                if(entry.getValue().equals(jobNode.getJobParentId())){
-                    jobNode.setJobParentId(entry.getKey());
-                    break;
+
+                // 5.3 创建任务组下的所有边
+                if (taskGroupInfo.getEdges() != null) {
+                    for (com.cc.job.xo.model.dto.PartitionExportData.EdgeInfo edgeInfo : taskGroupInfo.getEdges()) {
+                        // 映射节点ID
+                        Long newFromNodeId = oldToNewNodeIdMap.get(edgeInfo.getFromNodeId());
+                        Long newEndNodeId = oldToNewNodeIdMap.get(edgeInfo.getEndNodeId());
+                        
+                        if (newFromNodeId != null && newEndNodeId != null) {
+                            JobEdge newJobEdge = new JobEdge();
+                            newJobEdge.setJobParentId(newTaskGroupId);
+                            newJobEdge.setFromNodeId(newFromNodeId);
+                            newJobEdge.setEndNodeId(newEndNodeId);
+                            newJobEdge.setPointsList(edgeInfo.getPointsList());
+                            newJobEdge.setProperties(edgeInfo.getProperties());
+                            newJobEdge.setStartPoint(edgeInfo.getStartPoint());
+                            newJobEdge.setEndPoint(edgeInfo.getEndPoint());
+                            jobEdgeService.save(newJobEdge);
+
+                            Long newEdgeId = newJobEdge.getId();
+                            Long oldEdgeId = edgeInfo.getId();
+                            oldToNewEdgeIdMap.put(oldEdgeId, newEdgeId);
+                        }
+                    }
                 }
+
+                // 5.4 更新任务组节点的children字段（如果有嵌套任务组）
+                // 这里需要处理嵌套任务组的情况，暂时先跳过
             }
-            jobNodeService.updateById(jobNode);
         }
-        //4.往jobedge中插入数据
-        List<JobEdge> jobEdgeList = jobEdgeService.list(new LambdaQueryWrapper<JobEdge>().in(JobEdge::getJobParentId, ids));
-        for (JobEdge jobEdge : jobEdgeList) {
-            Long fromNodeId = jobEdge.getFromNodeId();
-            Long endNodeId = jobEdge.getEndNodeId();
-            JobEdge copyJobEdge = BeanUtil.copyProperties(jobEdge, JobEdge.class, "id");
-            Long fromId = jobNodeIdMap.get(fromNodeId);
-            Long endId = jobNodeIdMap.get(endNodeId);
-            for (Map.Entry<Long, Long> entry : jobParentIdMap2.entrySet()) {
-                if(entry.getValue().equals(jobEdge.getJobParentId())){
-                    copyJobEdge.setJobParentId(entry.getKey());
-                    break;
-                }
-            }
-            copyJobEdge.setFromNodeId(fromId);
-            copyJobEdge.setEndNodeId(endId);
-            jobEdgeService.save(copyJobEdge);
-        }
+    }
+
+    /**
+     * 将TaskInfoData转换为JobInfo
+     */
+    private JobInfo convertToJobInfo(com.cc.job.xo.model.dto.PartitionExportData.TaskInfoData taskInfoData) {
+        JobInfo jobInfo = new JobInfo();
+        jobInfo.setJobGroup(taskInfoData.getJobGroup());
+        jobInfo.setJobDesc(taskInfoData.getJobDesc());
+        jobInfo.setAuthor(taskInfoData.getAuthor());
+        jobInfo.setAlarmEmail(taskInfoData.getAlarmEmail());
+        jobInfo.setScheduleType(taskInfoData.getScheduleType());
+        jobInfo.setScheduleConf(taskInfoData.getScheduleConf());
+        jobInfo.setMisfireStrategy(taskInfoData.getMisfireStrategy());
+        jobInfo.setExecutorRouteStrategy(taskInfoData.getExecutorRouteStrategy());
+        jobInfo.setExecutorHandler(taskInfoData.getExecutorHandler());
+        jobInfo.setExecutorParam(taskInfoData.getExecutorParam());
+        jobInfo.setExecutorBlockStrategy(taskInfoData.getExecutorBlockStrategy());
+        jobInfo.setExecutorTimeout(taskInfoData.getExecutorTimeout());
+        jobInfo.setExecutorFailRetryCount(taskInfoData.getExecutorFailRetryCount());
+        jobInfo.setGlueType(taskInfoData.getGlueType());
+        jobInfo.setGlueSource(taskInfoData.getGlueSource());
+        jobInfo.setGlueRemark(taskInfoData.getGlueRemark());
+        jobInfo.setChildJobid(taskInfoData.getChildJobid());
+        jobInfo.setTriggerStatus(taskInfoData.getTriggerStatus());
+        jobInfo.setTriggerLastTime(taskInfoData.getTriggerLastTime());
+        jobInfo.setTriggerNextTime(taskInfoData.getTriggerNextTime());
+        jobInfo.setJobType(taskInfoData.getJobType());
+        jobInfo.setParentId(taskInfoData.getParentId());
+        jobInfo.setReqType(taskInfoData.getReqType());
+        jobInfo.setReqHeader(taskInfoData.getReqHeader());
+        jobInfo.setReqBody(taskInfoData.getReqBody());
+        jobInfo.setReqUrl(taskInfoData.getReqUrl());
+        jobInfo.setIsNode(taskInfoData.getIsNode());
+        jobInfo.setRankTriggerStatus(taskInfoData.getRankTriggerStatus());
+        jobInfo.setJdbcDatasourceId(taskInfoData.getJdbcDatasourceId());
+        jobInfo.setIncrType(taskInfoData.getIncrType());
+        jobInfo.setIncrContent(taskInfoData.getIncrContent());
+        jobInfo.setRunTime(taskInfoData.getRunTime());
+        jobInfo.setIsPause(taskInfoData.getIsPause());
+        jobInfo.setJobPartId(taskInfoData.getJobPartId());
+        jobInfo.setTriggerUserId(taskInfoData.getTriggerUserId());
+        return jobInfo;
     }
 
 

@@ -86,23 +86,16 @@ public class SSEService {
         // 设置完成和超时回调
         emitter.onCompletion(() -> {
             SSE_CONNECTIONS.remove(connectionKey);
-            log.info("[SSE] 连接完成并移除 - key: {}", connectionKey);
         });
 
         emitter.onTimeout(() -> {
             SSE_CONNECTIONS.remove(connectionKey);
-            log.info("[SSE] 连接超时并移除 - key: {}", connectionKey);
         });
 
         emitter.onError((ex) -> {
             SSE_CONNECTIONS.remove(connectionKey);
             log.error("[SSE] 连接错误并移除 - key: {}", connectionKey, ex);
         });
-
-        log.info("[SSE] ========== 创建SSE连接 ==========");
-        log.info("[SSE] connectionKey: {}", connectionKey);
-        log.info("[SSE] 当前连接数: {}", SSE_CONNECTIONS.size());
-        log.info("[SSE] ==========================================");
 
         return emitter;
     }
@@ -119,11 +112,6 @@ public class SSEService {
         }
 
         String connectionKey = message.getParentJobId() + ":" + message.getRandomId();
-        log.info("[SSE] ========== 发送消息 ==========");
-        log.info("[SSE] connectionKey: {}", connectionKey);
-        log.info("[SSE] message: jobId={}, status={}, randomId={}, parentJobId={}", 
-                message.getJobId(), message.getStatus(), message.getRandomId(), message.getParentJobId());
-        log.info("[SSE] 当前连接数: {}", SSE_CONNECTIONS.size());
 
         SseEmitter emitter = SSE_CONNECTIONS.get(connectionKey);
         
@@ -133,8 +121,6 @@ public class SSEService {
                 emitter.send(SseEmitter.event()
                         .name("nodeStatus")
                         .data(messageJson));
-                
-                log.info("[SSE] ✅ 消息已发送 - key: {}", connectionKey);
             } catch (IOException e) {
                 log.error("[SSE] ❌ 消息发送失败 - key: {}", connectionKey, e);
                 // 移除失效的连接
@@ -147,10 +133,7 @@ public class SSEService {
             }
         } else {
             log.warn("[SSE] ⚠️ 未找到连接 - key: {}, 当前连接数: {}", connectionKey, SSE_CONNECTIONS.size());
-            // 打印所有连接key用于调试
-            log.debug("[SSE] 当前所有连接key: {}", SSE_CONNECTIONS.keySet());
         }
-        log.info("[SSE] ==========================================");
     }
 
     /**
@@ -166,7 +149,6 @@ public class SSEService {
         if (emitter != null) {
             try {
                 emitter.complete();
-                log.info("[SSE] 连接已关闭 - key: {}", connectionKey);
             } catch (Exception e) {
                 log.error("[SSE] 关闭连接失败 - key: {}", connectionKey, e);
             }
@@ -193,10 +175,6 @@ public class SSEService {
                     // 忽略
                 }
             }
-        }
-        
-        if (removedCount > 0) {
-            log.info("[SSE] 清理了 {} 个过期连接", removedCount);
         }
     }
 

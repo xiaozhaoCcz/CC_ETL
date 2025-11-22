@@ -5,11 +5,13 @@ import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
 import javafx.beans.binding.DoubleBinding;
 import javafx.beans.property.SimpleObjectProperty;
+import javafx.scene.Node;
 import javafx.scene.Group;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.CubicCurve;
 import javafx.scene.shape.Polygon;
+import javafx.scene.layout.Pane;
 import javafx.util.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,9 +24,14 @@ public class NodeConnection extends Group {
     private static final Logger logger = LoggerFactory.getLogger(NodeConnection.class);
     
     private ProcessNode sourceNode;
-    private Circle sourceConnector;
     private ProcessNode targetNode;
+    private Circle sourceConnector;
     private Circle targetConnector;
+    // 新增：通用所有者与连接点父层，支持 GroupContainer 等
+    private Node sourceOwner;
+    private Pane sourceConnectorParent;
+    private Node targetOwner;
+    private Pane targetConnectorParent;
     private final SimpleObjectProperty<String> edgeId = new SimpleObjectProperty<>();
     
     private CubicCurve curve;
@@ -39,10 +46,31 @@ public class NodeConnection extends Group {
     public NodeConnection(ProcessNode sourceNode, Circle sourceConnector,
                          ProcessNode targetNode, Circle targetConnector) {
         this.sourceNode = sourceNode;
-        this.sourceConnector = sourceConnector;
         this.targetNode = targetNode;
+        this.sourceConnector = sourceConnector;
         this.targetConnector = targetConnector;
+        this.sourceOwner = sourceNode;
+        this.targetOwner = targetNode;
+        this.sourceConnectorParent = sourceNode.getConnectorPane();
+        this.targetConnectorParent = targetNode.getConnectorPane();
         
+        initializeUI();
+        bindConnection();
+        updateStyle();
+    }
+
+    /**
+     * 新增：通用构造，允许任意拥有者与连接点父层（例如 GroupContainer）
+     */
+    public NodeConnection(Node sourceOwner, Pane sourceConnectorParent, Circle sourceConnector,
+                          Node targetOwner, Pane targetConnectorParent, Circle targetConnector) {
+        this.sourceOwner = sourceOwner;
+        this.targetOwner = targetOwner;
+        this.sourceConnectorParent = sourceConnectorParent;
+        this.targetConnectorParent = targetConnectorParent;
+        this.sourceConnector = sourceConnector;
+        this.targetConnector = targetConnector;
+
         initializeUI();
         bindConnection();
         updateStyle();
@@ -86,12 +114,12 @@ public class NodeConnection extends Group {
     
     private void bindConnection() {
         // 计算起点坐标（源连接点的中心）
-        DoubleBinding startX = createConnectorCenterXBinding(sourceNode, sourceConnector);
-        DoubleBinding startY = createConnectorCenterYBinding(sourceNode, sourceConnector);
+        DoubleBinding startX = createConnectorCenterXBinding(sourceOwner, sourceConnectorParent, sourceConnector);
+        DoubleBinding startY = createConnectorCenterYBinding(sourceOwner, sourceConnectorParent, sourceConnector);
         
         // 计算终点坐标（目标连接点的中心）
-        DoubleBinding endX = createConnectorCenterXBinding(targetNode, targetConnector);
-        DoubleBinding endY = createConnectorCenterYBinding(targetNode, targetConnector);
+        DoubleBinding endX = createConnectorCenterXBinding(targetOwner, targetConnectorParent, targetConnector);
+        DoubleBinding endY = createConnectorCenterYBinding(targetOwner, targetConnectorParent, targetConnector);
         
         curve.startXProperty().bind(startX);
         curve.startYProperty().bind(startY);
@@ -122,10 +150,10 @@ public class NodeConnection extends Group {
     /**
      * 创建连接点中心X坐标的绑定
      */
-    private DoubleBinding createConnectorCenterXBinding(ProcessNode node, Circle connector) {
+    private DoubleBinding createConnectorCenterXBinding(Node owner, Pane connectorParent, Circle connector) {
         return new DoubleBinding() {
             {
-                super.bind(node.layoutXProperty(), connector.layoutXProperty());
+                super.bind(owner.layoutXProperty(), connector.layoutXProperty());
             }
             @Override
             protected double computeValue() {
@@ -134,8 +162,8 @@ public class NodeConnection extends Group {
                     connector.getLayoutX(),
                     connector.getLayoutY()
                 );
-                javafx.geometry.Point2D nodeLocal = node.getConnectorPane().localToParent(connectorCenter);
-                javafx.geometry.Point2D parentLocal = node.localToParent(nodeLocal);
+                javafx.geometry.Point2D nodeLocal = connectorParent.localToParent(connectorCenter);
+                javafx.geometry.Point2D parentLocal = owner.localToParent(nodeLocal);
                 return parentLocal.getX();
             }
         };
@@ -144,10 +172,10 @@ public class NodeConnection extends Group {
     /**
      * 创建连接点中心Y坐标的绑定
      */
-    private DoubleBinding createConnectorCenterYBinding(ProcessNode node, Circle connector) {
+    private DoubleBinding createConnectorCenterYBinding(Node owner, Pane connectorParent, Circle connector) {
         return new DoubleBinding() {
             {
-                super.bind(node.layoutYProperty(), connector.layoutYProperty());
+                super.bind(owner.layoutYProperty(), connector.layoutYProperty());
             }
             @Override
             protected double computeValue() {
@@ -156,8 +184,8 @@ public class NodeConnection extends Group {
                     connector.getLayoutX(),
                     connector.getLayoutY()
                 );
-                javafx.geometry.Point2D nodeLocal = node.getConnectorPane().localToParent(connectorCenter);
-                javafx.geometry.Point2D parentLocal = node.localToParent(nodeLocal);
+                javafx.geometry.Point2D nodeLocal = connectorParent.localToParent(connectorCenter);
+                javafx.geometry.Point2D parentLocal = owner.localToParent(nodeLocal);
                 return parentLocal.getY();
             }
         };
@@ -217,7 +245,21 @@ public class NodeConnection extends Group {
     public void setRunning(boolean running) {
         this.isRunning = running;
         updateStyle();
-        logger.debug("{} 边{}运行: {} → {}", running ? "▶️" : "⏹️", running ? "开始" : "停止", sourceNode.getJobHandlerName(), targetNode.getJobHandlerName());
+        // ⭐ 修复：使用 getSourceOwner() 和 getTargetOwner()，支持任务组容器
+        String sourceName = getOwnerName(sourceOwner);
+        String targetName = getOwnerName(targetOwner);
+    }
+    
+    /**
+     * 获取所有者名称（支持 ProcessNode 和 GroupContainer）
+     */
+    private String getOwnerName(javafx.scene.Node owner) {
+        if (owner instanceof ProcessNode) {
+            return ((ProcessNode) owner).getJobHandlerName();
+        } else if (owner instanceof com.cc.job.gui.model.GroupContainer) {
+            return ((com.cc.job.gui.model.GroupContainer) owner).getGroupName();
+        }
+        return "未知";
     }
     
     /**
@@ -341,4 +383,8 @@ public class NodeConnection extends Group {
     public Circle getTargetConnector() {
         return targetConnector;
     }
+    
+    // 新增：通用拥有者与父层访问器（用于前端保存时识别连接两端）
+    public Node getSourceOwner() { return sourceOwner; }
+    public Node getTargetOwner() { return targetOwner; }
 }

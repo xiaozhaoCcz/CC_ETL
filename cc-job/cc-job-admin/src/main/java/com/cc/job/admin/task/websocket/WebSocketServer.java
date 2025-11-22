@@ -139,7 +139,6 @@ public class WebSocketServer {
                 log.error("Failed to send message: {}", messageJson, e);
                 throw new IOException("Failed to send message", e);
             }
-            log.debug("Message sent successfully: {}", messageJson);
         } catch (Exception e) {
             log.error("Failed to send message: {}", message, e);
             throw new IOException("Failed to send message", e);
@@ -156,16 +155,6 @@ public class WebSocketServer {
      */
     public void sendInfo(Message message) {
         String sessionKey = message.getParentJobId() + ":" + message.getRandomId();
-        log.info("[WebSocket] ========== 发送消息 ==========");
-        log.info("[WebSocket] sessionKey: {}", sessionKey);
-        log.info("[WebSocket] message: jobId={}, status={}, randomId={}, parentJobId={}", 
-                message.getJobId(), message.getStatus(), message.getRandomId(), message.getParentJobId());
-        log.info("[WebSocket] 当前连接池大小: {}", SESSION_POOLS.size());
-        log.info("[WebSocket] 当前在线连接数: {}", ONLINE_NUM.get());
-        
-        // 打印所有连接ID
-        log.info("[WebSocket] 所有连接ID列表:");
-        SESSION_POOLS.keySet().forEach(key -> log.info("[WebSocket]   - {}", key));
         
         WebSocketSession webSocketSession = SESSION_POOLS.get(sessionKey);
         
@@ -175,7 +164,6 @@ public class WebSocketServer {
                 String messageJson = OBJECT_MAPPER.writeValueAsString(message);
                 webSocketSession.enqueueMessage(messageJson);
                 MESSAGE_COUNT.incrementAndGet();
-                log.info("[WebSocket] ✅ 消息已发送（精确匹配） - key: {}", sessionKey);
             } catch (Exception e) {
                 log.error("[WebSocket] ❌ 消息发送失败: {}", message, e);
                 removeSession(webSocketSession.getSession());
@@ -203,12 +191,10 @@ public class WebSocketServer {
             
             if (sent) {
                 MESSAGE_COUNT.incrementAndGet();
-                log.info("[WebSocket] ✅ 消息已广播（单连接模式） - key: {}, 广播数: {}", sessionKey, broadcastCount);
             } else {
                 log.warn("[WebSocket] ❌ 没有活跃连接接收消息 - key: {}, 在线连接数: {}", sessionKey, ONLINE_NUM.get());
             }
         }
-        log.info("[WebSocket] ==========================================");
     }
 
     /**
@@ -246,14 +232,6 @@ public class WebSocketServer {
         WebSocketSession webSocketSession = new WebSocketSession(session, id);
         SESSION_POOLS.put(id, webSocketSession);
         ONLINE_NUM.incrementAndGet();
-
-        log.info("[WebSocket] ========== 新连接建立 ==========");
-        log.info("[WebSocket] 连接ID: {}", id);
-        log.info("[WebSocket] 当前在线连接数: {}", ONLINE_NUM.get());
-        log.info("[WebSocket] 连接池大小: {}", SESSION_POOLS.size());
-        log.info("[WebSocket] 所有连接ID列表:");
-        SESSION_POOLS.keySet().forEach(key -> log.info("[WebSocket]   - {}", key));
-        log.info("[WebSocket] ==========================================");
     }
 
     /**
@@ -265,7 +243,6 @@ public class WebSocketServer {
         if (webSocketSession != null) {
             webSocketSession.close();
             ONLINE_NUM.decrementAndGet();
-            log.info("{} disconnected from WebSocket! Current online count: {}", id, ONLINE_NUM.get());
         }
     }
 
@@ -274,7 +251,6 @@ public class WebSocketServer {
      */
     @OnMessage
     public void onMessage(String message, @PathParam(value = "id") String id) {
-        log.debug("Received message from {}: {}", id, message);
         // 可以在这里处理客户端消息
     }
 
@@ -294,7 +270,6 @@ public class WebSocketServer {
         SESSION_POOLS.entrySet().removeIf(entry -> {
             if (entry.getValue().getSession().equals(session)) {
                 ONLINE_NUM.decrementAndGet();
-                log.info("Removed invalid session: {}", entry.getKey());
                 return true;
             }
             return false;
@@ -314,15 +289,10 @@ public class WebSocketServer {
                 session.close();
                 ONLINE_NUM.decrementAndGet();
                 removedCount.incrementAndGet();
-                log.info("Cleaned up expired session: {}", entry.getKey());
                 return true;
             }
             return false;
         });
-
-        if (removedCount.get() > 0) {
-            log.info("Cleaned up {} expired connections", removedCount.get());
-        }
     }
 
     /**

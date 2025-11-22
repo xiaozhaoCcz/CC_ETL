@@ -51,8 +51,6 @@ public class ApiUtil {
                 .registerTypeAdapter(LocalDateTime.class, new LocalDateTimeAdapter())
                 .create();
 
-        logger.info("✓ API Service 初始化完成");
-        logger.debug("  后端地址: {}", this.baseUrl);
     }
 }
 

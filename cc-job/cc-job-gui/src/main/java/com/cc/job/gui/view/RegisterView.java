@@ -378,7 +378,6 @@ public class RegisterView extends StackPane {
                     
                     if (result.isSuccess()) {
                         // 注册成功
-                        logger.info("✓ 注册成功！");
                         if (onRegisterSuccess != null) {
                             onRegisterSuccess.accept(result);
                         }

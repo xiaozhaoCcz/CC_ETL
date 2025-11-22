@@ -38,7 +38,6 @@ public class JobGroupService extends BaseService {
             }
             
             String responseBody = response.body().string();
-            logger.debug("getAllJobGroupList API 响应: {}", responseBody);
             
             // 解析 JSON 响应
             Type resultType = new TypeToken<Result<List<JobGroup>>>(){}.getType();

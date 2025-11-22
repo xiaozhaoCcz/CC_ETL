@@ -33,9 +33,7 @@ public class AuthController {
             @Parameter(description = "密码", example = "123456") @RequestParam String password
     ) {
         try {
-            log.info("收到登录请求 - 用户名: {}", username);
             LoginResult loginResult = jobUserService.login(username, password);
-            log.info("登录成功 - 用户名: {}", username);
             return Result.success(loginResult);
         } catch (Exception e) {
             log.error("登录失败 - 用户名: {}, 错误: {}", username, e.getMessage());
@@ -50,9 +48,7 @@ public class AuthController {
             @Parameter(description = "密码", example = "123456") @RequestParam String password
     ) {
         try {
-            log.info("收到注册请求 - 用户名: {}", username);
             LoginResult loginResult = jobUserService.register(username, password);
-            log.info("注册成功 - 用户名: {}", username);
             return Result.success(loginResult);
         } catch (Exception e) {
             log.error("注册失败 - 用户名: {}, 错误: {}", username, e.getMessage());
@@ -63,7 +59,6 @@ public class AuthController {
     @Operation(summary = "注销")
     @DeleteMapping("/logout")
     public Result<?> logout() {
-        log.info("用户注销");
         // TODO: 可以在这里清理session、token黑名单等
         return Result.success("注销成功");
     }
