@@ -328,19 +328,43 @@ public class JobComposeServiceImpl implements JobComposeService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean updateJobCompose(Long id, JobInfoForm formData) {
+        // ⭐ 修复：如果 nodes 为空，只更新任务组基本信息，不处理节点和边
+        if (StringUtils.isBlank(formData.getNodes())) {
+            JobInfo existsJobInfo = jobInfoService.getById(id);
+            if (existsJobInfo == null) {
+                throw new BusinessException("任务组不存在，id: " + id);
+            }
+            // ⭐ 修复：保存原有的 isNode 和 jobType 字段，避免被覆盖
+            String originalIsNode = existsJobInfo.getIsNode();
+            Integer originalJobType = existsJobInfo.getJobType();
+            
+            JobInfo jobInfo = jobInfoService.baseUpdateJobInfo(id, formData);
+            // ⭐ 修复：恢复原有的 isNode 和 jobType 字段
+            jobInfo.setIsNode(originalIsNode);
+            jobInfo.setJobType(originalJobType);
+            jobInfoService.updateById(jobInfo);
+            return true;
+        }
+        
+        // 只有当 nodes 不为空时，才验证边和更新节点
         boolean b = validateJobComposeEdge(formData.getNodes(), formData.getEdges());
         if (!b) {
             throw new BusinessException("任务组边不合法");
         }
-        JobInfo jobInfo = jobInfoService.baseUpdateJobInfo(id, formData);
-//        if (StringUtils.isBlank(formData.getNodes())) {
-//            throw new BusinessException("任务节点不能为空");
-//        }
-        jobInfoService.updateById(jobInfo);
-
-        if (StringUtils.isBlank(formData.getNodes())) {
-            return true;
+        
+        // ⭐ 修复：保存原有的 isNode 和 jobType 字段，避免被覆盖
+        JobInfo existsJobInfo = jobInfoService.getById(id);
+        if (existsJobInfo == null) {
+            throw new BusinessException("任务组不存在，id: " + id);
         }
+        String originalIsNode = existsJobInfo.getIsNode();
+        Integer originalJobType = existsJobInfo.getJobType();
+        
+        JobInfo jobInfo = jobInfoService.baseUpdateJobInfo(id, formData);
+        // ⭐ 修复：恢复原有的 isNode 和 jobType 字段
+        jobInfo.setIsNode(originalIsNode);
+        jobInfo.setJobType(originalJobType);
+        jobInfoService.updateById(jobInfo);
 
         // 添加任务组
         List<LfNode> lfNodes = JSONUtil.parseArray(formData.getNodes()).toList(LfNode.class);
@@ -594,78 +618,30 @@ public class JobComposeServiceImpl implements JobComposeService {
         jobEdgeService.saveBatch(jobEdgeList);
 
         // ⭐ 修复：收集所有应该保留的节点ID（包括任务组节点本身）
-        // 任务组节点可能因为过滤逻辑没有被包含在 nodeList 中，但应该被保留
-//        Set<Long> allNodeIdsToKeep = new HashSet<>();
         List<Long> updateNodeIds = updateNodes.stream().map(JobNode::getId).toList();
-//        allNodeIdsToKeep.addAll(updateNodeIds);
-//
-//        // ⭐ 修复：从 nodeList 中提取所有节点ID（包括任务组节点），无论是否被处理
-//        for (LfNode node : nodeList) {
-//            if (node.getId() != null && !node.getId().contains("-")) {
-//                try {
-//                    Long nodeId = Long.parseLong(node.getId());
-//                    // 直接添加到保留列表，无论是否被处理
-//                    allNodeIdsToKeep.add(nodeId);
-//                    System.out.println("【operateToUpdateJobCompose】保留节点: nodeId=" + nodeId);
-//                } catch (NumberFormatException e) {
-//                    // 忽略无法解析的ID
-//                }
-//            }
-//        }
-//
-//        // ⭐ 修复：从 lfNodes 中查找所有任务组节点，确保它们也被保留
-//        // 即使任务组节点不在 nodeList 中（因为过滤逻辑），也要保留
-//        for (LfNode node : lfNodes) {
-//            if (node != null && node.getId() != null && !node.getId().contains("-")) {
-//                // 检查是否是任务组节点
-//                boolean isGroupNode = false;
-//                if (node.getType() != null &&
-//                    (DYNAMIC_GROUP.equalsIgnoreCase(node.getType()) || "custom-group".equalsIgnoreCase(node.getType()))) {
-//                    isGroupNode = true;
-//                } else if (node.getProperties() != null) {
-//                    try {
-//                        Map<String, Object> props = JSONUtil.toBean(node.getProperties(), Map.class);
-//                        if (props != null && props.containsKey("children")) {
-//                            isGroupNode = true;
-//                        }
-//                    } catch (Exception e) {
-//                        // 忽略解析错误
-//                    }
-//                }
-//
-//                if (isGroupNode) {
-//                    try {
-//                        Long nodeId = Long.parseLong(node.getId());
-//                        // 检查节点是否属于当前任务组
-//                        JobNode groupNode = nodeFromDb.stream()
-//                            .filter(n -> n.getId().equals(nodeId))
-//                            .findFirst()
-//                            .orElse(null);
-//                        if (groupNode != null && groupNode.getJobParentId().equals(jobInfo.getId())) {
-//                            allNodeIdsToKeep.add(nodeId);
-//                            System.out.println("【operateToUpdateJobCompose】保留任务组节点: nodeId=" + nodeId);
-//                        }
-//                    } catch (NumberFormatException e) {
-//                        // 忽略无法解析的ID
-//                    }
-//                }
-//            }
-//        }
         
-        List<JobNode> delNodeDbs = nodeFromDb.stream()
-            .filter(n -> !updateNodeIds.contains(n.getId()))
-            .toList();
+        // ⭐ 修复：如果 nodeList 为空，说明只是更新基本信息，不应该删除任何节点
+        // 只有当 nodeList 不为空时，才执行删除逻辑
+        if (!nodeList.isEmpty()) {
+            List<JobNode> delNodeDbs = nodeFromDb.stream()
+                .filter(n -> !updateNodeIds.contains(n.getId()))
+                .toList();
 
-        if (!delNodeDbs.isEmpty()) {
-            for (JobNode delNodeDb : delNodeDbs) {
-                if (DYNAMIC_GROUP.equalsIgnoreCase(delNodeDb.getNodeType())) {
-                    jobInfoService.delNodes(delNodeDb.getJobId());
+            if (!delNodeDbs.isEmpty()) {
+                for (JobNode delNodeDb : delNodeDbs) {
+                    if (DYNAMIC_GROUP.equalsIgnoreCase(delNodeDb.getNodeType())) {
+                        jobInfoService.delNodes(delNodeDb.getJobId());
+                    }
                 }
+                jobInfoService.removeBatchByIds(delNodeDbs.stream().map(JobNode::getJobId).toList());
+                jobNodeService.removeBatchByIds(delNodeDbs.stream().map(JobNode::getId).toList());
             }
-            jobInfoService.removeBatchByIds(delNodeDbs.stream().map(JobNode::getJobId).toList());
-            jobNodeService.removeBatchByIds(delNodeDbs.stream().map(JobNode::getId).toList());
         }
-        jobNodeService.updateBatchById(updateNodes);
+        
+        // ⭐ 修复：只有当有需要更新的节点时，才执行批量更新
+        if (!updateNodes.isEmpty()) {
+            jobNodeService.updateBatchById(updateNodes);
+        }
 
         // 处理边
         List<JobNode> nodeFromDbList2 = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, jobInfo.getId()));

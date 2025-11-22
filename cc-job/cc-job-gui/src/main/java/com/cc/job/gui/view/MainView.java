@@ -1962,16 +1962,21 @@ public class MainView extends BorderPane {
                     // 更新工具栏显示
                     updateToolBarRunningJobs();
 
-                    // 恢复边的正常状态
+                    // 恢复边的正常状态（停止虚线动画）
                     canvas.setAllConnectionsRunning(false);
 
                     // 断开SSE连接
                     SSEService.getInstance().disconnect(jobId, runningJob.getRandomId());
 
-                    // 重置所有节点状态为空闲
-                    for (ProcessNode node : canvas.getNodes()) {
-                        node.updateStatus(ProcessNode.NodeStatus.IDLE);
-                    }
+                    // ⭐ 任务停止后，立即同步所有节点状态到数据库
+                    canvas.syncPendingNodeStatus();
+                    logPanel.info("已触发节点状态批量同步");
+
+                    // ⚠️ 重要：不重置节点状态，让节点保持当前状态（成功/失败/运行中）
+                    // 节点状态会在以下情况重置：
+                    // 1. 下次任务启动时（triggerJobExecution）
+                    // 2. 切换任务组时（loadTaskGroupData -> clear）
+                    // 停止任务时不应该重置节点状态，应该保持运行到哪里就是哪个状态
                 });
 
             } catch (Exception e) {
