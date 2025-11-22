@@ -43,7 +43,7 @@ public class NodeCanvas extends Pane {
     private static final double AUTO_SCROLL_MARGIN = 120.0;
 
     private List<ProcessNode> nodes = new ArrayList<>();
-    private List<com.cc.job.gui.model.GroupContainer> groupContainers = new ArrayList<>();
+    private List<GroupContainer> groupContainers = new ArrayList<>();
     private List<NodeConnection> connections = new ArrayList<>();
     private UndoRedoManager undoRedoManager;
     private boolean historyEnabled = true;
@@ -226,6 +226,24 @@ public class NodeCanvas extends Pane {
     
     public List<com.cc.job.gui.model.GroupContainer> getGroupContainers() {
         return new ArrayList<>(groupContainers);
+    }
+    
+    /**
+     * 将任务组容器添加到集合中（当容器已经添加到UI时使用）
+     * @param container 要添加到集合的任务组容器
+     */
+    public void addGroupContainerToCollection(com.cc.job.gui.model.GroupContainer container) {
+        if (container == null) {
+            logger.warn("尝试添加空的任务组容器到集合");
+            return;
+        }
+        
+        // 检查容器是否已经存在
+        if (!groupContainers.contains(container)) {
+            groupContainers.add(container);
+            logger.debug("成功添加任务组容器到集合: {} (id: {}, 总数: {})", 
+                container.getGroupName(), container.getNodeId(), groupContainers.size());
+        }
     }
     
     /**

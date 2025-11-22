@@ -418,14 +418,16 @@ public class MainView extends BorderPane {
                                         }
                                     }
                                     
-                                    // 3) UI上创建容器并绑定“节点+连线”，支持收起隐藏连线
+                                    // 3) UI上创建容器并绑定"节点+连线"，支持收起隐藏连线
                                     Thread.sleep(120);
                                     Platform.runLater(() -> {
                                         com.cc.job.gui.model.GroupContainer container =
                                                 new com.cc.job.gui.model.GroupContainer("group:" + sel.taskGroupId, sel.taskGroupId, sel.taskGroupName);
                                         container.bindCanvasNodes(newNodes);
                                         container.bindConnections(newConnections);
+                                        // ⭐ 修复：添加容器到UI和集合，确保getGroupContainers()能正确返回
                                         canvas.getChildren().add(0, container);
+                                        canvas.addGroupContainerToCollection(container);
                                         container.expand();
                                         canvas.selectNodes(newNodes);
                                         logPanel.success("✓ 已复制并持久化任务组: " + sel.taskGroupName);
