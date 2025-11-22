@@ -90,9 +90,6 @@ public class DetachablePanel {
                 if (content instanceof MiniMapView) {
                     javafx.application.Platform.runLater(() -> {
                         ((MiniMapView) content).refresh();
-                        logger.debug("📍 小地图已刷新，Canvas尺寸: {} x {}", 
-                            ((MiniMapView) content).getCanvas().getWidth(),
-                            ((MiniMapView) content).getCanvas().getHeight());
                     });
                 }
             });
@@ -103,7 +100,6 @@ public class DetachablePanel {
             onDetach.run();
         }
         
-        logger.debug("🪟 面板已弹出为独立窗口: {}", title);
     }
     
     /**
@@ -137,7 +133,6 @@ public class DetachablePanel {
             onReattach.run();
         }
         
-        logger.debug("📌 面板已恢复到原位置: {}", title);
     }
     
     /**

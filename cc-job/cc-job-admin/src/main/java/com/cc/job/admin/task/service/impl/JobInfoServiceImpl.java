@@ -329,7 +329,6 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
                     edgesJson,
                     triggerUserIdStr
                 );
-                log.info("[Snapshot] 任务组快照创建成功 - jobId: {}, randomId: {}", jobId, randomId);
             } catch (Exception e) {
                 log.error("[Snapshot] 创建任务组快照失败 - jobId: {}, randomId: {}", jobId, randomId, e);
                 throw new BusinessException("创建任务组快照失败: " + e.getMessage());
@@ -343,7 +342,6 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         // 只在任务组（jobType == 2）时记录触发用户ID
         if (taskInfo.getJobType() == 2 && taskInfoTriggerDto.getTriggerUserId() != null) {
             taskInfo.setTriggerUserId(taskInfoTriggerDto.getTriggerUserId());
-            log.info("✓ 记录任务组触发用户ID: " + taskInfoTriggerDto.getTriggerUserId());
         }
         
         // 原子性设置运行状态（在事务中，行锁保护）

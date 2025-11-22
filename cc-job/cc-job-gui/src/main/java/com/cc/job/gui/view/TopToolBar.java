@@ -305,7 +305,6 @@ public class TopToolBar extends VBox {
             MenuItem logoutItem = new MenuItem("退出登录");
             logoutItem.setStyle("-fx-text-fill: #EF4444; -fx-font-weight: bold;");
             logoutItem.setOnAction(e -> {
-                logger.debug("用户点击退出登录");
                 
                 // 确认对话框
                 Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);

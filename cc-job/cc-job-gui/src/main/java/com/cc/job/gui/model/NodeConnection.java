@@ -248,7 +248,6 @@ public class NodeConnection extends Group {
         // ⭐ 修复：使用 getSourceOwner() 和 getTargetOwner()，支持任务组容器
         String sourceName = getOwnerName(sourceOwner);
         String targetName = getOwnerName(targetOwner);
-        logger.debug("{} 边{}运行: {} → {}", running ? "▶️" : "⏹️", running ? "开始" : "停止", sourceName, targetName);
     }
     
     /**

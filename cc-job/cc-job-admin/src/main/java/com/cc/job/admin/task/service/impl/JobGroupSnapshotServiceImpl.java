@@ -25,8 +25,6 @@ public class JobGroupSnapshotServiceImpl extends ServiceImpl<JobGroupSnapshotMap
 
     @Override
     public Long createSnapshot(Long jobId, String randomId, String nodesJson, String edgesJson, String triggerUserId) {
-        log.info("[Snapshot] 创建任务组快照 - jobId: {}, randomId: {}", jobId, randomId);
-
         JobGroupSnapshot snapshot = new JobGroupSnapshot();
         snapshot.setJobId(jobId);
         snapshot.setRandomId(randomId);
@@ -38,14 +36,11 @@ public class JobGroupSnapshotServiceImpl extends ServiceImpl<JobGroupSnapshotMap
 
         this.save(snapshot);
 
-        log.info("[Snapshot] 快照创建成功 - snapshotId: {}, jobId: {}, randomId: {}", snapshot.getId(), jobId, randomId);
         return snapshot.getId();
     }
 
     @Override
     public JobGroupSnapshot getSnapshot(Long jobId, String randomId) {
-        log.debug("[Snapshot] 查询快照 - jobId: {}, randomId: {}", jobId, randomId);
-
         LambdaQueryWrapper<JobGroupSnapshot> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(JobGroupSnapshot::getJobId, jobId)
                 .eq(JobGroupSnapshot::getRandomId, randomId)
@@ -55,9 +50,7 @@ public class JobGroupSnapshotServiceImpl extends ServiceImpl<JobGroupSnapshotMap
 
         JobGroupSnapshot snapshot = this.getOne(wrapper);
 
-        if (snapshot != null) {
-            log.debug("[Snapshot] 快照查询成功 - snapshotId: {}, jobId: {}, randomId: {}", snapshot.getId(), jobId, randomId);
-        } else {
+        if (snapshot == null) {
             log.warn("[Snapshot] 快照不存在 - jobId: {}, randomId: {}", jobId, randomId);
         }
 
@@ -66,8 +59,6 @@ public class JobGroupSnapshotServiceImpl extends ServiceImpl<JobGroupSnapshotMap
 
     @Override
     public boolean deleteSnapshot(Long jobId, String randomId) {
-        log.info("[Snapshot] 删除快照 - jobId: {}, randomId: {}", jobId, randomId);
-
         LambdaQueryWrapper<JobGroupSnapshot> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(JobGroupSnapshot::getJobId, jobId)
                 .eq(JobGroupSnapshot::getRandomId, randomId)
@@ -77,8 +68,6 @@ public class JobGroupSnapshotServiceImpl extends ServiceImpl<JobGroupSnapshotMap
         if (snapshot != null) {
             snapshot.setIsDeleted(1);
             boolean result = this.updateById(snapshot);
-            log.info("[Snapshot] 快照删除{} - snapshotId: {}, jobId: {}, randomId: {}", 
-                    result ? "成功" : "失败", snapshot.getId(), jobId, randomId);
             return result;
         }
 

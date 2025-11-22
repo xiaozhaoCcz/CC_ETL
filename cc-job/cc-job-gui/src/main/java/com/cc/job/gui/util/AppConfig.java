@@ -22,9 +22,7 @@ public class AppConfig {
         try (InputStream input = AppConfig.class.getClassLoader().getResourceAsStream("application.properties")) {
             if (input != null) {
                 properties.load(input);
-                logger.info("✓ 配置文件加载成功");
             } else {
-                logger.warn("⚠ 未找到配置文件，使用默认配置");
             }
         } catch (IOException e) {
             logger.error("⚠ 加载配置文件失败: {}", e.getMessage(), e);

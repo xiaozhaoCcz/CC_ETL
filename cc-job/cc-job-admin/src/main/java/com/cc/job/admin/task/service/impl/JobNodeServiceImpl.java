@@ -33,8 +33,6 @@ public class JobNodeServiceImpl extends ServiceImpl<JobNodeMapper, JobNode> impl
      */
     @Override
     public boolean updateNodeStatus(Long jobId, Integer triggerStatus) {
-        log.info("更新节点运行状态 - jobId: {}, triggerStatus: {}", jobId, triggerStatus);
-        
         try {
             // 根据jobId查找节点
             LambdaQueryWrapper<JobNode> queryWrapper = new LambdaQueryWrapper<>();
@@ -53,9 +51,7 @@ public class JobNodeServiceImpl extends ServiceImpl<JobNodeMapper, JobNode> impl
             
             boolean success = this.update(updateWrapper);
             
-            if (success) {
-                log.info("✓ 节点状态更新成功 - jobId: {}, triggerStatus: {}", jobId, triggerStatus);
-            } else {
+            if (!success) {
                 log.error("✗ 节点状态更新失败 - jobId: {}", jobId);
             }
             
@@ -79,8 +75,6 @@ public class JobNodeServiceImpl extends ServiceImpl<JobNodeMapper, JobNode> impl
             log.warn("批量更新节点状态 - 参数为空");
             return 0;
         }
-        
-        log.info("批量更新节点状态 - 共 {} 个节点", statusMap.size());
         
         try {
             // 1. 批量查询所有需要更新的节点（一次性查询，避免N+1问题）
@@ -114,7 +108,6 @@ public class JobNodeServiceImpl extends ServiceImpl<JobNodeMapper, JobNode> impl
             if (!updateNodes.isEmpty()) {
                 boolean success = this.updateBatchById(updateNodes);
                 if (success) {
-                    log.info("✓ 批量更新节点状态完成 - 成功: {}/{}", updateNodes.size(), statusMap.size());
                     return updateNodes.size();
                 } else {
                     log.error("✗ 批量更新节点状态失败");
@@ -140,8 +133,6 @@ public class JobNodeServiceImpl extends ServiceImpl<JobNodeMapper, JobNode> impl
      */
     @Override
     public int resetAllNodeStatus(Long jobParentId) {
-        log.info("重置任务组所有节点状态 - jobParentId: {}", jobParentId);
-        
         try {
             // 1. 收集所有需要重置的节点ID（包括嵌套的任务组）
             Set<Long> allJobParentIds = new HashSet<>();
@@ -166,7 +157,6 @@ public class JobNodeServiceImpl extends ServiceImpl<JobNodeMapper, JobNode> impl
             // 4. 批量更新数据库
             boolean success = this.updateBatchById(nodes);
             if (success) {
-                log.info("✓ 重置任务组所有节点状态完成 - jobParentId: {}, 节点数量: {}", jobParentId, nodes.size());
                 return nodes.size();
             } else {
                 log.error("✗ 重置任务组所有节点状态失败 - jobParentId: {}", jobParentId);

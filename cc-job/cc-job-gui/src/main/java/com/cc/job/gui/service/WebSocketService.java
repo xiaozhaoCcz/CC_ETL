@@ -83,7 +83,6 @@ public class WebSocketService {
         
         public void connect() {
             if (client != null && isConnected) {
-                logger.warn("⚠️ WebSocket已经连接，跳过重复连接: {}", connectionId);
                 return; // 已经连接
             }
             
@@ -98,10 +97,6 @@ public class WebSocketService {
             // 使用正确的WebSocket端点路径（与后端@ServerEndpoint匹配）
             wsUrl += "/ccJobWs/" + connectionId;
             
-            logger.debug("🔌 开始连接WebSocket");
-            logger.debug("   连接ID: {}", connectionId);
-            logger.debug("   基础URL: {}", baseUrl);
-            logger.debug("   WebSocket URL: {}", wsUrl);
             
             try {
                 URI uri = new URI(wsUrl);
@@ -109,17 +104,10 @@ public class WebSocketService {
                     @Override
                     public void onOpen(ServerHandshake handshake) {
                         isConnected = true;
-                        logger.info("✅ WebSocket连接已建立: {}", connectionId);
-                        logger.debug("   连接URL: {}", wsUrl);
-                        logger.debug("   握手状态码: {}", handshake.getHttpStatus());
-                        logger.debug("   握手状态消息: {}", handshake.getHttpStatusMessage());
                     }
                     
                     @Override
                     public void onMessage(String message) {
-                        logger.debug("========================================");
-                        logger.debug("📨 WebSocket收到原始消息: {}", message);
-                        logger.debug("   连接ID: {}", connectionId);
                         
                         // 注意：这里不能直接使用logPanel，因为WebSocketService没有logPanel引用
                         // 消息会通过messageHandler传递到MainView，在那里记录到logPanel
@@ -127,15 +115,9 @@ public class WebSocketService {
                         try {
                             WebSocketMessage wsMessage = gson.fromJson(message, WebSocketMessage.class);
                             
-                            logger.debug("✅ 消息解析成功:");
-                            logger.debug("   jobId: {}", wsMessage.getJobId());
-                            logger.debug("   status: {}", wsMessage.getStatus());
-                            logger.debug("   randomId: {}", wsMessage.getRandomId());
-                            logger.debug("   result: {}", wsMessage.getResult());
                             
                             Platform.runLater(() -> {
                                 if (messageHandler != null) {
-                                    logger.debug("🔄 调用消息处理器");
                                     messageHandler.accept(wsMessage);
                                 } else {
                                     logger.error("❌ 消息处理器为null！");
@@ -145,13 +127,11 @@ public class WebSocketService {
                             logger.error("❌ 解析WebSocket消息失败: {}", e.getMessage(), e);
                         }
                         
-                        logger.debug("========================================");
                     }
                     
                     @Override
                     public void onClose(int code, String reason, boolean remote) {
                         isConnected = false;
-                        logger.debug("🔌 WebSocket连接已关闭: {} (code: {}, reason: {})", connectionId, code, reason);
                     }
                     
                     @Override
@@ -181,10 +161,8 @@ public class WebSocketService {
                 // 在后台线程中连接
                 new Thread(() -> {
                     try {
-                        logger.debug("🔄 尝试连接WebSocket: {}", wsUrl);
                         boolean connected = client.connectBlocking();
                         if (connected) {
-                            logger.info("✅ WebSocket连接成功（connectBlocking返回true）: {}", connectionId);
                         } else {
                             logger.error("❌ WebSocket连接失败（connectBlocking返回false）: {}", connectionId);
                         }
@@ -216,7 +194,6 @@ public class WebSocketService {
                 }
                 client = null;
             }
-            logger.debug("🔌 断开WebSocket连接: {}", connectionId);
         }
         
         public boolean isConnected() {
@@ -250,16 +227,12 @@ public class WebSocketService {
         connections.put(connectionId, wrapper);
         wrapper.connect();
         
-        logger.debug("🔌 WebSocket连接已创建: {}", connectionId);
         
         // 等待一段时间后检查连接状态
         new Thread(() -> {
             try {
                 Thread.sleep(2000); // 等待2秒
                 if (!wrapper.isConnected()) {
-                    logger.warn("⚠️ WebSocket连接超时，可能未成功建立: {}", connectionId);
-                    logger.warn("   请检查后端WebSocket服务是否正常运行");
-                    logger.warn("   请检查URL是否正确: ws://.../ws/{}", connectionId);
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -275,7 +248,6 @@ public class WebSocketService {
         WebSocketClientWrapper wrapper = connections.remove(connectionId);
         if (wrapper != null) {
             wrapper.disconnect();
-            logger.debug("🔌 WebSocket连接已断开: {}", connectionId);
         }
     }
     
@@ -297,7 +269,6 @@ public class WebSocketService {
     public void disconnectAll() {
         connections.values().forEach(WebSocketClientWrapper::disconnect);
         connections.clear();
-        logger.debug("🔌 所有WebSocket连接已断开");
     }
 }
 

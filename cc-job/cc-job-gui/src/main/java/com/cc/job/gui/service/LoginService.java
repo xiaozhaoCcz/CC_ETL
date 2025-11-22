@@ -58,13 +58,11 @@ public class LoginService extends BaseService {
                 .timeout(Duration.ofSeconds(10))
                 .build();
             
-            logger.debug("🔐 发送登录请求: {}", url);
             
             // 发送请求
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             
             // 解析响应
-            logger.debug("登录响应状态码: {}, 响应体: {}", response.statusCode(), response.body());
             
             if (response.statusCode() == 200) {
                 JsonNode jsonNode = objectMapper.readTree(response.body());
@@ -102,19 +100,15 @@ public class LoginService extends BaseService {
                                 : username;
                             
                             if (token != null && !token.isEmpty()) {
-                                logger.info("✓ 登录成功: {}", resultUsername);
                                 return new LoginResult(true, "登录成功", token, userId, resultUsername);
                             } else {
-                                logger.warn("✗ 登录响应中缺少token");
                                 return new LoginResult(false, "登录响应中缺少token", null, null, null);
                             }
                         } else {
-                            logger.warn("✗ 登录响应中缺少data字段");
                             return new LoginResult(false, "登录响应中缺少data字段", null, null, null);
                         }
                     } else {
                         // 登录失败
-                        logger.warn("✗ 登录失败: code={}, message={}", code, message);
                         return new LoginResult(false, message, null, null, null);
                     }
                 } else {
@@ -158,13 +152,11 @@ public class LoginService extends BaseService {
                 .timeout(Duration.ofSeconds(10))
                 .build();
             
-            logger.debug("📝 发送注册请求: {}", url);
             
             // 发送请求
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             
             // 解析响应
-            logger.debug("注册响应状态码: {}, 响应体: {}", response.statusCode(), response.body());
             
             if (response.statusCode() == 200) {
                 JsonNode jsonNode = objectMapper.readTree(response.body());
@@ -202,19 +194,15 @@ public class LoginService extends BaseService {
                                 : username;
                             
                             if (token != null && !token.isEmpty()) {
-                                logger.info("✓ 注册成功: {}", resultUsername);
                                 return new LoginResult(true, "注册成功", token, userId, resultUsername);
                             } else {
-                                logger.warn("✗ 注册响应中缺少token");
                                 return new LoginResult(false, "注册响应中缺少token", null, null, null);
                             }
                         } else {
-                            logger.warn("✗ 注册响应中缺少data字段");
                             return new LoginResult(false, "注册响应中缺少data字段", null, null, null);
                         }
                     } else {
                         // 注册失败
-                        logger.warn("✗ 注册失败: code={}, message={}", code, message);
                         return new LoginResult(false, message, null, null, null);
                     }
                 } else {

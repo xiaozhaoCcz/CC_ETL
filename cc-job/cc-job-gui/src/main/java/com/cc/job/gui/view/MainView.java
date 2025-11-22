@@ -228,7 +228,6 @@ public class MainView extends BorderPane {
                                             }
                                         }
                                     } catch (Exception e) {
-                                        logger.warn("创建任务组容器节点失败：{}", e.getMessage());
                                     }
                                     
                                     // 1) 先创建节点（持久化），记录 oldNodeId -> new ProcessNode
@@ -248,7 +247,6 @@ public class MainView extends BorderPane {
                                             originalGroupX = jobNode.getX();
                                             originalGroupY = jobNode.getY();
                                             foundGroupNode = true;
-                                            logger.debug("从jobNode获取任务组节点位置: ({}, {})", originalGroupX, originalGroupY);
                                         }
                                     }
                                     
@@ -271,7 +269,6 @@ public class MainView extends BorderPane {
                                                 originalGroupX = nd.getX();
                                                 originalGroupY = nd.getY();
                                                 foundGroupNode = true;
-                                                logger.debug("从nodes获取任务组节点位置: ({}, {})", originalGroupX, originalGroupY);
                                                 break;
                                             }
                                         }
@@ -292,7 +289,6 @@ public class MainView extends BorderPane {
                                             originalGroupX = minX - 50;
                                             originalGroupY = minY - 50;
                                             foundGroupNode = true;
-                                            logger.debug("从子节点最小位置计算任务组节点位置: ({}, {})", originalGroupX, originalGroupY);
                                         }
                                     }
                                     
@@ -633,7 +629,6 @@ public class MainView extends BorderPane {
                         nodeData.getType() != null && nodeData.getType() == 1) {
                         // ID存在且名称匹配，使用这个ID
                         resolvedTaskId = taskGroupId;
-                        logger.info("🔍 [DEBUG] 导航栏切换 - 使用导航栏存储的ID: {} (ID: {})", taskGroupName, resolvedTaskId);
                     } else {
                         // ID存在但名称不匹配，说明可能是旧的ID
                         logPanel.warn("⚠ 导航栏存储的ID和名称不匹配，重新查找...");
@@ -657,7 +652,6 @@ public class MainView extends BorderPane {
                             nodeData.getType() != null && nodeData.getType() == 1) {
                             // ID存在且名称匹配，使用这个ID
                             resolvedTaskId = foundId;
-                            logger.info("🔍 [DEBUG] 导航栏切换 - 从树形视图找到任务组: {} (ID: {})", taskGroupName, resolvedTaskId);
                         } else {
                             // ID存在但名称不匹配，说明可能是旧的ID，清除它并重新查找
                             logPanel.warn("⚠ 检测到任务组ID和名称不匹配，重新查找...");
@@ -681,7 +675,6 @@ public class MainView extends BorderPane {
                             nodeData.getType() != null && nodeData.getType() == 1) {
                             // 缓存的ID有效，使用它
                             resolvedTaskId = cachedId;
-                            logger.info("🔍 [DEBUG] 导航栏切换 - 使用缓存的ID: {} (ID: {})", taskGroupName, resolvedTaskId);
                         } else {
                             // 缓存的ID无效，清除它
                             logPanel.warn("⚠ 缓存的ID无效，已清除");
@@ -813,7 +806,6 @@ public class MainView extends BorderPane {
 
             @Override
             public void onRun() {
-                logger.debug("onRun 回调被触发");
                 logPanel.info("收到运行请求...");
                 triggerJobExecution();
             }
@@ -1196,7 +1188,6 @@ public class MainView extends BorderPane {
             toolBar.setCurrentTaskGroupId(taskId);
             
             logPanel.info("开始加载任务组数据，ID: " + taskId + ", 名称: " + taskName);
-            logger.info("🔍 [DEBUG] onTaskSelectedWithDetails - 准备加载任务组，taskId: {}, taskName: {}", taskId, taskName);
             loadTaskGroupData(taskId, taskName);
             
             // 注意：checkAndUpdateTaskGroupRunningStatus 现在在 loadTaskGroupData 内部调用
@@ -1313,7 +1304,6 @@ public class MainView extends BorderPane {
         logPanel.info("════════════════════════════════");
         logPanel.info("开始加载任务组: " + taskName);
         logPanel.info("任务组ID: " + taskId);
-        logger.info("🔍 [DEBUG] loadTaskGroupData - taskId: {}, taskName: {}", taskId, taskName);
 
         logPanel.info("准备同步当前任务组的节点运行状态...");
 
@@ -1323,26 +1313,19 @@ public class MainView extends BorderPane {
                 canvas.syncPendingNodeStatusBlocking();
                 Platform.runLater(() -> logPanel.info("节点状态同步完成，开始加载最新数据"));
 
-                logger.info("🔍 [DEBUG] 调用 getJobCompose，taskId: {}", taskId);
                 JobComposeData composeData = jobPartService.getJobCompose(taskId);
-                logger.info("🔍 [DEBUG] getJobCompose 返回，composeData: {}", composeData != null ? "非空" : "空");
 
                 // 在 JavaFX 主线程中更新 UI
                 Platform.runLater(() -> {
                     // ⚠️ 关键修复：在加载新任务组数据前，清除节点状态缓存
                     // 这样可以避免使用旧任务组的节点状态缓存
                     com.cc.job.gui.util.NodeStatusSyncManager.getInstance().clearCacheForTaskGroupSwitch();
-                    logger.info("🔍 [DEBUG] 已清除节点状态缓存，准备加载任务组ID: {}", taskId);
 
                     if (composeData != null) {
-                        logger.info("🔍 [DEBUG] 开始加载任务组数据，任务组ID: {}, 节点数量: {}", 
-                            taskId, composeData.getNodes() != null ? composeData.getNodes().size() : 0);
                         // 记录所有节点的jobId，用于调试
                         if (composeData.getNodes() != null) {
                             for (com.cc.job.gui.model.JobComposeData.NodeData nodeData : composeData.getNodes()) {
                                 if (nodeData.getJobId() != null) {
-                                    logger.info("🔍 [DEBUG] 节点: {}, jobId: {}, 任务组ID: {}", 
-                                        nodeData.getJobName(), nodeData.getJobId(), taskId);
                                 }
                             }
                         }
@@ -1481,10 +1464,8 @@ public class MainView extends BorderPane {
         logPanelDetachable = new DetachablePanel(logPanel, "日志监控");
         logPanelDetachable.setDefaultSize(1000, 300);
         logPanelDetachable.setOnDetach(() -> {
-            logger.debug("日志面板已弹出为独立窗口");
         });
         logPanelDetachable.setOnReattach(() -> {
-            logger.debug("日志面板已恢复到原位置");
         });
 
         // 连接弹出按钮
@@ -1535,15 +1516,12 @@ public class MainView extends BorderPane {
      * 触发任务执行
      */
     private void triggerJobExecution() {
-        logger.debug("triggerJobExecution 开始执行");
 
         // 获取当前选中的任务组
         Long currentJobId = usePageStoreHook().getCurrentPage();
-        logger.debug("当前任务组ID: {}", currentJobId);
 
         if (currentJobId == null || currentJobId == 0) {
             logPanel.warn("⚠ 请先选择一个任务组");
-            logger.warn("错误: 未选择任务组");
             return;
         }
 
@@ -1625,9 +1603,6 @@ public class MainView extends BorderPane {
         // 重置所有节点状态为空闲（紫色），等待SSE消息来更新节点状态
         // 只有实际运行到的节点才会通过SSE消息变成黄色
         Platform.runLater(() -> {
-            logger.debug("════════════════════════════════");
-            logger.debug("📋 任务组启动前，检查画布中的节点:");
-            logger.debug("   画布中共有 {} 个节点", canvas.getNodes().size());
             
             logPanel.info(currentJobId, "════════════════════════════════");
             logPanel.info(currentJobId, "📋 任务组启动前，检查画布中的节点:");
@@ -1637,19 +1612,13 @@ public class MainView extends BorderPane {
                 String nodeInfo = "   - 节点: " + node.getJobHandlerName() + 
                                  ", nodeId: " + node.getNodeId() + 
                                  ", jobId: " + node.getJobId();
-                logger.debug(nodeInfo);
                 logPanel.info(currentJobId, nodeInfo);
                 node.updateStatus(ProcessNode.NodeStatus.IDLE);
             }
-            logger.debug("════════════════════════════════");
             logPanel.info(currentJobId, "════════════════════════════════");
         });
 
         // 连接SSE以接收节点状态更新
-        logger.debug("🔌 准备连接SSE");
-        logger.debug("   任务组ID: {}", currentJobId);
-        logger.debug("   randomId: {}", randomId);
-        logger.debug("   连接ID: {}:{}", currentJobId, randomId);
         
         logPanel.info(currentJobId, "🔌 准备连接SSE");
         logPanel.info(currentJobId, "   任务组ID: " + currentJobId);
@@ -1662,7 +1631,6 @@ public class MainView extends BorderPane {
             handleSSEMessage(message, randomId);
         });
         
-        logger.debug("✅ SSE连接请求已发送");
         logPanel.info(currentJobId, "✅ SSE连接请求已发送");
         
         // 等待一段时间后检查连接状态
@@ -1722,13 +1690,6 @@ public class MainView extends BorderPane {
      * @param expectedRandomId 期望的randomId（用于验证消息）
      */
     private void handleSSEMessage(SSEService.SSEMessage message, String expectedRandomId) {
-        logger.debug("========================================");
-        logger.debug("📨 收到SSE消息");
-        logger.debug("   消息randomId: {}", message.getRandomId());
-        logger.debug("   期望randomId: {}", expectedRandomId);
-        logger.debug("   消息jobId: {}", message.getJobId());
-        logger.debug("   消息status: {}", message.getStatus());
-        logger.debug("   消息result: {}", message.getResult());
         
         logPanel.info("========================================");
         logPanel.info("📨 收到SSE消息");
@@ -1749,8 +1710,6 @@ public class MainView extends BorderPane {
         // 验证randomId是否匹配
         if (message.getRandomId() != null && !expectedRandomId.equals(message.getRandomId())) {
             String warnMsg = "⚠️ SSE消息randomId不匹配，忽略: " + message.getRandomId() + " != " + expectedRandomId;
-            logger.warn(warnMsg);
-            logger.debug("========================================");
             logPanel.warn(warnMsg);
             logPanel.info("========================================");
             return;
@@ -1772,33 +1731,24 @@ public class MainView extends BorderPane {
                             predictedNodeTimes.put(row[0], new String[]{row[1], row[2]});
                         }
                     }
-                    logger.debug("✓ 已缓存 {} 条节点预测时间", times.length);
                 }
             } catch (Exception e) {
-                logger.warn("解析预测时间失败: {}", e.getMessage());
             }
         }
 
-        logger.debug("✅ randomId匹配，开始处理消息");
-        logger.debug("📊 准备更新节点状态: jobId={}, status={}", jobId, status);
         
         logPanel.info("✅ randomId匹配，开始处理消息");
         logPanel.info("📊 准备更新节点状态: jobId=" + jobId + ", status=" + status);
 
         // 更新节点状态（必须在JavaFX线程中执行）
         if (jobId != null && status != null) {
-            logger.debug("✅ jobId和status都不为空，准备更新节点状态");
             logPanel.info("✅ jobId和status都不为空，准备更新节点状态");
             Platform.runLater(() -> {
-                logger.debug("🔄 在JavaFX线程中更新节点状态");
                 logPanel.info("🔄 在JavaFX线程中更新节点状态");
                 canvas.updateNodeStatusByJobId(jobId, status);
             });
         } else {
             String warnMsg = "⚠️ jobId或status为null，无法更新节点状态";
-            logger.warn(warnMsg);
-            logger.warn("   jobId: {}", jobId);
-            logger.warn("   status: {}", status);
             logPanel.warn(warnMsg);
             logPanel.warn("   jobId: " + jobId);
             logPanel.warn("   status: " + status);
@@ -1806,7 +1756,6 @@ public class MainView extends BorderPane {
 
         // 如果状态是5（任务完成），只恢复边的正常状态，但保留节点状态
         if (status != null && status == 5) {
-            logger.debug("🏁 任务完成（status=5），恢复边的正常状态，保留节点状态");
             logPanel.info("🏁 任务完成（status=5），恢复边的正常状态，保留节点状态");
             Platform.runLater(() -> {
                 // 只恢复边的运行状态（停止虚线动画），不重置节点状态
@@ -1815,7 +1764,6 @@ public class MainView extends BorderPane {
             });
         }
         
-        logger.debug("========================================");
         logPanel.info("========================================");
     }
 
@@ -1912,7 +1860,6 @@ public class MainView extends BorderPane {
             } else {
                 runningJob.setPullFailCount(runningJob.getPullFailCount() + 1);
                 if (response != null) {
-                    logger.warn("获取日志失败: {}", response.getMsg());
                 }
             }
 
@@ -2093,7 +2040,6 @@ public class MainView extends BorderPane {
         new Thread(() -> {
             try {
                 boolean isRunning = jobInfoService.getJobStatus(taskId);
-                logger.debug("📊 任务组 {} ({}) 运行状态: {}", taskId, taskGroupName, isRunning);
                 
                 // 更新导航栏中的小绿点
                 navigationBar.updateTaskGroupRunningStatus(taskId, isRunning);
@@ -2110,7 +2056,6 @@ public class MainView extends BorderPane {
                             // 刷新所有节点的状态（从缓存中获取最新状态）
                             // 这样可以确保切换回来时，节点状态是最新的
                             canvas.refreshAllNodeStatusFromCache();
-                            logger.debug("🔄 已恢复任务组 {} 的连接线动画状态并刷新节点状态", taskGroupName);
                         });
                         delay.play();
                     } else {
@@ -2706,13 +2651,11 @@ public class MainView extends BorderPane {
 
             @Override
             public void onNewJobGroup(Long partitionId, String partitionName) {
-                logger.debug("新建任务组 - 分区ID: {}, 分区名称: {}", partitionId, partitionName);
                 showNewJobGroupDialog(partitionId, partitionName, null);
             }
 
             @Override
             public void onNewJobNode(Long taskGroupId, String taskGroupName) {
-                logger.debug("新建任务节点 - 任务组ID: {}, 任务组名称: {}", taskGroupId, taskGroupName);
                 showNewJobNodeDialog(taskGroupId, taskGroupName, null);
             }
 
@@ -3722,22 +3665,18 @@ public class MainView extends BorderPane {
                                                             com.cc.job.xo.model.entity.JobEdge savedEdge = jobInfoService.saveJobEdge(edgeForm);
                                                             if (savedEdge != null) {
                                                                 savedConnectionCount.incrementAndGet();
-                                                                logger.debug("连线已保存到数据库: fromNodeId={}, endNodeId={}", 
-                                                                    savedEdge.getFromNodeId(), savedEdge.getEndNodeId());
                                                             }
                                                         } catch (Exception e) {
                                                             logger.error("保存连线到数据库失败: {}", e.getMessage(), e);
                                                         }
                                                     }, "save-edge-thread").start();
                                                 } catch (Exception e) {
-                                                    logger.warn("创建连线表单失败: {}", e.getMessage());
                                                 }
                                             }
                                         }
                                     }
                                 }
                             } catch (Exception e) {
-                                logger.warn("恢复连接失败: {}", e.getMessage());
                                 throw new Exception(e.getMessage());
                             }
                         }
@@ -3827,7 +3766,6 @@ public class MainView extends BorderPane {
                         com.cc.job.gui.service.JobJdbcDatasourceService datasourceService = new com.cc.job.gui.service.JobJdbcDatasourceService();
                         datasources = datasourceService.getDatasourceList();
                     } catch (Exception e) {
-                        logger.warn("获取数据源列表失败: {}", e.getMessage());
                     }
                 }
                 List<com.cc.job.xo.model.entity.JobJdbcDatasource> finalDatasources = datasources;
@@ -3921,7 +3859,6 @@ public class MainView extends BorderPane {
                         com.cc.job.gui.service.JobJdbcDatasourceService datasourceService = new com.cc.job.gui.service.JobJdbcDatasourceService();
                         datasources = datasourceService.getDatasourceList();
                     } catch (Exception e) {
-                        logger.warn("获取数据源列表失败: {}", e.getMessage());
                     }
                 }
                 List<com.cc.job.xo.model.entity.JobJdbcDatasource> finalDatasources = datasources;
@@ -4234,7 +4171,6 @@ public class MainView extends BorderPane {
             String nodeId = nodeData.getId();
             Long jobId = nodeData.getJobId();  // 这是任务ID
 
-            logger.debug("检查节点 - nodeId: {}, jobId: {}", nodeId, jobId);
 
             // 跳过没有 jobId 的节点
             if (nodeId == null || jobId == null) {
@@ -4249,7 +4185,6 @@ public class MainView extends BorderPane {
                     .ifPresent(node -> {
                         node.setJobId(jobId);
                         configureNodeCallbacks(node);
-                        logger.debug("✓ 已为节点 {} (jobId: {}) 设置回调", nodeId, jobId);
                     });
             callbackSetCount++;
         }

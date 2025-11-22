@@ -37,13 +37,11 @@ public class GlueTemplateUtil {
         
         try (InputStream inputStream = GlueTemplateUtil.class.getResourceAsStream(templatePath)) {
             if (inputStream == null) {
-                logger.warn("GLUE 模板文件不存在: {}", templatePath);
                 return "";
             }
             
             byte[] bytes = inputStream.readAllBytes();
             String template = new String(bytes, StandardCharsets.UTF_8);
-            logger.debug("成功加载 GLUE 模板: {}", glueType);
             return template;
             
         } catch (IOException e) {

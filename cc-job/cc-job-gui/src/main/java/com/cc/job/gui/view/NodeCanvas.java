@@ -234,15 +234,12 @@ public class NodeCanvas extends Pane {
      */
     public void addGroupContainerToCollection(com.cc.job.gui.model.GroupContainer container) {
         if (container == null) {
-            logger.warn("尝试添加空的任务组容器到集合");
             return;
         }
         
         // 检查容器是否已经存在
         if (!groupContainers.contains(container)) {
             groupContainers.add(container);
-            logger.debug("成功添加任务组容器到集合: {} (id: {}, 总数: {})", 
-                container.getGroupName(), container.getNodeId(), groupContainers.size());
         }
     }
     
@@ -317,7 +314,6 @@ public class NodeCanvas extends Pane {
     }
     
     private void log(String message) {
-        logger.debug(message);
         if (logCallback != null) {
             logCallback.log(message);
         }
@@ -1286,7 +1282,6 @@ public class NodeCanvas extends Pane {
         double x = canvasPoint.getX();
         double y = canvasPoint.getY();
         
-        logger.debug("   → 检测位置: sceneX={}, sceneY={} -> canvasX={}, canvasY={}", sceneX, sceneY, x, y);
         
         for (ProcessNode node : nodes) {
             double nodeX = node.getLayoutX();
@@ -1294,17 +1289,14 @@ public class NodeCanvas extends Pane {
             double nodeWidth = node.getPrefWidth();
             double nodeHeight = node.getPrefHeight();
             
-            logger.debug("   → 检查节点: {} bounds=[{},{}, {}x{}]", node.getJobHandlerName(), nodeX, nodeY, nodeWidth, nodeHeight);
             
             // 扩大检测范围（包括连接点突出部分）
             if (x >= nodeX - 15 && x <= nodeX + nodeWidth + 15 &&
                 y >= nodeY - 15 && y <= nodeY + nodeHeight + 15) {
-                logger.debug("   ✅ 找到目标节点: {}", node.getJobHandlerName());
                 return node;
             }
         }
         
-        logger.debug("   ❌ 未找到目标节点");
         return null;
     }
     
@@ -1559,20 +1551,17 @@ public class NodeCanvas extends Pane {
 
             List<JobComposeData.NodeData> nodeDataList = composeData.getNodes();
             if (nodeDataList != null && !nodeDataList.isEmpty()) {
-                logger.info("开始加载节点，总数: {}", nodeDataList.size());
                 for (JobComposeData.NodeData nodeData : nodeDataList) {
                     String nodeType = nodeData.getType();
                     String jobName = nodeData.getJobName();
                     Long jobId = nodeData.getJobId();
                     String nodeId = nodeData.getId();
-                    logger.debug("节点: id={}, name={}, type={}, jobId={}", nodeId, jobName, nodeType, jobId);
 
                     boolean isGroupNode = false;
                     if (nodeType != null && !nodeType.trim().isEmpty() && !"null".equals(nodeType)) {
                         String normalizedType = nodeType.trim();
                         isGroupNode = normalizedType.equals("CustomGroup") ||
                                 normalizedType.equalsIgnoreCase("custom-group");
-                        logger.debug("节点 {} 类型检查: normalizedType={}, isGroupNode={}", nodeId, normalizedType, isGroupNode);
                     }
 
                     if (!isGroupNode && nodeData.getProperties() != null) {
@@ -1580,12 +1569,10 @@ public class NodeCanvas extends Pane {
                         Object childrenObj = props.get("children");
                         if (childrenObj != null) {
                             isGroupNode = true;
-                            logger.debug("节点 {} 通过children属性识别为任务组节点", nodeId);
                         }
                     }
 
                     if (isGroupNode) {
-                        logger.info("识别为任务组节点: id={}, name={}, type={}", nodeId, jobName, nodeType);
                         groupNodeDataList.add(nodeData);
                         continue;
                     }
@@ -1657,29 +1644,23 @@ public class NodeCanvas extends Pane {
                 log("✓ 加载了 " + nodeDataList.size() + " 个节点");
             }
 
-            logger.info("准备处理任务组节点，数量: {}", groupNodeDataList.size());
             Map<String, GroupContainer> containerMap = new HashMap<>();
             if (!groupNodeDataList.isEmpty()) {
                 Map<String, JobComposeData.NodeData> groupNodeMap = new HashMap<>();
                 for (JobComposeData.NodeData groupNodeData : groupNodeDataList) {
                     groupNodeMap.put(groupNodeData.getId(), groupNodeData);
-                    logger.debug("任务组节点映射: id={}, name={}", groupNodeData.getId(), groupNodeData.getJobName());
                 }
 
                 for (JobComposeData.NodeData groupNodeData : groupNodeDataList) {
                     try {
-                        logger.info("开始创建任务组容器: id={}, name={}", groupNodeData.getId(), groupNodeData.getJobName());
                         createGroupContainerRecursive(groupNodeData, composeData, nodeMap, containerMap, groupNodeMap);
-                        logger.info("成功创建任务组容器: id={}, name={}", groupNodeData.getId(), groupNodeData.getJobName());
                     } catch (Exception e) {
                         logger.error("创建任务组容器失败: id={}, name={}, error={}", 
                             groupNodeData.getId(), groupNodeData.getJobName(), e.getMessage(), e);
                         log("✗ 创建任务组容器失败: " + groupNodeData.getJobName() + " - " + e.getMessage());
                     }
                 }
-                logger.info("任务组容器创建完成，总数: {}", containerMap.size());
             } else {
-                logger.warn("没有找到任务组节点！");
             }
 
             // ⭐ 修复：在创建任务组容器后，再次处理边数据，支持连接到任务组容器的边
@@ -1831,8 +1812,6 @@ public class NodeCanvas extends Pane {
         Map<String, Object> properties = groupNodeData.getProperties();
         if (properties != null) {
             Object childrenObj = properties.get("children");
-            logger.debug("任务组节点 {} 的children属性: type={}, value={}", 
-                groupNodeId, childrenObj != null ? childrenObj.getClass().getSimpleName() : "null", childrenObj);
             
             if (childrenObj instanceof String childrenStr) {
                 // ⭐ 修复：使用 Gson 正确解析 JSON 字符串
@@ -1847,7 +1826,6 @@ public class NodeCanvas extends Pane {
                             childNodeIds.addAll(parsedList);
                         }
                     } catch (Exception e) {
-                        logger.warn("解析children JSON字符串失败，尝试手动解析: {}", e.getMessage());
                         // 如果 JSON 解析失败，回退到手动解析
                         childrenStr = childrenStr.substring(1, childrenStr.length() - 1);
                         if (!childrenStr.isBlank()) {
@@ -1877,9 +1855,7 @@ public class NodeCanvas extends Pane {
                     }
                 }
             }
-            logger.info("任务组节点 {} 解析到的子节点ID列表: {}", groupNodeId, childNodeIds);
         } else {
-            logger.warn("任务组节点 {} 的properties为null或没有children属性", groupNodeId);
         }
 
         List<ProcessNode> childNodes = new ArrayList<>();
@@ -1890,7 +1866,6 @@ public class NodeCanvas extends Pane {
         // 但需要按照 children ID列表的顺序处理，确保子节点位置正确
         List<JobComposeData.NodeData> childrenNodesList = groupNodeData.getChildrenNodes();
         if (childrenNodesList != null && !childrenNodesList.isEmpty()) {
-            logger.info("任务组节点 {} 使用 childrenNodes 字段，子节点数量: {}", groupNodeId, childrenNodesList.size());
             
             // ⭐ 修复：按照 children ID列表的顺序处理子节点，确保位置正确
             Map<String, JobComposeData.NodeData> childrenNodesMap = new HashMap<>();
@@ -1902,11 +1877,9 @@ public class NodeCanvas extends Pane {
             for (String childId : childNodeIds) {
                 JobComposeData.NodeData childNodeData = childrenNodesMap.get(childId);
                 if (childNodeData == null) {
-                    logger.warn("childrenNodes中找不到子节点: childId={}", childId);
                     continue;
                 }
                 String childType = childNodeData.getType();
-                logger.debug("处理子节点: id={}, type={}, name={}", childId, childType, childNodeData.getJobName());
                 
                 // 检查是否是任务组节点
                 boolean isChildGroupNode = false;
@@ -1926,7 +1899,6 @@ public class NodeCanvas extends Pane {
                 
                 if (isChildGroupNode) {
                     // 子节点是任务组节点，递归创建
-                    logger.debug("子节点 {} 是任务组节点，递归创建", childId);
                     // 确保子任务组节点在 groupNodeMap 中
                     if (!groupNodeMap.containsKey(childId)) {
                         groupNodeMap.put(childId, childNodeData);
@@ -1935,18 +1907,14 @@ public class NodeCanvas extends Pane {
                     GroupContainer childContainer = containerMap.get(childId);
                     if (childContainer != null) {
                         childContainers.add(childContainer);
-                        logger.debug("成功添加嵌套任务组容器: {}", childId);
                     } else {
-                        logger.warn("嵌套任务组容器创建失败: {}", childId);
                     }
                 } else {
                     // 子节点是普通节点，从 nodeMap 中查找或创建
                     ProcessNode childNode = nodeMap.get(childId);
                     if (childNode != null) {
                         childNodes.add(childNode);
-                        logger.debug("成功添加子节点: {}", childId);
                     } else {
-                        logger.warn("找不到子节点: childId={}, 尝试创建", childId);
                         // 如果找不到，尝试创建节点（这种情况不应该发生，但为了容错）
                         String text = childNodeData.getJobName() != null ? childNodeData.getJobName() : "Node";
                         ProcessNode newNode = new ProcessNode(childId, text);
@@ -1971,40 +1939,29 @@ public class NodeCanvas extends Pane {
                         addNode(newNode, false);
                         nodeMap.put(childId, newNode);
                         childNodes.add(newNode);
-                        logger.info("创建了缺失的子节点: {}", childId);
                     }
                 }
             }
         } else {
             // 如果没有 childrenNodes 字段，回退到使用 children ID 列表
-            logger.info("任务组节点 {} 没有 childrenNodes 字段，使用 children ID 列表", groupNodeId);
             for (String childId : childNodeIds) {
-                logger.debug("查找子节点: childId={}", childId);
                 JobComposeData.NodeData childGroupData = groupNodeMap.get(childId);
                 if (childGroupData != null) {
-                    logger.debug("子节点 {} 是任务组节点，递归创建", childId);
                     createGroupContainerRecursive(childGroupData, composeData, nodeMap, containerMap, groupNodeMap);
                     GroupContainer childContainer = containerMap.get(childId);
                     if (childContainer != null) {
                         childContainers.add(childContainer);
-                        logger.debug("成功添加嵌套任务组容器: {}", childId);
                     } else {
-                        logger.warn("嵌套任务组容器创建失败: {}", childId);
                     }
                 } else {
                     ProcessNode childNode = nodeMap.get(childId);
                     if (childNode != null) {
                         childNodes.add(childNode);
-                        logger.debug("成功添加子节点: {}", childId);
                     } else {
-                        logger.warn("找不到子节点: childId={}, nodeMap大小={}, groupNodeMap大小={}", 
-                            childId, nodeMap.size(), groupNodeMap.size());
                     }
                 }
             }
         }
-        logger.info("任务组节点 {} 的子节点统计: 普通节点={}, 嵌套任务组={}", 
-            groupNodeId, childNodes.size(), childContainers.size());
 
         // ⭐ 修复：查找子节点之间的边（包括嵌套任务组中的边）
         // 注意：这里先收集所有子节点的ID（包括嵌套任务组中的节点）
@@ -2058,7 +2015,6 @@ public class NodeCanvas extends Pane {
                         if (sourceId.equals(connSourceId) && targetId.equals(connTargetId)) {
                             if (!childConnections.contains(conn)) {
                                 childConnections.add(conn);
-                                logger.debug("找到子节点之间的边: {} -> {}", sourceId, targetId);
                             }
                             break;
                         }
@@ -2066,7 +2022,6 @@ public class NodeCanvas extends Pane {
                 }
             }
         }
-        logger.info("任务组节点 {} 找到 {} 条子节点之间的边", groupNodeId, childConnections.size());
 
         GroupContainer container = new GroupContainer(groupNodeData.getId(), groupJobId, groupName);
         if (hasValidCoordinates(groupNodeData.getX(), groupNodeData.getY())) {
@@ -2184,7 +2139,6 @@ public class NodeCanvas extends Pane {
             }
         }
         
-        logger.debug("刷新任务组容器 {} 的边绑定，找到 {} 条边", container.getGroupName(), managedConnections.size());
     }
 
     private String mapNodeType(String rawType, Map<String, Object> properties) {
@@ -2238,7 +2192,6 @@ public class NodeCanvas extends Pane {
         for (NodeConnection conn : connections) {
             conn.setRunning(running);
         }
-        logger.debug("📊 所有边的运行状态已更新: {}", running ? "运行中" : "停止");
     }
     
     /**
@@ -2248,27 +2201,18 @@ public class NodeCanvas extends Pane {
      */
     public void updateNodeStatusByJobId(Long jobId, Integer statusCode) {
         if (jobId == null || statusCode == null) {
-            logger.warn("⚠️ 参数无效: jobId={}, statusCode={}", jobId, statusCode);
             return;
         }
         
-        logger.debug("🔍 开始查找节点: jobId={}, statusCode={}", jobId, statusCode);
-        logger.debug("📋 画布中共有 {} 个节点", nodes.size());
         
         boolean found = false;
         for (ProcessNode node : nodes) {
             Long nodeJobId = node.getJobId();
-            logger.debug("   → 检查节点: {}, jobId={}", node.getJobHandlerName(), nodeJobId);
             
             if (nodeJobId != null && nodeJobId.equals(jobId)) {
-                logger.debug("✅ 找到匹配的节点: {} (jobId={})", node.getJobHandlerName(), jobId);
-                logger.debug("   当前状态: {}", node.getStatus());
-                logger.debug("   即将更新为状态码: {}", statusCode);
                 
                 node.updateStatusByCode(statusCode);
                 
-                logger.debug("✅ 节点状态已更新: jobId={}, statusCode={}", jobId, statusCode);
-                logger.debug("   更新后状态: {}", node.getStatus());
                 
                 // ⭐ 添加到批量更新队列（不立即调用后端）
                 com.cc.job.gui.util.NodeStatusSyncManager.getInstance().addPendingUpdate(jobId, statusCode);
@@ -2279,10 +2223,7 @@ public class NodeCanvas extends Pane {
         }
         
         if (!found) {
-            logger.warn("⚠️ 未找到jobId={}的节点", jobId);
-            logger.debug("📋 画布中的节点jobId列表:");
             for (ProcessNode node : nodes) {
-                logger.debug("   - {}: jobId={}", node.getJobHandlerName(), node.getJobId());
             }
         }
     }
@@ -2315,16 +2256,12 @@ public class NodeCanvas extends Pane {
                     // 如果缓存中有状态，更新节点状态
                     node.updateStatusByCode(cachedStatus);
                     updatedCount++;
-                    logger.debug("🔄 从缓存恢复节点状态: {} (jobId={}) -> {}", 
-                            node.getJobHandlerName(), jobId, cachedStatus);
                 }
             }
         }
         
         if (updatedCount > 0) {
-            logger.debug("✅ 已从缓存恢复 {} 个节点的状态", updatedCount);
         } else {
-            logger.debug("ℹ️ 缓存中没有节点状态信息");
         }
     }
     

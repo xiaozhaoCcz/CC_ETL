@@ -465,9 +465,6 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
                 
                 Long oldTaskGroupId = taskGroupInfo.getTaskGroupData().getId();
                 oldToNewJobInfoIdMap.put(oldTaskGroupId, newTaskGroupId);
-                
-                log.info("✅ 导入任务组成功 - 旧ID: {}, 新ID: {}, 名称: {}", 
-                    oldTaskGroupId, newTaskGroupId, newTaskGroup.getJobDesc());
 
                 // 5.2 创建任务组下的所有节点
                 if (taskGroupInfo.getNodes() != null) {
@@ -533,10 +530,6 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
                 // 这里需要处理嵌套任务组的情况，暂时先跳过
             }
         }
-
-        log.info("✅ 导入分区数据成功，新分区ID: {}", newPartitionId);
-        log.info("✅ 导入的任务组数量: {}", exportData.getTaskGroups() != null ? exportData.getTaskGroups().size() : 0);
-        log.info("✅ ID映射表大小: {}", oldToNewJobInfoIdMap.size());
     }
 
     /**

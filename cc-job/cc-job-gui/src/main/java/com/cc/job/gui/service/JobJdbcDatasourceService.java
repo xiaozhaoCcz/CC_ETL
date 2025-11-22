@@ -40,7 +40,6 @@ public class JobJdbcDatasourceService extends BaseService {
             }
             
             String responseBody = response.body().string();
-            logger.debug("getDatasourceList API 响应: {}", responseBody);
             
             // 解析 JSON 响应
             Type resultType = new TypeToken<Result<List<JobJdbcDatasource>>>(){}.getType();

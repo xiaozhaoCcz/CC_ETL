@@ -34,8 +34,6 @@ public class JobUserServiceImpl extends ServiceImpl<JobUserMapper, JobUser> impl
      */
     @Override
     public LoginResult login(String username, String password) {
-        log.info("用户登录请求 - 用户名: {}", username);
-
         // 参数验证
         Assert.notBlank(username, "用户名不能为空");
         Assert.notBlank(password, "密码不能为空");
@@ -58,8 +56,6 @@ public class JobUserServiceImpl extends ServiceImpl<JobUserMapper, JobUser> impl
 
         // 计算过期时间（24小时）
         long expiresIn = 24 * 60 * 60 * 1000; // 24小时（毫秒）
-
-        log.info("用户登录成功 - 用户名: {}, 用户ID: {}", username, user.getId());
 
         // 返回登录结果
         return LoginResult.builder()
@@ -122,8 +118,6 @@ public class JobUserServiceImpl extends ServiceImpl<JobUserMapper, JobUser> impl
      */
     @Override
     public LoginResult register(String username, String password) {
-        log.info("用户注册请求 - 用户名: {}", username);
-
         // 参数验证
         Assert.notBlank(username, "用户名不能为空");
         Assert.notBlank(password, "密码不能为空");
@@ -156,8 +150,6 @@ public class JobUserServiceImpl extends ServiceImpl<JobUserMapper, JobUser> impl
             log.error("注册失败 - 数据库保存失败: {}", username);
             throw new BusinessException("注册失败，请稍后重试");
         }
-
-        log.info("用户注册成功 - 用户名: {}, 用户ID: {}", username, newUser.getId());
 
         // 自动登录，生成JWT Token
         String token = JwtUtil.generateToken(newUser.getId(), newUser.getUsername());

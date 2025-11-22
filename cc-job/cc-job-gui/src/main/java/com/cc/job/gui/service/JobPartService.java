@@ -35,7 +35,6 @@ public class JobPartService extends  BaseService {
             }
 
             String responseBody = response.body().string();
-            logger.debug("API 响应: {}", responseBody);
 
             // 解析 JSON 响应
             Type resultType = new TypeToken<Result<List<JobPartVo>>>(){}.getType();
@@ -70,7 +69,6 @@ public class JobPartService extends  BaseService {
             }
 
             String responseBody = response.body().string();
-            logger.debug("API 响应: {}", responseBody);
 
             // 解析 JSON 响应
             Type resultType = new TypeToken<Result<Object>>() {
@@ -113,7 +111,6 @@ public class JobPartService extends  BaseService {
             }
             
             String responseBody = response.body().string();
-            logger.debug("saveJobPart API 响应: {}", responseBody);
             
             // 解析 JSON 响应
             Type resultType = new TypeToken<Result<Void>>(){}.getType();
@@ -152,7 +149,6 @@ public class JobPartService extends  BaseService {
             }
             
             String responseBody = response.body().string();
-            logger.debug("getJobCompose API 响应: {}", responseBody);
             
             // 解析 JSON 响应
             Type resultType = new TypeToken<Result<Map<String, Object>>>(){}.getType();
@@ -473,7 +469,6 @@ public class JobPartService extends  BaseService {
             }
 
             String responseBody = response.body().string();
-            logger.debug("deleteJobPart API 响应: {}", responseBody);
 
             Type resultType = new TypeToken<Result<Void>>() {
             }.getType();
@@ -500,7 +495,6 @@ public class JobPartService extends  BaseService {
             }
 
             String responseBody = response.body().string();
-            logger.debug("deleteJobInfo API 响应: {}", responseBody);
 
             Type resultType = new TypeToken<Result<Void>>() {
             }.getType();
@@ -527,7 +521,6 @@ public class JobPartService extends  BaseService {
             }
 
             String responseBody = response.body().string();
-            logger.debug("deleteJobNode API 响应: {}", responseBody);
 
             Type resultType = new TypeToken<Result<Void>>() {
             }.getType();
@@ -588,7 +581,6 @@ public class JobPartService extends  BaseService {
             }
             
             String responseBody = response.body().string();
-            logger.debug("updateJobPart API 响应: {}", responseBody);
             
             // 解析 JSON 响应
             Type resultType = new TypeToken<Result<Void>>(){}.getType();
@@ -634,7 +626,6 @@ public class JobPartService extends  BaseService {
             }
             
             String responseBody = response.body().string();
-            logger.debug("importData API 响应: {}", responseBody);
             
             // 解析 JSON 响应
             Type resultType = new TypeToken<Result<Void>>(){}.getType();
