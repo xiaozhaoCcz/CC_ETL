@@ -305,16 +305,20 @@ public class JobComposeServiceImpl implements JobComposeService {
         Map<String, List<LfNode>> groupNodeMap = lfNodes.stream().collect(Collectors.groupingBy(LfNode::getType));
         List<LfNode> dynamicGroupNodes = groupNodeMap.get(DYNAMIC_GROUP);
         List<String> nodeIds = new ArrayList<>();
+        Set<String> groupNodeIds = new HashSet<>(); // ⭐ 修复：记录所有任务组节点的ID
         if (dynamicGroupNodes != null) {
             dynamicGroupNodes.forEach(node -> {
+                groupNodeIds.add(node.getId()); // ⭐ 修复：记录任务组节点ID
                 List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
                 nodeIds.addAll(childIds);
             });
         }
 
-        // ⭐ 修复：过滤掉任务组节点的子节点，只保留顶层节点和任务组节点本身
+        // ⭐ 修复：过滤掉任务组节点的子节点，但保留任务组节点本身
         // 子节点会通过任务组节点的children属性传递，后端会递归处理
-        List<LfNode> nodeList = lfNodes.stream().filter(n -> !nodeIds.contains(n.getId())).toList();
+        List<LfNode> nodeList = lfNodes.stream()
+            .filter(n -> !nodeIds.contains(n.getId()) || groupNodeIds.contains(n.getId()))
+            .toList();
         List<String> firstNodes = nodeList.stream().map(LfNode::getId).toList();
         List<LfEdge> edgeList = lfEdges.stream().filter(e -> firstNodes.contains(e.getSourceNodeId()) || firstNodes.contains(e.getTargetNodeId())).toList();
         operateToUpdateJobCompose(jobInfo, nodeList, edgeList, lfNodes, lfEdges);
@@ -530,8 +534,68 @@ public class JobComposeServiceImpl implements JobComposeService {
 
         jobEdgeService.saveBatch(jobEdgeList);
 
+        // ⭐ 修复：收集所有应该保留的节点ID（包括任务组节点本身）
+        // 任务组节点可能因为过滤逻辑没有被包含在 nodeList 中，但应该被保留
+//        Set<Long> allNodeIdsToKeep = new HashSet<>();
         List<Long> updateNodeIds = updateNodes.stream().map(JobNode::getId).toList();
-        List<JobNode> delNodeDbs = nodeFromDb.stream().filter(n -> !updateNodeIds.contains(n.getId())).toList();
+//        allNodeIdsToKeep.addAll(updateNodeIds);
+//
+//        // ⭐ 修复：从 nodeList 中提取所有节点ID（包括任务组节点），无论是否被处理
+//        for (LfNode node : nodeList) {
+//            if (node.getId() != null && !node.getId().contains("-")) {
+//                try {
+//                    Long nodeId = Long.parseLong(node.getId());
+//                    // 直接添加到保留列表，无论是否被处理
+//                    allNodeIdsToKeep.add(nodeId);
+//                    System.out.println("【operateToUpdateJobCompose】保留节点: nodeId=" + nodeId);
+//                } catch (NumberFormatException e) {
+//                    // 忽略无法解析的ID
+//                }
+//            }
+//        }
+//
+//        // ⭐ 修复：从 lfNodes 中查找所有任务组节点，确保它们也被保留
+//        // 即使任务组节点不在 nodeList 中（因为过滤逻辑），也要保留
+//        for (LfNode node : lfNodes) {
+//            if (node != null && node.getId() != null && !node.getId().contains("-")) {
+//                // 检查是否是任务组节点
+//                boolean isGroupNode = false;
+//                if (node.getType() != null &&
+//                    (DYNAMIC_GROUP.equalsIgnoreCase(node.getType()) || "custom-group".equalsIgnoreCase(node.getType()))) {
+//                    isGroupNode = true;
+//                } else if (node.getProperties() != null) {
+//                    try {
+//                        Map<String, Object> props = JSONUtil.toBean(node.getProperties(), Map.class);
+//                        if (props != null && props.containsKey("children")) {
+//                            isGroupNode = true;
+//                        }
+//                    } catch (Exception e) {
+//                        // 忽略解析错误
+//                    }
+//                }
+//
+//                if (isGroupNode) {
+//                    try {
+//                        Long nodeId = Long.parseLong(node.getId());
+//                        // 检查节点是否属于当前任务组
+//                        JobNode groupNode = nodeFromDb.stream()
+//                            .filter(n -> n.getId().equals(nodeId))
+//                            .findFirst()
+//                            .orElse(null);
+//                        if (groupNode != null && groupNode.getJobParentId().equals(jobInfo.getId())) {
+//                            allNodeIdsToKeep.add(nodeId);
+//                            System.out.println("【operateToUpdateJobCompose】保留任务组节点: nodeId=" + nodeId);
+//                        }
+//                    } catch (NumberFormatException e) {
+//                        // 忽略无法解析的ID
+//                    }
+//                }
+//            }
+//        }
+        
+        List<JobNode> delNodeDbs = nodeFromDb.stream()
+            .filter(n -> !updateNodeIds.contains(n.getId()))
+            .toList();
 
         if (!delNodeDbs.isEmpty()) {
             for (JobNode delNodeDb : delNodeDbs) {

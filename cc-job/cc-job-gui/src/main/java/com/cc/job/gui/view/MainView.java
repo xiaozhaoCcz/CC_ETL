@@ -234,6 +234,68 @@ public class MainView extends BorderPane {
                                     // 1) 先创建节点（持久化），记录 oldNodeId -> new ProcessNode
                                     java.util.Map<String, ProcessNode> idToNode = new java.util.HashMap<>();
                                     java.util.List<ProcessNode> newNodes = new java.util.ArrayList<>();
+                                    
+                                    // ⭐ 修复：先找到任务组节点的位置，用于计算子节点的相对位置
+                                    // 任务组节点的位置可能在 jobNode 中，或者在 nodes 中
+                                    double originalGroupX = 0;
+                                    double originalGroupY = 0;
+                                    boolean foundGroupNode = false;
+                                    
+                                    // 首先检查 jobNode（任务组节点本身）
+                                    if (compose != null && compose.getJobNode() != null) {
+                                        JobComposeData.NodeData jobNode = compose.getJobNode();
+                                        if (jobNode.getX() != null && jobNode.getY() != null) {
+                                            originalGroupX = jobNode.getX();
+                                            originalGroupY = jobNode.getY();
+                                            foundGroupNode = true;
+                                            logger.debug("从jobNode获取任务组节点位置: ({}, {})", originalGroupX, originalGroupY);
+                                        }
+                                    }
+                                    
+                                    // 如果jobNode中没有，再从nodes中查找
+                                    if (!foundGroupNode && compose != null && compose.getNodes() != null) {
+                                        for (JobComposeData.NodeData nd : compose.getNodes()) {
+                                            // 检查是否是任务组节点（通过type或properties中的children判断）
+                                            boolean isGroupNode = false;
+                                            if (nd.getType() != null && 
+                                                (nd.getType().equals("CustomGroup") || nd.getType().equalsIgnoreCase("custom-group"))) {
+                                                isGroupNode = true;
+                                            } else if (nd.getProperties() != null) {
+                                                // properties 已经是 Map 类型，直接使用
+                                                if (nd.getProperties().containsKey("children")) {
+                                                    isGroupNode = true;
+                                                }
+                                            }
+                                            
+                                            if (isGroupNode && nd.getX() != null && nd.getY() != null) {
+                                                originalGroupX = nd.getX();
+                                                originalGroupY = nd.getY();
+                                                foundGroupNode = true;
+                                                logger.debug("从nodes获取任务组节点位置: ({}, {})", originalGroupX, originalGroupY);
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    
+                                    // 如果还是没找到，使用子节点的最小X和Y作为参考点
+                                    if (!foundGroupNode && compose != null && compose.getNodes() != null) {
+                                        double minX = Double.MAX_VALUE;
+                                        double minY = Double.MAX_VALUE;
+                                        for (JobComposeData.NodeData nd : compose.getNodes()) {
+                                            if (nd.getX() != null && nd.getY() != null) {
+                                                minX = Math.min(minX, nd.getX());
+                                                minY = Math.min(minY, nd.getY());
+                                            }
+                                        }
+                                        if (minX != Double.MAX_VALUE && minY != Double.MAX_VALUE) {
+                                            // 使用子节点的最小位置减去一个偏移量作为任务组节点的位置
+                                            originalGroupX = minX - 50;
+                                            originalGroupY = minY - 50;
+                                            foundGroupNode = true;
+                                            logger.debug("从子节点最小位置计算任务组节点位置: ({}, {})", originalGroupX, originalGroupY);
+                                        }
+                                    }
+                                    
                                     if (compose != null && compose.getNodes() != null) {
                                         java.util.Set<Long> processedOriginalJobIds = new java.util.HashSet<>();
                                         int index = 0;
@@ -262,12 +324,38 @@ public class MainView extends BorderPane {
                                             copyForm.setParentId(effectiveParentId);
                                             String label = nd.getJobName() != null ? nd.getJobName() : originalForm.getJobDesc();
                                             copyForm.setJobDesc(label);
-                                            // 位置
+                                            // ⭐ 修复：保持子节点相对于任务组节点的相对位置
+                                            // 跳过任务组节点本身（只处理子节点）
+                                            boolean isGroupNode = false;
+                                            if (nd.getType() != null && 
+                                                (nd.getType().equals("CustomGroup") || nd.getType().equalsIgnoreCase("custom-group"))) {
+                                                isGroupNode = true;
+                                            } else if (nd.getProperties() != null) {
+                                                // properties 已经是 Map 类型，直接使用
+                                                if (nd.getProperties().containsKey("children")) {
+                                                    isGroupNode = true;
+                                                }
+                                            }
+                                            
+                                            if (isGroupNode) {
+                                                // 跳过任务组节点本身，只处理子节点
+                                                continue;
+                                            }
+                                            
+                                            // 计算新任务组节点的位置
                                             double[] base = calculateNewNodePosition();
+                                            double newGroupX = base[0];
+                                            double newGroupY = base[1];
+                                            
+                                            // 计算子节点相对于原始任务组节点的偏移量
                                             double nx = nd.getX() != null ? nd.getX() : 60 + index * 20;
                                             double ny = nd.getY() != null ? nd.getY() : 60 + index * 14;
-                                            copyForm.setNodePositionX(base[0] + (nx % 220));
-                                            copyForm.setNodePositionY(base[1] + (ny % 140));
+                                            double offsetX = foundGroupNode ? (nx - originalGroupX) : 0;
+                                            double offsetY = foundGroupNode ? (ny - originalGroupY) : 0;
+                                            
+                                            // 保持相对位置
+                                            copyForm.setNodePositionX(newGroupX + offsetX);
+                                            copyForm.setNodePositionY(newGroupY + offsetY);
                                             // 其他必填默认
                                             if (copyForm.getExecutorRouteStrategy() == null || copyForm.getExecutorRouteStrategy().isEmpty()) {
                                                 copyForm.setExecutorRouteStrategy("FIRST");
@@ -2085,8 +2173,14 @@ public class MainView extends BorderPane {
                 }
                 addedEdgeKeys.add(edgeKey);
                 
+                // ⭐ 修复：获取连接点的位置（startPoint和endPoint）
+                String startPoint = getConnectorPosition(conn.getSourceOwner(), conn.getSourceConnector());
+                String endPoint = getConnectorPosition(conn.getTargetOwner(), conn.getTargetConnector());
+                
                 edgeData.put("sourceNodeId", sourceId);
                 edgeData.put("targetNodeId", targetId);
+                edgeData.put("startPoint", startPoint);
+                edgeData.put("endPoint", endPoint);
                 edgesData.add(edgeData);
             }
 
@@ -2165,6 +2259,32 @@ public class MainView extends BorderPane {
             return "left";
         } else if (connector == node.getRightConnector()) {
             return "right";
+        }
+        return "right"; // 默认右侧
+    }
+    
+    /**
+     * 获取连接点位置（支持 ProcessNode 和 GroupContainer）
+     * @param owner 节点或任务组容器
+     * @param connector 连接点
+     * @return 连接点位置（"top", "bottom", "left", "right"）
+     */
+    private String getConnectorPosition(javafx.scene.Node owner, javafx.scene.shape.Circle connector) {
+        if (owner == null || connector == null) {
+            return "right"; // 默认右侧
+        }
+        if (owner instanceof ProcessNode) {
+            ProcessNode node = (ProcessNode) owner;
+            if (connector == node.getTopConnector()) return "top";
+            if (connector == node.getBottomConnector()) return "bottom";
+            if (connector == node.getLeftConnector()) return "left";
+            if (connector == node.getRightConnector()) return "right";
+        } else if (owner instanceof GroupContainer) {
+            GroupContainer group = (GroupContainer) owner;
+            if (connector == group.getTopConnector()) return "top";
+            if (connector == group.getBottomConnector()) return "bottom";
+            if (connector == group.getLeftConnector()) return "left";
+            if (connector == group.getRightConnector()) return "right";
         }
         return "right"; // 默认右侧
     }

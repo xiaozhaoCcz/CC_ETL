@@ -24,8 +24,10 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Locale;
 
 /**
@@ -1539,6 +1541,19 @@ public class NodeCanvas extends Pane {
 
                 log("✓ 加载了 " + successCount + " 条连接");
             }
+            
+            // ⭐ 修复：在所有边创建完成后，重新刷新所有任务组容器的边绑定
+            // 确保任务组容器中的边被正确管理，折叠时会隐藏
+            for (GroupContainer container : containerMap.values()) {
+                List<ProcessNode> managedNodes = container.getManagedCanvasNodes();
+                Set<String> managedNodeIds = new HashSet<>();
+                for (ProcessNode node : managedNodes) {
+                    if (node.getNodeId() != null) {
+                        managedNodeIds.add(node.getNodeId());
+                    }
+                }
+                refreshGroupContainerConnections(container, managedNodeIds);
+            }
 
             updateCanvasSize();
             log("✓ 任务组数据加载完成");
@@ -1656,11 +1671,24 @@ public class NodeCanvas extends Pane {
         List<NodeConnection> childConnections = new ArrayList<>();
 
         // ⭐ 修复：优先使用 childrenNodes 字段（包含子节点的完整数据）
+        // 但需要按照 children ID列表的顺序处理，确保子节点位置正确
         List<JobComposeData.NodeData> childrenNodesList = groupNodeData.getChildrenNodes();
         if (childrenNodesList != null && !childrenNodesList.isEmpty()) {
             logger.info("任务组节点 {} 使用 childrenNodes 字段，子节点数量: {}", groupNodeId, childrenNodesList.size());
+            
+            // ⭐ 修复：按照 children ID列表的顺序处理子节点，确保位置正确
+            Map<String, JobComposeData.NodeData> childrenNodesMap = new HashMap<>();
             for (JobComposeData.NodeData childNodeData : childrenNodesList) {
-                String childId = childNodeData.getId();
+                childrenNodesMap.put(childNodeData.getId(), childNodeData);
+            }
+            
+            // 按照 children ID列表的顺序处理
+            for (String childId : childNodeIds) {
+                JobComposeData.NodeData childNodeData = childrenNodesMap.get(childId);
+                if (childNodeData == null) {
+                    logger.warn("childrenNodes中找不到子节点: childId={}", childId);
+                    continue;
+                }
                 String childType = childNodeData.getType();
                 logger.debug("处理子节点: id={}, type={}, name={}", childId, childType, childNodeData.getJobName());
                 
@@ -1762,27 +1790,67 @@ public class NodeCanvas extends Pane {
         logger.info("任务组节点 {} 的子节点统计: 普通节点={}, 嵌套任务组={}", 
             groupNodeId, childNodes.size(), childContainers.size());
 
+        // ⭐ 修复：查找子节点之间的边（包括嵌套任务组中的边）
+        // 注意：这里先收集所有子节点的ID（包括嵌套任务组中的节点）
+        Set<String> allChildNodeIds = new HashSet<>();
+        for (ProcessNode childNode : childNodes) {
+            if (childNode.getNodeId() != null) {
+                allChildNodeIds.add(childNode.getNodeId());
+            }
+        }
+        for (GroupContainer childContainer : childContainers) {
+            List<ProcessNode> nestedNodes = childContainer.getManagedCanvasNodes();
+            if (nestedNodes != null) {
+                for (ProcessNode nestedNode : nestedNodes) {
+                    if (nestedNode.getNodeId() != null) {
+                        allChildNodeIds.add(nestedNode.getNodeId());
+                    }
+                }
+            }
+        }
+        
         List<JobComposeData.EdgeData> allEdgeDataList = composeData.getEdges();
         if (allEdgeDataList != null) {
             for (JobComposeData.EdgeData edgeData : allEdgeDataList) {
-                ProcessNode sourceNode = nodeMap.get(edgeData.getSourceNodeId());
-                ProcessNode targetNode = nodeMap.get(edgeData.getTargetNodeId());
-                if (sourceNode != null && targetNode != null &&
-                        childNodes.contains(sourceNode) && childNodes.contains(targetNode)) {
+                String sourceId = edgeData.getSourceNodeId();
+                String targetId = edgeData.getTargetNodeId();
+                
+                // ⭐ 修复：检查边的源节点和目标节点是否都在当前任务组的子节点中
+                if (allChildNodeIds.contains(sourceId) && allChildNodeIds.contains(targetId)) {
+                    // 从 connections 中查找对应的连接
                     for (NodeConnection conn : connections) {
                         // ⭐ 修复：使用 getSourceOwner() 和 getTargetOwner()，支持任务组容器
                         javafx.scene.Node sourceOwner = conn.getSourceOwner();
                         javafx.scene.Node targetOwner = conn.getTargetOwner();
                         
-                        if (sourceOwner instanceof ProcessNode && targetOwner instanceof ProcessNode &&
-                            sourceOwner == sourceNode && targetOwner == targetNode) {
-                            childConnections.add(conn);
+                        String connSourceId = null;
+                        String connTargetId = null;
+                        
+                        if (sourceOwner instanceof ProcessNode) {
+                            connSourceId = ((ProcessNode) sourceOwner).getNodeId();
+                        } else if (sourceOwner instanceof GroupContainer) {
+                            connSourceId = ((GroupContainer) sourceOwner).getNodeId();
+                        }
+                        
+                        if (targetOwner instanceof ProcessNode) {
+                            connTargetId = ((ProcessNode) targetOwner).getNodeId();
+                        } else if (targetOwner instanceof GroupContainer) {
+                            connTargetId = ((GroupContainer) targetOwner).getNodeId();
+                        }
+                        
+                        // 匹配边的源和目标ID
+                        if (sourceId.equals(connSourceId) && targetId.equals(connTargetId)) {
+                            if (!childConnections.contains(conn)) {
+                                childConnections.add(conn);
+                                logger.debug("找到子节点之间的边: {} -> {}", sourceId, targetId);
+                            }
                             break;
                         }
                     }
                 }
             }
         }
+        logger.info("任务组节点 {} 找到 {} 条子节点之间的边", groupNodeId, childConnections.size());
 
         GroupContainer container = new GroupContainer(groupNodeData.getId(), groupJobId, groupName);
         if (hasValidCoordinates(groupNodeData.getX(), groupNodeData.getY())) {
@@ -1799,6 +1867,7 @@ public class NodeCanvas extends Pane {
         }
 
         container.bindCanvasNodes(allChildNodes);
+        // ⭐ 修复：先绑定初始的边（可能为空，因为边可能还没有创建）
         container.bindConnections(childConnections);
 
         for (GroupContainer childContainer : childContainers) {
@@ -1811,6 +1880,10 @@ public class NodeCanvas extends Pane {
         getChildren().add(0, container);
         groupContainers.add(container);
         containerMap.put(groupNodeId, container);
+        
+        // ⭐ 修复：在创建任务组容器后，重新查找并绑定子节点之间的边
+        // 因为边可能是在创建任务组容器之后才创建的
+        refreshGroupContainerConnections(container, allChildNodeIds);
 
         setupConnectorHandler(container, container.getTopConnector());
         setupConnectorHandler(container, container.getBottomConnector());
@@ -1826,6 +1899,52 @@ public class NodeCanvas extends Pane {
 
         log("✓ 加载任务组节点: " + groupName +
                 " (子节点数: " + childNodes.size() + ", 嵌套任务组数: " + childContainers.size() + ")");
+    }
+    
+    /**
+     * 刷新任务组容器的边绑定（在边创建后调用）
+     * @param container 任务组容器
+     * @param managedNodeIds 管理的节点ID集合
+     */
+    private void refreshGroupContainerConnections(GroupContainer container, Set<String> managedNodeIds) {
+        if (container == null || managedNodeIds == null || managedNodeIds.isEmpty()) {
+            return;
+        }
+        
+        List<NodeConnection> managedConnections = new ArrayList<>();
+        
+        // 查找所有源节点和目标节点都在 managedNodeIds 中的边
+        for (NodeConnection conn : connections) {
+            javafx.scene.Node sourceOwner = conn.getSourceOwner();
+            javafx.scene.Node targetOwner = conn.getTargetOwner();
+            
+            String sourceId = null;
+            String targetId = null;
+            
+            if (sourceOwner instanceof ProcessNode) {
+                sourceId = ((ProcessNode) sourceOwner).getNodeId();
+            } else if (sourceOwner instanceof GroupContainer) {
+                sourceId = ((GroupContainer) sourceOwner).getNodeId();
+            }
+            
+            if (targetOwner instanceof ProcessNode) {
+                targetId = ((ProcessNode) targetOwner).getNodeId();
+            } else if (targetOwner instanceof GroupContainer) {
+                targetId = ((GroupContainer) targetOwner).getNodeId();
+            }
+            
+            // 如果边的源节点和目标节点都在管理的节点ID集合中，则添加到管理列表
+            if (sourceId != null && targetId != null && 
+                managedNodeIds.contains(sourceId) && managedNodeIds.contains(targetId)) {
+                if (!managedConnections.contains(conn)) {
+                    managedConnections.add(conn);
+                }
+            }
+        }
+        
+        // 重新绑定边
+        container.bindConnections(managedConnections);
+        logger.debug("刷新任务组容器 {} 的边绑定，找到 {} 条边", container.getGroupName(), managedConnections.size());
     }
 
     private String mapNodeType(String rawType, Map<String, Object> properties) {
