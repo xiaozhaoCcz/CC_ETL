@@ -1,0 +1,21 @@
+# 开发环境配置
+
+server:
+  port: 8500
+
+cc-job:
+  admin:
+    address: http://localhost:8989/xxl-job-admin
+  access-token: default_token
+  executor:
+    appname: cc-job-executor-compose
+    port: 10001
+    logpath: ./logs/executor-compose
+    logretentiondays: 7
+
+logging:
+  level:
+    root: INFO
+    com.cc.job.executor.compose: DEBUG
+  file:
+    name: ./logs/executor-compose/executor-compose.log
