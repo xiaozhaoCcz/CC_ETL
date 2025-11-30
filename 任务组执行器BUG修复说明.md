@@ -1,185 +1,339 @@
-# 任务组执行器Bug修复说明
+# 任务组执行器BUG修复说明
 
 ## 问题描述
 
-任务组执行器抽离到 `cc-job-executor-compose` 模块后,重新运行任务组时出现以下错误:
+任务组执行器只成功执行了一个任务，整个任务组存在相关依赖的任务，并不是所有的任务都执行了，只执行了第一个任务。
 
-```
-[AdminApiClient] 获取任务信息失败 - jobId: 25785, status: 404, body: <html>...
-[JobGroupExecutorComplete] 获取任务信息失败 - jobId: 25785
-[AdminApiClient] 上报状态失败 - jobId: 25785, status: 5, responseStatus: 404
-```
+### 现象
+- 任务组包含多个有依赖关系的子任务（例如：A -> B -> C）
+- 只有第一个任务（A）执行成功
+- 后续任务（B、C）没有被执行
+- 任务组提前结束
 
-## 根本原因
+## 根本原因分析
 
-1. **API路径不匹配**: `AdminApiClient` 使用的API路径 (`/api/job/*`) 与Admin模块实际提供的路径 (`/api/v1/jobInfos/*`) 不一致
-2. **缺失API接口**: Admin模块没有为executor-compose提供独立的获取任务信息、节点、边和上报状态的API接口
-3. **返回格式不匹配**: Admin模块返回的是包装在 `Result` 对象中的数据,而 `AdminApiClient` 直接解析为实体对象
+### 1. **主要问题：`Async.java` 中的 `finally` 块无条件中断线程**
 
-## 修复内容
+**位置**：`cc-job-executor-compose/src/main/java/com/cc/job/executor/compose/engine/Async.java`
 
-### 1. 在Admin模块添加API接口
-
-**文件**: `cc-job/cc-job-admin/src/main/java/com/cc/job/admin/task/controller/JobInfoController.java`
-
-添加了以下供执行器调用的API接口:
-
+**原代码**：
 ```java
-// 获取任务信息
-@GetMapping("/{id}")
-public Result<JobInfo> getJobInfoById(@PathVariable Long id)
-
-// 获取任务组的所有节点
-@GetMapping("/nodes/{jobId}")
-public Result<List<JobNode>> getJobNodes(@PathVariable Long jobId)
-
-// 获取任务组的所有边
-@GetMapping("/edges/{jobId}")
-public Result<List<JobEdge>> getJobEdges(@PathVariable Long jobId)
-
-// 上报任务执行状态
-@PostMapping("/status")
-public Result<Void> reportStatus(@RequestBody Map<String, Object> statusData)
-```
-
-### 2. 修复AdminApiClient的API路径
-
-**文件**: `cc-job/cc-job-executor-compose/src/main/java/com/cc/job/executor/compose/client/AdminApiClient.java`
-
-修改了所有API调用路径和响应解析逻辑:
-
-| 原路径 | 新路径 | 说明 |
-|--------|--------|------|
-| `/api/job/info/{jobId}` | `/api/v1/jobInfos/{id}` | 获取任务信息 |
-| `/api/job/nodes/{jobId}` | `/api/v1/jobInfos/nodes/{jobId}` | 获取节点列表 |
-| `/api/job/edges/{jobId}` | `/api/v1/jobInfos/edges/{jobId}` | 获取边列表 |
-| `/api/job/status` | `/api/v1/jobInfos/status` | 上报状态 |
-
-同时添加了对 `Result` 包装对象的解析:
-
-```java
-// 解析Result包装的响应
-Map<String, Object> resultMap = JSONUtil.toBean(response.body(), Map.class);
-Object data = resultMap.get("data");
-if (data != null) {
-    return JSONUtil.toBean(JSONUtil.toJsonStr(data), JobInfo.class);
-}
-```
-
-### 3. 实现停止任务组功能
-
-**文件**: `cc-job/cc-job-admin/src/main/java/com/cc/job/admin/task/service/impl/JobInfoServiceImpl.java`
-
-完善了 `stopJobCompose` 方法的实现:
-
-```java
-@Override
-public boolean stopJobCompose(Long id, String randomId) {
-    // 1. 更新任务状态
-    int flag = jobInfoMapper.stopJobCompose(id);
-    
-    // 2. 获取任务信息和执行器组信息
-    JobInfo jobInfo = this.getById(id);
-    JobGroup jobGroup = jobGroupService.getById(jobInfo.getJobGroup());
-    
-    // 3. 调用executor-compose的停止接口
-    String addressList = jobGroup.getAddressList();
-    if (StringUtils.isNotBlank(addressList)) {
-        String[] addresses = addressList.split(",");
-        for (String address : addresses) {
-            String url = address.trim() + "/api/jobgroup/stop";
-            HttpResponse response = HttpRequest.post(url)
-                    .form("jobId", id)
-                    .form("randomId", randomId)
-                    .timeout(5000)
-                    .execute();
+private static void executorWorkerWrapper(...) {
+    Thread thread = null;
+    try {
+        FutureTask<Boolean> futureTask = new FutureTask<>(() -> {
+            doWorkWrappers(wrapperMap, inDegree, submitted, time);
+            return true;
+        });
+        thread = new Thread(futureTask);
+        thread.start();
+        futureTask.get(timeout, TimeUnit.SECONDS);
+    } catch (Exception e) {
+        throw new RuntimeException(e);
+    } finally {
+        if (thread != null) {
+            thread.interrupt(); // ❌ 无论是否正常完成都会中断线程！
         }
     }
-    
-    return flag > 0;
 }
 ```
 
-### 4. 停止任务组的完整流程
+**问题分析**：
+1. `finally` 块会在任何情况下执行，包括任务组正常完成时
+2. `thread.interrupt()` 会中断调度线程，即使任务组还在正常执行
+3. 当调度线程在 `zeroQueue.poll(100, TimeUnit.MILLISECONDS)` 等待时被中断，会抛出 `InterruptedException`
+4. `InterruptedException` 导致主循环 `break`，提前退出
+5. 后续任务无法被提交执行
 
-executor-compose模块已经实现了完整的停止功能:
+**执行流程**：
+```
+1. 第一个任务（A）被提交到线程池执行
+2. 主循环继续，从 zeroQueue 中等待后续任务
+3. 如果此时没有新任务，主循环阻塞在 poll() 上
+4. 当某个条件满足时（例如超时、异常、或者误操作），finally 块执行
+5. thread.interrupt() 中断主循环
+6. 主循环捕获 InterruptedException，执行 break
+7. 主循环退出，后续任务无法执行
+```
 
-1. **Controller接口**: `JobGroupControlController.stopJobGroup()` - 接收停止请求
-2. **执行器处理**: `JobGroupExecutorComplete.stopJobGroup()` - 停止任务组
-3. **引擎停止**: `Async.stopWork()` - 将所有任务状态置为失败(state=3)
+### 2. **次要问题：缺少详细的日志输出**
 
-## 验证步骤
+原代码中日志输出较少，不便于排查问题。无法清楚地看到：
+- 任务的依赖关系是否正确构建
+- 任务入度的变化过程
+- 后续任务是否被加入执行队列
+- 为什么主循环提前退出
 
-1. 启动Admin模块
-2. 启动executor-compose模块
-3. 创建一个任务组
-4. 触发任务组执行
-5. 验证任务组正常运行
-6. 调用停止接口验证任务组能正确停止
+## 修复方案
 
-## API接口说明
+### 1. **修复 `Async.java` 中的线程中断问题**
 
-### executor-compose提供的接口
+**修改位置**：`executorWorkerWrapper` 方法
 
-| 接口 | 方法 | 路径 | 说明 |
-|------|------|------|------|
-| 停止任务组 | POST | `/api/jobgroup/stop` | 停止指定任务组 |
-| 查询任务组状态 | GET | `/api/jobgroup/status` | 查询任务组运行状态 |
-| 获取运行中的任务组 | GET | `/api/jobgroup/running` | 获取所有运行中的任务组 |
-| 健康检查 | GET | `/api/jobgroup/health` | 服务健康检查 |
+**修复后代码**：
+```java
+private static void executorWorkerWrapper(long timeout, Map<String, WorkerWrapper> wrapperMap,
+                                          Map<String, Integer> inDegree, Set<String> submitted) {
+    AtomicLong time = new AtomicLong(timeout * 1000);
+    
+    Thread thread = null;
+    boolean interrupted = false; // ✅ 添加标志，标记是否需要中断
+    try {
+        FutureTask<Boolean> futureTask = new FutureTask<>(() -> {
+            doWorkWrappers(wrapperMap, inDegree, submitted, time);
+            return true;
+        });
+        thread = new Thread(futureTask);
+        thread.start();
+        futureTask.get(timeout, TimeUnit.SECONDS);
+        logger.info("[Async] 任务组调度正常完成"); // ✅ 添加日志
+    } catch (TimeoutException e) {
+        logger.error("[Async] 任务组调度超时");
+        interrupted = true; // ✅ 只有超时时才标记需要中断
+        throw new RuntimeException("任务组调度超时", e);
+    } catch (Exception e) {
+        logger.error("[Async] 任务组调度异常: {}", e.getMessage(), e);
+        interrupted = true; // ✅ 只有异常时才标记需要中断
+        throw new RuntimeException(e);
+    } finally {
+        // ✅ 只有在超时或异常时才中断线程
+        if (thread != null && interrupted) {
+            logger.warn("[Async] 中断调度线程");
+            thread.interrupt();
+        }
+    }
+}
+```
 
-### Admin提供给executor的接口
+**修复效果**：
+- 只有在超时或异常时才中断调度线程
+- 正常完成时不会中断，主循环可以继续运行直到所有任务完成
+- 后续任务能够正常执行
 
-| 接口 | 方法 | 路径 | 说明 |
-|------|------|------|------|
-| 获取任务信息 | GET | `/api/v1/jobInfos/{id}` | 获取任务详细信息 |
-| 获取任务节点 | GET | `/api/v1/jobInfos/nodes/{jobId}` | 获取任务组的所有节点 |
-| 获取任务边 | GET | `/api/v1/jobInfos/edges/{jobId}` | 获取任务组的所有边 |
-| 上报状态 | POST | `/api/v1/jobInfos/status` | 上报任务执行状态 |
+### 2. **增强 `doWorkWrappers` 方法的日志输出**
 
-## 状态码说明
+**修改位置**：`Async.java` 的 `doWorkWrappers` 方法
 
-任务执行状态码:
-- `0`: 失败
-- `1`: 成功
-- `2`: 执行中
-- `5`: 任务组完成
+**主要改进**：
+1. 添加初始化日志，显示总任务数和初始可执行任务数
+2. 添加任务提交日志，显示剩余任务数
+3. 添加任务完成日志，显示后续任务的入度变化
+4. 添加后续任务加入队列的日志
+5. 添加空轮询超时保护
 
-## 注意事项
+**关键日志输出**：
+```java
+// 初始化日志
+logger.info("[Async] 初始入度为0的任务: {}", entry.getKey());
+logger.info("[Async] 开始任务调度，总任务数: {}, 初始可执行任务数: {}", 
+        remaining.get(), zeroQueue.size());
 
-1. 确保executor-compose的地址配置在执行器组的 `addressList` 中
-2. 确保Admin和executor-compose之间网络畅通
-3. 确保 `accessToken` 配置正确
-4. API调用超时设置为30秒,如果任务执行时间过长需要调整
+// 任务提交日志
+logger.info("[Async] 提交任务: {} 到线程池执行，剩余任务数: {}", id, remaining.get());
 
-## 相关文件清单
+// 任务完成日志
+logger.info("[Async] ========== 任务: {} 执行完成 ==========", id);
+logger.info("[Async] 任务: {} 完成，剩余任务数: {}", id, remainingCount);
+logger.info("[Async] 任务: {} 有 {} 个后续任务", id, nextWrappers.size());
 
-### 修改的文件
-1. `cc-job/cc-job-admin/src/main/java/com/cc/job/admin/task/controller/JobInfoController.java`
-2. `cc-job/cc-job-admin/src/main/java/com/cc/job/admin/task/service/impl/JobInfoServiceImpl.java`
-3. `cc-job/cc-job-executor-compose/src/main/java/com/cc/job/executor/compose/client/AdminApiClient.java`
+// 后续任务入度变化日志
+logger.info("[Async] 准备更新后续任务: {} 的入度，当前入度: {}", nextId, oldInDegree);
+logger.info("[Async] 后续任务: {} 入度从 {} 减少到 {}", nextId, i, updated);
+logger.info("[Async] 后续任务: {} 入度变为0，加入执行队列，结果: {}", 
+        nextId, offered ? "成功" : "失败");
+```
 
-### 已存在的关键文件
-1. `cc-job/cc-job-executor-compose/src/main/java/com/cc/job/executor/compose/handler/JobGroupExecutorComplete.java` - 任务组执行器
-2. `cc-job/cc-job-executor-compose/src/main/java/com/cc/job/executor/compose/controller/JobGroupControlController.java` - 控制接口
-3. `cc-job/cc-job-executor-compose/src/main/java/com/cc/job/executor/compose/engine/Async.java` - 异步执行引擎
+### 3. **增强依赖关系构建的日志输出**
 
-## 测试建议
+**修改位置**：`JobGroupExecutorComplete.java` 的 `buildDependencies` 方法
 
-1. 单元测试: 测试API接口的正确性
-2. 集成测试: 测试Admin与executor-compose的交互
-3. 端到端测试: 完整的任务组创建、执行、停止流程
-4. 压力测试: 测试多任务组并发执行和停止
+**主要改进**：
+1. 打印所有边的信息（from -> to）
+2. 打印每个节点的后续节点列表
+3. 打印每个 WorkerWrapper 的依赖关系设置过程
+4. 打印最终的依赖关系验证信息
 
-## 后续优化建议
+**关键日志输出**：
+```java
+logger.info("[JobGroupExecutor] ========== 开始构建依赖关系 ==========");
+logger.info("[JobGroupExecutor] 节点数: {}, 边数: {}", nodes.size(), edges.size());
 
-1. 添加重试机制,提高API调用的可靠性
-2. 添加缓存机制,减少重复的API调用
-3. 优化状态上报,支持批量上报
-4. 添加监控和告警功能
-5. 支持任务组的暂停和恢复功能
+// 打印所有边
+for (JobEdge edge : edges) {
+    logger.info("[JobGroupExecutor] 边: {} -> {}", edge.getFromNodeId(), edge.getEndNodeId());
+}
+
+// 打印后续节点
+logger.info("[JobGroupExecutor] 节点: {} 的后续节点: {}", node.getId(), nextNodeIds);
+
+// 打印依赖关系设置
+logger.info("[JobGroupExecutor] 设置依赖: {} -> {}", nodeId, nextWorker.getId());
+
+// 打印验证信息
+logger.info("[JobGroupExecutor] WorkerWrapper: {}, 依赖数: {}, 后续数: {}", 
+        wrapper.getId(), dependCount, nextCount);
+```
+
+## 修改文件列表
+
+### 1. `Async.java`
+**路径**：`cc-job-executor-compose/src/main/java/com/cc/job/executor/compose/engine/Async.java`
+
+**修改内容**：
+- 修复 `executorWorkerWrapper` 方法中的 `finally` 块，只在超时或异常时中断线程
+- 增强 `doWorkWrappers` 方法的日志输出，添加详细的任务调度和执行日志
+- 添加空轮询超时保护机制
+
+### 2. `JobGroupExecutorComplete.java`
+**路径**：`cc-job-executor-compose/src/main/java/com/cc/job/executor/compose/handler/JobGroupExecutorComplete.java`
+
+**修改内容**：
+- 增强 `buildDependencies` 方法的日志输出
+- 添加依赖关系构建和验证的详细日志
+
+## 测试验证
+
+### 1. 测试场景
+
+**任务组结构**：
+```
+A (demoJobHandler1)
+  ↓
+B (demoJobHandler2)
+  ↓
+C (demoJobHandler3)
+```
+
+**预期行为**：
+1. 任务 A 执行完成
+2. 任务 B 自动开始执行
+3. 任务 B 执行完成
+4. 任务 C 自动开始执行
+5. 任务 C 执行完成
+6. 任务组执行完成
+
+### 2. 验证日志
+
+**正常执行时应该看到的日志**：
+
+```
+[Async] 开始任务调度，总任务数: 3, 初始可执行任务数: 1
+[Async] 初始入度为0的任务: <A的ID>
+[Async] 提交任务: <A的ID> 到线程池执行，剩余任务数: 3
+
+[Async] ========== 开始执行任务: <A的ID> ==========
+[JobGroupExecutor] ========== 任务开始执行 ==========
+demoJobHandler1 beat at:1
+demoJobHandler1 beat at:2
+...
+demoJobHandler1 beat at:10
+demoJobHandler1 end
+[Async] ========== 任务: <A的ID> 执行完成 ==========
+[Async] 任务: <A的ID> 完成，剩余任务数: 2
+[Async] 任务: <A的ID> 有 1 个后续任务
+[Async] 准备更新后续任务: <B的ID> 的入度，当前入度: 1
+[Async] 后续任务: <B的ID> 入度从 1 减少到 0
+[Async] 后续任务: <B的ID> 入度变为0，加入执行队列，结果: 成功
+
+[Async] 提交任务: <B的ID> 到线程池执行，剩余任务数: 2
+[Async] ========== 开始执行任务: <B的ID> ==========
+demoJobHandler2 beat at:1
+...
+demoJobHandler2 end
+[Async] ========== 任务: <B的ID> 执行完成 ==========
+[Async] 任务: <B的ID> 完成，剩余任务数: 1
+[Async] 后续任务: <C的ID> 入度变为0，加入执行队列，结果: 成功
+
+[Async] 提交任务: <C的ID> 到线程池执行，剩余任务数: 1
+[Async] ========== 开始执行任务: <C的ID> ==========
+demoJobHandler3 beat at:1
+...
+demoJobHandler3 end
+[Async] ========== 任务: <C的ID> 执行完成 ==========
+[Async] 任务: <C的ID> 完成，剩余任务数: 0
+
+[Async] 任务组调度正常完成
+[JobGroupExecutor] ========== 任务组执行完成 ==========
+```
+
+### 3. 问题排查
+
+如果仍然只执行了第一个任务，检查日志中的以下信息：
+
+1. **依赖关系是否正确构建**：
+   ```
+   [JobGroupExecutor] ========== 开始构建依赖关系 ==========
+   [JobGroupExecutor] 边: A的ID -> B的ID
+   [JobGroupExecutor] 边: B的ID -> C的ID
+   ```
+   - 如果没有看到边信息，说明数据库中没有边数据
+
+2. **后续任务入度是否正确更新**：
+   ```
+   [Async] 后续任务: <B的ID> 入度从 1 减少到 0
+   [Async] 后续任务: <B的ID> 入度变为0，加入执行队列，结果: 成功
+   ```
+   - 如果看到 "跳过入度减少" 或 "加入执行队列失败"，说明有问题
+
+3. **主循环是否提前退出**：
+   ```
+   [Async] 任务调度线程被中断，剩余任务数: X
+   ```
+   - 如果看到这条日志且剩余任务数 > 0，说明主循环被异常中断
+
+## 其他可能的问题
+
+### 1. 数据库中没有边数据
+
+**检查方法**：
+```sql
+SELECT * FROM job_edge WHERE job_id = <任务组ID>;
+```
+
+如果结果为空，说明任务组的依赖关系没有保存到数据库中。
+
+**解决方案**：
+- 在创建任务组时，确保保存了边数据
+- 或者通过 Admin 界面重新配置任务组的依赖关系
+
+### 2. 节点ID与WorkerWrapper ID不匹配
+
+**检查方法**：
+查看日志中的 WorkerWrapper ID 和节点ID是否一致：
+```
+[JobGroupExecutor] 处理WorkerWrapper: <ID>, 后续节点IDs: [...]
+```
+
+**解决方案**：
+- 确保 `WorkerWrapper.id()` 设置的是 `String.valueOf(node.getId())`
+- 确保 `buildDependencies` 中使用 `Long.valueOf(wrapper.getId())` 来匹配
+
+### 3. 任务执行失败导致异常中断
+
+**检查方法**：
+查看日志中是否有任务执行失败的信息：
+```
+[Async] 任务: {} 执行失败: {}
+```
+
+**解决方案**：
+- 修复失败的任务
+- 或者配置任务的阻塞策略为 "DO_NOTHING"，允许任务失败后继续执行
+
+## 总结
+
+本次修复主要解决了 `Async.java` 中 `finally` 块无条件中断线程导致任务组提前结束的问题。通过添加 `interrupted` 标志，确保只有在超时或异常时才中断调度线程，正常情况下允许主循环完整执行。
+
+同时，通过增强日志输出，使问题排查更加方便。现在可以清楚地看到：
+- 任务组的依赖关系构建过程
+- 每个任务的执行状态
+- 后续任务的入度变化
+- 任务加入执行队列的过程
+
+这些改进确保了任务组中的所有子任务能够按照依赖关系顺序执行。
 
 ---
 
-修复完成日期: 2025-11-30
-修复人员: AI Assistant
+**修复时间**：2025-11-30
+**修复人**：AI Assistant
+**版本**：v1.0

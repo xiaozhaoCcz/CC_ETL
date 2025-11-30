@@ -479,30 +479,68 @@ public class JobGroupExecutorComplete {
      */
     private void buildDependencies(List<WorkerWrapper<Long, String>> workerWrappers, 
                                   List<JobNode> nodes, List<JobEdge> edges) {
+        logger.info("[JobGroupExecutor] ========== 开始构建依赖关系 ==========");
+        logger.info("[JobGroupExecutor] 节点数: {}, 边数: {}", nodes.size(), edges.size());
+        
+        // 打印所有边
+        for (JobEdge edge : edges) {
+            logger.info("[JobGroupExecutor] 边: {} -> {}", edge.getFromNodeId(), edge.getEndNodeId());
+        }
+        
         Map<Long, List<Long>> nextMap = new HashMap<>();
         
+        // 构建 nextMap：节点ID -> 后续节点ID列表
         for (JobNode node : nodes) {
             List<Long> nextNodeIds = edges.stream()
                     .filter(e -> e.getFromNodeId().equals(node.getId()))
                     .map(JobEdge::getEndNodeId)
                     .toList();
             nextMap.put(node.getId(), nextNodeIds);
+            
+            if (!nextNodeIds.isEmpty()) {
+                logger.info("[JobGroupExecutor] 节点: {} 的后续节点: {}", node.getId(), nextNodeIds);
+            }
         }
         
+        // 为每个 WorkerWrapper 设置后续任务
         for (WorkerWrapper<Long, String> wrapper : workerWrappers) {
             Long nodeId = Long.valueOf(wrapper.getId());
             List<Long> nextNodeIds = nextMap.get(nodeId);
+            
+            logger.debug("[JobGroupExecutor] 处理WorkerWrapper: {}, 后续节点IDs: {}", 
+                    nodeId, nextNodeIds);
             
             if (nextNodeIds != null && !nextNodeIds.isEmpty()) {
                 List<WorkerWrapper<Long, String>> nextWorkers = workerWrappers.stream()
                         .filter(w -> nextNodeIds.contains(Long.valueOf(w.getId())))
                         .toList();
                 
+                logger.info("[JobGroupExecutor] 节点: {} 找到 {} 个后续WorkerWrapper", 
+                        nodeId, nextWorkers.size());
+                
                 if (!nextWorkers.isEmpty()) {
                     wrapper.next(nextWorkers.toArray(new WorkerWrapper[0]));
+                    
+                    // 打印设置的依赖关系
+                    for (WorkerWrapper<Long, String> nextWorker : nextWorkers) {
+                        logger.info("[JobGroupExecutor] 设置依赖: {} -> {}", nodeId, nextWorker.getId());
+                    }
                 }
+            } else {
+                logger.info("[JobGroupExecutor] 节点: {} 没有后续节点（可能是终点）", nodeId);
             }
         }
+        
+        // 验证依赖关系
+        logger.info("[JobGroupExecutor] ========== 依赖关系验证 ==========");
+        for (WorkerWrapper<Long, String> wrapper : workerWrappers) {
+            int dependCount = wrapper.getDependWrappers() != null ? wrapper.getDependWrappers().size() : 0;
+            int nextCount = wrapper.getNextWrappers() != null ? wrapper.getNextWrappers().size() : 0;
+            logger.info("[JobGroupExecutor] WorkerWrapper: {}, 依赖数: {}, 后续数: {}", 
+                    wrapper.getId(), dependCount, nextCount);
+        }
+        
+        logger.info("[JobGroupExecutor] ========== 依赖关系构建完成 ==========");
     }
     
     /**
