@@ -19,6 +19,7 @@
         <module>cc-job-executor-samples</module>
         <module>cc-job-xo</module>
         <module>cc-job-executor</module>
+        <module>cc-job-executor-compose</module>
         <module>cc-job-gui</module>
     </modules>
 

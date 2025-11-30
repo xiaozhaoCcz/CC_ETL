@@ -1,0 +1,52 @@
+# CC-Job 任务组编排执行器配置
+
+server:
+  port: 8500
+
+spring:
+  application:
+    name: cc-job-executor-compose
+
+# XXL-Job 配置
+cc-job:
+  # Admin 地址（需要配置为实际的 Admin 地址）
+  admin:
+    address: http://127.0.0.1:8989/xxl-job-admin
+  
+  # 访问令牌（需要与 Admin 配置一致）
+  access-token: default_token
+  
+  # 执行器配置
+  executor:
+    # 执行器名称（需要在 Admin 中注册）
+    appname: cc-job-executor-compose
+    # 执行器地址（留空则自动获取）
+    address:
+    # 执行器IP（留空则自动获取）
+    ip:
+    # 执行器端口
+    port: 10001
+    # 日志路径
+    logpath: /data/applogs/cc-job/executor-compose
+    # 日志保留天数
+    logretentiondays: 30
+
+# 日志配置
+logging:
+  level:
+    root: INFO
+    com.cc.job.executor.compose: DEBUG
+  pattern:
+    console: '%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n'
+  file:
+    name: /data/applogs/cc-job/executor-compose/executor-compose.log
+
+# Actuator 配置（健康检查）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
