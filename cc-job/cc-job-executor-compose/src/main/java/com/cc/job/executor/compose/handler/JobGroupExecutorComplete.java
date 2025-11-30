@@ -541,9 +541,38 @@ public class JobGroupExecutorComplete {
             logger.info("[JobGroupExecutor] 停止任务组 - jobId: {}, randomId: {}", jobId, randomId);
             Async.stopWork((List<WorkerWrapper>) (List<?>) workerWrappers);
             RUNNING_JOBS.remove(executeKey);
+            
+            // 上报停止状态
+            reportStatus(jobId, randomId, 0, "任务组已被停止");
         } else {
             logger.warn("[JobGroupExecutor] 任务组不存在或已完成 - jobId: {}, randomId: {}", jobId, randomId);
         }
+    }
+    
+    /**
+     * 查询任务组是否正在运行
+     * 
+     * @param jobId 任务组ID
+     * @param randomId 批次ID
+     * @return 是否正在运行
+     */
+    public boolean isJobGroupRunning(Long jobId, String randomId) {
+        String executeKey = buildExecuteKey(jobId, randomId);
+        return RUNNING_JOBS.containsKey(executeKey);
+    }
+    
+    /**
+     * 获取所有运行中的任务组
+     * 
+     * @return 运行中的任务组映射 (executeKey -> isRunning)
+     */
+    public Map<String, Boolean> getAllRunningJobGroups() {
+        Map<String, Boolean> result = new HashMap<>();
+        for (String executeKey : RUNNING_JOBS.keySet()) {
+            result.put(executeKey, true);
+        }
+        logger.debug("[JobGroupExecutor] 当前运行中的任务组数量: {}", result.size());
+        return result;
     }
     
     /**
