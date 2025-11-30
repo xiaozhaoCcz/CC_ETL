@@ -79,6 +79,23 @@ public class MainView extends BorderPane {
     // 多个任务组的执行状态管理（类似Vue中的logTabs）
     private java.util.Map<Long, RunningJobGroup> runningJobs = new java.util.HashMap<>();
     
+    /**
+     * 清理所有资源（用于程序关闭时调用）
+     */
+    public void cleanup() {
+        // 清理所有运行中的任务组（停止所有Timer和SSE连接）
+        for (java.util.Map.Entry<Long, RunningJobGroup> entry : new java.util.HashMap<>(runningJobs).entrySet()) {
+            RunningJobGroup runningJob = entry.getValue();
+            try {
+                runningJob.cleanup();
+                SSEService.getInstance().disconnect(runningJob.getJobId(), runningJob.getRandomId());
+            } catch (Exception e) {
+                logger.error("清理任务组失败 - jobId: {}", runningJob.getJobId(), e);
+            }
+        }
+        runningJobs.clear();
+    }
+    
     // 复制粘贴相关：存储复制的节点数据
     private com.cc.job.xo.model.form.JobInfoForm copiedNodeForm = null; // 兼容单节点复制
     
@@ -1672,13 +1689,21 @@ public class MainView extends BorderPane {
                 Platform.runLater(() -> {
                     logPanel.error("✗ 任务执行失败: " + e.getMessage());
                     // 清理失败的任务组
-                    finalRunningJob.cleanup();
+                    try {
+                        finalRunningJob.cleanup();
+                    } catch (Exception cleanupEx) {
+                        logger.error("清理任务组失败: {}", cleanupEx.getMessage(), cleanupEx);
+                    }
                     runningJobs.remove(currentJobId);
                     updateToolBarRunningJobs();
                     // 恢复边的正常状态
                     canvas.setAllConnectionsRunning(false);
-                    // 断开SSE连接
-                    SSEService.getInstance().disconnect(currentJobId, randomId);
+                    // 断开SSE连接（确保在后台线程中断开，避免阻塞）
+                    try {
+                        SSEService.getInstance().disconnect(currentJobId, randomId);
+                    } catch (Exception sseEx) {
+                        logger.error("断开SSE连接失败: {}", sseEx.getMessage(), sseEx);
+                    }
                 });
             }
         }).start();

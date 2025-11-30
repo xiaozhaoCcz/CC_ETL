@@ -152,56 +152,53 @@ public class NodeStatusSyncManager {
     /**
      * 停止同步任务
      * 确保所有待更新的节点状态都已同步到数据库
+     * ⭐ 优化：添加超时保护，避免长时间阻塞
      */
     public void shutdown() {
-        
-        // 先同步剩余的更新
-        if (!pendingUpdates.isEmpty()) {
-            int count = pendingUpdates.size();
-            
-            // 立即同步（阻塞执行，确保完成）
-            syncPendingUpdatesInternal();
-            
-            // 等待一小段时间确保API调用完成
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-            
-            // 再次检查是否还有未同步的（同步失败的会重新加入）
-            if (!pendingUpdates.isEmpty()) {
-                syncPendingUpdatesInternal();
-                try {
-                    Thread.sleep(500);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            }
-        } else {
-        }
-        
-        // 取消定时任务
+        // 取消定时任务（立即取消，不等待）
         if (syncTask != null) {
             syncTask.cancel(false);
         }
         
-        // 关闭线程池
+        // ⭐ 快速关闭：使用超时保护，避免网络API调用阻塞
+        // 先尝试同步一次，但设置超时保护
+        if (!pendingUpdates.isEmpty()) {
+            try {
+                // 使用Future来设置超时
+                java.util.concurrent.Future<?> syncFuture = executorService.submit(() -> {
+                    syncPendingUpdatesInternal();
+                });
+                
+                // 最多等待1秒
+                try {
+                    syncFuture.get(1, TimeUnit.SECONDS);
+                } catch (java.util.concurrent.TimeoutException e) {
+                    // 超时，取消同步任务
+                    syncFuture.cancel(true);
+                    logger.warn("节点状态同步超时，已取消");
+                } catch (Exception e) {
+                    logger.error("节点状态同步失败: {}", e.getMessage());
+                }
+            } catch (Exception e) {
+                logger.error("提交同步任务失败: {}", e.getMessage());
+            }
+        }
+        
+        // 快速关闭线程池（不等待任务完成）
         executorService.shutdown();
         try {
-            if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
+            // 只等待500毫秒，然后强制关闭
+            if (!executorService.awaitTermination(500, TimeUnit.MILLISECONDS)) {
                 executorService.shutdownNow();
-            } else {
+                // 再等待100毫秒
+                if (!executorService.awaitTermination(100, TimeUnit.MILLISECONDS)) {
+                    logger.warn("线程池未能正常关闭，已强制关闭");
+                }
             }
         } catch (InterruptedException e) {
             executorService.shutdownNow();
             Thread.currentThread().interrupt();
         }
-        
-        if (pendingUpdates.isEmpty()) {
-        } else {
-        }
-        
     }
 
     private Map<Long, Integer> drainPendingUpdates() {

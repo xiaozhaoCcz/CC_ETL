@@ -68,7 +68,15 @@ public class JobInfoService extends BaseService {
             
             if (Result.isSuccess(result)) {
                 // 返回的数据是日志ID（字符串格式）
-                return Long.parseLong(result.getData());
+                String data = result.getData();
+                if (data == null || data.trim().isEmpty()) {
+                    throw new IOException("API 返回成功但数据为空，无法获取日志ID");
+                }
+                try {
+                    return Long.parseLong(data.trim());
+                } catch (NumberFormatException e) {
+                    throw new IOException("API 返回的数据格式错误，无法解析为日志ID: " + data, e);
+                }
             } else {
                 throw new IOException("API 返回错误: " + result.getMsg());
             }

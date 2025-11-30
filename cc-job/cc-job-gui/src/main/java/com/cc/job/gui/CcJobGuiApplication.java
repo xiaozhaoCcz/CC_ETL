@@ -203,14 +203,42 @@ public class CcJobGuiApplication extends Application {
             
             // 窗口关闭事件
             primaryStage.setOnCloseRequest(event -> {
-                // ⭐ 重要：关闭前立即同步所有待更新的节点状态到数据库
-                com.cc.job.gui.util.NodeStatusSyncManager.getInstance().shutdown();
+                // ⭐ 立即阻止窗口关闭事件传播，避免JavaFX等待
+                event.consume();
                 
-                // 退出登录
-                SessionManager.getInstance().logout();
-                
-                Platform.exit();
-                System.exit(0);
+                // ⭐ 完全异步化关闭流程，不阻塞UI线程
+                new Thread(() -> {
+                    try {
+                        // 1. 清理MainView的资源（停止所有Timer和SSE连接）
+                        try {
+                            com.cc.job.gui.view.MainView mainViewInstance = (com.cc.job.gui.view.MainView) scene.getRoot();
+                            if (mainViewInstance != null) {
+                                mainViewInstance.cleanup();
+                            }
+                        } catch (Exception e) {
+                            logger.debug("清理MainView失败: {}", e.getMessage());
+                        }
+                        
+                        // 2. 断开所有SSE连接（快速操作，双重保险）
+                        com.cc.job.gui.service.SSEService.getInstance().disconnectAll();
+                        
+                        // 3. 快速关闭NodeStatusSyncManager（已优化，最多阻塞1秒）
+                        com.cc.job.gui.util.NodeStatusSyncManager.getInstance().shutdown();
+                        
+                        // 4. 退出登录（快速操作）
+                        SessionManager.getInstance().logout();
+                        
+                    } catch (Exception e) {
+                        logger.error("关闭窗口时发生错误: {}", e.getMessage(), e);
+                    } finally {
+                        // 5. 强制退出（不等待任何操作）
+                        // 使用Platform.runLater确保在JavaFX线程中执行
+                        Platform.runLater(() -> {
+                            Platform.exit();
+                            System.exit(0);
+                        });
+                    }
+                }, "Shutdown-Thread").start();
             });
             
             // 显示窗口
