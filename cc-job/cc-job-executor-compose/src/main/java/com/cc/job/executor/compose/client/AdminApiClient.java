@@ -63,6 +63,33 @@ public class AdminApiClient {
     }
     
     /**
+     * 获取执行器组信息
+     * 
+     * @param jobGroupId 执行器组ID
+     * @return 执行器组信息
+     */
+    public com.cc.job.xo.model.entity.JobGroup getJobGroup(Long jobGroupId) {
+        try {
+            String url = adminAddress + "/api/job/group/" + jobGroupId;
+            HttpResponse response = HttpRequest.get(url)
+                    .header("Authorization", accessToken)
+                    .timeout(TIMEOUT)
+                    .execute();
+            
+            if (response.isOk()) {
+                return JSONUtil.toBean(response.body(), com.cc.job.xo.model.entity.JobGroup.class);
+            } else {
+                logger.error("[AdminApiClient] 获取执行器组失败 - jobGroupId: {}, status: {}", 
+                        jobGroupId, response.getStatus());
+                return null;
+            }
+        } catch (Exception e) {
+            logger.error("[AdminApiClient] 获取执行器组异常 - jobGroupId: {}", jobGroupId, e);
+            return null;
+        }
+    }
+    
+    /**
      * 获取任务组的所有节点
      * 
      * @param jobId 任务组ID

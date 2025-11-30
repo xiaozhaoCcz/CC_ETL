@@ -303,6 +303,32 @@ Response:
 
 ---
 
+## 🎭 两个版本可选
+
+本模块提供了**两个版本**的任务组执行器：
+
+### 版本对比
+
+| 功能 | 简化版 | 完整版 ⭐ |
+|------|--------|---------|
+| **类名** | `JobGroupExecutor` | `JobGroupExecutorComplete` |
+| **JobHandler** | `runJobGroupHandler` | `runJobGroupHandler` |
+| **任务触发** | ❌ 模拟实现 | ✅ 真实调用 XXL-Job 执行器 |
+| **路由策略** | ❌ 不支持 | ✅ 支持 6 种路由策略 |
+| **暂停/恢复** | ❌ 不支持 | ✅ 完整支持 |
+| **状态监听** | ❌ 不支持 | ✅ 实时监听 |
+| **超时控制** | ❌ 不支持 | ✅ 完整支持 |
+| **重试机制** | ❌ 不支持 | ✅ 自动重试 |
+| **适用场景** | 测试/演示 | **生产环境** ⭐ |
+
+### 推荐使用
+
+🌟 **生产环境强烈推荐使用完整版** (`JobGroupExecutorComplete`)
+
+详细功能说明请参考：[COMPLETE_IMPLEMENTATION.md](./COMPLETE_IMPLEMENTATION.md)
+
+---
+
 ## 📝 使用示例
 
 ### 1. 在 Admin 中注册执行器
