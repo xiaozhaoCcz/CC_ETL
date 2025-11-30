@@ -836,15 +836,58 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
     @Override
     public boolean stopJobCompose(Long id, String randomId) {
-        int flag = jobInfoMapper.stopJobCompose(id);
-//        if (flag > 0) {
-//            XxlJobExecutor.removeJobThread(id.intValue(), "stop task" + id);
-//            List<WorkerWrapper<Long, String>> workWrappers = JobGroupXxlJob.getWorkWrapper(id, randomId);
-//            if (workWrappers != null&&!workWrappers.isEmpty()) {
-//                Async.stopWork((List<WorkerWrapper>) (List<?>) workWrappers);
-//            }
-//        }
-        return true;
+        try {
+            // 1. 更新任务状态
+            int flag = jobInfoMapper.stopJobCompose(id);
+            
+            // 2. 获取任务信息和执行器组信息
+            JobInfo jobInfo = this.getById(id);
+            if (jobInfo == null) {
+                log.error("停止任务组失败 - 任务不存在: {}", id);
+                return false;
+            }
+            
+            JobGroup jobGroup = jobGroupService.getById(jobInfo.getJobGroup());
+            if (jobGroup == null) {
+                log.error("停止任务组失败 - 执行器组不存在: {}", jobInfo.getJobGroup());
+                return false;
+            }
+            
+            // 3. 调用executor-compose的停止接口
+            String addressList = jobGroup.getAddressList();
+            if (StringUtils.isNotBlank(addressList)) {
+                String[] addresses = addressList.split(",");
+                for (String address : addresses) {
+                    if (StringUtils.isBlank(address)) {
+                        continue;
+                    }
+                    
+                    try {
+                        String url = address.trim() + "/api/jobgroup/stop";
+                        cn.hutool.http.HttpResponse response = cn.hutool.http.HttpRequest.post(url)
+                                .form("jobId", id)
+                                .form("randomId", randomId)
+                                .timeout(5000)
+                                .execute();
+                        
+                        if (response.isOk()) {
+                            log.info("成功调用停止接口 - jobId: {}, randomId: {}, address: {}", id, randomId, address);
+                        } else {
+                            log.error("调用停止接口失败 - jobId: {}, randomId: {}, address: {}, status: {}", 
+                                    id, randomId, address, response.getStatus());
+                        }
+                    } catch (Exception e) {
+                        log.error("调用停止接口异常 - jobId: {}, randomId: {}, address: {}", 
+                                id, randomId, address, e);
+                    }
+                }
+            }
+            
+            return flag > 0;
+        } catch (Exception e) {
+            log.error("停止任务组异常 - jobId: {}, randomId: {}", id, randomId, e);
+            return false;
+        }
     }
 
     @Override

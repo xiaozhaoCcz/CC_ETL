@@ -43,14 +43,20 @@ public class AdminApiClient {
      */
     public JobInfo getJobInfo(Long jobId) {
         try {
-            String url = adminAddress + "/api/job/info/" + jobId;
+            String url = adminAddress + "/api/v1/jobInfos/" + jobId;
             HttpResponse response = HttpRequest.get(url)
                     .header("Authorization", accessToken)
                     .timeout(TIMEOUT)
                     .execute();
             
             if (response.isOk()) {
-                return JSONUtil.toBean(response.body(), JobInfo.class);
+                // 解析Result包装的响应
+                Map<String, Object> resultMap = JSONUtil.toBean(response.body(), Map.class);
+                Object data = resultMap.get("data");
+                if (data != null) {
+                    return JSONUtil.toBean(JSONUtil.toJsonStr(data), JobInfo.class);
+                }
+                return null;
             } else {
                 logger.error("[AdminApiClient] 获取任务信息失败 - jobId: {}, status: {}, body: {}", 
                         jobId, response.getStatus(), response.body());
@@ -97,14 +103,20 @@ public class AdminApiClient {
      */
     public List<JobNode> getJobNodes(Long jobId) {
         try {
-            String url = adminAddress + "/api/job/nodes/" + jobId;
+            String url = adminAddress + "/api/v1/jobInfos/nodes/" + jobId;
             HttpResponse response = HttpRequest.get(url)
                     .header("Authorization", accessToken)
                     .timeout(TIMEOUT)
                     .execute();
             
             if (response.isOk()) {
-                return JSONUtil.toList(response.body(), JobNode.class);
+                // 解析Result包装的响应
+                Map<String, Object> resultMap = JSONUtil.toBean(response.body(), Map.class);
+                Object data = resultMap.get("data");
+                if (data != null) {
+                    return JSONUtil.toList(JSONUtil.toJsonStr(data), JobNode.class);
+                }
+                return new ArrayList<>();
             } else {
                 logger.error("[AdminApiClient] 获取任务节点失败 - jobId: {}, status: {}", 
                         jobId, response.getStatus());
@@ -124,14 +136,20 @@ public class AdminApiClient {
      */
     public List<JobEdge> getJobEdges(Long jobId) {
         try {
-            String url = adminAddress + "/api/job/edges/" + jobId;
+            String url = adminAddress + "/api/v1/jobInfos/edges/" + jobId;
             HttpResponse response = HttpRequest.get(url)
                     .header("Authorization", accessToken)
                     .timeout(TIMEOUT)
                     .execute();
             
             if (response.isOk()) {
-                return JSONUtil.toList(response.body(), JobEdge.class);
+                // 解析Result包装的响应
+                Map<String, Object> resultMap = JSONUtil.toBean(response.body(), Map.class);
+                Object data = resultMap.get("data");
+                if (data != null) {
+                    return JSONUtil.toList(JSONUtil.toJsonStr(data), JobEdge.class);
+                }
+                return new ArrayList<>();
             } else {
                 logger.error("[AdminApiClient] 获取任务边失败 - jobId: {}, status: {}", 
                         jobId, response.getStatus());
@@ -148,13 +166,13 @@ public class AdminApiClient {
      * 
      * @param jobId 任务ID
      * @param randomId 批次ID
-     * @param status 状态（0=失败，1=成功，2=执行中）
+     * @param status 状态（0=失败，1=成功，2=执行中，5=完成）
      * @param message 状态消息
      * @return 是否上报成功
      */
     public boolean reportStatus(Long jobId, String randomId, Integer status, String message) {
         try {
-            String url = adminAddress + "/api/job/status";
+            String url = adminAddress + "/api/v1/jobInfos/status";
             Map<String, Object> params = new HashMap<>();
             params.put("jobId", jobId);
             params.put("randomId", randomId);
