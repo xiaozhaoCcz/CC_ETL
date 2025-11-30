@@ -1967,49 +1967,51 @@ public class MainView extends BorderPane {
             return;
         }
 
-        logPanel.info("正在停止任务组: " + runningJob.getJobName() + " (ID: " + jobId + ")...");
+        // ⭐ 保存必要的信息（在清理前）
+        String jobName = runningJob.getJobName();
+        String randomId = runningJob.getRandomId();
+        
+        // ⭐ 立即更新UI（不等待API调用）
+        Platform.runLater(() -> {
+            logPanel.info("正在停止任务组: " + jobName + " (ID: " + jobId + ")...");
+            logPanel.success("✓ 任务组 " + jobName + " 已停止（UI已更新）");
 
-        // 在后台线程中停止任务
+            // 清理该任务组的状态
+            runningJob.cleanup();
+            runningJobs.remove(jobId);
+            
+            // 更新导航栏中的小绿点（任务停止）
+            navigationBar.updateTaskGroupRunningStatus(jobId, false);
+
+            // 更新工具栏显示
+            updateToolBarRunningJobs();
+
+            // 恢复边的正常状态（停止虚线动画）
+            canvas.setAllConnectionsRunning(false);
+
+            // 断开SSE连接
+            SSEService.getInstance().disconnect(jobId, randomId);
+
+            // ⭐ 任务停止后，立即同步所有节点状态到数据库
+            canvas.syncPendingNodeStatus();
+            logPanel.info("已触发节点状态批量同步");
+
+            // ⚠️ 重要：不重置节点状态，让节点保持当前状态（成功/失败/运行中）
+            // 节点状态会在以下情况重置：
+            // 1. 下次任务启动时（triggerJobExecution）
+            // 2. 切换任务组时（loadTaskGroupData -> clear）
+            // 停止任务时不应该重置节点状态，应该保持运行到哪里就是哪个状态
+        });
+
+        // ⭐ 异步调用停止接口（后台执行，不阻塞UI）
         new Thread(() -> {
             try {
-                jobInfoService.stopJobCompose(jobId, runningJob.getRandomId());
-
-                Platform.runLater(() -> {
-                    logPanel.success("✓ 任务组 " + runningJob.getJobName() + " 已停止");
-
-                    // 清理该任务组的状态
-                    runningJob.cleanup();
-                    runningJobs.remove(jobId);
-                    
-                    // 更新导航栏中的小绿点（任务停止）
-                    navigationBar.updateTaskGroupRunningStatus(jobId, false);
-
-                    // 更新工具栏显示
-                    updateToolBarRunningJobs();
-
-                    // 恢复边的正常状态（停止虚线动画）
-                    canvas.setAllConnectionsRunning(false);
-
-                    // 断开SSE连接
-                    SSEService.getInstance().disconnect(jobId, runningJob.getRandomId());
-
-                    // ⭐ 任务停止后，立即同步所有节点状态到数据库
-                    canvas.syncPendingNodeStatus();
-                    logPanel.info("已触发节点状态批量同步");
-
-                    // ⚠️ 重要：不重置节点状态，让节点保持当前状态（成功/失败/运行中）
-                    // 节点状态会在以下情况重置：
-                    // 1. 下次任务启动时（triggerJobExecution）
-                    // 2. 切换任务组时（loadTaskGroupData -> clear）
-                    // 停止任务时不应该重置节点状态，应该保持运行到哪里就是哪个状态
-                });
-
+                jobInfoService.stopJobCompose(jobId, randomId);
+                logger.info("后台停止接口调用成功 - jobId: {}, randomId: {}", jobId, randomId);
             } catch (Exception e) {
-                logger.error("停止任务失败: {}", e.getMessage(), e);
-
-                Platform.runLater(() -> {
-                    logPanel.error("✗ 停止任务失败: " + e.getMessage());
-                });
+                logger.error("后台停止接口调用失败 - jobId: {}, randomId: {}", jobId, randomId, e);
+                // ⚠️ 注意：即使API调用失败，UI也已经更新了，这是符合预期的
+                // 因为用户点击停止后，UI应该立即响应，后台API调用失败不影响UI状态
             }
         }).start();
     }

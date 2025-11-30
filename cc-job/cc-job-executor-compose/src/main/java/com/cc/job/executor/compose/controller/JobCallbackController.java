@@ -1,6 +1,6 @@
 package com.cc.job.executor.compose.controller;
 
-import cn.hutool.core.lang.Pair;
+import com.cc.job.executor.compose.dto.JobGroupDataRequest;
 import com.cc.job.executor.compose.handler.JobGroupExecutorComplete;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,12 +30,29 @@ public class JobCallbackController {
      * 
      * <p>回调路径：{composeAddress}/api/addJobGroupData
      * 
-     * @param data 任务执行结果数据 (格式: Pair<String executeKey, Boolean success>)
+     * <p>请求体格式：
+     * <pre>
+     * {
+     *   "key": "jobId:randomId",
+     *   "value": true
+     * }
+     * </pre>
+     * 
+     * @param data 任务执行结果数据
      * @return 操作结果
      */
     @PostMapping("/addJobGroupData")
     @ResponseBody
-    public Map<String, Object> addJobGroupData(@RequestBody Pair<String, Boolean> data) {
+    public Map<String, Object> addJobGroupData(@RequestBody JobGroupDataRequest data) {
+        if (data == null || data.getKey() == null || data.getValue() == null) {
+            logger.error("[JobCallback] 请求参数无效 - data: {}", data);
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("code", 400);
+            errorResult.put("message", "请求参数无效：key 和 value 不能为空");
+            errorResult.put("data", null);
+            return errorResult;
+        }
+        
         String executeKey = data.getKey();
         Boolean success = data.getValue();
         

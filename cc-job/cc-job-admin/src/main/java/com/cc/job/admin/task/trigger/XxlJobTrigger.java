@@ -9,6 +9,7 @@ import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobLog;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.admin.task.scheduler.XxlJobScheduler;
 import com.cc.job.admin.task.utils.I18nUtil;
 import com.xxl.job.core.biz.ExecutorBiz;
@@ -120,14 +121,33 @@ public class XxlJobTrigger {
         String shardingParam = (ExecutorRouteStrategyEnum.SHARDING_BROADCAST == executorRouteStrategyEnum) ? String.valueOf(index).concat("/").concat(String.valueOf(total)) : null;
 
         // 1、save log-id
-        JobLog jobLog = new JobLog();
-        jobLog.setJobGroup(jobInfo.getJobGroup());
-        jobLog.setJobId(jobInfo.getId());
-        jobLog.setTriggerTime(LocalDateTime.now());
-        jobLog.setTriggerCode(0);
-        jobLog.setHandleCode(0);
-        XxlJobAdminConfig.getAdminConfig().getJobLogMapper().insert(jobLog);
-        logger.debug(">>>>>>>>>>> xxl-job trigger start, jobId:{}", jobLog.getId());
+        // ⭐ 检查是否已经存在 JobLog（避免重复创建）
+        // 查询最近1秒内创建的 JobLog，如果存在则使用它
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime oneSecondAgo = now.minusSeconds(1);
+        JobLog jobLog = XxlJobAdminConfig.getAdminConfig().getJobLogMapper().selectOne(
+            new LambdaQueryWrapper<JobLog>()
+                .eq(JobLog::getJobId, jobInfo.getId())
+                .eq(JobLog::getJobGroup, jobInfo.getJobGroup())
+                .ge(JobLog::getTriggerTime, oneSecondAgo)
+                .le(JobLog::getTriggerTime, now)
+                .orderByDesc(JobLog::getTriggerTime)
+                .last("LIMIT 1")
+        );
+        
+        if (jobLog == null) {
+            // 不存在，创建新的
+            jobLog = new JobLog();
+            jobLog.setJobGroup(jobInfo.getJobGroup());
+            jobLog.setJobId(jobInfo.getId());
+            jobLog.setTriggerTime(now);
+            jobLog.setTriggerCode(0);
+            jobLog.setHandleCode(0);
+            XxlJobAdminConfig.getAdminConfig().getJobLogMapper().insert(jobLog);
+            logger.debug(">>>>>>>>>>> xxl-job trigger start, jobId:{}, logId:{} (new)", jobInfo.getId(), jobLog.getId());
+        } else {
+            logger.debug(">>>>>>>>>>> xxl-job trigger start, jobId:{}, logId:{} (existing)", jobInfo.getId(), jobLog.getId());
+        }
 
         // 2、init trigger-param
         TriggerParam triggerParam = new TriggerParam();

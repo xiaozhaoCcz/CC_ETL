@@ -192,13 +192,13 @@ public class JobGroupExecutorComplete {
                             int count = currentWrapper != null ? currentWrapper.getCount() : 0;
                             
                             // 执行任务（完整实现）
-                            return executeTaskComplete(xxlJobContext, node, jobInfo, randomId, count);
+                            return executeTaskComplete(xxlJobContext, node, jobInfo, parentJobId, randomId, count);
                         }
                         
                         @Override
                         public String defaultValue() {
-                            // 默认失败
-                            reportStatus(jobInfo.getId(), randomId, 0, "任务执行失败");
+                            // 默认失败（传递 parentJobId）
+                            reportStatus(parentJobId, jobInfo.getId(), randomId, 0, "任务执行失败");
                             return JobConstant.FAIL_COMPLETE;
                         }
                     })
@@ -214,8 +214,8 @@ public class JobGroupExecutorComplete {
                             XxlJobHelper.log(xxlJobContext, "========== 任务开始执行 ==========");
                             XxlJobHelper.log(xxlJobContext, "任务ID: {}, 节点ID: {}", jobId, node.getId());
                             
-                            // 上报开始状态
-                            reportStatus(jobId, randomId, 2, "任务开始执行");
+                            // 上报开始状态（传递 parentJobId）
+                            reportStatus(parentJobId, jobId, randomId, 2, "任务开始执行");
                         }
                         
                         @Override
@@ -228,9 +228,9 @@ public class JobGroupExecutorComplete {
                             XxlJobHelper.log(xxlJobContext, "任务ID: {}, 成功: {}, 耗时: {}ms", 
                                     jobId, success, duration);
                             
-                            // 上报结果状态
+                            // 上报结果状态（传递 parentJobId）
                             int status = success ? 1 : 0;
-                            reportStatus(jobId, randomId, status, 
+                            reportStatus(parentJobId, jobId, randomId, status, 
                                     success ? "任务执行成功" : "任务执行失败");
                         }
                     });
@@ -257,7 +257,7 @@ public class JobGroupExecutorComplete {
      * </ul>
      */
     private String executeTaskComplete(XxlJobContext xxlJobContext, JobNode node, JobInfo jobInfo, 
-                                      String randomId, int retryCount) {
+                                      Long parentJobId, String randomId, int retryCount) {
         logger.info("[JobGroupExecutor] 开始执行任务 - jobId: {}, nodeId: {}, 重试次数: {}, 任务名称: {}",
                 jobInfo.getId(), node.getId(), retryCount, jobInfo.getJobDesc());
         
@@ -280,14 +280,14 @@ public class JobGroupExecutorComplete {
             }
             
             // 3. 监听任务执行状态
-            return monitorTaskExecution(node, jobInfo, randomId, retryCount);
+            return monitorTaskExecution(node, jobInfo, parentJobId, randomId, retryCount);
             
         } catch (Exception e) {
             logger.error("[JobGroupExecutor] 任务执行异常 - jobId: {}, nodeId: {}", 
                     jobInfo.getId(), node.getId(), e);
             
-            // 上报失败状态
-            reportStatus(jobInfo.getId(), randomId, 0, "任务执行异常: " + e.getMessage());
+            // 上报失败状态（传递 parentJobId）
+            reportStatus(parentJobId, jobInfo.getId(), randomId, 0, "任务执行异常: " + e.getMessage());
             
             // 判断是否需要抛出异常
             if (!JobConstant.DO_NOTHING.equalsIgnoreCase(jobInfo.getExecutorBlockStrategy())) {
@@ -355,7 +355,7 @@ public class JobGroupExecutorComplete {
     /**
      * 监听任务执行状态
      */
-    private String monitorTaskExecution(JobNode node, JobInfo jobInfo, String randomId, int retryCount) {
+    private String monitorTaskExecution(JobNode node, JobInfo jobInfo, Long parentJobId, String randomId, int retryCount) {
         logger.debug("[JobGroupExecutor] 开始监听任务执行状态 - jobId: {}, nodeId: {}, 超时: {}秒",
                 jobInfo.getId(), node.getId(), jobInfo.getExecutorTimeout());
         
@@ -383,8 +383,8 @@ public class JobGroupExecutorComplete {
             logger.error("[JobGroupExecutor] 任务执行超时 - jobId: {}, nodeId: {}, 超时时间: {}秒",
                     jobInfo.getId(), node.getId(), jobInfo.getExecutorTimeout());
             
-            // 上报超时状态
-            reportStatus(jobInfo.getId(), randomId, 0, "任务执行超时");
+            // 上报超时状态（传递 parentJobId）
+            reportStatus(node.getJobParentId(), jobInfo.getId(), randomId, 0, "任务执行超时");
             
             // 判断是否需要抛出异常
             if (!JobConstant.DO_NOTHING.equalsIgnoreCase(jobInfo.getExecutorBlockStrategy())) {
@@ -398,8 +398,8 @@ public class JobGroupExecutorComplete {
             logger.error("[JobGroupExecutor] 任务监听异常 - jobId: {}, nodeId: {}",
                     jobInfo.getId(), node.getId(), e);
             
-            // 上报失败状态
-            reportStatus(jobInfo.getId(), randomId, 0, "任务监听异常");
+            // 上报失败状态（传递 parentJobId）
+            reportStatus(parentJobId, jobInfo.getId(), randomId, 0, "任务监听异常");
             
             // 判断是否需要抛出异常
             if (!JobConstant.DO_NOTHING.equalsIgnoreCase(jobInfo.getExecutorBlockStrategy())) {
@@ -422,13 +422,20 @@ public class JobGroupExecutorComplete {
     }
     
     /**
-     * 上报任务状态
+     * 上报任务执行状态（带 parentJobId）
+     * 
+     * @param parentJobId 父任务ID（任务组ID）
+     * @param jobId 任务ID（子任务ID）
+     * @param randomId 批次ID
+     * @param status 状态（0=失败，1=成功，2=执行中，5=完成）
+     * @param message 状态消息
      */
-    private void reportStatus(Long jobId, String randomId, Integer status, String message) {
+    private void reportStatus(Long parentJobId, Long jobId, String randomId, Integer status, String message) {
         try {
-            adminApiClient.reportStatus(jobId, randomId, status, message);
+            adminApiClient.reportStatus(parentJobId, jobId, randomId, status, message);
         } catch (Exception e) {
-            logger.error("[JobGroupExecutor] 上报状态失败 - jobId: {}, status: {}", jobId, status, e);
+            logger.error("[JobGroupExecutor] 上报状态失败 - parentJobId: {}, jobId: {}, status: {}", 
+                    parentJobId, jobId, status, e);
         }
     }
     
@@ -558,8 +565,8 @@ public class JobGroupExecutorComplete {
         // 清理结果映射
         JOB_RESULTS.entrySet().removeIf(entry -> entry.getKey().startsWith(jobId + ":"));
         
-        // 上报完成状态
-        reportStatus(jobId, randomId, 5, "任务组执行完成");
+        // 上报完成状态（任务组本身，parentJobId = jobId）
+        reportStatus(jobId, jobId, randomId, 5, "任务组执行完成");
         
         // 清理线程本地变量
         CONTEXT_HOLDER.remove();
@@ -580,8 +587,8 @@ public class JobGroupExecutorComplete {
             Async.stopWork((List<WorkerWrapper>) (List<?>) workerWrappers);
             RUNNING_JOBS.remove(executeKey);
             
-            // 上报停止状态
-            reportStatus(jobId, randomId, 0, "任务组已被停止");
+            // 上报停止状态（任务组本身，parentJobId = jobId）
+            reportStatus(jobId, jobId, randomId, 0, "任务组已被停止");
         } else {
             logger.warn("[JobGroupExecutor] 任务组不存在或已完成 - jobId: {}, randomId: {}", jobId, randomId);
         }

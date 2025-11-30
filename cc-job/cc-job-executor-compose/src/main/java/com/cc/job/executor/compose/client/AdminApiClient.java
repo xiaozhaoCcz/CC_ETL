@@ -177,16 +177,18 @@ public class AdminApiClient {
     /**
      * 上报任务执行状态
      * 
-     * @param jobId 任务ID
+     * @param parentJobId 父任务ID（任务组ID）
+     * @param jobId 任务ID（子任务ID）
      * @param randomId 批次ID
      * @param status 状态（0=失败，1=成功，2=执行中，5=完成）
      * @param message 状态消息
      * @return 是否上报成功
      */
-    public boolean reportStatus(Long jobId, String randomId, Integer status, String message) {
+    public boolean reportStatus(Long parentJobId, Long jobId, String randomId, Integer status, String message) {
         try {
             String url = adminAddress + "/api/v1/jobInfos/status";
             Map<String, Object> params = new HashMap<>();
+            params.put("parentJobId", parentJobId);
             params.put("jobId", jobId);
             params.put("randomId", randomId);
             params.put("status", status);

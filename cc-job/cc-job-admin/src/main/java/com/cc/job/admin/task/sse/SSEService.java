@@ -195,5 +195,36 @@ public class SSEService {
     public java.util.Set<String> getAllConnectionKeys() {
         return SSE_CONNECTIONS.keySet();
     }
+
+    /**
+     * 发送任务状态更新消息（指定 parentJobId）
+     * 
+     * @param parentJobId 父任务ID（任务组ID）
+     * @param jobId 任务ID（子任务ID）
+     * @param randomId 批次ID
+     * @param status 状态（0=失败，1=成功，2=执行中，5=完成）
+     * @param message 状态消息
+     */
+    public void sendJobStatus(Long parentJobId, Long jobId, String randomId, Integer status, String message) {
+        if (parentJobId == null || jobId == null || randomId == null || status == null) {
+            log.warn("[SSE] 发送任务状态失败：参数不完整 - parentJobId: {}, jobId: {}, randomId: {}, status: {}", 
+                    parentJobId, jobId, randomId, status);
+            return;
+        }
+
+        // 创建消息对象
+        Message sseMessage = new Message();
+        sseMessage.setParentJobId(parentJobId);
+        sseMessage.setJobId(jobId);
+        sseMessage.setRandomId(randomId);
+        sseMessage.setStatus(status);
+        sseMessage.setResult(message);
+
+        log.debug("[SSE] 准备发送任务状态 - parentJobId: {}, jobId: {}, randomId: {}, status: {}", 
+                parentJobId, jobId, randomId, status);
+
+        // 发送消息
+        sendMessage(sseMessage);
+    }
 }
 

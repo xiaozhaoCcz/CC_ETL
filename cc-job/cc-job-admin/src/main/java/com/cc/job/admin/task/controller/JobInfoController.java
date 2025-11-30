@@ -2,6 +2,9 @@ package com.cc.job.admin.task.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.admin.task.service.JobComposeService;
+import com.cc.job.admin.task.service.JobEdgeService;
+import com.cc.job.admin.task.service.JobNodeService;
+import com.cc.job.admin.task.sse.SSEService;
 import com.cc.job.xo.model.dto.JobInfoTriggerDto;
 import com.cc.job.xo.model.entity.JobEdge;
 import com.cc.job.xo.model.entity.JobInfo;
@@ -45,9 +48,11 @@ public class JobInfoController {
 
     private final JobComposeService jobComposeService;
     
-    private final com.cc.job.admin.task.service.JobNodeService jobNodeService;
+    private final JobNodeService jobNodeService;
     
-    private final com.cc.job.admin.task.service.JobEdgeService jobEdgeService;
+    private final JobEdgeService jobEdgeService;
+
+    private final SSEService sseService;
 
     @Operation(summary = "initData")
     @GetMapping("initData")
@@ -343,14 +348,40 @@ public class JobInfoController {
             Integer status = Integer.valueOf(statusData.get("status").toString());
             String message = statusData.getOrDefault("message", "").toString();
             
-            // 这里可以添加状态保存逻辑,例如保存到数据库或发送SSE消息
-            // 目前先简单记录日志
-            org.slf4j.LoggerFactory.getLogger(getClass()).info(
-                    "收到任务状态上报 - jobId: {}, randomId: {}, status: {}, message: {}", 
-                    jobId, randomId, status, message);
+            // ⭐ 获取 parentJobId（优先从请求参数中获取，如果没有则查询数据库）
+            Long parentJobId = null;
+            if (statusData.containsKey("parentJobId") && statusData.get("parentJobId") != null) {
+                parentJobId = Long.valueOf(statusData.get("parentJobId").toString());
+            } else {
+                // 查询 parentJobId（从 JobNode 表中查询）
+                try {
+                    JobNode jobNode = jobNodeService.getOne(
+                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<JobNode>()
+                            .eq(JobNode::getJobId, jobId)
+                            .last("LIMIT 1")
+                    );
+                    
+                    if (jobNode != null && jobNode.getJobParentId() != null) {
+                        parentJobId = jobNode.getJobParentId();
+                    } else {
+                        // 如果没有找到 JobNode，说明可能是任务组本身，使用 jobId 作为 parentJobId
+                        parentJobId = jobId;
+                    }
+                } catch (Exception e) {
+                    // 查询失败时，使用 jobId 作为 parentJobId
+                    org.slf4j.LoggerFactory.getLogger(getClass()).warn(
+                            "查询 parentJobId 失败，使用 jobId 作为 parentJobId - jobId: {}", jobId, e);
+                    parentJobId = jobId;
+                }
+            }
             
-            // 可以调用SSE服务推送状态更新
-            // sseService.sendJobStatus(jobId, randomId, status, message);
+            // 记录日志
+            org.slf4j.LoggerFactory.getLogger(getClass()).info(
+                    "收到任务状态上报 - parentJobId: {}, jobId: {}, randomId: {}, status: {}, message: {}", 
+                    parentJobId, jobId, randomId, status, message);
+            
+            // ⭐ 调用SSE服务推送状态更新
+            sseService.sendJobStatus(parentJobId, jobId, randomId, status, message);
             
             return Result.success();
         } catch (Exception e) {

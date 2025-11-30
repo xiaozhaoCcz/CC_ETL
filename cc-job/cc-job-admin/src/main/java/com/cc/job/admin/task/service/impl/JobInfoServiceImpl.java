@@ -2,6 +2,7 @@ package com.cc.job.admin.task.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
+import cn.hutool.http.HttpResponse;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.admin.task.executor.Async;
@@ -46,8 +47,8 @@ import com.cc.job.xo.model.vo.JobInfoVO;
 import java.text.MessageFormat;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 import cn.hutool.core.lang.Assert;
@@ -84,6 +85,13 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
     @Value("${server.port}")
     private int port;
+    
+    // ⭐ 用于异步调用停止接口的线程池
+    private static final ExecutorService STOP_JOB_EXECUTOR = Executors.newCachedThreadPool(r -> {
+        Thread t = new Thread(r, "StopJobExecutor-Thread");
+        t.setDaemon(true);
+        return t;
+    });
 
     static final Map<String,String> NODE_TYPE_MAP = new HashMap<>(){{
         put("SQL","custom-sql");
@@ -335,6 +343,18 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
             }
         }
 
+        // ⭐ 创建 JobLog 记录（在触发前创建，以便返回日志ID）
+        JobLog jobLog = new JobLog();
+        jobLog.setJobGroup(taskInfo.getJobGroup());
+        jobLog.setJobId(taskInfo.getId());
+        jobLog.setTriggerTime(LocalDateTime.now());
+        jobLog.setTriggerCode(0);
+        jobLog.setHandleCode(0);
+        jobLogMapper.insert(jobLog);
+        Long logId = jobLog.getId();
+        
+        log.debug("[JobInfoService] 创建任务日志记录 - jobId: {}, logId: {}", taskInfo.getId(), logId);
+
         String ip = IpUtil.getIp();
         String adminAddress = String.format(ADMIN_ADDRESS, ip, port);
         JobTriggerPoolHelper.trigger(taskInfoTriggerDto.getId().intValue(), TriggerTypeEnum.MANUAL, -1, null, taskInfoTriggerDto.getExecutorParam(), taskInfoTriggerDto.getAddressList(), 1, adminAddress);
@@ -348,8 +368,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         taskInfo.setRankTriggerStatus(1);
         this.updateById(taskInfo);
 
-        // 监听任务运行
-        String result = "";
+        // ⭐ 返回日志ID（字符串格式）
+        String result = String.valueOf(logId);
 //        if (taskInfo.getJobType() == 2 && "N".equalsIgnoreCase(taskInfo.getIsNode())) {
 //            // 使用线程监听jobId
 //            JobLogThreadListener listener = null;
@@ -853,36 +873,46 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
                 return false;
             }
             
-            // 3. 调用executor-compose的停止接口
+            // 3. ⭐ 异步调用executor-compose的停止接口（不阻塞主线程）
             String addressList = jobGroup.getAddressList();
             if (StringUtils.isNotBlank(addressList)) {
                 String[] addresses = addressList.split(",");
+                final Long finalJobId = id;
+                final String finalRandomId = randomId;
+                
+                // 异步调用所有执行器的停止接口
                 for (String address : addresses) {
                     if (StringUtils.isBlank(address)) {
                         continue;
                     }
                     
-                    try {
-                        String url = address.trim() + "/api/jobgroup/stop";
-                        cn.hutool.http.HttpResponse response = cn.hutool.http.HttpRequest.post(url)
-                                .form("jobId", id)
-                                .form("randomId", randomId)
-                                .timeout(5000)
-                                .execute();
-                        
-                        if (response.isOk()) {
-                            log.info("成功调用停止接口 - jobId: {}, randomId: {}, address: {}", id, randomId, address);
-                        } else {
-                            log.error("调用停止接口失败 - jobId: {}, randomId: {}, address: {}, status: {}", 
-                                    id, randomId, address, response.getStatus());
+                    final String finalAddress = address.trim();
+                    // 异步执行，不等待结果
+                    STOP_JOB_EXECUTOR.submit(() -> {
+                        try {
+                            String url = finalAddress + "/api/jobgroup/stop";
+                            HttpResponse response = cn.hutool.http.HttpRequest.post(url)
+                                    .form("jobId", finalJobId)
+                                    .form("randomId", finalRandomId)
+                                    .timeout(5000)
+                                    .execute();
+                            
+                            if (response.isOk()) {
+                                log.info("成功调用停止接口 - jobId: {}, randomId: {}, address: {}", 
+                                        finalJobId, finalRandomId, finalAddress);
+                            } else {
+                                log.error("调用停止接口失败 - jobId: {}, randomId: {}, address: {}, status: {}", 
+                                        finalJobId, finalRandomId, finalAddress, response.getStatus());
+                            }
+                        } catch (Exception e) {
+                            log.error("调用停止接口异常 - jobId: {}, randomId: {}, address: {}", 
+                                    finalJobId, finalRandomId, finalAddress, e);
                         }
-                    } catch (Exception e) {
-                        log.error("调用停止接口异常 - jobId: {}, randomId: {}, address: {}", 
-                                id, randomId, address, e);
-                    }
+                    });
                 }
             }
             
+            // ⭐ 立即返回，不等待 HTTP 调用完成
             return flag > 0;
         } catch (Exception e) {
             log.error("停止任务组异常 - jobId: {}, randomId: {}", id, randomId, e);
