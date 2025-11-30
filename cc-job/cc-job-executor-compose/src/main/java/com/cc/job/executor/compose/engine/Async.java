@@ -195,6 +195,7 @@ public class Async {
         AtomicLong time = new AtomicLong(timeout * 1000);
 
         Thread thread = null;
+        boolean interrupted = false;
         try {
             FutureTask<Boolean> futureTask = new FutureTask<>(() -> {
                 doWorkWrappers(wrapperMap, inDegree, submitted, time);
@@ -203,10 +204,19 @@ public class Async {
             thread = new Thread(futureTask);
             thread.start();
             futureTask.get(timeout, TimeUnit.SECONDS);
+            logger.info("[Async] 任务组调度正常完成");
+        } catch (TimeoutException e) {
+            logger.error("[Async] 任务组调度超时");
+            interrupted = true;
+            throw new RuntimeException("任务组调度超时", e);
         } catch (Exception e) {
+            logger.error("[Async] 任务组调度异常: {}", e.getMessage(), e);
+            interrupted = true;
             throw new RuntimeException(e);
         } finally {
-            if (thread != null) {
+            // 只有在超时或异常时才中断线程
+            if (thread != null && interrupted) {
+                logger.warn("[Async] 中断调度线程");
                 thread.interrupt();
             }
         }
@@ -217,11 +227,19 @@ public class Async {
         BlockingQueue<String> zeroQueue = new LinkedBlockingQueue<>();
         AtomicInteger remaining = new AtomicInteger(inDegree.size());
 
+        // 初始化：将入度为0的任务加入队列
         for (Map.Entry<String, Integer> entry : inDegree.entrySet()) {
             if (entry.getValue() == 0) {
                 zeroQueue.offer(entry.getKey());
+                logger.info("[Async] 初始入度为0的任务: {}", entry.getKey());
             }
         }
+
+        logger.info("[Async] 开始任务调度，总任务数: {}, 初始可执行任务数: {}", 
+                remaining.get(), zeroQueue.size());
+
+        int emptyPollCount = 0;
+        int maxEmptyPolls = 600; // 最多等待60秒（100ms * 600）
 
         while (remaining.get() > 0) {
             String id;
@@ -229,53 +247,79 @@ public class Async {
                 id = zeroQueue.poll(100, TimeUnit.MILLISECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                logger.warn("[Async] 任务调度线程被中断");
+                logger.warn("[Async] 任务调度线程被中断，剩余任务数: {}", remaining.get());
                 break;
             }
 
             if (id == null) {
+                emptyPollCount++;
+                if (emptyPollCount >= maxEmptyPolls) {
+                    logger.error("[Async] 等待超时，队列一直为空，剩余任务数: {}", remaining.get());
+                    break;
+                }
                 continue;
             }
+            
+            // 重置空轮询计数
+            emptyPollCount = 0;
+            
             if (!submitted.add(id)) {
+                logger.warn("[Async] 任务: {} 已经提交过，跳过", id);
                 continue;
             }
 
-            logger.info("[Async] 提交任务: {} 到线程池执行", id);
+            logger.info("[Async] 提交任务: {} 到线程池执行，剩余任务数: {}", id, remaining.get());
             executorService.submit(() -> {
                 WorkerWrapper workerWrapper = null;
                 try {
                     long beginTime = SystemClock.now();
                     workerWrapper = wrapperMap.get(id);
-                    logger.debug("[Async] 开始执行任务: {}", id);
+                    logger.info("[Async] ========== 开始执行任务: {} ==========", id);
                     doJob(workerWrapper, wrapperMap);
+                    logger.info("[Async] ========== 任务: {} 执行完成 ==========", id);
 
                     synchronized (inDegree) {
                         inDegree.remove(id);
-                        remaining.decrementAndGet();
+                        int remainingCount = remaining.decrementAndGet();
+                        logger.info("[Async] 任务: {} 完成，剩余任务数: {}", id, remainingCount);
+                        
                         List<WorkerWrapper> nextWrappers = workerWrapper.getNextWrappers();
                         if (nextWrappers != null && !nextWrappers.isEmpty()) {
+                            logger.info("[Async] 任务: {} 有 {} 个后续任务", id, nextWrappers.size());
                             List<String> nextIds = nextWrappers.stream().map(WorkerWrapper::getId).toList();
+                            
                             for (String nextId : nextIds) {
                                 if (nextId == null || !inDegree.containsKey(nextId)) {
-                                    logger.warn("[Async] 发现不在inDegree中的任务ID: {}，跳过入度减少", nextId);
+                                    logger.warn("[Async] 后续任务: {} 不在inDegree中，跳过入度减少", nextId);
                                     continue;
                                 }
+                                
+                                Integer oldInDegree = inDegree.get(nextId);
+                                logger.info("[Async] 准备更新后续任务: {} 的入度，当前入度: {}", nextId, oldInDegree);
+                                
                                 inDegree.compute(nextId, (k, i) -> {
                                     if (i == null) {
-                                        logger.warn("[Async] 发现inDegree中值为null的任务ID: {}，重置为0", nextId);
+                                        logger.warn("[Async] 后续任务: {} 入度为null，重置为0", nextId);
                                         return 0;
                                     }
                                     if (i <= 0) {
+                                        logger.warn("[Async] 后续任务: {} 入度已经为0或负数: {}，不再减少", nextId, i);
                                         return i;
                                     }
                                     int updated = i - 1;
+                                    logger.info("[Async] 后续任务: {} 入度从 {} 减少到 {}", nextId, i, updated);
+                                    
                                     if (updated == 0) {
-                                        zeroQueue.offer(nextId);
+                                        boolean offered = zeroQueue.offer(nextId);
+                                        logger.info("[Async] 后续任务: {} 入度变为0，加入执行队列，结果: {}", 
+                                                nextId, offered ? "成功" : "失败");
                                         return 0;
                                     }
                                     return updated;
                                 });
                             }
+                        } else {
+                            logger.info("[Async] 任务: {} 没有后续任务", id);
                         }
                     }
 
@@ -287,7 +331,6 @@ public class Async {
                         logger.error("[Async] 任务组运行超时异常，任务: {}", id);
                         throw new RuntimeException("任务组运行超时异常");
                     }
-                    logger.info("[Async] 任务: {} 执行完成", id);
                 } catch (Exception e) {
                     logger.error("[Async] 任务: {} 执行失败: {}", id, e.getMessage(), e);
                     synchronized (inDegree) {
