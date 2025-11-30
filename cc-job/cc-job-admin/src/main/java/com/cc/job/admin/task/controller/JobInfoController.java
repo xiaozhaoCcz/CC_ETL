@@ -3,6 +3,7 @@ package com.cc.job.admin.task.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.admin.task.service.JobComposeService;
 import com.cc.job.xo.model.dto.JobInfoTriggerDto;
+import com.cc.job.xo.model.entity.JobEdge;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobLogglue;
 import com.cc.job.xo.model.entity.JobNode;
@@ -321,13 +322,13 @@ public class JobInfoController {
     
     @Operation(summary = "获取任务组的所有边（供执行器调用）")
     @GetMapping("/edges/{jobId}")
-    public Result<List<com.cc.job.xo.model.entity.JobEdge>> getJobEdges(
+    public Result<List<JobEdge>> getJobEdges(
             @Parameter(description = "任务组ID") @PathVariable Long jobId
     ) {
-        com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.cc.job.xo.model.entity.JobEdge> wrapper = 
+        LambdaQueryWrapper<JobEdge> wrapper =
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
-        wrapper.eq(com.cc.job.xo.model.entity.JobEdge::getJobId, jobId);
-        List<com.cc.job.xo.model.entity.JobEdge> edges = jobEdgeService.list(wrapper);
+        wrapper.eq(JobEdge::getJobParentId, jobId);
+        List<JobEdge> edges = jobEdgeService.list(wrapper);
         return Result.success(edges);
     }
     

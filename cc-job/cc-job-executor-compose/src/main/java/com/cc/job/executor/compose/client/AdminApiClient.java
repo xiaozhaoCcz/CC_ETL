@@ -4,6 +4,7 @@ import cn.hutool.http.HttpRequest;
 import cn.hutool.http.HttpResponse;
 import cn.hutool.json.JSONUtil;
 import com.cc.job.xo.model.entity.JobEdge;
+import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobNode;
 import org.slf4j.Logger;
@@ -27,8 +28,8 @@ public class AdminApiClient {
     
     private static final Logger logger = LoggerFactory.getLogger(AdminApiClient.class);
     
-    @Value("${cc-job.job.admin.addresses}")
-    private String adminAddress;
+    //@Value("${cc-job.job.admin.addresses}")
+    private String adminAddress = "http://127.0.0.1:8989";
     
     @Value("${cc-job.job.accessToken}")
     private String accessToken;
@@ -74,19 +75,31 @@ public class AdminApiClient {
      * @param jobGroupId 执行器组ID
      * @return 执行器组信息
      */
-    public com.cc.job.xo.model.entity.JobGroup getJobGroup(Long jobGroupId) {
+    public JobGroup getJobGroup(Long jobGroupId) {
         try {
-            String url = adminAddress + "/api/job/group/" + jobGroupId;
+            String url = adminAddress + "/api/v1/jobGroups/" + jobGroupId;
             HttpResponse response = HttpRequest.get(url)
                     .header("Authorization", accessToken)
                     .timeout(TIMEOUT)
                     .execute();
             
             if (response.isOk()) {
-                return JSONUtil.toBean(response.body(), com.cc.job.xo.model.entity.JobGroup.class);
+                // 解析Result包装的响应
+                Map<String, Object> resultMap = JSONUtil.toBean(response.body(), Map.class);
+                Object data = resultMap.get("data");
+                if (data != null) {
+                    JobGroup jobGroup = JSONUtil.toBean(JSONUtil.toJsonStr(data), JobGroup.class);
+                    logger.debug("[AdminApiClient] 获取执行器组成功 - jobGroupId: {}, appName: {}, addressList: {}", 
+                            jobGroupId, jobGroup != null ? jobGroup.getAppName() : null, 
+                            jobGroup != null ? jobGroup.getAddressList() : null);
+                    return jobGroup;
+                }
+                logger.warn("[AdminApiClient] 响应中data字段为空 - jobGroupId: {}, response: {}", 
+                        jobGroupId, response.body());
+                return null;
             } else {
-                logger.error("[AdminApiClient] 获取执行器组失败 - jobGroupId: {}, status: {}", 
-                        jobGroupId, response.getStatus());
+                logger.error("[AdminApiClient] 获取执行器组失败 - jobGroupId: {}, status: {}, body: {}", 
+                        jobGroupId, response.getStatus(), response.body());
                 return null;
             }
         } catch (Exception e) {

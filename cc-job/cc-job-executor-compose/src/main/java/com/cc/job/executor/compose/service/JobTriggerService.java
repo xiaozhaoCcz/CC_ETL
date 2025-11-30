@@ -67,6 +67,11 @@ public class JobTriggerService {
                 return false;
             }
             
+            // 调试日志：验证 JobGroup 对象属性
+            logger.info("[JobTrigger] 获取执行器组成功 - jobGroupId: {}, appName: {}, title: {}, addressType: {}, addressList: {}", 
+                    jobInfo.getJobGroup(), group.getAppName(), group.getTitle(), 
+                    group.getAddressType(), group.getAddressList());
+            
             // 2. 获取执行器地址列表
             List<String> registryList = group.getRegistryList();
             if (registryList == null || registryList.isEmpty()) {
