@@ -22,7 +22,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class CcJobExecutorComposeApplication {
     
     public static void main(String[] args) {
-        SpringApplication.run(CcJobExecutorComposeApplication.java, args);
+        SpringApplication.run(CcJobExecutorComposeApplication.class, args);
         System.out.println("========================================");
         System.out.println("CC-Job 任务组编排执行器启动成功！");
         System.out.println("========================================");

@@ -12,7 +12,7 @@ import com.cc.job.admin.task.thread.JobLogThreadListener;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.admin.cron.CronExpression;
 import com.cc.job.admin.task.enums.*;
-import com.cc.job.admin.task.handler.JobGroupXxlJob;
+//import com.cc.job.admin.task.handler.JobGroupXxlJob;
 import com.cc.job.xo.mapper.JobLogMapper;
 import com.cc.job.xo.mapper.JobLogglueMapper;
 import com.cc.job.xo.model.dto.JobEdgeDto;
@@ -350,25 +350,25 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
         // 监听任务运行
         String result = "";
-        if (taskInfo.getJobType() == 2 && "N".equalsIgnoreCase(taskInfo.getIsNode())) {
-            // 使用线程监听jobId
-            JobLogThreadListener listener = null;
-            Thread thread = null;
-            String key = JobGroupXxlJob.setExecuteJobId(taskInfoTriggerDto.getId(), taskInfoTriggerDto.getExecutorParam());
-            try {
-                listener = new JobLogThreadListener(key);
-                FutureTask<String> futureTask = new FutureTask<>(listener);
-                thread = new Thread(futureTask);
-                JobLogHelper.addJobLogThread(key, thread);
-                thread.start();
-                result = futureTask.get(1, TimeUnit.MINUTES);
-            } catch (Exception e) {
-                throw new BusinessException(e);
-            } finally {
-                listener.toStop();
-                JobLogHelper.removeJobLogThread(key);
-            }
-        }
+//        if (taskInfo.getJobType() == 2 && "N".equalsIgnoreCase(taskInfo.getIsNode())) {
+//            // 使用线程监听jobId
+//            JobLogThreadListener listener = null;
+//            Thread thread = null;
+//            String key = JobGroupXxlJob.setExecuteJobId(taskInfoTriggerDto.getId(), taskInfoTriggerDto.getExecutorParam());
+//            try {
+//                listener = new JobLogThreadListener(key);
+//                FutureTask<String> futureTask = new FutureTask<>(listener);
+//                thread = new Thread(futureTask);
+//                JobLogHelper.addJobLogThread(key, thread);
+//                thread.start();
+//                result = futureTask.get(1, TimeUnit.MINUTES);
+//            } catch (Exception e) {
+//                throw new BusinessException(e);
+//            } finally {
+//                listener.toStop();
+//                JobLogHelper.removeJobLogThread(key);
+//            }
+//        }
 
         return result;
     }
@@ -837,13 +837,13 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     @Override
     public boolean stopJobCompose(Long id, String randomId) {
         int flag = jobInfoMapper.stopJobCompose(id);
-        if (flag > 0) {
-            XxlJobExecutor.removeJobThread(id.intValue(), "stop task" + id);
-            List<WorkerWrapper<Long, String>> workWrappers = JobGroupXxlJob.getWorkWrapper(id, randomId);
-            if (workWrappers != null&&!workWrappers.isEmpty()) {
-                Async.stopWork((List<WorkerWrapper>) (List<?>) workWrappers);
-            }
-        }
+//        if (flag > 0) {
+//            XxlJobExecutor.removeJobThread(id.intValue(), "stop task" + id);
+//            List<WorkerWrapper<Long, String>> workWrappers = JobGroupXxlJob.getWorkWrapper(id, randomId);
+//            if (workWrappers != null&&!workWrappers.isEmpty()) {
+//                Async.stopWork((List<WorkerWrapper>) (List<?>) workWrappers);
+//            }
+//        }
         return true;
     }
 

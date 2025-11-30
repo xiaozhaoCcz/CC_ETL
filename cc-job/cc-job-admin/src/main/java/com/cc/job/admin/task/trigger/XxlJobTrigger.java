@@ -4,7 +4,7 @@ import cn.hutool.core.lang.Pair;
 import com.cc.job.admin.config.XxlJobAdminConfig;
 import com.cc.job.admin.task.enums.ExecutorRouteStrategyEnum;
 import com.cc.job.admin.task.enums.TriggerTypeEnum;
-import com.cc.job.admin.task.handler.JobGroupXxlJob;
+//import com.cc.job.admin.task.handler.JobGroupXxlJob;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.entity.JobInfo;
@@ -179,11 +179,11 @@ public class XxlJobTrigger {
         }
 
         // 返回jobId,执行日志专区任务
-        if (triggerOne == 1 && jobInfo.getJobType() == 2 && "N".equalsIgnoreCase(jobInfo.getIsNode())) {
-            String key = JobGroupXxlJob.setExecuteJobId(jobInfo.getId(), jobInfo.getExecutorParam());
-            String value = String.valueOf(jobLog.getId());
-            XxlJobRemotingUtil.postBody(adminAddress + "api/jobLogId", "", 10, new Pair<>(key, value), Pair.class);
-        }
+//        if (triggerOne == 1 && jobInfo.getJobType() == 2 && "N".equalsIgnoreCase(jobInfo.getIsNode())) {
+//            String key = JobGroupXxlJob.setExecuteJobId(jobInfo.getId(), jobInfo.getExecutorParam());
+//            String value = String.valueOf(jobLog.getId());
+//            XxlJobRemotingUtil.postBody(adminAddress + "api/jobLogId", "", 10, new Pair<>(key, value), Pair.class);
+//        }
 
         // 5、collection trigger info
         StringBuffer triggerMsgSb = new StringBuffer();

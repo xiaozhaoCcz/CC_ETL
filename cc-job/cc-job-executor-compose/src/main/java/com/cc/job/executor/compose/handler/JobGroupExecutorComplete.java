@@ -70,7 +70,7 @@ public class JobGroupExecutorComplete {
     /**
      * 任务组执行入口
      */
-    @XxlJob("runJobGroupHandler")
+    @XxlJob("runJobGroupXxlJob")
     public void execute() {
         long jobId = XxlJobHelper.getJobId();
         String executeParam = XxlJobHelper.getJobParam();

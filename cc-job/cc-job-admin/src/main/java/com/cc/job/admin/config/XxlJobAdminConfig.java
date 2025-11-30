@@ -168,13 +168,13 @@ public class XxlJobAdminConfig implements InitializingBean, DisposableBean {
     private int port;
 
 
-    @Bean
-    public XxlJobSpringExecutor xxlJobExecutor() {
-        XxlJobSpringExecutor xxlJobSpringExecutor = new XxlJobSpringExecutor();
-        xxlJobSpringExecutor.setLogPath(logPath);
-        String ip = IpUtil.getIp();
-        xxlJobSpringExecutor.setAdminAddresses("http://"+ip+":"+port+"/xxl-job-admin");
-        return xxlJobSpringExecutor;
-    }
+//    @Bean
+//    public XxlJobSpringExecutor xxlJobExecutor() {
+//        XxlJobSpringExecutor xxlJobSpringExecutor = new XxlJobSpringExecutor();
+//        xxlJobSpringExecutor.setLogPath(logPath);
+//        String ip = IpUtil.getIp();
+//        xxlJobSpringExecutor.setAdminAddresses("http://"+ip+":"+port+"/xxl-job-admin");
+//        return xxlJobSpringExecutor;
+//    }
 
 }

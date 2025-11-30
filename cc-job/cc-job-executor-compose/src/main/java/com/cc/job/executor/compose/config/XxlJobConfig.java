@@ -19,28 +19,28 @@ public class XxlJobConfig {
     
     private static final Logger logger = LoggerFactory.getLogger(XxlJobConfig.class);
 
-    @Value("${cc-job.admin.address}")
+    @Value("${cc-job.job.admin.addresses}")
     private String adminAddresses;
 
-    @Value("${cc-job.access-token:default_token}")
+    @Value("${cc-job.job.accessToken}")
     private String accessToken;
 
-    @Value("${cc-job.executor.appname:cc-job-executor-compose}")
+    @Value("${cc-job.job.executor.appname}")
     private String appname;
 
-    @Value("${cc-job.executor.address:}")
+    @Value("${cc-job.job.executor.address}")
     private String address;
 
-    @Value("${cc-job.executor.ip:}")
+    @Value("${cc-job.job.executor.ip}")
     private String ip;
 
-    @Value("${cc-job.executor.port:9999}")
+    @Value("${cc-job.job.executor.port}")
     private int port;
 
-    @Value("${cc-job.executor.logpath:/data/applogs/xxl-job/jobhandler}")
+    @Value("${cc-job.job.executor.logpath}")
     private String logPath;
 
-    @Value("${cc-job.executor.logretentiondays:30}")
+    @Value("${cc-job.job.executor.logretentiondays}")
     private int logRetentionDays;
 
     @Bean

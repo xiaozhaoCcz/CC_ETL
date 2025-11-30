@@ -1,7 +1,7 @@
 package com.cc.job.admin.task.controller;
 
 import cn.hutool.core.lang.Pair;
-import com.cc.job.admin.task.handler.JobGroupXxlJob;
+//import com.cc.job.admin.task.handler.JobGroupXxlJob;
 import com.cc.job.admin.task.thread.JobLogHelper;
 import com.cc.job.admin.task.thread.JobLogThreadListener;
 import com.xxl.job.core.biz.AdminBiz;
@@ -75,7 +75,7 @@ public class JobApiController {
             return adminBiz.registryRemove(registryParam);
         } else if ("addJobGroupData".equals(uri)) {
             Pair<String, Boolean> pair = GsonTool.fromJson(data, Pair.class);
-            JobGroupXxlJob.addJobData(pair.getKey(), pair.getValue());
+            //JobGroupXxlJob.addJobData(pair.getKey(), pair.getValue());
             return new ReturnT<>(ReturnT.SUCCESS_CODE, "success");
         } else if ("jobLogId".equals(uri)) {
             Pair<String, String> pair = GsonTool.fromJson(data, Pair.class);

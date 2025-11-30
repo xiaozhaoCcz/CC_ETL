@@ -27,10 +27,10 @@ public class AdminApiClient {
     
     private static final Logger logger = LoggerFactory.getLogger(AdminApiClient.class);
     
-    @Value("${cc-job.admin.address}")
+    @Value("${cc-job.job.admin.addresses}")
     private String adminAddress;
     
-    @Value("${cc-job.access-token:default_token}")
+    @Value("${cc-job.job.accessToken}")
     private String accessToken;
     
     private static final int TIMEOUT = 30000; // 30秒超时

@@ -1,7 +1,7 @@
 package com.cc.job.admin.task.scheduler;
 
 import com.cc.job.admin.config.XxlJobAdminConfig;
-import com.cc.job.admin.task.handler.JobGroupXxlJob;
+//import com.cc.job.admin.task.handler.JobGroupXxlJob;
 import com.cc.job.admin.task.thread.*;
 import com.cc.job.admin.task.utils.I18nUtil;
 import com.xxl.job.core.biz.ExecutorBiz;
@@ -70,7 +70,7 @@ public class XxlJobScheduler  {
         JobTriggerPoolHelper.toStop();
 
         // stop job set
-        JobGroupXxlJob.stopJobGroup();
+        //JobGroupXxlJob.stopJobGroup();
 
         JobLogHelper.stop();
     }
