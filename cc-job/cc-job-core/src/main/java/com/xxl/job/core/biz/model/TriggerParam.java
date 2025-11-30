@@ -39,6 +39,8 @@ public class TriggerParam implements Serializable{
     private XxlJobContext xxlJobContext;
 
     private String address;
+    
+    private String randomId;
 
     public String getAddress() {
         return address;
@@ -46,6 +48,14 @@ public class TriggerParam implements Serializable{
 
     public void setAddress(String address) {
         this.address = address;
+    }
+    
+    public String getRandomId() {
+        return randomId;
+    }
+
+    public void setRandomId(String randomId) {
+        this.randomId = randomId;
     }
 
     public XxlJobContext getXxlJobContext() {

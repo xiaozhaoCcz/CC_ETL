@@ -80,9 +80,11 @@ public class JobTriggerService {
                 return false;
             }
             
-            // 3. 构建 Admin 地址
+            // 3. 构建 Compose 执行器地址（用于子任务回调）
             String ip = IpUtil.getIp();
-            String adminAddress = String.format(JobConstant.ADMIN_ADDRESS, ip, port);
+            String composeAddress = "http://" + ip + ":" + port + "/";
+            
+            logger.info("[JobTrigger] Compose 执行器地址: {}", composeAddress);
             
             // 4. 获取路由策略
             String routeStrategy = jobInfo.getExecutorRouteStrategy();
@@ -93,10 +95,10 @@ public class JobTriggerService {
             // 5. 根据路由策略触发任务
             if ("SHARDING_BROADCAST".equals(routeStrategy)) {
                 // 分片广播：向所有执行器发送任务
-                return triggerShardingBroadcast(xxlJobContext, jobInfo, randomId, adminAddress, registryList);
+                return triggerShardingBroadcast(xxlJobContext, jobInfo, randomId, composeAddress, registryList);
             } else {
                 // 普通路由：选择一个执行器
-                return triggerNormal(xxlJobContext, jobInfo, randomId, adminAddress, registryList, routeStrategy);
+                return triggerNormal(xxlJobContext, jobInfo, randomId, composeAddress, registryList, routeStrategy);
             }
             
         } catch (Exception e) {
@@ -110,12 +112,12 @@ public class JobTriggerService {
      * 分片广播触发
      */
     private boolean triggerShardingBroadcast(XxlJobContext xxlJobContext, JobInfo jobInfo, String randomId,
-                                             String adminAddress, List<String> registryList) {
+                                             String composeAddress, List<String> registryList) {
         logger.info("[JobTrigger] 分片广播触发 - jobId: {}, 执行器数量: {}", jobInfo.getId(), registryList.size());
         
         boolean allSuccess = true;
         for (int i = 0; i < registryList.size(); i++) {
-            TriggerParam triggerParam = createTriggerParam(jobInfo, randomId, xxlJobContext, adminAddress, i, registryList.size());
+            TriggerParam triggerParam = createTriggerParam(jobInfo, randomId, xxlJobContext, composeAddress, i, registryList.size());
             boolean success = doTrigger(xxlJobContext, jobInfo, randomId, triggerParam, registryList.get(i));
             if (!success) {
                 allSuccess = false;
@@ -129,11 +131,11 @@ public class JobTriggerService {
      * 普通路由触发
      */
     private boolean triggerNormal(XxlJobContext xxlJobContext, JobInfo jobInfo, String randomId,
-                                  String adminAddress, List<String> registryList, String routeStrategy) {
+                                  String composeAddress, List<String> registryList, String routeStrategy) {
         logger.debug("[JobTrigger] 普通路由触发 - jobId: {}, 路由策略: {}", jobInfo.getId(), routeStrategy);
         
         // 构建触发参数
-        TriggerParam triggerParam = createTriggerParam(jobInfo, randomId, xxlJobContext, adminAddress, 0, 1);
+        TriggerParam triggerParam = createTriggerParam(jobInfo, randomId, xxlJobContext, composeAddress, 0, 1);
         
         // 路由选择执行器地址
         String address = selectAddress(triggerParam, registryList, routeStrategy);
@@ -151,14 +153,15 @@ public class JobTriggerService {
      * 创建触发参数
      */
     private TriggerParam createTriggerParam(JobInfo jobInfo, String randomId, XxlJobContext xxlJobContext,
-                                           String adminAddress, int broadcastIndex, int broadcastTotal) {
+                                           String composeAddress, int broadcastIndex, int broadcastTotal) {
         TriggerParam triggerParam = new TriggerParam();
         triggerParam.setJobId(jobInfo.getId().intValue());
         triggerParam.setExecutorHandler(jobInfo.getExecutorHandler());
         triggerParam.setExecutorParams(randomId);
         triggerParam.setExecutorBlockStrategy(jobInfo.getExecutorBlockStrategy());
         triggerParam.setExecutorTimeout(jobInfo.getExecutorTimeout());
-        triggerParam.setLogId(-1);
+        triggerParam.setLogId(-1);  // -1 表示这是任务组子任务
+        triggerParam.setRandomId(randomId);  // 设置 randomId，用于回调时标识任务组
         triggerParam.setGlueType(jobInfo.getGlueType());
         triggerParam.setGlueSource(jobInfo.getGlueSource());
         
@@ -176,7 +179,11 @@ public class JobTriggerService {
         triggerParam.setReqUrl(jobInfo.getReqUrl());
         
         triggerParam.setXxlJobContext(xxlJobContext);
-        triggerParam.setAddress(adminAddress);
+        // 关键：将 address 设置为 compose 执行器地址，这样子任务完成后会回调到 compose 执行器
+        triggerParam.setAddress(composeAddress);
+        
+        logger.debug("[JobTrigger] 创建触发参数 - jobId: {}, randomId: {}, 回调地址: {}", 
+                jobInfo.getId(), randomId, composeAddress);
         
         return triggerParam;
     }
