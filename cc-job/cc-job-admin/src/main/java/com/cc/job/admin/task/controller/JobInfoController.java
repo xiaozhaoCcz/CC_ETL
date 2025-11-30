@@ -45,6 +45,8 @@ public class JobInfoController {
     private final JobComposeService jobComposeService;
     
     private final com.cc.job.admin.task.service.JobNodeService jobNodeService;
+    
+    private final com.cc.job.admin.task.service.JobEdgeService jobEdgeService;
 
     @Operation(summary = "initData")
     @GetMapping("initData")
@@ -288,6 +290,70 @@ public class JobInfoController {
             return Result.success(successCount);
         } catch (Exception e) {
             return Result.failed("批量更新节点状态失败: " + e.getMessage());
+        }
+    }
+    
+    // ============= 以下为任务组执行器调用的API接口 =============
+    
+    @Operation(summary = "获取任务信息（供执行器调用）")
+    @GetMapping("/{id}")
+    public Result<JobInfo> getJobInfoById(
+            @Parameter(description = "任务ID") @PathVariable Long id
+    ) {
+        JobInfo jobInfo = jobInfoService.getById(id);
+        if (jobInfo == null) {
+            return Result.failed("任务不存在");
+        }
+        return Result.success(jobInfo);
+    }
+    
+    @Operation(summary = "获取任务组的所有节点（供执行器调用）")
+    @GetMapping("/nodes/{jobId}")
+    public Result<List<JobNode>> getJobNodes(
+            @Parameter(description = "任务组ID") @PathVariable Long jobId
+    ) {
+        com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<JobNode> wrapper = 
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+        wrapper.eq(JobNode::getJobParentId, jobId);
+        List<JobNode> nodes = jobNodeService.list(wrapper);
+        return Result.success(nodes);
+    }
+    
+    @Operation(summary = "获取任务组的所有边（供执行器调用）")
+    @GetMapping("/edges/{jobId}")
+    public Result<List<com.cc.job.xo.model.entity.JobEdge>> getJobEdges(
+            @Parameter(description = "任务组ID") @PathVariable Long jobId
+    ) {
+        com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.cc.job.xo.model.entity.JobEdge> wrapper = 
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+        wrapper.eq(com.cc.job.xo.model.entity.JobEdge::getJobId, jobId);
+        List<com.cc.job.xo.model.entity.JobEdge> edges = jobEdgeService.list(wrapper);
+        return Result.success(edges);
+    }
+    
+    @Operation(summary = "上报任务执行状态（供执行器调用）")
+    @PostMapping("/status")
+    public Result<Void> reportStatus(
+            @RequestBody Map<String, Object> statusData
+    ) {
+        try {
+            Long jobId = Long.valueOf(statusData.get("jobId").toString());
+            String randomId = statusData.get("randomId").toString();
+            Integer status = Integer.valueOf(statusData.get("status").toString());
+            String message = statusData.getOrDefault("message", "").toString();
+            
+            // 这里可以添加状态保存逻辑,例如保存到数据库或发送SSE消息
+            // 目前先简单记录日志
+            org.slf4j.LoggerFactory.getLogger(getClass()).info(
+                    "收到任务状态上报 - jobId: {}, randomId: {}, status: {}, message: {}", 
+                    jobId, randomId, status, message);
+            
+            // 可以调用SSE服务推送状态更新
+            // sseService.sendJobStatus(jobId, randomId, status, message);
+            
+            return Result.success();
+        } catch (Exception e) {
+            return Result.failed("上报状态失败: " + e.getMessage());
         }
     }
 }
