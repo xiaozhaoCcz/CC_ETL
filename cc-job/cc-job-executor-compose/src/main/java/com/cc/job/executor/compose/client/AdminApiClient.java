@@ -216,6 +216,35 @@ public class AdminApiClient {
     }
     
     /**
+     * 更新任务组运行状态
+     * 
+     * @param jobId 任务组ID
+     * @param status 运行状态：0=未运行, 1=运行中
+     * @return 是否更新成功
+     */
+    public boolean updateRankTriggerStatus(Long jobId, Integer status) {
+        try {
+            String url = adminAddress + "/api/v1/jobInfos/updateRankTriggerStatus/" + jobId + "?status=" + status;
+            HttpResponse response = HttpRequest.post(url)
+                    .header("Authorization", accessToken)
+                    .timeout(TIMEOUT)
+                    .execute();
+            
+            if (response.isOk()) {
+                logger.debug("[AdminApiClient] 更新任务组运行状态成功 - jobId: {}, status: {}", jobId, status);
+                return true;
+            } else {
+                logger.error("[AdminApiClient] 更新任务组运行状态失败 - jobId: {}, status: {}, responseStatus: {}", 
+                        jobId, status, response.getStatus());
+                return false;
+            }
+        } catch (Exception e) {
+            logger.error("[AdminApiClient] 更新任务组运行状态异常 - jobId: {}, status: {}", jobId, status, e);
+            return false;
+        }
+    }
+    
+    /**
      * 获取任务组批次的快照信息（如果有）
      * 
      * @param jobId 任务组ID
@@ -239,6 +268,51 @@ public class AdminApiClient {
         } catch (Exception e) {
             logger.error("[AdminApiClient] 获取快照异常 - jobId: {}, randomId: {}", jobId, randomId, e);
             return null;
+        }
+    }
+
+    /**
+     * 批量获取任务信息
+     *
+     * @param jobIds 任务ID列表
+     * @return 任务信息列表
+     */
+    public List<JobInfo> getJobInfos(List<Long> jobIds) {
+        try {
+            if (jobIds == null || jobIds.isEmpty()) {
+                logger.warn("[AdminApiClient] 任务ID列表为空");
+                return new ArrayList<>();
+            }
+
+            String url = adminAddress + "/api/v1/jobInfos/batch";
+            HttpResponse response = HttpRequest.post(url)
+                    .header("Authorization", accessToken)
+                    .header("Content-Type", "application/json")
+                    .body(JSONUtil.toJsonStr(jobIds))
+                    .timeout(TIMEOUT)
+                    .execute();
+
+            if (response.isOk()) {
+                // 解析Result包装的响应
+                Map<String, Object> resultMap = JSONUtil.toBean(response.body(), Map.class);
+                Object data = resultMap.get("data");
+                if (data != null) {
+                    List<JobInfo> jobInfos = JSONUtil.toList(JSONUtil.toJsonStr(data), JobInfo.class);
+                    logger.debug("[AdminApiClient] 批量获取任务信息成功 - jobIds: {}, 返回数量: {}",
+                            jobIds, jobInfos != null ? jobInfos.size() : 0);
+                    return jobInfos != null ? jobInfos : new ArrayList<>();
+                }
+                logger.warn("[AdminApiClient] 响应中data字段为空 - jobIds: {}, response: {}",
+                        jobIds, response.body());
+                return new ArrayList<>();
+            } else {
+                logger.error("[AdminApiClient] 批量获取任务信息失败 - jobIds: {}, status: {}, body: {}",
+                        jobIds, response.getStatus(), response.body());
+                return new ArrayList<>();
+            }
+        } catch (Exception e) {
+            logger.error("[AdminApiClient] 批量获取任务信息异常 - jobIds: {}", jobIds, e);
+            return new ArrayList<>();
         }
     }
 }

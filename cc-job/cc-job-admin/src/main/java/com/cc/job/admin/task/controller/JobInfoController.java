@@ -29,6 +29,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -168,6 +169,25 @@ public class JobInfoController {
     public Result<Void> stopJobCompose(@PathVariable Long id,@PathVariable String randomId) {
         boolean result = jobInfoService.stopJobCompose(id,randomId);
         return Result.judge(result);
+    }
+    
+    @Operation(summary = "更新任务组运行状态（供执行器调用）")
+    @PostMapping("/updateRankTriggerStatus/{id}")
+    public Result<Void> updateRankTriggerStatus(
+            @Parameter(description = "任务组ID") @PathVariable Long id,
+            @Parameter(description = "运行状态：0=未运行, 1=运行中") @RequestParam Integer status
+    ) {
+        try {
+            JobInfo jobInfo = jobInfoService.getById(id);
+            if (jobInfo == null) {
+                return Result.failed("任务不存在");
+            }
+            jobInfo.setRankTriggerStatus(status);
+            boolean success = jobInfoService.updateById(jobInfo);
+            return Result.judge(success);
+        } catch (Exception e) {
+            return Result.failed("更新任务组运行状态失败: " + e.getMessage());
+        }
     }
 
     @Operation(summary = "保存GlueSource")
@@ -318,8 +338,7 @@ public class JobInfoController {
     public Result<List<JobNode>> getJobNodes(
             @Parameter(description = "任务组ID") @PathVariable Long jobId
     ) {
-        com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<JobNode> wrapper = 
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+        LambdaQueryWrapper<JobNode> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(JobNode::getJobParentId, jobId);
         List<JobNode> nodes = jobNodeService.list(wrapper);
         return Result.success(nodes);
@@ -331,7 +350,7 @@ public class JobInfoController {
             @Parameter(description = "任务组ID") @PathVariable Long jobId
     ) {
         LambdaQueryWrapper<JobEdge> wrapper =
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+                new LambdaQueryWrapper<>();
         wrapper.eq(JobEdge::getJobParentId, jobId);
         List<JobEdge> edges = jobEdgeService.list(wrapper);
         return Result.success(edges);
@@ -356,7 +375,7 @@ public class JobInfoController {
                 // 查询 parentJobId（从 JobNode 表中查询）
                 try {
                     JobNode jobNode = jobNodeService.getOne(
-                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<JobNode>()
+                        new LambdaQueryWrapper<JobNode>()
                             .eq(JobNode::getJobId, jobId)
                             .last("LIMIT 1")
                     );
@@ -387,5 +406,17 @@ public class JobInfoController {
         } catch (Exception e) {
             return Result.failed("上报状态失败: " + e.getMessage());
         }
+    }
+
+    @Operation(summary = "批量获取任务信息（供执行器调用）")
+    @PostMapping("/batch")
+    public Result<List<JobInfo>> getJobInfosByIds(
+            @Parameter(description = "任务ID列表") @RequestBody List<Long> jobIds
+    ) {
+        if (jobIds == null || jobIds.isEmpty()) {
+            return Result.success(new ArrayList<>());
+        }
+        List<JobInfo> jobInfos = jobInfoService.listByIds(jobIds);
+        return Result.success(jobInfos);
     }
 }

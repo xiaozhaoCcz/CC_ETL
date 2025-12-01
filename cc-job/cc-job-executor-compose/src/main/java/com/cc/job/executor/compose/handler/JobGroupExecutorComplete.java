@@ -10,6 +10,8 @@ import com.cc.job.executor.compose.engine.worker.WorkResult;
 import com.cc.job.executor.compose.engine.wrapper.WorkerWrapper;
 import com.cc.job.executor.compose.service.JobExecutionMonitor;
 import com.cc.job.executor.compose.service.JobTriggerService;
+import com.cc.job.xo.mapper.JobGroupMapper;
+import com.cc.job.xo.mapper.JobInfoMapper;
 import com.cc.job.xo.model.entity.JobEdge;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobNode;
@@ -22,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
@@ -49,6 +52,8 @@ public class JobGroupExecutorComplete {
     
     private final AdminApiClient adminApiClient;
     private final JobTriggerService jobTriggerService;
+    private final JobGroupUtils jobGroupUtils;
+
     
     /**
      * 存储正在执行的任务组
@@ -137,7 +142,10 @@ public class JobGroupExecutorComplete {
             
             logger.info("[JobGroupExecutor] 开始执行任务组 - 任务数: {}, 超时: {}秒", 
                     workerWrappers.size(), jobInfo.getExecutorTimeout());
-            
+
+            // 预测任务的运行时间
+            getRuntime(workerWrappers, nodes, jobInfo.getExecutorTimeout(), jobId, randomId);
+
             // 8. 调用 Async 引擎执行
             Async.beginWork(jobInfo.getExecutorTimeout(), (List<WorkerWrapper>) (List<?>) workerWrappers);
             
@@ -147,15 +155,41 @@ public class JobGroupExecutorComplete {
         } catch (ExecutionException e) {
             logger.error("[JobGroupExecutor] 任务组执行异常 - jobId: {}, randomId: {}", jobId, randomId, e);
             XxlJobHelper.handleFail("任务组执行异常: " + e.getMessage());
+            // ⭐ 异常情况下也要更新状态为0
+            try {
+                adminApiClient.updateRankTriggerStatus(jobId, 0);
+            } catch (Exception ex) {
+                logger.error("[JobGroupExecutor] 异常情况下更新状态失败 - jobId: {}", jobId, ex);
+            }
         } catch (Exception e) {
             logger.error("[JobGroupExecutor] 任务组执行失败 - jobId: {}, randomId: {}", jobId, randomId, e);
             XxlJobHelper.handleFail("任务组执行失败: " + e.getMessage());
+            // ⭐ 异常情况下也要更新状态为0
+            try {
+                adminApiClient.updateRankTriggerStatus(jobId, 0);
+            } catch (Exception ex) {
+                logger.error("[JobGroupExecutor] 异常情况下更新状态失败 - jobId: {}", jobId, ex);
+            }
         } finally {
-            // 9. 清理资源
+            // 9. 清理资源（cleanup方法中也会更新状态，但这里确保即使cleanup失败也能更新状态）
             cleanup(jobId, randomId);
         }
     }
-    
+
+    private void getRuntime(List<WorkerWrapper<Long, String>> workerWrappers, List<JobNode> nodes, long timeout,
+                            Long jobId, String randomId) throws IOException {
+        logger.debug("[JobGroup] 开始计算任务运行时间 - jobId: {}, 节点数量: {}, 超时时间: {}秒", jobId, nodes.size(), timeout);
+        List<Long> jobIds = nodes.stream().map(JobNode::getJobId).toList();
+        List<JobInfo> jobInfos = adminApiClient.getJobInfos(jobIds);
+        Map<Long, JobInfo> jobInfoMap = new HashMap<>();
+        final Map<Long, JobInfo> jobInfoDbMap = jobInfos.stream().collect(Collectors.toMap(JobInfo::getId, t -> t));
+        for (JobNode jobNode : nodes) {
+            jobInfoMap.put(jobNode.getId(), jobInfoDbMap.get(jobNode.getJobId()));
+        }
+        List<Long> nodeIds = nodes.stream().filter(v -> v.getNodeInDegree().equals(0L)).map(JobNode::getId).toList();
+        String[][] nextRunTime = jobGroupUtils.getNextRunTime(workerWrappers, jobInfoMap, timeout,nodeIds,jobId);
+        adminApiClient.reportStatus(jobId, jobId, randomId, 9, JSONUtil.toJsonStr(nextRunTime));
+    }
     /**
      * 构建 WorkerWrapper 列表
      */
@@ -565,6 +599,18 @@ public class JobGroupExecutorComplete {
         // 清理结果映射
         JOB_RESULTS.entrySet().removeIf(entry -> entry.getKey().startsWith(jobId + ":"));
         
+        // ⭐ 更新任务组运行状态为0（未运行）
+        try {
+            boolean success = adminApiClient.updateRankTriggerStatus(jobId, 0);
+            if (success) {
+                logger.info("[JobGroupExecutor] ✅ 任务组运行状态已更新为0（未运行） - jobId: {}", jobId);
+            } else {
+                logger.error("[JobGroupExecutor] ❌ 任务组运行状态更新失败 - jobId: {}", jobId);
+            }
+        } catch (Exception e) {
+            logger.error("[JobGroupExecutor] ❌ 更新任务组运行状态异常 - jobId: {}", jobId, e);
+        }
+        
         // 上报完成状态（任务组本身，parentJobId = jobId）
         reportStatus(jobId, jobId, randomId, 5, "任务组执行完成");
         
@@ -586,6 +632,18 @@ public class JobGroupExecutorComplete {
             logger.info("[JobGroupExecutor] 停止任务组 - jobId: {}, randomId: {}", jobId, randomId);
             Async.stopWork((List<WorkerWrapper>) (List<?>) workerWrappers);
             RUNNING_JOBS.remove(executeKey);
+            
+            // ⭐ 更新任务组运行状态为0（未运行）
+            try {
+                boolean success = adminApiClient.updateRankTriggerStatus(jobId, 0);
+                if (success) {
+                    logger.info("[JobGroupExecutor] ✅ 任务组运行状态已更新为0（未运行） - jobId: {}", jobId);
+                } else {
+                    logger.error("[JobGroupExecutor] ❌ 任务组运行状态更新失败 - jobId: {}", jobId);
+                }
+            } catch (Exception e) {
+                logger.error("[JobGroupExecutor] ❌ 更新任务组运行状态异常 - jobId: {}", jobId, e);
+            }
             
             // 上报停止状态（任务组本身，parentJobId = jobId）
             reportStatus(jobId, jobId, randomId, 0, "任务组已被停止");

@@ -1779,14 +1779,46 @@ public class MainView extends BorderPane {
             logPanel.warn("   status: " + status);
         }
 
-        // 如果状态是5（任务完成），只恢复边的正常状态，但保留节点状态
+        // ⭐ 如果状态是5（任务完成），需要更新UI运行状态
         if (status != null && status == 5) {
-            logPanel.info("🏁 任务完成（status=5），恢复边的正常状态，保留节点状态");
-            Platform.runLater(() -> {
-                // 只恢复边的运行状态（停止虚线动画），不重置节点状态
-                canvas.setAllConnectionsRunning(false);
-                // 注意：不重置节点状态，让节点保持最终状态（成功/失败）
-            });
+            logPanel.info("🏁 任务完成（status=5），开始更新UI运行状态");
+            
+            // 查找对应的运行中任务组
+            final RunningJobGroup runningJob = jobId != null ? runningJobs.get(jobId) : null;
+            final Long finalJobId = jobId;
+            
+            if (runningJob != null && expectedRandomId.equals(runningJob.getRandomId())) {
+                // 找到对应的任务组，调用stopLogPolling来更新UI状态
+                logPanel.info("✅ 找到对应的运行中任务组，开始停止日志轮询并更新UI状态");
+                Platform.runLater(() -> {
+                    stopLogPolling(runningJob, "任务组执行完成");
+                });
+            } else {
+                // 没有找到对应的任务组，手动更新UI状态
+                logPanel.warn("⚠️ 未找到对应的运行中任务组，手动更新UI状态");
+                Platform.runLater(() -> {
+                    if (finalJobId != null) {
+                        // 从运行列表中移除（如果存在）
+                        runningJobs.remove(finalJobId);
+                        
+                        // 更新导航栏中的小绿点（任务完成）
+                        navigationBar.updateTaskGroupRunningStatus(finalJobId, false);
+                        
+                        // 更新工具栏显示
+                        updateToolBarRunningJobs();
+                        
+                        // 恢复边的正常状态（停止虚线动画）
+                        canvas.setAllConnectionsRunning(false);
+                        
+                        // 断开SSE连接
+                        SSEService.getInstance().disconnect(finalJobId, expectedRandomId);
+                        
+                        // 同步节点状态到数据库
+                        canvas.syncPendingNodeStatus();
+                        logPanel.info("✅ UI状态已更新为准备运行状态");
+                    }
+                });
+            }
         }
         
         logPanel.info("========================================");

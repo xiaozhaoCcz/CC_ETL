@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.util.StringUtils;
 import org.springframework.web.util.HtmlUtils;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * task_log服务实现类
@@ -39,6 +40,7 @@ import org.springframework.web.util.HtmlUtils;
  * @author ccjob
  * @since 2024-11-03 08:20
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class JobLogServiceImpl extends ServiceImpl<JobLogMapper, JobLog> implements JobLogService {
@@ -112,6 +114,11 @@ public class JobLogServiceImpl extends ServiceImpl<JobLogMapper, JobLog> impleme
 
             // log cat
             ExecutorBiz executorBiz = XxlJobScheduler.getExecutorBiz(jobLog.getExecutorAddress());
+            if (executorBiz == null) {
+                String errorMsg = "执行器不可用，无法获取日志。执行器地址: " + jobLog.getExecutorAddress();
+                log.warn("❌ 执行器不可用，无法获取日志。执行器地址: {}", jobLog.getExecutorAddress());
+                return new ReturnT<LogResult>(ReturnT.FAIL_CODE, errorMsg);
+            }
             ReturnT<LogResult> logResult = executorBiz.log(new LogParam(jobLog.getTriggerTime().toInstant(ZoneOffset.of("+8")).toEpochMilli(), logId, fromLineNum));
 
             // is end
