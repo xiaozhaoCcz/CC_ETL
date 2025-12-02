@@ -12,7 +12,6 @@ import com.cc.job.xo.model.entity.JobLogglue;
 import com.cc.job.xo.model.entity.JobNode;
 import com.cc.job.xo.model.form.JobGlueForm;
 import com.cc.job.admin.task.service.JobInfoService;
-import com.cc.job.xo.model.vo.JobNodeVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -34,12 +33,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * task_info前端控制层
+ * 任务信息控制层
  *
  * @author ccjob
  * @since 2024-11-03 08:21
  */
-@Tag(name = "task_info接口")
+@Tag(name = "任务管理接口")
 @RestController
 @RequestMapping("/api/v1/jobInfos")
 @RequiredArgsConstructor
@@ -62,14 +61,14 @@ public class JobInfoController {
         return Result.success(list);
     }
 
-    @Operation(summary = "task_info分页列表")
+    @Operation(summary = "任务分页列表")
     @GetMapping("/page")
     public PageResult<JobInfoVO> getJobInfoPage(JobInfoQuery queryParams) {
         IPage<JobInfoVO> result = jobInfoService.getJobInfoPage(queryParams);
         return PageResult.success(result);
     }
 
-    @Operation(summary = "task_info分页列表")
+    @Operation(summary = "任务列表")
     @GetMapping("/list")
     public Result<List<JobInfo>> getJobInfoList(Integer jobType) {
         LambdaQueryWrapper<JobInfo> wrapper = new LambdaQueryWrapper<>();
@@ -83,36 +82,36 @@ public class JobInfoController {
         return Result.success(list);
     }
 
-    @Operation(summary = "新增task_info")
+    @Operation(summary = "新增任务")
     @PostMapping
     public Result<Long> saveJobInfo(@RequestBody @Valid JobInfoForm formData) {
         long id = jobInfoService.saveJobInfo(formData);
         return Result.success(id);
     }
 
-    @Operation(summary = "获取task_info表单数据")
+    @Operation(summary = "获取任务表单数据")
     @GetMapping("/{id}/form")
     public Result<JobInfoForm> getJobInfoForm(
-            @Parameter(description = "task_infoID") @PathVariable Long id
+            @Parameter(description = "任务ID") @PathVariable Long id
     ) {
         JobInfoForm formData = jobInfoService.getJobInfoForm(id);
         return Result.success(formData);
     }
 
-    @Operation(summary = "修改task_info")
+    @Operation(summary = "修改任务")
     @PutMapping(value = "/{id}")
     public Result<Void> updateJobInfo(
-            @Parameter(description = "task_infoID") @PathVariable Long id,
+            @Parameter(description = "任务ID") @PathVariable Long id,
             @RequestBody @Validated JobInfoForm formData
     ) {
         boolean result = jobInfoService.updateJobInfo(id, formData);
         return Result.judge(result);
     }
 
-    @Operation(summary = "删除task_info")
+    @Operation(summary = "删除任务")
     @DeleteMapping("/{ids}")
     public Result<Void> deleteJobInfos(
-            @Parameter(description = "task_infoID，多个以英文逗号(,)分割") @PathVariable String ids
+            @Parameter(description = "任务ID，多个以英文逗号(,)分割") @PathVariable String ids
     ) {
         boolean result = jobInfoService.deleteJobInfos(ids);
         return Result.judge(result);
@@ -157,7 +156,7 @@ public class JobInfoController {
 
     @Operation(summary = "修改任务运行集")
     @PutMapping("updateJobCompose/{id}")
-    public Result<Void>  updateJobCompose(@Parameter(description = "task_infoID") @PathVariable Long id,
+    public Result<Void>  updateJobCompose(@Parameter(description = "任务ID") @PathVariable Long id,
                                        @RequestBody @Validated JobInfoForm formData){
         // 实现任务运行集的保存
         boolean result = jobComposeService.updateJobCompose(id,formData);

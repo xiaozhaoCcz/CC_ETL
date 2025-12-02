@@ -5,7 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.websocket.*;
 import jakarta.websocket.server.PathParam;
 import jakarta.websocket.server.ServerEndpoint;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -30,8 +31,9 @@ import java.util.concurrent.LinkedBlockingQueue;
  */
 @ServerEndpoint(value = "/ccJobWs/{id}", encoders = { ServerEncoder.class })
 @Component
-@Slf4j
 public class WebSocketServer {
+
+    private static final Logger log = LoggerFactory.getLogger(WebSocketServer.class);
 
     // 连接池管理（优化：使用ConcurrentHashMap提高并发性能）
     private static final ConcurrentHashMap<String, WebSocketSession> SESSION_POOLS = new ConcurrentHashMap<>();
@@ -115,35 +117,6 @@ public class WebSocketServer {
         }
     }
 
-    /**
-     * 同步发送消息（带超时）
-     */
-    private void sendMessageSync(Session session, Message message) throws IOException {
-        if (session == null || !session.isOpen()) {
-            return;
-        }
-        try {
-            String messageJson = OBJECT_MAPPER.writeValueAsString(message);
-            Callable<Void> sendTask = () -> {
-                session.getBasicRemote().sendText(messageJson);
-                return null;
-            };
-            Future<Void> future = MESSAGE_EXECUTOR.submit(sendTask);
-            try {
-                future.get(MESSAGE_TIMEOUT, TimeUnit.MILLISECONDS);
-            } catch (TimeoutException e) {
-                log.error("Send message timeout: {}", messageJson);
-                future.cancel(true);
-                throw new IOException("Send message timeout", e);
-            } catch (Exception e) {
-                log.error("Failed to send message: {}", messageJson, e);
-                throw new IOException("Failed to send message", e);
-            }
-        } catch (Exception e) {
-            log.error("Failed to send message: {}", message, e);
-            throw new IOException("Failed to send message", e);
-        }
-    }
 
     /**
      * 给指定用户发送信息（异步）
@@ -377,16 +350,8 @@ public class WebSocketServer {
             return id;
         }
 
-        public long getCreateTime() {
-            return createTime;
-        }
-
         public long getLastAccessTime() {
             return lastAccessTime;
-        }
-
-        public void updateLastAccessTime() {
-            this.lastAccessTime = System.currentTimeMillis();
         }
 
         public boolean isValid() {

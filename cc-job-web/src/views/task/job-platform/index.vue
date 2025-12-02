@@ -300,16 +300,8 @@ const menuConfig = {
       },
     },
   ],
-  graphMenu: [
-    {
-      text: "分享",
-      callback() {
-        alert("分享成功！");
-      },
-    },
-  ],
   // edgeMenu: false, // 删除默认的边右键菜单
-  graphMenu: [], // 覆盖默认的边右键菜单，与false表现一样
+  graphMenu: [], // 覆盖默认的图右键菜单
 };
 const jobComposeVisible = reactive({
   title: "",

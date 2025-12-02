@@ -15,7 +15,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.cc.job.executor.compose.engine.constant.JobConstant.DO_NOTHING;
+import static com.cc.job.executor.compose.infrastructure.constant.ExecutorConstants.ExecutionResult.DO_NOTHING;
 
 
 /**

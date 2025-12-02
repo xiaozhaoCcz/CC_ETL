@@ -2,7 +2,8 @@ package com.cc.job.admin.task.sse;
 
 import com.cc.job.admin.task.websocket.model.Message;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -20,8 +21,9 @@ import java.util.concurrent.TimeUnit;
  * @author xiaozhao
  */
 @Service
-@Slf4j
 public class SSEService {
+
+    private static final Logger log = LoggerFactory.getLogger(SSEService.class);
 
     // SSE连接池：key = parentJobId:randomId, value = SseEmitter
     private static final Map<String, SseEmitter> SSE_CONNECTIONS = new ConcurrentHashMap<>();

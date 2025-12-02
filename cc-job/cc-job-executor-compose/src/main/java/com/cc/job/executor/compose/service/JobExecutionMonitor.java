@@ -1,7 +1,7 @@
 package com.cc.job.executor.compose.service;
 
 import cn.hutool.core.lang.Pair;
-import com.cc.job.executor.compose.engine.constant.JobConstant;
+import com.cc.job.executor.compose.infrastructure.constant.ExecutorConstants;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobNode;
 import org.slf4j.Logger;
@@ -83,7 +83,7 @@ public class JobExecutionMonitor implements Callable<String> {
         }
         
         logger.debug("[JobMonitor] 监听结束 - jobId: {}", jobInfo.getId());
-        return JobConstant.SUCCESS;
+        return ExecutorConstants.ExecutionResult.SUCCESS;
     }
     
     /**
@@ -93,17 +93,17 @@ public class JobExecutionMonitor implements Callable<String> {
         if (success) {
             logger.info("[JobMonitor] 任务执行成功 - jobId: {}, 任务名称: {}", 
                     jobInfo.getId(), jobInfo.getJobDesc());
-            return JobConstant.SUCCESS;
+            return ExecutorConstants.ExecutionResult.SUCCESS;
         } else {
             // 任务失败
             if (currentRetryCount < jobInfo.getExecutorFailRetryCount()) {
                 logger.warn("[JobMonitor] 任务执行失败，准备重试 - jobId: {}, 当前重试次数: {}/{}", 
                         jobInfo.getId(), currentRetryCount, jobInfo.getExecutorFailRetryCount());
-                return JobConstant.FAIL_RETRY;
+                return ExecutorConstants.ExecutionResult.FAIL_RETRY;
             } else {
                 logger.error("[JobMonitor] 任务执行失败，已达到最大重试次数 - jobId: {}, 重试次数: {}",
                         jobInfo.getId(), currentRetryCount);
-                return JobConstant.FAIL_COMPLETE;
+                return ExecutorConstants.ExecutionResult.FAIL_COMPLETE;
             }
         }
     }

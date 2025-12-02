@@ -2,7 +2,7 @@ package com.cc.job.executor.compose.service;
 
 import cn.hutool.core.lang.Pair;
 import com.cc.job.executor.compose.client.AdminApiClient;
-import com.cc.job.executor.compose.engine.constant.JobConstant;
+import com.cc.job.executor.compose.infrastructure.constant.ExecutorConstants;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.xxl.job.core.biz.ExecutorBiz;
@@ -208,7 +208,7 @@ public class JobTriggerService {
                 XxlJobHelper.log(xxlJobContext, "任务ID: {}, 错误信息: {}", jobInfo.getId(), returnT.getMsg());
                 
                 // 判断是否需要抛出异常
-                if (!JobConstant.DO_NOTHING.equalsIgnoreCase(jobInfo.getExecutorBlockStrategy())) {
+                if (!ExecutorConstants.ExecutionResult.DO_NOTHING.equalsIgnoreCase(jobInfo.getExecutorBlockStrategy())) {
                     return false;
                 }
             } else {

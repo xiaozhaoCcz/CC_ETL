@@ -1,11 +1,8 @@
 package com.cc.job.admin.task.trigger;
 
-import cn.hutool.core.lang.Pair;
 import com.cc.job.admin.config.XxlJobAdminConfig;
 import com.cc.job.admin.task.enums.ExecutorRouteStrategyEnum;
 import com.cc.job.admin.task.enums.TriggerTypeEnum;
-//import com.cc.job.admin.task.handler.JobGroupXxlJob;
-import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobLog;
@@ -18,7 +15,6 @@ import com.xxl.job.core.biz.model.TriggerParam;
 import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
 import com.xxl.job.core.util.IpUtil;
 import com.xxl.job.core.util.ThrowableUtil;
-import com.xxl.job.core.util.XxlJobRemotingUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

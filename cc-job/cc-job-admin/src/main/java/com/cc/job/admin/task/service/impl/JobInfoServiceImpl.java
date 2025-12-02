@@ -5,15 +5,10 @@ import cn.hutool.core.bean.copier.CopyOptions;
 import cn.hutool.http.HttpResponse;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.cc.job.admin.task.executor.Async;
-import com.cc.job.admin.task.executor.wrapper.WorkerWrapper;
 import com.cc.job.admin.task.service.*;
-import com.cc.job.admin.task.thread.JobLogHelper;
-import com.cc.job.admin.task.thread.JobLogThreadListener;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.admin.cron.CronExpression;
 import com.cc.job.admin.task.enums.*;
-//import com.cc.job.admin.task.handler.JobGroupXxlJob;
 import com.cc.job.xo.mapper.JobLogMapper;
 import com.cc.job.xo.mapper.JobLogglueMapper;
 import com.cc.job.xo.model.dto.JobEdgeDto;
@@ -27,7 +22,6 @@ import com.cc.job.admin.task.thread.JobTriggerPoolHelper;
 import com.cc.job.admin.task.utils.I18nUtil;
 import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
-import com.xxl.job.core.executor.XxlJobExecutor;
 import com.xxl.job.core.glue.GlueTypeEnum;
 import com.xxl.job.core.util.DateUtil;
 import com.xxl.job.core.util.IpUtil;
@@ -55,8 +49,6 @@ import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
 import org.springframework.transaction.annotation.Transactional;
 
-import static com.cc.job.admin.task.handler.JobConstant.ADMIN_ADDRESS;
-
 
 /**
  * task_info服务实现类
@@ -83,6 +75,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
     private final JobGroupSnapshotService jobGroupSnapshotService;
 
+    private final String ADMIN_ADDRESS = "http://%s:%s/xxl-job-admin/";
     @Value("${server.port}")
     private int port;
     
@@ -368,29 +361,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         taskInfo.setRankTriggerStatus(1);
         this.updateById(taskInfo);
 
-        // ⭐ 返回日志ID（字符串格式）
-        String result = String.valueOf(logId);
-//        if (taskInfo.getJobType() == 2 && "N".equalsIgnoreCase(taskInfo.getIsNode())) {
-//            // 使用线程监听jobId
-//            JobLogThreadListener listener = null;
-//            Thread thread = null;
-//            String key = JobGroupXxlJob.setExecuteJobId(taskInfoTriggerDto.getId(), taskInfoTriggerDto.getExecutorParam());
-//            try {
-//                listener = new JobLogThreadListener(key);
-//                FutureTask<String> futureTask = new FutureTask<>(listener);
-//                thread = new Thread(futureTask);
-//                JobLogHelper.addJobLogThread(key, thread);
-//                thread.start();
-//                result = futureTask.get(1, TimeUnit.MINUTES);
-//            } catch (Exception e) {
-//                throw new BusinessException(e);
-//            } finally {
-//                listener.toStop();
-//                JobLogHelper.removeJobLogThread(key);
-//            }
-//        }
-
-        return result;
+        // 返回日志ID（字符串格式）
+        return String.valueOf(logId);
     }
 
 

@@ -1,9 +1,5 @@
 package com.cc.job.admin.task.service.impl;
 
-import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.json.JSON;
-import cn.hutool.json.JSONArray;
-import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.cc.job.admin.task.service.JobEdgeService;
@@ -19,10 +15,6 @@ import com.cc.job.xo.model.vo.JobPartVo;
 import com.google.gson.Gson;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.BeanUtils;
-import org.springframework.http.ContentDisposition;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -32,10 +24,7 @@ import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.SecretKeySpec;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
@@ -573,20 +562,5 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
         jobInfo.setJobPartId(taskInfoData.getJobPartId());
         jobInfo.setTriggerUserId(taskInfoData.getTriggerUserId());
         return jobInfo;
-    }
-
-
-    private void  getAllJobInfoMap(List<JobInfo> jobInfoList,Map<Long, JobInfo> jobInfoMap,Map<Long,Long> jobParentIdMap) {
-        if(jobInfoList==null){
-            return;
-        }
-        for (JobInfo jobInfo : jobInfoList) {
-            jobInfoMap.put(jobInfo.getId(), jobInfo);
-            jobParentIdMap.put(jobInfo.getId(), jobInfo.getParentId());
-            if(jobInfo.getJobType()==2){
-                List<JobInfo> childJobInfoList = jobInfoService.list(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getParentId, jobInfo.getId()));
-                getAllJobInfoMap(childJobInfoList, jobInfoMap,jobParentIdMap);
-            }
-        }
     }
 }

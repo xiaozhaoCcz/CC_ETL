@@ -11,7 +11,6 @@ import com.cc.job.admin.task.service.JobNodeService;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.xo.model.entity.JobEdge;
 import com.cc.job.xo.model.entity.JobInfo;
-import com.cc.job.xo.model.entity.JobLogglue;
 import com.cc.job.xo.model.entity.JobNode;
 import com.cc.job.xo.model.form.JobEdgeForm;
 import com.cc.job.xo.model.form.JobGlueForm;

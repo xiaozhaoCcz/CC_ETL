@@ -1,0 +1,262 @@
+/**
+ * 通用样式定义
+ * 
+ * @author cc-job-team
+ */
+
+/* ==========  布局相关  ========== */
+.flex-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.flex-start {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.flex-end {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.flex-column {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ==========  间距相关  ========== */
+.mt-8 {
+  margin-top: 8px;
+}
+
+.mt-16 {
+  margin-top: 16px;
+}
+
+.mb-8 {
+  margin-bottom: 8px;
+}
+
+.mb-16 {
+  margin-bottom: 16px;
+}
+
+.ml-8 {
+  margin-left: 8px;
+}
+
+.mr-8 {
+  margin-right: 8px;
+}
+
+.p-8 {
+  padding: 8px;
+}
+
+.p-16 {
+  padding: 16px;
+}
+
+/* ==========  文本相关  ========== */
+.text-center {
+  text-align: center;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.text-bold {
+  font-weight: bold;
+}
+
+/* ==========  颜色相关  ========== */
+.text-primary {
+  color: var(--el-color-primary);
+}
+
+.text-success {
+  color: var(--el-color-success);
+}
+
+.text-warning {
+  color: var(--el-color-warning);
+}
+
+.text-danger {
+  color: var(--el-color-danger);
+}
+
+.text-info {
+  color: var(--el-color-info);
+}
+
+.text-muted {
+  color: var(--el-text-color-secondary);
+}
+
+/* ==========  背景相关  ========== */
+.bg-primary {
+  background-color: var(--el-color-primary);
+}
+
+.bg-light {
+  background-color: var(--el-fill-color-light);
+}
+
+/* ==========  边框相关  ========== */
+.border-light {
+  border: 1px solid var(--el-border-color-light);
+}
+
+.border-radius-4 {
+  border-radius: 4px;
+}
+
+.border-radius-8 {
+  border-radius: 8px;
+}
+
+/* ==========  尺寸相关  ========== */
+.w-full {
+  width: 100%;
+}
+
+.h-full {
+  height: 100%;
+}
+
+/* ==========  卡片样式  ========== */
+.card {
+  padding: 16px;
+  background-color: var(--el-bg-color);
+  border-radius: 8px;
+  box-shadow: var(--el-box-shadow-light);
+}
+
+.card-title {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 16px;
+  color: var(--el-text-color-primary);
+}
+
+/* ==========  按钮组  ========== */
+.button-group {
+  display: flex;
+  gap: 8px;
+}
+
+/* ==========  表单样式优化  ========== */
+.form-container {
+  padding: 20px;
+  
+  .el-form-item {
+    margin-bottom: 18px;
+  }
+  
+  .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--el-border-color-light);
+  }
+}
+
+/* ==========  表格样式优化  ========== */
+.table-container {
+  .el-table {
+    border-radius: 4px;
+    
+    .el-table__header {
+      font-weight: bold;
+    }
+  }
+  
+  .table-toolbar {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    
+    .toolbar-left {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .toolbar-right {
+      display: flex;
+      gap: 8px;
+    }
+  }
+}
+
+/* ==========  状态标签  ========== */
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  
+  &.status-running {
+    background-color: var(--el-color-success-light-9);
+    color: var(--el-color-success);
+  }
+  
+  &.status-stopped {
+    background-color: var(--el-color-info-light-9);
+    color: var(--el-color-info);
+  }
+  
+  &.status-failed {
+    background-color: var(--el-color-danger-light-9);
+    color: var(--el-color-danger);
+  }
+}
+
+/* ==========  对话框样式优化  ========== */
+.dialog-container {
+  .el-dialog__header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--el-border-color-light);
+  }
+  
+  .el-dialog__body {
+    padding: 20px;
+  }
+  
+  .el-dialog__footer {
+    padding: 16px 20px;
+    border-top: 1px solid var(--el-border-color-light);
+  }
+}
+
+/* ==========  响应式适配  ========== */
+@media (max-width: 768px) {
+  .form-container {
+    padding: 12px;
+  }
+  
+  .table-toolbar {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+

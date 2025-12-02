@@ -2,7 +2,7 @@ package com.cc.job.executor.compose.engine;
 
 import com.cc.job.executor.compose.engine.callback.ICallback;
 import com.cc.job.executor.compose.engine.callback.IWorker;
-import com.cc.job.executor.compose.engine.constant.JobConstant;
+import com.cc.job.executor.compose.infrastructure.constant.ExecutorConstants;
 import com.cc.job.executor.compose.engine.timer.SystemClock;
 import com.cc.job.executor.compose.engine.worker.DependWrapper;
 import com.cc.job.executor.compose.engine.worker.ResultState;
@@ -390,8 +390,8 @@ public class Async {
             }
             
             // 检查重试后是否仍然失败
-            if (JobConstant.FAIL_RETRY.equals(String.valueOf(resultValue)) || 
-                JobConstant.FAIL_COMPLETE.equals(String.valueOf(resultValue))) {
+            if (ExecutorConstants.ExecutionResult.FAIL_RETRY.equals(String.valueOf(resultValue)) || 
+                ExecutorConstants.ExecutionResult.FAIL_COMPLETE.equals(String.valueOf(resultValue))) {
                 success = false;
                 workerWrapper.setWorkResult(new WorkResult(resultValue, ResultState.EXCEPTION));
                 logger.error("[Async] 任务: {} 执行失败，重试后仍然失败，结果: {}", workerWrapper.getId(), resultValue);

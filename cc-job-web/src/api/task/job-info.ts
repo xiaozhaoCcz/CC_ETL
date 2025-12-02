@@ -1,163 +1,214 @@
+/**
+ * 任务信息 API
+ * 
+ * @author cc-job-team
+ */
+
 import request from "@/utils/request";
 
-const JOB_INFO_BASE_URL = "/api/v1/jobInfos";
+const BASE_URL = "/api/v1/jobInfos";
 
+/**
+ * 任务信息 API
+ */
 const JobInfoAPI = {
+  /**
+   * 初始化数据
+   */
   initData() {
     return request({
-      url: `${JOB_INFO_BASE_URL}/initData`,
+      url: `${BASE_URL}/initData`,
       method: "get",
     });
   },
-  /** 获取task_info分页数据 */
+
+  /**
+   * 获取任务分页列表
+   */
   getPage(queryParams?: JobInfoPageQuery) {
     return request<any, PageResult<TaskInfoPageVO[]>>({
-      url: `${JOB_INFO_BASE_URL}/page`,
+      url: `${BASE_URL}/page`,
       method: "get",
       params: queryParams,
     });
   },
 
+  /**
+   * 获取任务列表
+   */
   getList(jobType?: number) {
     return request({
-      url: `${JOB_INFO_BASE_URL}/list`,
+      url: `${BASE_URL}/list`,
       method: "get",
       params: { jobType },
     });
   },
+
   /**
-   * 获取task_info表单数据
-   *
-   * @param id TaskInfoID
-   * @returns TaskInfo表单数据
+   * 获取任务表单数据
    */
   getFormData(id: number) {
     return request<any, JobInfoForm>({
-      url: `${JOB_INFO_BASE_URL}/${id}/form`,
+      url: `${BASE_URL}/${id}/form`,
       method: "get",
     });
   },
 
-  /** 添加task_info*/
+  /**
+   * 新增任务
+   */
   add(data: JobInfoForm) {
     return request({
-      url: `${JOB_INFO_BASE_URL}`,
+      url: BASE_URL,
       method: "post",
-      data: data,
+      data,
     });
   },
 
   /**
-   * 更新task_info
-   *
-   * @param id TaskInfoID
-   * @param data TaskInfo表单数据
+   * 更新任务
    */
   update(id: number, data: JobInfoForm) {
     return request({
-      url: `${JOB_INFO_BASE_URL}/${id}`,
+      url: `${BASE_URL}/${id}`,
       method: "put",
-      data: data,
+      data,
     });
   },
 
   /**
-   * 批量删除task_info，多个以英文逗号(,)分割
-   *
-   * @param ids task_infoID字符串，多个以英文逗号(,)分割
+   * 批量删除任务
    */
   deleteByIds(ids: string) {
     return request({
-      url: `${JOB_INFO_BASE_URL}/${ids}`,
+      url: `${BASE_URL}/${ids}`,
       method: "delete",
     });
   },
 
-  triggerJob(data: any) {
+  /**
+   * 触发任务执行
+   */
+  triggerJob(data: TriggerJobRequest) {
     return request({
-      url: `${JOB_INFO_BASE_URL}/trigger`,
+      url: `${BASE_URL}/trigger`,
       method: "post",
-      data: data,
+      data,
     });
   },
 
+  /**
+   * 启动任务
+   */
   startJob(id: number) {
     return request({
-      url: `${JOB_INFO_BASE_URL}/startJob/${id}`,
+      url: `${BASE_URL}/startJob/${id}`,
       method: "get",
     });
   },
 
+  /**
+   * 停止任务
+   */
   stopJob(id: number) {
     return request({
-      url: `${JOB_INFO_BASE_URL}/stopJob/${id}`,
+      url: `${BASE_URL}/stopJob/${id}`,
       method: "get",
     });
   },
 
+  /**
+   * 停止任务组
+   */
   stopJobCompose(id: number, randomId: string) {
     return request({
-      url: `${JOB_INFO_BASE_URL}/stopJobCompose/${id}/${randomId}`,
+      url: `${BASE_URL}/stopJobCompose/${id}/${randomId}`,
       method: "get",
     });
   },
 
+  /**
+   * 获取下次触发时间
+   */
   nextTriggerTime(scheduleType: string, scheduleConf: string) {
     return request({
-      url: `${JOB_INFO_BASE_URL}/nextTriggerTime`,
+      url: `${BASE_URL}/nextTriggerTime`,
       method: "get",
       params: { scheduleType, scheduleConf },
     });
   },
 
-  /** 添加task_info*/
+  /**
+   * 保存任务组
+   */
   saveJobCompose(data: JobInfoForm) {
     return request({
-      url: `${JOB_INFO_BASE_URL}/saveJobCompose`,
+      url: `${BASE_URL}/saveJobCompose`,
       method: "post",
-      data: data,
+      data,
     });
   },
 
+  /**
+   * 更新任务组
+   */
   updateJobCompose(id: number, data: JobInfoForm) {
     return request({
-      url: `${JOB_INFO_BASE_URL}/updateJobCompose/${id}`,
+      url: `${BASE_URL}/updateJobCompose/${id}`,
       method: "put",
-      data: data,
+      data,
     });
   },
 
-  saveGlueSource(data: any) {
+  /**
+   * 保存 GLUE 源码
+   */
+  saveGlueSource(data: SaveGlueSourceRequest) {
     return request({
-      url: `${JOB_INFO_BASE_URL}/saveGlueSource`,
+      url: `${BASE_URL}/saveGlueSource`,
       method: "post",
-      data: data,
+      data,
     });
   },
 
+  /**
+   * 获取 GLUE 历史版本列表
+   */
   getGlueList(id: number) {
     return request({
-      url: `${JOB_INFO_BASE_URL}/getGlueList/${id}`,
+      url: `${BASE_URL}/getGlueList/${id}`,
       method: "get",
     });
   },
-  getJobCompose(data: any) {
+
+  /**
+   * 获取任务组编排数据
+   */
+  getJobCompose(data: GetJobComposeRequest) {
     return request({
-      url: `${JOB_INFO_BASE_URL}/getJobCompose`,
+      url: `${BASE_URL}/getJobCompose`,
       method: "post",
-      data: data,
+      data,
     });
   },
+
+  /**
+   * 验证任务组边是否有效
+   */
   validateJobComposeEdge(data: JobInfoForm) {
     return request({
-      url: `${JOB_INFO_BASE_URL}/validateJobComposeEdge`,
+      url: `${BASE_URL}/validateJobComposeEdge`,
       method: "post",
-      data: data,
+      data,
     });
   },
+
+  /**
+   * 暂停/恢复任务
+   */
   pauseJob(id: number, isPause: number) {
     return request({
-      url: `${JOB_INFO_BASE_URL}/pauseJob/${id}`,
+      url: `${BASE_URL}/pauseJob/${id}`,
       method: "get",
       params: { isPause },
     });
@@ -166,54 +217,61 @@ const JobInfoAPI = {
 
 export default JobInfoAPI;
 
-/** task_info分页查询参数 */
-export interface JobInfoPageQuery extends PageQuery {}
+/**
+ * 类型定义
+ */
 
-/** task_info表单对象 */
-export interface JobInfoForm {
-  id?: number;
-  /** 执行器主键ID */
+/** 任务分页查询参数 */
+export interface JobInfoPageQuery extends PageQuery {
   jobGroup?: number;
   jobDesc?: string;
-  addTime?: Date;
-  updateTime?: Date;
-  /** 作者 */
   author?: string;
-  /** 报警邮件 */
-  alarmEmail?: string;
-  /** 调度类型 */
-  scheduleType?: string;
-  /** 调度配置，值含义取决于调度类型 */
-  scheduleConf?: string;
-  /** 调度过期策略 */
-  misfireStrategy?: string;
-  /** 执行器路由策略 */
-  executorRouteStrategy?: string;
-  /** 执行器任务handler */
-  executorHandler?: string;
-  /** 执行器任务参数 */
-  executorParam?: string;
-  /** 阻塞处理策略 */
-  executorBlockStrategy?: string;
-  /** 任务执行超时时间，单位秒 */
-  executorTimeout?: number;
-  /** 失败重试次数 */
-  executorFailRetryCount?: number;
-  /** GLUE类型 */
-  glueType?: string;
-  /** GLUE源代码 */
-  glueSource?: string;
-  /** GLUE备注 */
-  glueRemark?: string;
-  /** GLUE更新时间 */
-  glueUpdatetime?: Date;
-  /** 子任务ID，多个逗号分隔 */
-  childJobid?: string;
-  /** 调度状态：0-停止，1-运行 */
   triggerStatus?: number;
-  /** 上次调度时间 */
+}
+
+/** 触发任务请求 */
+export interface TriggerJobRequest {
+  id: number;
+  executorParam?: string;
+  triggerUserId?: number;
+}
+
+/** 保存 GLUE 源码请求 */
+export interface SaveGlueSourceRequest {
+  id: number;
+  glueSource: string;
+  glueRemark?: string;
+}
+
+/** 获取任务组请求 */
+export interface GetJobComposeRequest {
+  id: number;
+  randomId?: string;
+}
+
+/** 任务表单对象 */
+export interface JobInfoForm {
+  id?: number;
+  jobGroup?: number;
+  jobDesc?: string;
+  author?: string;
+  alarmEmail?: string;
+  scheduleType?: string;
+  scheduleConf?: string;
+  misfireStrategy?: string;
+  executorRouteStrategy?: string;
+  executorHandler?: string;
+  executorParam?: string;
+  executorBlockStrategy?: string;
+  executorTimeout?: number;
+  executorFailRetryCount?: number;
+  glueType?: string;
+  glueSource?: string;
+  glueRemark?: string;
+  glueUpdatetime?: Date;
+  childJobid?: string;
+  triggerStatus?: number;
   triggerLastTime?: number;
-  /** 下次调度时间 */
   triggerNextTime?: number;
   jobType?: number;
   parentId?: number;
@@ -224,52 +282,39 @@ export interface JobInfoForm {
   nodes?: string;
   edges?: string;
   incrType?: number;
+  jdbcDatasourceId?: number;
+  incrContent?: string;
+  runTime?: number;
+  isPause?: number;
+  jobPartId?: number;
+  triggerUserId?: number;
 }
 
-/** task_info分页对象 */
+/** 任务分页对象 */
 export interface TaskInfoPageVO {
   id?: number;
-  /** 执行器主键ID */
   jobGroup?: number;
   jobDesc?: string;
   addTime?: Date;
   updateTime?: Date;
-  /** 作者 */
   author?: string;
-  /** 报警邮件 */
   alarmEmail?: string;
-  /** 调度类型 */
   scheduleType?: string;
-  /** 调度配置，值含义取决于调度类型 */
   scheduleConf?: string;
-  /** 调度过期策略 */
   misfireStrategy?: string;
-  /** 执行器路由策略 */
   executorRouteStrategy?: string;
-  /** 执行器任务handler */
   executorHandler?: string;
-  /** 执行器任务参数 */
   executorParam?: string;
-  /** 阻塞处理策略 */
   executorBlockStrategy?: string;
-  /** 任务执行超时时间，单位秒 */
   executorTimeout?: number;
-  /** 失败重试次数 */
   executorFailRetryCount?: number;
-  /** GLUE类型 */
   glueType?: string;
-  /** GLUE源代码 */
   glueSource?: string;
-  /** GLUE备注 */
   glueRemark?: string;
-  /** GLUE更新时间 */
   glueUpdatetime?: Date;
-  /** 子任务ID，多个逗号分隔 */
   childJobid?: string;
-  /** 调度状态：0-停止，1-运行 */
   triggerStatus?: number;
-  /** 上次调度时间 */
   triggerLastTime?: number;
-  /** 下次调度时间 */
   triggerNextTime?: number;
+  jobType?: number;
 }

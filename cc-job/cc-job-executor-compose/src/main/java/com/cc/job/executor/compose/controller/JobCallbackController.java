@@ -1,5 +1,6 @@
 package com.cc.job.executor.compose.controller;
 
+import com.cc.job.executor.compose.core.service.TaskWrapperFactory;
 import com.cc.job.executor.compose.dto.JobGroupDataRequest;
 import com.cc.job.executor.compose.handler.JobGroupExecutorComplete;
 import org.slf4j.Logger;
@@ -62,7 +63,7 @@ public class JobCallbackController {
         
         try {
             // 将结果写入 jobResultMap
-            JobGroupExecutorComplete.addJobResult(executeKey, success);
+            TaskWrapperFactory.getJobResults().put(executeKey, success);
             
             result.put("code", 200);
             result.put("message", "任务结果记录成功");

@@ -22,7 +22,6 @@ import com.cc.job.admin.task.service.JobLogService;
 import com.cc.job.xo.model.entity.JobLog;
 import com.cc.job.xo.model.query.JobLogQuery;
 import com.cc.job.xo.model.vo.JobLogVO;
-import com.cc.job.admin.task.converter.TaskLogConverter;
 
 import java.time.ZoneOffset;
 import java.util.ArrayList;
