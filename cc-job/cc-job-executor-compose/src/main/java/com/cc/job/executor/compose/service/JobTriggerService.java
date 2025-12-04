@@ -165,8 +165,8 @@ public class JobTriggerService {
         triggerParam.setGlueType(jobInfo.getGlueType());
         triggerParam.setGlueSource(jobInfo.getGlueSource());
         
-        if (jobInfo.getGlueUpdatetime() != null) {
-            triggerParam.setGlueUpdatetime(jobInfo.getGlueUpdatetime().toInstant(ZoneOffset.of("+8")).toEpochMilli());
+        if (jobInfo.getGlueUpdateTime() != null) {
+            triggerParam.setGlueUpdateTime(jobInfo.getGlueUpdateTime().toInstant(ZoneOffset.of("+8")).toEpochMilli());
         }
         
         triggerParam.setBroadcastIndex(broadcastIndex);

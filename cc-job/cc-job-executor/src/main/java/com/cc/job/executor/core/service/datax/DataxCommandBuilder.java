@@ -44,7 +44,7 @@ public class DataxCommandBuilder {
         cmdList.add(jsonFile);
         
         // 如果是增量同步，添加参数
-        if (jobInfo.getIncrType() == ExecutorConstants.DataxType.INCREMENTAL) {
+        if (jobInfo.getIncrementType() == ExecutorConstants.DataxType.INCREMENTAL) {
             addIncrementalParams(cmdList, jobInfo);
         }
         
@@ -61,7 +61,7 @@ public class DataxCommandBuilder {
         cmdList.add(PARAM);
         
         StringBuilder paramBuilder = new StringBuilder();
-        JSONArray jsonArray = JSONUtil.parseArray(jobInfo.getIncrContent());
+        JSONArray jsonArray = JSONUtil.parseArray(jobInfo.getIncrementContent());
         List<DataxColumn> columns = jsonArray.toList(DataxColumn.class);
         
         for (DataxColumn column : columns) {

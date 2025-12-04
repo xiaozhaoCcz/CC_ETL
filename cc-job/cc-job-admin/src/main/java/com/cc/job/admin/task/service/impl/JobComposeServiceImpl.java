@@ -203,7 +203,7 @@ public class JobComposeServiceImpl implements JobComposeService {
                 }
                 
                 JobInfo copyJobInfo = BeanUtil.copyProperties(jobInfo1, JobInfo.class, "id");
-                copyJobInfo.setIsNode("Y");
+                copyJobInfo.setNodeFlag("Y");
                 copyJobInfo.setParentId(jobInfo.getId());
                 newJobInfos.add(copyJobInfo);
                 originalToNewMap.put(jobId, copyJobInfo);
@@ -334,12 +334,12 @@ public class JobComposeServiceImpl implements JobComposeService {
                 throw new BusinessException("任务组不存在，id: " + id);
             }
             // ⭐ 修复：保存原有的 isNode 和 jobType 字段，避免被覆盖
-            String originalIsNode = existsJobInfo.getIsNode();
+            String originalIsNode = existsJobInfo.getNodeFlag();
             Integer originalJobType = existsJobInfo.getJobType();
             
             JobInfo jobInfo = jobInfoService.baseUpdateJobInfo(id, formData);
             // ⭐ 修复：恢复原有的 isNode 和 jobType 字段
-            jobInfo.setIsNode(originalIsNode);
+            jobInfo.setNodeFlag(originalIsNode);
             jobInfo.setJobType(originalJobType);
             jobInfoService.updateById(jobInfo);
             return true;
@@ -356,12 +356,12 @@ public class JobComposeServiceImpl implements JobComposeService {
         if (existsJobInfo == null) {
             throw new BusinessException("任务组不存在，id: " + id);
         }
-        String originalIsNode = existsJobInfo.getIsNode();
+        String originalIsNode = existsJobInfo.getNodeFlag();
         Integer originalJobType = existsJobInfo.getJobType();
         
         JobInfo jobInfo = jobInfoService.baseUpdateJobInfo(id, formData);
         // ⭐ 修复：恢复原有的 isNode 和 jobType 字段
-        jobInfo.setIsNode(originalIsNode);
+        jobInfo.setNodeFlag(originalIsNode);
         jobInfo.setJobType(originalJobType);
         jobInfoService.updateById(jobInfo);
 
@@ -437,7 +437,7 @@ public class JobComposeServiceImpl implements JobComposeService {
                 if (copyJobInfo == null) {
                     throw new BusinessException("复制任务信息失败，jobId: " + jobId);
                 }
-                copyJobInfo.setIsNode("Y");
+                copyJobInfo.setNodeFlag("Y");
                 copyJobInfo.setParentId(jobInfo.getId());
                 jobInfoService.save(copyJobInfo);
 
@@ -496,7 +496,7 @@ public class JobComposeServiceImpl implements JobComposeService {
                     if (copyJobInfo == null) {
                         throw new BusinessException("复制任务信息失败，jobId: " + jobId);
                     }
-                    copyJobInfo.setIsNode("Y");
+                    copyJobInfo.setNodeFlag("Y");
                     copyJobInfo.setParentId(jobInfo.getId());
                     jobInfoService.save(copyJobInfo);
 
@@ -696,7 +696,7 @@ public class JobComposeServiceImpl implements JobComposeService {
         rootJobNodeVo.setJobId(jobInfo.getId());
         rootJobNodeVo.setNodeType(DYNAMIC_GROUP);
         rootJobNodeVo.setJobName(jobInfo.getJobDesc());
-        rootJobNodeVo.setIsPause(jobInfo.getIsPause());
+        rootJobNodeVo.setPauseStatus(jobInfo.getPauseStatus());
 
         List<JobNodeVo> rootLevelNodes = allNodeVos.stream()
                 .filter(node -> node.getJobParentId() != null && node.getJobParentId().equals(id))
@@ -779,7 +779,7 @@ public class JobComposeServiceImpl implements JobComposeService {
             nodeVo.setJobName(jobInfo.getJobDesc());
             nodeVo.setId(node.getId().toString());
             nodeVo.setJobParentId(node.getJobParentId());
-            nodeVo.setIsPause(jobInfo.getIsPause());
+            nodeVo.setPauseStatus(jobInfo.getPauseStatus());
             nodeVo.setNodeInDegree(inDegreeMap.getOrDefault(node.getId(), 0L));
             nodeVo.setNodeOutDegree(outDegreeMap.getOrDefault(node.getId(), 0L));
 
@@ -947,9 +947,9 @@ public class JobComposeServiceImpl implements JobComposeService {
     @Override
     public JobNode saveJobNode(JobInfoForm formData) {
         JobInfo jobInfo = BeanUtil.copyProperties(formData, JobInfo.class);
-        jobInfo.setGlueUpdatetime(LocalDateTime.now());
-        jobInfo.setIsNode("Y");
-        jobInfo.setIsPause(0);
+        jobInfo.setGlueUpdateTime(LocalDateTime.now());
+        jobInfo.setNodeFlag("Y");
+        jobInfo.setPauseStatus(0);
         jobInfoService.save(jobInfo);
 
         if (StringUtils.isNotBlank(formData.getGlueRemark())) {
@@ -994,7 +994,7 @@ public class JobComposeServiceImpl implements JobComposeService {
         List<Long> list = new ArrayList<>();
         List<JobInfo> jobInfoList = jobInfoService.listByIds(Arrays.asList(jobIds));
         jobInfoList.forEach(jobInfo -> {
-            if(jobInfo.getIsPause()==1){
+            if(jobInfo.getPauseStatus()==1){
                 list.add(jobInfo.getId());
             }
         });
@@ -1074,8 +1074,8 @@ public class JobComposeServiceImpl implements JobComposeService {
             JobInfo jobInfo = BeanUtil.copyProperties(originalJobInfo, JobInfo.class);
             jobInfo.setJobDesc(jobInfo.getJobDesc() + "_copy");
             jobInfo.setParentId(Long.parseLong(String.valueOf(parentId)));
-            jobInfo.setIsNode("Y");
-            jobInfo.setIsPause(0);
+            jobInfo.setNodeFlag("Y");
+            jobInfo.setPauseStatus(0);
             jobInfo.setId(null);
             newJobInfos.add(jobInfo);
         }
@@ -1486,7 +1486,7 @@ public class JobComposeServiceImpl implements JobComposeService {
             
             jobNodeVo.setJobName(jobInfo.getJobDesc());
             jobNodeVo.setId(randomId + node.getId());
-            jobNodeVo.setIsPause(jobInfo.getIsPause());
+            jobNodeVo.setPauseStatus(jobInfo.getPauseStatus());
             // 修复bug：节点运行状态处理
             // -1 = 未运行（白色背景）
             // 0 = 失败（红色背景）

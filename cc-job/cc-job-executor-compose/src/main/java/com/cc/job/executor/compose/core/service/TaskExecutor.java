@@ -81,7 +81,7 @@ public class TaskExecutor {
             return;
         }
         
-        boolean isPaused = latestJobInfo.getIsPause() != null && latestJobInfo.getIsPause() == 1;
+        boolean isPaused = latestJobInfo.getPauseStatus() != null && latestJobInfo.getPauseStatus() == 1;
         if (!isPaused) {
             return;
         }
@@ -96,7 +96,7 @@ public class TaskExecutor {
             
             JobInfo checkJobInfo = adminApiClient.getJobInfo(jobInfo.getId());
             if (checkJobInfo != null) {
-                isPaused = checkJobInfo.getIsPause() != null && checkJobInfo.getIsPause() == 1;
+                isPaused = checkJobInfo.getPauseStatus() != null && checkJobInfo.getPauseStatus() == 1;
             }
         }
         

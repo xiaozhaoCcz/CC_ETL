@@ -238,7 +238,7 @@ public class MainView extends BorderPane {
                                             // 设为 CUSTOM_GROUP，后端 NODE_TYPE_MAP 映射为 custom-group
                                             groupNodeForm.setGlueType("CUSTOM_GROUP");
                                             groupNodeForm.setExecutorHandler("runJobGroupXxlJob");
-                                            groupNodeForm.setGlueUpdatetime(null);
+                                            groupNodeForm.setGlueUpdateTime(null);
                                             com.cc.job.xo.model.entity.JobNode savedGroupNode = jobInfoService.saveJobNode(groupNodeForm);
                                             if (savedGroupNode != null) {
                                                 groupContainerJobIdRef[0] = savedGroupNode.getJobId();
@@ -377,7 +377,7 @@ public class MainView extends BorderPane {
                                                 copyForm.setExecutorRouteStrategy("FIRST");
                                             }
                                             // 避免 LocalDateTime 反序列化格式错误（后端自行维护该时间）
-                                            copyForm.setGlueUpdatetime(null);
+                                            copyForm.setGlueUpdateTime(null);
                                             
                                             // 保存为新节点（包括任务组节点本身）
                                             com.cc.job.xo.model.entity.JobNode saved = jobInfoService.saveJobNode(copyForm);
@@ -2476,7 +2476,7 @@ public class MainView extends BorderPane {
                     if (formData.getExecutorRouteStrategy() == null || formData.getExecutorRouteStrategy().isEmpty()) {
                         formData.setExecutorRouteStrategy("FIRST");
                     }
-                    formData.setGlueUpdatetime(null);
+                    formData.setGlueUpdateTime(null);
 
                     logPanel.info("正在保存到数据库...");
 
@@ -3409,7 +3409,7 @@ public class MainView extends BorderPane {
                 copyForm.setNodePositionY(sourceNode.getLayoutY() + 40);
                 
                 // 清除不应该复制的字段
-                copyForm.setGlueUpdatetime(null); // GLUE更新时间应该由后端管理
+                copyForm.setGlueUpdateTime(null); // GLUE更新时间应该由后端管理
                 
                 // 确保必填字段不为空
                 if (copyForm.getExecutorParam() == null) {
@@ -3505,7 +3505,7 @@ public class MainView extends BorderPane {
                 pasteForm.setNodePositionY(pastePosition[1]);
                 
                 // 清除不应该复制的字段
-                pasteForm.setGlueUpdatetime(null);
+                pasteForm.setGlueUpdateTime(null);
                 
                 // 确保必填字段不为空
                 if (pasteForm.getExecutorParam() == null) {
@@ -3619,7 +3619,7 @@ public class MainView extends BorderPane {
                         pasteForm.setNodePositionY(originalY + offsetY);
                         
                         // 清除不应该复制的字段
-                        pasteForm.setGlueUpdatetime(null);
+                        pasteForm.setGlueUpdateTime(null);
                         
                         // 确保必填字段不为空
                         if (pasteForm.getExecutorParam() == null) {
@@ -4058,9 +4058,9 @@ public class MainView extends BorderPane {
         appendDetailLine(sb, "请求体", form.getReqBody());
         appendDetailLine(sb, "节点X坐标", form.getNodePositionX());
         appendDetailLine(sb, "节点Y坐标", form.getNodePositionY());
-        appendDetailLine(sb, "子任务", form.getChildJobid());
-        appendDetailLine(sb, "增量类型", form.getIncrType());
-        appendDetailLine(sb, "增量内容", form.getIncrContent());
+        appendDetailLine(sb, "子任务", form.getChildJobId());
+        appendDetailLine(sb, "增量类型", form.getIncrementType());
+        appendDetailLine(sb, "增量内容", form.getIncrementContent());
         return sb.length() == 0 ? "暂无更多配置信息" : sb.toString();
     }
 
@@ -4629,7 +4629,7 @@ public class MainView extends BorderPane {
                     if (copyForm.getExecutorRouteStrategy() == null || copyForm.getExecutorRouteStrategy().isEmpty()) {
                         copyForm.setExecutorRouteStrategy("FIRST");
                     }
-                    copyForm.setGlueUpdatetime(null);
+                    copyForm.setGlueUpdateTime(null);
                     
                     // 先保存当前任务组节点
                     com.cc.job.xo.model.entity.JobNode savedNestedGroup = jobInfoService.saveJobNode(copyForm);
@@ -4674,7 +4674,7 @@ public class MainView extends BorderPane {
                     if (copyForm.getExecutorRouteStrategy() == null || copyForm.getExecutorRouteStrategy().isEmpty()) {
                         copyForm.setExecutorRouteStrategy("FIRST");
                     }
-                    copyForm.setGlueUpdatetime(null);
+                    copyForm.setGlueUpdateTime(null);
                     
                     com.cc.job.xo.model.entity.JobNode saved = jobInfoService.saveJobNode(copyForm);
                     if (saved != null) {

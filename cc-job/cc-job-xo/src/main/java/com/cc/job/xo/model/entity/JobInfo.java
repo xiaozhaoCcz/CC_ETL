@@ -85,11 +85,11 @@ public class JobInfo extends BaseEntity {
     /**
      * GLUE更新时间
      */
-    private LocalDateTime glueUpdatetime;
+    private LocalDateTime glueUpdateTime;
     /**
      * 子任务ID，多个逗号分隔
      */
-    private String childJobid;
+    private String childJobId;
     /**
      * 调度状态：0-停止，1-运行
      */
@@ -102,34 +102,60 @@ public class JobInfo extends BaseEntity {
      * 下次调度时间
      */
     private Long triggerNextTime;
-
+    /**
+     * 任务类型：0-普通任务，2-任务组
+     */
     private Integer jobType;
-
+    /**
+     * 父任务ID
+     */
     private Long parentId;
-
+    /**
+     * 请求类型（API任务专用）
+     */
     private String reqType;
-
+    /**
+     * 请求头（API任务专用）
+     */
     private String reqHeader;
-
+    /**
+     * 请求体（API任务专用）
+     */
     private String reqBody;
-
+    /**
+     * 请求URL（API任务专用）
+     */
     private String reqUrl;
-
-    private String isNode;
-
-    private Integer rankTriggerStatus;
-
+    /**
+     * 节点标识：Y-是节点，N-不是节点
+     */
+    private String nodeFlag;
+    /**
+     * JDBC数据源ID
+     */
     private Long jdbcDatasourceId;
-
-    private Integer incrType;
-
-    private String incrContent;
-
+    /**
+     * 增量类型：0-全量，1-增量
+     */
+    private Integer incrementType;
+    /**
+     * 增量字段配置（JSON格式）
+     */
+    private String incrementContent;
+    /**
+     * 最近一次运行耗时（毫秒）
+     */
     private Long runTime;
-
-    private Integer isPause;
-
+    /**
+     * 暂停状态：0-运行，1-暂停
+     */
+    private Integer pauseStatus;
+    /**
+     * 任务分区ID
+     */
     private Integer jobPartId;
-
+    /**
+     * 触发用户ID
+     */
     private Integer triggerUserId;
 }

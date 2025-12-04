@@ -7,6 +7,7 @@ import com.cc.job.admin.task.service.JobInfoService;
 import com.cc.job.admin.task.service.JobNodeService;
 import com.cc.job.admin.task.service.JobPartService;
 import com.cc.job.xo.mapper.JobPartMapper;
+import com.cc.job.xo.model.dto.PartitionExportData;
 import com.cc.job.xo.model.entity.JobEdge;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobNode;
@@ -50,7 +51,7 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
         // 获取所有的分区
         List<JobPart> jobPartList = this.list();
 
-        List<JobInfo> jobInfoList = jobInfoService.list(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getJobType, 2).eq(JobInfo::getIsNode, "N"));
+        List<JobInfo> jobInfoList = jobInfoService.list(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getJobType, 2).eq(JobInfo::getNodeFlag, "N"));
 
         Map<Integer, List<JobInfo>> jobInfoMap = jobInfoList.stream().collect(Collectors.groupingBy(JobInfo::getJobPartId));
 
@@ -236,7 +237,7 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
             new LambdaQueryWrapper<JobInfo>()
                 .eq(JobInfo::getJobPartId, id)
                 .eq(JobInfo::getJobType, 2)
-                .eq(JobInfo::getIsNode, "N")
+                .eq(JobInfo::getNodeFlag, "N")
         );
 
         List<com.cc.job.xo.model.dto.PartitionExportData.TaskGroupInfo> taskGroupInfoList = new ArrayList<>();
@@ -365,7 +366,7 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
         taskInfoData.setGlueType(jobInfo.getGlueType());
         taskInfoData.setGlueSource(jobInfo.getGlueSource());
         taskInfoData.setGlueRemark(jobInfo.getGlueRemark());
-        taskInfoData.setChildJobid(jobInfo.getChildJobid());
+        taskInfoData.setChildJobId(jobInfo.getChildJobId());
         taskInfoData.setTriggerStatus(jobInfo.getTriggerStatus());
         taskInfoData.setTriggerLastTime(jobInfo.getTriggerLastTime());
         taskInfoData.setTriggerNextTime(jobInfo.getTriggerNextTime());
@@ -375,13 +376,12 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
         taskInfoData.setReqHeader(jobInfo.getReqHeader());
         taskInfoData.setReqBody(jobInfo.getReqBody());
         taskInfoData.setReqUrl(jobInfo.getReqUrl());
-        taskInfoData.setIsNode(jobInfo.getIsNode());
-        taskInfoData.setRankTriggerStatus(jobInfo.getRankTriggerStatus());
+        taskInfoData.setNodeFlag(jobInfo.getNodeFlag());
         taskInfoData.setJdbcDatasourceId(jobInfo.getJdbcDatasourceId());
-        taskInfoData.setIncrType(jobInfo.getIncrType());
-        taskInfoData.setIncrContent(jobInfo.getIncrContent());
+        taskInfoData.setIncrementType(jobInfo.getIncrementType());
+        taskInfoData.setIncrementContent(jobInfo.getIncrementContent());
         taskInfoData.setRunTime(jobInfo.getRunTime());
-        taskInfoData.setIsPause(jobInfo.getIsPause());
+        taskInfoData.setPauseStatus(jobInfo.getPauseStatus());
         taskInfoData.setJobPartId(jobInfo.getJobPartId());
         taskInfoData.setTriggerUserId(jobInfo.getTriggerUserId());
         return taskInfoData;
@@ -438,7 +438,7 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
                 newTaskGroup.setId(null); // 清除ID，让数据库自动生成
                 newTaskGroup.setJobPartId(Integer.parseInt(String.valueOf(newPartitionId)));
                 newTaskGroup.setJobType(2);
-                newTaskGroup.setIsNode("N");
+                newTaskGroup.setNodeFlag("N");
                 newTaskGroup.setTriggerStatus(0); // 默认停止状态
                 jobInfoService.save(newTaskGroup);
                 
@@ -524,7 +524,7 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
     /**
      * 将TaskInfoData转换为JobInfo
      */
-    private JobInfo convertToJobInfo(com.cc.job.xo.model.dto.PartitionExportData.TaskInfoData taskInfoData) {
+    private JobInfo convertToJobInfo(PartitionExportData.TaskInfoData taskInfoData) {
         JobInfo jobInfo = new JobInfo();
         jobInfo.setJobGroup(taskInfoData.getJobGroup());
         jobInfo.setJobDesc(taskInfoData.getJobDesc());
@@ -542,7 +542,7 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
         jobInfo.setGlueType(taskInfoData.getGlueType());
         jobInfo.setGlueSource(taskInfoData.getGlueSource());
         jobInfo.setGlueRemark(taskInfoData.getGlueRemark());
-        jobInfo.setChildJobid(taskInfoData.getChildJobid());
+        jobInfo.setChildJobId(taskInfoData.getChildJobId());
         jobInfo.setTriggerStatus(taskInfoData.getTriggerStatus());
         jobInfo.setTriggerLastTime(taskInfoData.getTriggerLastTime());
         jobInfo.setTriggerNextTime(taskInfoData.getTriggerNextTime());
@@ -552,13 +552,12 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
         jobInfo.setReqHeader(taskInfoData.getReqHeader());
         jobInfo.setReqBody(taskInfoData.getReqBody());
         jobInfo.setReqUrl(taskInfoData.getReqUrl());
-        jobInfo.setIsNode(taskInfoData.getIsNode());
-        jobInfo.setRankTriggerStatus(taskInfoData.getRankTriggerStatus());
+        jobInfo.setNodeFlag(taskInfoData.getNodeFlag());
         jobInfo.setJdbcDatasourceId(taskInfoData.getJdbcDatasourceId());
-        jobInfo.setIncrType(taskInfoData.getIncrType());
-        jobInfo.setIncrContent(taskInfoData.getIncrContent());
+        jobInfo.setIncrementType(taskInfoData.getIncrementType());
+        jobInfo.setIncrementContent(taskInfoData.getIncrementContent());
         jobInfo.setRunTime(taskInfoData.getRunTime());
-        jobInfo.setIsPause(taskInfoData.getIsPause());
+        jobInfo.setPauseStatus(taskInfoData.getPauseStatus());
         jobInfo.setJobPartId(taskInfoData.getJobPartId());
         jobInfo.setTriggerUserId(taskInfoData.getTriggerUserId());
         return jobInfo;

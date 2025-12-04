@@ -79,7 +79,7 @@ public class DataxServiceImpl implements DataxService {
                     dataXParamsR.setTableName(readerTableName);
                     dataXParamsR.setColumns(tableNames);
                     dataXParamsR.setType(0);
-                    dataXParamsR.setIncrType(0);
+                    dataXParamsR.setIncrementType(0);
                     String readerJson = this.getJson(dataXParamsR);
 
                     DataXParams dataXParamsW = new DataXParams();
@@ -95,7 +95,7 @@ public class DataxServiceImpl implements DataxService {
                     dataXParamsW.setTableName(writerTableName);
                     dataXParamsW.setColumns(tableNamesW);
                     dataXParamsW.setType(1);
-                    dataXParamsW.setIncrType(0);
+                    dataXParamsW.setIncrementType(0);
                     dataXParamsW.setWriteMode("update");
                     String writerJson = this.getJson(dataXParamsW);
 
@@ -131,7 +131,7 @@ public class DataxServiceImpl implements DataxService {
             jobInfoForm.setExecutorBlockStrategy(String.valueOf(((Map<?,?>) formData).get("executorBlockStrategy")));
             jobInfoForm.setGlueType("DATAX");
             jobInfoForm.setExecutorHandler("runDataxHandler");
-            jobInfoForm.setIncrType(0);
+            jobInfoForm.setIncrementType(0);
         }
         return jobInfoForm;
     }

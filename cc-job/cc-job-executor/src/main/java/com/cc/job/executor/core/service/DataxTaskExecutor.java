@@ -95,7 +95,7 @@ public class DataxTaskExecutor {
             logger.info("[DataxTaskExecutor] DataX任务执行成功 - jobId: {}", jobInfo.getId());
             
             // 如果是增量同步，更新增量标记
-            if (jobInfo.getIncrType() == ExecutorConstants.DataxType.INCREMENTAL) {
+            if (jobInfo.getIncrementType() == ExecutorConstants.DataxType.INCREMENTAL) {
                 dataRefresher.refreshIncrementalData(jobInfo);
             }
         } else {

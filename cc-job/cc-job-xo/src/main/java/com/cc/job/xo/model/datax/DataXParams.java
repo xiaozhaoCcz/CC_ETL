@@ -35,10 +35,10 @@ public class DataXParams implements Serializable {
     private Integer type;
 
     // 0全量，1增量
-    private Integer incrType;
+    private Integer incrementType;
 
     // 增量字段，json
-    private String incrContent;
+    private String incrementContent;
 
     private String schemaName;
 }

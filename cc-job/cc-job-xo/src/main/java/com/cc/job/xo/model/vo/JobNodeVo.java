@@ -35,7 +35,7 @@ public class JobNodeVo implements Serializable {
 
     private String nodeType;
 
-    private Integer isPause;
+    private Integer pauseStatus;
 
     private List<JobNodeVo> childrenNodes = new ArrayList<>();
 

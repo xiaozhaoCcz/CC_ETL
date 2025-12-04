@@ -493,7 +493,7 @@
 //     */
 //    private void pauseJob(JobInfo jobInfo) {
 //        // 重新获取jobInfo
-//        boolean isPause = jobInfo.getIsPause() == 1;
+//        boolean isPause = jobInfo.getPauseStatus() == 1;
 //        if (isPause) {
 //            logger.info("[JobGroup] 任务处于暂停状态，等待恢复 - jobId: {}, 任务名称: {}",
 //                    jobInfo.getId(), jobInfo.getJobDesc());
@@ -514,7 +514,7 @@
 //                throw new RuntimeException(e);
 //            }
 //            JobInfo jobInfoModel = jobInfoService.getById(jobInfo.getId());
-//            isPause = jobInfoModel.getIsPause() == 1;
+//            isPause = jobInfoModel.getPauseStatus() == 1;
 //        }
 //        if (!isPause) {
 //            logger.info("[JobGroup] 任务恢复执行 - jobId: {}, 任务名称: {}", jobInfo.getId(), jobInfo.getJobDesc());

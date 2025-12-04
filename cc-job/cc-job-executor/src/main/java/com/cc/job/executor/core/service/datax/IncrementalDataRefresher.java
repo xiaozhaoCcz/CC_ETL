@@ -144,7 +144,7 @@ public class IncrementalDataRefresher {
         String querySql = configMap.get(QUERY_SQL);
         String tableName = configMap.get(TABLE);
         
-        JSONArray jsonArray = JSONUtil.parseArray(jobInfo.getIncrContent());
+        JSONArray jsonArray = JSONUtil.parseArray(jobInfo.getIncrementContent());
         List<DataxColumn> columnList = jsonArray.toList(DataxColumn.class);
         
         if (StringUtils.isNotBlank(querySql)) {
@@ -324,7 +324,7 @@ public class IncrementalDataRefresher {
      */
     private void saveIncrementalData(JobInfo jobInfo, List<DataxColumn> columnList) {
         String jsonStr = JSONUtil.toJsonStr(columnList);
-        jobInfo.setIncrContent(jsonStr);
+        jobInfo.setIncrementContent(jsonStr);
         jobInfoMapper.updateById(jobInfo);
         logger.info("[IncrementalRefresher] 增量标记已更新 - jobId: {}", jobInfo.getId());
     }

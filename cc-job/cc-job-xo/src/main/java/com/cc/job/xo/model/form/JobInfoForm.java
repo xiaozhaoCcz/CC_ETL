@@ -89,10 +89,10 @@ public class JobInfoForm implements Serializable {
     private String glueRemark;
 
     @Schema(description = "GLUE更新时间")
-    private LocalDateTime glueUpdatetime;
+    private LocalDateTime glueUpdateTime;
 
     @Schema(description = "子任务ID，多个逗号分隔")
-    private String childJobid;
+    private String childJobId;
 
     private Integer jobType;
 
@@ -112,11 +112,11 @@ public class JobInfoForm implements Serializable {
 
     private Long jdbcDatasourceId;
 
-    private Integer incrType;
+    private Integer incrementType;
 
-    private String incrContent;
+    private String incrementContent;
 
-    private Integer isPause;
+    private Integer pauseStatus;
 
     private Integer jobPartId;
 

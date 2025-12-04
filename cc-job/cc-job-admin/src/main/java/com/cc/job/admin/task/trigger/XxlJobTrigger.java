@@ -156,7 +156,7 @@ public class XxlJobTrigger {
         triggerParam.setLogDateTime(jobLog.getTriggerTime().toInstant(ZoneOffset.of("+8")).toEpochMilli());
         triggerParam.setGlueType(jobInfo.getGlueType());
         triggerParam.setGlueSource(jobInfo.getGlueSource());
-        triggerParam.setGlueUpdatetime(jobInfo.getGlueUpdatetime().toInstant(ZoneOffset.of("+8")).toEpochMilli());
+        triggerParam.setGlueUpdateTime(jobInfo.getGlueUpdateTime().toInstant(ZoneOffset.of("+8")).toEpochMilli());
         triggerParam.setBroadcastIndex(index);
         triggerParam.setBroadcastTotal(total);
         //设置请求信息

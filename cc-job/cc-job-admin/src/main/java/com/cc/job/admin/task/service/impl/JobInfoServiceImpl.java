@@ -128,7 +128,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         }
 
         wrapper.in(JobInfo::getJobType, 0, 2);
-        wrapper.in(JobInfo::getIsNode, "N");
+        wrapper.in(JobInfo::getNodeFlag, "N");
         wrapper.orderByDesc(JobInfo::getUpdateTime);
 
         Page<JobInfo> page = this.page(new Page<>(queryParams.getPageNum(), queryParams.getPageSize()), wrapper);
@@ -233,7 +233,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     }
 
     public void updateChild(JobInfo taskInfo) {
-        if (taskInfo.getJobType() == 2 && "Y".equalsIgnoreCase(taskInfo.getIsNode())) {
+        if (taskInfo.getJobType() == 2 && "Y".equalsIgnoreCase(taskInfo.getNodeFlag())) {
             //下面的子节点全部更新
             List<JobInfo> taskInfos = this.list(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getParentId, taskInfo.getId()));
             for (JobInfo info : taskInfos) {
@@ -300,7 +300,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         }
 
         // 检查是否正在运行（使用行锁后，这里是线程安全的）
-        if (taskInfo.getJobType() == 2 && taskInfo.getRankTriggerStatus() == 1) {
+        if (taskInfo.getJobType() == 2 && taskInfo.getTriggerStatus() == 1) {
             throw new BusinessException("当前任务正在运行中，请等待完成后再运行");
         }
 
@@ -358,7 +358,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         }
         
         // 原子性设置运行状态（在事务中，行锁保护）
-        taskInfo.setRankTriggerStatus(1);
+        taskInfo.setTriggerStatus(1);
         this.updateById(taskInfo);
 
         // 返回日志ID（字符串格式）
@@ -523,7 +523,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
             JobInfo copyTaskInfo = BeanUtil.copyProperties(taskInfo, JobInfo.class);
             copyTaskInfo.setId(null);
-            copyTaskInfo.setIsNode("Y");
+            copyTaskInfo.setNodeFlag("Y");
             copyTaskInfo.setParentId(parentTask.getId());
             newJobInfos.add(copyTaskInfo);
             nodeToJobInfoIndex.put(taskNode, newJobInfos.size() - 1);
@@ -653,8 +653,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
             throw new BusinessException(I18nUtil.getString("jobinfo_field_executorBlockStrategy") + I18nUtil.getString("system_unvalid"));
         }
 
-        if (formData.getChildJobid() != null && formData.getChildJobid().trim().length() > 0) {
-            String[] childJobIds = formData.getChildJobid().split(",");
+        if (formData.getChildJobId() != null && formData.getChildJobId().trim().length() > 0) {
+            String[] childJobIds = formData.getChildJobId().split(",");
             List<Integer> validJobIds = new ArrayList<>();
             
             // 优化：批量查询所有子任务，避免N+1查询问题
@@ -692,11 +692,11 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
                 temp.append(childJobIds[i]);
             }
 
-            formData.setChildJobid(temp.toString());
+            formData.setChildJobId(temp.toString());
         }
-        formData.setGlueUpdatetime(LocalDateTime.now());
+        formData.setGlueUpdateTime(LocalDateTime.now());
         JobInfo taskInfo = BeanUtil.copyProperties(formData, JobInfo.class);
-        taskInfo.setIsNode("N");
+        taskInfo.setNodeFlag("N");
         return taskInfo;
     }
 
@@ -742,7 +742,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
                 JobInfo copyTaskInfo = this.getById(taskId);
                 copyTaskInfo.setId(null);
                 copyTaskInfo.setParentId(id);
-                copyTaskInfo.setIsNode("Y");
+                copyTaskInfo.setNodeFlag("Y");
                 this.save(copyTaskInfo);
                 node.setJobId(copyTaskInfo.getId());
                 // 修复：新创建的节点，triggerStatus设置为-1表示未运行状态（白色背景）
@@ -897,7 +897,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         JobInfo taskInfo = this.getById(formData.getTaskId());
         taskInfo.setGlueRemark(formData.getGlueRemark());
         taskInfo.setGlueSource(formData.getGlueSource());
-        taskInfo.setGlueUpdatetime(LocalDateTime.now());
+        taskInfo.setGlueUpdateTime(LocalDateTime.now());
         // 如果传入了glueType，则更新taskInfo的glueType
         if (formData.getGlueType() != null && !formData.getGlueType().isEmpty()) {
             taskInfo.setGlueType(formData.getGlueType());
@@ -1009,8 +1009,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         }
 
         // 》ChildJobId valid
-        if (formData.getChildJobid() != null && formData.getChildJobid().trim().length() > 0) {
-            String[] childJobIds = formData.getChildJobid().split(",");
+        if (formData.getChildJobId() != null && formData.getChildJobId().trim().length() > 0) {
+            String[] childJobIds = formData.getChildJobId().split(",");
             for (String childJobIdItem : childJobIds) {
                 if (childJobIdItem != null && childJobIdItem.trim().length() > 0 && isNumeric(childJobIdItem)) {
                     JobInfo childJobInfo = this.getById(Integer.parseInt(childJobIdItem));
@@ -1031,7 +1031,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
             }
             temp = temp.substring(0, temp.length() - 1);
 
-            formData.setChildJobid(temp);
+            formData.setChildJobId(temp);
         }
 
         // group valid
@@ -1064,7 +1064,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         }
 
         BeanUtil.copyProperties(formData, existsJobInfo);
-        existsJobInfo.setGlueUpdatetime(LocalDateTime.now());
+        existsJobInfo.setGlueUpdateTime(LocalDateTime.now());
         existsJobInfo.setTriggerNextTime(nextTriggerTime);
         return existsJobInfo;
     }

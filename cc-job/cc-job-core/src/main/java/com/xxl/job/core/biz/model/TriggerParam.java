@@ -22,7 +22,7 @@ public class TriggerParam implements Serializable{
 
     private String glueType;
     private String glueSource;
-    private long glueUpdatetime;
+    private long glueUpdateTime;
 
     private int broadcastIndex;
     private int broadcastTotal;
@@ -171,12 +171,12 @@ public class TriggerParam implements Serializable{
         this.glueSource = glueSource;
     }
 
-    public long getGlueUpdatetime() {
-        return glueUpdatetime;
+    public long getGlueUpdateTime() {
+        return glueUpdateTime;
     }
 
-    public void setGlueUpdatetime(long glueUpdatetime) {
-        this.glueUpdatetime = glueUpdatetime;
+    public void setGlueUpdateTime(long glueUpdateTime) {
+        this.glueUpdateTime = glueUpdateTime;
     }
 
     public int getBroadcastIndex() {
@@ -208,7 +208,7 @@ public class TriggerParam implements Serializable{
                 ", logDateTime=" + logDateTime +
                 ", glueType='" + glueType + '\'' +
                 ", glueSource='" + glueSource + '\'' +
-                ", glueUpdatetime=" + glueUpdatetime +
+                ", glueUpdateTime=" + glueUpdateTime +
                 ", broadcastIndex=" + broadcastIndex +
                 ", broadcastTotal=" + broadcastTotal +
                 '}';

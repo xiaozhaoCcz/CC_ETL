@@ -77,7 +77,7 @@ public class JobInfoController {
         }else{
             wrapper.in(JobInfo::getJobType,0,2);
         }
-        wrapper.eq(JobInfo::getIsNode,"N");
+        wrapper.eq(JobInfo::getNodeFlag,"N");
         List<JobInfo> list = jobInfoService.list(wrapper);
         return Result.success(list);
     }
@@ -181,7 +181,7 @@ public class JobInfoController {
             if (jobInfo == null) {
                 return Result.failed("任务不存在");
             }
-            jobInfo.setRankTriggerStatus(status);
+            jobInfo.setTriggerStatus(status);
             boolean success = jobInfoService.updateById(jobInfo);
             return Result.judge(success);
         } catch (Exception e) {
@@ -255,7 +255,7 @@ public class JobInfoController {
     @GetMapping("getJobStatus/{id}")
     public Result<Boolean>  getJobStatus(@PathVariable Long id){
         JobInfo jobInfo = jobInfoService.getById(id);
-        return Result.success(jobInfo.getRankTriggerStatus()>0);
+        return Result.success(jobInfo.getTriggerStatus()>0);
     }
 
     @Operation(summary = "修改任务节点")
