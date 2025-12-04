@@ -28,7 +28,7 @@ import static com.cc.job.executor.compose.infrastructure.constant.ExecutorConsta
  *
  * @author cc-job-team
  */
-@Component
+@Component("jobTaskExecutor")
 @RequiredArgsConstructor
 public class TaskExecutor {
     
