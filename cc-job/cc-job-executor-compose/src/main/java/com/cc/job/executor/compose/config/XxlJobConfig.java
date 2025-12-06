@@ -6,6 +6,8 @@ import cn.hutool.json.JSONUtil;
 import com.xxl.job.core.executor.impl.XxlJobSpringExecutor;
 import com.xxl.job.core.util.IpUtil;
 import com.xxl.job.core.enums.RegistryConfig;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,7 +26,7 @@ import java.util.concurrent.TimeUnit;
  * @author xiaozhao
  */
 @Configuration
-public class XxlJobConfig {
+public class XxlJobConfig extends XxlJobSpringExecutor{
     
     private static final Logger logger = LoggerFactory.getLogger(XxlJobConfig.class);
 
@@ -58,25 +60,49 @@ public class XxlJobConfig {
     private Thread updateRegistryThread;
     private volatile boolean toStop = false;
 
-    @Bean
-    public XxlJobSpringExecutor xxlJobExecutor() {
+    /**
+     * 初始化方法，相当于 @Bean(initMethod = "init")
+     */
+    @PostConstruct
+    public void init() {
         logger.info(">>>>>>>>>>> xxl-job config init.");
-        XxlJobSpringExecutor xxlJobSpringExecutor = new XxlJobSpringExecutor();
-        xxlJobSpringExecutor.setAdminAddresses(adminAddresses);
-        xxlJobSpringExecutor.setAppname(appname);
-        xxlJobSpringExecutor.setAddress(address);
-        xxlJobSpringExecutor.setIp(ip);
-        xxlJobSpringExecutor.setPort(executorPort);
-        xxlJobSpringExecutor.setAccessToken(accessToken);
-        xxlJobSpringExecutor.setLogPath(logPath);
-        xxlJobSpringExecutor.setLogRetentionDays(logRetentionDays);
 
-        // ⭐ 执行器启动后，持续尝试更新注册信息，添加HTTP端口信息
-        // 采用与XXL-Job注册机制相同的持续循环方式，解决启动顺序问题
-        startUpdateRegistryThread();
+        // 设置执行器属性
+        this.setAdminAddresses(adminAddresses);
+        this.setAppname(appname);
+        this.setAddress(address);
+        this.setIp(ip);
+        this.setPort(executorPort);
+        this.setAccessToken(accessToken);
+        this.setLogPath(logPath);
+        this.setLogRetentionDays(logRetentionDays);
 
-        return xxlJobSpringExecutor;
+        // super start
+//        try {
+//            super.start();
+//        } catch (Exception e) {
+//            throw new RuntimeException(e);
+//        }
+
+        // 启动更新注册信息的线程
+        //startUpdateRegistryThread();
+
+        logger.info(">>>>>>>>>>> xxl-job executor initialized.");
     }
+
+    @PreDestroy
+    public void destroyXxlJobExecutor() {
+        logger.info(">>>>>>>>>>> xxl-job executor destroying...");
+
+        // 停止更新注册信息的线程
+        //stopUpdateRegistryThread();
+
+//        // 调用父类的销毁方法
+//        super.destroy();
+
+        logger.info(">>>>>>>>>>> xxl-job executor destroyed.");
+    }
+
     
     /**
      * 启动更新注册信息的线程（持续循环，直到成功）
