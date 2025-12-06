@@ -11,87 +11,71 @@
 
     <groupId>com.cc.job.executor</groupId>
     <artifactId>cc-job-executor</artifactId>
-
-    <properties>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    </properties>
-
     <packaging>jar</packaging>
 
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-parent</artifactId>
-                <version>${spring-boot.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
-
     <dependencies>
-        <!-- spring-boot-starter-web (spring-webmvc + tomcat) -->
+        <!-- Spring Boot Web -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+        
+        <!-- Spring Boot Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
 
+        <!-- Apache Commons Lang3 -->
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
-            <version>3.14.0</version>
-            <scope>compile</scope>
         </dependency>
 
+        <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <!--编译测试环境，不打包在lib-->
-            <scope>provided</scope>
         </dependency>
 
-        <!-- xxl-job-core -->
+        <!-- CC-Job Core -->
         <dependency>
             <groupId>com.ccJob</groupId>
             <artifactId>cc-job-core</artifactId>
-            <version>2.4.2-SNAPSHOT</version>
+            <version>${project.version}</version>
         </dependency>
 
+        <!-- CC-Job XO -->
         <dependency>
             <groupId>com.ccJob</groupId>
             <artifactId>cc-job-xo</artifactId>
-            <version>2.4.2-SNAPSHOT</version>
+            <version>${project.version}</version>
         </dependency>
 
+        <!-- Druid -->
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>druid-spring-boot-starter</artifactId>
-            <version>${druid.version}</version>
         </dependency>
 
+        <!-- Spring Boot Actuator -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+        <!-- Oracle JDBC -->
         <dependency>
             <groupId>com.oracle.database.jdbc</groupId>
             <artifactId>ojdbc8</artifactId>
         </dependency>
 
+        <!-- PostgreSQL -->
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
         </dependency>
-
     </dependencies>
 
     <build>
@@ -100,10 +84,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.8.1</version> <!-- 使用合适的版本 -->
                 <configuration>
-                    <source>17</source> <!-- 或者更高的版本 -->
-                    <target>17</target> <!-- 或者更高的版本 -->
                     <compilerArgs>
                         <arg>-parameters</arg>
                     </compilerArgs>

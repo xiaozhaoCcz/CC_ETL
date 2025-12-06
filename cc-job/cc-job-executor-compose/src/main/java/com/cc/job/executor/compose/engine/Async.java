@@ -226,8 +226,8 @@ public class Async {
                                        Set<String> submitted, AtomicLong time) {
         BlockingQueue<String> zeroQueue = new LinkedBlockingQueue<>();
         AtomicInteger remaining = new AtomicInteger(inDegree.size());
+        String END_MARKER = "";
 
-        // 初始化：将入度为0的任务加入队列
         for (Map.Entry<String, Integer> entry : inDegree.entrySet()) {
             if (entry.getValue() == 0) {
                 zeroQueue.offer(entry.getKey());
@@ -238,30 +238,20 @@ public class Async {
         logger.info("[Async] 开始任务调度，总任务数: {}, 初始可执行任务数: {}", 
                 remaining.get(), zeroQueue.size());
 
-        int emptyPollCount = 0;
-        int maxEmptyPolls = 600; // 最多等待60秒（100ms * 600）
-
-        while (remaining.get() > 0) {
+        while (true) {
             String id;
             try {
-                id = zeroQueue.poll(100, TimeUnit.MILLISECONDS);
+                id = zeroQueue.take();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 logger.warn("[Async] 任务调度线程被中断，剩余任务数: {}", remaining.get());
                 break;
             }
 
-            if (id == null) {
-                emptyPollCount++;
-                if (emptyPollCount >= maxEmptyPolls) {
-                    logger.error("[Async] 等待超时，队列一直为空，剩余任务数: {}", remaining.get());
-                    break;
-                }
-                continue;
+            if (END_MARKER.equals(id)) {
+                logger.info("[Async] 收到结束标记，所有任务已完成");
+                break;
             }
-            
-            // 重置空轮询计数
-            emptyPollCount = 0;
             
             if (!submitted.add(id)) {
                 logger.warn("[Async] 任务: {} 已经提交过，跳过", id);
@@ -283,43 +273,48 @@ public class Async {
                         int remainingCount = remaining.decrementAndGet();
                         logger.info("[Async] 任务: {} 完成，剩余任务数: {}", id, remainingCount);
                         
-                        List<WorkerWrapper> nextWrappers = workerWrapper.getNextWrappers();
-                        if (nextWrappers != null && !nextWrappers.isEmpty()) {
-                            logger.info("[Async] 任务: {} 有 {} 个后续任务", id, nextWrappers.size());
-                            List<String> nextIds = nextWrappers.stream().map(WorkerWrapper::getId).toList();
-                            
-                            for (String nextId : nextIds) {
-                                if (nextId == null || !inDegree.containsKey(nextId)) {
-                                    logger.warn("[Async] 后续任务: {} 不在inDegree中，跳过入度减少", nextId);
-                                    continue;
-                                }
-                                
-                                Integer oldInDegree = inDegree.get(nextId);
-                                logger.info("[Async] 准备更新后续任务: {} 的入度，当前入度: {}", nextId, oldInDegree);
-                                
-                                inDegree.compute(nextId, (k, i) -> {
-                                    if (i == null) {
-                                        logger.warn("[Async] 后续任务: {} 入度为null，重置为0", nextId);
-                                        return 0;
-                                    }
-                                    if (i <= 0) {
-                                        logger.warn("[Async] 后续任务: {} 入度已经为0或负数: {}，不再减少", nextId, i);
-                                        return i;
-                                    }
-                                    int updated = i - 1;
-                                    logger.info("[Async] 后续任务: {} 入度从 {} 减少到 {}", nextId, i, updated);
-                                    
-                                    if (updated == 0) {
-                                        boolean offered = zeroQueue.offer(nextId);
-                                        logger.info("[Async] 后续任务: {} 入度变为0，加入执行队列，结果: {}", 
-                                                nextId, offered ? "成功" : "失败");
-                                        return 0;
-                                    }
-                                    return updated;
-                                });
-                            }
+                        if (remainingCount == 0) {
+                            zeroQueue.offer(END_MARKER);
+                            logger.info("[Async] 所有任务已完成，发送结束标记");
                         } else {
-                            logger.info("[Async] 任务: {} 没有后续任务", id);
+                            List<WorkerWrapper> nextWrappers = workerWrapper.getNextWrappers();
+                            if (nextWrappers != null && !nextWrappers.isEmpty()) {
+                                logger.info("[Async] 任务: {} 有 {} 个后续任务", id, nextWrappers.size());
+                                List<String> nextIds = nextWrappers.stream().map(WorkerWrapper::getId).toList();
+                                
+                                for (String nextId : nextIds) {
+                                    if (nextId == null || !inDegree.containsKey(nextId)) {
+                                        logger.warn("[Async] 后续任务: {} 不在inDegree中，跳过入度减少", nextId);
+                                        continue;
+                                    }
+                                    
+                                    Integer oldInDegree = inDegree.get(nextId);
+                                    logger.info("[Async] 准备更新后续任务: {} 的入度，当前入度: {}", nextId, oldInDegree);
+                                    
+                                    inDegree.compute(nextId, (k, i) -> {
+                                        if (i == null) {
+                                            logger.warn("[Async] 后续任务: {} 入度为null，重置为0", nextId);
+                                            return 0;
+                                        }
+                                        if (i <= 0) {
+                                            logger.warn("[Async] 后续任务: {} 入度已经为0或负数: {}，不再减少", nextId, i);
+                                            return i;
+                                        }
+                                        int updated = i - 1;
+                                        logger.info("[Async] 后续任务: {} 入度从 {} 减少到 {}", nextId, i, updated);
+                                        
+                                        if (updated == 0) {
+                                            boolean offered = zeroQueue.offer(nextId);
+                                            logger.info("[Async] 后续任务: {} 入度变为0，加入执行队列，结果: {}", 
+                                                    nextId, offered ? "成功" : "失败");
+                                            return 0;
+                                        }
+                                        return updated;
+                                    });
+                                }
+                            } else {
+                                logger.info("[Async] 任务: {} 没有后续任务", id);
+                            }
                         }
                     }
 
@@ -338,6 +333,7 @@ public class Async {
                         remaining.set(0);
                     }
                     zeroQueue.clear();
+                    zeroQueue.offer(END_MARKER);
                     throw new RuntimeException(e);
                 }
             });

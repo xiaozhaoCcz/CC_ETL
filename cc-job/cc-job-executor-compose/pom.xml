@@ -17,24 +17,6 @@
     <name>cc-job-executor-compose</name>
     <description>任务组编排执行器 - Task Group Orchestration Executor</description>
 
-    <properties>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    </properties>
-
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-parent</artifactId>
-                <version>${spring-boot.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
-
     <dependencies>
         <!-- Spring Boot Web -->
         <dependency>
@@ -49,65 +31,54 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Apache Commons Lang -->
+        <!-- Apache Commons Lang3 -->
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
-            <version>3.14.0</version>
         </dependency>
 
         <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <scope>provided</scope>
         </dependency>
 
-        <!-- XXL-Job Core -->
+        <!-- CC-Job Core -->
         <dependency>
             <groupId>com.ccJob</groupId>
             <artifactId>cc-job-core</artifactId>
-            <version>2.4.2-SNAPSHOT</version>
+            <version>${project.version}</version>
         </dependency>
 
-        <!-- CC-Job XO（数据模型） -->
+        <!-- CC-Job XO -->
         <dependency>
             <groupId>com.ccJob</groupId>
             <artifactId>cc-job-xo</artifactId>
-            <version>2.4.2-SNAPSHOT</version>
+            <version>${project.version}</version>
         </dependency>
 
-        <!-- Hutool 工具类 -->
-        <dependency>
-            <groupId>cn.hutool</groupId>
-            <artifactId>hutool-all</artifactId>
-            <version>${hutool.version}</version>
-        </dependency>
-
-        <!-- OkHttp（用于API调用） -->
+        <!-- OkHttp -->
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>okhttp</artifactId>
-            <version>${okhttp3.version}</version>
         </dependency>
 
-        <!-- Gson（JSON处理） -->
+        <!-- Gson -->
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
-            <version>${gson.version}</version>
         </dependency>
 
-        <!-- Actuator（健康检查） -->
+        <!-- Spring Boot Actuator -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+        <!-- Druid -->
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>druid-spring-boot-starter</artifactId>
-            <version>${druid.version}</version>
         </dependency>
     </dependencies>
 
@@ -125,15 +96,6 @@
                         </goals>
                     </execution>
                 </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.8.1</version>
-                <configuration>
-                    <source>17</source>
-                    <target>17</target>
-                </configuration>
             </plugin>
         </plugins>
     </build>

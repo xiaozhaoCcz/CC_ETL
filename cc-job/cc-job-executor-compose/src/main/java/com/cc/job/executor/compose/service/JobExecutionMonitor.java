@@ -1,16 +1,14 @@
 package com.cc.job.executor.compose.service;
 
-import cn.hutool.core.lang.Pair;
 import com.cc.job.executor.compose.infrastructure.constant.ExecutorConstants;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CountDownLatch;
 
 /**
  * 任务执行监听器
@@ -28,6 +26,8 @@ public class JobExecutionMonitor implements Callable<String> {
     private final String randomId;
     private final Map<String, Boolean> jobResultMap;
     private final int retryCount;
+    private final String executeKey;
+    private final CountDownLatch latch;
     
     private volatile boolean stop = false;
     
@@ -38,6 +38,16 @@ public class JobExecutionMonitor implements Callable<String> {
         this.randomId = randomId;
         this.jobResultMap = jobResultMap;
         this.retryCount = retryCount;
+        this.executeKey = buildExecuteKey(jobInfo.getId(), randomId);
+        this.latch = new CountDownLatch(1);
+    }
+    
+    public String getExecuteKey() {
+        return executeKey;
+    }
+    
+    public CountDownLatch getLatch() {
+        return latch;
     }
     
     /**
@@ -45,45 +55,40 @@ public class JobExecutionMonitor implements Callable<String> {
      */
     public void stopMonitoring() {
         this.stop = true;
+        this.latch.countDown();
     }
     
     @Override
     public String call() {
-        String executeKey = buildExecuteKey(jobInfo.getId(), randomId);
+        logger.debug("[JobMonitor] 开始监听任务 - jobId: {}, randomId: {}, executeKey: {}", 
+                jobInfo.getId(), randomId, executeKey);
         
-        logger.debug("[JobMonitor] 开始监听任务 - jobId: {}, randomId: {}", jobInfo.getId(), randomId);
-        
-        // 循环检查任务是否完成
-        while (!stop) {
-            if (jobResultMap.containsKey(executeKey)) {
-                try {
-                    Boolean success = jobResultMap.get(executeKey);
-                    logger.info("[JobMonitor] 任务执行完成 - jobId: {}, 成功: {}", jobInfo.getId(), success);
-                    
-                    // 移除结果
-                    jobResultMap.remove(executeKey);
-                    
-                    // 处理任务完成
-                    return handleJobCompletion(success, retryCount);
-                    
-                } catch (Exception e) {
-                    logger.error("[JobMonitor] 处理任务完成异常 - jobId: {}", jobInfo.getId(), e);
-                    throw new RuntimeException(e);
-                }
+        try {
+            latch.await();
+            
+            if (stop) {
+                logger.debug("[JobMonitor] 监听被停止 - jobId: {}", jobInfo.getId());
+                return ExecutorConstants.ExecutionResult.SUCCESS;
             }
             
-            // 等待一段时间后再次检查
-            try {
-                TimeUnit.MILLISECONDS.sleep(50);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                logger.debug("[JobMonitor] 任务监听线程被中断 - jobId: {}", jobInfo.getId());
-                break;
+            Boolean success = jobResultMap.get(executeKey);
+            if (success != null) {
+                logger.info("[JobMonitor] 任务执行完成 - jobId: {}, 成功: {}", jobInfo.getId(), success);
+                jobResultMap.remove(executeKey);
+                return handleJobCompletion(success, retryCount);
+            } else {
+                logger.warn("[JobMonitor] 任务结果不存在 - jobId: {}, executeKey: {}", jobInfo.getId(), executeKey);
+                return ExecutorConstants.ExecutionResult.SUCCESS;
             }
+            
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            logger.debug("[JobMonitor] 任务监听线程被中断 - jobId: {}", jobInfo.getId());
+            return ExecutorConstants.ExecutionResult.SUCCESS;
+        } catch (Exception e) {
+            logger.error("[JobMonitor] 处理任务完成异常 - jobId: {}", jobInfo.getId(), e);
+            throw new RuntimeException(e);
         }
-        
-        logger.debug("[JobMonitor] 监听结束 - jobId: {}", jobInfo.getId());
-        return ExecutorConstants.ExecutionResult.SUCCESS;
     }
     
     /**

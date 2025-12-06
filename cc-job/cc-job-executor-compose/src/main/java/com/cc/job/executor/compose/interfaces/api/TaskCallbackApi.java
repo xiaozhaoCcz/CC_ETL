@@ -45,6 +45,9 @@ public class TaskCallbackApi {
         
         try {
             TaskWrapperFactory.getJobResults().put(executeKey, success);
+            
+            TaskWrapperFactory.notifyTaskComplete(executeKey);
+            
             logger.info("[TaskCallback] 任务结果记录成功 - executeKey: {}", executeKey);
             return buildSuccessResponse("任务结果记录成功");
             

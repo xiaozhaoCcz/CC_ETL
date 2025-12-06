@@ -6,14 +6,11 @@ import com.cc.job.executor.compose.service.JobExecutionMonitor;
 import com.cc.job.executor.compose.service.JobTriggerService;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobNode;
-import com.xxl.job.core.context.XxlJobHelper;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
@@ -89,10 +86,16 @@ public class TaskExecutor {
         logger.info("[TaskExecutor] 任务处于暂停状态，等待恢复 - jobId: {}", jobInfo.getId());
         
         long timeout = calculatePauseTimeout(jobInfo);
-        long startTime = System.currentTimeMillis();
+        long deadline = System.currentTimeMillis() + timeout;
         
-        while (isPaused && !isTimeout(startTime, timeout)) {
-            sleepQuietly(5);
+        while (isPaused && System.currentTimeMillis() < deadline) {
+            try {
+                TimeUnit.SECONDS.sleep(5);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                logger.warn("[TaskExecutor] 暂停等待被中断 - jobId: {}", jobInfo.getId());
+                throw new RuntimeException("暂停等待被中断", e);
+            }
             
             JobInfo checkJobInfo = adminApiClient.getJobInfo(jobInfo.getId());
             if (checkJobInfo != null) {
@@ -121,11 +124,13 @@ public class TaskExecutor {
         try {
             monitor = new JobExecutionMonitor(jobInfo, node, 
                     context.getExecutionBatchId(), jobResults, retryCount);
+            
+            TaskWrapperFactory.registerMonitor(monitor.getExecuteKey(), monitor);
+            
             FutureTask<String> futureTask = new FutureTask<>(monitor);
             monitorThread = new Thread(futureTask);
             monitorThread.start();
             
-            // 等待任务完成（支持超时）
             String result = waitForCompletion(futureTask, jobInfo);
             logger.info("[TaskExecutor] 任务监听完成 - jobId: {}, 结果: {}", jobInfo.getId(), result);
             return result;
@@ -135,6 +140,9 @@ public class TaskExecutor {
         } catch (Exception e) {
             return handleMonitorError(context, node, jobInfo, e);
         } finally {
+            if (monitor != null) {
+                TaskWrapperFactory.unregisterMonitor(monitor.getExecuteKey());
+            }
             cleanup(monitor, monitorThread);
         }
     }
@@ -228,26 +236,6 @@ public class TaskExecutor {
     }
     
     /**
-     * 检查是否超时
-     */
-    private boolean isTimeout(long startTime, long timeout) {
-        return System.currentTimeMillis() - startTime >= timeout;
-    }
-    
-    /**
-     * 安静地休眠
-     */
-    private void sleepQuietly(int seconds) {
-        try {
-            TimeUnit.SECONDS.sleep(seconds);
-        } catch (InterruptedException e) {
-            logger.error("[TaskExecutor] 休眠被中断", e);
-            Thread.currentThread().interrupt();
-            throw new RuntimeException(e);
-        }
-    }
-    
-    /**
      * 清理资源
      */
     private void cleanup(JobExecutionMonitor monitor, Thread thread) {
@@ -270,23 +258,6 @@ public class TaskExecutor {
             logger.error("[TaskExecutor] 上报状态失败 - jobId: {}, status: {}", 
                     jobId, status, e);
         }
-    }
-    
-    /**
-     * 获取任务信息映射
-     */
-    private Map<Long, JobInfo> getJobInfoMap(List<JobNode> nodes) {
-        Map<Long, JobInfo> jobInfoMap = new HashMap<>();
-        List<Long> jobIds = nodes.stream().map(JobNode::getJobId).distinct().toList();
-        
-        for (Long jobId : jobIds) {
-            JobInfo jobInfo = adminApiClient.getJobInfo(jobId);
-            if (jobInfo != null) {
-                jobInfoMap.put(jobId, jobInfo);
-            }
-        }
-        
-        return jobInfoMap;
     }
 }
 

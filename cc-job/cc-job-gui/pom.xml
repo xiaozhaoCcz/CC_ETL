@@ -14,11 +14,7 @@
     <packaging>jar</packaging>
     <description>JavaFX流程节点编辑器</description>
 
-
     <properties>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <javafx.version>21.0.1</javafx.version>
     </properties>
 
@@ -70,14 +66,12 @@
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>okhttp</artifactId>
-            <version>4.12.0</version>
         </dependency>
         
         <!-- JSON Processing -->
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
-            <version>2.10.1</version>
         </dependency>
         
         <!-- WebSocket Client -->
@@ -115,12 +109,12 @@
             <version>1.11.0</version>
         </dependency>
 
+        <!-- CC-Job XO -->
         <dependency>
             <groupId>com.ccJob</groupId>
             <artifactId>cc-job-xo</artifactId>
-            <version>2.4.2-SNAPSHOT</version>
+            <version>${project.version}</version>
             <exclusions>
-                <!-- 排除可能引入旧版本 logback 和 slf4j 的传递依赖 -->
                 <exclusion>
                     <groupId>ch.qos.logback</groupId>
                     <artifactId>logback-classic</artifactId>
@@ -140,6 +134,7 @@
             </exclusions>
         </dependency>
 
+        <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
@@ -147,16 +142,8 @@
     </dependencies>
 
     <build>
+        <finalName>${project.artifactId}</finalName>
         <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.11.0</version>
-                <configuration>
-                    <source>17</source>
-                    <target>17</target>
-                </configuration>
-            </plugin>
             <plugin>
                 <groupId>org.openjfx</groupId>
                 <artifactId>javafx-maven-plugin</artifactId>

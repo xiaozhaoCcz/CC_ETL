@@ -9,7 +9,6 @@ import com.cc.job.executor.compose.engine.wrapper.WorkerWrapper;
 import com.cc.job.executor.compose.service.JobExecutionMonitor;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobNode;
-import com.xxl.job.core.context.XxlJobContext;
 import com.xxl.job.core.context.XxlJobHelper;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -21,9 +20,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import static com.cc.job.executor.compose.infrastructure.constant.ExecutorConstants.ExecutionResult.*;
 
@@ -45,6 +41,9 @@ public class TaskWrapperFactory {
     
     /** 存储任务执行结果 */
     private static final Map<String, Boolean> JOB_RESULTS = new ConcurrentHashMap<>();
+    
+    /** 存储任务执行监听器 */
+    private static final Map<String, JobExecutionMonitor> MONITOR_MAP = new ConcurrentHashMap<>();
     
     /**
      * 创建 WorkerWrapper 列表
@@ -180,6 +179,33 @@ public class TaskWrapperFactory {
      */
     public static Map<String, Boolean> getJobResults() {
         return JOB_RESULTS;
+    }
+    
+    /**
+     * 注册任务监听器
+     */
+    public static void registerMonitor(String executeKey, JobExecutionMonitor monitor) {
+        MONITOR_MAP.put(executeKey, monitor);
+        logger.debug("[TaskWrapperFactory] 注册任务监听器 - executeKey: {}", executeKey);
+    }
+    
+    /**
+     * 移除任务监听器
+     */
+    public static void unregisterMonitor(String executeKey) {
+        MONITOR_MAP.remove(executeKey);
+        logger.debug("[TaskWrapperFactory] 移除任务监听器 - executeKey: {}", executeKey);
+    }
+    
+    /**
+     * 通知任务完成
+     */
+    public static void notifyTaskComplete(String executeKey) {
+        JobExecutionMonitor monitor = MONITOR_MAP.get(executeKey);
+        if (monitor != null) {
+            monitor.getLatch().countDown();
+            logger.debug("[TaskWrapperFactory] 通知任务完成 - executeKey: {}", executeKey);
+        }
     }
 }
 

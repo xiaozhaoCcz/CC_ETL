@@ -2,7 +2,6 @@ package com.cc.job.executor.compose.controller;
 
 import com.cc.job.executor.compose.core.service.TaskWrapperFactory;
 import com.cc.job.executor.compose.dto.JobGroupDataRequest;
-import com.cc.job.executor.compose.handler.JobGroupExecutorComplete;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
@@ -62,8 +61,9 @@ public class JobCallbackController {
         Map<String, Object> result = new HashMap<>();
         
         try {
-            // 将结果写入 jobResultMap
             TaskWrapperFactory.getJobResults().put(executeKey, success);
+            
+            TaskWrapperFactory.notifyTaskComplete(executeKey);
             
             result.put("code", 200);
             result.put("message", "任务结果记录成功");
