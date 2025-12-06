@@ -263,12 +263,14 @@ public class TaskGroupOrchestrator {
      * 
      * <p>给子任务的异步日志写入留出时间，确保所有日志都已经写入到文件
      * 这样可以避免前端收到完成状态后停止日志轮询，但日志还未完全写入的问题
+     * 
+     * <p>优化：减少延迟时间，因为前端在收到完成状态后会继续轮询一段时间
      */
     private void waitForLogsToFlush() {
         try {
-            // 等待3秒，确保所有子任务的日志回调都已经完成并写入文件
-            // 这个时间应该足够大部分异步日志写入完成
-            long waitTime = 3000L; // 3秒
+            // 等待1秒，确保大部分子任务的日志回调都已经完成并写入文件
+            // 前端在收到完成状态后会继续轮询，所以这里只需要短暂延迟即可
+            long waitTime = 1000L; // 1秒（从3秒减少到1秒，减少用户等待时间）
             logger.debug("[Orchestrator] 等待日志刷新完成，延迟 {}ms", waitTime);
             Thread.sleep(waitTime);
         } catch (InterruptedException e) {

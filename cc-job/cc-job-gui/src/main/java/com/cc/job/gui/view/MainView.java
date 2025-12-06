@@ -1782,17 +1782,28 @@ public class MainView extends BorderPane {
         // ⭐ 如果状态是5（任务完成），需要更新UI运行状态
         if (status != null && status == 5) {
             logPanel.info("🏁 任务完成（status=5），开始更新UI运行状态");
+            System.out.println(" 任务完成（status=5），开始更新UI运行状态");
             
             // 查找对应的运行中任务组
             final RunningJobGroup runningJob = jobId != null ? runningJobs.get(jobId) : null;
             final Long finalJobId = jobId;
             
             if (runningJob != null && expectedRandomId.equals(runningJob.getRandomId())) {
-                // 找到对应的任务组，调用stopLogPolling来更新UI状态
-                logPanel.info("✅ 找到对应的运行中任务组，开始停止日志轮询并更新UI状态");
-                Platform.runLater(() -> {
-                    stopLogPolling(runningJob, "任务组执行完成");
-                });
+                // 找到对应的任务组，延迟停止日志轮询，确保所有日志都已获取
+                logPanel.info("✅ 找到对应的运行中任务组，延迟停止日志轮询以确保日志完整");
+                
+                // ⚠️ 优化：延迟2秒停止日志轮询，确保所有日志都已写入并获取
+                // 这样可以避免后端延迟导致的日志丢失问题，同时减少用户等待时间
+                java.util.Timer delayTimer = new java.util.Timer("DelayStopTimer-" + runningJob.getJobId(), true);
+                delayTimer.schedule(new java.util.TimerTask() {
+                    @Override
+                    public void run() {
+                        Platform.runLater(() -> {
+                            stopLogPolling(runningJob, "任务组执行完成");
+                        });
+                        delayTimer.cancel();
+                    }
+                }, 2000); // 延迟2秒停止，确保日志完整
             } else {
                 // 没有找到对应的任务组，手动更新UI状态
                 logPanel.warn("⚠️ 未找到对应的运行中任务组，手动更新UI状态");
