@@ -1937,12 +1937,12 @@ public class MainView extends BorderPane {
             
             // ⚠️ 如果执行器不可用，说明任务已完成且执行器已下线，应该停止日志轮询
             // 这种情况通常发生在任务完成后，执行器地址被清空或执行器已下线
-            if (errorMsg != null && (errorMsg.contains("执行器不可用") || errorMsg.contains("执行器地址: null"))) {
-                logger.warn("执行器不可用，停止日志轮询 - jobId: {}, logId: {}", 
-                        runningJob.getJobId(), runningJob.getLogId());
-                stopLogPolling(runningJob, "执行器不可用，日志获取已停止");
-                return;
-            }
+//            if (errorMsg != null && (errorMsg.contains("执行器不可用") || errorMsg.contains("执行器地址: null"))) {
+//                logger.warn("执行器不可用，停止日志轮询 - jobId: {}, logId: {}",
+//                        runningJob.getJobId(), runningJob.getLogId());
+//                stopLogPolling(runningJob, "执行器不可用，日志获取已停止");
+//                return;
+//            }
             
             runningJob.setPullFailCount(runningJob.getPullFailCount() + 1);
         }

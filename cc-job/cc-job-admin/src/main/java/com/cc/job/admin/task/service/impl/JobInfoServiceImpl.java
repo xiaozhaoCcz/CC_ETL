@@ -47,7 +47,9 @@ import java.util.stream.Collectors;
 
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 
 /**
@@ -57,7 +59,6 @@ import org.springframework.transaction.annotation.Transactional;
  * @since 2024-11-03 08:21
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> implements JobInfoService {
 
@@ -74,6 +75,27 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     private final JobLogMapper jobLogMapper;
 
     private final JobGroupSnapshotService jobGroupSnapshotService;
+
+    private final TransactionTemplate transactionTemplate;
+
+    // 构造函数注入PlatformTransactionManager并创建TransactionTemplate
+    public JobInfoServiceImpl(JobGroupService jobGroupService,
+                              JobNodeService jobNodeService,
+                              JobEdgeService jobEdgeService,
+                              JobLogglueMapper jobLogglueMapper,
+                              JobInfoMapper jobInfoMapper,
+                              JobLogMapper jobLogMapper,
+                              JobGroupSnapshotService jobGroupSnapshotService,
+                              PlatformTransactionManager transactionManager) {
+        this.jobGroupService = jobGroupService;
+        this.jobNodeService = jobNodeService;
+        this.jobEdgeService = jobEdgeService;
+        this.jobLogglueMapper = jobLogglueMapper;
+        this.jobInfoMapper = jobInfoMapper;
+        this.jobLogMapper = jobLogMapper;
+        this.jobGroupSnapshotService = jobGroupSnapshotService;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+    }
 
     private final String ADMIN_ADDRESS = "http://%s:%s/xxl-job-admin/";
     @Value("${server.port}")
@@ -288,7 +310,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    //@Transactional(rollbackFor = Exception.class)
     public String triggerJob(JobInfoTriggerDto taskInfoTriggerDto) {
         Long jobId = taskInfoTriggerDto.getId();
         String randomId = taskInfoTriggerDto.getExecutorParam();
@@ -315,42 +337,48 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
             randomId = taskInfo.getExecutorParam();
         }
 
-        // 【快照模式】如果是任务组，创建快照
-        if (taskInfo.getJobType() == 2 && StringUtils.isNotBlank(randomId)) {
-            try {
-                String nodesJson = getNodesJsonForSnapshot(jobId);
-                String edgesJson = getEdgesJsonForSnapshot(jobId);
-                String triggerUserIdStr = taskInfoTriggerDto.getTriggerUserId() != null 
-                    ? String.valueOf(taskInfoTriggerDto.getTriggerUserId()) 
-                    : null;
-                jobGroupSnapshotService.createSnapshot(
-                    jobId,
-                    randomId,
-                    nodesJson,
-                    edgesJson,
-                    triggerUserIdStr
-                );
-            } catch (Exception e) {
-                log.error("[Snapshot] 创建任务组快照失败 - jobId: {}, randomId: {}", jobId, randomId, e);
-                throw new BusinessException("创建任务组快照失败: " + e.getMessage());
-            }
-        }
-
+        // 【快照模式】使用编程式事务，确保快照创建和JobLog创建在同一事务中
         // ⭐ 创建 JobLog 记录（在触发前创建，以便返回日志ID）
-        JobLog jobLog = new JobLog();
-        jobLog.setJobGroup(taskInfo.getJobGroup());
-        jobLog.setJobId(taskInfo.getId());
-        jobLog.setTriggerTime(LocalDateTime.now());
-        jobLog.setTriggerCode(0);
-        jobLog.setHandleCode(0);
-        jobLogMapper.insert(jobLog);
-        Long logId = jobLog.getId();
-        
+        // 这里必须使用编程式事务，因为triggerJob是异步操作，可能会先比数据库执行更快
+        String finalRandomId = randomId;
+        Long logId = transactionTemplate.execute(status -> {
+            try {
+                // 【快照模式】如果是任务组，创建快照
+                if (taskInfo.getJobType() == 2 && StringUtils.isNotBlank(finalRandomId)) {
+                    String nodesJson = getNodesJsonForSnapshot(jobId);
+                    String edgesJson = getEdgesJsonForSnapshot(jobId);
+                    String triggerUserIdStr = taskInfoTriggerDto.getTriggerUserId() != null 
+                        ? String.valueOf(taskInfoTriggerDto.getTriggerUserId()) 
+                        : null;
+                    jobGroupSnapshotService.createSnapshot(
+                        jobId,
+                            finalRandomId,
+                        nodesJson,
+                        edgesJson,
+                        triggerUserIdStr
+                    );
+                }
+
+                // 创建 JobLog 记录
+                JobLog jobLog = new JobLog();
+                jobLog.setJobGroup(taskInfo.getJobGroup());
+                jobLog.setJobId(taskInfo.getId());
+                jobLog.setTriggerTime(LocalDateTime.now());
+                jobLog.setTriggerCode(0);
+                jobLog.setHandleCode(0);
+                jobLogMapper.insert(jobLog);
+                
+                return jobLog.getId();
+            } catch (Exception e) {
+                log.error("[Snapshot] 创建任务组快照或JobLog失败 - jobId: {}, randomId: {}", jobId, finalRandomId, e);
+                status.setRollbackOnly(); // 标记事务回滚
+                throw new BusinessException("创建任务组快照或JobLog失败: " + e.getMessage());
+            }
+        });
+
         log.debug("[JobInfoService] 创建任务日志记录 - jobId: {}, logId: {}", taskInfo.getId(), logId);
 
-        String ip = IpUtil.getIp();
-        String adminAddress = String.format(ADMIN_ADDRESS, ip, port);
-        JobTriggerPoolHelper.trigger(taskInfoTriggerDto.getId().intValue(), TriggerTypeEnum.MANUAL, -1, null, taskInfoTriggerDto.getExecutorParam(), taskInfoTriggerDto.getAddressList(), 1, adminAddress);
+        JobTriggerPoolHelper.trigger(taskInfoTriggerDto.getId().intValue(), TriggerTypeEnum.MANUAL, -1, null, taskInfoTriggerDto.getExecutorParam(), taskInfoTriggerDto.getAddressList(), logId);
 
         // 只在任务组（jobType == 2）时记录触发用户ID
         if (taskInfo.getJobType() == 2 && taskInfoTriggerDto.getTriggerUserId() != null) {

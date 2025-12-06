@@ -90,8 +90,7 @@ public class JobTriggerPoolHelper {
                            final String executorShardingParam,
                            final String executorParam,
                            final String addressList,
-                           final int triggerOne,
-                           final String adminAddress
+                           final long logId
     ) {
 
         // choose thread pool
@@ -110,7 +109,7 @@ public class JobTriggerPoolHelper {
 
                 try {
                     // do trigger
-                    XxlJobTrigger.trigger((long) jobId, triggerType, failRetryCount, executorShardingParam, executorParam, addressList,triggerOne,adminAddress);
+                    XxlJobTrigger.trigger((long) jobId, triggerType, failRetryCount, executorShardingParam, executorParam, addressList,logId);
                 } catch (Exception e) {
                     logger.error(e.getMessage(), e);
                 } finally {
@@ -161,8 +160,8 @@ public class JobTriggerPoolHelper {
      *          null: use job param
      *          not null: cover job param
      */
-    public static void trigger(int jobId, TriggerTypeEnum triggerType, int failRetryCount, String executorShardingParam, String executorParam, String addressList, int triggerOne,String adminAddress) {
-        helper.addTrigger(jobId, triggerType, failRetryCount, executorShardingParam, executorParam, addressList,triggerOne, adminAddress);
+    public static void trigger(int jobId, TriggerTypeEnum triggerType, int failRetryCount, String executorShardingParam, String executorParam, String addressList, long logId) {
+        helper.addTrigger(jobId, triggerType, failRetryCount, executorShardingParam, executorParam, addressList,logId);
     }
 
 }

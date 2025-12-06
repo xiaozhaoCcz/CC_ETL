@@ -10,6 +10,7 @@ import com.cc.job.xo.model.entity.JobEdge;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobLogglue;
 import com.cc.job.xo.model.entity.JobNode;
+import com.cc.job.xo.model.form.JobEdgeForm;
 import com.cc.job.xo.model.form.JobGlueForm;
 import com.cc.job.admin.task.service.JobInfoService;
 import lombok.RequiredArgsConstructor;
@@ -246,8 +247,8 @@ public class JobInfoController {
 
     @Operation(summary = "保存连线")
     @PostMapping("saveJobEdge")
-    public Result<com.cc.job.xo.model.entity.JobEdge> saveJobEdge(@RequestBody @Valid com.cc.job.xo.model.form.JobEdgeForm formData) {
-        com.cc.job.xo.model.entity.JobEdge jobEdge = jobComposeService.saveJobEdge(formData);
+    public Result<JobEdge> saveJobEdge(@RequestBody @Valid JobEdgeForm formData) {
+        JobEdge jobEdge = jobComposeService.saveJobEdge(formData);
         return Result.success(jobEdge);
     }
 
