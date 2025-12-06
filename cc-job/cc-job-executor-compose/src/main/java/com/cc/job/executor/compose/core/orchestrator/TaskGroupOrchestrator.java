@@ -244,6 +244,11 @@ public class TaskGroupOrchestrator {
         Map<String, Boolean> jobResults = TaskWrapperFactory.getJobResults();
         jobResults.entrySet().removeIf(entry -> entry.getKey().startsWith(taskGroupId + ":"));
         
+        // ⚠️ 重要：等待一段时间，确保所有子任务的日志都已经写入完成
+        // 子任务执行完成后，日志通过异步回调写入，需要给日志写入留出时间
+        // 否则前端收到完成状态后会停止日志轮询，导致日志未完全显示
+        waitForLogsToFlush();
+        
         // 更新任务组运行状态
         updateTaskGroupStatus(taskGroupId, executionBatchId);
         
@@ -251,6 +256,25 @@ public class TaskGroupOrchestrator {
         CONTEXT_HOLDER.remove();
         
         logger.info("[Orchestrator] 资源清理完成 - 剩余任务组数量: {}", RUNNING_JOBS.size());
+    }
+    
+    /**
+     * 等待日志刷新完成
+     * 
+     * <p>给子任务的异步日志写入留出时间，确保所有日志都已经写入到文件
+     * 这样可以避免前端收到完成状态后停止日志轮询，但日志还未完全写入的问题
+     */
+    private void waitForLogsToFlush() {
+        try {
+            // 等待3秒，确保所有子任务的日志回调都已经完成并写入文件
+            // 这个时间应该足够大部分异步日志写入完成
+            long waitTime = 3000L; // 3秒
+            logger.debug("[Orchestrator] 等待日志刷新完成，延迟 {}ms", waitTime);
+            Thread.sleep(waitTime);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            logger.warn("[Orchestrator] 等待日志刷新被中断", e);
+        }
     }
     
     /**

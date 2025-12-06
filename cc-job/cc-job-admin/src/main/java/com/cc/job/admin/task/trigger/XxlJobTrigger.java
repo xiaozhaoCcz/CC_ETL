@@ -220,7 +220,13 @@ public class XxlJobTrigger {
                 .append((routeAddressResult != null && routeAddressResult.getMsg() != null) ? routeAddressResult.getMsg() + "<br><br>" : "").append(triggerResult.getMsg() != null ? triggerResult.getMsg() : "");
 
         // 6、save log trigger-info
-        jobLog.setExecutorAddress(address);
+        // ⚠️ 只有当 address 不为 null 时才设置 executorAddress
+        // 如果 address 为 null，说明执行器注册列表为空或路由失败，此时不应该覆盖 executorAddress
+        // 这样可以避免将已存在的 executorAddress 设置为 null
+        if (address != null) {
+            jobLog.setExecutorAddress(address);
+        }
+        // executorHandler 始终设置，因为它是任务配置的一部分
         jobLog.setExecutorHandler(jobInfo.getExecutorHandler());
         jobLog.setExecutorParam(jobInfo.getExecutorParam());
         jobLog.setExecutorShardingParam(shardingParam);

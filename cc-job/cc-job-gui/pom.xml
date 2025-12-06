@@ -92,7 +92,6 @@
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.4.14</version>
         </dependency>
 
         <!-- SLF4J Bridge for Java Util Logging (兼容 slf4j-api 2.0.x) -->
