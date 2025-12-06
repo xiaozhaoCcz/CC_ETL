@@ -44,4 +44,13 @@
           AND registry_value = #{registryValue}
     </delete>
 
+    <update id="updateRegistryValue">
+        UPDATE job_registry
+        SET `registry_value` = #{newRegistryValue},
+            `update_time` = #{updateTime}
+        WHERE `registry_group` = #{registryGroup}
+          AND `registry_key` = #{registryKey}
+          AND `registry_value` = #{oldRegistryValue}
+    </update>
+
 </mapper>

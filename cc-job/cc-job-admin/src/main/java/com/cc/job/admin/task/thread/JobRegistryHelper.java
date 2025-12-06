@@ -203,5 +203,42 @@ public class JobRegistryHelper {
 		// Under consideration, prevent affecting core tables
 	}
 
+	/**
+	 * 更新注册信息的registryValue（用于executor-compose更新HTTP端口信息）
+	 * 
+	 * @param registryGroup 注册组
+	 * @param registryKey 注册键（appName）
+	 * @param oldRegistryValue 旧的registryValue（执行器地址）
+	 * @param newRegistryValue 新的registryValue（JSON格式，包含执行器地址和HTTP端口）
+	 * @return 操作结果
+	 */
+	public ReturnT<String> updateRegistryValue(String registryGroup, String registryKey, 
+	                                          String oldRegistryValue, String newRegistryValue) {
+		// valid
+		if (!StringUtils.hasText(registryGroup)
+				|| !StringUtils.hasText(registryKey)
+				|| !StringUtils.hasText(oldRegistryValue)
+				|| !StringUtils.hasText(newRegistryValue)) {
+			return new ReturnT<String>(ReturnT.FAIL_CODE, "Illegal Argument.");
+		}
+
+		// async execute
+		registryOrRemoveThreadPool.execute(new Runnable() {
+			@Override
+			public void run() {
+				int ret = XxlJobAdminConfig.getAdminConfig().getJobRegistryMapper()
+						.updateRegistryValue(registryGroup, registryKey, oldRegistryValue, newRegistryValue, new Date());
+				if (ret > 0) {
+					logger.info("更新注册信息成功 - registryGroup: {}, registryKey: {}, oldValue: {}, newValue: {}", 
+							registryGroup, registryKey, oldRegistryValue, newRegistryValue);
+				} else {
+					logger.warn("更新注册信息失败，未找到匹配的记录 - registryGroup: {}, registryKey: {}, oldValue: {}", 
+							registryGroup, registryKey, oldRegistryValue);
+				}
+			}
+		});
+
+		return ReturnT.SUCCESS;
+	}
 
 }

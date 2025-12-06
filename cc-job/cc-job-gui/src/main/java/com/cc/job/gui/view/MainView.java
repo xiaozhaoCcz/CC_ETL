@@ -1,5 +1,6 @@
 package com.cc.job.gui.view;
 
+import cn.hutool.core.date.StopWatch;
 import com.cc.job.gui.history.UndoRedoManager;
 import com.cc.job.gui.model.*;
 import com.cc.job.gui.service.JobGroupService;
@@ -1787,7 +1788,6 @@ public class MainView extends BorderPane {
         // ⭐ 如果状态是5（任务完成），需要更新UI运行状态
         if (status != null && status == 5) {
             logPanel.info("🏁 任务完成（status=5），开始更新UI运行状态");
-            System.out.println(" 任务完成（status=5），开始更新UI运行状态");
             
             // 查找对应的运行中任务组
             final RunningJobGroup runningJob = jobId != null ? runningJobs.get(jobId) : null;
@@ -1799,8 +1799,8 @@ public class MainView extends BorderPane {
                 
                 // ⚠️ 优化：延迟2秒停止日志轮询，确保所有日志都已写入并获取
                 // 这样可以避免后端延迟导致的日志丢失问题，同时减少用户等待时间
-                java.util.Timer delayTimer = new java.util.Timer("DelayStopTimer-" + runningJob.getJobId(), true);
-                delayTimer.schedule(new java.util.TimerTask() {
+                Timer delayTimer = new java.util.Timer("DelayStopTimer-" + runningJob.getJobId(), true);
+                delayTimer.schedule(new TimerTask() {
                     @Override
                     public void run() {
                         Platform.runLater(() -> {
@@ -1826,14 +1826,24 @@ public class MainView extends BorderPane {
                         // 恢复边的正常状态（停止虚线动画）
                         canvas.setAllConnectionsRunning(false);
                         
-                        // 断开SSE连接
-                        SSEService.getInstance().disconnect(finalJobId, expectedRandomId);
-                        
                         // 同步节点状态到数据库
                         canvas.syncPendingNodeStatus();
                         logPanel.info("✅ UI状态已更新为准备运行状态");
                     }
                 });
+                
+                // ⭐ 优化：异步断开SSE连接，不阻塞UI更新
+                final Long asyncJobId = finalJobId;
+                final String asyncRandomId = expectedRandomId;
+                new Thread(() -> {
+                    try {
+                        Thread.sleep(100); // 等待一小段时间，确保UI已更新
+                        SSEService.getInstance().disconnect(asyncJobId, asyncRandomId);
+                        logger.debug("SSE连接已异步断开（未找到任务组） - jobId: {}, randomId: {}", asyncJobId, asyncRandomId);
+                    } catch (Exception e) {
+                        logger.error("异步断开SSE连接失败（未找到任务组） - jobId: {}, randomId: {}", asyncJobId, asyncRandomId, e);
+                    }
+                }, "SSE-Disconnect-NotFound-" + finalJobId).start();
             }
         }
         
@@ -1957,30 +1967,34 @@ public class MainView extends BorderPane {
      * 停止日志轮询（针对特定任务组）
      */
     private void stopLogPolling(RunningJobGroup runningJob, String message) {
+        // ⭐ 先停止日志轮询，确保不再获取日志
         runningJob.cleanup();
 
+        // ⭐ 保存必要信息，因为后续会在异步线程中使用
+        final Long jobId = runningJob.getJobId();
+        final String jobName = runningJob.getJobName();
+        final String randomId = runningJob.getRandomId();
+
         Platform.runLater(() -> {
-            logPanel.info(runningJob.getJobId(), "════════════════════════════════");
-            logPanel.success(runningJob.getJobId(), "✓ " + runningJob.getJobName() + " " + message);
-            logPanel.info(runningJob.getJobId(), "════════════════════════════════");
+            logPanel.info(jobId, "════════════════════════════════");
+            logPanel.success(jobId, "✓ " + jobName + " " + message);
+            logPanel.info(jobId, "════════════════════════════════");
 
             // 从运行列表中移除
-            runningJobs.remove(runningJob.getJobId());
+            runningJobs.remove(jobId);
             
-            // 更新导航栏中的小绿点（任务完成）
-            navigationBar.updateTaskGroupRunningStatus(runningJob.getJobId(), false);
-            
+            // 更新导航栏中的小绿点（任务完成）- 按钮从"停止"变成"运行"
+            navigationBar.updateTaskGroupRunningStatus(jobId, false);
+
             updateToolBarRunningJobs();
 
             // 恢复边的正常状态（停止虚线动画）
             canvas.setAllConnectionsRunning(false);
 
-            // 断开SSE连接
-            SSEService.getInstance().disconnect(runningJob.getJobId(), runningJob.getRandomId());
-            
             // ⭐ 任务执行完成后，立即同步所有节点状态到数据库
             canvas.syncPendingNodeStatus();
-            logPanel.info(runningJob.getJobId(), "已触发节点状态批量同步");
+            logPanel.info(jobId, "已触发节点状态批量同步");
+
 
             // ⚠️ 重要：不重置节点状态，让节点保持最终状态（成功/失败）
             // 节点状态会在以下情况重置：
@@ -1988,6 +2002,22 @@ public class MainView extends BorderPane {
             // 2. 切换任务组时（loadTaskGroupData -> clear）
             // 3. 手动停止任务时（stopJobExecution）
         });
+
+        // ⭐ 优化：异步断开SSE连接，不阻塞UI更新
+        // 这样UI状态（按钮从停止变成运行）可以立即更新，而SSE断开在后台进行
+        // 确保日志轮询已经停止（cleanup已调用）后再断开连接
+        new Thread(() -> {
+            try {
+                // 等待一小段时间，确保日志轮询已经完全停止
+                Thread.sleep(100);
+                
+                // 异步断开SSE连接
+                SSEService.getInstance().disconnect(jobId, randomId);
+                logger.debug("SSE连接已异步断开 - jobId: {}, randomId: {}", jobId, randomId);
+            } catch (Exception e) {
+                logger.error("异步断开SSE连接失败 - jobId: {}, randomId: {}", jobId, randomId, e);
+            }
+        }, "SSE-Disconnect-" + jobId).start();
     }
 
     /**
@@ -2029,6 +2059,14 @@ public class MainView extends BorderPane {
         // ⭐ 保存必要的信息（在清理前）
         String jobName = runningJob.getJobName();
         String randomId = runningJob.getRandomId();
+
+        try {
+            jobInfoService.stopJobCompose(jobId, randomId);
+
+        }catch (Exception e) {
+            logger.error("后台停止接口调用失败 - jobId: {}, randomId: {}", jobId, randomId, e);
+        }
+
         
         // ⭐ 立即更新UI（不等待API调用）
         Platform.runLater(() -> {
@@ -2048,9 +2086,6 @@ public class MainView extends BorderPane {
             // 恢复边的正常状态（停止虚线动画）
             canvas.setAllConnectionsRunning(false);
 
-            // 断开SSE连接
-            SSEService.getInstance().disconnect(jobId, randomId);
-
             // ⭐ 任务停止后，立即同步所有节点状态到数据库
             canvas.syncPendingNodeStatus();
             logPanel.info("已触发节点状态批量同步");
@@ -2062,17 +2097,18 @@ public class MainView extends BorderPane {
             // 停止任务时不应该重置节点状态，应该保持运行到哪里就是哪个状态
         });
 
-        // ⭐ 异步调用停止接口（后台执行，不阻塞UI）
         new Thread(() -> {
             try {
-                jobInfoService.stopJobCompose(jobId, randomId);
-                logger.info("后台停止接口调用成功 - jobId: {}, randomId: {}", jobId, randomId);
+                // 等待一小段时间，确保日志轮询已经完全停止
+                Thread.sleep(100);
+
+                // 异步断开SSE连接
+                SSEService.getInstance().disconnect(jobId, randomId);
+                logger.debug("SSE连接已异步断开 - jobId: {}, randomId: {}", jobId, randomId);
             } catch (Exception e) {
-                logger.error("后台停止接口调用失败 - jobId: {}, randomId: {}", jobId, randomId, e);
-                // ⚠️ 注意：即使API调用失败，UI也已经更新了，这是符合预期的
-                // 因为用户点击停止后，UI应该立即响应，后台API调用失败不影响UI状态
+                logger.error("异步断开SSE连接失败 - jobId: {}, randomId: {}", jobId, randomId, e);
             }
-        }).start();
+        }, "SSE-Disconnect-" + jobId).start();
     }
 
     /**
@@ -2081,8 +2117,8 @@ public class MainView extends BorderPane {
     private void updateToolBarRunningJobs() {
         if (toolBar != null) {
             // 过滤出正在运行的任务组
-            java.util.Map<Long, RunningJobGroup> activeJobs = new java.util.HashMap<>();
-            for (java.util.Map.Entry<Long, RunningJobGroup> entry : runningJobs.entrySet()) {
+            Map<Long, RunningJobGroup> activeJobs = new java.util.HashMap<>();
+            for (Map.Entry<Long, RunningJobGroup> entry : runningJobs.entrySet()) {
                 if (entry.getValue().isRunning()) {
                     activeJobs.put(entry.getKey(), entry.getValue());
                 }
@@ -2093,7 +2129,7 @@ public class MainView extends BorderPane {
         // 同时更新导航栏
         if (navigationBar != null) {
             // 过滤出正在运行的任务组
-            java.util.Map<Long, RunningJobGroup> activeJobs = new java.util.HashMap<>();
+            Map<Long, RunningJobGroup> activeJobs = new java.util.HashMap<>();
             for (java.util.Map.Entry<Long, RunningJobGroup> entry : runningJobs.entrySet()) {
                 if (entry.getValue().isRunning()) {
                     activeJobs.put(entry.getKey(), entry.getValue());

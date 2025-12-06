@@ -75,6 +75,15 @@ public class JobApiController {
             Pair<String, String> pair = GsonTool.fromJson(data, Pair.class);
             JobLogHelper.addJobLog(pair);
             return new ReturnT<>(ReturnT.SUCCESS_CODE, "success");
+        } else if ("updateRegistryValue".equals(uri)) {
+            // ⭐ 更新注册信息的registryValue（用于executor-compose更新HTTP端口信息）
+            Map<String, String> params = GsonTool.fromJson(data, Map.class);
+            String registryGroup = params.get("registryGroup");
+            String registryKey = params.get("registryKey");
+            String oldRegistryValue = params.get("oldRegistryValue");
+            String newRegistryValue = params.get("newRegistryValue");
+            return com.cc.job.admin.task.thread.JobRegistryHelper.getInstance()
+                    .updateRegistryValue(registryGroup, registryKey, oldRegistryValue, newRegistryValue);
         } else {
             return new ReturnT<>(ReturnT.FAIL_CODE, "invalid request, uri-mapping(" + uri + ") not found.");
         }

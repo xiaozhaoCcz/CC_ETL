@@ -2,6 +2,7 @@ package com.cc.job.admin.task.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
+import cn.hutool.http.HttpRequest;
 import cn.hutool.http.HttpResponse;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -20,11 +21,14 @@ import com.cc.job.xo.model.vo.JobNodeVo;
 import com.cc.job.admin.task.thread.JobScheduleHelper;
 import com.cc.job.admin.task.thread.JobTriggerPoolHelper;
 import com.cc.job.admin.task.utils.I18nUtil;
+import com.cc.job.admin.config.XxlJobAdminConfig;
 import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
 import com.xxl.job.core.glue.GlueTypeEnum;
 import com.xxl.job.core.util.DateUtil;
 import com.xxl.job.core.util.IpUtil;
+import com.xxl.job.core.biz.model.RegistryParam;
+import com.xxl.job.core.enums.RegistryConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -100,6 +104,11 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     private final String ADMIN_ADDRESS = "http://%s:%s/xxl-job-admin/";
     @Value("${server.port}")
     private int port;
+    
+    // ⭐ executor-compose的HTTP服务器端口（向后兼容，用于解析旧格式的registryValue）
+    // 新格式的registryValue是JSON格式，包含httpPort字段，不需要此配置
+    @Value("${cc-job.executor-compose.http-port:8500}")
+    private int executorComposeHttpPort;
     
     // ⭐ 用于异步调用停止接口的线程池
     private static final ExecutorService STOP_JOB_EXECUTOR = Executors.newCachedThreadPool(r -> {
@@ -386,8 +395,10 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         }
         
         // 原子性设置运行状态（在事务中，行锁保护）
-        taskInfo.setTriggerStatus(1);
-        this.updateById(taskInfo);
+        if (taskInfo.getJobType() == 2 && taskInfo.getTriggerStatus() == 0) {
+            taskInfo.setTriggerStatus(1);
+            this.updateById(taskInfo);
+        }
 
         // 返回日志ID（字符串格式）
         return String.valueOf(logId);
@@ -873,43 +884,78 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
                 return false;
             }
             
-            // 3. ⭐ 异步调用executor-compose的停止接口（不阻塞主线程）
-            String addressList = jobGroup.getAddressList();
-            if (StringUtils.isNotBlank(addressList)) {
-                String[] addresses = addressList.split(",");
-                final Long finalJobId = id;
-                final String finalRandomId = randomId;
-                
-                // 异步调用所有执行器的停止接口
-                for (String address : addresses) {
-                    if (StringUtils.isBlank(address)) {
-                        continue;
-                    }
-                    
-                    final String finalAddress = address.trim();
-                    // 异步执行，不等待结果
-                    STOP_JOB_EXECUTOR.submit(() -> {
-                        try {
-                            String url = finalAddress + "/api/jobgroup/stop";
-                            HttpResponse response = cn.hutool.http.HttpRequest.post(url)
-                                    .form("jobId", finalJobId)
-                                    .form("randomId", finalRandomId)
-                                    .timeout(5000)
-                                    .execute();
-                            
-                            if (response.isOk()) {
-                                log.info("成功调用停止接口 - jobId: {}, randomId: {}, address: {}", 
-                                        finalJobId, finalRandomId, finalAddress);
-                            } else {
-                                log.error("调用停止接口失败 - jobId: {}, randomId: {}, address: {}, status: {}", 
-                                        finalJobId, finalRandomId, finalAddress, response.getStatus());
+            // 3. ⭐ 从注册表中获取executor-compose服务的HTTP地址
+            // executor-compose的appName是固定的：cc-job-executor-compose
+            final String EXECUTOR_COMPOSE_APP_NAME = "cc-job-executor-compose";
+            final Long finalJobId = id;
+            final String finalRandomId = randomId;
+            
+            // 从注册表中查询executor-compose服务的地址
+            List<JobRegistry> registryList = XxlJobAdminConfig.getAdminConfig()
+                    .getJobRegistryMapper()
+                    .findAll(RegistryConfig.DEAD_TIMEOUT, new Date());
+            
+            List<String> composeHttpAddresses = new ArrayList<>();
+            if (registryList != null) {
+                for (JobRegistry registry : registryList) {
+                    // 查找appName为cc-job-executor-compose的注册记录
+                    if (RegistryConfig.RegistType.EXECUTOR.name().equals(registry.getRegistryGroup())
+                            && EXECUTOR_COMPOSE_APP_NAME.equals(registry.getRegistryKey())) {
+                        String registryValue = registry.getRegistryValue();
+                        if (StringUtils.isNotBlank(registryValue)) {
+                            // ⚠️ 重要：registryValue可能是JSON格式（包含executorAddress和httpPort）
+                            // 也可能是旧的格式（直接是executorAddress）
+                            String httpAddress = parseHttpAddressFromRegistryValue(registryValue.trim());
+                            if (httpAddress != null && !composeHttpAddresses.contains(httpAddress)) {
+                                composeHttpAddresses.add(httpAddress);
                             }
-                        } catch (Exception e) {
-                            log.error("调用停止接口异常 - jobId: {}, randomId: {}, address: {}", 
-                                    finalJobId, finalRandomId, finalAddress, e);
                         }
-                    });
+                    }
                 }
+            }
+            
+            if (composeHttpAddresses.isEmpty()) {
+                log.warn("停止任务组失败 - 未找到executor-compose服务地址 - jobId: {}, randomId: {}", id, randomId);
+                // 即使找不到executor-compose地址，也返回成功（因为数据库状态已更新）
+                return flag > 0;
+            }
+            
+            // 4. ⭐ 异步调用executor-compose的停止接口（不阻塞主线程）
+            // 使用HTTP服务器地址（端口8500）而不是执行器地址（端口15000）
+            for (String httpAddress : composeHttpAddresses) {
+                final String finalHttpAddress = httpAddress;
+                // 异步执行，不等待结果
+                STOP_JOB_EXECUTOR.submit(() -> {
+                    try {
+                        // 构建完整的URL（确保地址格式正确）
+                        // 地址格式可能是 "http://ip:8500" 或 "http://ip:8500/"
+                        String url = finalHttpAddress;
+                        if (!url.endsWith("/")) {
+                            url += "/";
+                        }
+                        // 移除末尾的斜杠后再拼接路径，避免双斜杠
+                        url = url.replaceAll("/+$", "") + "/api/jobgroup/stop";
+                        
+                        log.debug("调用停止接口 - URL: {}, jobId: {}, randomId: {}", url, finalJobId, finalRandomId);
+                        
+                        HttpResponse response = HttpRequest.post(url)
+                                .form("jobId", finalJobId)
+                                .form("randomId", finalRandomId)
+                                .timeout(5000)
+                                .execute();
+                        
+                        if (response.isOk()) {
+                            log.info("成功调用停止接口 - jobId: {}, randomId: {}, httpAddress: {}", 
+                                    finalJobId, finalRandomId, finalHttpAddress);
+                        } else {
+                            log.error("调用停止接口失败 - jobId: {}, randomId: {}, httpAddress: {}, status: {}, body: {}", 
+                                    finalJobId, finalRandomId, finalHttpAddress, response.getStatus(), response.body());
+                        }
+                    } catch (Exception e) {
+                        log.error("调用停止接口异常 - jobId: {}, randomId: {}, httpAddress: {}, error: {}", 
+                                finalJobId, finalRandomId, finalHttpAddress, e.getMessage(), e);
+                    }
+                });
             }
             
             // ⭐ 立即返回，不等待 HTTP 调用完成
@@ -917,6 +963,95 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         } catch (Exception e) {
             log.error("停止任务组异常 - jobId: {}, randomId: {}", id, randomId, e);
             return false;
+        }
+    }
+
+    /**
+     * 从注册表的registryValue中解析HTTP服务器地址
+     * 
+     * ⚠️ 重要：registryValue可能是两种格式：
+     * 1. JSON格式：{"executorAddress":"http://ip:15000/","httpPort":8500}（新格式，包含HTTP端口）
+     * 2. 字符串格式：http://ip:15000/（旧格式，只有执行器地址）
+     * 
+     * @param registryValue 注册表的registryValue
+     * @return HTTP服务器地址，格式如 "http://172.0.2.241:8500/"
+     */
+    private String parseHttpAddressFromRegistryValue(String registryValue) {
+        if (StringUtils.isBlank(registryValue)) {
+            return null;
+        }
+        
+        try {
+            // 尝试解析JSON格式
+            if (registryValue.trim().startsWith("{")) {
+                Map<String, Object> registryMap = JSONUtil.toBean(registryValue, Map.class);
+                String executorAddress = (String) registryMap.get("executorAddress");
+                Object httpPortObj = registryMap.get("httpPort");
+                
+                if (StringUtils.isNotBlank(executorAddress) && httpPortObj != null) {
+                    int httpPort = httpPortObj instanceof Number 
+                            ? ((Number) httpPortObj).intValue() 
+                            : Integer.parseInt(httpPortObj.toString());
+                    
+                    // 从executorAddress中提取IP
+                    String ip = extractIpFromAddress(executorAddress);
+                    if (ip != null) {
+                        String httpAddress = "http://" + ip + ":" + httpPort + "/";
+                        log.debug("从JSON格式解析HTTP地址 - registryValue: {} -> HTTP地址: {}", registryValue, httpAddress);
+                        return httpAddress;
+                    }
+                }
+            }
+            
+            // 如果不是JSON格式，说明是旧格式，使用配置的HTTP端口（向后兼容）
+            String ip = extractIpFromAddress(registryValue);
+            if (ip != null) {
+                String httpAddress = "http://" + ip + ":" + executorComposeHttpPort + "/";
+                log.debug("从旧格式解析HTTP地址（使用配置端口） - registryValue: {} -> HTTP地址: {}", registryValue, httpAddress);
+                return httpAddress;
+            }
+            
+            return null;
+        } catch (Exception e) {
+            log.error("解析registryValue失败 - registryValue: {}", registryValue, e);
+            return null;
+        }
+    }
+    
+    /**
+     * 从地址中提取IP地址
+     * 
+     * @param address 地址，格式如 "http://172.0.2.241:15000/" 或 "http://172.0.2.241:15000"
+     * @return IP地址，如 "172.0.2.241"
+     */
+    private String extractIpFromAddress(String address) {
+        if (StringUtils.isBlank(address)) {
+            return null;
+        }
+        
+        try {
+            // 移除末尾的斜杠
+            address = address.trim().replaceAll("/+$", "");
+            
+            // 解析URL，提取IP
+            if (!address.startsWith("http://") && !address.startsWith("https://")) {
+                // 如果没有协议前缀，添加http://
+                address = "http://" + address;
+            }
+            
+            // 提取IP地址（移除协议和端口）
+            String ip = address;
+            if (ip.contains("://")) {
+                ip = ip.substring(ip.indexOf("://") + 3);
+            }
+            if (ip.contains(":")) {
+                ip = ip.substring(0, ip.indexOf(":"));
+            }
+            
+            return ip;
+        } catch (Exception e) {
+            log.error("提取IP地址失败 - address: {}", address, e);
+            return null;
         }
     }
 
