@@ -1,6 +1,7 @@
 package com.cc.job.gui.view;
 
 import com.cc.job.gui.util.IconUtil;
+import com.cc.job.gui.util.NotificationToast;
 import com.cc.job.gui.util.StyleUtil;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -1752,7 +1753,7 @@ public class LogPanel extends VBox {
     private void checkAndShowNotification(String originalText, String lowerText, boolean isError, boolean isWarn, boolean isSuccess) {
         // 检测需要显示提示框的关键词（只显示警告和错误）
         boolean shouldShowNotification = false;
-        com.cc.job.gui.util.NotificationToast.NotificationType notificationType = null;
+        NotificationToast.NotificationType notificationType = null;
         String notificationMessage = null;
 
         // 检测错误信息
@@ -1760,13 +1761,13 @@ public class LogPanel extends VBox {
                                 lowerText.contains("任务触发失败") ||
                                 lowerText.contains("执行结果:失败"))) {
             shouldShowNotification = true;
-            notificationType = com.cc.job.gui.util.NotificationToast.NotificationType.ERROR;
+            notificationType = NotificationToast.NotificationType.ERROR;
             notificationMessage = "任务执行失败，请查看日志详情";
         } 
         // 检测警告信息
         else if (isWarn && lowerText.contains("警告")) {
             shouldShowNotification = true;
-            notificationType = com.cc.job.gui.util.NotificationToast.NotificationType.WARNING;
+            notificationType = NotificationToast.NotificationType.WARNING;
             // 提取警告信息（最多120个字符）
             if (originalText.length() > 120) {
                 notificationMessage = originalText.substring(0, 117) + "...";
@@ -1777,7 +1778,7 @@ public class LogPanel extends VBox {
         
         // 显示通知提示框（只显示警告和错误）
         if (shouldShowNotification && notificationType != null && notificationMessage != null) {
-            com.cc.job.gui.util.NotificationToast.show(notificationMessage, notificationType);
+            NotificationToast.show(notificationMessage, notificationType);
         }
     }
     

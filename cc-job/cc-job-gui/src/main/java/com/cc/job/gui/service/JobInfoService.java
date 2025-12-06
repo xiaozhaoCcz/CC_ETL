@@ -1,5 +1,6 @@
 package com.cc.job.gui.service;
 
+import com.cc.job.gui.util.SessionManager;
 import com.cc.job.xo.common.result.Result;
 import com.cc.job.xo.model.entity.JobLogglue;
 import com.cc.job.xo.model.form.JobGlueForm;
@@ -38,7 +39,7 @@ public class JobInfoService extends BaseService {
         requestMap.put("executorParam", executorParam);
         
         // 添加触发用户ID（从SessionManager获取）
-        com.cc.job.gui.util.SessionManager session = com.cc.job.gui.util.SessionManager.getInstance();
+        SessionManager session = SessionManager.getInstance();
         if (session.isLoggedIn() && session.getUserId() != null) {
             try {
                 Integer triggerUserId = Integer.parseInt(session.getUserId());

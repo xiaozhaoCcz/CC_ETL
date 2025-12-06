@@ -222,11 +222,11 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
         }
 
         // 2. 构建导出数据结构
-        com.cc.job.xo.model.dto.PartitionExportData exportData = new com.cc.job.xo.model.dto.PartitionExportData();
+        PartitionExportData exportData = new PartitionExportData();
         
         // 2.1 设置分区信息
-        com.cc.job.xo.model.dto.PartitionExportData.PartitionInfo partitionInfo = 
-            new com.cc.job.xo.model.dto.PartitionExportData.PartitionInfo();
+        PartitionExportData.PartitionInfo partitionInfo = 
+            new PartitionExportData.PartitionInfo();
         partitionInfo.setId(jobPart.getId());
         partitionInfo.setJobPartName(jobPart.getJobPartName());
         partitionInfo.setSort(jobPart.getSort());
@@ -240,15 +240,15 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
                 .eq(JobInfo::getNodeFlag, "N")
         );
 
-        List<com.cc.job.xo.model.dto.PartitionExportData.TaskGroupInfo> taskGroupInfoList = new ArrayList<>();
+        List<PartitionExportData.TaskGroupInfo> taskGroupInfoList = new ArrayList<>();
 
         // 2.3 遍历每个任务组，获取其节点和边
         for (JobInfo taskGroup : taskGroupList) {
-            com.cc.job.xo.model.dto.PartitionExportData.TaskGroupInfo taskGroupInfo = 
-                new com.cc.job.xo.model.dto.PartitionExportData.TaskGroupInfo();
+            PartitionExportData.TaskGroupInfo taskGroupInfo = 
+                new PartitionExportData.TaskGroupInfo();
 
             // 2.3.1 设置任务组基本信息
-            com.cc.job.xo.model.dto.PartitionExportData.TaskInfoData taskGroupData = 
+            PartitionExportData.TaskInfoData taskGroupData = 
                 convertToTaskInfoData(taskGroup);
             taskGroupInfo.setTaskGroupData(taskGroupData);
 
@@ -258,10 +258,10 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
                     .eq(JobNode::getJobParentId, taskGroup.getId())
             );
 
-            List<com.cc.job.xo.model.dto.PartitionExportData.NodeInfo> nodeInfoList = new ArrayList<>();
+            List<PartitionExportData.NodeInfo> nodeInfoList = new ArrayList<>();
             for (JobNode jobNode : jobNodeList) {
-                com.cc.job.xo.model.dto.PartitionExportData.NodeInfo nodeInfo = 
-                    new com.cc.job.xo.model.dto.PartitionExportData.NodeInfo();
+                PartitionExportData.NodeInfo nodeInfo = 
+                    new PartitionExportData.NodeInfo();
                 
                 // 设置JobNode信息
                 nodeInfo.setNodeId(jobNode.getId());
@@ -293,10 +293,10 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
                     .eq(JobEdge::getJobParentId, taskGroup.getId())
             );
 
-            List<com.cc.job.xo.model.dto.PartitionExportData.EdgeInfo> edgeInfoList = new ArrayList<>();
+            List<PartitionExportData.EdgeInfo> edgeInfoList = new ArrayList<>();
             for (JobEdge jobEdge : jobEdgeList) {
-                com.cc.job.xo.model.dto.PartitionExportData.EdgeInfo edgeInfo = 
-                    new com.cc.job.xo.model.dto.PartitionExportData.EdgeInfo();
+                PartitionExportData.EdgeInfo edgeInfo = 
+                    new PartitionExportData.EdgeInfo();
                 edgeInfo.setId(jobEdge.getId());
                 edgeInfo.setJobParentId(jobEdge.getJobParentId());
                 edgeInfo.setFromNodeId(jobEdge.getFromNodeId());
@@ -346,9 +346,9 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
     /**
      * 将JobInfo转换为TaskInfoData
      */
-    private com.cc.job.xo.model.dto.PartitionExportData.TaskInfoData convertToTaskInfoData(JobInfo jobInfo) {
-        com.cc.job.xo.model.dto.PartitionExportData.TaskInfoData taskInfoData = 
-            new com.cc.job.xo.model.dto.PartitionExportData.TaskInfoData();
+    private PartitionExportData.TaskInfoData convertToTaskInfoData(JobInfo jobInfo) {
+        PartitionExportData.TaskInfoData taskInfoData = 
+            new PartitionExportData.TaskInfoData();
         taskInfoData.setId(jobInfo.getId());
         taskInfoData.setJobGroup(jobInfo.getJobGroup());
         taskInfoData.setJobDesc(jobInfo.getJobDesc());
@@ -411,8 +411,8 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
 
         // 2. 解析JSON数据
         Gson gson = new Gson();
-        com.cc.job.xo.model.dto.PartitionExportData exportData = 
-            gson.fromJson(json, com.cc.job.xo.model.dto.PartitionExportData.class);
+        PartitionExportData exportData = 
+            gson.fromJson(json, PartitionExportData.class);
         
         if (exportData == null || exportData.getPartition() == null) {
             throw new RuntimeException("导入数据格式错误");
@@ -432,7 +432,7 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
 
         // 5. 遍历所有任务组，重新创建
         if (exportData.getTaskGroups() != null) {
-            for (com.cc.job.xo.model.dto.PartitionExportData.TaskGroupInfo taskGroupInfo : exportData.getTaskGroups()) {
+            for (PartitionExportData.TaskGroupInfo taskGroupInfo : exportData.getTaskGroups()) {
                 // 5.1 创建任务组（JobInfo，jobType=2, isNode="N"）
                 JobInfo newTaskGroup = convertToJobInfo(taskGroupInfo.getTaskGroupData());
                 newTaskGroup.setId(null); // 清除ID，让数据库自动生成
@@ -457,7 +457,7 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
 
                 // 5.2 创建任务组下的所有节点
                 if (taskGroupInfo.getNodes() != null) {
-                    for (com.cc.job.xo.model.dto.PartitionExportData.NodeInfo nodeInfo : taskGroupInfo.getNodes()) {
+                    for (PartitionExportData.NodeInfo nodeInfo : taskGroupInfo.getNodes()) {
                         // 5.2.1 创建节点对应的JobInfo
                         JobInfo newNodeJobInfo = convertToJobInfo(nodeInfo.getTaskInfo());
                         newNodeJobInfo.setId(null);
@@ -492,7 +492,7 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
 
                 // 5.3 创建任务组下的所有边
                 if (taskGroupInfo.getEdges() != null) {
-                    for (com.cc.job.xo.model.dto.PartitionExportData.EdgeInfo edgeInfo : taskGroupInfo.getEdges()) {
+                    for (PartitionExportData.EdgeInfo edgeInfo : taskGroupInfo.getEdges()) {
                         // 映射节点ID
                         Long newFromNodeId = oldToNewNodeIdMap.get(edgeInfo.getFromNodeId());
                         Long newEndNodeId = oldToNewNodeIdMap.get(edgeInfo.getEndNodeId());

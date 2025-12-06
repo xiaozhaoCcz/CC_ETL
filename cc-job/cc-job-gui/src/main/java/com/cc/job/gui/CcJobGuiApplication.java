@@ -211,7 +211,7 @@ public class CcJobGuiApplication extends Application {
                     try {
                         // 1. 清理MainView的资源（停止所有Timer和SSE连接）
                         try {
-                            com.cc.job.gui.view.MainView mainViewInstance = (com.cc.job.gui.view.MainView) scene.getRoot();
+                            MainView mainViewInstance = (MainView) scene.getRoot();
                             if (mainViewInstance != null) {
                                 mainViewInstance.cleanup();
                             }

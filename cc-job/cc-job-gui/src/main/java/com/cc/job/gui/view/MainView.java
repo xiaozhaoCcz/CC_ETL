@@ -4,11 +4,16 @@ import com.cc.job.gui.history.UndoRedoManager;
 import com.cc.job.gui.model.*;
 import com.cc.job.gui.service.JobGroupService;
 import com.cc.job.gui.service.JobInfoService;
+import com.cc.job.gui.service.JobJdbcDatasourceService;
 import com.cc.job.gui.service.JobLogService;
 import com.cc.job.gui.service.JobPartService;
 import com.cc.job.gui.service.SSEService;
 import com.cc.job.gui.util.*;
+import com.cc.job.xo.model.entity.JobEdge;
 import com.cc.job.xo.model.entity.JobGroup;
+import com.cc.job.xo.model.entity.JobJdbcDatasource;
+import com.cc.job.xo.model.entity.JobNode;
+import com.cc.job.xo.model.form.JobEdgeForm;
 import com.cc.job.xo.model.form.JobInfoForm;
 import javafx.application.Platform;
 import javafx.geometry.Bounds;
@@ -97,7 +102,7 @@ public class MainView extends BorderPane {
     }
     
     // 复制粘贴相关：存储复制的节点数据
-    private com.cc.job.xo.model.form.JobInfoForm copiedNodeForm = null; // 兼容单节点复制
+    private JobInfoForm copiedNodeForm = null; // 兼容单节点复制
     
     // 多节点复制粘贴数据结构
     private static class CopiedNodesData {
@@ -107,7 +112,7 @@ public class MainView extends BorderPane {
         double minY = Double.MAX_VALUE;
         
         static class NodeFormData {
-            com.cc.job.xo.model.form.JobInfoForm form;
+            JobInfoForm form;
             Long originalJobId; // 原始jobId，用于匹配连接关系
             String originalNodeId; // 原始节点ID
         }
@@ -239,7 +244,7 @@ public class MainView extends BorderPane {
                                             groupNodeForm.setGlueType("CUSTOM_GROUP");
                                             groupNodeForm.setExecutorHandler("runJobGroupXxlJob");
                                             groupNodeForm.setGlueUpdateTime(null);
-                                            com.cc.job.xo.model.entity.JobNode savedGroupNode = jobInfoService.saveJobNode(groupNodeForm);
+                                            JobNode savedGroupNode = jobInfoService.saveJobNode(groupNodeForm);
                                             if (savedGroupNode != null) {
                                                 groupContainerJobIdRef[0] = savedGroupNode.getJobId();
                                             }
@@ -380,7 +385,7 @@ public class MainView extends BorderPane {
                                             copyForm.setGlueUpdateTime(null);
                                             
                                             // 保存为新节点（包括任务组节点本身）
-                                            com.cc.job.xo.model.entity.JobNode saved = jobInfoService.saveJobNode(copyForm);
+                                            JobNode saved = jobInfoService.saveJobNode(copyForm);
                                             
                                             // ⭐ 修复：如果是任务组节点，递归处理子节点（在保存节点之后）
                                             if (isGroupNode && saved != null) {
@@ -450,7 +455,7 @@ public class MainView extends BorderPane {
                                             if (s != null && t != null && s.getNodeId() != null && t.getNodeId() != null) {
                                                 // 保存到数据库
                                                 try {
-                                                    com.cc.job.xo.model.form.JobEdgeForm edgeForm = new com.cc.job.xo.model.form.JobEdgeForm();
+                                                    JobEdgeForm edgeForm = new JobEdgeForm();
                                                     Long effectiveParentId = groupContainerJobIdRef[0] != null ? groupContainerJobIdRef[0] : currentTaskGroupId;
                                                     edgeForm.setJobParentId(effectiveParentId);
                                                     edgeForm.setFromNodeId(Long.parseLong(s.getNodeId()));
@@ -3081,7 +3086,7 @@ public class MainView extends BorderPane {
             new Thread(() -> {
                 try {
                     // 获取任务组表单数据
-                    com.cc.job.xo.model.form.JobInfoForm formData = jobInfoService.getFormData(taskGroupId);
+                    JobInfoForm formData = jobInfoService.getFormData(taskGroupId);
                     
                     if (formData == null) {
                         Platform.runLater(() -> {
@@ -3123,7 +3128,7 @@ public class MainView extends BorderPane {
     /**
      * 显示新建/编辑任务组对话框
      */
-    private void showNewJobGroupDialog(Long partitionId, String partitionName, com.cc.job.xo.model.form.JobInfoForm editData) {
+    private void showNewJobGroupDialog(Long partitionId, String partitionName, JobInfoForm editData) {
         try {
             logPanel.info("════════════════════════════════");
             logPanel.info(editData == null ? "📝 新建任务组 - 分区: " + partitionName : "✏️ 编辑任务组");
@@ -3131,7 +3136,7 @@ public class MainView extends BorderPane {
             // 在后台线程中加载JobGroup列表
             new Thread(() -> {
                 try {
-                    java.util.List<com.cc.job.xo.model.entity.JobGroup> jobGroupList = jobGroupService.getAllJobGroupList();
+                    java.util.List<JobGroup> jobGroupList = jobGroupService.getAllJobGroupList();
 
                     Platform.runLater(() -> {
                         try {
@@ -3141,7 +3146,7 @@ public class MainView extends BorderPane {
 
                             // 创建并显示对话框
                             NewJobGroupDialog dialog = new NewJobGroupDialog(ownerStage, partitionId, editData, jobGroupList);
-                            java.util.Optional<com.cc.job.xo.model.form.JobInfoForm> result = dialog.showAndWait();
+                            java.util.Optional<JobInfoForm> result = dialog.showAndWait();
 
                             // 处理结果
                             result.ifPresent(formData -> {
@@ -3213,7 +3218,7 @@ public class MainView extends BorderPane {
     /**
      * 显示新建/编辑任务节点对话框
      */
-    private void showNewJobNodeDialog(Long taskGroupId, String taskGroupName, com.cc.job.xo.model.form.JobInfoForm editData) {
+    private void showNewJobNodeDialog(Long taskGroupId, String taskGroupName, JobInfoForm editData) {
         try {
             logPanel.info("════════════════════════════════");
             logPanel.info(editData == null ? "📝 新建任务节点 - 任务组: " + taskGroupName : "✏️ 编辑任务节点");
@@ -3221,7 +3226,7 @@ public class MainView extends BorderPane {
             // 在后台线程中加载JobGroup列表
             new Thread(() -> {
                 try {
-                    java.util.List<com.cc.job.xo.model.entity.JobGroup> jobGroupList = jobGroupService.getAllJobGroupList();
+                    java.util.List<JobGroup> jobGroupList = jobGroupService.getAllJobGroupList();
 
                     Platform.runLater(() -> {
                         try {
@@ -3231,7 +3236,7 @@ public class MainView extends BorderPane {
 
                             // 创建并显示对话框
                             NewJobNodeDialog dialog = new NewJobNodeDialog(ownerStage, taskGroupId, editData, jobGroupList);
-                            java.util.Optional<com.cc.job.xo.model.form.JobInfoForm> result = dialog.showAndWait();
+                            java.util.Optional<JobInfoForm> result = dialog.showAndWait();
 
                             // 处理结果
                             result.ifPresent(formData -> {
@@ -3240,7 +3245,7 @@ public class MainView extends BorderPane {
                                 // 在后台线程中保存
                                 new Thread(() -> {
                                     try {
-                                        com.cc.job.xo.model.entity.JobNode jobNode = jobInfoService.saveJobNode(formData);
+                                        JobNode jobNode = jobInfoService.saveJobNode(formData);
 
                                         if (jobNode != null) {
                                             Platform.runLater(() -> {
@@ -3302,7 +3307,7 @@ public class MainView extends BorderPane {
     /**
      * 在画布上添加节点
      */
-    private void addNodeToCanvas(com.cc.job.xo.model.entity.JobNode jobNode, com.cc.job.xo.model.form.JobInfoForm formData) {
+    private void addNodeToCanvas(JobNode jobNode, JobInfoForm formData) {
         addNodeToCanvasAndReturn(jobNode, formData);
     }
     
@@ -3312,7 +3317,7 @@ public class MainView extends BorderPane {
      * @param formData 任务表单数据
      * @return 创建的ProcessNode对象，如果失败返回null
      */
-    private ProcessNode addNodeToCanvasAndReturn(com.cc.job.xo.model.entity.JobNode jobNode, com.cc.job.xo.model.form.JobInfoForm formData) {
+    private ProcessNode addNodeToCanvasAndReturn(JobNode jobNode, JobInfoForm formData) {
         try {
             logPanel.info("正在画布上添加节点...");
 
@@ -3444,7 +3449,7 @@ public class MainView extends BorderPane {
                     copyForm.setExecutorBlockStrategy("SERIAL_EXECUTION"); // 默认阻塞策略
                 }
 
-                com.cc.job.xo.model.entity.JobNode newJobNode = jobInfoService.saveJobNode(copyForm);
+                JobNode newJobNode = jobInfoService.saveJobNode(copyForm);
                 if (newJobNode == null) {
                     Platform.runLater(() -> logPanel.error("✗ 复制节点失败：后端返回空数据"));
                     return;
@@ -3541,7 +3546,7 @@ public class MainView extends BorderPane {
                 }
                 
                 // 保存到后端
-                com.cc.job.xo.model.entity.JobNode newJobNode = jobInfoService.saveJobNode(pasteForm);
+                JobNode newJobNode = jobInfoService.saveJobNode(pasteForm);
                 if (newJobNode == null) {
                     Platform.runLater(() -> logPanel.error("✗ 粘贴节点失败：后端返回空数据"));
                     return;
@@ -3655,7 +3660,7 @@ public class MainView extends BorderPane {
                         }
                         
                         // 保存到后端
-                        com.cc.job.xo.model.entity.JobNode newJobNode = jobInfoService.saveJobNode(pasteForm);
+                        JobNode newJobNode = jobInfoService.saveJobNode(pasteForm);
                         if (newJobNode == null) {
                             logPanel.warn("⚠ 粘贴节点失败：后端返回空数据: " + safeString(pasteForm.getJobDesc()));
                             continue;
@@ -3737,7 +3742,7 @@ public class MainView extends BorderPane {
                                             // 保存连线到数据库
                                             if (connection != null && sourceNode.getNodeId() != null && targetNode.getNodeId() != null) {
                                                 try {
-                                                    com.cc.job.xo.model.form.JobEdgeForm edgeForm = new com.cc.job.xo.model.form.JobEdgeForm();
+                                                    JobEdgeForm edgeForm = new JobEdgeForm();
                                                     edgeForm.setJobParentId(currentTaskGroupId);
 
                                                     edgeForm.setFromNodeId(Long.parseLong(sourceNode.getNodeId()));
@@ -3748,7 +3753,7 @@ public class MainView extends BorderPane {
                                                     // 在后台线程中保存连线
                                                     new Thread(() -> {
                                                         try {
-                                                            com.cc.job.xo.model.entity.JobEdge savedEdge = jobInfoService.saveJobEdge(edgeForm);
+                                                            JobEdge savedEdge = jobInfoService.saveJobEdge(edgeForm);
                                                             if (savedEdge != null) {
                                                                 savedConnectionCount.incrementAndGet();
                                                             }
@@ -3846,15 +3851,15 @@ public class MainView extends BorderPane {
                 JobInfoForm form = jobInfoService.getJobNodeFormData(jobId);
                 List<JobGroup> jobGroups = jobGroupService.getAllJobGroupList();
                 // 如果是SQL模式，获取数据源列表
-                List<com.cc.job.xo.model.entity.JobJdbcDatasource> datasources = null;
+                List<JobJdbcDatasource> datasources = null;
                 if (form != null && "SQL".equals(form.getGlueType())) {
                     try {
-                        com.cc.job.gui.service.JobJdbcDatasourceService datasourceService = new com.cc.job.gui.service.JobJdbcDatasourceService();
+                        JobJdbcDatasourceService datasourceService = new JobJdbcDatasourceService();
                         datasources = datasourceService.getDatasourceList();
                     } catch (Exception e) {
                     }
                 }
-                List<com.cc.job.xo.model.entity.JobJdbcDatasource> finalDatasources = datasources;
+                List<JobJdbcDatasource> finalDatasources = datasources;
                 Platform.runLater(() -> {
                     showJobNodeDetailDialog(node, form, jobGroups, null, null, finalDatasources);
                     logPanel.info("════════════════════════════════");
@@ -3939,15 +3944,15 @@ public class MainView extends BorderPane {
                 JobInfoForm form = jobInfoService.getJobNodeFormData(jobId);
                 List<JobGroup> jobGroups = jobGroupService.getAllJobGroupList();
                 // 如果是SQL模式，获取数据源列表
-                List<com.cc.job.xo.model.entity.JobJdbcDatasource> datasources = null;
+                List<JobJdbcDatasource> datasources = null;
                 if (form != null && "SQL".equals(form.getGlueType())) {
                     try {
-                        com.cc.job.gui.service.JobJdbcDatasourceService datasourceService = new com.cc.job.gui.service.JobJdbcDatasourceService();
+                        JobJdbcDatasourceService datasourceService = new JobJdbcDatasourceService();
                         datasources = datasourceService.getDatasourceList();
                     } catch (Exception e) {
                     }
                 }
-                List<com.cc.job.xo.model.entity.JobJdbcDatasource> finalDatasources = datasources;
+                List<JobJdbcDatasource> finalDatasources = datasources;
                 Platform.runLater(() -> {
                     showJobNodeDetailDialog(null, form, jobGroups, jobId, nodeName, finalDatasources);
                     logPanel.info("════════════════════════════════");
@@ -3973,7 +3978,7 @@ public class MainView extends BorderPane {
         showJobNodeDetailDialog(node, form, jobGroups, jobId, nodeName, null);
     }
     
-    private void showJobNodeDetailDialog(ProcessNode node, JobInfoForm form, List<JobGroup> jobGroups, Long jobId, String nodeName, List<com.cc.job.xo.model.entity.JobJdbcDatasource> datasources) {
+    private void showJobNodeDetailDialog(ProcessNode node, JobInfoForm form, List<JobGroup> jobGroups, Long jobId, String nodeName, List<JobJdbcDatasource> datasources) {
         if (form == null) {
             logPanel.warn("⚠ 未获取到节点详情数据");
             return;
@@ -4007,7 +4012,7 @@ public class MainView extends BorderPane {
                 datasourceName = datasources.stream()
                     .filter(ds -> ds.getId().equals(form.getJdbcDatasourceId()))
                     .findFirst()
-                    .map(com.cc.job.xo.model.entity.JobJdbcDatasource::getDatabaseName)
+                    .map(JobJdbcDatasource::getDatabaseName)
                     .orElse(null);
             }
             addDetailRow(grid, rowIndex++, "数据库", datasourceName != null ? datasourceName : ("ID: " + form.getJdbcDatasourceId()));
@@ -4317,7 +4322,7 @@ public class MainView extends BorderPane {
             new Thread(() -> {
                 try {
                     // 获取节点表单数据
-                    com.cc.job.xo.model.form.JobInfoForm formData = jobInfoService.getJobNodeFormData(jobId);
+                    JobInfoForm formData = jobInfoService.getJobNodeFormData(jobId);
 
                     if (formData == null) {
                         Platform.runLater(() -> {
@@ -4654,7 +4659,7 @@ public class MainView extends BorderPane {
                     copyForm.setGlueUpdateTime(null);
                     
                     // 先保存当前任务组节点
-                    com.cc.job.xo.model.entity.JobNode savedNestedGroup = jobInfoService.saveJobNode(copyForm);
+                    JobNode savedNestedGroup = jobInfoService.saveJobNode(copyForm);
                     if (savedNestedGroup != null) {
                         // 递归获取并保存更深层的嵌套任务组节点
                         try {
@@ -4698,7 +4703,7 @@ public class MainView extends BorderPane {
                     }
                     copyForm.setGlueUpdateTime(null);
                     
-                    com.cc.job.xo.model.entity.JobNode saved = jobInfoService.saveJobNode(copyForm);
+                    JobNode saved = jobInfoService.saveJobNode(copyForm);
                     if (saved != null) {
                         final String nodeIdStr = String.valueOf(saved.getId());
                         final Long newJobId = saved.getJobId();

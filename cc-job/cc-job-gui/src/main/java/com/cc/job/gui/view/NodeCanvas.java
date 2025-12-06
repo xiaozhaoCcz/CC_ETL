@@ -7,6 +7,7 @@ import com.cc.job.gui.model.JobComposeData;
 import com.cc.job.gui.model.NodeConnection;
 import com.cc.job.gui.model.ProcessNode;
 import com.cc.job.gui.service.JobPartService;
+import com.cc.job.gui.util.NodeStatusSyncManager;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.geometry.Bounds;
@@ -55,7 +56,7 @@ public class NodeCanvas extends Pane {
     private Runnable onRequestClearCanvas;
     
     // 任务组容器删除回调
-    private java.util.function.Consumer<com.cc.job.gui.model.GroupContainer> onDeleteGroupContainer;
+    private java.util.function.Consumer<GroupContainer> onDeleteGroupContainer;
 
     // 临时连线相关
     private Object startOwner; // ProcessNode 或 GroupContainer
@@ -160,7 +161,7 @@ public class NodeCanvas extends Pane {
         this.onRequestClearCanvas = runnable;
     }
     
-    public void setOnDeleteGroupContainer(java.util.function.Consumer<com.cc.job.gui.model.GroupContainer> callback) {
+    public void setOnDeleteGroupContainer(java.util.function.Consumer<GroupContainer> callback) {
         this.onDeleteGroupContainer = callback;
     }
     
@@ -224,7 +225,7 @@ public class NodeCanvas extends Pane {
         }
     }
     
-    public List<com.cc.job.gui.model.GroupContainer> getGroupContainers() {
+    public List<GroupContainer> getGroupContainers() {
         return new ArrayList<>(groupContainers);
     }
     
@@ -232,7 +233,7 @@ public class NodeCanvas extends Pane {
      * 将任务组容器添加到集合中（当容器已经添加到UI时使用）
      * @param container 要添加到集合的任务组容器
      */
-    public void addGroupContainerToCollection(com.cc.job.gui.model.GroupContainer container) {
+    public void addGroupContainerToCollection(GroupContainer container) {
         if (container == null) {
             return;
         }
@@ -246,11 +247,11 @@ public class NodeCanvas extends Pane {
     /**
      * 移除任务组容器
      */
-    public void removeGroupContainer(com.cc.job.gui.model.GroupContainer container) {
+    public void removeGroupContainer(GroupContainer container) {
         removeGroupContainer(container, true);
     }
     
-    public void removeGroupContainer(com.cc.job.gui.model.GroupContainer container, boolean recordHistory) {
+    public void removeGroupContainer(GroupContainer container, boolean recordHistory) {
         if (container == null) {
             return;
         }
@@ -944,8 +945,8 @@ public class NodeCanvas extends Pane {
     private String getOwnerName(javafx.scene.Node owner) {
         if (owner instanceof ProcessNode) {
             return ((ProcessNode) owner).getJobHandlerName();
-        } else if (owner instanceof com.cc.job.gui.model.GroupContainer) {
-            return ((com.cc.job.gui.model.GroupContainer) owner).getGroupName();
+        } else if (owner instanceof GroupContainer) {
+            return ((GroupContainer) owner).getGroupName();
         }
         return "未知";
     }
@@ -963,8 +964,8 @@ public class NodeCanvas extends Pane {
             if (connector == node.getBottomConnector()) return "bottom";
             if (connector == node.getLeftConnector()) return "left";
             if (connector == node.getRightConnector()) return "right";
-        } else if (owner instanceof com.cc.job.gui.model.GroupContainer) {
-            com.cc.job.gui.model.GroupContainer group = (com.cc.job.gui.model.GroupContainer) owner;
+        } else if (owner instanceof GroupContainer) {
+            GroupContainer group = (GroupContainer) owner;
             if (connector == group.getTopConnector()) return "top";
             if (connector == group.getBottomConnector()) return "bottom";
             if (connector == group.getLeftConnector()) return "left";
@@ -1027,7 +1028,7 @@ public class NodeCanvas extends Pane {
                 
             // 检查鼠标释放位置是否在某个节点或任务组上
             ProcessNode targetNode = findNodeAtPosition(e.getSceneX(), e.getSceneY());
-            com.cc.job.gui.model.GroupContainer targetGroup = findGroupAtPosition(e.getSceneX(), e.getSceneY());
+            GroupContainer targetGroup = findGroupAtPosition(e.getSceneX(), e.getSceneY());
             
             if (targetNode != null && startOwner instanceof ProcessNode && targetNode != startOwner) {
                     // 找到最近的目标连接点
@@ -1077,8 +1078,8 @@ public class NodeCanvas extends Pane {
                         conn.getSourceOwner() == startOwner && conn.getTargetOwner() == targetGroup &&
                         conn.getSourceConnector() == connector && conn.getTargetConnector() == targetConnector
                     );
-                } else if (startOwner instanceof com.cc.job.gui.model.GroupContainer) {
-                    Circle startConn = findNearestConnector((com.cc.job.gui.model.GroupContainer) startOwner, e.getSceneX(), e.getSceneY());
+                } else if (startOwner instanceof GroupContainer) {
+                    Circle startConn = findNearestConnector((GroupContainer) startOwner, e.getSceneX(), e.getSceneY());
                     exists = connections.stream().anyMatch(conn ->
                         conn.getSourceOwner() == startOwner && conn.getTargetOwner() == targetGroup &&
                         conn.getSourceConnector() == startConn && conn.getTargetConnector() == targetConnector
@@ -1107,12 +1108,12 @@ public class NodeCanvas extends Pane {
                                 // ⭐ 修复：连接成功后清除临时连线
                                 cancelTempLine();
                             }
-                        } else if (startOwner instanceof com.cc.job.gui.model.GroupContainer) {
+                        } else if (startOwner instanceof GroupContainer) {
                             // 任务组 -> 任务组
-                            Circle startConn = findNearestConnector((com.cc.job.gui.model.GroupContainer) startOwner, e.getSceneX(), e.getSceneY());
+                            Circle startConn = findNearestConnector((GroupContainer) startOwner, e.getSceneX(), e.getSceneY());
                             // ⭐ 修复：使用 addConnection 方法，自动配置交互功能
                             NodeConnection conn = addConnection(
-                                ((com.cc.job.gui.model.GroupContainer) startOwner), ((com.cc.job.gui.model.GroupContainer) startOwner).getConnectorPane(), startConn,
+                                ((GroupContainer) startOwner), ((GroupContainer) startOwner).getConnectorPane(), startConn,
                                 targetGroup, targetGroup.getConnectorPane(), targetConnector,
                                 true
                             );
@@ -1156,7 +1157,7 @@ public class NodeCanvas extends Pane {
     }
 
     // 为任务组容器的连接点挂接同样的行为
-    private void setupConnectorHandler(com.cc.job.gui.model.GroupContainer group, Circle connector) {
+    private void setupConnectorHandler(GroupContainer group, Circle connector) {
         connector.setOnMousePressed(e -> {
             startOwner = group;
             
@@ -1191,7 +1192,7 @@ public class NodeCanvas extends Pane {
         connector.setOnMouseReleased(e -> {
             if (tempLine != null) {
                 ProcessNode targetNode = findNodeAtPosition(e.getSceneX(), e.getSceneY());
-                com.cc.job.gui.model.GroupContainer targetGroup = findGroupAtPosition(e.getSceneX(), e.getSceneY());
+                GroupContainer targetGroup = findGroupAtPosition(e.getSceneX(), e.getSceneY());
                 
                 if (targetNode != null) {
                     Circle targetConnector = findNearestConnector(targetNode, e.getSceneX(), e.getSceneY());
@@ -1304,7 +1305,7 @@ public class NodeCanvas extends Pane {
         javafx.geometry.Point2D canvasPoint = sceneToLocal(sceneX, sceneY);
         double x = canvasPoint.getX();
         double y = canvasPoint.getY();
-        for (com.cc.job.gui.model.GroupContainer g : groupContainers) {
+        for (GroupContainer g : groupContainers) {
             double gx = g.getLayoutX();
             double gy = g.getLayoutY();
             double gw = g.getWidth() > 0 ? g.getWidth() : 320;
@@ -1373,7 +1374,7 @@ public class NodeCanvas extends Pane {
     }
     
     // 重载：任务组容器
-    private Circle findNearestConnector(com.cc.job.gui.model.GroupContainer group, double sceneX, double sceneY) {
+    private Circle findNearestConnector(GroupContainer group, double sceneX, double sceneY) {
         javafx.geometry.Point2D canvasPoint = sceneToLocal(sceneX, sceneY);
         double x = canvasPoint.getX();
         double y = canvasPoint.getY();
@@ -1468,7 +1469,7 @@ public class NodeCanvas extends Pane {
      */
     public void clear() {
         // ⭐ 修复：清空任务组容器
-        for (com.cc.job.gui.model.GroupContainer container : new ArrayList<>(groupContainers)) {
+        for (GroupContainer container : new ArrayList<>(groupContainers)) {
             this.getChildren().remove(container);
         }
         groupContainers.clear();
@@ -1493,7 +1494,7 @@ public class NodeCanvas extends Pane {
             this.getChildren().remove(node);
         }
         // ⭐ 修复：清空任务组容器
-        for (com.cc.job.gui.model.GroupContainer container : new ArrayList<>(groupContainers)) {
+        for (GroupContainer container : new ArrayList<>(groupContainers)) {
             this.getChildren().remove(container);
         }
         groupContainers.clear();
@@ -1582,7 +1583,7 @@ public class NodeCanvas extends Pane {
 
                     if (nodeData.getJobId() != null) {
                         node.setJobId(nodeData.getJobId());
-                        com.cc.job.gui.util.NodeStatusSyncManager.getInstance()
+                        NodeStatusSyncManager.getInstance()
                                 .rememberStatus(nodeData.getJobId(), nodeData.getTriggerStatus());
                     }
 
@@ -1590,7 +1591,7 @@ public class NodeCanvas extends Pane {
                     Long nodeJobId = nodeData.getJobId();
                     Integer backendStatus = nodeData.getTriggerStatus();
                     Integer cachedStatus = nodeJobId != null
-                            ? com.cc.job.gui.util.NodeStatusSyncManager.getInstance().getCachedStatus(nodeJobId)
+                            ? NodeStatusSyncManager.getInstance().getCachedStatus(nodeJobId)
                             : null;
 
                     if (backendStatus != null && cachedStatus != null) {
@@ -1608,7 +1609,7 @@ public class NodeCanvas extends Pane {
                     if (triggerStatus != null) {
                         node.updateStatusByCode(triggerStatus);
                         if (nodeJobId != null) {
-                            com.cc.job.gui.util.NodeStatusSyncManager.getInstance()
+                            NodeStatusSyncManager.getInstance()
                                     .rememberStatus(nodeJobId, triggerStatus);
                         }
                     }
@@ -1920,7 +1921,7 @@ public class NodeCanvas extends Pane {
                         ProcessNode newNode = new ProcessNode(childId, text);
                         if (childNodeData.getJobId() != null) {
                             newNode.setJobId(childNodeData.getJobId());
-                            com.cc.job.gui.util.NodeStatusSyncManager.getInstance()
+                            NodeStatusSyncManager.getInstance()
                                     .rememberStatus(childNodeData.getJobId(), childNodeData.getTriggerStatus());
                         }
                         
@@ -2215,7 +2216,7 @@ public class NodeCanvas extends Pane {
                 
                 
                 // ⭐ 添加到批量更新队列（不立即调用后端）
-                com.cc.job.gui.util.NodeStatusSyncManager.getInstance().addPendingUpdate(jobId, statusCode);
+                NodeStatusSyncManager.getInstance().addPendingUpdate(jobId, statusCode);
                 
                 found = true;
                 break; // 找到节点后更新并退出
@@ -2233,7 +2234,7 @@ public class NodeCanvas extends Pane {
      * 在页面切换、任务完成等时机调用
      */
     public void syncPendingNodeStatus() {
-        com.cc.job.gui.util.NodeStatusSyncManager.getInstance().syncNow();
+        NodeStatusSyncManager.getInstance().syncNow();
     }
 
     public void syncPendingNodeStatusBlocking() {
@@ -2245,7 +2246,7 @@ public class NodeCanvas extends Pane {
      * 用于切换任务组时恢复节点状态
      */
     public void refreshAllNodeStatusFromCache() {
-        com.cc.job.gui.util.NodeStatusSyncManager statusManager = com.cc.job.gui.util.NodeStatusSyncManager.getInstance();
+        NodeStatusSyncManager statusManager = NodeStatusSyncManager.getInstance();
         int updatedCount = 0;
         
         for (ProcessNode node : nodes) {

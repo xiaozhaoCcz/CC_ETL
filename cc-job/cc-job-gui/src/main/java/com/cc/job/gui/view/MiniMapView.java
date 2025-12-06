@@ -1,5 +1,7 @@
 package com.cc.job.gui.view;
 
+import com.cc.job.gui.model.GroupContainer;
+import com.cc.job.gui.model.ProcessNode;
 import com.cc.job.gui.util.IconUtil;
 import com.cc.job.gui.util.StyleUtil;
 import javafx.geometry.Bounds;
@@ -258,12 +260,12 @@ public class MiniMapView extends VBox {
             double x1, y1, x2, y2;
             
             // 获取源节点/容器的位置
-            if (sourceOwner instanceof com.cc.job.gui.model.ProcessNode) {
-                com.cc.job.gui.model.ProcessNode sourceNode = (com.cc.job.gui.model.ProcessNode) sourceOwner;
+            if (sourceOwner instanceof ProcessNode) {
+                ProcessNode sourceNode = (ProcessNode) sourceOwner;
                 x1 = sourceNode.getLayoutX() * scale + offsetX + sourceNode.getPrefWidth() * scale / 2;
                 y1 = sourceNode.getLayoutY() * scale + offsetY + sourceNode.getPrefHeight() * scale / 2;
-            } else if (sourceOwner instanceof com.cc.job.gui.model.GroupContainer) {
-                com.cc.job.gui.model.GroupContainer sourceContainer = (com.cc.job.gui.model.GroupContainer) sourceOwner;
+            } else if (sourceOwner instanceof GroupContainer) {
+                GroupContainer sourceContainer = (GroupContainer) sourceOwner;
                 x1 = sourceContainer.getLayoutX() * scale + offsetX + sourceContainer.getFrame().getWidth() * scale / 2;
                 y1 = sourceContainer.getLayoutY() * scale + offsetY + sourceContainer.getFrame().getHeight() * scale / 2;
             } else {
@@ -271,12 +273,12 @@ public class MiniMapView extends VBox {
             }
             
             // 获取目标节点/容器的位置
-            if (targetOwner instanceof com.cc.job.gui.model.ProcessNode) {
-                com.cc.job.gui.model.ProcessNode targetNode = (com.cc.job.gui.model.ProcessNode) targetOwner;
+            if (targetOwner instanceof ProcessNode) {
+                ProcessNode targetNode = (ProcessNode) targetOwner;
                 x2 = targetNode.getLayoutX() * scale + offsetX + targetNode.getPrefWidth() * scale / 2;
                 y2 = targetNode.getLayoutY() * scale + offsetY + targetNode.getPrefHeight() * scale / 2;
-            } else if (targetOwner instanceof com.cc.job.gui.model.GroupContainer) {
-                com.cc.job.gui.model.GroupContainer targetContainer = (com.cc.job.gui.model.GroupContainer) targetOwner;
+            } else if (targetOwner instanceof GroupContainer) {
+                GroupContainer targetContainer = (GroupContainer) targetOwner;
                 x2 = targetContainer.getLayoutX() * scale + offsetX + targetContainer.getFrame().getWidth() * scale / 2;
                 y2 = targetContainer.getLayoutY() * scale + offsetY + targetContainer.getFrame().getHeight() * scale / 2;
             } else {

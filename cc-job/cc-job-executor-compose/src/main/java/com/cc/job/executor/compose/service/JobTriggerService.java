@@ -6,6 +6,7 @@ import com.cc.job.executor.compose.infrastructure.constant.ExecutorConstants;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.xxl.job.core.biz.ExecutorBiz;
+import com.xxl.job.core.biz.client.ExecutorBizClient;
 import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.biz.model.TriggerParam;
 import com.xxl.job.core.context.XxlJobContext;
@@ -268,7 +269,7 @@ public class JobTriggerService {
             try {
                 // 创建执行器客户端
                 // 注意：这里需要使用 XXL-Job 的 ExecutorBizClient
-                return new com.xxl.job.core.biz.client.ExecutorBizClient(addr, null);
+                return new ExecutorBizClient(addr, null);
             } catch (Exception e) {
                 logger.error("[JobTrigger] 创建执行器客户端失败 - 地址: {}", addr, e);
                 throw new RuntimeException("创建执行器客户端失败", e);
