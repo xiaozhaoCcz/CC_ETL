@@ -2,9 +2,13 @@ package com.cc.job.gui.service;
 
 import com.cc.job.gui.util.SessionManager;
 import com.cc.job.xo.common.result.Result;
+import com.cc.job.xo.common.result.PageResult;
+import com.cc.job.xo.model.dto.JobInfoTriggerDto;
 import com.cc.job.xo.model.entity.JobLogglue;
 import com.cc.job.xo.model.form.JobGlueForm;
 import com.cc.job.xo.model.form.JobInfoForm;
+import com.cc.job.xo.model.query.JobInfoQuery;
+import com.cc.job.xo.model.vo.JobInfoVO;
 import com.google.gson.reflect.TypeToken;
 import okhttp3.*;
 import org.slf4j.Logger;
@@ -142,6 +146,131 @@ public class JobInfoService extends BaseService {
             
             if (Result.isSuccess(result)) {
                 return result.getData() != null && result.getData();
+            } else {
+                throw new IOException("API 返回错误: " + result.getMsg());
+            }
+        }
+    }
+
+    /**
+     * 分页查询任务列表
+     * @param query 查询参数
+     * @return 分页结果
+     * @throws IOException 网络异常
+     */
+    public PageResult<JobInfoVO> getJobInfoPage(JobInfoQuery query) throws IOException {
+        String url = apiUtil.getBaseUrl() + "/api/v1/jobInfos/page";
+
+        HttpUrl.Builder urlBuilder = HttpUrl.parse(url).newBuilder();
+        if (query != null) {
+            urlBuilder.addQueryParameter("pageNum", String.valueOf(query.getPageNum()));
+            urlBuilder.addQueryParameter("pageSize", String.valueOf(query.getPageSize()));
+            if (query.getJobGroup() != null) {
+                urlBuilder.addQueryParameter("jobGroup", String.valueOf(query.getJobGroup()));
+            }
+            if (query.getTriggerStatus() != null) {
+                urlBuilder.addQueryParameter("triggerStatus", String.valueOf(query.getTriggerStatus()));
+            }
+            if (query.getJobDesc() != null && !query.getJobDesc().isEmpty()) {
+                urlBuilder.addQueryParameter("jobDesc", query.getJobDesc());
+            }
+            if (query.getExecutorHandler() != null && !query.getExecutorHandler().isEmpty()) {
+                urlBuilder.addQueryParameter("executorHandler", query.getExecutorHandler());
+            }
+            if (query.getAuthor() != null && !query.getAuthor().isEmpty()) {
+                urlBuilder.addQueryParameter("author", query.getAuthor());
+            }
+        }
+
+        Request request = new Request.Builder()
+                .url(urlBuilder.build())
+                .get()
+                .build();
+
+        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("请求失败: " + response);
+            }
+
+            String responseBody = response.body().string();
+
+            Type resultType = new TypeToken<PageResult<JobInfoVO>>(){}.getType();
+            return apiUtil.getGson().fromJson(responseBody, resultType);
+        }
+    }
+
+    /**
+     * 启动作业
+     */
+    public boolean startJob(Long jobId) throws IOException {
+        String url = apiUtil.getBaseUrl() + "/api/v1/jobInfos/startJob/" + jobId;
+        Request request = new Request.Builder().url(url).get().build();
+        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("请求失败: " + response);
+            }
+            Type resultType = new TypeToken<Result<Void>>(){}.getType();
+            Result<Void> result = apiUtil.getGson().fromJson(response.body().string(), resultType);
+            return Result.isSuccess(result);
+        }
+    }
+
+    /**
+     * 停止作业
+     */
+    public boolean stopJob(Long jobId) throws IOException {
+        String url = apiUtil.getBaseUrl() + "/api/v1/jobInfos/stopJob/" + jobId;
+        Request request = new Request.Builder().url(url).get().build();
+        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("请求失败: " + response);
+            }
+            Type resultType = new TypeToken<Result<Void>>(){}.getType();
+            Result<Void> result = apiUtil.getGson().fromJson(response.body().string(), resultType);
+            return Result.isSuccess(result);
+        }
+    }
+
+    /**
+     * 执行一次
+     */
+    public String triggerOnce(Long jobId, String executorParam) throws IOException {
+        String url = apiUtil.getBaseUrl() + "/api/v1/jobInfos/trigger";
+
+        JobInfoTriggerDto dto = new JobInfoTriggerDto();
+        dto.setId(jobId);
+        dto.setExecutorParam(executorParam);
+
+        // 添加触发用户ID（从SessionManager获取）
+        SessionManager session = SessionManager.getInstance();
+        if (session.isLoggedIn() && session.getUserId() != null) {
+            try {
+                Integer triggerUserId = Integer.parseInt(session.getUserId());
+                dto.setTriggerUserId(triggerUserId);
+            } catch (NumberFormatException e) {
+            }
+        }
+
+        String jsonBody = apiUtil.getGson().toJson(dto);
+        RequestBody body = RequestBody.create(jsonBody, MediaType.get("application/json; charset=utf-8"));
+
+        Request request = new Request.Builder()
+                .url(url)
+                .post(body)
+                .build();
+
+        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("请求失败: " + response);
+            }
+
+            String responseBody = response.body().string();
+
+            Type resultType = new TypeToken<Result<String>>(){}.getType();
+            Result<String> result = apiUtil.getGson().fromJson(responseBody, resultType);
+
+            if (Result.isSuccess(result)) {
+                return result.getData();
             } else {
                 throw new IOException("API 返回错误: " + result.getMsg());
             }

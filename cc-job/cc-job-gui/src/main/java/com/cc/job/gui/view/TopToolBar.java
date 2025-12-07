@@ -4,9 +4,11 @@ import com.cc.job.gui.model.RunningJobGroup;
 import com.cc.job.gui.util.IconUtil;
 import com.cc.job.gui.util.SessionManager;
 import com.cc.job.gui.util.StyleUtil;
+import com.cc.job.xo.model.entity.JobGroup;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -20,6 +22,8 @@ import javafx.scene.text.FontWeight;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -46,6 +50,22 @@ public class TopToolBar extends VBox {
         void onSelect(); // 框选功能
         void onLayoutHorizontal(); // 横向布局
         void onLayoutVertical(); // 纵向布局
+        void onJobList();
+
+        /**
+         * 任务菜单需要的任务列表（供“任务”下拉菜单展示）
+         */
+        default List<JobGroup> onRequestTaskList() {
+            return Collections.emptyList();
+        }
+
+        /**
+         * 点击任务菜单中的任务后触发
+         * @param taskGroupId 任务组ID
+         * @param taskGroupName 任务组名称
+         */
+        default void onTaskSelected(Long taskGroupId, String taskGroupName) {
+        }
     }
     
     private ToolBarCallback callback;
@@ -68,6 +88,9 @@ public class TopToolBar extends VBox {
     
     // 运行中的任务组列表
     private Map<Long, RunningJobGroup> runningJobs = new java.util.HashMap<>();
+
+    //private Menu taskMenu;
+    private boolean loadingTaskMenu = false;
     
     public TopToolBar() {
         initializeUI();
@@ -81,41 +104,54 @@ public class TopToolBar extends VBox {
         );
         setPadding(new Insets(0));
         
-        // 工具栏（移除菜单栏，使用更简洁的设计）
+        // 顶部菜单栏
+        MenuBar menuBar = createMenuBar();
+        // 工具栏
         HBox toolBar = createToolBar();
         
-        getChildren().add(toolBar);
+        getChildren().addAll(menuBar, toolBar);
     }
     
-    private HBox createMenuBar() {
-        HBox menuBar = new HBox(0);
-        menuBar.setAlignment(Pos.CENTER_LEFT);
-        menuBar.setPadding(new Insets(8, 10, 8, 10));
-        menuBar.setStyle("-fx-background-color: #F9FAFB;");
-        
-        // 文件菜单 - 扁平化设计
-        Label fileMenu = createMenuLabel("文件");
-        Label taskMenu = createMenuLabel("任务组");
-        
-        menuBar.getChildren().addAll(fileMenu, taskMenu);
-        
+    private MenuBar createMenuBar() {
+        MenuBar menuBar = new MenuBar();
+        menuBar.setPadding(new Insets(0, 12, 0, 12));
+        menuBar.setStyle("-fx-background-color: #F8FAFC;");
+
+        // 文件菜单
+        Menu fileMenu = new Menu("文件");
+        MenuItem newItem = new MenuItem("新建");
+        newItem.setOnAction(e -> safeCall(ToolBarCallback::onNew));
+        MenuItem openItem = new MenuItem("打开");
+        openItem.setOnAction(e -> safeCall(ToolBarCallback::onOpen));
+        MenuItem saveItem = new MenuItem("保存");
+        saveItem.setOnAction(e -> safeCall(ToolBarCallback::onSave));
+        fileMenu.getItems().addAll(newItem, openItem, saveItem);
+
+        // 编辑菜单
+        Menu editMenu = new Menu("编辑");
+        MenuItem undoItem = new MenuItem("撤销");
+        undoItem.setOnAction(e -> safeCall(ToolBarCallback::onUndo));
+        MenuItem redoItem = new MenuItem("重做");
+        redoItem.setOnAction(e -> safeCall(ToolBarCallback::onRedo));
+        MenuItem selectItem = new MenuItem("框选");
+        selectItem.setOnAction(e -> safeCall(ToolBarCallback::onSelect));
+        MenuItem layoutHorizontalItem = new MenuItem("横向布局");
+        layoutHorizontalItem.setOnAction(e -> safeCall(ToolBarCallback::onLayoutHorizontal));
+        MenuItem layoutVerticalItem = new MenuItem("纵向布局");
+        layoutVerticalItem.setOnAction(e -> safeCall(ToolBarCallback::onLayoutVertical));
+        editMenu.getItems().addAll(undoItem, redoItem, new SeparatorMenuItem(), selectItem,
+            layoutHorizontalItem, layoutVerticalItem);
+
+        // 任务菜单
+        Menu jobMenu = new Menu("任务");
+        MenuItem  jobMenuList= new MenuItem("任务列表");
+        jobMenuList.setOnAction(e->safeCall(ToolBarCallback::onJobList));
+        jobMenu.getItems().addAll(jobMenuList);
+//
+
+
+        menuBar.getMenus().addAll(fileMenu, editMenu, jobMenu);
         return menuBar;
-    }
-    
-    private Label createMenuLabel(String text) {
-        Label label = new Label(text);
-        label.setStyle("-fx-padding: 5 15 5 15; -fx-font-size: 13; -fx-cursor: hand; -fx-font-weight: 500;");
-        label.setOnMouseEntered(e -> {
-            if (!label.getStyle().contains("border-width")) {
-                label.setStyle("-fx-background-color: #F3F4F6; -fx-padding: 5 15 5 15; -fx-font-size: 13; -fx-cursor: hand; -fx-font-weight: 500;");
-            }
-        });
-        label.setOnMouseExited(e -> {
-            if (!label.getStyle().contains("border-width")) {
-                label.setStyle("-fx-padding: 5 15 5 15; -fx-font-size: 13; -fx-cursor: hand; -fx-font-weight: 500;");
-            }
-        });
-        return label;
     }
     
     private HBox createToolBar() {
@@ -286,7 +322,7 @@ public class TopToolBar extends VBox {
     /**
      * 显示用户菜单
      */
-    private void showUserMenu(javafx.scene.Node node) {
+    private void showUserMenu(Node node) {
         ContextMenu userMenu = new ContextMenu();
         
         // 用户信息菜单项（不可点击）
@@ -352,8 +388,9 @@ public class TopToolBar extends VBox {
         separator.setStyle("-fx-background-color: #E2E8F0;");
         return separator;
     }
+
     
-    private HBox createToolGroup(javafx.scene.Node... buttons) {
+    private HBox createToolGroup(Node... buttons) {
         HBox group = new HBox(4);
         group.setAlignment(Pos.CENTER_LEFT);
         group.getChildren().addAll(buttons);
@@ -363,7 +400,7 @@ public class TopToolBar extends VBox {
     /**
      * 创建带图标的工具按钮
      */
-    private Button createIconButton(javafx.scene.Node icon, String text, String tooltip, Runnable action) {
+    private Button createIconButton(Node icon, String text, String tooltip, Runnable action) {
         Button btn = new Button(text, icon);
         btn.setGraphicTextGap(6);
         StyleUtil.applyIconButtonHover(btn);

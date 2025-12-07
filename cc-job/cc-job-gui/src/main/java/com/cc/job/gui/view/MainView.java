@@ -27,6 +27,7 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.transform.Scale;
 import javafx.stage.Stage;
+import javafx.stage.Window;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -196,7 +197,7 @@ public class MainView extends BorderPane {
         canvas.setOnRequestSelectTaskGroup(() -> {
             try {
                 // 打开级联弹窗：分区 -> 任务组
-                javafx.stage.Window window = this.getScene().getWindow();
+               Window window = this.getScene().getWindow();
                 javafx.stage.Stage ownerStage = (javafx.stage.Stage) window;
                 java.util.Optional<SelectTaskGroupDialog.Selection> result = SelectTaskGroupDialog.showDialog(ownerStage);
                 result.ifPresent(sel -> {
@@ -872,6 +873,43 @@ public class MainView extends BorderPane {
                 // 纵向布局：将所有选中节点的 X 坐标对齐
                 canvas.alignVertical();
             }
+
+            @Override
+            public void onJobList() {
+                //展示任务列表
+                showJobListDialog();
+            }
+
+            @Override
+            public List<JobGroup> onRequestTaskList() {
+                try {
+                    return jobGroupService.getAllJobGroupList();
+                } catch (Exception e) {
+                    logger.error("加载任务列表失败", e);
+                    Platform.runLater(() -> logPanel.error("✗ 加载任务列表失败: " + e.getMessage()));
+                    return java.util.Collections.emptyList();
+                }
+            }
+
+            @Override
+            public void onTaskSelected(Long taskGroupId, String taskGroupName) {
+                if (taskGroupId == null) {
+                    logPanel.warn("⚠ 任务ID无效，无法加载");
+                    return;
+                }
+                String displayName = (taskGroupName != null && !taskGroupName.isBlank())
+                    ? taskGroupName
+                    : ("任务组 " + taskGroupId);
+
+                // 更新当前页面、导航栏与工具栏状态
+                taskGroupNameToIdMap.put(displayName, taskGroupId);
+                usePageStoreHook().setCurrentPage(taskGroupId);
+                navigationBar.addOrSelectTask(displayName, taskGroupId);
+                toolBar.setCurrentTaskGroupId(taskGroupId);
+
+                // 加载所选任务组的数据
+                loadTaskGroupData(taskGroupId, displayName);
+            }
         });
 
         // 定期更新工具栏显示运行中的任务组
@@ -1387,7 +1425,9 @@ public class MainView extends BorderPane {
      * 根据类型码获取类型名称
      */
     private String getTypeNameByType(Integer type) {
-        if (type == null) return "未知";
+        if (type == null) {
+            return "未知";
+        }
         return switch (type) {
             case 0 -> "分区";
             case 1 -> "任务组";
@@ -2606,16 +2646,32 @@ public class MainView extends BorderPane {
         }
         if (owner instanceof ProcessNode) {
             ProcessNode node = (ProcessNode) owner;
-            if (connector == node.getTopConnector()) return "top";
-            if (connector == node.getBottomConnector()) return "bottom";
-            if (connector == node.getLeftConnector()) return "left";
-            if (connector == node.getRightConnector()) return "right";
+            if (connector == node.getTopConnector()) {
+                return "top";
+            }
+            if (connector == node.getBottomConnector()) {
+                return "bottom";
+            }
+            if (connector == node.getLeftConnector()) {
+                return "left";
+            }
+            if (connector == node.getRightConnector()) {
+                return "right";
+            }
         } else if (owner instanceof GroupContainer) {
             GroupContainer group = (GroupContainer) owner;
-            if (connector == group.getTopConnector()) return "top";
-            if (connector == group.getBottomConnector()) return "bottom";
-            if (connector == group.getLeftConnector()) return "left";
-            if (connector == group.getRightConnector()) return "right";
+            if (connector == group.getTopConnector()) {
+                return "top";
+            }
+            if (connector == group.getBottomConnector()) {
+                return "bottom";
+            }
+            if (connector == group.getLeftConnector()) {
+                return "left";
+            }
+            if (connector == group.getRightConnector()) {
+                return "right";
+            }
         }
         return "right"; // 默认右侧
     }
@@ -2631,14 +2687,19 @@ public class MainView extends BorderPane {
         if (anchor != null && !anchor.isEmpty()) {
             // 根据锚点字符串返回对应的连接点（不区分大小写）
             String anchorLower = anchor.toLowerCase();
-            if ("top".equals(anchorLower)) {
+            switch (anchorLower) {
+                case "top" -> {
                 return node.getTopConnector();
-            } else if ("bottom".equals(anchorLower)) {
+                }
+                case "bottom" -> {
                 return node.getBottomConnector();
-            } else if ("left".equals(anchorLower)) {
+                }
+                case "left" -> {
                 return node.getLeftConnector();
-            } else if ("right".equals(anchorLower)) {
+                }
+                case "right" -> {
                 return node.getRightConnector();
+                }
             }
         }
         
@@ -2658,12 +2719,12 @@ public class MainView extends BorderPane {
     private void showNewPartitionDialog() {
         try {
             // 获取当前窗口
-            javafx.stage.Window window = this.getScene().getWindow();
-            javafx.stage.Stage ownerStage = (javafx.stage.Stage) window;
+            Window window = this.getScene().getWindow();
+            Stage ownerStage = (Stage) window;
 
             // 创建并显示对话框
             NewPartitionDialog dialog = new NewPartitionDialog(ownerStage);
-            java.util.Optional<String> result = dialog.showAndWait();
+            Optional<String> result = dialog.showAndWait();
 
             // 处理结果
             result.ifPresent(partitionName -> {
@@ -2708,6 +2769,13 @@ public class MainView extends BorderPane {
             logger.error("显示新建分区对话框失败: {}", e.getMessage(), e);
             logPanel.error("✗ 打开对话框失败: " + e.getMessage());
         }
+    }
+
+    private void showJobListDialog() {
+        Window window = this.getScene().getWindow();
+        Stage ownerStage = (Stage) window;
+        ShowJobListDialog showJobListDialog = new ShowJobListDialog(ownerStage);
+        showJobListDialog.show();
     }
 
     /**
@@ -2978,7 +3046,7 @@ public class MainView extends BorderPane {
                     new javafx.stage.FileChooser.ExtensionFilter("加密数据文件", "*.cetl")
                 );
                 
-                javafx.stage.Window window = this.getScene().getWindow();
+               Window window = this.getScene().getWindow();
                 java.io.File file = fileChooser.showOpenDialog(window);
                 
                 if (file != null) {
@@ -3083,7 +3151,7 @@ public class MainView extends BorderPane {
                             new javafx.stage.FileChooser.ExtensionFilter("加密数据文件", "*.cetl")
                         );
                         
-                        javafx.stage.Window window = this.getScene().getWindow();
+                       Window window = this.getScene().getWindow();
                         java.io.File file = fileChooser.showSaveDialog(window);
                         
                         if (file != null) {
@@ -3177,7 +3245,7 @@ public class MainView extends BorderPane {
                     Platform.runLater(() -> {
                         try {
                             // 获取当前窗口
-                            javafx.stage.Window window = this.getScene().getWindow();
+                           Window window = this.getScene().getWindow();
                             javafx.stage.Stage ownerStage = (javafx.stage.Stage) window;
 
                             // 创建并显示对话框
@@ -3267,7 +3335,7 @@ public class MainView extends BorderPane {
                     Platform.runLater(() -> {
                         try {
                             // 获取当前窗口
-                            javafx.stage.Window window = this.getScene().getWindow();
+                            Window window = this.getScene().getWindow();
                             javafx.stage.Stage ownerStage = (javafx.stage.Stage) window;
 
                             // 创建并显示对话框
@@ -4450,7 +4518,9 @@ public class MainView extends BorderPane {
      * 根据GlueType获取节点类型图标
      */
     private String getNodeTypeIcon(String glueType) {
-        if (glueType == null) return "Bean";
+        if (glueType == null) {
+            return "Bean";
+        }
 
         switch (glueType) {
             case "BEAN":
@@ -4481,7 +4551,9 @@ public class MainView extends BorderPane {
      * 用于保存时将前端显示类型转回后端期望的大写格式
      */
     private String convertNodeTypeToGlueType(String nodeType) {
-        if (nodeType == null) return "BEAN";
+        if (nodeType == null) {
+            return "BEAN";
+        }
 
         switch (nodeType) {
             case "Bean":
