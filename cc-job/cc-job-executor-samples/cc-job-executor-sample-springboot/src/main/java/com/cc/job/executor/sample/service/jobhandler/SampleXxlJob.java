@@ -83,10 +83,10 @@ public class SampleXxlJob {
         }
 //        if(retryCount<2){
 //            retryCount++;
-//            throw new RuntimeException();
-//        }
-        XxlJobHelper.log(">>>>>>>> demoJobHandler3 end");
-        System.out.println(">>>>>>>> demoJobHandler3 end");
+            throw new RuntimeException();
+       // }
+//        XxlJobHelper.log(">>>>>>>> demoJobHandler3 end");
+//        System.out.println(">>>>>>>> demoJobHandler3 end");
     }
 
     @XxlJob("demoJobHandler4")

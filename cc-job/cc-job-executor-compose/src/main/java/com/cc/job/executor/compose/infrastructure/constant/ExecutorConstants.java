@@ -30,6 +30,8 @@ public final class ExecutorConstants {
         /** 任务失败完成（不重试） */
         public static final String FAIL_COMPLETE = "FAIL_COMPLETE";
 
+        public static final String TIMEOUT = "TIMEOUT";
+
         private ExecutionResult() {
         }
     }

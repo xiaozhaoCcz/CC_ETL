@@ -226,8 +226,8 @@ public class JobInfoController {
 
     @Operation(summary = "暂停任务")
     @GetMapping("pauseJob/{id}")
-    public Result<Void>  pauseJob(@PathVariable Long id,Integer isPause){
-        boolean result = jobInfoService.pauseJob(id,isPause);
+    public Result<Void>  pauseJob(@PathVariable Long id,Integer pauseStatus){
+        boolean result = jobInfoService.pauseJob(id,pauseStatus);
         return Result.judge(result);
     }
 

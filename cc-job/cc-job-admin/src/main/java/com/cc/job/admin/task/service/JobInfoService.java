@@ -96,5 +96,5 @@ public interface JobInfoService extends IService<JobInfo> {
 
     List<Long> initData();
 
-    boolean pauseJob(Long id, Integer isPause);
+    boolean pauseJob(Long id, Integer pauseStatus);
 }

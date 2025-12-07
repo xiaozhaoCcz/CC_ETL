@@ -35,7 +35,7 @@
 	</update>
 
 	<update id="pauseJob">
-		update job_info set is_pause = #{isPause} where id = #{id};
+		update job_info set pause_status = #{pauseStatus} where id = #{id};
 	</update>
 
 

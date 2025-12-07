@@ -1004,8 +1004,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     }
 
     @Override
-    public boolean pauseJob(Long id, Integer isPause) {
-        int i = jobInfoMapper.pauseJob(id, isPause);
+    public boolean pauseJob(Long id, Integer pauseStatus) {
+        int i = jobInfoMapper.pauseJob(id, pauseStatus);
         return i > 0;
     }
 

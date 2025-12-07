@@ -387,10 +387,14 @@ public class Async {
             
             // 检查重试后是否仍然失败
             if (ExecutorConstants.ExecutionResult.FAIL_RETRY.equals(String.valueOf(resultValue)) || 
-                ExecutorConstants.ExecutionResult.FAIL_COMPLETE.equals(String.valueOf(resultValue))) {
+                ExecutorConstants.ExecutionResult.FAIL_COMPLETE.equals(String.valueOf(resultValue))||
+                    ExecutorConstants.ExecutionResult.DO_NOTHING.equals(String.valueOf(resultValue))) {
                 success = false;
                 workerWrapper.setWorkResult(new WorkResult(resultValue, ResultState.EXCEPTION));
                 logger.error("[Async] 任务: {} 执行失败，重试后仍然失败，结果: {}", workerWrapper.getId(), resultValue);
+                if(!ExecutorConstants.ExecutionResult.DO_NOTHING.equals(String.valueOf(resultValue))){
+                    throw new RuntimeException();
+                }
             } else {
                 workerWrapper.setWorkResult(new WorkResult(resultValue, ResultState.SUCCESS));
             }

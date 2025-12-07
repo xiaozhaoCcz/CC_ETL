@@ -3921,7 +3921,7 @@ public class MainView extends BorderPane {
             logPanel.warn("⚠ 任务ID为空，无法禁用/启用节点");
             // 恢复节点状态
             if (node != null) {
-                javafx.application.Platform.runLater(() -> {
+                Platform.runLater(() -> {
                     node.restoreEnabledState(!isDisabled);
                 });
             }

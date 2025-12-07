@@ -395,19 +395,19 @@ public class JobInfoService extends BaseService {
     /**
      * 暂停/启用任务
      * @param jobId 任务ID
-     * @param isPause 是否暂停：0=启用, 1=禁用
+     * @param pause_status 是否暂停：0=启用, 1=禁用
      * @return 是否成功
      * @throws IOException 网络异常
      */
-    public boolean pauseJob(Long jobId, Integer isPause) throws IOException {
+    public boolean pauseJob(Long jobId, Integer pauseStatus) throws IOException {
         if (jobId == null) {
             throw new IllegalArgumentException("任务ID不能为空");
         }
-        if (isPause == null || (isPause != 0 && isPause != 1)) {
-            throw new IllegalArgumentException("isPause 参数必须为 0（启用）或 1（禁用）");
+        if (pauseStatus == null || (pauseStatus != 0 && pauseStatus != 1)) {
+            throw new IllegalArgumentException("pause_status 参数必须为 0（启用）或 1（禁用）");
         }
         
-        String url = apiUtil.getBaseUrl() + "/api/v1/jobInfos/pauseJob/" + jobId + "?isPause=" + isPause;
+        String url = apiUtil.getBaseUrl() + "/api/v1/jobInfos/pauseJob/" + jobId + "?pauseStatus=" + pauseStatus;
         
         Request request = new Request.Builder()
                 .url(url)

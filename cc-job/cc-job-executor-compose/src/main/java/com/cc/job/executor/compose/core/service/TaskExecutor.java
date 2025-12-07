@@ -179,14 +179,12 @@ public class TaskExecutor {
     private String handleTimeout(ExecutionContext context, JobNode node, JobInfo jobInfo) {
         logger.error("[TaskExecutor] 任务执行超时 - jobId: {}, nodeId: {}, 超时: {}秒",
                 jobInfo.getId(), node.getId(), jobInfo.getExecutorTimeout());
-        
-        reportStatus(context, jobInfo.getId(), 0, "任务执行超时");
-        
+
         if (!DO_NOTHING.equalsIgnoreCase(jobInfo.getExecutorBlockStrategy())) {
             throw new RuntimeException("任务执行超时");
         } else {
             logger.warn("[TaskExecutor] 任务执行超时但忽略继续执行 - jobId: {}", jobInfo.getId());
-            return SUCCESS;
+            return DO_NOTHING;
         }
     }
     
