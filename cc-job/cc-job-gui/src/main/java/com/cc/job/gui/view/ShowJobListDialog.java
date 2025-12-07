@@ -72,7 +72,6 @@ public class ShowJobListDialog extends Dialog<Void> {
      * 设置对话框样式
      */
     private void styleDialog() {
-        getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
         getDialogPane().setPrefSize(1080, 680);
         // 设置对话框大小
         getDialogPane().setPrefWidth(1080);
@@ -97,6 +96,14 @@ public class ShowJobListDialog extends Dialog<Void> {
                 stage.setMinWidth(1080);
                 stage.setMinHeight(580);
             }
+            stage.setOnCloseRequest(event -> {
+                // 这里可以添加关闭前的确认逻辑，例如：
+                // if (!dataIsSaved) {
+                //     event.consume(); // 阻止关闭
+                //     showSaveDialog();
+                // }
+                close(); // 调用Dialog的close方法
+            });
         });
     }
 
