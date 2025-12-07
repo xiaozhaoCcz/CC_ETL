@@ -4,11 +4,14 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.lang.UUID;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.cc.job.admin.task.service.JobComposeService;
 import com.cc.job.admin.task.service.JobEdgeService;
 import com.cc.job.admin.task.service.JobInfoService;
 import com.cc.job.admin.task.service.JobNodeService;
 import com.cc.job.xo.common.exception.BusinessException;
+import com.cc.job.xo.mapper.JobComposeMapper;
+import com.cc.job.xo.model.entity.JobCompose;
 import com.cc.job.xo.model.entity.JobEdge;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobNode;
@@ -17,7 +20,6 @@ import com.cc.job.xo.model.form.JobGlueForm;
 import com.cc.job.xo.model.form.JobInfoForm;
 import com.cc.job.xo.model.vo.JobEdgeVo;
 import com.cc.job.xo.model.vo.JobNodeVo;
-import com.cc.job.xo.mapper.JobLogglueMapper;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
@@ -33,15 +35,14 @@ import static com.cc.job.admin.task.service.impl.JobInfoServiceImpl.NODE_TYPE_MA
 
 @Service
 @AllArgsConstructor
-public class JobComposeServiceImpl implements JobComposeService {
+public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobCompose>  implements JobComposeService {
 
     final JobInfoService jobInfoService;
 
     final JobNodeService jobNodeService;
 
     final JobEdgeService jobEdgeService;
-    
-    final JobLogglueMapper jobLogglueMapper;
+
 
     @Data
     public static class LfNode {

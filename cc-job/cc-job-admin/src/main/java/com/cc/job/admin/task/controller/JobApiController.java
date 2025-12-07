@@ -2,6 +2,7 @@ package com.cc.job.admin.task.controller;
 
 import cn.hutool.core.lang.Pair;
 import com.cc.job.admin.task.thread.JobLogHelper;
+import com.cc.job.admin.task.thread.JobRegistryHelper;
 import com.xxl.job.core.biz.AdminBiz;
 import com.xxl.job.core.biz.model.HandleCallbackParam;
 import com.xxl.job.core.biz.model.RegistryParam;
@@ -78,12 +79,11 @@ public class JobApiController {
         } else if ("updateRegistryValue".equals(uri)) {
             // ⭐ 更新注册信息的registryValue（用于executor-compose更新HTTP端口信息）
             Map<String, String> params = GsonTool.fromJson(data, Map.class);
-            String registryGroup = params.get("registryGroup");
-            String registryKey = params.get("registryKey");
-            String oldRegistryValue = params.get("oldRegistryValue");
-            String newRegistryValue = params.get("newRegistryValue");
-            return com.cc.job.admin.task.thread.JobRegistryHelper.getInstance()
-                    .updateRegistryValue(registryGroup, registryKey, oldRegistryValue, newRegistryValue);
+            String appName = params.get("appName");
+            String executorAddress = params.get("executorAddress");
+            String executorServerAddress = params.get("executorServerAddress");
+            return JobRegistryHelper.getInstance()
+                    .updateRegistryValue(appName, executorAddress, executorServerAddress);
         } else {
             return new ReturnT<>(ReturnT.FAIL_CODE, "invalid request, uri-mapping(" + uri + ") not found.");
         }

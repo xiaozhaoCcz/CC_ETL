@@ -42,6 +42,10 @@ public class JobGroupExecutorComplete {
      */
     @XxlJob("runJobGroupXxlJob")
     public void execute() {
+        //注册
+        if(!orchestrator.updateRegistryWithHttpPort()){
+            return;
+        }
         // 1. 获取参数
         long taskGroupId = XxlJobHelper.getJobId();
         String executeParam = XxlJobHelper.getJobParam();

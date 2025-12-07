@@ -1,5 +1,7 @@
 package com.cc.job.executor.compose.core.orchestrator;
 
+import cn.hutool.http.HttpRequest;
+import cn.hutool.http.HttpResponse;
 import cn.hutool.json.JSONUtil;
 import com.cc.job.executor.compose.client.AdminApiClient;
 import com.cc.job.executor.compose.core.model.ExecutionContext;
@@ -14,10 +16,12 @@ import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobNode;
 import com.xxl.job.core.context.XxlJobContext;
 import com.xxl.job.core.context.XxlJobHelper;
+import com.xxl.job.core.util.IpUtil;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -50,7 +54,72 @@ public class TaskGroupOrchestrator {
     
     /** 线程本地变量，用于存储 XxlJobContext */
     private static final InheritableThreadLocal<XxlJobContext> CONTEXT_HOLDER = new InheritableThreadLocal<>();
-    
+
+    @Value("${cc-job.job.executor.ip}")
+    private String ip;
+
+    @Value("${cc-job.job.executor.port}")
+    private int executorPort;
+
+    @Value("${server.port:8500}")
+    private int httpPort;
+
+    @Value("${cc-job.job.executor.appname}")
+    private String appname;
+
+    @Value("${cc-job.job.admin.addresses}")
+    private String adminAddresses;
+
+    public boolean updateRegistryWithHttpPort() {
+        try {
+            // 构建执行器地址（Netty端口）
+            String executorIp = (ip != null && !ip.trim().isEmpty()) ? ip : IpUtil.getIp();
+            String executorAddress = "http://" + executorIp + ":" + executorPort + "/";
+
+            String executorServerAddress = "http://" + executorIp + ":" + httpPort + "/";
+
+            // 构建请求参数
+            Map<String, String> params = new HashMap<>();
+            params.put("appName", appname);
+            params.put("executorAddress", executorAddress);
+            params.put("executorServerAddress", executorServerAddress);
+
+            // 调用admin接口更新注册信息
+            // adminAddresses格式可能是 "http://127.0.0.1:8989/xxl-job-admin,http://127.0.0.1:8990/xxl-job-admin"
+            String[] adminAddressArray = adminAddresses.split(",");
+            for (String adminAddress : adminAddressArray) {
+                try {
+                    // 确保adminAddress以/结尾
+                    String baseUrl = adminAddress.trim();
+                    if (!baseUrl.endsWith("/")) {
+                        baseUrl += "/";
+                    }
+                    String url = baseUrl + "api/updateRegistryValue";
+
+                    HttpResponse response = HttpRequest.post(url)
+                            .header("Content-Type", "application/json")
+                            .body(JSONUtil.toJsonStr(params))
+                            .timeout(5000)
+                            .execute();
+
+                    if (response.isOk()) {
+                        logger.info("成功更新注册信息 - executorAddress: {}, httpPort: {}", executorAddress, httpPort);
+                        return true; // 成功则返回true
+                    } else {
+                        logger.debug("更新注册信息失败 - adminAddress: {}, status: {}, body: {}",
+                                adminAddress, response.getStatus(), response.body());
+                    }
+                } catch (Exception e) {
+                    logger.debug("调用admin接口更新注册信息失败 - adminAddress: {}, error: {}", adminAddress, e.getMessage());
+                }
+            }
+            return false; // 所有admin地址都失败
+        } catch (Exception e) {
+            logger.error("更新注册信息异常", e);
+            return false;
+        }
+    }
+
     /**
      * 执行任务组
      * 

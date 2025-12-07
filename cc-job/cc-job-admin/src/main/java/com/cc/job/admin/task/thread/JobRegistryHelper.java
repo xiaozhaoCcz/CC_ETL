@@ -3,6 +3,8 @@ package com.cc.job.admin.task.thread;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.admin.config.XxlJobAdminConfig;
+import com.cc.job.xo.mapper.JobComposeMapper;
+import com.cc.job.xo.model.entity.JobCompose;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.entity.JobRegistry;
 import com.xxl.job.core.biz.model.RegistryParam;
@@ -203,22 +205,17 @@ public class JobRegistryHelper {
 		// Under consideration, prevent affecting core tables
 	}
 
+    private final Object lock = new Object();
+
 	/**
 	 * 更新注册信息的registryValue（用于executor-compose更新HTTP端口信息）
-	 * 
-	 * @param registryGroup 注册组
-	 * @param registryKey 注册键（appName）
-	 * @param oldRegistryValue 旧的registryValue（执行器地址）
-	 * @param newRegistryValue 新的registryValue（JSON格式，包含执行器地址和HTTP端口）
-	 * @return 操作结果
-	 */
-	public ReturnT<String> updateRegistryValue(String registryGroup, String registryKey, 
-	                                          String oldRegistryValue, String newRegistryValue) {
+	 **/
+	public ReturnT<String> updateRegistryValue(String appName, String executorAddress,
+	                                          String executorServerAddress) {
 		// valid
-		if (!StringUtils.hasText(registryGroup)
-				|| !StringUtils.hasText(registryKey)
-				|| !StringUtils.hasText(oldRegistryValue)
-				|| !StringUtils.hasText(newRegistryValue)) {
+		if (!StringUtils.hasText(appName)
+				|| !StringUtils.hasText(executorAddress)
+				|| !StringUtils.hasText(executorServerAddress)) {
 			return new ReturnT<String>(ReturnT.FAIL_CODE, "Illegal Argument.");
 		}
 
@@ -226,15 +223,20 @@ public class JobRegistryHelper {
 		registryOrRemoveThreadPool.execute(new Runnable() {
 			@Override
 			public void run() {
-				int ret = XxlJobAdminConfig.getAdminConfig().getJobRegistryMapper()
-						.updateRegistryValue(registryGroup, registryKey, oldRegistryValue, newRegistryValue, new Date());
-				if (ret > 0) {
-					logger.info("更新注册信息成功 - registryGroup: {}, registryKey: {}, oldValue: {}, newValue: {}", 
-							registryGroup, registryKey, oldRegistryValue, newRegistryValue);
-				} else {
-					logger.warn("更新注册信息失败，未找到匹配的记录 - registryGroup: {}, registryKey: {}, oldValue: {}", 
-							registryGroup, registryKey, oldRegistryValue);
-				}
+                JobComposeMapper jobComposeMapper = XxlJobAdminConfig.getAdminConfig().getJobComposeMapper();
+                JobCompose jobCompose = jobComposeMapper.selectOne(new LambdaQueryWrapper<JobCompose>().eq(JobCompose::getAppName,appName).eq(JobCompose::getExecutorAddress,executorAddress).eq(JobCompose::getExecutorServerAddress,executorServerAddress));
+                if (jobCompose == null) {
+                    synchronized (lock) {
+                        JobCompose model = new JobCompose();
+                        model.setAppName(appName);
+                        model.setExecutorAddress(executorAddress);
+                        model.setExecutorServerAddress(executorServerAddress);
+                        jobComposeMapper.insert(model);
+                        logger.info("更新注册信息成功 - appName: {}, executorAddress: {}, executorServerAddress: {}",appName,executorAddress,executorServerAddress);
+                    }
+                }else{
+                    logger.info("更新注册信息成功 - appName: {}, executorAddress: {}, executorServerAddress: {}",appName,executorAddress,executorServerAddress);
+                }
 			}
 		});
 

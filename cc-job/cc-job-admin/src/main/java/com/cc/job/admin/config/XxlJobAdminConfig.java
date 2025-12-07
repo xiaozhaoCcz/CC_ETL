@@ -87,6 +87,8 @@ public class XxlJobAdminConfig implements InitializingBean, DisposableBean {
     private DataSource dataSource;
     @Resource
     private JobAlarmer jobAlarmer;
+    @Resource
+    private JobComposeMapper jobComposeMapper;
 
 
     public String getI18n() {
@@ -157,5 +159,8 @@ public class XxlJobAdminConfig implements InitializingBean, DisposableBean {
         return jobAlarmer;
     }
 
+    public JobComposeMapper getJobComposeMapper() {
+        return jobComposeMapper;
+    }
 
 }

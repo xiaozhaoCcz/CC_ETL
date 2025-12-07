@@ -10,6 +10,7 @@ import com.cc.job.admin.task.service.*;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.admin.cron.CronExpression;
 import com.cc.job.admin.task.enums.*;
+import com.cc.job.xo.mapper.JobComposeMapper;
 import com.cc.job.xo.mapper.JobLogMapper;
 import com.cc.job.xo.mapper.JobLogglueMapper;
 import com.cc.job.xo.model.dto.JobEdgeDto;
@@ -82,6 +83,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
     private final TransactionTemplate transactionTemplate;
 
+    private final JobComposeMapper jobComposeMapper;
+
     // 构造函数注入PlatformTransactionManager并创建TransactionTemplate
     public JobInfoServiceImpl(JobGroupService jobGroupService,
                               JobNodeService jobNodeService,
@@ -90,7 +93,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
                               JobInfoMapper jobInfoMapper,
                               JobLogMapper jobLogMapper,
                               JobGroupSnapshotService jobGroupSnapshotService,
-                              PlatformTransactionManager transactionManager) {
+                              PlatformTransactionManager transactionManager,
+                              JobComposeMapper jobComposeMapper) {
         this.jobGroupService = jobGroupService;
         this.jobNodeService = jobNodeService;
         this.jobEdgeService = jobEdgeService;
@@ -99,17 +103,9 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         this.jobLogMapper = jobLogMapper;
         this.jobGroupSnapshotService = jobGroupSnapshotService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.jobComposeMapper = jobComposeMapper;
     }
 
-    private final String ADMIN_ADDRESS = "http://%s:%s/xxl-job-admin/";
-    @Value("${server.port}")
-    private int port;
-    
-    // ⭐ executor-compose的HTTP服务器端口（向后兼容，用于解析旧格式的registryValue）
-    // 新格式的registryValue是JSON格式，包含httpPort字段，不需要此配置
-    @Value("${cc-job.executor-compose.http-port:8500}")
-    private int executorComposeHttpPort;
-    
     // ⭐ 用于异步调用停止接口的线程池
     private static final ExecutorService STOP_JOB_EXECUTOR = Executors.newCachedThreadPool(r -> {
         Thread t = new Thread(r, "StopJobExecutor-Thread");
@@ -883,37 +879,18 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
                 log.error("停止任务组失败 - 执行器组不存在: {}", jobInfo.getJobGroup());
                 return false;
             }
-            
-            // 3. ⭐ 从注册表中获取executor-compose服务的HTTP地址
-            // executor-compose的appName是固定的：cc-job-executor-compose
-            final String EXECUTOR_COMPOSE_APP_NAME = "cc-job-executor-compose";
+
             final Long finalJobId = id;
             final String finalRandomId = randomId;
-            
-            // 从注册表中查询executor-compose服务的地址
-            List<JobRegistry> registryList = XxlJobAdminConfig.getAdminConfig()
-                    .getJobRegistryMapper()
-                    .findAll(RegistryConfig.DEAD_TIMEOUT, new Date());
-            
-            List<String> composeHttpAddresses = new ArrayList<>();
-            if (registryList != null) {
-                for (JobRegistry registry : registryList) {
-                    // 查找appName为cc-job-executor-compose的注册记录
-                    if (RegistryConfig.RegistType.EXECUTOR.name().equals(registry.getRegistryGroup())
-                            && EXECUTOR_COMPOSE_APP_NAME.equals(registry.getRegistryKey())) {
-                        String registryValue = registry.getRegistryValue();
-                        if (StringUtils.isNotBlank(registryValue)) {
-                            // ⚠️ 重要：registryValue可能是JSON格式（包含executorAddress和httpPort）
-                            // 也可能是旧的格式（直接是executorAddress）
-                            String httpAddress = parseHttpAddressFromRegistryValue(registryValue.trim());
-                            if (httpAddress != null && !composeHttpAddresses.contains(httpAddress)) {
-                                composeHttpAddresses.add(httpAddress);
-                            }
-                        }
-                    }
-                }
+
+            List<JobCompose> jobComposes = jobComposeMapper.selectList(null);
+
+            if(jobComposes.isEmpty()){
+                log.error("停止任务组失败 - 执行器组查找失败");
+                return false;
             }
-            
+
+            List<String> composeHttpAddresses = jobComposes.stream().map(JobCompose::getExecutorServerAddress).toList();
             if (composeHttpAddresses.isEmpty()) {
                 log.warn("停止任务组失败 - 未找到executor-compose服务地址 - jobId: {}, randomId: {}", id, randomId);
                 // 即使找不到executor-compose地址，也返回成功（因为数据库状态已更新）
@@ -963,95 +940,6 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         } catch (Exception e) {
             log.error("停止任务组异常 - jobId: {}, randomId: {}", id, randomId, e);
             return false;
-        }
-    }
-
-    /**
-     * 从注册表的registryValue中解析HTTP服务器地址
-     * 
-     * ⚠️ 重要：registryValue可能是两种格式：
-     * 1. JSON格式：{"executorAddress":"http://ip:15000/","httpPort":8500}（新格式，包含HTTP端口）
-     * 2. 字符串格式：http://ip:15000/（旧格式，只有执行器地址）
-     * 
-     * @param registryValue 注册表的registryValue
-     * @return HTTP服务器地址，格式如 "http://172.0.2.241:8500/"
-     */
-    private String parseHttpAddressFromRegistryValue(String registryValue) {
-        if (StringUtils.isBlank(registryValue)) {
-            return null;
-        }
-        
-        try {
-            // 尝试解析JSON格式
-            if (registryValue.trim().startsWith("{")) {
-                Map<String, Object> registryMap = JSONUtil.toBean(registryValue, Map.class);
-                String executorAddress = (String) registryMap.get("executorAddress");
-                Object httpPortObj = registryMap.get("httpPort");
-                
-                if (StringUtils.isNotBlank(executorAddress) && httpPortObj != null) {
-                    int httpPort = httpPortObj instanceof Number 
-                            ? ((Number) httpPortObj).intValue() 
-                            : Integer.parseInt(httpPortObj.toString());
-                    
-                    // 从executorAddress中提取IP
-                    String ip = extractIpFromAddress(executorAddress);
-                    if (ip != null) {
-                        String httpAddress = "http://" + ip + ":" + httpPort + "/";
-                        log.debug("从JSON格式解析HTTP地址 - registryValue: {} -> HTTP地址: {}", registryValue, httpAddress);
-                        return httpAddress;
-                    }
-                }
-            }
-            
-            // 如果不是JSON格式，说明是旧格式，使用配置的HTTP端口（向后兼容）
-            String ip = extractIpFromAddress(registryValue);
-            if (ip != null) {
-                String httpAddress = "http://" + ip + ":" + executorComposeHttpPort + "/";
-                log.debug("从旧格式解析HTTP地址（使用配置端口） - registryValue: {} -> HTTP地址: {}", registryValue, httpAddress);
-                return httpAddress;
-            }
-            
-            return null;
-        } catch (Exception e) {
-            log.error("解析registryValue失败 - registryValue: {}", registryValue, e);
-            return null;
-        }
-    }
-    
-    /**
-     * 从地址中提取IP地址
-     * 
-     * @param address 地址，格式如 "http://172.0.2.241:15000/" 或 "http://172.0.2.241:15000"
-     * @return IP地址，如 "172.0.2.241"
-     */
-    private String extractIpFromAddress(String address) {
-        if (StringUtils.isBlank(address)) {
-            return null;
-        }
-        
-        try {
-            // 移除末尾的斜杠
-            address = address.trim().replaceAll("/+$", "");
-            
-            // 解析URL，提取IP
-            if (!address.startsWith("http://") && !address.startsWith("https://")) {
-                // 如果没有协议前缀，添加http://
-                address = "http://" + address;
-            }
-            
-            // 提取IP地址（移除协议和端口）
-            String ip = address;
-            if (ip.contains("://")) {
-                ip = ip.substring(ip.indexOf("://") + 3);
-            }
-            if (ip.contains(":")) {
-                ip = ip.substring(0, ip.indexOf(":"));
-            }
-            
-            return ip;
-        } catch (Exception e) {
-            log.error("提取IP地址失败 - address: {}", address, e);
-            return null;
         }
     }
 
