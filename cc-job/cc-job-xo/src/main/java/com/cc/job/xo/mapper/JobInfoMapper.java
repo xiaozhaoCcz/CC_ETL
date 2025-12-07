@@ -21,7 +21,7 @@ public interface JobInfoMapper extends BaseMapper<JobInfo> {
 
     int stopJobCompose(@Param("id") Long id);
 
-    int pauseJob(@Param("id")Long id, @Param("isPause")Integer isPause);
+    int pauseJob(@Param("id")Long id, @Param("pauseStatus")Integer pauseStatus);
 
     /**
      * 使用行锁查询任务信息（防止并发执行）

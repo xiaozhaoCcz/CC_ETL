@@ -2,13 +2,17 @@ package com.cc.job.admin.task.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.admin.task.service.JobComposeService;
+import com.cc.job.admin.task.service.JobEdgeService;
+import com.cc.job.admin.task.service.JobNodeService;
+import com.cc.job.admin.task.sse.SSEService;
 import com.cc.job.xo.model.dto.JobInfoTriggerDto;
+import com.cc.job.xo.model.entity.JobEdge;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobLogglue;
 import com.cc.job.xo.model.entity.JobNode;
+import com.cc.job.xo.model.form.JobEdgeForm;
 import com.cc.job.xo.model.form.JobGlueForm;
 import com.cc.job.admin.task.service.JobInfoService;
-import com.cc.job.xo.model.vo.JobNodeVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -25,16 +29,17 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 /**
- * task_info前端控制层
+ * 任务信息控制层
  *
  * @author ccjob
  * @since 2024-11-03 08:21
  */
-@Tag(name = "task_info接口")
+@Tag(name = "任务管理接口")
 @RestController
 @RequestMapping("/api/v1/jobInfos")
 @RequiredArgsConstructor
@@ -44,7 +49,11 @@ public class JobInfoController {
 
     private final JobComposeService jobComposeService;
     
-    private final com.cc.job.admin.task.service.JobNodeService jobNodeService;
+    private final JobNodeService jobNodeService;
+    
+    private final JobEdgeService jobEdgeService;
+
+    private final SSEService sseService;
 
     @Operation(summary = "initData")
     @GetMapping("initData")
@@ -53,14 +62,14 @@ public class JobInfoController {
         return Result.success(list);
     }
 
-    @Operation(summary = "task_info分页列表")
+    @Operation(summary = "任务分页列表")
     @GetMapping("/page")
     public PageResult<JobInfoVO> getJobInfoPage(JobInfoQuery queryParams) {
         IPage<JobInfoVO> result = jobInfoService.getJobInfoPage(queryParams);
         return PageResult.success(result);
     }
 
-    @Operation(summary = "task_info分页列表")
+    @Operation(summary = "任务列表")
     @GetMapping("/list")
     public Result<List<JobInfo>> getJobInfoList(Integer jobType) {
         LambdaQueryWrapper<JobInfo> wrapper = new LambdaQueryWrapper<>();
@@ -69,41 +78,41 @@ public class JobInfoController {
         }else{
             wrapper.in(JobInfo::getJobType,0,2);
         }
-        wrapper.eq(JobInfo::getIsNode,"N");
+        wrapper.eq(JobInfo::getNodeFlag,"N");
         List<JobInfo> list = jobInfoService.list(wrapper);
         return Result.success(list);
     }
 
-    @Operation(summary = "新增task_info")
+    @Operation(summary = "新增任务")
     @PostMapping
     public Result<Long> saveJobInfo(@RequestBody @Valid JobInfoForm formData) {
         long id = jobInfoService.saveJobInfo(formData);
         return Result.success(id);
     }
 
-    @Operation(summary = "获取task_info表单数据")
+    @Operation(summary = "获取任务表单数据")
     @GetMapping("/{id}/form")
     public Result<JobInfoForm> getJobInfoForm(
-            @Parameter(description = "task_infoID") @PathVariable Long id
+            @Parameter(description = "任务ID") @PathVariable Long id
     ) {
         JobInfoForm formData = jobInfoService.getJobInfoForm(id);
         return Result.success(formData);
     }
 
-    @Operation(summary = "修改task_info")
+    @Operation(summary = "修改任务")
     @PutMapping(value = "/{id}")
     public Result<Void> updateJobInfo(
-            @Parameter(description = "task_infoID") @PathVariable Long id,
+            @Parameter(description = "任务ID") @PathVariable Long id,
             @RequestBody @Validated JobInfoForm formData
     ) {
         boolean result = jobInfoService.updateJobInfo(id, formData);
         return Result.judge(result);
     }
 
-    @Operation(summary = "删除task_info")
+    @Operation(summary = "删除任务")
     @DeleteMapping("/{ids}")
     public Result<Void> deleteJobInfos(
-            @Parameter(description = "task_infoID，多个以英文逗号(,)分割") @PathVariable String ids
+            @Parameter(description = "任务ID，多个以英文逗号(,)分割") @PathVariable String ids
     ) {
         boolean result = jobInfoService.deleteJobInfos(ids);
         return Result.judge(result);
@@ -148,7 +157,7 @@ public class JobInfoController {
 
     @Operation(summary = "修改任务运行集")
     @PutMapping("updateJobCompose/{id}")
-    public Result<Void>  updateJobCompose(@Parameter(description = "task_infoID") @PathVariable Long id,
+    public Result<Void>  updateJobCompose(@Parameter(description = "任务ID") @PathVariable Long id,
                                        @RequestBody @Validated JobInfoForm formData){
         // 实现任务运行集的保存
         boolean result = jobComposeService.updateJobCompose(id,formData);
@@ -160,6 +169,25 @@ public class JobInfoController {
     public Result<Void> stopJobCompose(@PathVariable Long id,@PathVariable String randomId) {
         boolean result = jobInfoService.stopJobCompose(id,randomId);
         return Result.judge(result);
+    }
+    
+    @Operation(summary = "更新任务组运行状态（供执行器调用）")
+    @PostMapping("/updateRankTriggerStatus/{id}")
+    public Result<Void> updateRankTriggerStatus(
+            @Parameter(description = "任务组ID") @PathVariable Long id,
+            @Parameter(description = "运行状态：0=未运行, 1=运行中") @RequestParam Integer status
+    ) {
+        try {
+            JobInfo jobInfo = jobInfoService.getById(id);
+            if (jobInfo == null) {
+                return Result.failed("任务不存在");
+            }
+            jobInfo.setTriggerStatus(status);
+            boolean success = jobInfoService.updateById(jobInfo);
+            return Result.judge(success);
+        } catch (Exception e) {
+            return Result.failed("更新任务组运行状态失败: " + e.getMessage());
+        }
     }
 
     @Operation(summary = "保存GlueSource")
@@ -198,8 +226,8 @@ public class JobInfoController {
 
     @Operation(summary = "暂停任务")
     @GetMapping("pauseJob/{id}")
-    public Result<Void>  pauseJob(@PathVariable Long id,Integer isPause){
-        boolean result = jobInfoService.pauseJob(id,isPause);
+    public Result<Void>  pauseJob(@PathVariable Long id,Integer pauseStatus){
+        boolean result = jobInfoService.pauseJob(id,pauseStatus);
         return Result.judge(result);
     }
 
@@ -219,8 +247,8 @@ public class JobInfoController {
 
     @Operation(summary = "保存连线")
     @PostMapping("saveJobEdge")
-    public Result<com.cc.job.xo.model.entity.JobEdge> saveJobEdge(@RequestBody @Valid com.cc.job.xo.model.form.JobEdgeForm formData) {
-        com.cc.job.xo.model.entity.JobEdge jobEdge = jobComposeService.saveJobEdge(formData);
+    public Result<JobEdge> saveJobEdge(@RequestBody @Valid JobEdgeForm formData) {
+        JobEdge jobEdge = jobComposeService.saveJobEdge(formData);
         return Result.success(jobEdge);
     }
 
@@ -228,7 +256,7 @@ public class JobInfoController {
     @GetMapping("getJobStatus/{id}")
     public Result<Boolean>  getJobStatus(@PathVariable Long id){
         JobInfo jobInfo = jobInfoService.getById(id);
-        return Result.success(jobInfo.getRankTriggerStatus()>0);
+        return Result.success(jobInfo.getTriggerStatus()>0);
     }
 
     @Operation(summary = "修改任务节点")
@@ -289,5 +317,106 @@ public class JobInfoController {
         } catch (Exception e) {
             return Result.failed("批量更新节点状态失败: " + e.getMessage());
         }
+    }
+    
+    // ============= 以下为任务组执行器调用的API接口 =============
+    
+    @Operation(summary = "获取任务信息（供执行器调用）")
+    @GetMapping("/{id}")
+    public Result<JobInfo> getJobInfoById(
+            @Parameter(description = "任务ID") @PathVariable Long id
+    ) {
+        JobInfo jobInfo = jobInfoService.getById(id);
+        if (jobInfo == null) {
+            return Result.failed("任务不存在");
+        }
+        return Result.success(jobInfo);
+    }
+    
+    @Operation(summary = "获取任务组的所有节点（供执行器调用）")
+    @GetMapping("/nodes/{jobId}")
+    public Result<List<JobNode>> getJobNodes(
+            @Parameter(description = "任务组ID") @PathVariable Long jobId
+    ) {
+        LambdaQueryWrapper<JobNode> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(JobNode::getJobParentId, jobId);
+        List<JobNode> nodes = jobNodeService.list(wrapper);
+        return Result.success(nodes);
+    }
+    
+    @Operation(summary = "获取任务组的所有边（供执行器调用）")
+    @GetMapping("/edges/{jobId}")
+    public Result<List<JobEdge>> getJobEdges(
+            @Parameter(description = "任务组ID") @PathVariable Long jobId
+    ) {
+        LambdaQueryWrapper<JobEdge> wrapper =
+                new LambdaQueryWrapper<>();
+        wrapper.eq(JobEdge::getJobParentId, jobId);
+        List<JobEdge> edges = jobEdgeService.list(wrapper);
+        return Result.success(edges);
+    }
+    
+    @Operation(summary = "上报任务执行状态（供执行器调用）")
+    @PostMapping("/status")
+    public Result<Void> reportStatus(
+            @RequestBody Map<String, Object> statusData
+    ) {
+        try {
+            Long jobId = Long.valueOf(statusData.get("jobId").toString());
+            String randomId = statusData.get("randomId").toString();
+            Integer status = Integer.valueOf(statusData.get("status").toString());
+            String message = statusData.getOrDefault("message", "").toString();
+            
+            // ⭐ 获取 parentJobId（优先从请求参数中获取，如果没有则查询数据库）
+            Long parentJobId = null;
+            if (statusData.containsKey("parentJobId") && statusData.get("parentJobId") != null) {
+                parentJobId = Long.valueOf(statusData.get("parentJobId").toString());
+            } else {
+                // 查询 parentJobId（从 JobNode 表中查询）
+                try {
+                    JobNode jobNode = jobNodeService.getOne(
+                        new LambdaQueryWrapper<JobNode>()
+                            .eq(JobNode::getJobId, jobId)
+                            .last("LIMIT 1")
+                    );
+                    
+                    if (jobNode != null && jobNode.getJobParentId() != null) {
+                        parentJobId = jobNode.getJobParentId();
+                    } else {
+                        // 如果没有找到 JobNode，说明可能是任务组本身，使用 jobId 作为 parentJobId
+                        parentJobId = jobId;
+                    }
+                } catch (Exception e) {
+                    // 查询失败时，使用 jobId 作为 parentJobId
+                    org.slf4j.LoggerFactory.getLogger(getClass()).warn(
+                            "查询 parentJobId 失败，使用 jobId 作为 parentJobId - jobId: {}", jobId, e);
+                    parentJobId = jobId;
+                }
+            }
+            
+            // 记录日志
+            org.slf4j.LoggerFactory.getLogger(getClass()).info(
+                    "收到任务状态上报 - parentJobId: {}, jobId: {}, randomId: {}, status: {}, message: {}", 
+                    parentJobId, jobId, randomId, status, message);
+            
+            // ⭐ 调用SSE服务推送状态更新
+            sseService.sendJobStatus(parentJobId, jobId, randomId, status, message);
+            
+            return Result.success();
+        } catch (Exception e) {
+            return Result.failed("上报状态失败: " + e.getMessage());
+        }
+    }
+
+    @Operation(summary = "批量获取任务信息（供执行器调用）")
+    @PostMapping("/batch")
+    public Result<List<JobInfo>> getJobInfosByIds(
+            @Parameter(description = "任务ID列表") @RequestBody List<Long> jobIds
+    ) {
+        if (jobIds == null || jobIds.isEmpty()) {
+            return Result.success(new ArrayList<>());
+        }
+        List<JobInfo> jobInfos = jobInfoService.listByIds(jobIds);
+        return Result.success(jobInfos);
     }
 }

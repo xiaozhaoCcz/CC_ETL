@@ -3,6 +3,8 @@ package com.cc.job.admin.task.thread;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.admin.config.XxlJobAdminConfig;
+import com.cc.job.xo.mapper.JobComposeMapper;
+import com.cc.job.xo.model.entity.JobCompose;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.entity.JobRegistry;
 import com.xxl.job.core.biz.model.RegistryParam;
@@ -203,5 +205,42 @@ public class JobRegistryHelper {
 		// Under consideration, prevent affecting core tables
 	}
 
+    private final Object lock = new Object();
+
+	/**
+	 * 更新注册信息的registryValue（用于executor-compose更新HTTP端口信息）
+	 **/
+	public ReturnT<String> updateRegistryValue(String appName, String executorAddress,
+	                                          String executorServerAddress) {
+		// valid
+		if (!StringUtils.hasText(appName)
+				|| !StringUtils.hasText(executorAddress)
+				|| !StringUtils.hasText(executorServerAddress)) {
+			return new ReturnT<String>(ReturnT.FAIL_CODE, "Illegal Argument.");
+		}
+
+		// async execute
+		registryOrRemoveThreadPool.execute(new Runnable() {
+			@Override
+			public void run() {
+                JobComposeMapper jobComposeMapper = XxlJobAdminConfig.getAdminConfig().getJobComposeMapper();
+                JobCompose jobCompose = jobComposeMapper.selectOne(new LambdaQueryWrapper<JobCompose>().eq(JobCompose::getAppName,appName).eq(JobCompose::getExecutorAddress,executorAddress).eq(JobCompose::getExecutorServerAddress,executorServerAddress));
+                if (jobCompose == null) {
+                    synchronized (lock) {
+                        JobCompose model = new JobCompose();
+                        model.setAppName(appName);
+                        model.setExecutorAddress(executorAddress);
+                        model.setExecutorServerAddress(executorServerAddress);
+                        jobComposeMapper.insert(model);
+                        logger.info("更新注册信息成功 - appName: {}, executorAddress: {}, executorServerAddress: {}",appName,executorAddress,executorServerAddress);
+                    }
+                }else{
+                    logger.info("更新注册信息成功 - appName: {}, executorAddress: {}, executorServerAddress: {}",appName,executorAddress,executorServerAddress);
+                }
+			}
+		});
+
+		return ReturnT.SUCCESS;
+	}
 
 }

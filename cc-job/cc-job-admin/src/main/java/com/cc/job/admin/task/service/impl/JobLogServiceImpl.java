@@ -22,7 +22,6 @@ import com.cc.job.admin.task.service.JobLogService;
 import com.cc.job.xo.model.entity.JobLog;
 import com.cc.job.xo.model.query.JobLogQuery;
 import com.cc.job.xo.model.vo.JobLogVO;
-import com.cc.job.admin.task.converter.TaskLogConverter;
 
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -32,6 +31,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.util.StringUtils;
 import org.springframework.web.util.HtmlUtils;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * task_log服务实现类
@@ -39,6 +39,7 @@ import org.springframework.web.util.HtmlUtils;
  * @author ccjob
  * @since 2024-11-03 08:20
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class JobLogServiceImpl extends ServiceImpl<JobLogMapper, JobLog> implements JobLogService {
@@ -111,7 +112,31 @@ public class JobLogServiceImpl extends ServiceImpl<JobLogMapper, JobLog> impleme
             }
 
             // log cat
-            ExecutorBiz executorBiz = XxlJobScheduler.getExecutorBiz(jobLog.getExecutorAddress());
+            // ⚠️ 检查执行器地址是否为空
+            String executorAddress = jobLog.getExecutorAddress();
+            if (executorAddress == null || executorAddress.trim().isEmpty()) {
+                String errorMsg = "执行器不可用，无法获取日志。执行器地址: null（任务可能已完成，执行器已下线）";
+                log.warn("❌ 执行器地址为空，无法获取日志 - logId: {}, jobId: {}", logId, jobLog.getJobId());
+                // 如果任务已完成，返回空的日志结果，标记为结束
+                if (jobLog.getHandleCode() != null && jobLog.getHandleCode() > 0) {
+                    LogResult emptyResult = new LogResult(fromLineNum, fromLineNum, "", true);
+                    return new ReturnT<LogResult>(emptyResult);
+                }
+                return new ReturnT<LogResult>(ReturnT.FAIL_CODE, errorMsg);
+            }
+            
+            ExecutorBiz executorBiz = XxlJobScheduler.getExecutorBiz(executorAddress);
+            if (executorBiz == null) {
+                String errorMsg = "执行器不可用，无法获取日志。执行器地址: " + executorAddress + "（执行器可能已下线）";
+                log.warn("❌ 执行器不可用，无法获取日志 - logId: {}, jobId: {}, 执行器地址: {}", 
+                        logId, jobLog.getJobId(), executorAddress);
+                // 如果任务已完成，返回空的日志结果，标记为结束
+                if (jobLog.getHandleCode() != null && jobLog.getHandleCode() > 0) {
+                    LogResult emptyResult = new LogResult(fromLineNum, fromLineNum, "", true);
+                    return new ReturnT<LogResult>(emptyResult);
+                }
+                return new ReturnT<LogResult>(ReturnT.FAIL_CODE, errorMsg);
+            }
             ReturnT<LogResult> logResult = executorBiz.log(new LogParam(jobLog.getTriggerTime().toInstant(ZoneOffset.of("+8")).toEpochMilli(), logId, fromLineNum));
 
             // is end

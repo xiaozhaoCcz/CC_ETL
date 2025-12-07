@@ -1,7 +1,7 @@
 package com.cc.job.executor.handler;
 
-import com.cc.job.executor.command.JdbcCommand;
-import com.cc.job.executor.enums.SqlEnum;
+import com.cc.job.executor.core.service.JdbcTaskExecutor;
+import com.cc.job.executor.infrastructure.constant.ExecutorConstants;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.xo.mapper.JobInfoMapper;
 import com.cc.job.xo.mapper.JobJdbcDatasourceMapper;
@@ -9,90 +9,75 @@ import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobJdbcDatasource;
 import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.handler.annotation.XxlJob;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 
-import java.sql.*;
-import java.util.Optional;
-
+/**
+ * JDBC 任务处理器
+ * 
+ * <p>负责接收 XXL-Job 调度请求，执行 JDBC SQL 任务
+ *
+ * @author cc-job-team
+ */
 @Component
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class JobJdbcHandler {
-
-    final JobJdbcDatasourceMapper jobJdbcDatasourceMapper;
-
-    final JobInfoMapper jobInfoMapper;
-
+    
+    private static final Logger logger = LoggerFactory.getLogger(JobJdbcHandler.class);
+    
+    private final JobJdbcDatasourceMapper datasourceMapper;
+    private final JobInfoMapper jobInfoMapper;
+    private final JdbcTaskExecutor jdbcTaskExecutor;
+    
+    /**
+     * 执行 JDBC 任务
+     */
     @XxlJob("runJobJdbcXxlJob")
     public void runJobJdbcXxlJob() {
         long jobId = XxlJobHelper.getJobId();
-        JobInfo jobInfo = Optional.ofNullable(jobInfoMapper.selectById(jobId))
-                .orElseThrow(() -> new BusinessException("jobInfo not found for jobId: " + jobId));
-
-        JobJdbcDatasource jobJdbcDatasource = Optional.ofNullable(jobJdbcDatasourceMapper.selectById(jobInfo.getJdbcDatasourceId()))
-                .orElseThrow(() -> new BusinessException("jobJdbcDatasource not found"));
-
-        JdbcCommand jdbcCommand = new JdbcCommand(jobJdbcDatasource.getJdbcDriverClass(), jobJdbcDatasource.getJdbcUrl(), jobJdbcDatasource.getJdbcUsername(), jobJdbcDatasource.getJdbcPassword());
-        Connection con = jdbcCommand.getConnection();
-        String sql = jobInfo.getExecutorParam().trim();
-        if (!StringUtils.hasText(sql)) {
-            throw new RuntimeException("sql is empty");
-        }
+        logger.info("[JobJdbcHandler] 开始执行JDBC任务 - jobId: {}", jobId);
         
-        // 移除 SQL 末尾的分号（如果存在），避免语法错误
-        if (sql.endsWith(";")) {
-            sql = sql.substring(0, sql.length() - 1).trim();
-        }
-        
-        XxlJobHelper.log("execute sql: {} ", sql);
-        PreparedStatement ps = null;
-        ResultSet rs = null;
-        CallableStatement cs = null;
-        Statement stmt = null;
         try {
-            // 提取 SQL 类型（第一个单词）
-            int firstSpaceIndex = sql.indexOf(" ");
-            if (firstSpaceIndex == -1) {
-                throw new RuntimeException("Invalid SQL syntax: " + sql);
-            }
-            String type = sql.substring(0, firstSpaceIndex);
+            // 1. 获取任务信息
+            JobInfo jobInfo = getJobInfo(jobId);
             
-            if (type.equalsIgnoreCase(SqlEnum.DELETE.getName()) || 
-                type.equalsIgnoreCase(SqlEnum.INSERT.getName()) || 
-                type.equalsIgnoreCase(SqlEnum.UPDATE.getName())) {
-                // DELETE/INSERT/UPDATE: 使用 PreparedStatement
-            ps = con.prepareStatement(sql);
-                int i = ps.executeUpdate();
-                XxlJobHelper.log("result {} executeUpdate {}", jobId, i > 0 ? "success" : "fail");
-            } else if (type.equalsIgnoreCase(SqlEnum.CALL.getName())) {
-                // CALL: 使用 CallableStatement
-                cs = con.prepareCall("{" + sql + "}");
-                cs.execute();
-                XxlJobHelper.log("execute call jobId:{}", jobId);
-            } else {
-                // SELECT: 使用 Statement 执行 count 查询（因为需要动态拼接 SQL）
-                stmt = con.createStatement();
-                String countSql = "select count(*) from (" + sql + ") t";
-                XxlJobHelper.log("execute count sql: {} ", countSql);
-                rs = stmt.executeQuery(countSql);
-                int count = 0;
-                while (rs.next()) {
-                    count = rs.getInt(1);
-                }
-                // 获取数量
-                XxlJobHelper.log("jobId:{},data row: {} ", jobId, count);
-            }
-        } catch (SQLException e) {
-            XxlJobHelper.log("SQL execution error: {}", e.getMessage());
-            throw new RuntimeException("SQL execution failed: " + e.getMessage(), e);
-        } finally {
-            JdbcCommand.close(rs);
-            JdbcCommand.close(cs);
-            JdbcCommand.close(ps);
-            JdbcCommand.close(stmt);
-            JdbcCommand.close(con);
+            // 2. 获取数据源信息
+            JobJdbcDatasource datasource = getDatasource(jobInfo);
+            
+            // 3. 委托给 JdbcTaskExecutor 执行
+            jdbcTaskExecutor.execute(jobInfo, datasource);
+            
+            XxlJobHelper.log("JDBC任务执行成功");
+            logger.info("[JobJdbcHandler] JDBC任务执行完成 - jobId: {}", jobId);
+            
+        } catch (Exception e) {
+            logger.error("[JobJdbcHandler] JDBC任务执行失败 - jobId: {}", jobId, e);
+            XxlJobHelper.log("错误: {}", e.getMessage());
+            throw new RuntimeException("JDBC任务执行失败", e);
         }
     }
+    
+    /**
+     * 获取任务信息
+     */
+    private JobInfo getJobInfo(long jobId) {
+        JobInfo jobInfo = jobInfoMapper.selectById(jobId);
+        if (jobInfo == null) {
+            throw new BusinessException(ExecutorConstants.ErrorMessage.JOB_NOT_FOUND + ": " + jobId);
+        }
+        return jobInfo;
+    }
+    
+    /**
+     * 获取数据源信息
+     */
+    private JobJdbcDatasource getDatasource(JobInfo jobInfo) {
+        JobJdbcDatasource datasource = datasourceMapper.selectById(jobInfo.getJdbcDatasourceId());
+        if (datasource == null) {
+            throw new BusinessException(ExecutorConstants.ErrorMessage.DATASOURCE_NOT_FOUND);
+        }
+        return datasource;
+    }
 }
-

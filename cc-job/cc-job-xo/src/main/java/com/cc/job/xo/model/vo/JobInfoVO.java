@@ -60,9 +60,9 @@ public class JobInfoVO implements Serializable {
     @Schema(description = "GLUE备注")
     private String glueRemark;
     @Schema(description = "GLUE更新时间")
-    private LocalDateTime glueUpdatetime;
+    private LocalDateTime glueUpdateTime;
     @Schema(description = "子任务ID，多个逗号分隔")
-    private String childJobid;
+    private String childJobId;
     @Schema(description = "调度状态：0-停止，1-运行")
     private Integer triggerStatus;
     @Schema(description = "上次调度时间")

@@ -44,4 +44,5 @@
           AND registry_value = #{registryValue}
     </delete>
 
+
 </mapper>

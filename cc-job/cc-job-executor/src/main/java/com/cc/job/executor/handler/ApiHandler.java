@@ -1,59 +1,66 @@
 package com.cc.job.executor.handler;
 
-import cn.hutool.http.HttpRequest;
-import cn.hutool.json.JSONArray;
-import cn.hutool.json.JSONUtil;
+import com.cc.job.executor.core.service.HttpTaskExecutor;
+import com.cc.job.executor.infrastructure.constant.ExecutorConstants;
 import com.cc.job.xo.mapper.JobInfoMapper;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.handler.annotation.XxlJob;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
+/**
+ * HTTP API 任务处理器
+ * 
+ * <p>负责接收 XXL-Job 调度请求，执行 HTTP API 任务
+ *
+ * @author cc-job-team
+ */
 @Component
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class ApiHandler {
-
-    final JobInfoMapper jobInfoMapper;
-
+    
+    private static final Logger logger = LoggerFactory.getLogger(ApiHandler.class);
+    
+    private final JobInfoMapper jobInfoMapper;
+    private final HttpTaskExecutor httpTaskExecutor;
+    
+    /**
+     * 执行 HTTP API 任务
+     */
     @XxlJob("runApiHandler")
-    public void  runApiHandler(){
+    public void runApiHandler() {
         long jobId = XxlJobHelper.getJobId();
+        logger.info("[ApiHandler] 开始执行HTTP任务 - jobId: {}", jobId);
+        
+        try {
+            // 1. 获取任务信息
+            JobInfo jobInfo = getJobInfo(jobId);
+            
+            // 2. 执行 HTTP 请求
+            String result = httpTaskExecutor.execute(jobInfo);
+            
+            // 3. 输出结果
+            XxlJobHelper.log("HTTP请求执行成功，响应: {}", result);
+            logger.info("[ApiHandler] HTTP任务执行完成 - jobId: {}", jobId);
+            
+        } catch (Exception e) {
+            logger.error("[ApiHandler] HTTP任务执行失败 - jobId: {}", jobId, e);
+            XxlJobHelper.log("错误: {}", e.getMessage());
+            throw new RuntimeException("HTTP任务执行失败", e);
+        }
+    }
+    
+    /**
+     * 获取任务信息
+     */
+    private JobInfo getJobInfo(long jobId) {
         JobInfo jobInfo = jobInfoMapper.selectById(jobId);
-        if(jobInfo==null){
-            throw new RuntimeException("jobInfo is null");
+        if (jobInfo == null) {
+            throw new IllegalArgumentException(ExecutorConstants.ErrorMessage.JOB_NOT_FOUND);
         }
-        String reqHeader = jobInfo.getReqHeader();
-        String reqUrl = jobInfo.getReqUrl();
-        String reqType = jobInfo.getReqType();
-        String reqBody = jobInfo.getReqBody();
-        JSONArray jsonArray = JSONUtil.parseArray(reqHeader);
-        List<Map> headerList = jsonArray.toList(Map.class);
-        Map<String,String> headers = new HashMap<>();
-        if(!headerList.isEmpty()){
-            for (Map data : headerList) {
-                String key = (String) data.get("columnKey");
-                String value = (String) data.get("columnValue");
-                headers.put(key, value);
-            }
-        }
-        String result = null;
-        if("GET".equalsIgnoreCase(reqType)){
-            result =  HttpRequest.get(reqUrl)
-                    .addHeaders(headers)
-                    .execute()
-                    .body();
-        }else if("POST".equalsIgnoreCase( reqType)){
-            result= HttpRequest.post(reqUrl)
-                    .addHeaders(headers)
-                    .form(reqBody)
-                    .execute()
-                    .body();
-        }
-        XxlJobHelper.log(result);
+        return jobInfo;
     }
 }

@@ -34,6 +34,15 @@ public class JobGroupController {
 
     private final JobGroupService jobGroupService;
 
+
+    @Operation(summary = "task_group分页列表")
+    @GetMapping("/{id}")
+    public Result<JobGroup> getJobGroup(@PathVariable Long id) {
+        JobGroup jobGroup= jobGroupService.getById(id);
+        return Result.success(jobGroup);
+    }
+
+
     @Operation(summary = "task_group分页列表")
     @GetMapping("/page")
     public PageResult<JobGroupVO> getJobGroupPage(JobGroupQuery queryParams ) {

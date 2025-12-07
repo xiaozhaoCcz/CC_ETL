@@ -1,14 +1,20 @@
 package com.cc.job.gui.view;
 
+import cn.hutool.core.date.StopWatch;
 import com.cc.job.gui.history.UndoRedoManager;
 import com.cc.job.gui.model.*;
 import com.cc.job.gui.service.JobGroupService;
 import com.cc.job.gui.service.JobInfoService;
+import com.cc.job.gui.service.JobJdbcDatasourceService;
 import com.cc.job.gui.service.JobLogService;
 import com.cc.job.gui.service.JobPartService;
 import com.cc.job.gui.service.SSEService;
 import com.cc.job.gui.util.*;
+import com.cc.job.xo.model.entity.JobEdge;
 import com.cc.job.xo.model.entity.JobGroup;
+import com.cc.job.xo.model.entity.JobJdbcDatasource;
+import com.cc.job.xo.model.entity.JobNode;
+import com.cc.job.xo.model.form.JobEdgeForm;
 import com.cc.job.xo.model.form.JobInfoForm;
 import javafx.application.Platform;
 import javafx.geometry.Bounds;
@@ -79,8 +85,25 @@ public class MainView extends BorderPane {
     // 多个任务组的执行状态管理（类似Vue中的logTabs）
     private java.util.Map<Long, RunningJobGroup> runningJobs = new java.util.HashMap<>();
     
+    /**
+     * 清理所有资源（用于程序关闭时调用）
+     */
+    public void cleanup() {
+        // 清理所有运行中的任务组（停止所有Timer和SSE连接）
+        for (java.util.Map.Entry<Long, RunningJobGroup> entry : new java.util.HashMap<>(runningJobs).entrySet()) {
+            RunningJobGroup runningJob = entry.getValue();
+            try {
+                runningJob.cleanup();
+                SSEService.getInstance().disconnect(runningJob.getJobId(), runningJob.getRandomId());
+            } catch (Exception e) {
+                logger.error("清理任务组失败 - jobId: {}", runningJob.getJobId(), e);
+            }
+        }
+        runningJobs.clear();
+    }
+    
     // 复制粘贴相关：存储复制的节点数据
-    private com.cc.job.xo.model.form.JobInfoForm copiedNodeForm = null; // 兼容单节点复制
+    private JobInfoForm copiedNodeForm = null; // 兼容单节点复制
     
     // 多节点复制粘贴数据结构
     private static class CopiedNodesData {
@@ -90,7 +113,7 @@ public class MainView extends BorderPane {
         double minY = Double.MAX_VALUE;
         
         static class NodeFormData {
-            com.cc.job.xo.model.form.JobInfoForm form;
+            JobInfoForm form;
             Long originalJobId; // 原始jobId，用于匹配连接关系
             String originalNodeId; // 原始节点ID
         }
@@ -221,8 +244,8 @@ public class MainView extends BorderPane {
                                             // 设为 CUSTOM_GROUP，后端 NODE_TYPE_MAP 映射为 custom-group
                                             groupNodeForm.setGlueType("CUSTOM_GROUP");
                                             groupNodeForm.setExecutorHandler("runJobGroupXxlJob");
-                                            groupNodeForm.setGlueUpdatetime(null);
-                                            com.cc.job.xo.model.entity.JobNode savedGroupNode = jobInfoService.saveJobNode(groupNodeForm);
+                                            groupNodeForm.setGlueUpdateTime(null);
+                                            JobNode savedGroupNode = jobInfoService.saveJobNode(groupNodeForm);
                                             if (savedGroupNode != null) {
                                                 groupContainerJobIdRef[0] = savedGroupNode.getJobId();
                                             }
@@ -360,10 +383,10 @@ public class MainView extends BorderPane {
                                                 copyForm.setExecutorRouteStrategy("FIRST");
                                             }
                                             // 避免 LocalDateTime 反序列化格式错误（后端自行维护该时间）
-                                            copyForm.setGlueUpdatetime(null);
+                                            copyForm.setGlueUpdateTime(null);
                                             
                                             // 保存为新节点（包括任务组节点本身）
-                                            com.cc.job.xo.model.entity.JobNode saved = jobInfoService.saveJobNode(copyForm);
+                                            JobNode saved = jobInfoService.saveJobNode(copyForm);
                                             
                                             // ⭐ 修复：如果是任务组节点，递归处理子节点（在保存节点之后）
                                             if (isGroupNode && saved != null) {
@@ -433,7 +456,7 @@ public class MainView extends BorderPane {
                                             if (s != null && t != null && s.getNodeId() != null && t.getNodeId() != null) {
                                                 // 保存到数据库
                                                 try {
-                                                    com.cc.job.xo.model.form.JobEdgeForm edgeForm = new com.cc.job.xo.model.form.JobEdgeForm();
+                                                    JobEdgeForm edgeForm = new JobEdgeForm();
                                                     Long effectiveParentId = groupContainerJobIdRef[0] != null ? groupContainerJobIdRef[0] : currentTaskGroupId;
                                                     edgeForm.setJobParentId(effectiveParentId);
                                                     edgeForm.setFromNodeId(Long.parseLong(s.getNodeId()));
@@ -1672,13 +1695,21 @@ public class MainView extends BorderPane {
                 Platform.runLater(() -> {
                     logPanel.error("✗ 任务执行失败: " + e.getMessage());
                     // 清理失败的任务组
-                    finalRunningJob.cleanup();
+                    try {
+                        finalRunningJob.cleanup();
+                    } catch (Exception cleanupEx) {
+                        logger.error("清理任务组失败: {}", cleanupEx.getMessage(), cleanupEx);
+                    }
                     runningJobs.remove(currentJobId);
                     updateToolBarRunningJobs();
                     // 恢复边的正常状态
                     canvas.setAllConnectionsRunning(false);
-                    // 断开SSE连接
-                    SSEService.getInstance().disconnect(currentJobId, randomId);
+                    // 断开SSE连接（确保在后台线程中断开，避免阻塞）
+                    try {
+                        SSEService.getInstance().disconnect(currentJobId, randomId);
+                    } catch (Exception sseEx) {
+                        logger.error("断开SSE连接失败: {}", sseEx.getMessage(), sseEx);
+                    }
                 });
             }
         }).start();
@@ -1754,14 +1785,66 @@ public class MainView extends BorderPane {
             logPanel.warn("   status: " + status);
         }
 
-        // 如果状态是5（任务完成），只恢复边的正常状态，但保留节点状态
+        // ⭐ 如果状态是5（任务完成），需要更新UI运行状态
         if (status != null && status == 5) {
-            logPanel.info("🏁 任务完成（status=5），恢复边的正常状态，保留节点状态");
-            Platform.runLater(() -> {
-                // 只恢复边的运行状态（停止虚线动画），不重置节点状态
-                canvas.setAllConnectionsRunning(false);
-                // 注意：不重置节点状态，让节点保持最终状态（成功/失败）
-            });
+            logPanel.info("🏁 任务完成（status=5），开始更新UI运行状态");
+            
+            // 查找对应的运行中任务组
+            final RunningJobGroup runningJob = jobId != null ? runningJobs.get(jobId) : null;
+            final Long finalJobId = jobId;
+            
+            if (runningJob != null && expectedRandomId.equals(runningJob.getRandomId())) {
+                // 找到对应的任务组，延迟停止日志轮询，确保所有日志都已获取
+                logPanel.info("✅ 找到对应的运行中任务组，延迟停止日志轮询以确保日志完整");
+                
+                // ⚠️ 优化：延迟2秒停止日志轮询，确保所有日志都已写入并获取
+                // 这样可以避免后端延迟导致的日志丢失问题，同时减少用户等待时间
+                Timer delayTimer = new java.util.Timer("DelayStopTimer-" + runningJob.getJobId(), true);
+                delayTimer.schedule(new TimerTask() {
+                    @Override
+                    public void run() {
+                        Platform.runLater(() -> {
+                            stopLogPolling(runningJob, "任务组执行完成");
+                        });
+                        delayTimer.cancel();
+                    }
+                }, 2000); // 延迟2秒停止，确保日志完整
+            } else {
+                // 没有找到对应的任务组，手动更新UI状态
+                logPanel.warn("⚠️ 未找到对应的运行中任务组，手动更新UI状态");
+                Platform.runLater(() -> {
+                    if (finalJobId != null) {
+                        // 从运行列表中移除（如果存在）
+                        runningJobs.remove(finalJobId);
+                        
+                        // 更新导航栏中的小绿点（任务完成）
+                        navigationBar.updateTaskGroupRunningStatus(finalJobId, false);
+                        
+                        // 更新工具栏显示
+                        updateToolBarRunningJobs();
+                        
+                        // 恢复边的正常状态（停止虚线动画）
+                        canvas.setAllConnectionsRunning(false);
+                        
+                        // 同步节点状态到数据库
+                        canvas.syncPendingNodeStatus();
+                        logPanel.info("✅ UI状态已更新为准备运行状态");
+                    }
+                });
+                
+                // ⭐ 优化：异步断开SSE连接，不阻塞UI更新
+                final Long asyncJobId = finalJobId;
+                final String asyncRandomId = expectedRandomId;
+                new Thread(() -> {
+                    try {
+                        Thread.sleep(100); // 等待一小段时间，确保UI已更新
+                        SSEService.getInstance().disconnect(asyncJobId, asyncRandomId);
+                        logger.debug("SSE连接已异步断开（未找到任务组） - jobId: {}, randomId: {}", asyncJobId, asyncRandomId);
+                    } catch (Exception e) {
+                        logger.error("异步断开SSE连接失败（未找到任务组） - jobId: {}, randomId: {}", asyncJobId, asyncRandomId, e);
+                    }
+                }, "SSE-Disconnect-NotFound-" + finalJobId).start();
+            }
         }
         
         logPanel.info("========================================");
@@ -1864,7 +1947,18 @@ public class MainView extends BorderPane {
             }
 
         } catch (Exception e) {
-            logger.error("获取执行日志失败: {}", e.getMessage(), e);
+            String errorMsg = e.getMessage();
+            logger.error("获取执行日志失败: {}", errorMsg, e);
+            
+            // ⚠️ 如果执行器不可用，说明任务已完成且执行器已下线，应该停止日志轮询
+            // 这种情况通常发生在任务完成后，执行器地址被清空或执行器已下线
+//            if (errorMsg != null && (errorMsg.contains("执行器不可用") || errorMsg.contains("执行器地址: null"))) {
+//                logger.warn("执行器不可用，停止日志轮询 - jobId: {}, logId: {}",
+//                        runningJob.getJobId(), runningJob.getLogId());
+//                stopLogPolling(runningJob, "执行器不可用，日志获取已停止");
+//                return;
+//            }
+            
             runningJob.setPullFailCount(runningJob.getPullFailCount() + 1);
         }
     }
@@ -1873,30 +1967,34 @@ public class MainView extends BorderPane {
      * 停止日志轮询（针对特定任务组）
      */
     private void stopLogPolling(RunningJobGroup runningJob, String message) {
+        // ⭐ 先停止日志轮询，确保不再获取日志
         runningJob.cleanup();
 
+        // ⭐ 保存必要信息，因为后续会在异步线程中使用
+        final Long jobId = runningJob.getJobId();
+        final String jobName = runningJob.getJobName();
+        final String randomId = runningJob.getRandomId();
+
         Platform.runLater(() -> {
-            logPanel.info(runningJob.getJobId(), "════════════════════════════════");
-            logPanel.success(runningJob.getJobId(), "✓ " + runningJob.getJobName() + " " + message);
-            logPanel.info(runningJob.getJobId(), "════════════════════════════════");
+            logPanel.info(jobId, "════════════════════════════════");
+            logPanel.success(jobId, "✓ " + jobName + " " + message);
+            logPanel.info(jobId, "════════════════════════════════");
 
             // 从运行列表中移除
-            runningJobs.remove(runningJob.getJobId());
+            runningJobs.remove(jobId);
             
-            // 更新导航栏中的小绿点（任务完成）
-            navigationBar.updateTaskGroupRunningStatus(runningJob.getJobId(), false);
-            
+            // 更新导航栏中的小绿点（任务完成）- 按钮从"停止"变成"运行"
+            navigationBar.updateTaskGroupRunningStatus(jobId, false);
+
             updateToolBarRunningJobs();
 
             // 恢复边的正常状态（停止虚线动画）
             canvas.setAllConnectionsRunning(false);
 
-            // 断开SSE连接
-            SSEService.getInstance().disconnect(runningJob.getJobId(), runningJob.getRandomId());
-            
             // ⭐ 任务执行完成后，立即同步所有节点状态到数据库
             canvas.syncPendingNodeStatus();
-            logPanel.info(runningJob.getJobId(), "已触发节点状态批量同步");
+            logPanel.info(jobId, "已触发节点状态批量同步");
+
 
             // ⚠️ 重要：不重置节点状态，让节点保持最终状态（成功/失败）
             // 节点状态会在以下情况重置：
@@ -1904,6 +2002,22 @@ public class MainView extends BorderPane {
             // 2. 切换任务组时（loadTaskGroupData -> clear）
             // 3. 手动停止任务时（stopJobExecution）
         });
+
+        // ⭐ 优化：异步断开SSE连接，不阻塞UI更新
+        // 这样UI状态（按钮从停止变成运行）可以立即更新，而SSE断开在后台进行
+        // 确保日志轮询已经停止（cleanup已调用）后再断开连接
+        new Thread(() -> {
+            try {
+                // 等待一小段时间，确保日志轮询已经完全停止
+                Thread.sleep(100);
+                
+                // 异步断开SSE连接
+                SSEService.getInstance().disconnect(jobId, randomId);
+                logger.debug("SSE连接已异步断开 - jobId: {}, randomId: {}", jobId, randomId);
+            } catch (Exception e) {
+                logger.error("异步断开SSE连接失败 - jobId: {}, randomId: {}", jobId, randomId, e);
+            }
+        }, "SSE-Disconnect-" + jobId).start();
     }
 
     /**
@@ -1942,51 +2056,59 @@ public class MainView extends BorderPane {
             return;
         }
 
-        logPanel.info("正在停止任务组: " + runningJob.getJobName() + " (ID: " + jobId + ")...");
+        // ⭐ 保存必要的信息（在清理前）
+        String jobName = runningJob.getJobName();
+        String randomId = runningJob.getRandomId();
 
-        // 在后台线程中停止任务
+        try {
+            jobInfoService.stopJobCompose(jobId, randomId);
+
+        }catch (Exception e) {
+            logger.error("后台停止接口调用失败 - jobId: {}, randomId: {}", jobId, randomId, e);
+        }
+
+        
+        // ⭐ 立即更新UI（不等待API调用）
+        Platform.runLater(() -> {
+            logPanel.info("正在停止任务组: " + jobName + " (ID: " + jobId + ")...");
+            logPanel.success("✓ 任务组 " + jobName + " 已停止（UI已更新）");
+
+            // 清理该任务组的状态
+            runningJob.cleanup();
+            runningJobs.remove(jobId);
+            
+            // 更新导航栏中的小绿点（任务停止）
+            navigationBar.updateTaskGroupRunningStatus(jobId, false);
+
+            // 更新工具栏显示
+            updateToolBarRunningJobs();
+
+            // 恢复边的正常状态（停止虚线动画）
+            canvas.setAllConnectionsRunning(false);
+
+            // ⭐ 任务停止后，立即同步所有节点状态到数据库
+            canvas.syncPendingNodeStatus();
+            logPanel.info("已触发节点状态批量同步");
+
+            // ⚠️ 重要：不重置节点状态，让节点保持当前状态（成功/失败/运行中）
+            // 节点状态会在以下情况重置：
+            // 1. 下次任务启动时（triggerJobExecution）
+            // 2. 切换任务组时（loadTaskGroupData -> clear）
+            // 停止任务时不应该重置节点状态，应该保持运行到哪里就是哪个状态
+        });
+
         new Thread(() -> {
             try {
-                jobInfoService.stopJobCompose(jobId, runningJob.getRandomId());
+                // 等待一小段时间，确保日志轮询已经完全停止
+                Thread.sleep(100);
 
-                Platform.runLater(() -> {
-                    logPanel.success("✓ 任务组 " + runningJob.getJobName() + " 已停止");
-
-                    // 清理该任务组的状态
-                    runningJob.cleanup();
-                    runningJobs.remove(jobId);
-                    
-                    // 更新导航栏中的小绿点（任务停止）
-                    navigationBar.updateTaskGroupRunningStatus(jobId, false);
-
-                    // 更新工具栏显示
-                    updateToolBarRunningJobs();
-
-                    // 恢复边的正常状态（停止虚线动画）
-                    canvas.setAllConnectionsRunning(false);
-
-                    // 断开SSE连接
-                    SSEService.getInstance().disconnect(jobId, runningJob.getRandomId());
-
-                    // ⭐ 任务停止后，立即同步所有节点状态到数据库
-                    canvas.syncPendingNodeStatus();
-                    logPanel.info("已触发节点状态批量同步");
-
-                    // ⚠️ 重要：不重置节点状态，让节点保持当前状态（成功/失败/运行中）
-                    // 节点状态会在以下情况重置：
-                    // 1. 下次任务启动时（triggerJobExecution）
-                    // 2. 切换任务组时（loadTaskGroupData -> clear）
-                    // 停止任务时不应该重置节点状态，应该保持运行到哪里就是哪个状态
-                });
-
+                // 异步断开SSE连接
+                SSEService.getInstance().disconnect(jobId, randomId);
+                logger.debug("SSE连接已异步断开 - jobId: {}, randomId: {}", jobId, randomId);
             } catch (Exception e) {
-                logger.error("停止任务失败: {}", e.getMessage(), e);
-
-                Platform.runLater(() -> {
-                    logPanel.error("✗ 停止任务失败: " + e.getMessage());
-                });
+                logger.error("异步断开SSE连接失败 - jobId: {}, randomId: {}", jobId, randomId, e);
             }
-        }).start();
+        }, "SSE-Disconnect-" + jobId).start();
     }
 
     /**
@@ -1995,8 +2117,8 @@ public class MainView extends BorderPane {
     private void updateToolBarRunningJobs() {
         if (toolBar != null) {
             // 过滤出正在运行的任务组
-            java.util.Map<Long, RunningJobGroup> activeJobs = new java.util.HashMap<>();
-            for (java.util.Map.Entry<Long, RunningJobGroup> entry : runningJobs.entrySet()) {
+            Map<Long, RunningJobGroup> activeJobs = new java.util.HashMap<>();
+            for (Map.Entry<Long, RunningJobGroup> entry : runningJobs.entrySet()) {
                 if (entry.getValue().isRunning()) {
                     activeJobs.put(entry.getKey(), entry.getValue());
                 }
@@ -2007,7 +2129,7 @@ public class MainView extends BorderPane {
         // 同时更新导航栏
         if (navigationBar != null) {
             // 过滤出正在运行的任务组
-            java.util.Map<Long, RunningJobGroup> activeJobs = new java.util.HashMap<>();
+            Map<Long, RunningJobGroup> activeJobs = new java.util.HashMap<>();
             for (java.util.Map.Entry<Long, RunningJobGroup> entry : runningJobs.entrySet()) {
                 if (entry.getValue().isRunning()) {
                     activeJobs.put(entry.getKey(), entry.getValue());
@@ -2417,7 +2539,7 @@ public class MainView extends BorderPane {
                     if (formData.getExecutorRouteStrategy() == null || formData.getExecutorRouteStrategy().isEmpty()) {
                         formData.setExecutorRouteStrategy("FIRST");
                     }
-                    formData.setGlueUpdatetime(null);
+                    formData.setGlueUpdateTime(null);
 
                     logPanel.info("正在保存到数据库...");
 
@@ -3000,7 +3122,7 @@ public class MainView extends BorderPane {
             new Thread(() -> {
                 try {
                     // 获取任务组表单数据
-                    com.cc.job.xo.model.form.JobInfoForm formData = jobInfoService.getFormData(taskGroupId);
+                    JobInfoForm formData = jobInfoService.getFormData(taskGroupId);
                     
                     if (formData == null) {
                         Platform.runLater(() -> {
@@ -3042,7 +3164,7 @@ public class MainView extends BorderPane {
     /**
      * 显示新建/编辑任务组对话框
      */
-    private void showNewJobGroupDialog(Long partitionId, String partitionName, com.cc.job.xo.model.form.JobInfoForm editData) {
+    private void showNewJobGroupDialog(Long partitionId, String partitionName, JobInfoForm editData) {
         try {
             logPanel.info("════════════════════════════════");
             logPanel.info(editData == null ? "📝 新建任务组 - 分区: " + partitionName : "✏️ 编辑任务组");
@@ -3050,7 +3172,7 @@ public class MainView extends BorderPane {
             // 在后台线程中加载JobGroup列表
             new Thread(() -> {
                 try {
-                    java.util.List<com.cc.job.xo.model.entity.JobGroup> jobGroupList = jobGroupService.getAllJobGroupList();
+                    java.util.List<JobGroup> jobGroupList = jobGroupService.getAllJobGroupList();
 
                     Platform.runLater(() -> {
                         try {
@@ -3060,7 +3182,7 @@ public class MainView extends BorderPane {
 
                             // 创建并显示对话框
                             NewJobGroupDialog dialog = new NewJobGroupDialog(ownerStage, partitionId, editData, jobGroupList);
-                            java.util.Optional<com.cc.job.xo.model.form.JobInfoForm> result = dialog.showAndWait();
+                            java.util.Optional<JobInfoForm> result = dialog.showAndWait();
 
                             // 处理结果
                             result.ifPresent(formData -> {
@@ -3132,7 +3254,7 @@ public class MainView extends BorderPane {
     /**
      * 显示新建/编辑任务节点对话框
      */
-    private void showNewJobNodeDialog(Long taskGroupId, String taskGroupName, com.cc.job.xo.model.form.JobInfoForm editData) {
+    private void showNewJobNodeDialog(Long taskGroupId, String taskGroupName, JobInfoForm editData) {
         try {
             logPanel.info("════════════════════════════════");
             logPanel.info(editData == null ? "📝 新建任务节点 - 任务组: " + taskGroupName : "✏️ 编辑任务节点");
@@ -3140,7 +3262,7 @@ public class MainView extends BorderPane {
             // 在后台线程中加载JobGroup列表
             new Thread(() -> {
                 try {
-                    java.util.List<com.cc.job.xo.model.entity.JobGroup> jobGroupList = jobGroupService.getAllJobGroupList();
+                    java.util.List<JobGroup> jobGroupList = jobGroupService.getAllJobGroupList();
 
                     Platform.runLater(() -> {
                         try {
@@ -3150,7 +3272,7 @@ public class MainView extends BorderPane {
 
                             // 创建并显示对话框
                             NewJobNodeDialog dialog = new NewJobNodeDialog(ownerStage, taskGroupId, editData, jobGroupList);
-                            java.util.Optional<com.cc.job.xo.model.form.JobInfoForm> result = dialog.showAndWait();
+                            java.util.Optional<JobInfoForm> result = dialog.showAndWait();
 
                             // 处理结果
                             result.ifPresent(formData -> {
@@ -3159,7 +3281,7 @@ public class MainView extends BorderPane {
                                 // 在后台线程中保存
                                 new Thread(() -> {
                                     try {
-                                        com.cc.job.xo.model.entity.JobNode jobNode = jobInfoService.saveJobNode(formData);
+                                        JobNode jobNode = jobInfoService.saveJobNode(formData);
 
                                         if (jobNode != null) {
                                             Platform.runLater(() -> {
@@ -3221,7 +3343,7 @@ public class MainView extends BorderPane {
     /**
      * 在画布上添加节点
      */
-    private void addNodeToCanvas(com.cc.job.xo.model.entity.JobNode jobNode, com.cc.job.xo.model.form.JobInfoForm formData) {
+    private void addNodeToCanvas(JobNode jobNode, JobInfoForm formData) {
         addNodeToCanvasAndReturn(jobNode, formData);
     }
     
@@ -3231,7 +3353,7 @@ public class MainView extends BorderPane {
      * @param formData 任务表单数据
      * @return 创建的ProcessNode对象，如果失败返回null
      */
-    private ProcessNode addNodeToCanvasAndReturn(com.cc.job.xo.model.entity.JobNode jobNode, com.cc.job.xo.model.form.JobInfoForm formData) {
+    private ProcessNode addNodeToCanvasAndReturn(JobNode jobNode, JobInfoForm formData) {
         try {
             logPanel.info("正在画布上添加节点...");
 
@@ -3350,7 +3472,7 @@ public class MainView extends BorderPane {
                 copyForm.setNodePositionY(sourceNode.getLayoutY() + 40);
                 
                 // 清除不应该复制的字段
-                copyForm.setGlueUpdatetime(null); // GLUE更新时间应该由后端管理
+                copyForm.setGlueUpdateTime(null); // GLUE更新时间应该由后端管理
                 
                 // 确保必填字段不为空
                 if (copyForm.getExecutorParam() == null) {
@@ -3363,7 +3485,7 @@ public class MainView extends BorderPane {
                     copyForm.setExecutorBlockStrategy("SERIAL_EXECUTION"); // 默认阻塞策略
                 }
 
-                com.cc.job.xo.model.entity.JobNode newJobNode = jobInfoService.saveJobNode(copyForm);
+                JobNode newJobNode = jobInfoService.saveJobNode(copyForm);
                 if (newJobNode == null) {
                     Platform.runLater(() -> logPanel.error("✗ 复制节点失败：后端返回空数据"));
                     return;
@@ -3446,7 +3568,7 @@ public class MainView extends BorderPane {
                 pasteForm.setNodePositionY(pastePosition[1]);
                 
                 // 清除不应该复制的字段
-                pasteForm.setGlueUpdatetime(null);
+                pasteForm.setGlueUpdateTime(null);
                 
                 // 确保必填字段不为空
                 if (pasteForm.getExecutorParam() == null) {
@@ -3460,7 +3582,7 @@ public class MainView extends BorderPane {
                 }
                 
                 // 保存到后端
-                com.cc.job.xo.model.entity.JobNode newJobNode = jobInfoService.saveJobNode(pasteForm);
+                JobNode newJobNode = jobInfoService.saveJobNode(pasteForm);
                 if (newJobNode == null) {
                     Platform.runLater(() -> logPanel.error("✗ 粘贴节点失败：后端返回空数据"));
                     return;
@@ -3560,7 +3682,7 @@ public class MainView extends BorderPane {
                         pasteForm.setNodePositionY(originalY + offsetY);
                         
                         // 清除不应该复制的字段
-                        pasteForm.setGlueUpdatetime(null);
+                        pasteForm.setGlueUpdateTime(null);
                         
                         // 确保必填字段不为空
                         if (pasteForm.getExecutorParam() == null) {
@@ -3574,7 +3696,7 @@ public class MainView extends BorderPane {
                         }
                         
                         // 保存到后端
-                        com.cc.job.xo.model.entity.JobNode newJobNode = jobInfoService.saveJobNode(pasteForm);
+                        JobNode newJobNode = jobInfoService.saveJobNode(pasteForm);
                         if (newJobNode == null) {
                             logPanel.warn("⚠ 粘贴节点失败：后端返回空数据: " + safeString(pasteForm.getJobDesc()));
                             continue;
@@ -3656,7 +3778,7 @@ public class MainView extends BorderPane {
                                             // 保存连线到数据库
                                             if (connection != null && sourceNode.getNodeId() != null && targetNode.getNodeId() != null) {
                                                 try {
-                                                    com.cc.job.xo.model.form.JobEdgeForm edgeForm = new com.cc.job.xo.model.form.JobEdgeForm();
+                                                    JobEdgeForm edgeForm = new JobEdgeForm();
                                                     edgeForm.setJobParentId(currentTaskGroupId);
 
                                                     edgeForm.setFromNodeId(Long.parseLong(sourceNode.getNodeId()));
@@ -3667,7 +3789,7 @@ public class MainView extends BorderPane {
                                                     // 在后台线程中保存连线
                                                     new Thread(() -> {
                                                         try {
-                                                            com.cc.job.xo.model.entity.JobEdge savedEdge = jobInfoService.saveJobEdge(edgeForm);
+                                                            JobEdge savedEdge = jobInfoService.saveJobEdge(edgeForm);
                                                             if (savedEdge != null) {
                                                                 savedConnectionCount.incrementAndGet();
                                                             }
@@ -3765,15 +3887,15 @@ public class MainView extends BorderPane {
                 JobInfoForm form = jobInfoService.getJobNodeFormData(jobId);
                 List<JobGroup> jobGroups = jobGroupService.getAllJobGroupList();
                 // 如果是SQL模式，获取数据源列表
-                List<com.cc.job.xo.model.entity.JobJdbcDatasource> datasources = null;
+                List<JobJdbcDatasource> datasources = null;
                 if (form != null && "SQL".equals(form.getGlueType())) {
                     try {
-                        com.cc.job.gui.service.JobJdbcDatasourceService datasourceService = new com.cc.job.gui.service.JobJdbcDatasourceService();
+                        JobJdbcDatasourceService datasourceService = new JobJdbcDatasourceService();
                         datasources = datasourceService.getDatasourceList();
                     } catch (Exception e) {
                     }
                 }
-                List<com.cc.job.xo.model.entity.JobJdbcDatasource> finalDatasources = datasources;
+                List<JobJdbcDatasource> finalDatasources = datasources;
                 Platform.runLater(() -> {
                     showJobNodeDetailDialog(node, form, jobGroups, null, null, finalDatasources);
                     logPanel.info("════════════════════════════════");
@@ -3799,7 +3921,7 @@ public class MainView extends BorderPane {
             logPanel.warn("⚠ 任务ID为空，无法禁用/启用节点");
             // 恢复节点状态
             if (node != null) {
-                javafx.application.Platform.runLater(() -> {
+                Platform.runLater(() -> {
                     node.restoreEnabledState(!isDisabled);
                 });
             }
@@ -3858,15 +3980,15 @@ public class MainView extends BorderPane {
                 JobInfoForm form = jobInfoService.getJobNodeFormData(jobId);
                 List<JobGroup> jobGroups = jobGroupService.getAllJobGroupList();
                 // 如果是SQL模式，获取数据源列表
-                List<com.cc.job.xo.model.entity.JobJdbcDatasource> datasources = null;
+                List<JobJdbcDatasource> datasources = null;
                 if (form != null && "SQL".equals(form.getGlueType())) {
                     try {
-                        com.cc.job.gui.service.JobJdbcDatasourceService datasourceService = new com.cc.job.gui.service.JobJdbcDatasourceService();
+                        JobJdbcDatasourceService datasourceService = new JobJdbcDatasourceService();
                         datasources = datasourceService.getDatasourceList();
                     } catch (Exception e) {
                     }
                 }
-                List<com.cc.job.xo.model.entity.JobJdbcDatasource> finalDatasources = datasources;
+                List<JobJdbcDatasource> finalDatasources = datasources;
                 Platform.runLater(() -> {
                     showJobNodeDetailDialog(null, form, jobGroups, jobId, nodeName, finalDatasources);
                     logPanel.info("════════════════════════════════");
@@ -3892,7 +4014,7 @@ public class MainView extends BorderPane {
         showJobNodeDetailDialog(node, form, jobGroups, jobId, nodeName, null);
     }
     
-    private void showJobNodeDetailDialog(ProcessNode node, JobInfoForm form, List<JobGroup> jobGroups, Long jobId, String nodeName, List<com.cc.job.xo.model.entity.JobJdbcDatasource> datasources) {
+    private void showJobNodeDetailDialog(ProcessNode node, JobInfoForm form, List<JobGroup> jobGroups, Long jobId, String nodeName, List<JobJdbcDatasource> datasources) {
         if (form == null) {
             logPanel.warn("⚠ 未获取到节点详情数据");
             return;
@@ -3926,7 +4048,7 @@ public class MainView extends BorderPane {
                 datasourceName = datasources.stream()
                     .filter(ds -> ds.getId().equals(form.getJdbcDatasourceId()))
                     .findFirst()
-                    .map(com.cc.job.xo.model.entity.JobJdbcDatasource::getDatabaseName)
+                    .map(JobJdbcDatasource::getDatabaseName)
                     .orElse(null);
             }
             addDetailRow(grid, rowIndex++, "数据库", datasourceName != null ? datasourceName : ("ID: " + form.getJdbcDatasourceId()));
@@ -3999,9 +4121,9 @@ public class MainView extends BorderPane {
         appendDetailLine(sb, "请求体", form.getReqBody());
         appendDetailLine(sb, "节点X坐标", form.getNodePositionX());
         appendDetailLine(sb, "节点Y坐标", form.getNodePositionY());
-        appendDetailLine(sb, "子任务", form.getChildJobid());
-        appendDetailLine(sb, "增量类型", form.getIncrType());
-        appendDetailLine(sb, "增量内容", form.getIncrContent());
+        appendDetailLine(sb, "子任务", form.getChildJobId());
+        appendDetailLine(sb, "增量类型", form.getIncrementType());
+        appendDetailLine(sb, "增量内容", form.getIncrementContent());
         return sb.length() == 0 ? "暂无更多配置信息" : sb.toString();
     }
 
@@ -4236,7 +4358,7 @@ public class MainView extends BorderPane {
             new Thread(() -> {
                 try {
                     // 获取节点表单数据
-                    com.cc.job.xo.model.form.JobInfoForm formData = jobInfoService.getJobNodeFormData(jobId);
+                    JobInfoForm formData = jobInfoService.getJobNodeFormData(jobId);
 
                     if (formData == null) {
                         Platform.runLater(() -> {
@@ -4570,10 +4692,10 @@ public class MainView extends BorderPane {
                     if (copyForm.getExecutorRouteStrategy() == null || copyForm.getExecutorRouteStrategy().isEmpty()) {
                         copyForm.setExecutorRouteStrategy("FIRST");
                     }
-                    copyForm.setGlueUpdatetime(null);
+                    copyForm.setGlueUpdateTime(null);
                     
                     // 先保存当前任务组节点
-                    com.cc.job.xo.model.entity.JobNode savedNestedGroup = jobInfoService.saveJobNode(copyForm);
+                    JobNode savedNestedGroup = jobInfoService.saveJobNode(copyForm);
                     if (savedNestedGroup != null) {
                         // 递归获取并保存更深层的嵌套任务组节点
                         try {
@@ -4615,9 +4737,9 @@ public class MainView extends BorderPane {
                     if (copyForm.getExecutorRouteStrategy() == null || copyForm.getExecutorRouteStrategy().isEmpty()) {
                         copyForm.setExecutorRouteStrategy("FIRST");
                     }
-                    copyForm.setGlueUpdatetime(null);
+                    copyForm.setGlueUpdateTime(null);
                     
-                    com.cc.job.xo.model.entity.JobNode saved = jobInfoService.saveJobNode(copyForm);
+                    JobNode saved = jobInfoService.saveJobNode(copyForm);
                     if (saved != null) {
                         final String nodeIdStr = String.valueOf(saved.getId());
                         final Long newJobId = saved.getJobId();

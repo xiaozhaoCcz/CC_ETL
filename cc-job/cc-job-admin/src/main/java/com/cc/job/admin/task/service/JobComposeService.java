@@ -1,16 +1,16 @@
 package com.cc.job.admin.task.service;
 
+import com.baomidou.mybatisplus.extension.service.IService;
+import com.cc.job.xo.model.entity.JobCompose;
 import com.cc.job.xo.model.entity.JobEdge;
 import com.cc.job.xo.model.entity.JobNode;
 import com.cc.job.xo.model.form.JobEdgeForm;
-import com.cc.job.xo.model.form.JobGlueForm;
 import com.cc.job.xo.model.form.JobInfoForm;
-import jakarta.validation.Valid;
 
 import java.util.List;
 import java.util.Map;
 
-public interface JobComposeService {
+public interface JobComposeService extends IService<JobCompose> {
 
     boolean saveJobCompose(JobInfoForm formData);
 

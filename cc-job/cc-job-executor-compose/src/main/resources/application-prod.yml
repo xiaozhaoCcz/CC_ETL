@@ -1,0 +1,24 @@
+# 生产环境配置
+
+server:
+  port: 8500
+
+cc-job:
+  admin:
+    # 生产环境需要配置实际的 Admin 地址
+    address: http://your-admin-host:8989/xxl-job-admin
+  access-token: ${CC_JOB_ACCESS_TOKEN:default_token}
+  executor:
+    appname: cc-job-executor-compose
+    port: 10001
+    logpath: /data/applogs/cc-job/executor-compose
+    logretentiondays: 30
+
+logging:
+  level:
+    root: WARN
+    com.cc.job.executor.compose: INFO
+  file:
+    name: /data/applogs/cc-job/executor-compose/executor-compose.log
+    max-size: 100MB
+    max-history: 30

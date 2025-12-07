@@ -1,9 +1,5 @@
 package com.cc.job.admin.task.service.impl;
 
-import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.json.JSON;
-import cn.hutool.json.JSONArray;
-import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.cc.job.admin.task.service.JobEdgeService;
@@ -11,6 +7,7 @@ import com.cc.job.admin.task.service.JobInfoService;
 import com.cc.job.admin.task.service.JobNodeService;
 import com.cc.job.admin.task.service.JobPartService;
 import com.cc.job.xo.mapper.JobPartMapper;
+import com.cc.job.xo.model.dto.PartitionExportData;
 import com.cc.job.xo.model.entity.JobEdge;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobNode;
@@ -19,10 +16,6 @@ import com.cc.job.xo.model.vo.JobPartVo;
 import com.google.gson.Gson;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.BeanUtils;
-import org.springframework.http.ContentDisposition;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -32,10 +25,7 @@ import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.SecretKeySpec;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
@@ -61,7 +51,7 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
         // 获取所有的分区
         List<JobPart> jobPartList = this.list();
 
-        List<JobInfo> jobInfoList = jobInfoService.list(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getJobType, 2).eq(JobInfo::getIsNode, "N"));
+        List<JobInfo> jobInfoList = jobInfoService.list(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getJobType, 2).eq(JobInfo::getNodeFlag, "N"));
 
         Map<Integer, List<JobInfo>> jobInfoMap = jobInfoList.stream().collect(Collectors.groupingBy(JobInfo::getJobPartId));
 
@@ -232,11 +222,11 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
         }
 
         // 2. 构建导出数据结构
-        com.cc.job.xo.model.dto.PartitionExportData exportData = new com.cc.job.xo.model.dto.PartitionExportData();
+        PartitionExportData exportData = new PartitionExportData();
         
         // 2.1 设置分区信息
-        com.cc.job.xo.model.dto.PartitionExportData.PartitionInfo partitionInfo = 
-            new com.cc.job.xo.model.dto.PartitionExportData.PartitionInfo();
+        PartitionExportData.PartitionInfo partitionInfo = 
+            new PartitionExportData.PartitionInfo();
         partitionInfo.setId(jobPart.getId());
         partitionInfo.setJobPartName(jobPart.getJobPartName());
         partitionInfo.setSort(jobPart.getSort());
@@ -247,18 +237,18 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
             new LambdaQueryWrapper<JobInfo>()
                 .eq(JobInfo::getJobPartId, id)
                 .eq(JobInfo::getJobType, 2)
-                .eq(JobInfo::getIsNode, "N")
+                .eq(JobInfo::getNodeFlag, "N")
         );
 
-        List<com.cc.job.xo.model.dto.PartitionExportData.TaskGroupInfo> taskGroupInfoList = new ArrayList<>();
+        List<PartitionExportData.TaskGroupInfo> taskGroupInfoList = new ArrayList<>();
 
         // 2.3 遍历每个任务组，获取其节点和边
         for (JobInfo taskGroup : taskGroupList) {
-            com.cc.job.xo.model.dto.PartitionExportData.TaskGroupInfo taskGroupInfo = 
-                new com.cc.job.xo.model.dto.PartitionExportData.TaskGroupInfo();
+            PartitionExportData.TaskGroupInfo taskGroupInfo = 
+                new PartitionExportData.TaskGroupInfo();
 
             // 2.3.1 设置任务组基本信息
-            com.cc.job.xo.model.dto.PartitionExportData.TaskInfoData taskGroupData = 
+            PartitionExportData.TaskInfoData taskGroupData = 
                 convertToTaskInfoData(taskGroup);
             taskGroupInfo.setTaskGroupData(taskGroupData);
 
@@ -268,10 +258,10 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
                     .eq(JobNode::getJobParentId, taskGroup.getId())
             );
 
-            List<com.cc.job.xo.model.dto.PartitionExportData.NodeInfo> nodeInfoList = new ArrayList<>();
+            List<PartitionExportData.NodeInfo> nodeInfoList = new ArrayList<>();
             for (JobNode jobNode : jobNodeList) {
-                com.cc.job.xo.model.dto.PartitionExportData.NodeInfo nodeInfo = 
-                    new com.cc.job.xo.model.dto.PartitionExportData.NodeInfo();
+                PartitionExportData.NodeInfo nodeInfo = 
+                    new PartitionExportData.NodeInfo();
                 
                 // 设置JobNode信息
                 nodeInfo.setNodeId(jobNode.getId());
@@ -303,10 +293,10 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
                     .eq(JobEdge::getJobParentId, taskGroup.getId())
             );
 
-            List<com.cc.job.xo.model.dto.PartitionExportData.EdgeInfo> edgeInfoList = new ArrayList<>();
+            List<PartitionExportData.EdgeInfo> edgeInfoList = new ArrayList<>();
             for (JobEdge jobEdge : jobEdgeList) {
-                com.cc.job.xo.model.dto.PartitionExportData.EdgeInfo edgeInfo = 
-                    new com.cc.job.xo.model.dto.PartitionExportData.EdgeInfo();
+                PartitionExportData.EdgeInfo edgeInfo = 
+                    new PartitionExportData.EdgeInfo();
                 edgeInfo.setId(jobEdge.getId());
                 edgeInfo.setJobParentId(jobEdge.getJobParentId());
                 edgeInfo.setFromNodeId(jobEdge.getFromNodeId());
@@ -356,9 +346,9 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
     /**
      * 将JobInfo转换为TaskInfoData
      */
-    private com.cc.job.xo.model.dto.PartitionExportData.TaskInfoData convertToTaskInfoData(JobInfo jobInfo) {
-        com.cc.job.xo.model.dto.PartitionExportData.TaskInfoData taskInfoData = 
-            new com.cc.job.xo.model.dto.PartitionExportData.TaskInfoData();
+    private PartitionExportData.TaskInfoData convertToTaskInfoData(JobInfo jobInfo) {
+        PartitionExportData.TaskInfoData taskInfoData = 
+            new PartitionExportData.TaskInfoData();
         taskInfoData.setId(jobInfo.getId());
         taskInfoData.setJobGroup(jobInfo.getJobGroup());
         taskInfoData.setJobDesc(jobInfo.getJobDesc());
@@ -376,7 +366,7 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
         taskInfoData.setGlueType(jobInfo.getGlueType());
         taskInfoData.setGlueSource(jobInfo.getGlueSource());
         taskInfoData.setGlueRemark(jobInfo.getGlueRemark());
-        taskInfoData.setChildJobid(jobInfo.getChildJobid());
+        taskInfoData.setChildJobId(jobInfo.getChildJobId());
         taskInfoData.setTriggerStatus(jobInfo.getTriggerStatus());
         taskInfoData.setTriggerLastTime(jobInfo.getTriggerLastTime());
         taskInfoData.setTriggerNextTime(jobInfo.getTriggerNextTime());
@@ -386,13 +376,12 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
         taskInfoData.setReqHeader(jobInfo.getReqHeader());
         taskInfoData.setReqBody(jobInfo.getReqBody());
         taskInfoData.setReqUrl(jobInfo.getReqUrl());
-        taskInfoData.setIsNode(jobInfo.getIsNode());
-        taskInfoData.setRankTriggerStatus(jobInfo.getRankTriggerStatus());
+        taskInfoData.setNodeFlag(jobInfo.getNodeFlag());
         taskInfoData.setJdbcDatasourceId(jobInfo.getJdbcDatasourceId());
-        taskInfoData.setIncrType(jobInfo.getIncrType());
-        taskInfoData.setIncrContent(jobInfo.getIncrContent());
+        taskInfoData.setIncrementType(jobInfo.getIncrementType());
+        taskInfoData.setIncrementContent(jobInfo.getIncrementContent());
         taskInfoData.setRunTime(jobInfo.getRunTime());
-        taskInfoData.setIsPause(jobInfo.getIsPause());
+        taskInfoData.setPauseStatus(jobInfo.getPauseStatus());
         taskInfoData.setJobPartId(jobInfo.getJobPartId());
         taskInfoData.setTriggerUserId(jobInfo.getTriggerUserId());
         return taskInfoData;
@@ -422,8 +411,8 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
 
         // 2. 解析JSON数据
         Gson gson = new Gson();
-        com.cc.job.xo.model.dto.PartitionExportData exportData = 
-            gson.fromJson(json, com.cc.job.xo.model.dto.PartitionExportData.class);
+        PartitionExportData exportData = 
+            gson.fromJson(json, PartitionExportData.class);
         
         if (exportData == null || exportData.getPartition() == null) {
             throw new RuntimeException("导入数据格式错误");
@@ -443,13 +432,13 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
 
         // 5. 遍历所有任务组，重新创建
         if (exportData.getTaskGroups() != null) {
-            for (com.cc.job.xo.model.dto.PartitionExportData.TaskGroupInfo taskGroupInfo : exportData.getTaskGroups()) {
+            for (PartitionExportData.TaskGroupInfo taskGroupInfo : exportData.getTaskGroups()) {
                 // 5.1 创建任务组（JobInfo，jobType=2, isNode="N"）
                 JobInfo newTaskGroup = convertToJobInfo(taskGroupInfo.getTaskGroupData());
                 newTaskGroup.setId(null); // 清除ID，让数据库自动生成
                 newTaskGroup.setJobPartId(Integer.parseInt(String.valueOf(newPartitionId)));
                 newTaskGroup.setJobType(2);
-                newTaskGroup.setIsNode("N");
+                newTaskGroup.setNodeFlag("N");
                 newTaskGroup.setTriggerStatus(0); // 默认停止状态
                 jobInfoService.save(newTaskGroup);
                 
@@ -468,7 +457,7 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
 
                 // 5.2 创建任务组下的所有节点
                 if (taskGroupInfo.getNodes() != null) {
-                    for (com.cc.job.xo.model.dto.PartitionExportData.NodeInfo nodeInfo : taskGroupInfo.getNodes()) {
+                    for (PartitionExportData.NodeInfo nodeInfo : taskGroupInfo.getNodes()) {
                         // 5.2.1 创建节点对应的JobInfo
                         JobInfo newNodeJobInfo = convertToJobInfo(nodeInfo.getTaskInfo());
                         newNodeJobInfo.setId(null);
@@ -503,7 +492,7 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
 
                 // 5.3 创建任务组下的所有边
                 if (taskGroupInfo.getEdges() != null) {
-                    for (com.cc.job.xo.model.dto.PartitionExportData.EdgeInfo edgeInfo : taskGroupInfo.getEdges()) {
+                    for (PartitionExportData.EdgeInfo edgeInfo : taskGroupInfo.getEdges()) {
                         // 映射节点ID
                         Long newFromNodeId = oldToNewNodeIdMap.get(edgeInfo.getFromNodeId());
                         Long newEndNodeId = oldToNewNodeIdMap.get(edgeInfo.getEndNodeId());
@@ -535,7 +524,7 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
     /**
      * 将TaskInfoData转换为JobInfo
      */
-    private JobInfo convertToJobInfo(com.cc.job.xo.model.dto.PartitionExportData.TaskInfoData taskInfoData) {
+    private JobInfo convertToJobInfo(PartitionExportData.TaskInfoData taskInfoData) {
         JobInfo jobInfo = new JobInfo();
         jobInfo.setJobGroup(taskInfoData.getJobGroup());
         jobInfo.setJobDesc(taskInfoData.getJobDesc());
@@ -553,7 +542,7 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
         jobInfo.setGlueType(taskInfoData.getGlueType());
         jobInfo.setGlueSource(taskInfoData.getGlueSource());
         jobInfo.setGlueRemark(taskInfoData.getGlueRemark());
-        jobInfo.setChildJobid(taskInfoData.getChildJobid());
+        jobInfo.setChildJobId(taskInfoData.getChildJobId());
         jobInfo.setTriggerStatus(taskInfoData.getTriggerStatus());
         jobInfo.setTriggerLastTime(taskInfoData.getTriggerLastTime());
         jobInfo.setTriggerNextTime(taskInfoData.getTriggerNextTime());
@@ -563,30 +552,14 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
         jobInfo.setReqHeader(taskInfoData.getReqHeader());
         jobInfo.setReqBody(taskInfoData.getReqBody());
         jobInfo.setReqUrl(taskInfoData.getReqUrl());
-        jobInfo.setIsNode(taskInfoData.getIsNode());
-        jobInfo.setRankTriggerStatus(taskInfoData.getRankTriggerStatus());
+        jobInfo.setNodeFlag(taskInfoData.getNodeFlag());
         jobInfo.setJdbcDatasourceId(taskInfoData.getJdbcDatasourceId());
-        jobInfo.setIncrType(taskInfoData.getIncrType());
-        jobInfo.setIncrContent(taskInfoData.getIncrContent());
+        jobInfo.setIncrementType(taskInfoData.getIncrementType());
+        jobInfo.setIncrementContent(taskInfoData.getIncrementContent());
         jobInfo.setRunTime(taskInfoData.getRunTime());
-        jobInfo.setIsPause(taskInfoData.getIsPause());
+        jobInfo.setPauseStatus(taskInfoData.getPauseStatus());
         jobInfo.setJobPartId(taskInfoData.getJobPartId());
         jobInfo.setTriggerUserId(taskInfoData.getTriggerUserId());
         return jobInfo;
-    }
-
-
-    private void  getAllJobInfoMap(List<JobInfo> jobInfoList,Map<Long, JobInfo> jobInfoMap,Map<Long,Long> jobParentIdMap) {
-        if(jobInfoList==null){
-            return;
-        }
-        for (JobInfo jobInfo : jobInfoList) {
-            jobInfoMap.put(jobInfo.getId(), jobInfo);
-            jobParentIdMap.put(jobInfo.getId(), jobInfo.getParentId());
-            if(jobInfo.getJobType()==2){
-                List<JobInfo> childJobInfoList = jobInfoService.list(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getParentId, jobInfo.getId()));
-                getAllJobInfoMap(childJobInfoList, jobInfoMap,jobParentIdMap);
-            }
-        }
     }
 }

@@ -23,19 +23,19 @@
 		t.glue_type,
 		t.glue_source,
 		t.glue_remark,
-		t.glue_updatetime,
-		t.child_jobid,
+		t.glue_update_time,
+		t.child_job_id,
 		t.trigger_status,
 		t.trigger_last_time,
 		t.trigger_next_time
     </sql>
 
     <update id="stopJobCompose">
-		update job_info set rank_trigger_status = 0 where id = #{id} and rank_trigger_status = 1;
+		update job_info set trigger_status = 0 where id = #{id} and trigger_status = 1;
 	</update>
 
 	<update id="pauseJob">
-		update job_info set is_pause = #{isPause} where id = #{id};
+		update job_info set pause_status = #{pauseStatus} where id = #{id};
 	</update>
 
 

@@ -134,7 +134,9 @@ public class SSEService {
                 connection.setRequestProperty("Accept", "text/event-stream");
                 connection.setRequestProperty("Cache-Control", "no-cache");
                 connection.setConnectTimeout(10000); // 10秒连接超时
-                connection.setReadTimeout(0); // 读取超时设为0，表示无限等待
+                // ⭐ 设置读取超时为30秒，这样readLine()会在超时时抛出SocketTimeoutException，可以被中断
+                // 如果不设置超时，readLine()会无限阻塞，无法被interrupt()中断
+                connection.setReadTimeout(30000); // 30秒读取超时
                 
                 int responseCode = connection.getResponseCode();
                 if (responseCode != HttpURLConnection.HTTP_OK) {
@@ -149,7 +151,30 @@ public class SSEService {
                 StringBuilder eventData = new StringBuilder();
                 String eventType = null;
                 
-                while (running && (line = reader.readLine()) != null) {
+                // 使用可中断的读取方式
+                while (running && !Thread.currentThread().isInterrupted()) {
+                    try {
+                        line = reader.readLine();
+                        if (line == null) {
+                            // 流结束
+                            break;
+                        }
+                    } catch (java.net.SocketTimeoutException e) {
+                        // 读取超时，检查running状态，如果还在运行则继续等待
+                        if (!running || Thread.currentThread().isInterrupted()) {
+                            break;
+                        }
+                        // 继续循环，等待下一次读取
+                        continue;
+                    } catch (java.io.IOException e) {
+                        // IO异常，可能是连接断开
+                        if (running) {
+                            logger.debug("SSE读取数据时发生IO异常: {}", e.getMessage());
+                        }
+                        break;
+                    }
+                    
+                    // 处理读取到的行
                     if (line.isEmpty()) {
                         // 空行表示事件结束，处理事件
                         if (eventData.length() > 0 && eventType != null) {
@@ -240,11 +265,28 @@ public class SSEService {
         
         public void disconnect() {
             running = false;
-            if (connection != null) {
-                connection.disconnect();
-            }
+            
+            // 先中断连接线程
             if (connectionThread != null && connectionThread.isAlive()) {
                 connectionThread.interrupt();
+            }
+            
+            // 然后断开HTTP连接
+            if (connection != null) {
+                try {
+                    connection.disconnect();
+                } catch (Exception e) {
+                    logger.debug("断开SSE连接时发生异常: {}", e.getMessage());
+                }
+            }
+            
+            // 等待线程结束（最多等待1秒）
+            if (connectionThread != null && connectionThread.isAlive()) {
+                try {
+                    connectionThread.join(1000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
             }
         }
         

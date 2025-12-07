@@ -461,7 +461,7 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
         if (data.getExecutorFailRetryCount() != null && data.getExecutorFailRetryCount() != 0) {
             return true;
         }
-        if (data.getChildJobid() != null && !data.getChildJobid().trim().isEmpty()) {
+        if (data.getChildJobId() != null && !data.getChildJobId().trim().isEmpty()) {
             return true;
         }
         return false;
@@ -516,7 +516,7 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
         }
         if (data.getExecutorTimeout() != null) executorTimeoutField.setText(String.valueOf(data.getExecutorTimeout()));
         if (data.getExecutorFailRetryCount() != null) executorFailRetryCountField.setText(String.valueOf(data.getExecutorFailRetryCount()));
-        if (data.getChildJobid() != null) childJobidField.setText(data.getChildJobid());
+        if (data.getChildJobId() != null) childJobidField.setText(data.getChildJobId());
     }
     
     /**
@@ -558,7 +558,7 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
             form.setExecutorFailRetryCount(0);
         }
         
-        form.setChildJobid(childJobidField.getText().trim());
+        form.setChildJobId(childJobidField.getText().trim());
         
         // 固定字段
         form.setGlueType("BEAN");

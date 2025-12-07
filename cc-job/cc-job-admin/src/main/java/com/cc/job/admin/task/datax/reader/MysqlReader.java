@@ -36,9 +36,9 @@ public class MysqlReader implements BaseRW {
         if (dataXParams.getColumns() != null && !dataXParams.getColumns().isEmpty()) {
             connection.append(TABLE, dataXParams.getTableName());
             parameter.putOnce(COLUMN, dataXParams.getColumns());
-            if (dataXParams.getIncrType() == 1) {
+            if (dataXParams.getIncrementType() == 1) {
                 // 增量同步
-                JSONArray jsonArray = JSONUtil.parseArray(dataXParams.getIncrContent());
+                JSONArray jsonArray = JSONUtil.parseArray(dataXParams.getIncrementContent());
                 List<DataxColumn> columnList = jsonArray.toList(DataxColumn.class);
                 if (columnList.isEmpty()) {
                     throw new BusinessException(ERROR_INCREMENT_CONTENT_EMPTY);

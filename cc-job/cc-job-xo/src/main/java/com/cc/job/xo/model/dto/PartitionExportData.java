@@ -77,7 +77,7 @@ public class PartitionExportData implements Serializable {
         private String glueType;
         private String glueSource;
         private String glueRemark;
-        private String childJobid;
+        private String childJobId;
         private Integer triggerStatus;
         private Long triggerLastTime;
         private Long triggerNextTime;
@@ -87,13 +87,12 @@ public class PartitionExportData implements Serializable {
         private String reqHeader;
         private String reqBody;
         private String reqUrl;
-        private String isNode;
-        private Integer rankTriggerStatus;
+        private String nodeFlag;
         private Long jdbcDatasourceId;
-        private Integer incrType;
-        private String incrContent;
+        private Integer incrementType;
+        private String incrementContent;
         private Long runTime;
-        private Integer isPause;
+        private Integer pauseStatus;
         private Integer jobPartId;
         private Integer triggerUserId;
     }

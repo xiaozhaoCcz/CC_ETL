@@ -37,4 +37,5 @@ public interface JobRegistryMapper extends BaseMapper<JobRegistry> {
     int registryDelete(@Param("registryGroup") String registryGroup,
                               @Param("registryKey") String registryKey,
                               @Param("registryValue") String registryValue);
+
 }

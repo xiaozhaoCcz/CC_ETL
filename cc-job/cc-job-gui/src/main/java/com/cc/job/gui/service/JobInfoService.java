@@ -1,5 +1,6 @@
 package com.cc.job.gui.service;
 
+import com.cc.job.gui.util.SessionManager;
 import com.cc.job.xo.common.result.Result;
 import com.cc.job.xo.model.entity.JobLogglue;
 import com.cc.job.xo.model.form.JobGlueForm;
@@ -38,7 +39,7 @@ public class JobInfoService extends BaseService {
         requestMap.put("executorParam", executorParam);
         
         // 添加触发用户ID（从SessionManager获取）
-        com.cc.job.gui.util.SessionManager session = com.cc.job.gui.util.SessionManager.getInstance();
+        SessionManager session = SessionManager.getInstance();
         if (session.isLoggedIn() && session.getUserId() != null) {
             try {
                 Integer triggerUserId = Integer.parseInt(session.getUserId());
@@ -68,7 +69,15 @@ public class JobInfoService extends BaseService {
             
             if (Result.isSuccess(result)) {
                 // 返回的数据是日志ID（字符串格式）
-                return Long.parseLong(result.getData());
+                String data = result.getData();
+                if (data == null || data.trim().isEmpty()) {
+                    throw new IOException("API 返回成功但数据为空，无法获取日志ID");
+                }
+                try {
+                    return Long.parseLong(data.trim());
+                } catch (NumberFormatException e) {
+                    throw new IOException("API 返回的数据格式错误，无法解析为日志ID: " + data, e);
+                }
             } else {
                 throw new IOException("API 返回错误: " + result.getMsg());
             }
@@ -386,19 +395,19 @@ public class JobInfoService extends BaseService {
     /**
      * 暂停/启用任务
      * @param jobId 任务ID
-     * @param isPause 是否暂停：0=启用, 1=禁用
+     * @param pause_status 是否暂停：0=启用, 1=禁用
      * @return 是否成功
      * @throws IOException 网络异常
      */
-    public boolean pauseJob(Long jobId, Integer isPause) throws IOException {
+    public boolean pauseJob(Long jobId, Integer pauseStatus) throws IOException {
         if (jobId == null) {
             throw new IllegalArgumentException("任务ID不能为空");
         }
-        if (isPause == null || (isPause != 0 && isPause != 1)) {
-            throw new IllegalArgumentException("isPause 参数必须为 0（启用）或 1（禁用）");
+        if (pauseStatus == null || (pauseStatus != 0 && pauseStatus != 1)) {
+            throw new IllegalArgumentException("pause_status 参数必须为 0（启用）或 1（禁用）");
         }
         
-        String url = apiUtil.getBaseUrl() + "/api/v1/jobInfos/pauseJob/" + jobId + "?isPause=" + isPause;
+        String url = apiUtil.getBaseUrl() + "/api/v1/jobInfos/pauseJob/" + jobId + "?pauseStatus=" + pauseStatus;
         
         Request request = new Request.Builder()
                 .url(url)

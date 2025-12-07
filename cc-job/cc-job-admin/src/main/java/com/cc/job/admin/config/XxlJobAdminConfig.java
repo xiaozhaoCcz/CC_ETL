@@ -4,13 +4,10 @@ package com.cc.job.admin.config;
 import com.cc.job.admin.task.alarm.JobAlarmer;
 import com.cc.job.admin.task.scheduler.XxlJobScheduler;
 import com.cc.job.xo.mapper.*;
-import com.xxl.job.core.executor.impl.XxlJobSpringExecutor;
-import com.xxl.job.core.util.IpUtil;
 import jakarta.annotation.Resource;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Bean;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Component;
 
@@ -90,6 +87,8 @@ public class XxlJobAdminConfig implements InitializingBean, DisposableBean {
     private DataSource dataSource;
     @Resource
     private JobAlarmer jobAlarmer;
+    @Resource
+    private JobComposeMapper jobComposeMapper;
 
 
     public String getI18n() {
@@ -160,21 +159,8 @@ public class XxlJobAdminConfig implements InitializingBean, DisposableBean {
         return jobAlarmer;
     }
 
-
-    @Value("${xxl.job.logpath}")
-    private String logPath;
-
-    @Value("${server.port}")
-    private int port;
-
-
-    @Bean
-    public XxlJobSpringExecutor xxlJobExecutor() {
-        XxlJobSpringExecutor xxlJobSpringExecutor = new XxlJobSpringExecutor();
-        xxlJobSpringExecutor.setLogPath(logPath);
-        String ip = IpUtil.getIp();
-        xxlJobSpringExecutor.setAdminAddresses("http://"+ip+":"+port+"/xxl-job-admin");
-        return xxlJobSpringExecutor;
+    public JobComposeMapper getJobComposeMapper() {
+        return jobComposeMapper;
     }
 
 }

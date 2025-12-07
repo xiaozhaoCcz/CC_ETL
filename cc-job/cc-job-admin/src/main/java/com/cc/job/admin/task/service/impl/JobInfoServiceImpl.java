@@ -2,17 +2,15 @@ package com.cc.job.admin.task.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
+import cn.hutool.http.HttpRequest;
+import cn.hutool.http.HttpResponse;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.cc.job.admin.task.executor.Async;
-import com.cc.job.admin.task.executor.wrapper.WorkerWrapper;
 import com.cc.job.admin.task.service.*;
-import com.cc.job.admin.task.thread.JobLogHelper;
-import com.cc.job.admin.task.thread.JobLogThreadListener;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.admin.cron.CronExpression;
 import com.cc.job.admin.task.enums.*;
-import com.cc.job.admin.task.handler.JobGroupXxlJob;
+import com.cc.job.xo.mapper.JobComposeMapper;
 import com.cc.job.xo.mapper.JobLogMapper;
 import com.cc.job.xo.mapper.JobLogglueMapper;
 import com.cc.job.xo.model.dto.JobEdgeDto;
@@ -24,12 +22,14 @@ import com.cc.job.xo.model.vo.JobNodeVo;
 import com.cc.job.admin.task.thread.JobScheduleHelper;
 import com.cc.job.admin.task.thread.JobTriggerPoolHelper;
 import com.cc.job.admin.task.utils.I18nUtil;
+import com.cc.job.admin.config.XxlJobAdminConfig;
 import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
-import com.xxl.job.core.executor.XxlJobExecutor;
 import com.xxl.job.core.glue.GlueTypeEnum;
 import com.xxl.job.core.util.DateUtil;
 import com.xxl.job.core.util.IpUtil;
+import com.xxl.job.core.biz.model.RegistryParam;
+import com.xxl.job.core.enums.RegistryConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -46,15 +46,15 @@ import com.cc.job.xo.model.vo.JobInfoVO;
 import java.text.MessageFormat;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
-
-import static com.cc.job.admin.task.handler.JobConstant.ADMIN_ADDRESS;
+import org.springframework.transaction.support.TransactionTemplate;
 
 
 /**
@@ -64,7 +64,6 @@ import static com.cc.job.admin.task.handler.JobConstant.ADMIN_ADDRESS;
  * @since 2024-11-03 08:21
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> implements JobInfoService {
 
@@ -82,8 +81,37 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
     private final JobGroupSnapshotService jobGroupSnapshotService;
 
-    @Value("${server.port}")
-    private int port;
+    private final TransactionTemplate transactionTemplate;
+
+    private final JobComposeMapper jobComposeMapper;
+
+    // 构造函数注入PlatformTransactionManager并创建TransactionTemplate
+    public JobInfoServiceImpl(JobGroupService jobGroupService,
+                              JobNodeService jobNodeService,
+                              JobEdgeService jobEdgeService,
+                              JobLogglueMapper jobLogglueMapper,
+                              JobInfoMapper jobInfoMapper,
+                              JobLogMapper jobLogMapper,
+                              JobGroupSnapshotService jobGroupSnapshotService,
+                              PlatformTransactionManager transactionManager,
+                              JobComposeMapper jobComposeMapper) {
+        this.jobGroupService = jobGroupService;
+        this.jobNodeService = jobNodeService;
+        this.jobEdgeService = jobEdgeService;
+        this.jobLogglueMapper = jobLogglueMapper;
+        this.jobInfoMapper = jobInfoMapper;
+        this.jobLogMapper = jobLogMapper;
+        this.jobGroupSnapshotService = jobGroupSnapshotService;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.jobComposeMapper = jobComposeMapper;
+    }
+
+    // ⭐ 用于异步调用停止接口的线程池
+    private static final ExecutorService STOP_JOB_EXECUTOR = Executors.newCachedThreadPool(r -> {
+        Thread t = new Thread(r, "StopJobExecutor-Thread");
+        t.setDaemon(true);
+        return t;
+    });
 
     static final Map<String,String> NODE_TYPE_MAP = new HashMap<>(){{
         put("SQL","custom-sql");
@@ -127,7 +155,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         }
 
         wrapper.in(JobInfo::getJobType, 0, 2);
-        wrapper.in(JobInfo::getIsNode, "N");
+        wrapper.in(JobInfo::getNodeFlag, "N");
         wrapper.orderByDesc(JobInfo::getUpdateTime);
 
         Page<JobInfo> page = this.page(new Page<>(queryParams.getPageNum(), queryParams.getPageSize()), wrapper);
@@ -232,7 +260,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     }
 
     public void updateChild(JobInfo taskInfo) {
-        if (taskInfo.getJobType() == 2 && "Y".equalsIgnoreCase(taskInfo.getIsNode())) {
+        if (taskInfo.getJobType() == 2 && "Y".equalsIgnoreCase(taskInfo.getNodeFlag())) {
             //下面的子节点全部更新
             List<JobInfo> taskInfos = this.list(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getParentId, taskInfo.getId()));
             for (JobInfo info : taskInfos) {
@@ -287,7 +315,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    //@Transactional(rollbackFor = Exception.class)
     public String triggerJob(JobInfoTriggerDto taskInfoTriggerDto) {
         Long jobId = taskInfoTriggerDto.getId();
         String randomId = taskInfoTriggerDto.getExecutorParam();
@@ -299,7 +327,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         }
 
         // 检查是否正在运行（使用行锁后，这里是线程安全的）
-        if (taskInfo.getJobType() == 2 && taskInfo.getRankTriggerStatus() == 1) {
+        if (taskInfo.getJobType() == 2 && taskInfo.getTriggerStatus() == 1) {
             throw new BusinessException("当前任务正在运行中，请等待完成后再运行");
         }
 
@@ -314,30 +342,48 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
             randomId = taskInfo.getExecutorParam();
         }
 
-        // 【快照模式】如果是任务组，创建快照
-        if (taskInfo.getJobType() == 2 && StringUtils.isNotBlank(randomId)) {
+        // 【快照模式】使用编程式事务，确保快照创建和JobLog创建在同一事务中
+        // ⭐ 创建 JobLog 记录（在触发前创建，以便返回日志ID）
+        // 这里必须使用编程式事务，因为triggerJob是异步操作，可能会先比数据库执行更快
+        String finalRandomId = randomId;
+        Long logId = transactionTemplate.execute(status -> {
             try {
-                String nodesJson = getNodesJsonForSnapshot(jobId);
-                String edgesJson = getEdgesJsonForSnapshot(jobId);
-                String triggerUserIdStr = taskInfoTriggerDto.getTriggerUserId() != null 
-                    ? String.valueOf(taskInfoTriggerDto.getTriggerUserId()) 
-                    : null;
-                jobGroupSnapshotService.createSnapshot(
-                    jobId,
-                    randomId,
-                    nodesJson,
-                    edgesJson,
-                    triggerUserIdStr
-                );
-            } catch (Exception e) {
-                log.error("[Snapshot] 创建任务组快照失败 - jobId: {}, randomId: {}", jobId, randomId, e);
-                throw new BusinessException("创建任务组快照失败: " + e.getMessage());
-            }
-        }
+                // 【快照模式】如果是任务组，创建快照
+                if (taskInfo.getJobType() == 2 && StringUtils.isNotBlank(finalRandomId)) {
+                    String nodesJson = getNodesJsonForSnapshot(jobId);
+                    String edgesJson = getEdgesJsonForSnapshot(jobId);
+                    String triggerUserIdStr = taskInfoTriggerDto.getTriggerUserId() != null 
+                        ? String.valueOf(taskInfoTriggerDto.getTriggerUserId()) 
+                        : null;
+                    jobGroupSnapshotService.createSnapshot(
+                        jobId,
+                            finalRandomId,
+                        nodesJson,
+                        edgesJson,
+                        triggerUserIdStr
+                    );
+                }
 
-        String ip = IpUtil.getIp();
-        String adminAddress = String.format(ADMIN_ADDRESS, ip, port);
-        JobTriggerPoolHelper.trigger(taskInfoTriggerDto.getId().intValue(), TriggerTypeEnum.MANUAL, -1, null, taskInfoTriggerDto.getExecutorParam(), taskInfoTriggerDto.getAddressList(), 1, adminAddress);
+                // 创建 JobLog 记录
+                JobLog jobLog = new JobLog();
+                jobLog.setJobGroup(taskInfo.getJobGroup());
+                jobLog.setJobId(taskInfo.getId());
+                jobLog.setTriggerTime(LocalDateTime.now());
+                jobLog.setTriggerCode(0);
+                jobLog.setHandleCode(0);
+                jobLogMapper.insert(jobLog);
+                
+                return jobLog.getId();
+            } catch (Exception e) {
+                log.error("[Snapshot] 创建任务组快照或JobLog失败 - jobId: {}, randomId: {}", jobId, finalRandomId, e);
+                status.setRollbackOnly(); // 标记事务回滚
+                throw new BusinessException("创建任务组快照或JobLog失败: " + e.getMessage());
+            }
+        });
+
+        log.debug("[JobInfoService] 创建任务日志记录 - jobId: {}, logId: {}", taskInfo.getId(), logId);
+
+        JobTriggerPoolHelper.trigger(taskInfoTriggerDto.getId().intValue(), TriggerTypeEnum.MANUAL, -1, null, taskInfoTriggerDto.getExecutorParam(), taskInfoTriggerDto.getAddressList(), logId);
 
         // 只在任务组（jobType == 2）时记录触发用户ID
         if (taskInfo.getJobType() == 2 && taskInfoTriggerDto.getTriggerUserId() != null) {
@@ -345,32 +391,13 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         }
         
         // 原子性设置运行状态（在事务中，行锁保护）
-        taskInfo.setRankTriggerStatus(1);
-        this.updateById(taskInfo);
-
-        // 监听任务运行
-        String result = "";
-        if (taskInfo.getJobType() == 2 && "N".equalsIgnoreCase(taskInfo.getIsNode())) {
-            // 使用线程监听jobId
-            JobLogThreadListener listener = null;
-            Thread thread = null;
-            String key = JobGroupXxlJob.setExecuteJobId(taskInfoTriggerDto.getId(), taskInfoTriggerDto.getExecutorParam());
-            try {
-                listener = new JobLogThreadListener(key);
-                FutureTask<String> futureTask = new FutureTask<>(listener);
-                thread = new Thread(futureTask);
-                JobLogHelper.addJobLogThread(key, thread);
-                thread.start();
-                result = futureTask.get(1, TimeUnit.MINUTES);
-            } catch (Exception e) {
-                throw new BusinessException(e);
-            } finally {
-                listener.toStop();
-                JobLogHelper.removeJobLogThread(key);
-            }
+        if (taskInfo.getJobType() == 2 && taskInfo.getTriggerStatus() == 0) {
+            taskInfo.setTriggerStatus(1);
+            this.updateById(taskInfo);
         }
 
-        return result;
+        // 返回日志ID（字符串格式）
+        return String.valueOf(logId);
     }
 
 
@@ -531,7 +558,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
             JobInfo copyTaskInfo = BeanUtil.copyProperties(taskInfo, JobInfo.class);
             copyTaskInfo.setId(null);
-            copyTaskInfo.setIsNode("Y");
+            copyTaskInfo.setNodeFlag("Y");
             copyTaskInfo.setParentId(parentTask.getId());
             newJobInfos.add(copyTaskInfo);
             nodeToJobInfoIndex.put(taskNode, newJobInfos.size() - 1);
@@ -661,8 +688,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
             throw new BusinessException(I18nUtil.getString("jobinfo_field_executorBlockStrategy") + I18nUtil.getString("system_unvalid"));
         }
 
-        if (formData.getChildJobid() != null && formData.getChildJobid().trim().length() > 0) {
-            String[] childJobIds = formData.getChildJobid().split(",");
+        if (formData.getChildJobId() != null && formData.getChildJobId().trim().length() > 0) {
+            String[] childJobIds = formData.getChildJobId().split(",");
             List<Integer> validJobIds = new ArrayList<>();
             
             // 优化：批量查询所有子任务，避免N+1查询问题
@@ -700,11 +727,11 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
                 temp.append(childJobIds[i]);
             }
 
-            formData.setChildJobid(temp.toString());
+            formData.setChildJobId(temp.toString());
         }
-        formData.setGlueUpdatetime(LocalDateTime.now());
+        formData.setGlueUpdateTime(LocalDateTime.now());
         JobInfo taskInfo = BeanUtil.copyProperties(formData, JobInfo.class);
-        taskInfo.setIsNode("N");
+        taskInfo.setNodeFlag("N");
         return taskInfo;
     }
 
@@ -750,7 +777,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
                 JobInfo copyTaskInfo = this.getById(taskId);
                 copyTaskInfo.setId(null);
                 copyTaskInfo.setParentId(id);
-                copyTaskInfo.setIsNode("Y");
+                copyTaskInfo.setNodeFlag("Y");
                 this.save(copyTaskInfo);
                 node.setJobId(copyTaskInfo.getId());
                 // 修复：新创建的节点，triggerStatus设置为-1表示未运行状态（白色背景）
@@ -836,15 +863,84 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
     @Override
     public boolean stopJobCompose(Long id, String randomId) {
-        int flag = jobInfoMapper.stopJobCompose(id);
-        if (flag > 0) {
-            XxlJobExecutor.removeJobThread(id.intValue(), "stop task" + id);
-            List<WorkerWrapper<Long, String>> workWrappers = JobGroupXxlJob.getWorkWrapper(id, randomId);
-            if (workWrappers != null&&!workWrappers.isEmpty()) {
-                Async.stopWork((List<WorkerWrapper>) (List<?>) workWrappers);
+        try {
+            // 1. 更新任务状态
+            int flag = jobInfoMapper.stopJobCompose(id);
+            
+            // 2. 获取任务信息和执行器组信息
+            JobInfo jobInfo = this.getById(id);
+            if (jobInfo == null) {
+                log.error("停止任务组失败 - 任务不存在: {}", id);
+                return false;
             }
+            
+            JobGroup jobGroup = jobGroupService.getById(jobInfo.getJobGroup());
+            if (jobGroup == null) {
+                log.error("停止任务组失败 - 执行器组不存在: {}", jobInfo.getJobGroup());
+                return false;
+            }
+
+            final Long finalJobId = id;
+            final String finalRandomId = randomId;
+
+            List<JobCompose> jobComposes = jobComposeMapper.selectList(null);
+
+            if(jobComposes.isEmpty()){
+                log.error("停止任务组失败 - 执行器组查找失败");
+                return false;
+            }
+
+            List<String> composeHttpAddresses = jobComposes.stream().map(JobCompose::getExecutorServerAddress).toList();
+            if (composeHttpAddresses.isEmpty()) {
+                log.warn("停止任务组失败 - 未找到executor-compose服务地址 - jobId: {}, randomId: {}", id, randomId);
+                // 即使找不到executor-compose地址，也返回成功（因为数据库状态已更新）
+                return flag > 0;
+            }
+            
+            // 4. ⭐ 异步调用executor-compose的停止接口（不阻塞主线程）
+            // 使用HTTP服务器地址（端口8500）而不是执行器地址（端口15000）
+            for (String httpAddress : composeHttpAddresses) {
+                final String finalHttpAddress = httpAddress;
+                // 异步执行，不等待结果
+                STOP_JOB_EXECUTOR.submit(() -> {
+                    try {
+                        // 构建完整的URL（确保地址格式正确）
+                        // 地址格式可能是 "http://ip:8500" 或 "http://ip:8500/"
+                        String url = finalHttpAddress;
+                        if (!url.endsWith("/")) {
+                            url += "/";
+                        }
+                        // 移除末尾的斜杠后再拼接路径，避免双斜杠
+                        url = url.replaceAll("/+$", "") + "/api/jobgroup/stop";
+                        
+                        log.debug("调用停止接口 - URL: {}, jobId: {}, randomId: {}", url, finalJobId, finalRandomId);
+                        
+                        HttpResponse response = HttpRequest.post(url)
+                                .form("jobId", finalJobId)
+                                .form("randomId", finalRandomId)
+                                .timeout(5000)
+                                .execute();
+                        
+                        if (response.isOk()) {
+                            log.info("成功调用停止接口 - jobId: {}, randomId: {}, httpAddress: {}", 
+                                    finalJobId, finalRandomId, finalHttpAddress);
+                        } else {
+                            log.error("调用停止接口失败 - jobId: {}, randomId: {}, httpAddress: {}, status: {}, body: {}", 
+                                    finalJobId, finalRandomId, finalHttpAddress, response.getStatus(), response.body());
+                        }
+                    } catch (Exception e) {
+                        log.error("调用停止接口异常 - jobId: {}, randomId: {}, httpAddress: {}, error: {}", 
+                                finalJobId, finalRandomId, finalHttpAddress, e.getMessage(), e);
+                    }
+                });
+            }
+            
+            // ⭐ 立即返回，不等待 HTTP 调用完成
+            return flag > 0;
+        } catch (Exception e) {
+            log.error("停止任务组异常 - jobId: {}, randomId: {}", id, randomId, e);
+            return false;
         }
-        return true;
     }
 
     @Override
@@ -852,7 +948,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         JobInfo taskInfo = this.getById(formData.getTaskId());
         taskInfo.setGlueRemark(formData.getGlueRemark());
         taskInfo.setGlueSource(formData.getGlueSource());
-        taskInfo.setGlueUpdatetime(LocalDateTime.now());
+        taskInfo.setGlueUpdateTime(LocalDateTime.now());
         // 如果传入了glueType，则更新taskInfo的glueType
         if (formData.getGlueType() != null && !formData.getGlueType().isEmpty()) {
             taskInfo.setGlueType(formData.getGlueType());
@@ -908,8 +1004,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     }
 
     @Override
-    public boolean pauseJob(Long id, Integer isPause) {
-        int i = jobInfoMapper.pauseJob(id, isPause);
+    public boolean pauseJob(Long id, Integer pauseStatus) {
+        int i = jobInfoMapper.pauseJob(id, pauseStatus);
         return i > 0;
     }
 
@@ -964,8 +1060,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         }
 
         // 》ChildJobId valid
-        if (formData.getChildJobid() != null && formData.getChildJobid().trim().length() > 0) {
-            String[] childJobIds = formData.getChildJobid().split(",");
+        if (formData.getChildJobId() != null && formData.getChildJobId().trim().length() > 0) {
+            String[] childJobIds = formData.getChildJobId().split(",");
             for (String childJobIdItem : childJobIds) {
                 if (childJobIdItem != null && childJobIdItem.trim().length() > 0 && isNumeric(childJobIdItem)) {
                     JobInfo childJobInfo = this.getById(Integer.parseInt(childJobIdItem));
@@ -986,7 +1082,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
             }
             temp = temp.substring(0, temp.length() - 1);
 
-            formData.setChildJobid(temp);
+            formData.setChildJobId(temp);
         }
 
         // group valid
@@ -1019,7 +1115,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         }
 
         BeanUtil.copyProperties(formData, existsJobInfo);
-        existsJobInfo.setGlueUpdatetime(LocalDateTime.now());
+        existsJobInfo.setGlueUpdateTime(LocalDateTime.now());
         existsJobInfo.setTriggerNextTime(nextTriggerTime);
         return existsJobInfo;
     }
