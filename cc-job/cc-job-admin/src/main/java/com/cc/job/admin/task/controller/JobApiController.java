@@ -84,6 +84,14 @@ public class JobApiController {
             String executorServerAddress = params.get("executorServerAddress");
             return JobRegistryHelper.getInstance()
                     .updateRegistryValue(appName, executorAddress, executorServerAddress);
+        } else if ("removeRegistryValue".equals(uri)) {
+            // ⭐ 删除注册信息的registryValue（用于executor-compose停止时清理HTTP端口信息）
+            Map<String, String> params = GsonTool.fromJson(data, Map.class);
+            String appName = params.get("appName");
+            String executorAddress = params.get("executorAddress");
+            String executorServerAddress = params.get("executorServerAddress");
+            return JobRegistryHelper.getInstance()
+                    .removeRegistryValue(appName, executorAddress, executorServerAddress);
         } else {
             return new ReturnT<>(ReturnT.FAIL_CODE, "invalid request, uri-mapping(" + uri + ") not found.");
         }
