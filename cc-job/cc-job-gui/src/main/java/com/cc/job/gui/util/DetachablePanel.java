@@ -69,10 +69,20 @@ public class DetachablePanel {
         
         // 确保content能够填充整个StackPane
         content.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        // 设置首选尺寸，确保组件有初始大小
+        content.setPrefSize(defaultWidth, defaultHeight);
+        
+        // 确保组件在新窗口中可见（修复白板问题）
+        content.setVisible(true);
+        content.setManaged(true);
         
         // 创建场景
         Scene scene = new Scene(root, defaultWidth, defaultHeight);
         detachedStage.setScene(scene);
+        
+        // 确保StackPane填充整个场景
+        root.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        root.setPrefSize(defaultWidth, defaultHeight);
         
         // 窗口关闭时自动恢复到原位置
         detachedStage.setOnCloseRequest(e -> {
@@ -80,12 +90,26 @@ public class DetachablePanel {
         });
         
         isDetached = true;
+        
+        // 触发弹出回调（在显示窗口之前，以便更新可见性标志）
+        if (onDetach != null) {
+            onDetach.run();
+        }
+        
+        // 显示窗口
         detachedStage.show();
         
         // 强制刷新内容布局（修复白板问题）
         // 使用多级runLater确保布局完全完成
         Platform.runLater(() -> {
+            // 再次确保组件可见（防止回调中设置了不可见）
+            content.setVisible(true);
+            content.setManaged(true);
+            
+            // 强制重新计算布局
+            root.requestLayout();
             content.requestLayout();
+            
             Platform.runLater(() -> {
                 // 如果是MiniMapView，需要手动触发刷新
                 if (content instanceof MiniMapView) {
@@ -93,13 +117,19 @@ public class DetachablePanel {
                         ((MiniMapView) content).refresh();
                     });
                 }
+                
+                // 再次强制布局计算，确保内容正确显示
+                root.autosize();
+                content.autosize();
+                
+                // 如果内容仍然不可见，强制设置尺寸
+                if (!content.isVisible() || content.getWidth() <= 0 || content.getHeight() <= 0) {
+                    content.setPrefSize(defaultWidth, defaultHeight);
+                    content.setVisible(true);
+                    content.setManaged(true);
+                }
             });
         });
-        
-        // 触发弹出回调
-        if (onDetach != null) {
-            onDetach.run();
-        }
         
     }
     

@@ -55,6 +55,7 @@ public class MainView extends BorderPane {
     private VBox leftArea;
     private HBox leftContainer;
     private SplitPane horizontalSplit;
+    private SplitPane verticalSplit;
     private boolean treeViewVisible = true;
     private boolean miniMapVisible = true;
     private boolean logPanelVisible = true;
@@ -550,7 +551,7 @@ public class MainView extends BorderPane {
         logPanel = new LogPanel();
 
         // 创建垂直分割面板：画布区域和日志面板
-        SplitPane verticalSplit = new SplitPane();
+        verticalSplit = new SplitPane();
         verticalSplit.setOrientation(Orientation.VERTICAL);
         verticalSplit.getItems().addAll(canvasArea, logPanel);
         verticalSplit.setDividerPositions(0.7); // 初始位置：70% 给画布，30% 给日志
@@ -1513,9 +1514,15 @@ public class MainView extends BorderPane {
         treeViewDetachable.setDefaultSize(400, 600);
         treeViewDetachable.setOnDetach(() -> {
             logPanel.info("任务组面板已弹出为独立窗口");
+            // 弹出时更新可见性标志并调整分割线
+            treeViewVisible = false;
+            updateLeftSidebar();
         });
         treeViewDetachable.setOnReattach(() -> {
             logPanel.info("任务组面板已恢复到原位置");
+            // 恢复时更新可见性标志并调整分割线
+            treeViewVisible = true;
+            updateLeftSidebar();
         });
 
         // 连接弹出按钮
@@ -1528,9 +1535,15 @@ public class MainView extends BorderPane {
         miniMapDetachable.setDefaultSize(350, 350);
         miniMapDetachable.setOnDetach(() -> {
             logPanel.info("小地图面板已弹出为独立窗口");
+            // 弹出时更新可见性标志并调整分割线
+            miniMapVisible = false;
+            updateLeftSidebar();
         });
         miniMapDetachable.setOnReattach(() -> {
             logPanel.info("小地图面板已恢复到原位置");
+            // 恢复时更新可见性标志并调整分割线
+            miniMapVisible = true;
+            updateLeftSidebar();
         });
 
         // 连接弹出按钮
@@ -1542,8 +1555,14 @@ public class MainView extends BorderPane {
         logPanelDetachable = new DetachablePanel(logPanel, "日志监控");
         logPanelDetachable.setDefaultSize(1000, 300);
         logPanelDetachable.setOnDetach(() -> {
+            // 弹出时更新可见性标志并调整分割线
+            logPanelVisible = false;
+            updateLeftSidebar();
         });
         logPanelDetachable.setOnReattach(() -> {
+            // 恢复时更新可见性标志并调整分割线
+            logPanelVisible = true;
+            updateLeftSidebar();
         });
 
         // 连接弹出按钮
@@ -1556,13 +1575,34 @@ public class MainView extends BorderPane {
      * 更新左侧边栏状态
      */
     private void updateLeftSidebar() {
-        // 更新组件的可见性
-        treeView.setVisible(treeViewVisible);
-        treeView.setManaged(treeViewVisible);
-        miniMap.setVisible(miniMapVisible);
-        miniMap.setManaged(miniMapVisible);
-        logPanel.setVisible(logPanelVisible);
-        logPanel.setManaged(logPanelVisible);
+        // 更新组件的可见性（只有当组件没有被弹出时才设置）
+        // 如果组件已经被弹出到独立窗口，它的可见性由弹出窗口管理
+        if (treeViewDetachable == null || !treeViewDetachable.isDetached()) {
+            treeView.setVisible(treeViewVisible);
+            treeView.setManaged(treeViewVisible);
+        } else {
+            // 如果已经弹出，确保在新窗口中可见
+            treeView.setVisible(true);
+            treeView.setManaged(true);
+        }
+        
+        if (miniMapDetachable == null || !miniMapDetachable.isDetached()) {
+            miniMap.setVisible(miniMapVisible);
+            miniMap.setManaged(miniMapVisible);
+        } else {
+            // 如果已经弹出，确保在新窗口中可见
+            miniMap.setVisible(true);
+            miniMap.setManaged(true);
+        }
+        
+        if (logPanelDetachable == null || !logPanelDetachable.isDetached()) {
+            logPanel.setVisible(logPanelVisible);
+            logPanel.setManaged(logPanelVisible);
+        } else {
+            // 如果已经弹出，确保在新窗口中可见
+            logPanel.setVisible(true);
+            logPanel.setManaged(true);
+        }
 
         // 判断是否有任何组件可见
         boolean anyVisible = treeViewVisible || miniMapVisible;
@@ -1579,6 +1619,7 @@ public class MainView extends BorderPane {
 
         // 根据可见性立即调整分割线位置
         Platform.runLater(() -> {
+            // 处理水平分割线（左侧边栏）
             if (!anyVisible) {
                 // 如果 treeView 和 miniMap 都不可见，将分割线移到最左边（位置0）
                 horizontalSplit.setDividerPositions(0);
@@ -1588,6 +1629,19 @@ public class MainView extends BorderPane {
                 double[] currentPositions = horizontalSplit.getDividerPositions();
                 if (currentPositions.length > 0 && currentPositions[0] == 0.0) {
                     horizontalSplit.setDividerPositions(0.2);
+                }
+            }
+            
+            // 处理垂直分割线（日志面板）
+            if (!logPanelVisible) {
+                // 如果日志面板不可见，将分割线移到最下面（位置1.0，100%给画布）
+                verticalSplit.setDividerPositions(1.0);
+            } else {
+                // 如果日志面板可见，恢复分割线位置（70%给画布，30%给日志）
+                // 只有当分割线位置为1.0时才恢复，避免覆盖用户手动调整的位置
+                double[] currentPositions = verticalSplit.getDividerPositions();
+                if (currentPositions.length > 0 && currentPositions[0] == 1.0) {
+                    verticalSplit.setDividerPositions(0.7);
                 }
             }
         });
