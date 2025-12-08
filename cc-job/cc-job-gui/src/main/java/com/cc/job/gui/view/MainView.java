@@ -783,6 +783,11 @@ public class MainView extends BorderPane {
         toolBar.setCallback(new TopToolBar.ToolBarCallback() {
             @Override
             public void onNew() {
+                showJobNodeDialog();
+            }
+
+            @Override
+            public void onNewPart() {
                 showNewPartitionDialog();
             }
 
@@ -2798,6 +2803,38 @@ public class MainView extends BorderPane {
     }
 
     /**
+     * 显示任务节点对话框
+     */
+    private void showJobNodeDialog(){
+        // 获取当前窗口
+        Window window = this.getScene().getWindow();
+        Stage ownerStage = (Stage) window;
+
+        try {
+            List<JobGroup> jobGroupList = jobGroupService.getAllJobGroupList();
+            // 创建并显示对话框
+            NewJobNodeDialog dialog = new NewJobNodeDialog(ownerStage, (long)0, null, jobGroupList);
+            Optional<JobInfoForm> result = dialog.showAndWait();
+
+            result.ifPresent(formData -> {
+                // 在后台线程中保存
+                new Thread(() -> {
+                    try {
+                        jobInfoService.saveJobInfo(formData);
+                    }catch (Exception e){
+                        logger.error("保存任务节点失败: {}", e.getMessage(), e);
+                        logPanel.error("✗ 保存失败: " + e.getMessage());
+                        logPanel.warn("提示: 请检查后端服务是否正常运行");
+                        logPanel.info("════════════════════════════════");
+                    }
+                }).start();
+            });
+        }catch (Exception e){
+            throw new RuntimeException("显示任务节点对话框失败: " + e.getMessage());
+        }
+    }
+
+    /**
      * 显示新建分区对话框
      */
     private void showNewPartitionDialog() {
@@ -3344,7 +3381,7 @@ public class MainView extends BorderPane {
                         try {
                             // 获取当前窗口
                            Window window = this.getScene().getWindow();
-                            javafx.stage.Stage ownerStage = (javafx.stage.Stage) window;
+                           Stage ownerStage = (Stage) window;
 
                             // 创建并显示对话框
                             NewJobGroupDialog dialog = new NewJobGroupDialog(ownerStage, partitionId, editData, jobGroupList);
@@ -3428,17 +3465,17 @@ public class MainView extends BorderPane {
             // 在后台线程中加载JobGroup列表
             new Thread(() -> {
                 try {
-                    java.util.List<JobGroup> jobGroupList = jobGroupService.getAllJobGroupList();
+                    List<JobGroup> jobGroupList = jobGroupService.getAllJobGroupList();
 
                     Platform.runLater(() -> {
                         try {
                             // 获取当前窗口
                             Window window = this.getScene().getWindow();
-                            javafx.stage.Stage ownerStage = (javafx.stage.Stage) window;
+                            Stage ownerStage = (Stage) window;
 
                             // 创建并显示对话框
                             NewJobNodeDialog dialog = new NewJobNodeDialog(ownerStage, taskGroupId, editData, jobGroupList);
-                            java.util.Optional<JobInfoForm> result = dialog.showAndWait();
+                            Optional<JobInfoForm> result = dialog.showAndWait();
 
                             // 处理结果
                             result.ifPresent(formData -> {

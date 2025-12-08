@@ -11,6 +11,7 @@ import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
@@ -139,7 +140,7 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
             Button saveButton = (Button) getDialogPane().lookupButton(saveButtonType);
             if (saveButton != null) {
                 // 拦截ActionEvent（按钮的默认行为），验证失败时阻止对话框关闭
-                saveButton.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+                saveButton.addEventFilter(ActionEvent.ACTION, event -> {
                     if (!validateForm()) {
                         event.consume(); // 验证失败，阻止事件传播，防止对话框关闭
                     }

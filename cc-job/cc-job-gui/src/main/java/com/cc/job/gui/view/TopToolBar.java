@@ -36,6 +36,7 @@ public class TopToolBar extends VBox {
     // 回调接口
     public interface ToolBarCallback {
         void onNew();
+        void onNewPart();
         void onOpen();
         void onSave();
         void onUndo();
@@ -121,8 +122,12 @@ public class TopToolBar extends VBox {
 
         // 文件菜单
         Menu fileMenu = new Menu("文件");
-        MenuItem newItem = new MenuItem("新建");
-        newItem.setOnAction(e -> safeCall(ToolBarCallback::onNew));
+        Menu newItem = new Menu("新建");
+        MenuItem newJobItem = new MenuItem("新建任务");
+        MenuItem newJobPartItem = new MenuItem("新建任务组");
+        newJobItem.setOnAction(e -> safeCall(ToolBarCallback::onNew));
+        newJobPartItem.setOnAction(e -> safeCall(ToolBarCallback::onNewPart));
+        newItem.getItems().addAll(newJobItem, newJobPartItem);
         MenuItem openItem = new MenuItem("打开");
         openItem.setOnAction(e -> safeCall(ToolBarCallback::onOpen));
         MenuItem saveItem = new MenuItem("保存");

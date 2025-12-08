@@ -4,7 +4,6 @@ import com.cc.job.xo.common.result.Result;
 import com.cc.job.xo.model.vo.JobPartVo;
 import com.cc.job.gui.model.JobComposeData;
 import com.google.gson.reflect.TypeToken;
-import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,30 +21,9 @@ public class JobPartService extends  BaseService {
      * @throws IOException 网络异常
      */
     public List<JobPartVo> getTree() throws IOException {
-        String url = apiUtil.getBaseUrl() + "/api/v1/jobParts/getTree";
-
-        Request request = new Request.Builder()
-                .url(url)
-                .get()
-                .build();
-
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                throw new IOException("请求失败: " + response);
-            }
-
-            String responseBody = response.body().string();
-
-            // 解析 JSON 响应
-            Type resultType = new TypeToken<Result<List<JobPartVo>>>(){}.getType();
-            Result<List<JobPartVo>> result = apiUtil.getGson().fromJson(responseBody, resultType);
-
-            if (Result.isSuccess(result)) {
-                return result.getData();
-            } else {
-                throw new IOException("API 返回错误: " + result.getMsg());
-            }
-        }
+        TypeToken<List<JobPartVo>> typeToken = new TypeToken<List<JobPartVo>>(){};
+        Result<List<JobPartVo>> result = httpClient.get("/api/v1/jobParts/getTree", typeToken);
+        return httpClient.extractData(result, "获取树形数据失败");
     }
 
     /**
@@ -56,31 +34,9 @@ public class JobPartService extends  BaseService {
      * @throws IOException 网络异常
      */
     public Object getChildren(Long id, Integer type) throws IOException {
-        String url = apiUtil.getBaseUrl() + "/api/v1/jobParts/getChildren/" + id + "/" + type;
-
-        Request request = new Request.Builder()
-                .url(url)
-                .get()
-                .build();
-
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                throw new IOException("请求失败: " + response);
-            }
-
-            String responseBody = response.body().string();
-
-            // 解析 JSON 响应
-            Type resultType = new TypeToken<Result<Object>>() {
-            }.getType();
-            Result<Object> result = apiUtil.getGson().fromJson(responseBody, resultType);
-
-            if (Result.isSuccess(result)) {
-                return result.getData();
-            } else {
-                throw new IOException("API 返回错误: " + result.getMsg());
-            }
-        }
+        String path = "/api/v1/jobParts/getChildren/" + id + "/" + type;
+        Result<Object> result = httpClient.get(path, Object.class);
+        return httpClient.extractDataOrNull(result, "获取子节点数据失败");
     }
     
     /**
@@ -90,34 +46,10 @@ public class JobPartService extends  BaseService {
      * @throws IOException 网络异常
      */
     public boolean saveJobPart(String jobPartName) throws IOException {
-        String url = apiUtil.getBaseUrl() + "/api/v1/jobParts/saveJobPart";
-        
-        // 构建请求参数
         Map<String, Object> requestMap = new HashMap<>();
         requestMap.put("jobPartName", jobPartName);
         requestMap.put("sort", 0); // 默认排序为0
-        
-        String jsonBody = apiUtil.getGson().toJson(requestMap);
-        RequestBody body = RequestBody.create(jsonBody, MediaType.get("application/json; charset=utf-8"));
-        
-        Request request = new Request.Builder()
-                .url(url)
-                .post(body)
-                .build();
-        
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                throw new IOException("请求失败: " + response);
-            }
-            
-            String responseBody = response.body().string();
-            
-            // 解析 JSON 响应
-            Type resultType = new TypeToken<Result<Void>>(){}.getType();
-            Result<Void> result = apiUtil.getGson().fromJson(responseBody, resultType);
-            
-            return Result.isSuccess(result);
-        }
+        return httpClient.postForBoolean("/api/v1/jobParts/saveJobPart", requestMap);
     }
     
     /**
@@ -127,40 +59,17 @@ public class JobPartService extends  BaseService {
      * @throws IOException 网络异常
      */
     public JobComposeData getJobCompose(Long jobId) throws IOException {
-        String url = apiUtil.getBaseUrl() + "/api/v1/jobInfos/getJobCompose";
-        
         // 构建请求参数
         Map<String, Object> requestMap = new HashMap<>();
         requestMap.put("id", jobId);
         requestMap.put("type", 0);  // 添加type参数，0表示普通加载
         // 注意：不要传递x和y参数，否则会导致后端调整节点位置
         
-        String jsonBody = apiUtil.getGson().toJson(requestMap);
-        RequestBody body = RequestBody.create(jsonBody, MediaType.get("application/json; charset=utf-8"));
+        TypeToken<Map<String, Object>> typeToken = new TypeToken<Map<String, Object>>(){};
+        Result<Map<String, Object>> result = httpClient.post("/api/v1/jobInfos/getJobCompose", requestMap, typeToken);
         
-        Request request = new Request.Builder()
-                .url(url)
-                .post(body)
-                .build();
-        
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                throw new IOException("请求失败: " + response);
-            }
-            
-            String responseBody = response.body().string();
-            
-            // 解析 JSON 响应
-            Type resultType = new TypeToken<Result<Map<String, Object>>>(){}.getType();
-            Result<Map<String, Object>> result = apiUtil.getGson().fromJson(responseBody, resultType);
-            
-            if (Result.isSuccess(result)) {
-                Map<String, Object> data = result.getData();
-                return parseJobComposeData(data);
-            } else {
-                throw new IOException("API 返回错误: " + result.getMsg());
-            }
-        }
+        Map<String, Object> data = httpClient.extractData(result, "获取任务组合数据失败");
+        return parseJobComposeData(data);
     }
 
     private JobComposeData parseJobComposeData(Map<String, Object> data) {
@@ -456,25 +365,8 @@ public class JobPartService extends  BaseService {
      * 使用 admin 服务提供的 /api/v1/jobParts/deleteJobPart/{id} 接口
      */
     public boolean deleteJobPart(Long partId) throws IOException {
-        String url = apiUtil.getBaseUrl() + "/api/v1/jobParts/deleteJobPart/" + partId;
-
-        Request request = new Request.Builder()
-                .url(url)
-                .get()
-                .build();
-
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                throw new IOException("删除任务分区失败: " + response);
-            }
-
-            String responseBody = response.body().string();
-
-            Type resultType = new TypeToken<Result<Void>>() {
-            }.getType();
-            Result<Void> result = apiUtil.getGson().fromJson(responseBody, resultType);
-            return Result.isSuccess(result);
-        }
+        Result<Void> result = httpClient.get("/api/v1/jobParts/deleteJobPart/" + partId, Void.class);
+        return Result.isSuccess(result);
     }
 
     /**
@@ -482,25 +374,7 @@ public class JobPartService extends  BaseService {
      * 对应 admin 服务的 DELETE /api/v1/jobInfos/{id}
      */
     public boolean deleteJobInfo(Long jobInfoId) throws IOException {
-        String url = apiUtil.getBaseUrl() + "/api/v1/jobInfos/" + jobInfoId;
-
-        Request request = new Request.Builder()
-                .url(url)
-                .delete()
-                .build();
-
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                throw new IOException("删除任务组失败: " + response);
-            }
-
-            String responseBody = response.body().string();
-
-            Type resultType = new TypeToken<Result<Void>>() {
-            }.getType();
-            Result<Void> result = apiUtil.getGson().fromJson(responseBody, resultType);
-            return Result.isSuccess(result);
-        }
+        return httpClient.deleteForBoolean("/api/v1/jobInfos/" + jobInfoId);
     }
 
     /**
@@ -508,25 +382,8 @@ public class JobPartService extends  BaseService {
      * 对应 admin 服务的 GET /api/v1/jobInfos/deleteJobNode/{nodeId}
      */
     public boolean deleteJobNode(Long nodeId) throws IOException {
-        String url = apiUtil.getBaseUrl() + "/api/v1/jobInfos/deleteJobNode/" + nodeId;
-
-        Request request = new Request.Builder()
-                .url(url)
-                .get()
-                .build();
-
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                throw new IOException("删除任务节点失败: " + response);
-            }
-
-            String responseBody = response.body().string();
-
-            Type resultType = new TypeToken<Result<Void>>() {
-            }.getType();
-            Result<Void> result = apiUtil.getGson().fromJson(responseBody, resultType);
-            return Result.isSuccess(result);
-        }
+        Result<Void> result = httpClient.get("/api/v1/jobInfos/deleteJobNode/" + nodeId, Void.class);
+        return Result.isSuccess(result);
     }
     
     /**
@@ -536,18 +393,17 @@ public class JobPartService extends  BaseService {
      * @throws IOException 网络异常
      */
     public byte[] exportData(Long partId) throws IOException {
-        String url = apiUtil.getBaseUrl() + "/api/v1/jobParts/exportData/" + partId;
-
-        Request request = new Request.Builder()
-                .url(url)
+        // 这个方法需要直接返回字节数组，不能使用通用的工具类
+        // 保留原有实现，但需要添加import
+        okhttp3.Request request = new okhttp3.Request.Builder()
+                .url(httpClient.buildUrl("/api/v1/jobParts/exportData/" + partId))
                 .get()
                 .build();
 
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+        try (okhttp3.Response response = apiUtil.getClient().newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 throw new IOException("导出分区数据失败: " + response);
             }
-
             return response.body().bytes();
         }
     }
@@ -560,34 +416,10 @@ public class JobPartService extends  BaseService {
      * @throws IOException 网络异常
      */
     public boolean updateJobPart(Long partId, String partName) throws IOException {
-        String url = apiUtil.getBaseUrl() + "/api/v1/jobParts/updateJobPart";
-        
-        // 构建请求参数
         Map<String, Object> requestMap = new HashMap<>();
         requestMap.put("id", partId);
         requestMap.put("jobPartName", partName);
-        
-        String jsonBody = apiUtil.getGson().toJson(requestMap);
-        RequestBody body = RequestBody.create(jsonBody, MediaType.get("application/json; charset=utf-8"));
-        
-        Request request = new Request.Builder()
-                .url(url)
-                .post(body)
-                .build();
-        
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                throw new IOException("更新分区失败: " + response);
-            }
-            
-            String responseBody = response.body().string();
-            
-            // 解析 JSON 响应
-            Type resultType = new TypeToken<Result<Void>>(){}.getType();
-            Result<Void> result = apiUtil.getGson().fromJson(responseBody, resultType);
-            
-            return Result.isSuccess(result);
-        }
+        return httpClient.postForBoolean("/api/v1/jobParts/updateJobPart", requestMap);
     }
     
     /**
@@ -597,7 +429,9 @@ public class JobPartService extends  BaseService {
      * @throws IOException 网络异常
      */
     public boolean importData(java.io.File file) throws IOException {
-        String url = apiUtil.getBaseUrl() + "/api/v1/jobParts/importData";
+        // 这个方法需要multipart/form-data，不能使用通用的工具类
+        // 保留原有实现，但需要添加import
+        String url = httpClient.buildUrl("/api/v1/jobParts/importData");
         
         // 读取文件内容
         byte[] fileBytes = java.nio.file.Files.readAllBytes(file.toPath());
@@ -614,12 +448,12 @@ public class JobPartService extends  BaseService {
         builder.addFormDataPart("file", file.getName(), fileBody);
         okhttp3.RequestBody requestBody = builder.build();
         
-        Request request = new Request.Builder()
+        okhttp3.Request request = new okhttp3.Request.Builder()
                 .url(url)
                 .post(requestBody)
                 .build();
         
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+        try (okhttp3.Response response = apiUtil.getClient().newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 String errorBody = response.body() != null ? response.body().string() : "";
                 throw new IOException("导入分区数据失败: " + response.code() + " - " + errorBody);

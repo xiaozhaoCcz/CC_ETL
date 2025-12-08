@@ -7,13 +7,14 @@ import com.cc.job.xo.model.form.JobGroupForm;
 import com.cc.job.xo.model.query.JobGroupQuery;
 import com.cc.job.xo.model.vo.JobGroupVO;
 import com.google.gson.reflect.TypeToken;
-import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.lang.reflect.Type;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 
 /**
  * JobGroup服务类
@@ -28,30 +29,9 @@ public class JobGroupService extends BaseService {
      * @throws IOException 网络异常
      */
     public List<JobGroup> getAllJobGroupList() throws IOException {
-        String url = apiUtil.getBaseUrl() + "/api/v1/jobGroups/getAllJobGroupList";
-        
-        Request request = new Request.Builder()
-                .url(url)
-                .get()
-                .build();
-        
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                throw new IOException("请求失败: " + response);
-            }
-            
-            String responseBody = response.body().string();
-            
-            // 解析 JSON 响应
-            Type resultType = new TypeToken<Result<List<JobGroup>>>(){}.getType();
-            Result<List<JobGroup>> result = apiUtil.getGson().fromJson(responseBody, resultType);
-            
-            if (Result.isSuccess(result)) {
-                return result.getData();
-            } else {
-                throw new IOException("API 返回错误: " + result.getMsg());
-            }
-        }
+        TypeToken<List<JobGroup>> typeToken = new TypeToken<List<JobGroup>>(){};
+        Result<List<JobGroup>> result = httpClient.get("/api/v1/jobGroups/getAllJobGroupList", typeToken);
+        return httpClient.extractData(result, "获取JobGroup列表失败");
     }
     
     /**
@@ -61,35 +41,14 @@ public class JobGroupService extends BaseService {
      * @throws IOException 网络异常
      */
     public PageResult<JobGroupVO> getJobGroupPage(JobGroupQuery query) throws IOException {
-        String url = apiUtil.getBaseUrl() + "/api/v1/jobGroups/page";
+        Map<String, Function<JobGroupQuery, Object>> extractors = new HashMap<>();
+        extractors.put("pageNum", JobGroupQuery::getPageNum);
+        extractors.put("pageSize", JobGroupQuery::getPageSize);
+        extractors.put("appName", JobGroupQuery::getAppName);
+        extractors.put("title", JobGroupQuery::getTitle);
         
-        HttpUrl.Builder urlBuilder = HttpUrl.parse(url).newBuilder();
-        if (query != null) {
-            urlBuilder.addQueryParameter("pageNum", String.valueOf(query.getPageNum()));
-            urlBuilder.addQueryParameter("pageSize", String.valueOf(query.getPageSize()));
-            if (query.getAppName() != null && !query.getAppName().isEmpty()) {
-                urlBuilder.addQueryParameter("appName", query.getAppName());
-            }
-            if (query.getTitle() != null && !query.getTitle().isEmpty()) {
-                urlBuilder.addQueryParameter("title", query.getTitle());
-            }
-        }
-        
-        Request request = new Request.Builder()
-                .url(urlBuilder.build())
-                .get()
-                .build();
-        
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                throw new IOException("请求失败: " + response);
-            }
-            
-            String responseBody = response.body().string();
-            
-            Type resultType = new TypeToken<PageResult<JobGroupVO>>(){}.getType();
-            return apiUtil.getGson().fromJson(responseBody, resultType);
-        }
+        Map<String, String> queryParams = HttpClientUtil.buildQueryParams(query, extractors);
+        return httpClient.getPage("/api/v1/jobGroups/page", JobGroupVO.class, queryParams);
     }
     
     /**
@@ -99,29 +58,9 @@ public class JobGroupService extends BaseService {
      * @throws IOException 网络异常
      */
     public List<String> findAddressList(Long id) throws IOException {
-        String url = apiUtil.getBaseUrl() + "/api/v1/jobGroups/findAddressList/" + id;
-        
-        Request request = new Request.Builder()
-                .url(url)
-                .get()
-                .build();
-        
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                throw new IOException("请求失败: " + response);
-            }
-            
-            String responseBody = response.body().string();
-            
-            Type resultType = new TypeToken<Result<List<String>>>(){}.getType();
-            Result<List<String>> result = apiUtil.getGson().fromJson(responseBody, resultType);
-            
-            if (Result.isSuccess(result)) {
-                return result.getData();
-            } else {
-                throw new IOException("API 返回错误: " + result.getMsg());
-            }
-        }
+        TypeToken<List<String>> typeToken = new TypeToken<List<String>>(){};
+        Result<List<String>> result = httpClient.get("/api/v1/jobGroups/findAddressList/" + id, typeToken);
+        return httpClient.extractData(result, "获取执行器地址列表失败");
     }
     
     /**
@@ -131,27 +70,7 @@ public class JobGroupService extends BaseService {
      * @throws IOException 网络异常
      */
     public boolean saveJobGroup(JobGroupForm form) throws IOException {
-        String url = apiUtil.getBaseUrl() + "/api/v1/jobGroups";
-        
-        String jsonBody = apiUtil.getGson().toJson(form);
-        RequestBody body = RequestBody.create(jsonBody, MediaType.get("application/json; charset=utf-8"));
-        
-        Request request = new Request.Builder()
-                .url(url)
-                .post(body)
-                .build();
-        
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                throw new IOException("请求失败: " + response);
-            }
-            
-            String responseBody = response.body().string();
-            Type resultType = new TypeToken<Result<Void>>(){}.getType();
-            Result<Void> result = apiUtil.getGson().fromJson(responseBody, resultType);
-            
-            return Result.isSuccess(result);
-        }
+        return httpClient.postForBoolean("/api/v1/jobGroups", form);
     }
     
     /**
@@ -162,27 +81,7 @@ public class JobGroupService extends BaseService {
      * @throws IOException 网络异常
      */
     public boolean updateJobGroup(Long id, JobGroupForm form) throws IOException {
-        String url = apiUtil.getBaseUrl() + "/api/v1/jobGroups/" + id;
-        
-        String jsonBody = apiUtil.getGson().toJson(form);
-        RequestBody body = RequestBody.create(jsonBody, MediaType.get("application/json; charset=utf-8"));
-        
-        Request request = new Request.Builder()
-                .url(url)
-                .put(body)
-                .build();
-        
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                throw new IOException("请求失败: " + response);
-            }
-            
-            String responseBody = response.body().string();
-            Type resultType = new TypeToken<Result<Void>>(){}.getType();
-            Result<Void> result = apiUtil.getGson().fromJson(responseBody, resultType);
-            
-            return Result.isSuccess(result);
-        }
+        return httpClient.putForBoolean("/api/v1/jobGroups/" + id, form);
     }
     
     /**
@@ -192,24 +91,7 @@ public class JobGroupService extends BaseService {
      * @throws IOException 网络异常
      */
     public boolean deleteJobGroups(String ids) throws IOException {
-        String url = apiUtil.getBaseUrl() + "/api/v1/jobGroups/" + ids;
-        
-        Request request = new Request.Builder()
-                .url(url)
-                .delete()
-                .build();
-        
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                throw new IOException("请求失败: " + response);
-            }
-            
-            String responseBody = response.body().string();
-            Type resultType = new TypeToken<Result<Void>>(){}.getType();
-            Result<Void> result = apiUtil.getGson().fromJson(responseBody, resultType);
-            
-            return Result.isSuccess(result);
-        }
+        return httpClient.deleteForBoolean("/api/v1/jobGroups/" + ids);
     }
     
     /**
@@ -219,29 +101,8 @@ public class JobGroupService extends BaseService {
      * @throws IOException 网络异常
      */
     public JobGroupForm getJobGroupForm(Long id) throws IOException {
-        String url = apiUtil.getBaseUrl() + "/api/v1/jobGroups/" + id + "/form";
-        
-        Request request = new Request.Builder()
-                .url(url)
-                .get()
-                .build();
-        
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                throw new IOException("请求失败: " + response);
-            }
-            
-            String responseBody = response.body().string();
-            
-            Type resultType = new TypeToken<Result<JobGroupForm>>(){}.getType();
-            Result<JobGroupForm> result = apiUtil.getGson().fromJson(responseBody, resultType);
-            
-            if (Result.isSuccess(result)) {
-                return result.getData();
-            } else {
-                throw new IOException("API 返回错误: " + result.getMsg());
-            }
-        }
+        Result<JobGroupForm> result = httpClient.get("/api/v1/jobGroups/" + id + "/form", JobGroupForm.class);
+        return httpClient.extractData(result, "获取执行器表单数据失败");
     }
 }
 
