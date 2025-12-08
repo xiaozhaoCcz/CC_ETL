@@ -1,6 +1,7 @@
 package com.cc.job.gui.view;
 
 import com.cc.job.gui.service.JobInfoService;
+import com.cc.job.gui.util.StyleUtil;
 import com.cc.job.xo.common.result.PageResult;
 import com.cc.job.xo.model.query.JobInfoQuery;
 import com.cc.job.xo.model.vo.JobInfoVO;
@@ -14,8 +15,6 @@ import javafx.scene.control.*;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
@@ -56,7 +55,8 @@ public class ShowJobListDialog extends Dialog<Void> {
 
         styleDialog();
         BorderPane root = new BorderPane();
-        root.setPadding(new Insets(10));
+        root.setPadding(new Insets(16));
+        root.setStyle("-fx-background-color: " + StyleUtil.BG_SECONDARY + ";");
 
         root.setTop(createFilterBar());
         root.setCenter(createTable());
@@ -82,11 +82,11 @@ public class ShowJobListDialog extends Dialog<Void> {
         getDialogPane().setMaxHeight(Double.MAX_VALUE);
         setResizable(true);
 
-        // 设置对话框样式
+        // 设置对话框样式 - 与主页面背景色一致
         getDialogPane().setStyle(
-                "-fx-background-color: white; " +
-                        "-fx-background-radius: 8; " +
-                        "-fx-border-radius: 8;"
+                "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
+                        "-fx-background-radius: " + StyleUtil.RADIUS_LG + "; " +
+                        "-fx-border-radius: " + StyleUtil.RADIUS_LG + ";"
         );
 
         Platform.runLater(() -> {
@@ -95,47 +95,71 @@ public class ShowJobListDialog extends Dialog<Void> {
                 stage.setResizable(true);
                 stage.setMinWidth(1080);
                 stage.setMinHeight(580);
+                
+                // 加载全局CSS样式
+                try {
+                    String css = getClass().getResource("/styles.css").toExternalForm();
+                    stage.getScene().getStylesheets().add(css);
+                } catch (Exception e) {
+                    // CSS文件加载失败，忽略
+                }
+                
+                stage.setOnCloseRequest(event -> {
+                    // 这里可以添加关闭前的确认逻辑，例如：
+                    // if (!dataIsSaved) {
+                    //     event.consume(); // 阻止关闭
+                    //     showSaveDialog();
+                    // }
+                    close(); // 调用Dialog的close方法
+                });
             }
-            stage.setOnCloseRequest(event -> {
-                // 这里可以添加关闭前的确认逻辑，例如：
-                // if (!dataIsSaved) {
-                //     event.consume(); // 阻止关闭
-                //     showSaveDialog();
-                // }
-                close(); // 调用Dialog的close方法
-            });
         });
     }
 
     private Node createFilterBar() {
         GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(6);
-        grid.setPadding(new Insets(6, 0, 12, 0));
+        grid.setHgap(12);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(16, 16, 16, 16));
+        grid.setStyle(
+                "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
+                "-fx-background-radius: " + StyleUtil.RADIUS_LG + "; " +
+                "-fx-effect: " + StyleUtil.SHADOW_SM + ";"
+        );
+
+        // 创建标签样式
+        String labelStyle = StyleUtil.body();
 
         jobGroupField = new TextField();
         jobGroupField.setPromptText("执行器ID");
+        jobGroupField.setStyle(StyleUtil.searchField());
 
         jobDescField = new TextField();
         jobDescField.setPromptText("任务描述");
+        jobDescField.setStyle(StyleUtil.searchField());
 
         handlerField = new TextField();
         handlerField.setPromptText("JobHandler");
+        handlerField.setStyle(StyleUtil.searchField());
 
         authorField = new TextField();
         authorField.setPromptText("负责人");
+        authorField.setStyle(StyleUtil.searchField());
 
         statusCombo = new ComboBox<>();
         statusCombo.getItems().addAll("全部", "运行", "停止");
         statusCombo.getSelectionModel().selectFirst();
 
         Button searchBtn = new Button("搜索");
+        searchBtn.setStyle(StyleUtil.primaryButton());
+        StyleUtil.applyPrimaryButtonHover(searchBtn);
         searchBtn.setOnAction(e -> {
             pageNum = 1;
             loadPage(true);
         });
 
         Button resetBtn = new Button("重置");
+        resetBtn.setStyle(StyleUtil.secondaryButton());
         resetBtn.setOnAction(e -> {
             jobGroupField.clear();
             jobDescField.clear();
@@ -146,29 +170,42 @@ public class ShowJobListDialog extends Dialog<Void> {
             loadPage(true);
         });
 
+        Label executorLabel = new Label("执行器");
+        executorLabel.setStyle(labelStyle);
+        Label statusLabel = new Label("任务状态");
+        statusLabel.setStyle(labelStyle);
+        Label descLabel = new Label("任务描述");
+        descLabel.setStyle(labelStyle);
+        Label authorLabel = new Label("负责人");
+        authorLabel.setStyle(labelStyle);
+        Label handlerLabel = new Label("JobHandler");
+        handlerLabel.setStyle(labelStyle);
+
         int col = 0;
-        grid.add(new Label("执行器"), col++, 0);
+        grid.add(executorLabel, col++, 0);
         grid.add(jobGroupField, col++, 0);
-        grid.add(new Label("任务状态"), col++, 0);
+        grid.add(statusLabel, col++, 0);
         grid.add(statusCombo, col++, 0);
-        grid.add(new Label("任务描述"), col++, 0);
+        grid.add(descLabel, col++, 0);
         grid.add(jobDescField, col++, 0);
 
-        grid.add(new Label("负责人"), 0, 1);
+        grid.add(authorLabel, 0, 1);
         grid.add(authorField, 1, 1);
-        grid.add(new Label("JobHandler"), 2, 1);
+        grid.add(handlerLabel, 2, 1);
         grid.add(handlerField, 3, 1);
 
-        HBox btnBox = new HBox(8, searchBtn, resetBtn);
+        HBox btnBox = new HBox(10, searchBtn, resetBtn);
         btnBox.setAlignment(Pos.CENTER_LEFT);
         grid.add(btnBox, 4, 1);
 
         return grid;
     }
 
+    @SuppressWarnings("unchecked")
     private Node createTable() {
         tableView = new TableView<>();
-        tableView.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        tableView.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+        // 表格样式通过CSS类自动应用，与主页面一致
 
         TableColumn<JobInfoVO, Number> idxCol = new TableColumn<>("序号");
         idxCol.setCellValueFactory(c -> Bindings.createIntegerBinding(
@@ -212,6 +249,8 @@ public class ShowJobListDialog extends Dialog<Void> {
                 actionMenuBtn.getItems().addAll(runItem, startItem, stopItem);
                 // 可选：设置按钮宽度，使其更紧凑
                 actionMenuBtn.setPrefWidth(80);
+                // 应用按钮样式
+                actionMenuBtn.setStyle(StyleUtil.secondaryButton());
             }
 
             @Override
@@ -255,11 +294,16 @@ public class ShowJobListDialog extends Dialog<Void> {
 
     private Node createPagerBar() {
         totalLabel = new Label("共 0 条");
+        totalLabel.setStyle(StyleUtil.body());
 
         prevBtn = new Button("上一页");
+        prevBtn.setStyle(StyleUtil.secondaryButton());
         nextBtn = new Button("下一页");
+        nextBtn.setStyle(StyleUtil.secondaryButton());
+        
         pageField = new TextField(String.valueOf(pageNum));
         pageField.setPrefWidth(60);
+        pageField.setStyle(StyleUtil.searchField());
         pageField.setOnAction(e -> {
             try {
                 int p = Integer.parseInt(pageField.getText().trim());
@@ -295,15 +339,25 @@ public class ShowJobListDialog extends Dialog<Void> {
             }
         });
 
-        HBox pager = new HBox(10,
+        Label pageSizeLabel = new Label("每页");
+        pageSizeLabel.setStyle(StyleUtil.body());
+        Label pageLabel = new Label("页码");
+        pageLabel.setStyle(StyleUtil.body());
+
+        HBox pager = new HBox(12,
                 totalLabel,
-                new Label("每页"), pageSizeBox,
+                pageSizeLabel, pageSizeBox,
                 prevBtn,
-                new Label("页码"), pageField,
+                pageLabel, pageField,
                 nextBtn
         );
         pager.setAlignment(Pos.CENTER_LEFT);
-        pager.setPadding(new Insets(10, 0, 0, 0));
+        pager.setPadding(new Insets(16, 16, 16, 16));
+        pager.setStyle(
+                "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
+                "-fx-background-radius: " + StyleUtil.RADIUS_LG + "; " +
+                "-fx-effect: " + StyleUtil.SHADOW_SM + ";"
+        );
         return pager;
     }
 

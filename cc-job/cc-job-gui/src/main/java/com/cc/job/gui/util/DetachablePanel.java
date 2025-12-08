@@ -1,6 +1,7 @@
 package com.cc.job.gui.util;
 
 import com.cc.job.gui.view.MiniMapView;
+import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Region;
@@ -83,12 +84,12 @@ public class DetachablePanel {
         
         // 强制刷新内容布局（修复白板问题）
         // 使用多级runLater确保布局完全完成
-        javafx.application.Platform.runLater(() -> {
+        Platform.runLater(() -> {
             content.requestLayout();
-            javafx.application.Platform.runLater(() -> {
+            Platform.runLater(() -> {
                 // 如果是MiniMapView，需要手动触发刷新
                 if (content instanceof MiniMapView) {
-                    javafx.application.Platform.runLater(() -> {
+                    Platform.runLater(() -> {
                         ((MiniMapView) content).refresh();
                     });
                 }

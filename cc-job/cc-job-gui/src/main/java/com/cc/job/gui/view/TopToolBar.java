@@ -51,6 +51,8 @@ public class TopToolBar extends VBox {
         void onLayoutHorizontal(); // 横向布局
         void onLayoutVertical(); // 纵向布局
         void onJobList();
+        void onJobGroupList();
+        void onJobLogList();
 
         /**
          * 任务菜单需要的任务列表（供“任务”下拉菜单展示）
@@ -145,8 +147,13 @@ public class TopToolBar extends VBox {
         // 任务菜单
         Menu jobMenu = new Menu("任务");
         MenuItem  jobMenuList= new MenuItem("任务列表");
+        MenuItem  jobGroupMenuList= new MenuItem("任务执行器");
+        MenuItem  jobLogMenuList = new MenuItem("任务日志");
         jobMenuList.setOnAction(e->safeCall(ToolBarCallback::onJobList));
-        jobMenu.getItems().addAll(jobMenuList);
+        jobGroupMenuList.setOnAction(e->safeCall(ToolBarCallback::onJobGroupList));
+        jobLogMenuList.setOnAction(e->safeCall(ToolBarCallback::onJobLogList));
+        jobMenu.getItems().addAll(jobMenuList,jobGroupMenuList,jobLogMenuList);
+
 //
 
 

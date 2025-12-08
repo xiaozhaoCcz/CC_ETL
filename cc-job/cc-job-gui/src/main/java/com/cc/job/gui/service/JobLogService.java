@@ -1,7 +1,11 @@
 package com.cc.job.gui.service;
 
 import com.cc.job.xo.common.result.Result;
+import com.cc.job.xo.common.result.PageResult;
+import com.cc.job.xo.model.query.JobLogQuery;
+import com.cc.job.xo.model.vo.JobLogVO;
 import com.google.gson.reflect.TypeToken;
+import okhttp3.HttpUrl;
 import okhttp3.Request;
 import okhttp3.Response;
 import org.slf4j.Logger;
@@ -240,6 +244,95 @@ public class JobLogService extends BaseService {
             logResponse.setContent(content);
             
             return logResponse;
+        }
+    }
+    
+    /**
+     * 分页查询日志列表
+     * @param query 查询参数
+     * @return 分页结果
+     * @throws IOException 网络异常
+     */
+    public PageResult<JobLogVO> getJobLogPage(JobLogQuery query) throws IOException {
+        String url = apiUtil.getBaseUrl() + "/api/v1/jobLogs/page";
+        
+        HttpUrl.Builder urlBuilder = HttpUrl.parse(url).newBuilder();
+        if (query != null) {
+            urlBuilder.addQueryParameter("pageNum", String.valueOf(query.getPageNum()));
+            urlBuilder.addQueryParameter("pageSize", String.valueOf(query.getPageSize()));
+            if (query.getJobId() != null) {
+                urlBuilder.addQueryParameter("jobId", String.valueOf(query.getJobId()));
+            }
+            if (query.getJobGroup() != null) {
+                urlBuilder.addQueryParameter("jobGroup", String.valueOf(query.getJobGroup()));
+            }
+            if (query.getLogStatus() != null) {
+                urlBuilder.addQueryParameter("logStatus", String.valueOf(query.getLogStatus()));
+            }
+            if (query.getFilterTime() != null && query.getFilterTime().length == 2) {
+                urlBuilder.addQueryParameter("filterTime[0]", query.getFilterTime()[0]);
+                urlBuilder.addQueryParameter("filterTime[1]", query.getFilterTime()[1]);
+            }
+        }
+        
+        Request request = new Request.Builder()
+                .url(urlBuilder.build())
+                .get()
+                .build();
+        
+        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("请求失败: " + response);
+            }
+            
+            String responseBody = response.body().string();
+            
+            Type resultType = new TypeToken<PageResult<JobLogVO>>(){}.getType();
+            return apiUtil.getGson().fromJson(responseBody, resultType);
+        }
+    }
+    
+    /**
+     * 删除日志
+     * @param query 查询参数（用于指定删除条件）
+     * @return 是否成功
+     * @throws IOException 网络异常
+     */
+    public boolean deleteJobLogs(JobLogQuery query) throws IOException {
+        String url = apiUtil.getBaseUrl() + "/api/v1/jobLogs";
+        
+        HttpUrl.Builder urlBuilder = HttpUrl.parse(url).newBuilder();
+        if (query != null) {
+            if (query.getJobId() != null) {
+                urlBuilder.addQueryParameter("jobId", String.valueOf(query.getJobId()));
+            }
+            if (query.getJobGroup() != null) {
+                urlBuilder.addQueryParameter("jobGroup", String.valueOf(query.getJobGroup()));
+            }
+            if (query.getLogStatus() != null) {
+                urlBuilder.addQueryParameter("logStatus", String.valueOf(query.getLogStatus()));
+            }
+            if (query.getFilterTime() != null && query.getFilterTime().length == 2) {
+                urlBuilder.addQueryParameter("filterTime[0]", query.getFilterTime()[0]);
+                urlBuilder.addQueryParameter("filterTime[1]", query.getFilterTime()[1]);
+            }
+        }
+        
+        Request request = new Request.Builder()
+                .url(urlBuilder.build())
+                .delete()
+                .build();
+        
+        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("请求失败: " + response);
+            }
+            
+            String responseBody = response.body().string();
+            Type resultType = new TypeToken<Result<Void>>(){}.getType();
+            Result<Void> result = apiUtil.getGson().fromJson(responseBody, resultType);
+            
+            return Result.isSuccess(result);
         }
     }
 }
