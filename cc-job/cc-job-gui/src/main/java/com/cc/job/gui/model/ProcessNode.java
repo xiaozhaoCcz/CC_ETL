@@ -574,6 +574,16 @@ public class ProcessNode extends StackPane {
     public void setOnDisable(DisableNodeCallback callback) {
         this.onDisable = callback;
     }
+    
+    /**
+     * 调整拖拽起始点，用于在画布扩展时保持拖拽位置的正确性
+     * @param deltaX X方向的偏移量
+     * @param deltaY Y方向的偏移量
+     */
+    public void adjustDragStart(double deltaX, double deltaY) {
+        dragStartX += deltaX;
+        dragStartY += deltaY;
+    }
 
     public interface DragFinishedListener {
         void onDragFinished(double oldX, double oldY, double newX, double newY);

@@ -86,6 +86,8 @@ public class NodeCanvas extends Pane {
     private double autoShiftApplied = 0.0;
     private double autoShiftAppliedX = 0.0;
     private ScrollPane hostingScrollPane;
+    private double leftExpansionApplied = 0.0; // 记录左侧已扩展的宽度
+    private boolean hasExpandedInThisDrag = false; // 标记本次拖拽是否已经扩展过
 
     public interface LogCallback {
         void log(String message);
@@ -93,8 +95,9 @@ public class NodeCanvas extends Pane {
     
     public NodeCanvas() {
         // 设置初始尺寸
-        setPrefSize(2000, 1500);
-        setStyle("-fx-background-color: #F3F4F6;");
+        setPrefSize(2000, 1000);
+        //setStyle("-fx-background-color: #F3F4F6;");
+        setStyle("-fx-background-color: gray;");
         
         // 初始化框选矩形（临时框选时显示）
         selectionRect = new javafx.scene.shape.Rectangle();
@@ -325,6 +328,8 @@ public class NodeCanvas extends Pane {
         autoShiftOriginalPositions.clear();
         autoShiftApplied = 0.0;
         autoShiftAppliedX = 0.0;
+        leftExpansionApplied = 0.0; // 重置扩展记录
+        hasExpandedInThisDrag = false; // 重置扩展标记
     }
 
     private void endAutoShiftSession() {
@@ -332,45 +337,47 @@ public class NodeCanvas extends Pane {
         autoShiftOriginalPositions.clear();
         autoShiftApplied = 0.0;
         autoShiftAppliedX = 0.0;
+        leftExpansionApplied = 0.0; // 重置扩展记录
+        hasExpandedInThisDrag = false; // 重置扩展标记
     }
 
     private Point2D adjustNodePositionOnDrag(ProcessNode node, double proposedX, double proposedY) {
         double adjustedX = Math.max(0, proposedX);
         double adjustedY = Math.max(0, proposedY);
 
-        if (currentDraggingNode == node) {
-            if (adjustedY < TOP_DRAG_MARGIN) {
-                double requiredShift = TOP_DRAG_MARGIN - adjustedY;
-                double incrementalShift = requiredShift - autoShiftApplied;
-                if (incrementalShift > 0) {
-                    shiftOtherNodesVertically(node, incrementalShift);
-                    autoShiftApplied += incrementalShift;
-                }
-                adjustedY = TOP_DRAG_MARGIN;
-            } else if (autoShiftApplied > 0) {
-                double release = Math.min(autoShiftApplied, adjustedY - TOP_DRAG_MARGIN);
-                if (release > 0) {
-                    shiftOtherNodesVertically(node, -release);
-                    autoShiftApplied -= release;
-                }
-            }
-
-            if (adjustedX < LEFT_DRAG_MARGIN) {
-                double requiredShiftX = LEFT_DRAG_MARGIN - adjustedX;
-                double incrementalShiftX = requiredShiftX - autoShiftAppliedX;
-                if (incrementalShiftX > 0) {
-                    shiftOtherNodesHorizontally(node, incrementalShiftX);
-                    autoShiftAppliedX += incrementalShiftX;
-                }
-                adjustedX = LEFT_DRAG_MARGIN;
-            } else if (autoShiftAppliedX > 0) {
-                double releaseX = Math.min(autoShiftAppliedX, adjustedX - LEFT_DRAG_MARGIN);
-                if (releaseX > 0) {
-                    shiftOtherNodesHorizontally(node, -releaseX);
-                    autoShiftAppliedX -= releaseX;
-                }
-            }
-        }
+//        if (currentDraggingNode == node) {
+//            if (adjustedY < TOP_DRAG_MARGIN) {
+//                double requiredShift = TOP_DRAG_MARGIN - adjustedY;
+//                double incrementalShift = requiredShift - autoShiftApplied;
+//                if (incrementalShift > 0) {
+//                    shiftOtherNodesVertically(node, incrementalShift);
+//                    autoShiftApplied += incrementalShift;
+//                }
+//                adjustedY = TOP_DRAG_MARGIN;
+//            } else if (autoShiftApplied > 0) {
+//                double release = Math.min(autoShiftApplied, adjustedY - TOP_DRAG_MARGIN);
+//                if (release > 0) {
+//                    shiftOtherNodesVertically(node, -release);
+//                    autoShiftApplied -= release;
+//                }
+//            }
+//
+//            if (adjustedX < LEFT_DRAG_MARGIN) {
+//                double requiredShiftX = LEFT_DRAG_MARGIN - adjustedX;
+//                double incrementalShiftX = requiredShiftX - autoShiftAppliedX;
+//                if (incrementalShiftX > 0) {
+//                    shiftOtherNodesHorizontally(node, incrementalShiftX);
+//                    autoShiftAppliedX += incrementalShiftX;
+//                }
+//                adjustedX = LEFT_DRAG_MARGIN;
+//            } else if (autoShiftAppliedX > 0) {
+//                double releaseX = Math.min(autoShiftAppliedX, adjustedX - LEFT_DRAG_MARGIN);
+//                if (releaseX > 0) {
+//                    shiftOtherNodesHorizontally(node, -releaseX);
+//                    autoShiftAppliedX -= releaseX;
+//                }
+//            }
+//        }
 
         return new Point2D(adjustedX, adjustedY);
     }
@@ -424,6 +431,41 @@ public class NodeCanvas extends Pane {
             return;
         }
 
+        // ========== 第一部分：画布扩展逻辑（检查节点是否靠近画布边缘）==========
+        // 画布扩展：检查节点是否靠近画布的绝对边缘（画布坐标）
+        double nodeLayoutX = node.getLayoutX();
+        double contentWidth = getBoundsInLocal().getWidth();
+        
+        // 检查节点是否靠近画布左边缘（画布的绝对位置）
+        if (nodeLayoutX < 80 && !hasExpandedInThisDrag) {
+            double incrementalExpansion = 500; // 限制每次最多扩展500
+
+            if (incrementalExpansion > 10) {
+                // 页面进行扩展
+                setPrefWidth(contentWidth + incrementalExpansion);
+
+                // 调整节点位置和拖拽起始点
+                node.setLayoutX(nodeLayoutX + incrementalExpansion);
+                node.adjustDragStart(-incrementalExpansion, 0);
+
+                // 其他节点也需要平移
+                for (ProcessNode processNode : nodes) {
+                    if (processNode != node) {
+                        processNode.setLayoutX(processNode.getLayoutX() + incrementalExpansion);
+                    }
+                }
+
+                // 更新已扩展的宽度和标记
+                leftExpansionApplied += incrementalExpansion;
+                hasExpandedInThisDrag = true;
+                
+                // 扩展后，重新获取信息用于后续的窗口跟随检查
+                contentWidth = getBoundsInLocal().getWidth();
+            }
+        }
+
+        // ========== 第二部分：窗口跟随逻辑（检查节点是否靠近可视区域边缘）==========
+        // 窗口跟随：检查节点是否靠近或超出可视区域边缘（视口坐标）
         Bounds viewportBounds = hostingScrollPane.getViewportBounds();
         if (viewportBounds == null || viewportBounds.getWidth() <= 0 || viewportBounds.getHeight() <= 0) {
             return;
@@ -440,45 +482,74 @@ public class NodeCanvas extends Pane {
         }
 
         Bounds nodeBounds = node.getBoundsInParent();
-
-        double contentWidth = getBoundsInLocal().getWidth();
         double contentHeight = getBoundsInLocal().getHeight();
         double viewportWidth = viewportInCanvas.getWidth();
         double viewportHeight = viewportInCanvas.getHeight();
 
-        double contentMaxX = Math.max(contentWidth - viewportWidth, 0);
-        double contentMaxY = Math.max(contentHeight - viewportHeight, 0);
-
+        // 计算可视区域和节点的边界
         double viewportMinX = viewportInCanvas.getMinX();
         double viewportMaxX = viewportInCanvas.getMaxX();
         double viewportMinY = viewportInCanvas.getMinY();
         double viewportMaxY = viewportInCanvas.getMaxY();
 
+        double nodeMinX = nodeBounds.getMinX();
+        double nodeMaxX = nodeBounds.getMaxX();
+        double nodeMinY = nodeBounds.getMinY();
+        double nodeMaxY = nodeBounds.getMaxY();
+
+        // 使用容差值避免浮点数精度问题
+        final double EPSILON = 1.0;
+        
+        // 检查节点是否完全在可视区域内
+        boolean nodeFullyVisibleX = (nodeMinX + EPSILON >= viewportMinX) && (nodeMaxX - EPSILON <= viewportMaxX);
+        boolean nodeFullyVisibleY = (nodeMinY + EPSILON >= viewportMinY) && (nodeMaxY - EPSILON <= viewportMaxY);
+        boolean nodeFullyVisible = nodeFullyVisibleX && nodeFullyVisibleY;
+
+        // 如果节点完全在可视区域内，不进行滚动，直接返回
+        if (nodeFullyVisible) {
+            return;
+        }
+
+        // 只有当节点真正超出可视区域时，才计算新的滚动位置
+        double contentMaxX = Math.max(contentWidth - viewportWidth, 0);
+        double contentMaxY = Math.max(contentHeight - viewportHeight, 0);
+
+        boolean needsVerticalScroll = false;
+        boolean needsHorizontalScroll = false;
+        
         double newViewportX = viewportMinX;
         double newViewportY = viewportMinY;
 
-        if (nodeBounds.getMinY() < viewportMinY + AUTO_SCROLL_MARGIN) {
-            newViewportY = Math.max(nodeBounds.getMinY() - AUTO_SCROLL_MARGIN, 0);
-        } else if (nodeBounds.getMaxY() > viewportMaxY - AUTO_SCROLL_MARGIN) {
-            newViewportY = Math.min(nodeBounds.getMaxY() + AUTO_SCROLL_MARGIN - viewportHeight, contentMaxY);
+        // 垂直方向：只有当节点真正超出可视区域时才滚动
+        if (nodeMinY < viewportMinY - EPSILON) {
+            // 节点超出上边缘，向上滚动使节点可见
+            needsVerticalScroll = true;
+            newViewportY = Math.max(nodeMinY - AUTO_SCROLL_MARGIN, 0);
+        } else if (nodeMaxY > viewportMaxY + EPSILON) {
+            // 节点超出下边缘，向下滚动使节点可见
+            needsVerticalScroll = true;
+            newViewportY = Math.min(nodeMaxY + AUTO_SCROLL_MARGIN - viewportHeight, contentMaxY);
         }
 
-        if (nodeBounds.getMinX() < viewportMinX + AUTO_SCROLL_MARGIN) {
-            newViewportX = Math.max(nodeBounds.getMinX() - AUTO_SCROLL_MARGIN, 0);
-        } else if (nodeBounds.getMaxX() > viewportMaxX - AUTO_SCROLL_MARGIN) {
-            newViewportX = Math.min(nodeBounds.getMaxX() + AUTO_SCROLL_MARGIN - viewportWidth, contentMaxX);
+        // 水平方向：只有当节点真正超出可视区域时才滚动
+        if (nodeMinX < viewportMinX - EPSILON) {
+            // 节点超出左边缘，向左滚动使节点可见
+            needsHorizontalScroll = true;
+            newViewportX = Math.max(nodeMinX - AUTO_SCROLL_MARGIN, 0);
+        } else if (nodeMaxX > viewportMaxX + EPSILON) {
+            // 节点超出右边缘，向右滚动使节点可见
+            needsHorizontalScroll = true;
+            newViewportX = Math.min(nodeMaxX + AUTO_SCROLL_MARGIN - viewportWidth, contentMaxX);
         }
 
-        if (contentMaxY > 0 && Math.abs(newViewportY - viewportMinY) > 1e-3) {
+        // 应用垂直滚动（只有在真正需要且位置改变时才更新）
+        if (needsVerticalScroll && contentMaxY > 0 && Math.abs(newViewportY - viewportMinY) > 1e-3) {
             hostingScrollPane.setVvalue(clamp01(newViewportY / contentMaxY));
-        } else if (contentMaxY <= 0) {
-            hostingScrollPane.setVvalue(0);
         }
 
-        if (contentMaxX > 0 && Math.abs(newViewportX - viewportMinX) > 1e-3) {
+        // 应用水平滚动（只有在真正需要且位置改变时才更新）
+        if (needsHorizontalScroll && contentMaxX > 0 && Math.abs(newViewportX - viewportMinX) > 1e-3) {
             hostingScrollPane.setHvalue(clamp01(newViewportX / contentMaxX));
-        } else if (contentMaxX <= 0) {
-            hostingScrollPane.setHvalue(0);
         }
     }
 
@@ -1508,28 +1579,28 @@ public class NodeCanvas extends Pane {
      * 动态更新画布大小以包含所有节点
      */
     private void updateCanvasSize() {
-        if (nodes.isEmpty()) {
-            setPrefSize(2000, 1500);
-            return;
-        }
-        
-        // 计算所有节点的边界
-        double maxX = 0;
-        double maxY = 0;
-        
-        for (ProcessNode node : nodes) {
-            double nodeRight = node.getLayoutX() + node.getPrefWidth() + 100; // 额外空间
-            double nodeBottom = node.getLayoutY() + node.getPrefHeight() + 100;
-            
-            maxX = Math.max(maxX, nodeRight);
-            maxY = Math.max(maxY, nodeBottom);
-        }
-        
-        // 设置最小尺寸，确保画布至少有基本大小
-        maxX = Math.max(maxX, 2000);
-        maxY = Math.max(maxY, 1500);
-        
-        setPrefSize(maxX, maxY);
+//        if (nodes.isEmpty()) {
+//            setPrefSize(2000, 1500);
+//            return;
+//        }
+//
+//        // 计算所有节点的边界
+//        double maxX = 0;
+//        double maxY = 0;
+//
+//        for (ProcessNode node : nodes) {
+//            double nodeRight = node.getLayoutX() + node.getPrefWidth() + 100; // 额外空间
+//            double nodeBottom = node.getLayoutY() + node.getPrefHeight() + 100;
+//
+//            maxX = Math.max(maxX, nodeRight);
+//            maxY = Math.max(maxY, nodeBottom);
+//        }
+//
+//        // 设置最小尺寸，确保画布至少有基本大小
+//        maxX = Math.max(maxX, 2000);
+//        maxY = Math.max(maxY, 1500);
+//
+//        setPrefSize(maxX, maxY);
     }
 
     public void loadFromComposeData(JobComposeData composeData) {
