@@ -1,0 +1,108 @@
+package com.cc.job.gui.manager;
+
+import com.cc.job.gui.model.ProcessNode;
+import com.cc.job.gui.view.LogPanel;
+import com.cc.job.gui.view.NodeCanvas;
+import javafx.application.Platform;
+
+/**
+ * 节点回调配置器 - 为节点配置编辑、复制、查看详情等回调
+ */
+public class NodeCallbackConfigurator {
+    
+    private final NodeOperationManager nodeOperationManager;
+    private final NodeCanvas canvas;
+    private final LogPanel logPanel;
+    
+    public NodeCallbackConfigurator(NodeOperationManager nodeOperationManager, 
+                                    NodeCanvas canvas, 
+                                    LogPanel logPanel) {
+        this.nodeOperationManager = nodeOperationManager;
+        this.canvas = canvas;
+        this.logPanel = logPanel;
+    }
+    
+    /**
+     * 为节点配置所有回调
+     */
+    public void configureNodeCallbacks(ProcessNode node, Long currentTaskGroupId) {
+        if (node == null) return;
+        
+        Long jobId = node.getJobId();
+        
+        // 编辑回调
+        node.setOnEdit(() -> {
+            if (jobId == null) {
+                logPanel.warn("⚠ 该节点未绑定后端任务，无法编辑");
+                return;
+            }
+            nodeOperationManager.editNode(jobId, node, currentTaskGroupId);
+        });
+        
+        // 复制回调
+        node.setOnCopy(() -> {
+            if (jobId == null) {
+                logPanel.warn("⚠ 该节点未绑定后端任务，无法复制");
+                return;
+            }
+            nodeOperationManager.copyNodeToClipboard(node, currentTaskGroupId);
+        });
+        
+        // 查看详情回调
+        node.setOnShowDetails(() -> {
+            if (jobId == null) {
+                logPanel.warn("⚠ 该节点未绑定后端任务，无法查看详情");
+                return;
+            }
+            // 显示节点详情（可以在 NodeOperationManager 中添加此方法）
+            logPanel.info("查看节点详情: " + node.getJobHandlerName() + " (jobId=" + jobId + ")");
+        });
+        
+        // 禁用/启用回调
+        node.setOnDisable(new com.cc.job.gui.model.ProcessNode.DisableNodeCallback() {
+            @Override
+            public void onDisableNode(Long nodeJobId, boolean isDisabled) {
+                if (nodeJobId == null) {
+                    logPanel.warn("⚠ 该节点未绑定后端任务，无法禁用/启用");
+                    Platform.runLater(() -> node.restoreEnabledState(!isDisabled));
+                    return;
+                }
+                
+                String action = isDisabled ? "禁用" : "启用";
+                logPanel.info("正在" + action + "节点: " + node.getJobHandlerName());
+                
+                new Thread(() -> {
+                    try {
+                        com.cc.job.gui.service.JobInfoService jobInfoService = new com.cc.job.gui.service.JobInfoService();
+                        Integer isPause = isDisabled ? 1 : 0;
+                        boolean success = jobInfoService.pauseJob(nodeJobId, isPause);
+                        
+                        Platform.runLater(() -> {
+                            if (success) {
+                                logPanel.success("✓ 节点已" + action);
+                            } else {
+                                logPanel.error("✗ 节点" + action + "失败");
+                                node.restoreEnabledState(!isDisabled);
+                            }
+                        });
+                    } catch (Exception e) {
+                        Platform.runLater(() -> {
+                            logPanel.error("✗ 节点" + action + "失败: " + e.getMessage());
+                            node.restoreEnabledState(!isDisabled);
+                        });
+                    }
+                }).start();
+            }
+        });
+    }
+    
+    /**
+     * 为所有节点配置回调
+     */
+    public void configureAllNodeCallbacks(Long currentTaskGroupId) {
+        for (ProcessNode node : canvas.getNodes()) {
+            configureNodeCallbacks(node, currentTaskGroupId);
+        }
+    }
+}
+

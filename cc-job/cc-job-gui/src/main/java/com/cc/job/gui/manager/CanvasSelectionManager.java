@@ -1,0 +1,367 @@
+package com.cc.job.gui.manager;
+
+import com.cc.job.gui.model.NodeConnection;
+import com.cc.job.gui.model.ProcessNode;
+import javafx.scene.layout.Pane;
+import javafx.scene.paint.Color;
+
+import java.util.*;
+import java.util.function.Consumer;
+
+/**
+ * 画布选择管理器 - 负责框选、多选等操作
+ */
+public class CanvasSelectionManager {
+    
+    private final Pane canvas;
+    private final List<ProcessNode> nodes;
+    private final List<NodeConnection> connections;
+    private final Consumer<String> logger;
+    private final Runnable notifyChanged;
+    
+    private boolean selectionMode = false;
+    private javafx.scene.shape.Rectangle selectionRect;
+    private javafx.scene.shape.Rectangle selectionBoundingBox;
+    private double selectionStartX;
+    private double selectionStartY;
+    private Set<ProcessNode> selectedNodes = new HashSet<>();
+    private Set<NodeConnection> selectedConnections = new HashSet<>();
+    private Map<ProcessNode, double[]> selectionOriginalPositions = new HashMap<>();
+    
+    private boolean isMovingSelection = false;
+    private ProcessNode dragStartNode;
+    
+    public CanvasSelectionManager(Pane canvas, List<ProcessNode> nodes, List<NodeConnection> connections,
+                                  Consumer<String> logger, Runnable notifyChanged) {
+        this.canvas = canvas;
+        this.nodes = nodes;
+        this.connections = connections;
+        this.logger = logger;
+        this.notifyChanged = notifyChanged;
+        initializeSelectionRectangles();
+    }
+    
+    private void initializeSelectionRectangles() {
+        selectionRect = new javafx.scene.shape.Rectangle();
+        selectionRect.setFill(Color.web("#2563EB", 0.1));
+        selectionRect.setStroke(Color.web("#2563EB"));
+        selectionRect.setStrokeWidth(2);
+        selectionRect.getStrokeDashArray().addAll(5.0, 5.0);
+        selectionRect.setVisible(false);
+        selectionRect.setMouseTransparent(true);
+        canvas.getChildren().add(selectionRect);
+        
+        selectionBoundingBox = new javafx.scene.shape.Rectangle();
+        selectionBoundingBox.setFill(Color.TRANSPARENT);
+        selectionBoundingBox.setStroke(Color.web("#EF4444"));
+        selectionBoundingBox.setStrokeWidth(2);
+        selectionBoundingBox.getStrokeDashArray().addAll(8.0, 4.0);
+        selectionBoundingBox.setVisible(false);
+        selectionBoundingBox.setMouseTransparent(true);
+        canvas.getChildren().add(selectionBoundingBox);
+    }
+    
+    public boolean isSelectionMode() {
+        return selectionMode;
+    }
+    
+    public void setSelectionMode(boolean enabled) {
+        this.selectionMode = enabled;
+        if (!enabled) {
+            clearSelection();
+        }
+        logger.accept(selectionMode ? "✓ 框选模式已启用" : "✓ 框选模式已禁用");
+    }
+    
+    public void startSelection(double x, double y) {
+        selectionStartX = x;
+        selectionStartY = y;
+        selectionRect.setX(x);
+        selectionRect.setY(y);
+        selectionRect.setWidth(0);
+        selectionRect.setHeight(0);
+        selectionRect.setVisible(true);
+        canvas.getChildren().remove(selectionRect);
+        canvas.getChildren().add(selectionRect);
+        selectionRect.toFront();
+    }
+    
+    public void updateSelection(double currentX, double currentY) {
+        double rectX = Math.min(selectionStartX, currentX);
+        double rectY = Math.min(selectionStartY, currentY);
+        double rectWidth = Math.abs(currentX - selectionStartX);
+        double rectHeight = Math.abs(currentY - selectionStartY);
+        
+        selectionRect.setX(rectX);
+        selectionRect.setY(rectY);
+        selectionRect.setWidth(rectWidth);
+        selectionRect.setHeight(rectHeight);
+        selectionRect.toFront();
+        
+        updateSelectionDuringDrag(rectX, rectY, rectWidth, rectHeight);
+    }
+    
+    public void finishSelection(double currentX, double currentY) {
+        double rectX = Math.min(selectionStartX, currentX);
+        double rectY = Math.min(selectionStartY, currentY);
+        double rectWidth = Math.abs(currentX - selectionStartX);
+        double rectHeight = Math.abs(currentY - selectionStartY);
+        
+        selectionRect.setVisible(false);
+        
+        if (rectWidth > 5 && rectHeight > 5) {
+            performSelection(rectX, rectY, rectWidth, rectHeight);
+            if (!selectedNodes.isEmpty()) {
+                logger.accept("✓ 框选完成: 选中 " + selectedNodes.size() + " 个节点, " + selectedConnections.size() + " 条边");
+            }
+        } else {
+            clearSelection();
+        }
+    }
+    
+    private void updateSelectionDuringDrag(double rectX, double rectY, double rectWidth, double rectHeight) {
+        for (ProcessNode node : selectedNodes) {
+            highlightNode(node, false);
+        }
+        for (NodeConnection connection : selectedConnections) {
+            connection.setSelected(false);
+        }
+        
+        selectedNodes.clear();
+        selectedConnections.clear();
+        selectionOriginalPositions.clear();
+        
+        for (ProcessNode node : nodes) {
+            if (rectIntersects(rectX, rectY, rectWidth, rectHeight,
+                              node.getLayoutX(), node.getLayoutY(), 
+                              node.getPrefWidth(), node.getPrefHeight())) {
+                selectedNodes.add(node);
+                highlightNode(node, true);
+                selectionOriginalPositions.put(node, new double[]{node.getLayoutX(), node.getLayoutY()});
+            }
+        }
+        
+        for (NodeConnection connection : connections) {
+            ProcessNode sourceNode = connection.getSourceNode();
+            ProcessNode targetNode = connection.getTargetNode();
+            if (sourceNode != null && targetNode != null &&
+                selectedNodes.contains(sourceNode) && selectedNodes.contains(targetNode)) {
+                selectedConnections.add(connection);
+                connection.setSelected(true);
+            }
+        }
+    }
+    
+    private void performSelection(double rectX, double rectY, double rectWidth, double rectHeight) {
+        clearSelectionVisual();
+        selectedNodes.clear();
+        selectedConnections.clear();
+        selectionOriginalPositions.clear();
+        
+        for (ProcessNode node : nodes) {
+            if (rectIntersects(rectX, rectY, rectWidth, rectHeight,
+                              node.getLayoutX(), node.getLayoutY(),
+                              node.getPrefWidth(), node.getPrefHeight())) {
+                selectedNodes.add(node);
+                highlightNode(node, true);
+                selectionOriginalPositions.put(node, new double[]{node.getLayoutX(), node.getLayoutY()});
+            }
+        }
+        
+        for (NodeConnection connection : connections) {
+            javafx.scene.Node sourceOwner = connection.getSourceOwner();
+            javafx.scene.Node targetOwner = connection.getTargetOwner();
+            
+            if (sourceOwner instanceof ProcessNode && targetOwner instanceof ProcessNode) {
+                ProcessNode sourceNode = (ProcessNode) sourceOwner;
+                ProcessNode targetNode = (ProcessNode) targetOwner;
+                
+                if (selectedNodes.contains(sourceNode) && selectedNodes.contains(targetNode)) {
+                    selectedConnections.add(connection);
+                    connection.setSelected(true);
+                }
+            }
+        }
+        
+        updateSelectionBoundingBox();
+    }
+    
+    public void updateSelectionBoundingBox() {
+        if (selectedNodes.isEmpty()) {
+            selectionBoundingBox.setVisible(false);
+            return;
+        }
+        
+        double minX = Double.MAX_VALUE, minY = Double.MAX_VALUE;
+        double maxX = Double.MIN_VALUE, maxY = Double.MIN_VALUE;
+        
+        for (ProcessNode node : selectedNodes) {
+            minX = Math.min(minX, node.getLayoutX());
+            minY = Math.min(minY, node.getLayoutY());
+            maxX = Math.max(maxX, node.getLayoutX() + node.getPrefWidth());
+            maxY = Math.max(maxY, node.getLayoutY() + node.getPrefHeight());
+        }
+        
+        double padding = 10;
+        selectionBoundingBox.setX(minX - padding);
+        selectionBoundingBox.setY(minY - padding);
+        selectionBoundingBox.setWidth(maxX - minX + padding * 2);
+        selectionBoundingBox.setHeight(maxY - minY + padding * 2);
+        selectionBoundingBox.setVisible(true);
+        
+        canvas.getChildren().remove(selectionBoundingBox);
+        canvas.getChildren().add(selectionBoundingBox);
+    }
+    
+    public void clearSelection() {
+        clearSelectionVisual();
+        selectedNodes.clear();
+        selectedConnections.clear();
+        selectionRect.setVisible(false);
+        selectionBoundingBox.setVisible(false);
+        isMovingSelection = false;
+        dragStartNode = null;
+        selectionOriginalPositions.clear();
+    }
+    
+    private void clearSelectionVisual() {
+        for (ProcessNode node : selectedNodes) {
+            highlightNode(node, false);
+        }
+        for (NodeConnection connection : selectedConnections) {
+            connection.setSelected(false);
+        }
+        selectionBoundingBox.setVisible(false);
+    }
+    
+    public void highlightNode(ProcessNode node, boolean highlight) {
+        if (highlight) {
+            node.setStyle("-fx-effect: dropshadow(gaussian, rgba(37,99,235,0.5), 10, 0, 0, 0);");
+        } else {
+            node.setStyle("-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 5, 0, 0, 2);");
+        }
+    }
+    
+    public void selectNode(ProcessNode node) {
+        if (node == null || !nodes.contains(node)) return;
+        
+        clearSelection();
+        selectedNodes.add(node);
+        highlightNode(node, true);
+        selectionOriginalPositions.put(node, new double[]{node.getLayoutX(), node.getLayoutY()});
+        updateSelectionBoundingBox();
+    }
+    
+    public void selectNodes(Collection<ProcessNode> nodesToSelect) {
+        if (nodesToSelect == null || nodesToSelect.isEmpty()) {
+            clearSelection();
+            return;
+        }
+        
+        clearSelection();
+        for (ProcessNode node : nodesToSelect) {
+            if (node != null && nodes.contains(node)) {
+                selectedNodes.add(node);
+                highlightNode(node, true);
+                selectionOriginalPositions.put(node, new double[]{node.getLayoutX(), node.getLayoutY()});
+            }
+        }
+        updateSelectionBoundingBox();
+    }
+    
+    public void alignHorizontal() {
+        if (selectedNodes.size() < 2) {
+            logger.accept("⚠ 需要至少选中 2 个节点");
+            return;
+        }
+        
+        double avgY = 0.0;
+        for (ProcessNode node : selectedNodes) {
+            avgY += node.getLayoutY();
+        }
+        
+        final double finalAvgY = Math.max(0, avgY / selectedNodes.size());
+        for (ProcessNode node : selectedNodes) {
+            node.setLayoutY(finalAvgY);
+        }
+        
+        updateSelectionBoundingBox();
+        notifyChanged.run();
+        logger.accept("✓ 横向布局完成: " + selectedNodes.size() + " 个节点已对齐");
+    }
+    
+    public void alignVertical() {
+        if (selectedNodes.size() < 2) {
+            logger.accept("⚠ 需要至少选中 2 个节点");
+            return;
+        }
+        
+        double avgX = 0.0;
+        for (ProcessNode node : selectedNodes) {
+            avgX += node.getLayoutX();
+        }
+        
+        final double finalAvgX = Math.max(0, avgX / selectedNodes.size());
+        for (ProcessNode node : selectedNodes) {
+            node.setLayoutX(finalAvgX);
+        }
+        
+        updateSelectionBoundingBox();
+        notifyChanged.run();
+        logger.accept("✓ 纵向布局完成: " + selectedNodes.size() + " 个节点已对齐");
+    }
+    
+    private boolean rectIntersects(double x1, double y1, double w1, double h1,
+                                   double x2, double y2, double w2, double h2) {
+        return x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2;
+    }
+    
+    public Set<ProcessNode> getSelectedNodes() {
+        return new HashSet<>(selectedNodes);
+    }
+    
+    public Set<NodeConnection> getSelectedConnections() {
+        return new HashSet<>(selectedConnections);
+    }
+    
+    public javafx.scene.shape.Rectangle getSelectionRect() {
+        return selectionRect;
+    }
+    
+    public boolean isMovingSelection() {
+        return isMovingSelection;
+    }
+    
+    public void setMovingSelection(boolean moving) {
+        this.isMovingSelection = moving;
+    }
+    
+    public ProcessNode getDragStartNode() {
+        return dragStartNode;
+    }
+    
+    public void setDragStartNode(ProcessNode node) {
+        this.dragStartNode = node;
+    }
+    
+    public Map<ProcessNode, double[]> getSelectionOriginalPositions() {
+        return selectionOriginalPositions;
+    }
+    
+    public javafx.scene.shape.Rectangle getSelectionBoundingBox() {
+        return selectionBoundingBox;
+    }
+    
+    /**
+     * 重新添加选择矩形到画布（在清空后调用）
+     */
+    public void reattachToCanvas() {
+        if (!canvas.getChildren().contains(selectionRect)) {
+            canvas.getChildren().add(selectionRect);
+        }
+        if (!canvas.getChildren().contains(selectionBoundingBox)) {
+            canvas.getChildren().add(selectionBoundingBox);
+        }
+    }
+}
+
