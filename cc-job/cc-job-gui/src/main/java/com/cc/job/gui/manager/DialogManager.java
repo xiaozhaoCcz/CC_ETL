@@ -173,5 +173,17 @@ public class DialogManager {
         ShowJobLogListDialog dialog = new ShowJobLogListDialog(ownerStage);
         dialog.show();
     }
+    
+    /**
+     * 显示节点详情对话框
+     * @param jobId 任务ID
+     * @param taskGroupId 任务组ID
+     * @param nodeName 节点名称
+     * @param nodeId 节点ID
+     */
+    public void showNodeDetailsDialog(Long jobId, Long taskGroupId, String nodeName, String nodeId) {
+        NodeDetailsDialog dialog = new NodeDetailsDialog(ownerStage, jobId, taskGroupId, nodeName, nodeId);
+        dialog.show();
+    }
 }
 

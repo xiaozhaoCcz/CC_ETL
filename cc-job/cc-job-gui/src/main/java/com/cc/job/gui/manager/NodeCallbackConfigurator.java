@@ -13,6 +13,7 @@ public class NodeCallbackConfigurator {
     private final NodeOperationManager nodeOperationManager;
     private final NodeCanvas canvas;
     private final LogPanel logPanel;
+    private DialogManager dialogManager;
     
     public NodeCallbackConfigurator(NodeOperationManager nodeOperationManager, 
                                     NodeCanvas canvas, 
@@ -23,42 +24,63 @@ public class NodeCallbackConfigurator {
     }
     
     /**
+     * 设置对话框管理器
+     */
+    public void setDialogManager(DialogManager dialogManager) {
+        this.dialogManager = dialogManager;
+    }
+    
+    /**
      * 为节点配置所有回调
      */
     public void configureNodeCallbacks(ProcessNode node, Long currentTaskGroupId) {
-        if (node == null) return;
+        if (node == null) {
+            return;
+        }
         
-        Long jobId = node.getJobId();
-        
-        // 编辑回调
+        // 编辑回调 - 动态获取 jobId，避免闭包捕获问题
         node.setOnEdit(() -> {
+            Long jobId = node.getJobId();
             if (jobId == null) {
-                logPanel.warn("⚠ 该节点未绑定后端任务，无法编辑");
+                Platform.runLater(() -> logPanel.warn("⚠ 该节点未绑定后端任务，无法编辑"));
                 return;
             }
             nodeOperationManager.editNode(jobId, node, currentTaskGroupId);
         });
         
-        // 复制回调
+        // 复制回调 - 动态获取 jobId
         node.setOnCopy(() -> {
+            Long jobId = node.getJobId();
             if (jobId == null) {
-                logPanel.warn("⚠ 该节点未绑定后端任务，无法复制");
+                Platform.runLater(() -> logPanel.warn("⚠ 该节点未绑定后端任务，无法复制"));
                 return;
             }
             nodeOperationManager.copyNodeToClipboard(node, currentTaskGroupId);
         });
         
-        // 查看详情回调
+        // 查看详情回调 - 动态获取 jobId
         node.setOnShowDetails(() -> {
+            Long jobId = node.getJobId();
             if (jobId == null) {
-                logPanel.warn("⚠ 该节点未绑定后端任务，无法查看详情");
+                Platform.runLater(() -> logPanel.warn("⚠ 该节点未绑定后端任务，无法查看详情"));
                 return;
             }
-            // 显示节点详情（可以在 NodeOperationManager 中添加此方法）
-            logPanel.info("查看节点详情: " + node.getJobHandlerName() + " (jobId=" + jobId + ")");
+            // 显示节点详情对话框
+            if (dialogManager != null) {
+                Platform.runLater(() -> {
+                    dialogManager.showNodeDetailsDialog(
+                        jobId, 
+                        currentTaskGroupId, 
+                        node.getJobHandlerName(), 
+                        node.getNodeId()
+                    );
+                });
+            } else {
+                Platform.runLater(() -> logPanel.warn("⚠ 对话框管理器未设置，无法显示详情"));
+            }
         });
         
-        // 禁用/启用回调
+        // 禁用/启用回调 - nodeJobId 已经是参数传入的，不需要修改
         node.setOnDisable(new com.cc.job.gui.model.ProcessNode.DisableNodeCallback() {
             @Override
             public void onDisableNode(Long nodeJobId, boolean isDisabled) {

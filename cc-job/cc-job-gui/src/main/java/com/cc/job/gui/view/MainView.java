@@ -154,6 +154,12 @@ public class MainView extends BorderPane {
         dataManager = new DataManager(canvas, logPanel, treeView);
         nodeCallbackConfigurator = new NodeCallbackConfigurator(nodeOperationManager, canvas, logPanel);
         
+        // 重要：设置节点操作管理器的回调配置器（用于新增节点时自动配置回调）
+        nodeOperationManager.setNodeCallbackConfigurator(nodeCallbackConfigurator);
+        
+        // 重要：设置对话框管理器（用于显示节点详情对话框）
+        nodeCallbackConfigurator.setDialogManager(dialogManager);
+        
         // 设置数据加载完成后的回调，配置所有节点的操作回调
         dataManager.setOnDataLoaded(() -> {
             Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();

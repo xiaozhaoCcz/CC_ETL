@@ -72,7 +72,7 @@ public class NodeCanvas extends Pane {
     
     public NodeCanvas() {
         setPrefSize(2000, 1000);
-        setStyle("-fx-background-color: gray;");
+        setStyle("-fx-background-color: #F3F4F6;");
         
         initializeManagers();
         setupCanvasContextMenu();

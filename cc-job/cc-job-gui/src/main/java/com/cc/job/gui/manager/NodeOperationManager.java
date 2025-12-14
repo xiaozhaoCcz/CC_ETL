@@ -31,6 +31,9 @@ public class NodeOperationManager {
     private JobInfoForm copiedNodeForm = null;
     private CopiedNodesData copiedNodesData = null;
     
+    // 节点回调配置器（用于配置编辑、复制等业务逻辑回调）
+    private NodeCallbackConfigurator nodeCallbackConfigurator;
+    
     public NodeOperationManager(NodeCanvas canvas, LogPanel logPanel, TaskTreeView treeView, Stage ownerStage) {
         this.canvas = canvas;
         this.logPanel = logPanel;
@@ -41,15 +44,27 @@ public class NodeOperationManager {
     }
     
     /**
-     * 复制单个节点到剪贴板
+     * 设置节点回调配置器
+     */
+    public void setNodeCallbackConfigurator(NodeCallbackConfigurator configurator) {
+        this.nodeCallbackConfigurator = configurator;
+    }
+    
+    /**
+     * 复制节点 - 直接创建新节点并添加到画布
      */
     public void copyNodeToClipboard(ProcessNode sourceNode, Long currentTaskGroupId) {
         if (sourceNode == null || sourceNode.getJobId() == null) {
-            logPanel.warn("⚠ 节点无效或未绑定任务，无法复制");
+            Platform.runLater(() -> logPanel.warn("⚠ 节点无效或未绑定任务，无法复制"));
             return;
         }
         
-        logPanel.info("📋 正在复制节点: " + sourceNode.getJobHandlerName());
+        if (currentTaskGroupId == null) {
+            Platform.runLater(() -> logPanel.warn("⚠ 当前任务组ID无效，无法复制节点"));
+            return;
+        }
+        
+        Platform.runLater(() -> logPanel.info("📋 正在复制节点: " + sourceNode.getJobHandlerName()));
         
         new Thread(() -> {
             try {
@@ -59,17 +74,47 @@ public class NodeOperationManager {
                     return;
                 }
                 
+                // 创建新节点的表单数据
                 JobInfoForm copyForm = deepCopyJobInfoForm(originalForm);
-                copiedNodeForm = copyForm;
-                copiedNodesData = null;
+                copyForm.setId(null);
+                copyForm.setParentId(currentTaskGroupId);
+                copyForm.setJobDesc(generateCopyName(originalForm.getJobDesc()));
                 
-                Platform.runLater(() -> {
-                    logPanel.success("✓ 节点已复制: " + copyForm.getJobDesc());
-                });
+                // 计算新节点的位置（在源节点右侧）
+                double[] position = calculateCopyPosition(sourceNode);
+                copyForm.setNodePositionX(position[0]);
+                copyForm.setNodePositionY(position[1]);
+                copyForm.setGlueUpdateTime(null);
+                
+                // 保存新节点到后端
+                JobNode newJobNode = jobInfoService.saveJobNode(copyForm);
+                if (newJobNode != null) {
+                    Platform.runLater(() -> {
+                        addNodeToCanvas(newJobNode, copyForm);
+                        logPanel.success("✓ 节点复制成功: " + copyForm.getJobDesc());
+                    });
+                } else {
+                    Platform.runLater(() -> logPanel.error("✗ 节点复制失败：后端返回空"));
+                }
             } catch (Exception e) {
                 Platform.runLater(() -> logPanel.error("✗ 复制失败: " + e.getMessage()));
             }
         }).start();
+    }
+    
+    /**
+     * 计算复制节点的位置（在源节点右侧）
+     */
+    private double[] calculateCopyPosition(ProcessNode sourceNode) {
+        double sourceX = sourceNode.getLayoutX();
+        double sourceY = sourceNode.getLayoutY();
+        double nodeWidth = sourceNode.getWidth() > 0 ? sourceNode.getWidth() : sourceNode.getPrefWidth();
+        
+        // 在源节点右侧，间隔50像素
+        double newX = sourceX + nodeWidth + 50;
+        double newY = sourceY;
+        
+        return new double[]{newX, newY};
     }
     
     /**
@@ -284,6 +329,11 @@ public class NodeOperationManager {
         node.setJobId(jobNode.getJobId());
         node.setType(getNodeTypeIcon(formData.getGlueType()));
         canvas.addNode(node, true);
+        
+        // 配置节点的业务逻辑回调（编辑、复制、查看详情等）
+        if (nodeCallbackConfigurator != null && formData.getParentId() != null) {
+            nodeCallbackConfigurator.configureNodeCallbacks(node, formData.getParentId());
+        }
         
         return node;
     }

@@ -266,6 +266,23 @@ public class JobInfoService extends BaseService {
     }
     
     /**
+     * 获取下一次运行时间
+     * @param scheduleType 调度类型
+     * @param scheduleConf 调度配置
+     * @return 下一次运行时间列表（最多5个）
+     * @throws IOException 网络异常
+     */
+    public List<String> getNextTriggerTime(String scheduleType, String scheduleConf) throws IOException {
+        Map<String, String> queryParams = new HashMap<>();
+        queryParams.put("scheduleType", scheduleType);
+        queryParams.put("scheduleConf", scheduleConf);
+        
+        TypeToken<List<String>> typeToken = new TypeToken<List<String>>(){};
+        Result<List<String>> result = httpClient.get("/api/v1/jobInfos/nextTriggerTime", typeToken, queryParams);
+        return httpClient.extractData(result, "获取下一次运行时间失败");
+    }
+    
+    /**
      * 暂停/启用任务
      * @param jobId 任务ID
      * @param pauseStatus 是否暂停：0=启用, 1=禁用
