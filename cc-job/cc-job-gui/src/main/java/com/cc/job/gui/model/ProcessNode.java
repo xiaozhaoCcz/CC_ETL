@@ -68,6 +68,8 @@ public class ProcessNode extends StackPane {
     
     // 禁用/启用节点回调
     private DisableNodeCallback onDisable;
+
+
     
     public interface DisableNodeCallback {
         void onDisableNode(Long jobId, boolean isDisabled);

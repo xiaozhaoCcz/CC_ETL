@@ -54,6 +54,18 @@ public class NodeCanvas extends Pane {
     
     private ScrollPane hostingScrollPane;
     
+    // 画布自动扩展相关
+    private static final double EDGE_THRESHOLD = 100.0; // 距离边缘的阈值（像素）
+    private static final double EXPAND_SIZE = 500.0;    // 每次扩展的大小
+    
+    // 窗口自动滚动相关
+    private static final double VIEWPORT_EDGE_THRESHOLD = 50.0; // 距离可视窗口边缘的阈值（像素）
+    private static final double SCROLL_SPEED = 0.02;            // 滚动速度系数
+    
+    // 防止重复扩展
+    private boolean isExpanding = false; // 标记是否正在执行扩展操作
+    private boolean isDragging = false;  // 标记是否有节点正在被拖拽
+    
     public interface LogCallback {
         void log(String message);
     }
@@ -150,6 +162,9 @@ public class NodeCanvas extends Pane {
         nodeManager.addNode(node);
         setupNodeCallbacks(node);
         
+        // 检查新添加的节点是否需要扩展画布
+        checkAndExpandCanvas(node);
+        
         if (recordHistory) {
             pushAction(new AddNodeAction(node));
         }
@@ -179,10 +194,13 @@ public class NodeCanvas extends Pane {
         
         node.setOnDragged(() -> {
             if (onNodeMoved != null) onNodeMoved.run();
+            checkAndExpandCanvas(node);  // 单个节点拖拽时也检查画布扩展
+            checkAndScrollViewport(node); // 检查并自动滚动可视窗口
             handleNodeDrag(node);
         });
         
         node.setOnDragStarted(() -> {
+            isDragging = true; // 标记开始拖拽
             if (!selectionManager.getSelectedNodes().isEmpty() && 
                 selectionManager.getSelectedNodes().contains(node) && 
                 selectionManager.getSelectedNodes().size() > 1) {
@@ -198,6 +216,11 @@ public class NodeCanvas extends Pane {
         });
         
         node.setOnDragFinished((oldX, oldY, newX, newY) -> {
+            isDragging = false; // 标记拖拽结束
+            
+            // 拖拽结束后，检查是否需要左侧或上侧扩展
+            checkAndExpandCanvas(node);
+            
             if (selectionManager.isMovingSelection() && selectionManager.getDragStartNode() == node) {
                 selectionManager.setMovingSelection(false);
                 selectionManager.setDragStartNode(null);
@@ -221,6 +244,9 @@ public class NodeCanvas extends Pane {
     }
     
     private void handleNodeDrag(ProcessNode node) {
+        // 检查并扩展画布
+        checkAndExpandCanvas(node);
+        
         if (selectionManager.isMovingSelection() && selectionManager.getDragStartNode() == node && 
             selectionManager.getSelectedNodes().size() > 1) {
             
@@ -238,6 +264,9 @@ public class NodeCanvas extends Pane {
                         if (originalPos != null) {
                             selectedNode.setLayoutX(Math.max(0, originalPos[0] + deltaX));
                             selectedNode.setLayoutY(Math.max(0, originalPos[1] + deltaY));
+                            // 为每个选中的节点也检查边缘
+                            checkAndExpandCanvas(selectedNode);
+                            checkAndScrollViewport(selectedNode); // 多节点拖拽时也检查滚动
                         }
                     }
                 }
@@ -627,6 +656,248 @@ public class NodeCanvas extends Pane {
         boolean previous = historyEnabled;
         historyEnabled = false;
         try { runnable.run(); } finally { historyEnabled = previous; }
+    }
+    
+    /**
+     * 检查节点是否靠近画布边缘，如果是则自动扩展画布
+     * 支持四个方向的扩展：左、右、上、下
+     */
+    private void checkAndExpandCanvas(ProcessNode node) {
+        if (node == null) return;
+        
+        // 如果正在执行扩展操作，跳过本次检查，防止重复扩展
+        if (isExpanding) return;
+        
+        double nodeX = node.getLayoutX();
+        double nodeY = node.getLayoutY();
+        
+        // 获取节点实际尺寸，如果为0则使用预设尺寸
+        double nodeWidth = node.getWidth() > 0 ? node.getWidth() : node.getPrefWidth();
+        double nodeHeight = node.getHeight() > 0 ? node.getHeight() : node.getPrefHeight();
+        
+        // 防止出现异常值
+        if (nodeWidth <= 0 || nodeHeight <= 0) {
+            return;
+        }
+        
+        // 节点的四个边缘
+        double nodeRight = nodeX + nodeWidth;
+        double nodeBottom = nodeY + nodeHeight;
+        
+        // 当前画布尺寸
+        double currentWidth = getPrefWidth();
+        double currentHeight = getPrefHeight();
+        
+        boolean needsExpansion = false;
+        double newWidth = currentWidth;
+        double newHeight = currentHeight;
+        double offsetX = 0; // 向右偏移量（左侧扩展时使用）
+        double offsetY = 0; // 向下偏移量（上侧扩展时使用）
+        
+        // 检查左边缘 - 当节点靠近左边缘时扩展（拖拽时禁用，避免坐标系统冲突）
+        if (nodeX < EDGE_THRESHOLD && !isDragging) {
+            offsetX = EXPAND_SIZE;
+            newWidth = currentWidth + EXPAND_SIZE;
+            needsExpansion = true;
+        }
+        
+        // 检查右边缘 - 当节点靠近右边缘时扩展
+        if (nodeRight > currentWidth - EDGE_THRESHOLD) {
+            newWidth = Math.max(newWidth, nodeRight + EXPAND_SIZE + offsetX);
+            needsExpansion = true;
+        }
+        
+        // 检查上边缘 - 当节点靠近上边缘时扩展（拖拽时禁用，避免坐标系统冲突）
+        if (nodeY < EDGE_THRESHOLD && !isDragging) {
+            offsetY = EXPAND_SIZE;
+            newHeight = currentHeight + EXPAND_SIZE;
+            needsExpansion = true;
+        }
+        
+        // 检查底边缘 - 当节点靠近底边缘时扩展
+        if (nodeBottom > currentHeight - EDGE_THRESHOLD) {
+            newHeight = Math.max(newHeight, nodeBottom + EXPAND_SIZE + offsetY);
+            needsExpansion = true;
+        }
+        
+        // 如果需要扩展，则执行扩展
+        if (needsExpansion && !isExpanding) {
+            // 设置扩展标志，防止重复扩展
+            isExpanding = true;
+            
+            // 如果是左侧或上侧扩展，需要调整所有节点和容器的位置
+            if (offsetX > 0 || offsetY > 0) {
+                adjustAllNodesPosition(offsetX, offsetY);
+            }
+            
+            setPrefSize(newWidth, newHeight);
+            setMinSize(newWidth, newHeight);
+            
+            // 调整 ScrollPane 的滚动位置，保持视图稳定
+            if (hostingScrollPane != null && (offsetX > 0 || offsetY > 0)) {
+                adjustScrollPaneAfterExpansion(offsetX, offsetY, currentWidth, currentHeight, newWidth, newHeight);
+            }
+            
+            String direction = "";
+            if (offsetX > 0) direction += "左";
+            if (offsetY > 0) direction += "上";
+            if (nodeRight > currentWidth - EDGE_THRESHOLD) direction += "右";
+            if (nodeBottom > currentHeight - EDGE_THRESHOLD) direction += "下";
+            
+            log(String.format("🔄 画布已向%s扩展至: %.0f x %.0f", direction, newWidth, newHeight));
+            
+            // 重置扩展标志
+            isExpanding = false;
+        }
+    }
+    
+    /**
+     * 调整所有节点和容器的位置（用于左侧或上侧扩展时）
+     */
+    private void adjustAllNodesPosition(double offsetX, double offsetY) {
+        // 调整所有节点的位置
+        for (ProcessNode processNode : nodes) {
+            if (processNode != null) {
+                processNode.setLayoutX(processNode.getLayoutX() + offsetX);
+                processNode.setLayoutY(processNode.getLayoutY() + offsetY);
+                // 同时调整拖拽起始坐标，避免拖拽时节点被"拉回"原位置
+                processNode.adjustDragStart(offsetX, offsetY);
+            }
+        }
+        
+        // 调整所有组容器的位置
+        for (GroupContainer container : groupContainers) {
+            if (container != null) {
+                container.setLayoutX(container.getLayoutX() + offsetX);
+                container.setLayoutY(container.getLayoutY() + offsetY);
+            }
+        }
+        
+        // 调整多选时的原始位置记录
+        if (selectionManager != null && selectionManager.getSelectionOriginalPositions() != null) {
+            for (Map.Entry<ProcessNode, double[]> entry : selectionManager.getSelectionOriginalPositions().entrySet()) {
+                double[] pos = entry.getValue();
+                if (pos != null && pos.length >= 2) {
+                    pos[0] += offsetX;
+                    pos[1] += offsetY;
+                }
+            }
+        }
+        
+        // 连接线会自动跟随节点位置更新
+    }
+    
+    /**
+     * 调整 ScrollPane 的滚动位置，保持视图稳定
+     */
+    private void adjustScrollPaneAfterExpansion(double offsetX, double offsetY, 
+                                                double oldWidth, double oldHeight,
+                                                double newWidth, double newHeight) {
+        if (hostingScrollPane == null) return;
+        
+        double viewportWidth = hostingScrollPane.getViewportBounds().getWidth();
+        double viewportHeight = hostingScrollPane.getViewportBounds().getHeight();
+        
+        // 如果画布小于视口，不需要调整滚动
+        if (oldWidth <= viewportWidth && oldHeight <= viewportHeight) {
+            return;
+        }
+        
+        // 计算当前视图在画布上的实际位置
+        double currentHValue = hostingScrollPane.getHvalue();
+        double currentVValue = hostingScrollPane.getVvalue();
+        
+        // 计算偏移后应该的滚动位置，保持视图内容不变
+        if (offsetX > 0 && newWidth > viewportWidth) {
+            double oldScrollableWidth = oldWidth - viewportWidth;
+            double newScrollableWidth = newWidth - viewportWidth;
+            double oldViewportLeft = currentHValue * oldScrollableWidth;
+            double newViewportLeft = oldViewportLeft + offsetX;
+            double newHValue = newScrollableWidth > 0 ? newViewportLeft / newScrollableWidth : 0;
+            hostingScrollPane.setHvalue(Math.max(0, Math.min(1, newHValue)));
+        }
+        
+        if (offsetY > 0 && newHeight > viewportHeight) {
+            double oldScrollableHeight = oldHeight - viewportHeight;
+            double newScrollableHeight = newHeight - viewportHeight;
+            double oldViewportTop = currentVValue * oldScrollableHeight;
+            double newViewportTop = oldViewportTop + offsetY;
+            double newVValue = newScrollableHeight > 0 ? newViewportTop / newScrollableHeight : 0;
+            hostingScrollPane.setVvalue(Math.max(0, Math.min(1, newVValue)));
+        }
+    }
+    
+    /**
+     * 检查节点是否靠近可视窗口边缘，如果是则自动滚动窗口
+     */
+    private void checkAndScrollViewport(ProcessNode node) {
+        if (node == null || hostingScrollPane == null) return;
+        
+        double nodeX = node.getLayoutX();
+        double nodeY = node.getLayoutY();
+        
+        // 获取节点实际尺寸
+        double nodeWidth = node.getWidth() > 0 ? node.getWidth() : node.getPrefWidth();
+        double nodeHeight = node.getHeight() > 0 ? node.getHeight() : node.getPrefHeight();
+        
+        if (nodeWidth <= 0 || nodeHeight <= 0) return;
+        
+        // 节点中心点
+        double nodeCenterX = nodeX + nodeWidth / 2;
+        double nodeCenterY = nodeY + nodeHeight / 2;
+        
+        // 获取ScrollPane的可视区域信息
+        double viewportWidth = hostingScrollPane.getViewportBounds().getWidth();
+        double viewportHeight = hostingScrollPane.getViewportBounds().getHeight();
+        
+        // 当前滚动位置（相对于画布的偏移）
+        double currentHValue = hostingScrollPane.getHvalue();
+        double currentVValue = hostingScrollPane.getVvalue();
+        
+        // 计算可视区域在画布上的位置
+        double canvasWidth = getPrefWidth();
+        double canvasHeight = getPrefHeight();
+        
+        double viewportLeft = currentHValue * (canvasWidth - viewportWidth);
+        double viewportRight = viewportLeft + viewportWidth;
+        double viewportTop = currentVValue * (canvasHeight - viewportHeight);
+        double viewportBottom = viewportTop + viewportHeight;
+        
+        boolean needsScroll = false;
+        double newHValue = currentHValue;
+        double newVValue = currentVValue;
+        
+        // 检查左边缘
+        if (nodeCenterX < viewportLeft + VIEWPORT_EDGE_THRESHOLD) {
+            double scrollAmount = VIEWPORT_EDGE_THRESHOLD - (nodeCenterX - viewportLeft);
+            newHValue = Math.max(0, currentHValue - scrollAmount * SCROLL_SPEED / canvasWidth);
+            needsScroll = true;
+        }
+        // 检查右边缘
+        else if (nodeCenterX > viewportRight - VIEWPORT_EDGE_THRESHOLD) {
+            double scrollAmount = nodeCenterX - (viewportRight - VIEWPORT_EDGE_THRESHOLD);
+            newHValue = Math.min(1, currentHValue + scrollAmount * SCROLL_SPEED / canvasWidth);
+            needsScroll = true;
+        }
+        
+        // 检查上边缘
+        if (nodeCenterY < viewportTop + VIEWPORT_EDGE_THRESHOLD) {
+            double scrollAmount = VIEWPORT_EDGE_THRESHOLD - (nodeCenterY - viewportTop);
+            newVValue = Math.max(0, currentVValue - scrollAmount * SCROLL_SPEED / canvasHeight);
+            needsScroll = true;
+        }
+        // 检查下边缘
+        else if (nodeCenterY > viewportBottom - VIEWPORT_EDGE_THRESHOLD) {
+            double scrollAmount = nodeCenterY - (viewportBottom - VIEWPORT_EDGE_THRESHOLD);
+            newVValue = Math.min(1, currentVValue + scrollAmount * SCROLL_SPEED / canvasHeight);
+            needsScroll = true;
+        }
+        
+        // 执行滚动
+        if (needsScroll) {
+            hostingScrollPane.setHvalue(newHValue);
+            hostingScrollPane.setVvalue(newVValue);
+        }
     }
     
     // ==================== 历史记录 Actions ====================
