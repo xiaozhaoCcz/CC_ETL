@@ -7,10 +7,10 @@ import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.input.MouseButton;
-import javafx.scene.layout.Pane;
-import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
+import javafx.scene.input.ScrollEvent;
+import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
 
 import java.util.ArrayList;
@@ -23,11 +23,11 @@ import java.util.function.Consumer;
  * 任务组容器（可折叠）：大框是任务组，内部小框是子任务节点
  */
 public class GroupContainer extends StackPane {
-    
+
     private final String groupName;
     private final Long groupId;
     private final String nodeId;
-    
+
     private final Rectangle frame;
     private final Label titleLabel;
     private final VBox header;
@@ -36,20 +36,20 @@ public class GroupContainer extends StackPane {
     private final Pane contentLayer;
     // 新增：用于承载四个连接点的层
     private final Pane connectorPane = new Pane();
-    private final javafx.scene.shape.Circle topConnector = new javafx.scene.shape.Circle(5, Color.web("#E0E7FF"));
-    private final javafx.scene.shape.Circle bottomConnector = new javafx.scene.shape.Circle(5, Color.web("#E0E7FF"));
-    private final javafx.scene.shape.Circle leftConnector = new javafx.scene.shape.Circle(5, Color.web("#E0E7FF"));
-    private final javafx.scene.shape.Circle rightConnector = new javafx.scene.shape.Circle(5, Color.web("#E0E7FF"));
+    private final Circle topConnector = new Circle(5, Color.web("#E0E7FF"));
+    private final Circle bottomConnector = new Circle(5, Color.web("#E0E7FF"));
+    private final Circle leftConnector = new Circle(5, Color.web("#E0E7FF"));
+    private final Circle rightConnector = new Circle(5, Color.web("#E0E7FF"));
     // ⭐ 新增：四个角的调整大小控制点
-    private final javafx.scene.shape.Circle topLeftResizeHandle = new javafx.scene.shape.Circle(6, Color.web("#6366F1"));
-    private final javafx.scene.shape.Circle topRightResizeHandle = new javafx.scene.shape.Circle(6, Color.web("#6366F1"));
-    private final javafx.scene.shape.Circle bottomLeftResizeHandle = new javafx.scene.shape.Circle(6, Color.web("#6366F1"));
-    private final javafx.scene.shape.Circle bottomRightResizeHandle = new javafx.scene.shape.Circle(6, Color.web("#6366F1"));
+    private final Circle topLeftResizeHandle = new Circle(6, Color.web("#6366F1"));
+    private final Circle topRightResizeHandle = new Circle(6, Color.web("#6366F1"));
+    private final Circle bottomLeftResizeHandle = new Circle(6, Color.web("#6366F1"));
+    private final Circle bottomRightResizeHandle = new Circle(6, Color.web("#6366F1"));
     private boolean expanded = true;
     private ContextMenu contextMenu;
     private Runnable onExpand; // 扩展回调（用于懒加载）
     private Runnable onDelete; // 删除回调
-    
+
     private final List<ProcessNode> innerNodes = new ArrayList<>();
     private final List<ProcessNode> managedCanvasNodes = new ArrayList<>();
     private final List<NodeConnection> managedConnections = new ArrayList<>();
@@ -63,16 +63,16 @@ public class GroupContainer extends StackPane {
     private double originX = 0; // 受管节点的参考左上角（画布坐标）
     private double originY = 0;
     private double zoom = 1.0;  // 缩放倍数（针对受管节点的相对定位）
-    
+
     public GroupContainer(String nodeId, Long groupId, String groupName) {
         this.nodeId = nodeId;
         this.groupId = groupId;
         this.groupName = groupName;
-        
+
         setPickOnBounds(false);
         // ⭐ 修复：确保容器本身可以接收鼠标事件，以便触发右键菜单
         setMouseTransparent(false);
-        
+
         frame = new Rectangle(320, 200);
         frame.setArcWidth(12);
         frame.setArcHeight(12);
@@ -89,20 +89,20 @@ public class GroupContainer extends StackPane {
         ds.setOffsetY(2);
         ds.setColor(Color.web("#C7D2FE", 0.55));
         frame.setEffect(ds);
-        
+
         header = new VBox();
         header.setPadding(new Insets(6, 10, 6, 10));
         header.setStyle("-fx-background-color: rgba(99,102,241,0.10); -fx-background-radius: 10 10 0 0;");
-        
+
         // 顶部栏：左标题 + 右上角 +/- 按钮
-        javafx.scene.layout.HBox headerBar = new javafx.scene.layout.HBox();
+        HBox headerBar = new HBox();
         headerBar.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-        
+
         titleLabel = new Label(groupName);
         titleLabel.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: #3730A3;");
-        javafx.scene.layout.Region spacer = new javafx.scene.layout.Region();
-        javafx.scene.layout.HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
-        
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
         toggleBtn = new Label("-");
         toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #3730A3; -fx-background-color: rgba(99,102,241,0.12); -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;");
         toggleBtn.setOnMouseClicked(e -> {
@@ -111,62 +111,62 @@ public class GroupContainer extends StackPane {
         });
         toggleBtn.setOnMouseEntered(e -> toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: white; -fx-background-color: #6366F1; -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;"));
         toggleBtn.setOnMouseExited(e -> toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #3730A3; -fx-background-color: rgba(99,102,241,0.12); -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;"));
-        
+
         // 缩放比例显示标签
         zoomLabel = new Label("100%");
         zoomLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #6366F1; -fx-background-color: rgba(99,102,241,0.12); -fx-padding: 2 6 2 6; -fx-background-radius: 4;");
-        
+
         headerBar.getChildren().addAll(titleLabel, spacer, zoomLabel, toggleBtn);
         header.getChildren().add(headerBar);
-        
+
         contentLayer = new Pane();
         contentLayer.setPickOnBounds(false);
         contentLayer.setStyle("-fx-background-color: transparent;");
-        
+
         // 连接点层置顶、不可拦截事件
         connectorPane.setPickOnBounds(false);
         connectorPane.setMouseTransparent(false);
-        for (javafx.scene.shape.Circle c : new javafx.scene.shape.Circle[]{topConnector, bottomConnector, leftConnector, rightConnector}) {
+        for (Circle c : new Circle[]{topConnector, bottomConnector, leftConnector, rightConnector}) {
             c.setRadius(5); // 与普通节点一致
             c.setFill(Color.web("#8B5CF6")); // 与普通节点默认紫色一致
             c.setStroke(Color.WHITE);
             c.setStrokeWidth(2);
             c.setVisible(false); // 初始隐藏，悬停显示
             c.setMouseTransparent(false);
-            c.setCursor(javafx.scene.Cursor.CROSSHAIR);
+            c.setCursor(Cursor.CROSSHAIR);
             // 轻微投影
             c.setStyle("-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 2, 0, 0, 0.5);");
             c.setOnMouseEntered(ev -> {
                 c.setFill(Color.web("#A78BFA")); // 浅紫
-                c.setCursor(javafx.scene.Cursor.CROSSHAIR);
+                c.setCursor(Cursor.CROSSHAIR);
             });
             c.setOnMouseExited(ev -> {
                 c.setFill(Color.web("#8B5CF6"));
             });
         }
-        
+
         VBox container = new VBox();
         container.getChildren().addAll(header, contentLayer);
         container.setPickOnBounds(false);
         // ⭐ 修复：确保container可以接收鼠标事件，以便触发右键菜单
         container.setMouseTransparent(false);
-        
+
         // ⭐ 新增：初始化调整大小控制点
         setupResizeHandles();
-        
+
         // 作为顶层叠加：frame < container < connectorPane < resizeHandles（调整大小控制点在最上层）
         getChildren().addAll(frame, container, connectorPane);
         getChildren().addAll(topLeftResizeHandle, topRightResizeHandle, bottomLeftResizeHandle, bottomRightResizeHandle);
-        
+
         // ⭐ 修复：确保调整大小控制点始终在最上层，并且可以接收鼠标事件
         topLeftResizeHandle.toFront();
         topRightResizeHandle.toFront();
         bottomLeftResizeHandle.toFront();
         bottomRightResizeHandle.toFront();
-        
+
         // 拖拽移动容器
         enableDrag();
-        
+
         // 双击标题切换展开/收起
         header.setOnMouseClicked(e -> {
             if (e.getButton() == MouseButton.PRIMARY && e.getClickCount() == 2) {
@@ -174,7 +174,7 @@ public class GroupContainer extends StackPane {
                 e.consume();
             }
         });
-        
+
         // 双击缩放标签重置缩放
         zoomLabel.setOnMouseClicked(e -> {
             if (e.getButton() == MouseButton.PRIMARY && e.getClickCount() == 2) {
@@ -182,21 +182,21 @@ public class GroupContainer extends StackPane {
                 e.consume();
             }
         });
-        
+
         // Ctrl+滚轮缩放（在整个容器上）
-        addEventFilter(javafx.scene.input.ScrollEvent.SCROLL, e -> {
+        addEventFilter(ScrollEvent.SCROLL, e -> {
             if (e.isControlDown() && expanded) {
                 double delta = e.getDeltaY() > 0 ? 0.1 : -0.1;
                 setZoom(zoom + delta);
                 e.consume();
             }
         });
-        
+
         // 右键菜单
         setupContextMenu();
-        
+
         updateFrameSize();
-        
+
         // 初始化连接点位置绑定到外框
         layoutConnectors();
         // 默认隐藏，悬停显示（与普通节点一致）
@@ -220,7 +220,7 @@ public class GroupContainer extends StackPane {
             bottomRightResizeHandle.setVisible(false);
         });
     }
-    
+
     private void layoutConnectors() {
         // connectorPane 尺寸与 frame 一致覆盖
         connectorPane.prefWidthProperty().bind(frame.widthProperty());
@@ -229,34 +229,34 @@ public class GroupContainer extends StackPane {
         connectorPane.minHeightProperty().bind(frame.heightProperty());
         connectorPane.maxWidthProperty().bind(frame.widthProperty());
         connectorPane.maxHeightProperty().bind(frame.heightProperty());
-        
+
         // 连接点相对 frame 四边定位（与普通节点一致：位于边缘正中）
         topConnector.layoutXProperty().bind(frame.widthProperty().divide(2));
         topConnector.layoutYProperty().set(0);
-        
+
         bottomConnector.layoutXProperty().bind(frame.widthProperty().divide(2));
         bottomConnector.layoutYProperty().bind(frame.heightProperty());
-        
+
         leftConnector.layoutXProperty().set(0);
         leftConnector.layoutYProperty().bind(frame.heightProperty().divide(2));
-        
+
         rightConnector.layoutXProperty().bind(frame.widthProperty());
         rightConnector.layoutYProperty().bind(frame.heightProperty().divide(2));
-        
+
         if (!connectorPane.getChildren().contains(topConnector)) {
             connectorPane.getChildren().addAll(topConnector, bottomConnector, leftConnector, rightConnector);
         }
-        
+
         // ⭐ 新增：更新调整大小控制点位置
         updateResizeHandlesPosition();
-        
+
         // ⭐ 修复：确保调整大小控制点始终在最上层
         topLeftResizeHandle.toFront();
         topRightResizeHandle.toFront();
         bottomLeftResizeHandle.toFront();
         bottomRightResizeHandle.toFront();
     }
-    
+
     private void setConnectorVisible(boolean visible) {
         topConnector.setVisible(visible);
         bottomConnector.setVisible(visible);
@@ -266,7 +266,7 @@ public class GroupContainer extends StackPane {
         bottomConnector.setManaged(visible);
         leftConnector.setManaged(visible);
         rightConnector.setManaged(visible);
-        
+
         // ⭐ 新增：调整大小控制点也跟随连接点的显示/隐藏
         topLeftResizeHandle.setVisible(visible && expanded);
         topRightResizeHandle.setVisible(visible && expanded);
@@ -277,13 +277,13 @@ public class GroupContainer extends StackPane {
         bottomLeftResizeHandle.setManaged(visible && expanded);
         bottomRightResizeHandle.setManaged(visible && expanded);
     }
-    
+
     /**
      * ⭐ 新增：设置调整大小控制点
      */
     private void setupResizeHandles() {
         // 设置控制点样式
-        for (javafx.scene.shape.Circle handle : new javafx.scene.shape.Circle[]{
+        for (Circle handle : new Circle[]{
             topLeftResizeHandle, topRightResizeHandle, bottomLeftResizeHandle, bottomRightResizeHandle
         }) {
             handle.setStroke(Color.WHITE);
@@ -293,7 +293,7 @@ public class GroupContainer extends StackPane {
             handle.setManaged(false);
             handle.setPickOnBounds(true);
             handle.setMouseTransparent(false); // ⭐ 修复：确保可以接收鼠标事件
-            
+
             // 鼠标悬停效果
             handle.setOnMouseEntered(e -> {
                 handle.setFill(Color.web("#4F46E5"));
@@ -303,7 +303,7 @@ public class GroupContainer extends StackPane {
                 handle.setFill(Color.web("#6366F1"));
                 handle.setRadius(6);
             });
-            
+
             // ⭐ 修复：为调整大小控制点添加右键事件处理，确保右键菜单可以显示
             handle.setOnContextMenuRequested(e -> {
                 // 直接显示容器的右键菜单
@@ -319,52 +319,52 @@ public class GroupContainer extends StackPane {
                 e.consume();
             });
         }
-        
+
         // 设置不同角的鼠标样式
         topLeftResizeHandle.setCursor(Cursor.NW_RESIZE);
         topRightResizeHandle.setCursor(Cursor.NE_RESIZE);
         bottomLeftResizeHandle.setCursor(Cursor.SW_RESIZE);
         bottomRightResizeHandle.setCursor(Cursor.SE_RESIZE);
-        
+
         // 绑定控制点位置到frame的四个角
         updateResizeHandlesPosition();
-        
+
         // 为每个控制点添加拖动事件
         setupResizeHandleDrag(topLeftResizeHandle, true, true);
         setupResizeHandleDrag(topRightResizeHandle, false, true);
         setupResizeHandleDrag(bottomLeftResizeHandle, true, false);
         setupResizeHandleDrag(bottomRightResizeHandle, false, false);
     }
-    
+
     /**
      * ⭐ 新增：更新调整大小控制点的位置
      */
     private void updateResizeHandlesPosition() {
         double width = frame.getWidth();
         double height = frame.getHeight();
-        
+
         topLeftResizeHandle.setLayoutX(0);
         topLeftResizeHandle.setLayoutY(0);
-        
+
         topRightResizeHandle.setLayoutX(width);
         topRightResizeHandle.setLayoutY(0);
-        
+
         bottomLeftResizeHandle.setLayoutX(0);
         bottomLeftResizeHandle.setLayoutY(height);
-        
+
         bottomRightResizeHandle.setLayoutX(width);
         bottomRightResizeHandle.setLayoutY(height);
     }
-    
+
     /**
      * ⭐ 新增：为调整大小控制点设置拖动事件
      * @param handle 控制点
      * @param adjustLeft 是否调整左边界
      * @param adjustTop 是否调整上边界
      */
-    private void setupResizeHandleDrag(javafx.scene.shape.Circle handle, boolean adjustLeft, boolean adjustTop) {
+    private void setupResizeHandleDrag(Circle handle, boolean adjustLeft, boolean adjustTop) {
         final double[] dragStart = new double[4]; // [startX, startY, startWidth, startHeight]
-        
+
         handle.setOnMousePressed(e -> {
             if (e.isPrimaryButtonDown() && expanded) {
                 dragStart[0] = e.getSceneX();
@@ -374,20 +374,20 @@ public class GroupContainer extends StackPane {
                 e.consume();
             }
         });
-        
+
         handle.setOnMouseDragged(e -> {
             if (e.isPrimaryButtonDown() && expanded) {
                 isResizing = true;
                 try {
                     double deltaX = e.getSceneX() - dragStart[0];
                     double deltaY = e.getSceneY() - dragStart[1];
-                    
+
                     // 计算新的容器位置和大小
                     double newX = getLayoutX();
                     double newY = getLayoutY();
                     double newWidth = dragStart[2];
                     double newHeight = dragStart[3];
-                    
+
                     // 根据拖动的角调整相应的边界
                     if (adjustLeft) {
                         // 调整左边界
@@ -397,7 +397,7 @@ public class GroupContainer extends StackPane {
                         // 调整右边界
                         newWidth = dragStart[2] + deltaX;
                     }
-                    
+
                     if (adjustTop) {
                         // 调整上边界
                         newY = getLayoutY() + deltaY;
@@ -406,12 +406,12 @@ public class GroupContainer extends StackPane {
                         // 调整下边界
                         newHeight = dragStart[3] + deltaY;
                     }
-                    
+
                     // 计算包含所有子节点的最小尺寸
                     double[] minSize = calculateMinSize();
                     double minWidth = minSize[0];
                     double minHeight = minSize[1];
-                    
+
                     // 确保容器大小不小于最小尺寸
                     if (newWidth < minWidth) {
                         if (adjustLeft) {
@@ -425,17 +425,17 @@ public class GroupContainer extends StackPane {
                         }
                         newHeight = minHeight;
                     }
-                    
+
                     // 确保容器位置不小于0
                     newX = Math.max(0, newX);
                     newY = Math.max(0, newY);
-                    
+
                     // 更新容器位置和大小
                     setLayoutX(newX);
                     setLayoutY(newY);
                     frame.setWidth(newWidth);
                     frame.setHeight(newHeight);
-                    
+
                     // 更新连接点和调整大小控制点的位置
                     layoutConnectors();
                     updateResizeHandlesPosition();
@@ -446,7 +446,7 @@ public class GroupContainer extends StackPane {
             }
         });
     }
-    
+
     /**
      * ⭐ 新增：计算包含所有子节点的最小尺寸
      * @return [minWidth, minHeight]
@@ -455,7 +455,7 @@ public class GroupContainer extends StackPane {
         double padding = 24;
         double minWidth = 320; // 默认最小宽度
         double minHeight = 160; // 默认最小高度
-        
+
         if (!managedCanvasNodes.isEmpty()) {
             double minX = Double.MAX_VALUE, minY = Double.MAX_VALUE, maxX = 0, maxY = 0;
             for (ProcessNode n : managedCanvasNodes) {
@@ -463,13 +463,13 @@ public class GroupContainer extends StackPane {
                 double nodeY = n.getLayoutY();
                 double nodeWidth = n.getPrefWidth();
                 double nodeHeight = n.getPrefHeight();
-                
+
                 minX = Math.min(minX, nodeX);
                 minY = Math.min(minY, nodeY);
                 maxX = Math.max(maxX, nodeX + nodeWidth);
                 maxY = Math.max(maxY, nodeY + nodeHeight);
             }
-            
+
             // 计算相对于容器位置的尺寸
             double containerX = getLayoutX();
             double containerY = getLayoutY();
@@ -477,36 +477,36 @@ public class GroupContainer extends StackPane {
             double relativeMinY = minY - containerY;
             double relativeMaxX = maxX - containerX;
             double relativeMaxY = maxY - containerY;
-            
+
             minWidth = Math.max(320, relativeMaxX - relativeMinX + padding * 2);
             minHeight = Math.max(160, relativeMaxY - relativeMinY + padding * 2 + header.getHeight());
         }
-        
+
         return new double[]{minWidth, minHeight};
     }
-    
+
     private void setupContextMenu() {
         contextMenu = new ContextMenu();
-        
+
         MenuItem expandItem = new MenuItem();
         updateExpandMenuItemText(expandItem);
         expandItem.setOnAction(e -> {
             toggle();
             updateExpandMenuItemText(expandItem);
         });
-        
+
         MenuItem zoomInItem = new MenuItem("放大 (+10%)");
         zoomInItem.setOnAction(e -> setZoom(Math.min(2.0, zoom + 0.1)));
-        
+
         MenuItem zoomOutItem = new MenuItem("缩小 (-10%)");
         zoomOutItem.setOnAction(e -> setZoom(Math.max(0.5, zoom - 0.1)));
-        
+
         MenuItem resetZoomItem = new MenuItem("重置缩放 (100%)");
         resetZoomItem.setOnAction(e -> setZoom(1.0));
-        
+
         // 分隔符
         SeparatorMenuItem separator2 = new SeparatorMenuItem();
-        
+
         // 删除节点
         MenuItem deleteItem = new MenuItem("删除节点");
         deleteItem.setStyle("-fx-text-fill: #EF4444;"); // 红色文字
@@ -519,31 +519,31 @@ public class GroupContainer extends StackPane {
                 System.err.println("错误：onDelete回调为null，无法删除任务组节点！");
             }
         });
-        
-        contextMenu.getItems().addAll(expandItem, new SeparatorMenuItem(), 
+
+        contextMenu.getItems().addAll(expandItem, new SeparatorMenuItem(),
                 zoomInItem, zoomOutItem, resetZoomItem, separator2, deleteItem);
-        
+
         // 右键显示菜单时更新展开/收起文本
         setOnContextMenuRequested(e -> {
             updateExpandMenuItemText(expandItem);
             contextMenu.show(this, e.getScreenX(), e.getScreenY());
             e.consume();
         });
-        
+
         // ⭐ 修复：为frame添加右键事件转发，确保点击frame时也能显示右键菜单
         frame.setOnContextMenuRequested(e -> {
             updateExpandMenuItemText(expandItem);
             contextMenu.show(this, e.getScreenX(), e.getScreenY());
             e.consume();
         });
-        
+
         // ⭐ 修复：为header添加右键事件转发（但header已经有双击事件，需要确保右键也能工作）
         header.setOnContextMenuRequested(e -> {
             updateExpandMenuItemText(expandItem);
             contextMenu.show(this, e.getScreenX(), e.getScreenY());
             e.consume();
         });
-        
+
         // ⭐ 修复：为contentLayer添加右键事件转发
         contentLayer.setOnContextMenuRequested(e -> {
             updateExpandMenuItemText(expandItem);
@@ -551,11 +551,11 @@ public class GroupContainer extends StackPane {
             e.consume();
         });
     }
-    
+
     private void updateExpandMenuItemText(MenuItem item) {
         item.setText(expanded ? "收起" : "展开");
     }
-    
+
     private void enableDrag() {
         final double[] delta = new double[2];
         header.setCursor(Cursor.MOVE);
@@ -595,30 +595,30 @@ public class GroupContainer extends StackPane {
             }
         });
     }
-    
+
     public void addInnerNode(ProcessNode node) {
         innerNodes.add(node);
         contentLayer.getChildren().add(node);
         updateFrameSize();
     }
-    
+
     public void addInnerNodes(List<ProcessNode> nodes) {
         for (ProcessNode n : nodes) {
             addInnerNode(n);
         }
     }
-    
+
     public List<ProcessNode> getInnerNodes() {
         return new ArrayList<>(innerNodes);
     }
-    
+
     /**
      * ⭐ 新增：获取管理的画布节点列表（用于嵌套任务组）
      */
     public List<ProcessNode> getManagedCanvasNodes() {
         return new ArrayList<>(managedCanvasNodes);
     }
-    
+
     /**
      * 绑定管理一组已经在画布上的节点（不作为子节点添加，只负责折叠显示与测量外框）
      */
@@ -635,12 +635,12 @@ public class GroupContainer extends StackPane {
             }
         }
         originalPositionCallbacks.clear();
-        
+
         managedCanvasNodes.clear();
         if (nodesOnCanvas != null) {
             managedCanvasNodes.addAll(nodesOnCanvas);
         }
-        
+
         // ⭐ 新增：为每个子节点添加位置变化监听器，当节点移动时自动更新容器大小
         for (ProcessNode node : managedCanvasNodes) {
             if (node != null) {
@@ -652,7 +652,7 @@ public class GroupContainer extends StackPane {
                 });
             }
         }
-        
+
         // 计算参考原点与相对位置
         if (!managedCanvasNodes.isEmpty()) {
             double minX = Double.MAX_VALUE, minY = Double.MAX_VALUE;
@@ -671,7 +671,7 @@ public class GroupContainer extends StackPane {
             updateFrameFromManagedNodes();
         }
     }
-    
+
     /**
      * ⭐ 新增：检查子节点是否超出容器边界，如果超出则自动扩大容器
      */
@@ -680,7 +680,7 @@ public class GroupContainer extends StackPane {
         if (isContainerDragging || isResizing || managedCanvasNodes.isEmpty() || !expanded) {
             return;
         }
-        
+
         // 计算所有子节点的边界
         double minX = Double.MAX_VALUE, minY = Double.MAX_VALUE, maxX = 0, maxY = 0;
         for (ProcessNode n : managedCanvasNodes) {
@@ -688,74 +688,74 @@ public class GroupContainer extends StackPane {
             double nodeY = n.getLayoutY();
             double nodeWidth = n.getPrefWidth();
             double nodeHeight = n.getPrefHeight();
-            
+
             minX = Math.min(minX, nodeX);
             minY = Math.min(minY, nodeY);
             maxX = Math.max(maxX, nodeX + nodeWidth);
             maxY = Math.max(maxY, nodeY + nodeHeight);
         }
-        
+
         // 计算当前容器的边界
         double containerX = getLayoutX();
         double containerY = getLayoutY();
         double containerWidth = frame.getWidth();
         double containerHeight = frame.getHeight();
-        
+
         // 计算需要的padding
         double padding = 24;
         double requiredMinX = minX - padding;
         double requiredMinY = minY - padding - header.getHeight();
-        
+
         // 检查是否需要调整容器
         boolean needUpdate = false;
         double newX = containerX;
         double newY = containerY;
         double newWidth = containerWidth;
         double newHeight = containerHeight;
-        
+
         // 如果子节点超出了容器的左边界，需要向左扩展
         if (requiredMinX < containerX) {
             newX = Math.max(0, requiredMinX);
             newWidth = containerWidth + (containerX - newX);
             needUpdate = true;
         }
-        
+
         // 如果子节点超出了容器的上边界，需要向上扩展
         if (requiredMinY < containerY) {
             newY = Math.max(0, requiredMinY);
             newHeight = containerHeight + (containerY - newY);
             needUpdate = true;
         }
-        
+
         // 如果子节点超出了容器的右边界，需要向右扩展
         if (maxX + padding > containerX + containerWidth) {
             newWidth = Math.max(newWidth, maxX + padding - newX);
             needUpdate = true;
         }
-        
+
         // 如果子节点超出了容器的下边界，需要向下扩展
         if (maxY + padding > containerY + containerHeight) {
             newHeight = Math.max(newHeight, maxY + padding - newY);
             needUpdate = true;
         }
-        
+
         // 如果容器需要更新，调整容器的大小和位置
         if (needUpdate) {
             // 确保最小尺寸
             newWidth = Math.max(320, newWidth);
             newHeight = Math.max(160, newHeight);
-            
+
             // 更新容器位置和大小
             setLayoutX(newX);
             setLayoutY(newY);
             frame.setWidth(newWidth);
             frame.setHeight(newHeight);
-            
+
             // 更新连接点位置
             layoutConnectors();
             // ⭐ 新增：更新调整大小控制点位置
             updateResizeHandlesPosition();
-            
+
             // 更新参考原点
             originX = minX;
             originY = minY;
@@ -765,7 +765,7 @@ public class GroupContainer extends StackPane {
             }
         }
     }
-    
+
     /**
      * 绑定管理这些节点之间的连线，折叠时隐藏、展开时显示
      */
@@ -777,14 +777,14 @@ public class GroupContainer extends StackPane {
             ensureConnectionsOnTop();
         }
     }
-    
+
     /**
      * ⭐ 新增：获取管理的连接列表
      */
     public List<NodeConnection> getManagedConnections() {
         return new ArrayList<>(managedConnections);
     }
-    
+
     /**
      * ⭐ 修复：确保任务组容器内的边的Z-order高于容器本身
      */
@@ -796,11 +796,11 @@ public class GroupContainer extends StackPane {
             }
         }
     }
-    
+
     public boolean isExpanded() {
         return expanded;
     }
-    
+
     public void expand() {
         if (!expanded) {
             expanded = true;
@@ -826,7 +826,7 @@ public class GroupContainer extends StackPane {
             }
         }
     }
-    
+
     public void collapse() {
         if (expanded) {
             expanded = false;
@@ -847,15 +847,15 @@ public class GroupContainer extends StackPane {
             toggleBtn.setText("+"); // 收起时显示“+”（点击展开）
         }
     }
-    
+
     public void toggle() {
         if (expanded) collapse(); else expand();
     }
-    
+
     public void setOnExpand(Runnable onExpand) {
         this.onExpand = onExpand;
     }
-    
+
     public void setOnDelete(Runnable onDelete) {
         this.onDelete = onDelete;
     }
@@ -936,14 +936,14 @@ public class GroupContainer extends StackPane {
         setLayoutY(Math.max(0, minY - (padding + header.getHeight())));
         return true;
     }
-    
+
     /**
      * ⭐ 新增：获取框架矩形（用于嵌套任务组的边界计算）
      */
     public Rectangle getFrame() {
         return frame;
     }
-    
+
     /**
      * 设置缩放倍数（0.5 ~ 2.0），对受管节点相对参考点缩放布局，实现"缩放展开"
      */
@@ -953,11 +953,11 @@ public class GroupContainer extends StackPane {
             return;
         }
         this.zoom = clamped;
-        
+
         // 更新缩放比例显示
         int zoomPercent = (int) Math.round(zoom * 100);
         zoomLabel.setText(zoomPercent + "%");
-        
+
         if (!managedCanvasNodes.isEmpty() && !baseRelativePos.isEmpty()) {
             for (ProcessNode n : managedCanvasNodes) {
                 double[] base = baseRelativePos.get(n);
@@ -971,31 +971,31 @@ public class GroupContainer extends StackPane {
             updateFrameFromManagedNodes();
         }
     }
-    
+
     public double getZoom() {
         return zoom;
     }
-    
+
     public Long getGroupId() {
         return groupId;
     }
-    
+
     public String getGroupName() {
         return groupName;
     }
-    
+
     public String getNodeId() {
         return nodeId;
     }
-    
+
     // 暴露连接点与承载层，供 NodeCanvas 统一处理
     public Pane getConnectorPane() {
         return connectorPane;
     }
-    public javafx.scene.shape.Circle getTopConnector() { return topConnector; }
-    public javafx.scene.shape.Circle getBottomConnector() { return bottomConnector; }
-    public javafx.scene.shape.Circle getLeftConnector() { return leftConnector; }
-    public javafx.scene.shape.Circle getRightConnector() { return rightConnector; }
+    public Circle getTopConnector() { return topConnector; }
+    public Circle getBottomConnector() { return bottomConnector; }
+    public Circle getLeftConnector() { return leftConnector; }
+    public Circle getRightConnector() { return rightConnector; }
 }
 
 

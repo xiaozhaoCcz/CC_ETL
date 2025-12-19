@@ -2,8 +2,10 @@ package com.cc.job.gui.manager;
 
 import com.cc.job.gui.model.NodeConnection;
 import com.cc.job.gui.model.ProcessNode;
+import javafx.scene.Node;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Rectangle;
 
 import java.util.*;
 import java.util.function.Consumer;
@@ -20,8 +22,8 @@ public class CanvasSelectionManager {
     private final Runnable notifyChanged;
     
     private boolean selectionMode = false;
-    private javafx.scene.shape.Rectangle selectionRect;
-    private javafx.scene.shape.Rectangle selectionBoundingBox;
+    private Rectangle selectionRect;
+    private Rectangle selectionBoundingBox;
     private double selectionStartX;
     private double selectionStartY;
     private Set<ProcessNode> selectedNodes = new HashSet<>();
@@ -42,7 +44,7 @@ public class CanvasSelectionManager {
     }
     
     private void initializeSelectionRectangles() {
-        selectionRect = new javafx.scene.shape.Rectangle();
+        selectionRect = new Rectangle();
         selectionRect.setFill(Color.web("#2563EB", 0.1));
         selectionRect.setStroke(Color.web("#2563EB"));
         selectionRect.setStrokeWidth(2);
@@ -51,7 +53,7 @@ public class CanvasSelectionManager {
         selectionRect.setMouseTransparent(true);
         canvas.getChildren().add(selectionRect);
         
-        selectionBoundingBox = new javafx.scene.shape.Rectangle();
+        selectionBoundingBox = new Rectangle();
         selectionBoundingBox.setFill(Color.TRANSPARENT);
         selectionBoundingBox.setStroke(Color.web("#EF4444"));
         selectionBoundingBox.setStrokeWidth(2);
@@ -169,8 +171,8 @@ public class CanvasSelectionManager {
         }
         
         for (NodeConnection connection : connections) {
-            javafx.scene.Node sourceOwner = connection.getSourceOwner();
-            javafx.scene.Node targetOwner = connection.getTargetOwner();
+            Node sourceOwner = connection.getSourceOwner();
+            Node targetOwner = connection.getTargetOwner();
             
             if (sourceOwner instanceof ProcessNode && targetOwner instanceof ProcessNode) {
                 ProcessNode sourceNode = (ProcessNode) sourceOwner;

@@ -1,10 +1,13 @@
 package com.cc.job.gui.manager;
 
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.scene.control.*;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.KeyCode;
+import javafx.util.Duration;
 import org.fxmisc.flowless.VirtualizedScrollPane;
 import org.fxmisc.richtext.CodeArea;
 
@@ -125,9 +128,9 @@ public class LogContentManager {
         codeArea.textProperty().addListener((obs, oldText, newText) -> {
             if (autoScrollToBottom && newText != null && !newText.equals(oldText)) {
                 Platform.runLater(() -> {
-                    javafx.animation.Timeline scrollTimeline = new javafx.animation.Timeline(
-                        new javafx.animation.KeyFrame(
-                            javafx.util.Duration.millis(50),
+                    Timeline scrollTimeline = new Timeline(
+                        new KeyFrame(
+                            Duration.millis(50),
                             e -> {
                                 codeArea.moveTo(codeArea.getLength());
                                 codeArea.requestFollowCaret();

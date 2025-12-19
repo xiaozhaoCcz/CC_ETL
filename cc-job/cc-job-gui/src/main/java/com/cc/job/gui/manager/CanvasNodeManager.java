@@ -2,6 +2,9 @@ package com.cc.job.gui.manager;
 
 import com.cc.job.gui.model.NodeConnection;
 import com.cc.job.gui.model.ProcessNode;
+import com.cc.job.gui.util.NodeStatusSyncManager;
+import javafx.geometry.Point2D;
+import javafx.scene.Node;
 import javafx.scene.layout.Pane;
 import javafx.scene.shape.Circle;
 
@@ -58,8 +61,8 @@ public class CanvasNodeManager {
         
         List<NodeConnection> attachedConnections = new ArrayList<>();
         for (NodeConnection conn : new ArrayList<>(connections)) {
-            javafx.scene.Node sourceOwner = conn.getSourceOwner();
-            javafx.scene.Node targetOwner = conn.getTargetOwner();
+            Node sourceOwner = conn.getSourceOwner();
+            Node targetOwner = conn.getTargetOwner();
             
             if ((sourceOwner instanceof ProcessNode && sourceOwner == node) ||
                 (targetOwner instanceof ProcessNode && targetOwner == node)) {
@@ -100,7 +103,7 @@ public class CanvasNodeManager {
             Long nodeJobId = node.getJobId();
             if (nodeJobId != null && nodeJobId.equals(jobId)) {
                 node.updateStatusByCode(statusCode);
-                com.cc.job.gui.util.NodeStatusSyncManager.getInstance().addPendingUpdate(jobId, statusCode);
+                NodeStatusSyncManager.getInstance().addPendingUpdate(jobId, statusCode);
                 break;
             }
         }
@@ -110,7 +113,7 @@ public class CanvasNodeManager {
      * 刷新所有节点状态从缓存
      */
     public void refreshAllNodeStatusFromCache() {
-        com.cc.job.gui.util.NodeStatusSyncManager statusManager = com.cc.job.gui.util.NodeStatusSyncManager.getInstance();
+        NodeStatusSyncManager statusManager = NodeStatusSyncManager.getInstance();
         
         for (ProcessNode node : nodes) {
             Long jobId = node.getJobId();
@@ -156,12 +159,12 @@ public class CanvasNodeManager {
         double minDistance = Double.MAX_VALUE;
         
         for (Circle connector : connectors) {
-            javafx.geometry.Point2D connectorCenter = new javafx.geometry.Point2D(
+            Point2D connectorCenter = new Point2D(
                 connector.getLayoutX() + connector.getRadius(),
                 connector.getLayoutY() + connector.getRadius()
             );
-            javafx.geometry.Point2D nodeLocal = node.getConnectorPane().localToParent(connectorCenter);
-            javafx.geometry.Point2D canvasLocal = node.localToParent(nodeLocal);
+            Point2D nodeLocal = node.getConnectorPane().localToParent(connectorCenter);
+            Point2D canvasLocal = node.localToParent(nodeLocal);
             
             double dx = canvasLocal.getX() - x;
             double dy = canvasLocal.getY() - y;

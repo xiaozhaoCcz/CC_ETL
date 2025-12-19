@@ -3,6 +3,7 @@ package com.cc.job.gui.manager;
 import com.cc.job.gui.model.*;
 import com.cc.job.gui.service.*;
 import com.cc.job.gui.util.ApiUtil;
+import com.cc.job.gui.util.NodeStatusSyncManager;
 import com.cc.job.gui.view.*;
 import com.cc.job.xo.model.form.JobInfoForm;
 import javafx.application.Platform;
@@ -60,7 +61,7 @@ public class DataManager {
                 JobComposeData composeData = jobPartService.getJobCompose(taskId);
                 
                 Platform.runLater(() -> {
-                    com.cc.job.gui.util.NodeStatusSyncManager.getInstance().clearCacheForTaskGroupSwitch();
+                    NodeStatusSyncManager.getInstance().clearCacheForTaskGroupSwitch();
                     
                     if (composeData != null) {
                         canvas.loadFromComposeData(composeData);

@@ -1,6 +1,7 @@
 package com.cc.job.gui.manager;
 
 import com.cc.job.gui.model.ProcessNode;
+import com.cc.job.gui.service.JobInfoService;
 import com.cc.job.gui.view.LogPanel;
 import com.cc.job.gui.view.NodeCanvas;
 import javafx.application.Platform;
@@ -81,7 +82,7 @@ public class NodeCallbackConfigurator {
         });
         
         // 禁用/启用回调 - nodeJobId 已经是参数传入的，不需要修改
-        node.setOnDisable(new com.cc.job.gui.model.ProcessNode.DisableNodeCallback() {
+        node.setOnDisable(new ProcessNode.DisableNodeCallback() {
             @Override
             public void onDisableNode(Long nodeJobId, boolean isDisabled) {
                 if (nodeJobId == null) {
@@ -95,7 +96,7 @@ public class NodeCallbackConfigurator {
                 
                 new Thread(() -> {
                     try {
-                        com.cc.job.gui.service.JobInfoService jobInfoService = new com.cc.job.gui.service.JobInfoService();
+                        JobInfoService jobInfoService = new JobInfoService();
                         Integer isPause = isDisabled ? 1 : 0;
                         boolean success = jobInfoService.pauseJob(nodeJobId, isPause);
                         

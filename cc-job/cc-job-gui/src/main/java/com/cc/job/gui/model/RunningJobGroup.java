@@ -1,5 +1,7 @@
 package com.cc.job.gui.model;
 
+import java.util.Timer;
+
 /**
  * 运行中的任务组信息
  * 用于跟踪多个同时运行的任务组
@@ -9,7 +11,7 @@ public class RunningJobGroup {
     private String jobName;
     private String randomId;
     private Long logId;
-    private java.util.Timer logTimer;
+    private Timer logTimer;
     private int fromLineNum;
     private int pullFailCount;
     private boolean isRunning;

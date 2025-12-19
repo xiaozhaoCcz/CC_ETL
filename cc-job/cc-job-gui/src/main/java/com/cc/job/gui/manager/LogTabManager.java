@@ -4,6 +4,7 @@ import com.cc.job.gui.util.StyleUtil;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
+import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
@@ -123,7 +124,7 @@ public class LogTabManager {
             nameLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: " + StyleUtil.GRAY_600 + "; -fx-font-weight: 600;");
             nameLabel.setPrefWidth(100);
             nameLabel.setMaxWidth(100);
-            nameLabel.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
+            nameLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
             Tooltip.install(nameLabel, new Tooltip(taskGroupName));
             
             Label closeIcon = new Label("×");

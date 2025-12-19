@@ -7,6 +7,7 @@ import com.cc.job.xo.model.dto.JobInfoTriggerDto;
 import com.cc.job.xo.model.entity.JobEdge;
 import com.cc.job.xo.model.entity.JobLogglue;
 import com.cc.job.xo.model.entity.JobNode;
+import com.cc.job.xo.model.form.JobEdgeForm;
 import com.cc.job.xo.model.form.JobGlueForm;
 import com.cc.job.xo.model.form.JobInfoForm;
 import com.cc.job.xo.model.query.JobInfoQuery;
@@ -16,6 +17,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -342,7 +345,7 @@ public class JobInfoService extends BaseService {
         String path;
         if (glueType != null && !glueType.trim().isEmpty()) {
             path = "/api/v1/jobInfos/getGlueList/" + id + "/" + 
-                   java.net.URLEncoder.encode(glueType, java.nio.charset.StandardCharsets.UTF_8);
+                   URLEncoder.encode(glueType, StandardCharsets.UTF_8);
         } else {
             path = "/api/v1/jobInfos/getGlueList/" + id;
         }
@@ -358,7 +361,7 @@ public class JobInfoService extends BaseService {
      * @return 保存后的连线实体
      * @throws IOException 网络异常
      */
-    public JobEdge saveJobEdge(com.cc.job.xo.model.form.JobEdgeForm formData) throws IOException {
+    public JobEdge saveJobEdge(JobEdgeForm formData) throws IOException {
         Result<JobEdge> result = httpClient.post("/api/v1/jobInfos/saveJobEdge", formData, JobEdge.class);
         return httpClient.extractData(result, "保存连线失败");
     }

@@ -1,6 +1,8 @@
 package com.cc.job.gui;
 
 import atlantafx.base.theme.PrimerLight;
+import com.cc.job.gui.service.SSEService;
+import com.cc.job.gui.util.NodeStatusSyncManager;
 import com.cc.job.gui.util.SessionManager;
 import com.cc.job.gui.view.LoginView;
 import com.cc.job.gui.view.RegisterView;
@@ -220,10 +222,10 @@ public class CcJobGuiApplication extends Application {
                         }
                         
                         // 2. 断开所有SSE连接（快速操作，双重保险）
-                        com.cc.job.gui.service.SSEService.getInstance().disconnectAll();
+                        SSEService.getInstance().disconnectAll();
                         
                         // 3. 快速关闭NodeStatusSyncManager（已优化，最多阻塞1秒）
-                        com.cc.job.gui.util.NodeStatusSyncManager.getInstance().shutdown();
+                        NodeStatusSyncManager.getInstance().shutdown();
                         
                         // 4. 退出登录（快速操作）
                         SessionManager.getInstance().logout();
@@ -255,7 +257,7 @@ public class CcJobGuiApplication extends Application {
     public void stop() throws Exception {
         // ⭐ 确保所有待更新的节点状态都已同步到数据库
         try {
-            com.cc.job.gui.util.NodeStatusSyncManager.getInstance().shutdown();
+            NodeStatusSyncManager.getInstance().shutdown();
         } catch (Exception e) {
         }
         

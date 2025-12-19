@@ -1,9 +1,13 @@
 package com.cc.job.gui.manager;
 
+import com.cc.job.gui.model.ProcessNode;
 import com.cc.job.gui.model.RunningJobGroup;
 import com.cc.job.gui.service.JobInfoService;
 import com.cc.job.gui.service.JobLogService;
 import com.cc.job.gui.service.SSEService;
+import com.cc.job.gui.util.ApiUtil;
+import com.cc.job.gui.util.NotificationToast;
+import com.cc.job.gui.util.SessionManager;
 import com.cc.job.gui.util.SnowflakeIdGenerator;
 import com.cc.job.gui.view.LogPanel;
 import com.cc.job.gui.view.NodeCanvas;
@@ -57,8 +61,8 @@ public class TaskExecutionManager {
         // 检查本地状态
         RunningJobGroup existingJob = runningJobs.get(currentJobId);
         if (existingJob != null && existingJob.isRunning()) {
-            com.cc.job.gui.util.NotificationToast.show("任务组"+ currentJobId + " 正在运行中，请稍后再试", 
-                com.cc.job.gui.util.NotificationToast.NotificationType.WARNING);
+           NotificationToast.show("任务组"+ currentJobId + " 正在运行中，请稍后再试",
+               NotificationToast.NotificationType.WARNING);
             return;
         }
         
@@ -69,8 +73,8 @@ public class TaskExecutionManager {
                 
                 Platform.runLater(() -> {
                     if (isRunningOnServer) {
-                        com.cc.job.gui.util.NotificationToast.show("任务组"+ currentJobId + " 正在运行中，请稍后再试", 
-                            com.cc.job.gui.util.NotificationToast.NotificationType.WARNING);
+                        NotificationToast.show("任务组"+ currentJobId + " 正在运行中，请稍后再试",
+                           NotificationToast.NotificationType.WARNING);
                         logPanel.info("提示：该任务组可能正在其他客户端或服务器实例上运行");
                         return;
                     }
@@ -88,7 +92,7 @@ public class TaskExecutionManager {
     
     private void continueJobExecution(Long currentJobId, String jobName) {
         String randomId = snowflake.nextIdStr();
-        String currentUserId = com.cc.job.gui.util.SessionManager.getInstance().getUserId();
+        String currentUserId = SessionManager.getInstance().getUserId();
         
         RunningJobGroup runningJob = new RunningJobGroup(currentJobId, jobName, randomId, currentUserId);
         runningJobs.put(currentJobId, runningJob);
@@ -104,8 +108,8 @@ public class TaskExecutionManager {
         
         // 重置所有节点状态为空闲
         Platform.runLater(() -> {
-            for (com.cc.job.gui.model.ProcessNode node : canvas.getNodes()) {
-                node.updateStatus(com.cc.job.gui.model.ProcessNode.NodeStatus.IDLE);
+            for (ProcessNode node : canvas.getNodes()) {
+                node.updateStatus(ProcessNode.NodeStatus.IDLE);
             }
         });
         
@@ -190,7 +194,7 @@ public class TaskExecutionManager {
         // 处理预测时间（status=9）
         if (status != null && status == 9 && message.getResult() != null) {
             try {
-                String[][] times = com.cc.job.gui.util.ApiUtil.getInstance().getGson()
+                String[][] times = ApiUtil.getInstance().getGson()
                     .fromJson(message.getResult(), String[][].class);
                 if (times != null) {
                     ensurePredictedTimeCache();

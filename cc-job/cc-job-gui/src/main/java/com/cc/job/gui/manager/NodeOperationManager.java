@@ -4,6 +4,7 @@ import com.cc.job.gui.model.*;
 import com.cc.job.gui.service.*;
 import com.cc.job.gui.util.*;
 import com.cc.job.gui.view.*;
+import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.form.JobInfoForm;
 import com.cc.job.xo.model.entity.JobNode;
 import javafx.application.Platform;
@@ -288,7 +289,7 @@ public class NodeOperationManager {
         new Thread(() -> {
             try {
                 JobInfoForm formData = jobInfoService.getJobNodeFormData(jobId);
-                List<com.cc.job.xo.model.entity.JobGroup> jobGroupList = jobGroupService.getAllJobGroupList();
+                List<JobGroup> jobGroupList = jobGroupService.getAllJobGroupList();
                 
                 Platform.runLater(() -> {
                     NewJobNodeDialog dialog = new NewJobNodeDialog(ownerStage, taskGroupId, formData, jobGroupList);
