@@ -405,6 +405,42 @@ public class MainView extends BorderPane {
             logPanelVisible = true;
             updateLeftSidebar();
         });
+        
+        // 任务组面板关闭和弹出回调
+        treeView.setOnClose(() -> {
+            treeViewVisible = false;
+            updateLeftSidebar();
+        });
+        treeView.setOnDetach(() -> {
+            detachPanel("任务组", treeView, () -> {
+                treeViewVisible = true;
+                updateLeftSidebar();
+            });
+        });
+        
+        // 小地图面板关闭和弹出回调
+        miniMap.setOnClose(() -> {
+            miniMapVisible = false;
+            updateLeftSidebar();
+        });
+        miniMap.setOnDetach(() -> {
+            detachPanel("小地图", miniMap, () -> {
+                miniMapVisible = true;
+                updateLeftSidebar();
+            });
+        });
+        
+        // 日志面板关闭和弹出回调
+        logPanel.setOnClose(() -> {
+            logPanelVisible = false;
+            updateLeftSidebar();
+        });
+        logPanel.setOnDetach(() -> {
+            detachPanel("监控", logPanel, () -> {
+                logPanelVisible = true;
+                updateLeftSidebar();
+            });
+        });
     }
 
     private void setupTreeViewCallback() {
@@ -578,6 +614,185 @@ public class MainView extends BorderPane {
                 }
             }
             
+            if (!logPanelVisible) {
+                verticalSplit.setDividerPositions(1.0);
+            } else {
+                double[] currentPositions = verticalSplit.getDividerPositions();
+                if (currentPositions.length > 0 && currentPositions[0] == 1.0) {
+                    verticalSplit.setDividerPositions(0.7);
+                }
+            }
+        });
+    }
+
+    /**
+     * 弹出面板为独立窗口
+     * @param title 窗口标题
+     * @param panel 要弹出的面板
+     * @param onWindowClosed 窗口关闭时的回调
+     */
+    private void detachPanel(String title, javafx.scene.Node panel, Runnable onWindowClosed) {
+        // 先更新状态标志（在移除面板之前）
+        if (panel instanceof TaskTreeView) {
+            treeViewVisible = false;
+        } else if (panel instanceof MiniMapView) {
+            miniMapVisible = false;
+        } else if (panel instanceof LogPanel) {
+            logPanelVisible = false;
+        }
+        
+        // 从原容器中移除面板
+        javafx.scene.Parent parent = panel.getParent();
+        if (parent instanceof javafx.scene.layout.Pane) {
+            ((javafx.scene.layout.Pane) parent).getChildren().remove(panel);
+        } else if (parent instanceof SplitPane) {
+            ((SplitPane) parent).getItems().remove(panel);
+        }
+        
+        // 更新侧边栏显示（此时面板已从原容器移除，不会影响它）
+        updateDetachedSidebarState();
+        
+        // 确保面板在弹出窗口中可见
+        panel.setVisible(true);
+        panel.setManaged(true);
+        
+        // 创建新窗口
+        Stage detachedStage = new Stage();
+        detachedStage.setTitle(title);
+        detachedStage.initOwner(this.getScene().getWindow());
+        detachedStage.initModality(javafx.stage.Modality.NONE);
+        
+        // 设置窗口内容
+        VBox container = new VBox();
+        container.setStyle("-fx-background-color: #F1F5F9;");
+        container.getChildren().add(panel);
+        VBox.setVgrow(panel, Priority.ALWAYS);
+        
+        // 设置窗口大小
+        javafx.scene.Scene scene = new javafx.scene.Scene(container, 400, 500);
+        detachedStage.setScene(scene);
+        
+        // 窗口关闭时的处理
+        detachedStage.setOnCloseRequest(event -> {
+            // 从弹出窗口中移除面板
+            container.getChildren().remove(panel);
+            
+            // 清除独立窗口中的布局约束（VBox.setVgrow）
+            // 因为面板要移回 SplitPane，不需要这个约束
+            if (panel.getParent() == container) {
+                // 如果面板还在 container 中，清除约束
+                VBox.setVgrow(panel, null);
+            }
+            
+            // 将面板添加回原容器
+            if (panel instanceof TaskTreeView) {
+                if (!leftArea.getChildren().contains(panel)) {
+                    leftArea.getChildren().add(0, panel);
+                }
+            } else if (panel instanceof MiniMapView) {
+                if (!leftArea.getChildren().contains(panel)) {
+                    leftArea.getChildren().add(panel);
+                }
+            } else if (panel instanceof LogPanel) {
+                if (!verticalSplit.getItems().contains(panel)) {
+                    verticalSplit.getItems().add(panel);
+                }
+                // 确保日志面板恢复时分割位置正确（如果当前是完全隐藏状态，则调整为显示状态）
+                double[] currentPositions = verticalSplit.getDividerPositions();
+                if (currentPositions.length > 0 && currentPositions[0] >= 0.99) {
+                    verticalSplit.setDividerPositions(0.7);
+                }
+            }
+            
+            // 确保面板可见性和管理状态正确设置
+            panel.setVisible(true);
+            panel.setManaged(true);
+            
+            // 强制面板及其所有子节点重新布局和显示
+            Platform.runLater(() -> {
+                // 对于 LogPanel，需要恢复其内容（必须在 Platform.runLater 中执行，确保面板已添加到容器）
+                if (panel instanceof LogPanel) {
+                    LogPanel logPanel = (LogPanel) panel;
+                    // 恢复日志面板的内容（确保 logContainer 中的 scrollPane 正确显示）
+                    logPanel.restoreContent();
+                }
+                
+                // 递归设置所有子节点的可见性和管理状态
+                setNodeVisibleAndManaged(panel, true);
+                
+                // 强制重新布局
+                if (panel instanceof javafx.scene.Parent) {
+                    ((javafx.scene.Parent) panel).requestLayout();
+                }
+            });
+            
+            // 执行回调（会更新状态标志并调用updateLeftSidebar）
+            if (onWindowClosed != null) {
+                onWindowClosed.run();
+            }
+        });
+        
+        detachedStage.show();
+    }
+    
+    /**
+     * 递归设置节点及其所有子节点的可见性和管理状态
+     */
+    private void setNodeVisibleAndManaged(javafx.scene.Node node, boolean visible) {
+        if (node == null) return;
+        
+        // 检查 visible 属性是否是绑定的，如果是绑定的则不能直接设置
+        try {
+            if (!node.visibleProperty().isBound()) {
+                node.setVisible(visible);
+            }
+        } catch (Exception e) {
+            // 如果设置失败，忽略（可能是某些特殊节点）
+        }
+        
+        // 检查 managed 属性是否是绑定的
+        try {
+            if (!node.managedProperty().isBound()) {
+                node.setManaged(visible);
+            }
+        } catch (Exception e) {
+            // 如果设置失败，忽略
+        }
+        
+        if (node instanceof javafx.scene.Parent) {
+            javafx.scene.Parent parent = (javafx.scene.Parent) node;
+            for (javafx.scene.Node child : parent.getChildrenUnmodifiable()) {
+                setNodeVisibleAndManaged(child, visible);
+            }
+        }
+    }
+    
+    /**
+     * 更新弹出面板后的侧边栏状态（不影响已弹出的面板）
+     */
+    private void updateDetachedSidebarState() {
+        // 更新折叠侧边栏按钮显示
+        collapsedSidebar.showTreeViewButton(!treeViewVisible);
+        collapsedSidebar.showMiniMapButton(!miniMapVisible);
+        collapsedSidebar.showLogPanelButton(!logPanelVisible);
+        
+        // 更新左侧区域可见性
+        boolean anyLeftVisible = treeViewVisible || miniMapVisible;
+        leftArea.setVisible(anyLeftVisible);
+        leftArea.setManaged(anyLeftVisible);
+        
+        Platform.runLater(() -> {
+            // 调整水平分割面板
+            if (!anyLeftVisible) {
+                horizontalSplit.setDividerPositions(0);
+            } else {
+                double[] currentPositions = horizontalSplit.getDividerPositions();
+                if (currentPositions.length > 0 && currentPositions[0] == 0.0) {
+                    horizontalSplit.setDividerPositions(0.2);
+                }
+            }
+            
+            // 调整垂直分割面板
             if (!logPanelVisible) {
                 verticalSplit.setDividerPositions(1.0);
             } else {

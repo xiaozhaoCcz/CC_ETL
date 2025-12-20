@@ -544,6 +544,82 @@ public class LogPanel extends VBox {
     }
     
     /**
+     * 恢复日志面板内容（用于面板从独立窗口移回时调用）
+     * 确保当前标签页的内容正确显示在 logContainer 中
+     */
+    public void restoreContent() {
+        Platform.runLater(() -> {
+            // 确保 logContainer 在 LogPanel 中（面板移回时可能丢失）
+            if (logContainer != null && !this.getChildren().contains(logContainer)) {
+                // logContainer 应该在 titleBar 之后，statusBar 之前
+                // 查找 titleBar 和 statusBar 的位置
+                int insertIndex = -1;
+                for (int i = 0; i < this.getChildren().size(); i++) {
+                    javafx.scene.Node child = this.getChildren().get(i);
+                    // titleBar 是第二个子节点（index 1），logContainer 应该在它之后
+                    if (i == 1 && child instanceof HBox) {
+                        insertIndex = i + 1;
+                        break;
+                    }
+                }
+                if (insertIndex < 0) {
+                    // 如果找不到，添加到倒数第二个位置（在 statusBar 之前）
+                    insertIndex = Math.max(0, this.getChildren().size() - 1);
+                }
+                this.getChildren().add(insertIndex, logContainer);
+                // 确保 logContainer 的布局约束正确
+                VBox.setVgrow(logContainer, Priority.ALWAYS);
+            }
+            
+            // 获取当前标签页的数据
+            Long currentTaskGroupId = tabManager.getCurrentTaskGroupId();
+            LogContentManager tabData = tabManager.getTabData(currentTaskGroupId);
+            
+            if (tabData != null && logContainer != null) {
+                javafx.scene.Node scrollPane = tabData.getScrollPane();
+                
+                // 如果 scrollPane 还在其他容器中，先移除它
+                javafx.scene.Parent parent = scrollPane.getParent();
+                if (parent != null && parent != logContainer) {
+                    if (parent instanceof javafx.scene.layout.Pane) {
+                        ((javafx.scene.layout.Pane) parent).getChildren().remove(scrollPane);
+                    } else if (parent instanceof SplitPane) {
+                        ((SplitPane) parent).getItems().remove(scrollPane);
+                    }
+                }
+                
+                // 检查 logContainer 中是否已经有 scrollPane
+                boolean scrollPaneInContainer = logContainer.getChildren().contains(scrollPane);
+                
+                // 如果 scrollPane 不在 logContainer 中，清空并重新添加
+                if (!scrollPaneInContainer) {
+                    logContainer.getChildren().clear();
+                    logContainer.getChildren().add(scrollPane);
+                }
+                
+                // 确保 logContainer 和 scrollPane 可见且被管理
+                logContainer.setVisible(true);
+                logContainer.setManaged(true);
+                if (scrollPane != null) {
+                    scrollPane.setVisible(true);
+                    scrollPane.setManaged(true);
+                }
+                
+                // 重新渲染内容
+                tabData.render(currentSearchKeyword);
+                updateStatusBar(tabData);
+                
+                // 强制重新布局，确保内容正确显示
+                this.requestLayout();
+                logContainer.requestLayout();
+                if (scrollPane instanceof javafx.scene.Parent) {
+                    ((javafx.scene.Parent) scrollPane).requestLayout();
+                }
+            }
+        });
+    }
+    
+    /**
      * 日志更新任务
      */
     private static class LogUpdateTask {
