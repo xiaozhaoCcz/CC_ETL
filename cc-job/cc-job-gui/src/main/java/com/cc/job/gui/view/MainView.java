@@ -159,6 +159,9 @@ public class MainView extends BorderPane {
         dataManager = new DataManager(canvas, logPanel, treeView);
         nodeCallbackConfigurator = new NodeCallbackConfigurator(nodeOperationManager, canvas, logPanel);
         
+        // 重要：设置数据管理器的对话框管理器（用于显示消息弹出框）
+        dataManager.setDialogManager(dialogManager);
+        
         // 重要：设置节点操作管理器的回调配置器（用于新增节点时自动配置回调）
         nodeOperationManager.setNodeCallbackConfigurator(nodeCallbackConfigurator);
         

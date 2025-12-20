@@ -17,10 +17,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
-import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.GridPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.VBox;
+import javafx.scene.layout.*;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
@@ -97,6 +94,7 @@ public class ShowJobListDialog extends Dialog<Void> {
     private Node createTopSection() {
         VBox topSection = new VBox(12);
         topSection.getChildren().addAll(createFilterBar(), createActionBar());
+        topSection.setPadding(new Insets(0, 0, 12, 0)); // 底部间距12px
         return topSection;
     }
 
@@ -171,11 +169,11 @@ public class ShowJobListDialog extends Dialog<Void> {
     }
 
     private Node createFilterBar() {
-        GridPane grid = new GridPane();
-        grid.setHgap(12);
-        grid.setVgap(10);
-        grid.setPadding(new Insets(16, 16, 16, 16));
-        grid.setStyle(
+        FlowPane pane = new FlowPane();
+        pane.setHgap(12);
+        pane.setVgap(10);
+        pane.setPadding(new Insets(16, 16, 16, 16));
+        pane.setStyle(
                 "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
                 "-fx-background-radius: " + StyleUtil.RADIUS_LG + "; " +
                 "-fx-effect: " + StyleUtil.SHADOW_SM + ";"
@@ -260,26 +258,23 @@ public class ShowJobListDialog extends Dialog<Void> {
         Label handlerLabel = new Label("JobHandler");
         handlerLabel.setStyle(labelStyle);
 
-        // 布局第一行
-        int col = 0;
-        grid.add(executorLabel, col++, 0);
-        grid.add(jobGroupCombo, col++, 0);
-        grid.add(statusLabel, col++, 0);
-        grid.add(statusCombo, col++, 0);
-        grid.add(descLabel, col++, 0);
-        grid.add(jobDescField, col++, 0);
+        HBox jobGroupHBox =  new HBox(12, executorLabel, jobGroupCombo);
+        jobGroupHBox.setAlignment(Pos.CENTER_LEFT);
+        HBox statusHBox =  new HBox(12, statusLabel, statusCombo);
+        statusHBox.setAlignment(Pos.CENTER_LEFT);
+        HBox descHBox =  new HBox(12, descLabel, jobDescField);
+        descHBox.setAlignment(Pos.CENTER_LEFT);
+        HBox handlerHBox =  new HBox(12, handlerLabel, handlerField);
+        handlerHBox.setAlignment(Pos.CENTER_LEFT);
+        HBox authorHBox =  new HBox(12, authorLabel, authorField);
+        authorHBox.setAlignment(Pos.CENTER_LEFT);
 
-        // 布局第二行
-        grid.add(handlerLabel, 0, 1);
-        grid.add(handlerField, 1, 1);
-        grid.add(authorLabel, 2, 1);
-        grid.add(authorField, 3, 1);
 
         HBox btnBox = new HBox(10, searchBtn, resetBtn);
         btnBox.setAlignment(Pos.CENTER_LEFT);
-        grid.add(btnBox, 4, 1, 2, 1);
+        pane.getChildren().addAll(jobGroupHBox,statusHBox, descHBox, handlerHBox, authorHBox,btnBox);
 
-        return grid;
+        return pane;
     }
 
     /**
@@ -314,37 +309,92 @@ public class ShowJobListDialog extends Dialog<Void> {
         TableColumn<JobInfoVO, Number> idxCol = new TableColumn<>("序号");
         idxCol.setCellValueFactory(c -> Bindings.createIntegerBinding(
                 () -> tableView.getItems().indexOf(c.getValue()) + 1));
-        idxCol.setMaxWidth(60);
-        idxCol.setMinWidth(50);
+        idxCol.setCellFactory(col -> new TableCell<JobInfoVO, Number>() {
+            @Override
+            protected void updateItem(Number item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : String.valueOf(item.intValue()));
+                setAlignment(Pos.CENTER);
+            }
+        });
+        idxCol.setMinWidth(60);
 
         // 任务描述列
         TableColumn<JobInfoVO, String> descCol = new TableColumn<>("任务描述");
         descCol.setCellValueFactory(c -> new SimpleStringProperty(safe(c.getValue().getJobDesc())));
+        descCol.setCellFactory(col -> new TableCell<JobInfoVO, String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item);
+                setAlignment(Pos.CENTER);
+            }
+        });
         descCol.setMinWidth(120);
 
         // 调度类型列
         TableColumn<JobInfoVO, String> scheduleTypeCol = new TableColumn<>("调度类型");
         scheduleTypeCol.setCellValueFactory(c -> new SimpleStringProperty(safe(c.getValue().getScheduleType())));
+        scheduleTypeCol.setCellFactory(col -> new TableCell<JobInfoVO, String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item);
+                setAlignment(Pos.CENTER);
+            }
+        });
         scheduleTypeCol.setMinWidth(80);
 
         // 调度配置列
         TableColumn<JobInfoVO, String> scheduleConfCol = new TableColumn<>("调度配置");
         scheduleConfCol.setCellValueFactory(c -> new SimpleStringProperty(safe(c.getValue().getScheduleConf())));
+        scheduleConfCol.setCellFactory(col -> new TableCell<JobInfoVO, String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item);
+                setAlignment(Pos.CENTER);
+            }
+        });
         scheduleConfCol.setMinWidth(100);
 
         // 运行模式列 (glueType)
         TableColumn<JobInfoVO, String> glueTypeCol = new TableColumn<>("运行模式");
         glueTypeCol.setCellValueFactory(c -> new SimpleStringProperty(safe(c.getValue().getGlueType())));
+        glueTypeCol.setCellFactory(col -> new TableCell<JobInfoVO, String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item);
+                setAlignment(Pos.CENTER);
+            }
+        });
         glueTypeCol.setMinWidth(80);
 
         // JobHandler列
         TableColumn<JobInfoVO, String> handlerCol = new TableColumn<>("JobHandler");
         handlerCol.setCellValueFactory(c -> new SimpleStringProperty(safe(c.getValue().getExecutorHandler())));
+        handlerCol.setCellFactory(col -> new TableCell<JobInfoVO, String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item);
+                setAlignment(Pos.CENTER);
+            }
+        });
         handlerCol.setMinWidth(120);
 
         // 负责人列
         TableColumn<JobInfoVO, String> authorCol = new TableColumn<>("负责人");
         authorCol.setCellValueFactory(c -> new SimpleStringProperty(safe(c.getValue().getAuthor())));
+        authorCol.setCellFactory(col -> new TableCell<JobInfoVO, String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item);
+                setAlignment(Pos.CENTER);
+            }
+        });
         authorCol.setMinWidth(80);
 
         // 任务类型列 - 使用标签显示
@@ -406,8 +456,75 @@ public class ShowJobListDialog extends Dialog<Void> {
         actionCol.setCellFactory(col -> createActionCell());
         actionCol.setPrefWidth(100);
         actionCol.setMinWidth(100);
+        actionCol.setMaxWidth(100);
 
-        tableView.getColumns().addAll(idxCol, descCol, scheduleTypeCol, scheduleConfCol,
+        // 复选框列 - 放在最前面
+        TableColumn<JobInfoVO, Boolean> checkBoxCol = new TableColumn<>("");
+        // 创建全选复选框
+        CheckBox selectAllCheckBox = new CheckBox();
+        selectAllCheckBox.setOnAction(e -> {
+            boolean selected = selectAllCheckBox.isSelected();
+            if (selected) {
+                selectionModel.selectAll();
+            } else {
+                selectionModel.clearSelection();
+            }
+        });
+        // 监听选择变化，更新全选复选框状态
+        selectionModel.getSelectedItems().addListener((javafx.collections.ListChangeListener.Change<? extends JobInfoVO> c) -> {
+            Platform.runLater(() -> {
+                int totalItems = tableView.getItems().size();
+                int selectedItems = selectionModel.getSelectedItems().size();
+                selectAllCheckBox.setSelected(totalItems > 0 && selectedItems == totalItems);
+                selectAllCheckBox.setIndeterminate(selectedItems > 0 && selectedItems < totalItems);
+            });
+        });
+        
+        checkBoxCol.setGraphic(selectAllCheckBox);
+        checkBoxCol.setCellValueFactory(c -> new javafx.beans.property.SimpleBooleanProperty(false));
+        checkBoxCol.setCellFactory(col -> new TableCell<JobInfoVO, Boolean>() {
+            private final CheckBox checkBox = new CheckBox();
+            
+            {
+                checkBox.setOnAction(e -> {
+                    JobInfoVO job = getTableRow().getItem();
+                    if (job != null) {
+                        Boolean selected = checkBox.isSelected();
+                        // 同步到表格选择模型
+                        if (selected) {
+                            selectionModel.select(job);
+                        } else {
+                            int index = tableView.getItems().indexOf(job);
+                            if (index >= 0) {
+                                selectionModel.clearSelection(index);
+                            }
+                        }
+                    }
+                });
+            }
+            
+            @Override
+            protected void updateItem(Boolean item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || getTableRow() == null || getTableRow().getItem() == null) {
+                    setGraphic(null);
+                } else {
+                    JobInfoVO job = getTableRow().getItem();
+                    // 同步复选框状态与选择模型
+                    int index = tableView.getItems().indexOf(job);
+                    checkBox.setSelected(index >= 0 && selectionModel.isSelected(index));
+                    setGraphic(checkBox);
+                    setAlignment(Pos.CENTER);
+                }
+            }
+        });
+        checkBoxCol.setPrefWidth(50);
+        checkBoxCol.setMinWidth(50);
+        checkBoxCol.setMaxWidth(50);
+        checkBoxCol.setResizable(false);
+        checkBoxCol.setSortable(false);
+
+        tableView.getColumns().addAll(checkBoxCol, idxCol, descCol, scheduleTypeCol, scheduleConfCol,
                 glueTypeCol, handlerCol, authorCol, typeCol, statusCol, 
                 createTimeCol, updateTimeCol, actionCol);
 
@@ -474,8 +591,25 @@ public class ShowJobListDialog extends Dialog<Void> {
             {
                 actionMenuBtn.getItems().addAll(runItem, logItem, nextTimeItem, sep1,
                         startItem, stopItem, sep2, editItem, deleteItem, copyItem);
-                actionMenuBtn.setPrefWidth(80);
-                actionMenuBtn.setStyle(StyleUtil.secondaryButton());
+                actionMenuBtn.setPrefWidth(90);
+                actionMenuBtn.setMinWidth(90);
+                actionMenuBtn.setMaxWidth(90);
+                actionMenuBtn.setPrefHeight(26);
+                actionMenuBtn.setGraphicTextGap(4);
+                // 确保文字显示：设置文本颜色和内容显示方式
+                // 使用明确的样式设置，确保文字可见
+                actionMenuBtn.setStyle(
+                    "-fx-background-color: white; " +
+                    "-fx-text-fill: #374151; " +
+                    "-fx-font-size: 11px; " +
+                    "-fx-font-weight: 500; " +
+                    "-fx-padding: 4 8 4 8; " +
+                    "-fx-border-color: #D1D5DB; " +
+                    "-fx-border-width: 1; " +
+                    "-fx-border-radius: 4; " +
+                    "-fx-background-radius: 4; " +
+                    "-fx-content-display: LEFT; " +
+                    "-fx-text-overrun: VISIBLE;");
             }
 
             @Override
@@ -484,6 +618,8 @@ public class ShowJobListDialog extends Dialog<Void> {
 
                 if (empty || getTableRow() == null || getTableRow().getItem() == null) {
                     setGraphic(null);
+                    setAlignment(null);
+                    setPadding(Insets.EMPTY);
                     return;
                 }
 
@@ -510,7 +646,10 @@ public class ShowJobListDialog extends Dialog<Void> {
                 deleteItem.setOnAction(e -> handleDelete(currentJob));
                 copyItem.setOnAction(e -> handleCopy(currentJob));
 
+                // 设置单元格上下间距
+                setPadding(new Insets(4, 0, 4, 0));
                 setGraphic(actionMenuBtn);
+                setAlignment(Pos.CENTER);
             }
         };
     }

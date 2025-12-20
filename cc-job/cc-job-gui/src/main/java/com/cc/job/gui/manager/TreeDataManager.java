@@ -58,15 +58,9 @@ public class TreeDataManager {
         rootItem.getChildren().clear();
         
         for (JobPartVo partVo : data) {
-            if (partVo.getChildren() != null && !partVo.getChildren().isEmpty()) {
-                boolean hasTaskGroup = partVo.getChildren().stream()
-                    .anyMatch(child -> child.getType() != null && child.getType() == 1);
-                
-                if (hasTaskGroup) {
-                    TreeItem<TreeNodeData> partitionItem = createPartitionItem(partVo);
-                    rootItem.getChildren().add(partitionItem);
-                }
-            }
+            // 显示所有分区，即使没有任务组（新建的分区可能还没有任务组）
+            TreeItem<TreeNodeData> partitionItem = createPartitionItem(partVo);
+            rootItem.getChildren().add(partitionItem);
         }
         
         handlePendingSelection();

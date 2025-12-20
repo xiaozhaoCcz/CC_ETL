@@ -6,6 +6,8 @@ import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.entity.JobNode;
 import com.cc.job.xo.model.form.JobInfoForm;
 import javafx.application.Platform;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
 import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -249,6 +251,141 @@ public class DialogManager {
     public void showNodeDetailsDialog(Long jobId, Long taskGroupId, String nodeName, String nodeId) {
         NodeDetailsDialog dialog = new NodeDetailsDialog(ownerStage, jobId, taskGroupId, nodeName, nodeId);
         dialog.show();
+    }
+    
+    // ==================== 全局消息弹出框 ====================
+    
+    /**
+     * 显示成功消息弹出框
+     * @param message 消息内容
+     */
+    public void showSuccessAlert(String message) {
+        showSuccessAlert("成功", message);
+    }
+    
+    /**
+     * 显示成功消息弹出框
+     * @param title 标题
+     * @param message 消息内容
+     */
+    public void showSuccessAlert(String title, String message) {
+        Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle(title);
+            alert.setHeaderText(null);
+            alert.setContentText(message);
+            alert.initOwner(ownerStage);
+            alert.getButtonTypes().setAll(ButtonType.OK);
+            styleAlert(alert, "success");
+            // 在显示前设置样式监听器
+            alert.setOnShown(e -> applyButtonStyle(alert, "success"));
+            alert.showAndWait();
+        });
+    }
+    
+    /**
+     * 显示错误消息弹出框
+     * @param message 消息内容
+     */
+    public void showErrorAlert(String message) {
+        showErrorAlert("错误", message);
+    }
+    
+    /**
+     * 显示错误消息弹出框
+     * @param title 标题
+     * @param message 消息内容
+     */
+    public void showErrorAlert(String title, String message) {
+        Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle(title);
+            alert.setHeaderText(null);
+            alert.setContentText(message);
+            alert.initOwner(ownerStage);
+            alert.getButtonTypes().setAll(ButtonType.OK);
+            styleAlert(alert, "error");
+            // 在显示前设置样式监听器
+            alert.setOnShown(e -> applyButtonStyle(alert, "error"));
+            alert.showAndWait();
+        });
+    }
+    
+    /**
+     * 显示警告消息弹出框
+     * @param message 消息内容
+     */
+    public void showWarningAlert(String message) {
+        showWarningAlert("警告", message);
+    }
+    
+    /**
+     * 显示警告消息弹出框
+     * @param title 标题
+     * @param message 消息内容
+     */
+    public void showWarningAlert(String title, String message) {
+        Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle(title);
+            alert.setHeaderText(null);
+            alert.setContentText(message);
+            alert.initOwner(ownerStage);
+            alert.getButtonTypes().setAll(ButtonType.OK);
+            styleAlert(alert, "warning");
+            // 在显示前设置样式监听器
+            alert.setOnShown(e -> applyButtonStyle(alert, "warning"));
+            alert.showAndWait();
+        });
+    }
+    
+    /**
+     * 为弹出框应用样式
+     * @param alert 弹出框
+     * @param type 类型：success, error, warning
+     */
+    private void styleAlert(Alert alert, String type) {
+        // 应用对话框样式
+        alert.getDialogPane().setStyle(
+            "-fx-background-color: #FFFFFF; " +
+            "-fx-padding: 20; " +
+            "-fx-font-size: 14px;"
+        );
+    }
+    
+    /**
+     * 应用按钮样式
+     * @param alert 弹出框
+     * @param type 类型：success, error, warning
+     */
+    private void applyButtonStyle(Alert alert, String type) {
+        String iconColor;
+        switch (type) {
+            case "success":
+                iconColor = "#10B981";
+                break;
+            case "error":
+                iconColor = "#EF4444";
+                break;
+            case "warning":
+                iconColor = "#F59E0B";
+                break;
+            default:
+                iconColor = "#6366F1";
+        }
+        
+        javafx.scene.Node button = alert.getDialogPane().lookupButton(ButtonType.OK);
+        if (button != null) {
+            button.setStyle(
+                "-fx-background-color: " + iconColor + "; " +
+                "-fx-text-fill: white; " +
+                "-fx-font-size: 13px; " +
+                "-fx-font-weight: bold; " +
+                "-fx-padding: 8 20; " +
+                "-fx-background-radius: 4; " +
+                "-fx-cursor: hand;"
+            );
+        }
     }
 }
 

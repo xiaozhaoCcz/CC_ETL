@@ -127,7 +127,7 @@ public class TopToolBar extends VBox {
         Menu fileMenu = new Menu("文件");
         Menu newItem = new Menu("新建");
         MenuItem newJobItem = new MenuItem("新建任务");
-        MenuItem newJobPartItem = new MenuItem("新建任务组");
+        MenuItem newJobPartItem = new MenuItem("新建分区");
         newJobItem.setOnAction(e -> safeCall(ToolBarCallback::onNew));
         newJobPartItem.setOnAction(e -> safeCall(ToolBarCallback::onNewPart));
         newItem.getItems().addAll(newJobItem, newJobPartItem);
@@ -186,7 +186,7 @@ public class TopToolBar extends VBox {
         
         // 文件操作组
         HBox fileGroup = createToolGroup(
-            createIconButton(IconUtil.plusIcon(), "新建", "创建新的流程图", () -> safeCall(ToolBarCallback::onNew)),
+            createNewMenuButton(),
             createIconButton(IconUtil.folderIcon(), "打开", "打开已有流程图", () -> safeCall(ToolBarCallback::onOpen)),
             createIconButton(IconUtil.saveIcon(), "保存", "保存当前流程图", () -> safeCall(ToolBarCallback::onSave))
         );
@@ -420,6 +420,36 @@ public class TopToolBar extends VBox {
         group.setAlignment(Pos.CENTER_LEFT);
         group.getChildren().addAll(buttons);
         return group;
+    }
+    
+    /**
+     * 创建新建下拉菜单按钮
+     */
+    private MenuButton createNewMenuButton() {
+        MenuButton menuButton = new MenuButton("新建", IconUtil.plusIcon());
+        menuButton.setGraphicTextGap(6);
+        
+        // 应用图标按钮样式和悬停效果
+        String normalStyle = StyleUtil.iconButton();
+        String hoverStyle = normalStyle.replace("transparent", "#F3F4F6");
+        menuButton.setStyle(normalStyle);
+        menuButton.setOnMouseEntered(e -> menuButton.setStyle(hoverStyle));
+        menuButton.setOnMouseExited(e -> menuButton.setStyle(normalStyle));
+        
+        Tooltip tip = new Tooltip("创建新的任务或分区");
+        tip.setStyle("-fx-font-size: 12px;");
+        menuButton.setTooltip(tip);
+        
+        // 创建菜单项
+        MenuItem newJobItem = new MenuItem("新建任务");
+        newJobItem.setOnAction(e -> safeCall(ToolBarCallback::onNew));
+        
+        MenuItem newPartItem = new MenuItem("新建分区");
+        newPartItem.setOnAction(e -> safeCall(ToolBarCallback::onNewPart));
+        
+        menuButton.getItems().addAll(newJobItem, newPartItem);
+        
+        return menuButton;
     }
     
     /**
