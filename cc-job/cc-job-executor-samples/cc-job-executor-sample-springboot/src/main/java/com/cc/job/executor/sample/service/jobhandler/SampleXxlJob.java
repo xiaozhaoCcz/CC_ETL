@@ -328,9 +328,10 @@ public class SampleXxlJob {
             System.out.println("demoJobHandler18 beat at:" + i);
             TimeUnit.MILLISECONDS.sleep(500);
         }
+        throw new RuntimeException("节点18运行失败");
         //default success
-        XxlJobHelper.log(">>>>>>>> demoJobHandler18 end");
-        System.out.println(">>>>>>>> demoJobHandler18 end");
+//        XxlJobHelper.log(">>>>>>>> demoJobHandler18 end");
+//        System.out.println(">>>>>>>> demoJobHandler18 end");
     }
 
     @XxlJob("demoJobHandler19")

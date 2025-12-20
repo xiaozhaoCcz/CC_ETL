@@ -6,6 +6,7 @@ import com.cc.job.gui.model.*;
 import com.cc.job.gui.service.*;
 import com.cc.job.gui.util.*;
 import com.cc.job.xo.model.entity.JobGroup;
+import com.cc.job.xo.model.form.JobInfoForm;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
@@ -177,16 +178,10 @@ public class MainView extends BorderPane {
         toolBar.setCallback(new TopToolBar.ToolBarCallback() {
             @Override
             public void onNew() {
-                Long taskGroupId = pageStoreHelper.getCurrentTaskGroupId();
-                if (taskGroupId != null && taskGroupId != 0) {
-                    String taskGroupName = getJobNameById(taskGroupId);
-                    dialogManager.showJobNodeDialog(taskGroupId, taskGroupName != null ? taskGroupName : "新建任务节点", null, () -> {
-                        // 数据加载后会自动配置节点回调
-                        dataManager.loadTaskGroupData(taskGroupId, taskGroupName);
-                    });
-                } else {
-                    logPanel.warn("⚠ 请先选择任务组");
-                }
+                // 导航栏"新增任务"使用新的 NewJobDialog 页面（含调度配置）
+                dialogManager.showJobDialog(null, () -> {
+                    dataManager.refreshTreeView();
+                });
             }
 
             @Override
@@ -454,7 +449,28 @@ public class MainView extends BorderPane {
             public void onPartitionAction(Long partitionId, String partitionName, TaskTreeView.TaskSelectionCallback.PartitionAction action) {}
 
             @Override
-            public void onJobGroupEdit(Long taskGroupId, String taskGroupName) {}
+            public void onJobGroupEdit(Long taskGroupId, String taskGroupName) {
+                // 编辑任务组：加载任务组数据并弹出编辑对话框
+                if (taskGroupId != null) {
+                    new Thread(() -> {
+                        try {
+                            // 使用getJobNodeFormData获取任务组的表单数据
+                            JobInfoForm formData = new JobInfoService().getJobNodeFormData(taskGroupId);
+                            Platform.runLater(() -> {
+                                // 获取任务组所属的分区ID
+                                Long partitionId = formData.getJobPartId() != null ? formData.getJobPartId().longValue() : null;
+                                // 弹出编辑对话框
+                                dialogManager.showJobGroupDialog(partitionId, taskGroupName, formData, () -> {
+                                    // 编辑成功后刷新树视图
+                                    dataManager.refreshTreeView();
+                                });
+                            });
+                        } catch (Exception e) {
+                            Platform.runLater(() -> logPanel.error("✗ 加载任务组数据失败: " + e.getMessage()));
+                        }
+                    }).start();
+                }
+            }
         });
     }
 

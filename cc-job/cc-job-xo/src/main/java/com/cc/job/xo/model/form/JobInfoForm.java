@@ -62,6 +62,10 @@ public class JobInfoForm implements Serializable {
     @NotBlank(message = "执行器路由策略不能为空")
     private String executorRouteStrategy;
 
+    @Schema(description = "失败策略")
+    @NotBlank(message = "失败策略不能为空")
+    private String failStrategy;
+
     @Schema(description = "执行器任务handler")
     private String executorHandler;
 

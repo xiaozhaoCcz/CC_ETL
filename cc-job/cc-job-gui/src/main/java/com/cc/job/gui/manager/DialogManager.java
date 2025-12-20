@@ -151,6 +151,47 @@ public class DialogManager {
     }
     
     /**
+     * 显示新建/编辑普通任务对话框
+     * 用于导航栏"新增任务"功能，包含调度配置和子任务ID
+     */
+    public void showJobDialog(JobInfoForm editData, Runnable onSuccess) {
+        new Thread(() -> {
+            try {
+                List<JobGroup> jobGroupList = jobGroupService.getAllJobGroupList();
+                
+                Platform.runLater(() -> {
+                    try {
+                        NewJobDialog dialog = new NewJobDialog(ownerStage, editData, jobGroupList);
+                        Optional<JobInfoForm> result = dialog.showAndWait();
+                        
+                        result.ifPresent(formData -> {
+                            new Thread(() -> {
+                                try {
+                                    long jobId = jobInfoService.saveJobInfo(formData);
+                                    Platform.runLater(() -> {
+                                        if (jobId > 0) {
+                                            logPanel.success(editData == null ? "✓ 任务创建成功" : "✓ 任务更新成功");
+                                            if (onSuccess != null) onSuccess.run();
+                                        } else {
+                                            logPanel.error("✗ 操作失败");
+                                        }
+                                    });
+                                } catch (Exception e) {
+                                    Platform.runLater(() -> logPanel.error("✗ 保存失败: " + e.getMessage()));
+                                }
+                            }).start();
+                        });
+                    } catch (Exception e) {
+                        logPanel.error("✗ 打开对话框失败: " + e.getMessage());
+                    }
+                });
+            } catch (Exception e) {
+                Platform.runLater(() -> logPanel.error("✗ 加载执行器列表失败: " + e.getMessage()));
+            }
+        }).start();
+    }
+    
+    /**
      * 显示任务列表对话框
      */
     public void showJobListDialog() {
