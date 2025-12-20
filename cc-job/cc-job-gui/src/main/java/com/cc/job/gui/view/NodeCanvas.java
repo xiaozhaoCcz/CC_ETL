@@ -12,7 +12,10 @@ import javafx.animation.AnimationTimer;
 import javafx.animation.PauseTransition;
 import javafx.geometry.Point2D;
 import javafx.scene.control.ContextMenu;
+import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
@@ -77,6 +80,13 @@ public class NodeCanvas extends Pane {
     private AnimationTimer dragScrollTimer;
     private ProcessNode currentDragNode;
     private volatile boolean scrollAnimationRunning = false;
+    
+    // 主题相关
+    private String currentTheme = "default"; // "default", "grid", "dots"
+    private Canvas dotsBackgroundCanvas; // 用于绘制圆点背景的Canvas
+    private Canvas gridBackgroundCanvas; // 用于绘制网格背景的Canvas
+    private boolean dotsBackgroundListenersAdded = false; // 标记是否已添加监听器
+    private boolean gridBackgroundListenersAdded = false; // 标记是否已添加监听器
     
     public interface LogCallback {
         void log(String message);
@@ -660,7 +670,17 @@ public class NodeCanvas extends Pane {
         MenuItem runGroupItem = new MenuItem("运行任务组");
         runGroupItem.setOnAction(e -> { if (onRequestRunTaskGroup != null) onRequestRunTaskGroup.run(); });
         
-        menu.getItems().addAll(addNodeItem, clearItem, runGroupItem);
+        // 主题菜单
+        Menu themeMenu = new Menu("主题");
+        MenuItem defaultThemeItem = new MenuItem("默认");
+        defaultThemeItem.setOnAction(e -> setTheme("default"));
+        MenuItem gridThemeItem = new MenuItem("框框");
+        gridThemeItem.setOnAction(e -> setTheme("grid"));
+        MenuItem dotsThemeItem = new MenuItem("圆点");
+        dotsThemeItem.setOnAction(e -> setTheme("dots"));
+        themeMenu.getItems().addAll(defaultThemeItem, gridThemeItem, dotsThemeItem);
+        
+        menu.getItems().addAll(addNodeItem, clearItem, runGroupItem, themeMenu);
         
         this.setOnContextMenuRequested(e -> {
             if (!isClickOnNodeOrEdge((javafx.scene.Node) e.getTarget())) {
@@ -668,6 +688,205 @@ public class NodeCanvas extends Pane {
                 e.consume();
             }
         });
+        
+        // 修复：点击画布其他地方时隐藏菜单（排除右键点击，因为右键用于显示菜单）
+        this.setOnMousePressed(e -> {
+            if (menu.isShowing() && e.isPrimaryButtonDown() && !isClickOnNodeOrEdge((javafx.scene.Node) e.getTarget())) {
+                menu.hide();
+            }
+        });
+    }
+    
+    /**
+     * 设置画布主题
+     * @param theme 主题名称："default"（默认）、"grid"（框框）、"dots"（圆点）
+     */
+    private void setTheme(String theme) {
+        if (theme == null || theme.equals(currentTheme)) {
+            return;
+        }
+        
+        currentTheme = theme;
+        
+        // 移除之前的背景Canvas（如果存在）
+        if (dotsBackgroundCanvas != null) {
+            this.getChildren().remove(dotsBackgroundCanvas);
+            dotsBackgroundCanvas = null;
+        }
+        if (gridBackgroundCanvas != null) {
+            this.getChildren().remove(gridBackgroundCanvas);
+            gridBackgroundCanvas = null;
+        }
+        
+        switch (theme) {
+            case "default":
+                // 默认：纯色背景
+                setStyle("-fx-background-color: #F3F4F6;");
+                log("✓ 已切换到默认主题");
+                break;
+            case "grid":
+                // 框框：网格背景 - 使用Canvas绘制网格图案（更可靠）
+                setStyle("-fx-background-color: #F3F4F6;");
+                createGridBackground();
+                log("✓ 已切换到框框主题");
+                break;
+            case "dots":
+                // 圆点：圆点背景 - 使用Canvas绘制圆点图案
+                setStyle("-fx-background-color: #F3F4F6;");
+                createDotsBackground();
+                log("✓ 已切换到圆点主题");
+                break;
+            default:
+                setStyle("-fx-background-color: #F3F4F6;");
+                log("⚠️ 未知主题，已切换到默认主题");
+                break;
+        }
+    }
+    
+    /**
+     * 创建圆点背景Canvas
+     */
+    private void createDotsBackground() {
+        // 移除旧的Canvas（如果存在）
+        if (dotsBackgroundCanvas != null) {
+            this.getChildren().remove(dotsBackgroundCanvas);
+        }
+        
+        // 创建新的Canvas，大小与画布相同
+        dotsBackgroundCanvas = new Canvas(getPrefWidth(), getPrefHeight());
+        dotsBackgroundCanvas.setMouseTransparent(true); // 不拦截鼠标事件
+        dotsBackgroundCanvas.toBack(); // 放在最底层
+        
+        GraphicsContext gc = dotsBackgroundCanvas.getGraphicsContext2D();
+        gc.setFill(Color.web("#D1D5DB"));
+        
+        // 绘制圆点网格，每个圆点间隔20px
+        double spacing = 20.0;
+        double dotRadius = 1.5;
+        
+        for (double x = spacing / 2; x < getPrefWidth(); x += spacing) {
+            for (double y = spacing / 2; y < getPrefHeight(); y += spacing) {
+                gc.fillOval(x - dotRadius, y - dotRadius, dotRadius * 2, dotRadius * 2);
+            }
+        }
+        
+        // 监听画布大小变化，更新Canvas大小（只添加一次监听器）
+        if (!dotsBackgroundListenersAdded) {
+            widthProperty().addListener((obs, oldVal, newVal) -> {
+                if (dotsBackgroundCanvas != null && newVal.doubleValue() > 0) {
+                    dotsBackgroundCanvas.setWidth(newVal.doubleValue());
+                    redrawDotsBackground();
+                }
+            });
+            
+            heightProperty().addListener((obs, oldVal, newVal) -> {
+                if (dotsBackgroundCanvas != null && newVal.doubleValue() > 0) {
+                    dotsBackgroundCanvas.setHeight(newVal.doubleValue());
+                    redrawDotsBackground();
+                }
+            });
+            dotsBackgroundListenersAdded = true;
+        }
+        
+        // 将Canvas添加到画布最底层
+        this.getChildren().add(0, dotsBackgroundCanvas);
+    }
+    
+    /**
+     * 重新绘制圆点背景
+     */
+    private void redrawDotsBackground() {
+        if (dotsBackgroundCanvas == null) return;
+        
+        GraphicsContext gc = dotsBackgroundCanvas.getGraphicsContext2D();
+        gc.clearRect(0, 0, dotsBackgroundCanvas.getWidth(), dotsBackgroundCanvas.getHeight());
+        gc.setFill(Color.web("#D1D5DB"));
+        
+        double spacing = 20.0;
+        double dotRadius = 1.5;
+        
+        for (double x = spacing / 2; x < dotsBackgroundCanvas.getWidth(); x += spacing) {
+            for (double y = spacing / 2; y < dotsBackgroundCanvas.getHeight(); y += spacing) {
+                gc.fillOval(x - dotRadius, y - dotRadius, dotRadius * 2, dotRadius * 2);
+            }
+        }
+    }
+    
+    /**
+     * 创建网格背景Canvas
+     */
+    private void createGridBackground() {
+        // 移除旧的Canvas（如果存在）
+        if (gridBackgroundCanvas != null) {
+            this.getChildren().remove(gridBackgroundCanvas);
+        }
+        
+        // 创建新的Canvas，大小与画布相同
+        gridBackgroundCanvas = new Canvas(getPrefWidth(), getPrefHeight());
+        gridBackgroundCanvas.setMouseTransparent(true); // 不拦截鼠标事件
+        gridBackgroundCanvas.toBack(); // 放在最底层
+        
+        GraphicsContext gc = gridBackgroundCanvas.getGraphicsContext2D();
+        gc.setStroke(Color.web("#D1D5DB"));
+        gc.setLineWidth(1.0);
+        
+        // 绘制网格线，每个网格20px
+        double spacing = 20.0;
+        
+        // 绘制垂直线
+        for (double x = 0; x < getPrefWidth(); x += spacing) {
+            gc.strokeLine(x, 0, x, getPrefHeight());
+        }
+        
+        // 绘制水平线
+        for (double y = 0; y < getPrefHeight(); y += spacing) {
+            gc.strokeLine(0, y, getPrefWidth(), y);
+        }
+        
+        // 监听画布大小变化，更新Canvas大小（只添加一次监听器）
+        if (!gridBackgroundListenersAdded) {
+            widthProperty().addListener((obs, oldVal, newVal) -> {
+                if (gridBackgroundCanvas != null && newVal.doubleValue() > 0) {
+                    gridBackgroundCanvas.setWidth(newVal.doubleValue());
+                    redrawGridBackground();
+                }
+            });
+            
+            heightProperty().addListener((obs, oldVal, newVal) -> {
+                if (gridBackgroundCanvas != null && newVal.doubleValue() > 0) {
+                    gridBackgroundCanvas.setHeight(newVal.doubleValue());
+                    redrawGridBackground();
+                }
+            });
+            gridBackgroundListenersAdded = true;
+        }
+        
+        // 将Canvas添加到画布最底层
+        this.getChildren().add(0, gridBackgroundCanvas);
+    }
+    
+    /**
+     * 重新绘制网格背景
+     */
+    private void redrawGridBackground() {
+        if (gridBackgroundCanvas == null) return;
+        
+        GraphicsContext gc = gridBackgroundCanvas.getGraphicsContext2D();
+        gc.clearRect(0, 0, gridBackgroundCanvas.getWidth(), gridBackgroundCanvas.getHeight());
+        gc.setStroke(Color.web("#D1D5DB"));
+        gc.setLineWidth(1.0);
+        
+        double spacing = 20.0;
+        
+        // 绘制垂直线
+        for (double x = 0; x < gridBackgroundCanvas.getWidth(); x += spacing) {
+            gc.strokeLine(x, 0, x, gridBackgroundCanvas.getHeight());
+        }
+        
+        // 绘制水平线
+        for (double y = 0; y < gridBackgroundCanvas.getHeight(); y += spacing) {
+            gc.strokeLine(0, y, gridBackgroundCanvas.getWidth(), y);
+        }
     }
     
     // ==================== 数据加载 ====================
