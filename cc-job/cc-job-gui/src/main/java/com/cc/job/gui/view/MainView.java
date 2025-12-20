@@ -10,9 +10,13 @@ import com.cc.job.xo.model.form.JobInfoForm;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
+import javafx.scene.Node;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.transform.Scale;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -430,16 +434,14 @@ public class MainView extends BorderPane {
             });
         });
         
-        // 日志面板关闭和弹出回调
+        // 日志面板关闭和弹出回调（使用专用方法）
         logPanel.setOnClose(() -> {
             logPanelVisible = false;
             updateLeftSidebar();
         });
+
         logPanel.setOnDetach(() -> {
-            detachPanel("监控", logPanel, () -> {
-                logPanelVisible = true;
-                updateLeftSidebar();
-            });
+            detachLogPanel();
         });
     }
 
@@ -631,36 +633,47 @@ public class MainView extends BorderPane {
      * @param panel 要弹出的面板
      * @param onWindowClosed 窗口关闭时的回调
      */
-    private void detachPanel(String title, javafx.scene.Node panel, Runnable onWindowClosed) {
+    private void detachPanel(String title, Node panel, Runnable onWindowClosed) {
+        // 注意：LogPanel 使用专用的 detachLogPanel 方法
+        if (panel instanceof LogPanel) {
+            detachLogPanel();
+            return;
+        }
+        
         // 先更新状态标志（在移除面板之前）
         if (panel instanceof TaskTreeView) {
             treeViewVisible = false;
         } else if (panel instanceof MiniMapView) {
             miniMapVisible = false;
-        } else if (panel instanceof LogPanel) {
-            logPanelVisible = false;
         }
         
         // 从原容器中移除面板
-        javafx.scene.Parent parent = panel.getParent();
-        if (parent instanceof javafx.scene.layout.Pane) {
-            ((javafx.scene.layout.Pane) parent).getChildren().remove(panel);
+        Parent parent = panel.getParent();
+        if (parent instanceof Pane) {
+            ((Pane) parent).getChildren().remove(panel);
         } else if (parent instanceof SplitPane) {
             ((SplitPane) parent).getItems().remove(panel);
         }
         
-        // 更新侧边栏显示（此时面板已从原容器移除，不会影响它）
+        // 更新侧边栏显示
         updateDetachedSidebarState();
         
         // 确保面板在弹出窗口中可见
         panel.setVisible(true);
         panel.setManaged(true);
         
+        // 隐藏面板内部的弹出和关闭按钮
+        if (panel instanceof TaskTreeView) {
+            ((TaskTreeView) panel).setDetachButtonsVisible(false);
+        } else if (panel instanceof MiniMapView) {
+            ((MiniMapView) panel).setDetachButtonsVisible(false);
+        }
+        
         // 创建新窗口
         Stage detachedStage = new Stage();
         detachedStage.setTitle(title);
         detachedStage.initOwner(this.getScene().getWindow());
-        detachedStage.initModality(javafx.stage.Modality.NONE);
+        detachedStage.initModality(Modality.NONE);
         
         // 设置窗口内容
         VBox container = new VBox();
@@ -669,19 +682,26 @@ public class MainView extends BorderPane {
         VBox.setVgrow(panel, Priority.ALWAYS);
         
         // 设置窗口大小
-        javafx.scene.Scene scene = new javafx.scene.Scene(container, 400, 500);
+        Scene scene = new Scene(container, 400, 500);
         detachedStage.setScene(scene);
         
         // 窗口关闭时的处理
-        detachedStage.setOnCloseRequest(event -> {
+        detachedStage.setOnHidden(event -> {
             // 从弹出窗口中移除面板
-            container.getChildren().remove(panel);
+            if (container.getChildren().contains(panel)) {
+                container.getChildren().remove(panel);
+            }
+            VBox.clearConstraints(panel);
             
-            // 清除独立窗口中的布局约束（VBox.setVgrow）
-            // 因为面板要移回 SplitPane，不需要这个约束
-            if (panel.getParent() == container) {
-                // 如果面板还在 container 中，清除约束
-                VBox.setVgrow(panel, null);
+            // 确保面板可见
+            panel.setVisible(true);
+            panel.setManaged(true);
+            
+            // 恢复面板内部的弹出和关闭按钮显示
+            if (panel instanceof TaskTreeView) {
+                ((TaskTreeView) panel).setDetachButtonsVisible(true);
+            } else if (panel instanceof MiniMapView) {
+                ((MiniMapView) panel).setDetachButtonsVisible(true);
             }
             
             // 将面板添加回原容器
@@ -693,43 +713,59 @@ public class MainView extends BorderPane {
                 if (!leftArea.getChildren().contains(panel)) {
                     leftArea.getChildren().add(panel);
                 }
-            } else if (panel instanceof LogPanel) {
-                if (!verticalSplit.getItems().contains(panel)) {
-                    verticalSplit.getItems().add(panel);
-                }
-                // 确保日志面板恢复时分割位置正确（如果当前是完全隐藏状态，则调整为显示状态）
-                double[] currentPositions = verticalSplit.getDividerPositions();
-                if (currentPositions.length > 0 && currentPositions[0] >= 0.99) {
-                    verticalSplit.setDividerPositions(0.7);
-                }
             }
             
-            // 确保面板可见性和管理状态正确设置
-            panel.setVisible(true);
-            panel.setManaged(true);
-            
-            // 强制面板及其所有子节点重新布局和显示
-            Platform.runLater(() -> {
-                // 对于 LogPanel，需要恢复其内容（必须在 Platform.runLater 中执行，确保面板已添加到容器）
-                if (panel instanceof LogPanel) {
-                    LogPanel logPanel = (LogPanel) panel;
-                    // 恢复日志面板的内容（确保 logContainer 中的 scrollPane 正确显示）
-                    logPanel.restoreContent();
-                }
-                
-                // 递归设置所有子节点的可见性和管理状态
-                setNodeVisibleAndManaged(panel, true);
-                
-                // 强制重新布局
-                if (panel instanceof javafx.scene.Parent) {
-                    ((javafx.scene.Parent) panel).requestLayout();
-                }
-            });
-            
-            // 执行回调（会更新状态标志并调用updateLeftSidebar）
+            // 执行回调
             if (onWindowClosed != null) {
                 onWindowClosed.run();
             }
+        });
+        
+        detachedStage.show();
+    }
+    
+    /**
+     * 专用方法：弹出日志面板为独立窗口
+     * 与其他面板不同，LogPanel 本身不移动，只移动内部的所有子节点
+     */
+    private void detachLogPanel() {
+        
+        // 隐藏弹出和关闭按钮
+        logPanel.setDetachButtonsVisible(false);
+        
+        // 创建新窗口
+        Stage detachedStage = new Stage();
+        detachedStage.setTitle("监控");
+        detachedStage.initOwner(this.getScene().getWindow());
+        detachedStage.initModality(Modality.NONE);
+        
+        // 创建容器（不需要 padding，因为子节点已经有自己的样式）
+        VBox container = new VBox();
+        container.setStyle("-fx-background-color: #FFFFFF;");
+        
+        // 将日志面板的所有子节点移动到弹出窗口
+        logPanel.detachContent(container);
+        
+        // 隐藏主界面的日志面板（但不移除）
+        logPanelVisible = false;
+        updateLeftSidebar();
+        
+        // 设置窗口大小
+        Scene scene = new Scene(container, 800, 500);
+        detachedStage.setScene(scene);
+        
+        // 窗口关闭时的处理
+        detachedStage.setOnHidden(event -> {
+            
+            // 将内容移回主面板
+            logPanel.restoreContentFromDetach(container);
+            
+            // 恢复按钮显示
+            logPanel.setDetachButtonsVisible(true);
+            
+            // 显示日志面板
+            logPanelVisible = true;
+            updateLeftSidebar();
         });
         
         detachedStage.show();
@@ -759,9 +795,9 @@ public class MainView extends BorderPane {
             // 如果设置失败，忽略
         }
         
-        if (node instanceof javafx.scene.Parent) {
-            javafx.scene.Parent parent = (javafx.scene.Parent) node;
-            for (javafx.scene.Node child : parent.getChildrenUnmodifiable()) {
+        if (node instanceof Parent) {
+            Parent parent = (Parent) node;
+            for (Node child : parent.getChildrenUnmodifiable()) {
                 setNodeVisibleAndManaged(child, visible);
             }
         }

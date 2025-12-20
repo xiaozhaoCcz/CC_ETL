@@ -31,6 +31,8 @@ public class TaskTreeView extends VBox {
     private TaskSelectionCallback selectionCallback;
     private Runnable onClose;
     private Runnable onDetach;
+    private Button detachBtn;
+    private Button closeBtn;
     
     private TreeDataManager dataManager;
     private TreeSearchManager searchManager;
@@ -95,12 +97,12 @@ public class TaskTreeView extends VBox {
         titleLabel.setStyle(StyleUtil.subtitle());
         HBox.setHgrow(titleLabel, Priority.ALWAYS);
         
-        Button detachBtn = new Button("", IconUtil.windowIcon());
+        detachBtn = new Button("", IconUtil.windowIcon());
         StyleUtil.applyIconButtonHover(detachBtn);
         detachBtn.setTooltip(new Tooltip("弹出为独立窗口"));
         detachBtn.setOnAction(e -> { if (onDetach != null) onDetach.run(); });
         
-        Button closeBtn = new Button("", IconUtil.closeIcon());
+        closeBtn = new Button("", IconUtil.closeIcon());
         StyleUtil.applyIconButtonHover(closeBtn);
         closeBtn.setTooltip(new Tooltip("关闭面板"));
         closeBtn.setOnAction(e -> { if (onClose != null) onClose.run(); });
@@ -219,7 +221,7 @@ public class TaskTreeView extends VBox {
                 setGraphic(null);
                 setStyle("");
                 setContextMenu(null);
-                stopBlinking();
+                //stopBlinking();
             } else {
                 if (contentBox == null) {
                     contentBox = new HBox(8);
@@ -231,22 +233,29 @@ public class TaskTreeView extends VBox {
                     
                     textLabel = new Label();
                     
-                    runningIndicator = new Circle(4);
-                    runningIndicator.setFill(Color.web("#10B981"));
-                    runningIndicator.setVisible(false);
+//                    runningIndicator = new Circle(4);
+//                    runningIndicator.setFill(Color.web("#10B981"));
+//                    runningIndicator.setVisible(false);
+//                    runningIndicator.setManaged(false);  // 初始状态不占用布局空间
                     
-                    contentBox.getChildren().addAll(iconContainer, textLabel, runningIndicator);
+                    contentBox.getChildren().addAll(iconContainer, textLabel);
                 }
                 
                 textLabel.setText(item.getLabel());
                 iconContainer.getChildren().clear();
                 iconContainer.getChildren().add(IconUtil.getIconByType(item.getType()));
                 
-                boolean isRunning = item.getType() != null && item.getType() == 1 && 
-                    runningTaskGroups.containsKey(item.getId()) && runningTaskGroups.get(item.getId());
-                
-                runningIndicator.setVisible(isRunning);
-                if (isRunning) startBlinking(); else stopBlinking();
+                // TODO 显示只有任务组类型（type == 1）且正在运行时才显示绿色圆点
+//                boolean isRunning = item.getType() != null && item.getType() == 1 &&
+//                    runningTaskGroups.containsKey(item.getId()) && runningTaskGroups.get(item.getId());
+//
+//                runningIndicator.setVisible(isRunning);
+//                runningIndicator.setManaged(isRunning);
+//                if (isRunning) {
+//                    startBlinking();
+//                } else {
+//                    stopBlinking();
+//                }
                 
                 setText(null);
                 setGraphic(contentBox);
@@ -557,6 +566,20 @@ public class TaskTreeView extends VBox {
     
     public void setOnDetach(Runnable callback) {
         this.onDetach = callback;
+    }
+    
+    /**
+     * 设置弹出和关闭按钮的可见性（用于面板弹出为独立窗口时隐藏按钮）
+     */
+    public void setDetachButtonsVisible(boolean visible) {
+        if (detachBtn != null) {
+            detachBtn.setVisible(visible);
+            detachBtn.setManaged(visible);
+        }
+        if (closeBtn != null) {
+            closeBtn.setVisible(visible);
+            closeBtn.setManaged(visible);
+        }
     }
     
     public String getSelectedTask() {

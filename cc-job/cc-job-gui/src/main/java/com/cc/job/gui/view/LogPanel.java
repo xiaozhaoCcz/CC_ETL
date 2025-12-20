@@ -8,12 +8,17 @@ import com.cc.job.gui.util.StyleUtil;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
+import javafx.scene.Parent;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import org.apache.commons.text.StringEscapeUtils;
+import org.fxmisc.richtext.CodeArea;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -24,6 +29,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  * 专业的日志监控面板 - 支持多任务组标签页（简化版）
  */
 public class LogPanel extends VBox {
+    
+    private static final Logger logger = LoggerFactory.getLogger(LogPanel.class);
     
     private HBox tabContainer;
     private StackPane logContainer;
@@ -36,6 +43,8 @@ public class LogPanel extends VBox {
     
     private Runnable onDetach;
     private Runnable onClose;
+    private Button detachBtn;
+    private Button closeBtn;
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
     
     private javafx.animation.Timeline searchDebounceTimeline;
@@ -88,15 +97,21 @@ public class LogPanel extends VBox {
         monitorLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
         monitorLabel.setTextFill(Color.web(StyleUtil.GRAY_900));
         
-        Button detachBtn = new Button("", IconUtil.windowIcon());
+        detachBtn = new Button("", IconUtil.windowIcon());
         StyleUtil.applyIconButtonHover(detachBtn);
         detachBtn.setTooltip(new Tooltip("弹出为独立窗口"));
-        detachBtn.setOnAction(e -> { if (onDetach != null) onDetach.run(); });
+        detachBtn.setOnAction(e -> { if (onDetach != null) {
+            onDetach.run();
+        }
+        });
         
-        Button closeBtn = new Button("", IconUtil.closeIcon());
+        closeBtn = new Button("", IconUtil.closeIcon());
         StyleUtil.applyIconButtonHover(closeBtn);
         closeBtn.setTooltip(new Tooltip("关闭面板"));
-        closeBtn.setOnAction(e -> { if (onClose != null) onClose.run(); });
+        closeBtn.setOnAction(e -> { if (onClose != null) {
+            onClose.run();
+        }
+        });
         
         titleContainer.getChildren().addAll(monitorLabel, detachBtn, closeBtn);
         
@@ -544,79 +559,106 @@ public class LogPanel extends VBox {
     }
     
     /**
-     * 恢复日志面板内容（用于面板从独立窗口移回时调用）
-     * 确保当前标签页的内容正确显示在 logContainer 中
+     * 设置弹出和关闭按钮的可见性（用于面板弹出为独立窗口时隐藏按钮）
      */
-    public void restoreContent() {
-        Platform.runLater(() -> {
-            // 确保 logContainer 在 LogPanel 中（面板移回时可能丢失）
-            if (logContainer != null && !this.getChildren().contains(logContainer)) {
-                // logContainer 应该在 titleBar 之后，statusBar 之前
-                // 查找 titleBar 和 statusBar 的位置
-                int insertIndex = -1;
-                for (int i = 0; i < this.getChildren().size(); i++) {
-                    javafx.scene.Node child = this.getChildren().get(i);
-                    // titleBar 是第二个子节点（index 1），logContainer 应该在它之后
-                    if (i == 1 && child instanceof HBox) {
-                        insertIndex = i + 1;
-                        break;
-                    }
-                }
-                if (insertIndex < 0) {
-                    // 如果找不到，添加到倒数第二个位置（在 statusBar 之前）
-                    insertIndex = Math.max(0, this.getChildren().size() - 1);
-                }
-                this.getChildren().add(insertIndex, logContainer);
-                // 确保 logContainer 的布局约束正确
-                VBox.setVgrow(logContainer, Priority.ALWAYS);
+    public void setDetachButtonsVisible(boolean visible) {
+        if (detachBtn != null) {
+            detachBtn.setVisible(visible);
+            detachBtn.setManaged(visible);
+        }
+        if (closeBtn != null) {
+            closeBtn.setVisible(visible);
+            closeBtn.setManaged(visible);
+        }
+    }
+    
+    /**
+     * 获取日志内容容器（用于弹出窗口显示）
+     */
+    public StackPane getLogContainer() {
+        return logContainer;
+    }
+    
+    /**
+     * 获取标签栏容器（用于弹出窗口显示）
+     */
+    public HBox getTabContainer() {
+        return tabContainer;
+    }
+    
+    // 保存子节点的引用，用于恢复
+    private HBox savedTabBar;
+    private HBox savedTitleBar;
+    private HBox savedStatusBar;
+    
+    /**
+     * 弹出时调用：将所有UI元素移动到弹出窗口的容器中
+     * @param targetContainer 弹出窗口的容器
+     */
+    public void detachContent(VBox targetContainer) {
+        
+        // 保存子节点引用（用于恢复）
+        // LogPanel 的子节点顺序：tabBar(0), titleBar(1), logContainer(2), statusBar(3)
+        if (this.getChildren().size() >= 4) {
+            savedTabBar = (HBox) this.getChildren().get(0);
+            savedTitleBar = (HBox) this.getChildren().get(1);
+            savedStatusBar = (HBox) this.getChildren().get(3);
+        }
+        
+        // 将所有子节点移动到目标容器
+        List<Node> children = new ArrayList<>(this.getChildren());
+        this.getChildren().clear();
+        
+        for (Node child : children) {
+            targetContainer.getChildren().add(child);
+            // logContainer 需要占用剩余空间
+            if (child == logContainer) {
+                VBox.setVgrow(child, Priority.ALWAYS);
+            }
+        }
+
+    }
+    
+    /**
+     * 关闭弹出窗口时调用：将所有UI元素移回主面板
+     * @param sourceContainer 弹出窗口的容器
+     */
+    public void restoreContentFromDetach(VBox sourceContainer) {
+        
+        // 将所有子节点从源容器移回
+        if (sourceContainer != null) {
+            List<Node> children = new ArrayList<>(sourceContainer.getChildren());
+            sourceContainer.getChildren().clear();
+            
+            // 清除 VBox 约束
+            for (Node child : children) {
+                VBox.clearConstraints(child);
             }
             
-            // 获取当前标签页的数据
-            Long currentTaskGroupId = tabManager.getCurrentTaskGroupId();
-            LogContentManager tabData = tabManager.getTabData(currentTaskGroupId);
+            // 添加回 LogPanel
+            this.getChildren().addAll(children);
             
-            if (tabData != null && logContainer != null) {
-                javafx.scene.Node scrollPane = tabData.getScrollPane();
-                
-                // 如果 scrollPane 还在其他容器中，先移除它
-                javafx.scene.Parent parent = scrollPane.getParent();
-                if (parent != null && parent != logContainer) {
-                    if (parent instanceof javafx.scene.layout.Pane) {
-                        ((javafx.scene.layout.Pane) parent).getChildren().remove(scrollPane);
-                    } else if (parent instanceof SplitPane) {
-                        ((SplitPane) parent).getItems().remove(scrollPane);
-                    }
-                }
-                
-                // 检查 logContainer 中是否已经有 scrollPane
-                boolean scrollPaneInContainer = logContainer.getChildren().contains(scrollPane);
-                
-                // 如果 scrollPane 不在 logContainer 中，清空并重新添加
-                if (!scrollPaneInContainer) {
-                    logContainer.getChildren().clear();
-                    logContainer.getChildren().add(scrollPane);
-                }
-                
-                // 确保 logContainer 和 scrollPane 可见且被管理
-                logContainer.setVisible(true);
-                logContainer.setManaged(true);
-                if (scrollPane != null) {
-                    scrollPane.setVisible(true);
-                    scrollPane.setManaged(true);
-                }
-                
-                // 重新渲染内容
+            // 重新设置 logContainer 的布局约束
+            VBox.setVgrow(logContainer, Priority.ALWAYS);
+
+        }
+        
+        // 确保所有子节点可见
+        for (Node child : this.getChildren()) {
+            child.setVisible(true);
+            child.setManaged(true);
+        }
+        
+        // 刷新显示
+        Platform.runLater(() -> {
+            LogContentManager tabData = tabManager.getCurrentTabData();
+            if (tabData != null) {
                 tabData.render(currentSearchKeyword);
                 updateStatusBar(tabData);
-                
-                // 强制重新布局，确保内容正确显示
-                this.requestLayout();
-                logContainer.requestLayout();
-                if (scrollPane instanceof javafx.scene.Parent) {
-                    ((javafx.scene.Parent) scrollPane).requestLayout();
-                }
             }
+            this.requestLayout();
         });
+
     }
     
     /**

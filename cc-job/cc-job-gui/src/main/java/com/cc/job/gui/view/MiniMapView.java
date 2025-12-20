@@ -55,6 +55,10 @@ public class MiniMapView extends VBox {
     // 弹出回调
     private Runnable onDetach;
     
+    // 弹出和关闭按钮
+    private Button detachBtn;
+    private Button closeBtn;
+    
     public MiniMapView() {
         initializeUI();
     }
@@ -133,7 +137,7 @@ public class MiniMapView extends VBox {
         HBox.setHgrow(titleLabel, Priority.ALWAYS);
         
         // 弹出按钮
-        Button detachBtn = new Button("", IconUtil.windowIcon());
+        detachBtn = new Button("", IconUtil.windowIcon());
         StyleUtil.applyIconButtonHover(detachBtn);
         detachBtn.setTooltip(new Tooltip("弹出为独立窗口"));
         detachBtn.setOnAction(e -> {
@@ -143,7 +147,7 @@ public class MiniMapView extends VBox {
         });
         
         // 关闭按钮
-        Button closeBtn = new Button("", IconUtil.closeIcon());
+        closeBtn = new Button("", IconUtil.closeIcon());
         StyleUtil.applyIconButtonHover(closeBtn);
         closeBtn.setTooltip(new Tooltip("关闭面板"));
         closeBtn.setOnAction(e -> {
@@ -564,6 +568,20 @@ public class MiniMapView extends VBox {
      */
     public void setOnDetach(Runnable callback) {
         this.onDetach = callback;
+    }
+    
+    /**
+     * 设置弹出和关闭按钮的可见性（用于面板弹出为独立窗口时隐藏按钮）
+     */
+    public void setDetachButtonsVisible(boolean visible) {
+        if (detachBtn != null) {
+            detachBtn.setVisible(visible);
+            detachBtn.setManaged(visible);
+        }
+        if (closeBtn != null) {
+            closeBtn.setVisible(visible);
+            closeBtn.setManaged(visible);
+        }
     }
     
     /**
