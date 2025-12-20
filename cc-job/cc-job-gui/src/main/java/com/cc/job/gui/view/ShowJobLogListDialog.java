@@ -14,18 +14,32 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
-import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.GridPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.VBox;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
+import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.stage.Screen;
+import javafx.geometry.Rectangle2D;
+import org.apache.commons.text.StringEscapeUtils;
+import org.fxmisc.flowless.VirtualizedScrollPane;
+import org.fxmisc.richtext.CodeArea;
+import org.fxmisc.richtext.LineNumberFactory;
+import org.fxmisc.richtext.model.StyleSpans;
+import org.fxmisc.richtext.model.StyleSpansBuilder;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * 展示任务日志列表
@@ -506,75 +520,358 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         showExecutionLogDialog(item);
     }
 
+    /**
+     * 执行日志对话框 - 带行号、语法高亮、自动刷新、全屏功能
+     */
     private void showExecutionLogDialog(JobLogVO item) {
         Dialog<Void> dialog = new Dialog<>();
         dialog.setTitle("执行日志 - " + safe(item.getJobDesc()));
         dialog.initOwner(getDialogPane().getScene().getWindow());
         dialog.initModality(Modality.WINDOW_MODAL);
 
-        VBox content = new VBox(10);
-        content.setPadding(new Insets(20));
-        content.setPrefWidth(800);
-        content.setPrefHeight(600);
+        // 状态变量
+        AtomicBoolean isFullscreen = new AtomicBoolean(false);
+        AtomicBoolean isAutoRefresh = new AtomicBoolean(true);
+        AtomicBoolean isLogEnd = new AtomicBoolean(false);
+        AtomicInteger fromLineNum = new AtomicInteger(0);
+        AtomicInteger pullFailCount = new AtomicInteger(0);
+        Timer[] refreshTimer = new Timer[1];
 
-        TextArea logArea = new TextArea();
-        logArea.setEditable(false);
-        logArea.setWrapText(false);
-        logArea.setStyle("-fx-font-family: 'Consolas', 'Monaco', monospace; -fx-font-size: 12px;");
+        // 创建CodeArea并配置
+        CodeArea codeArea = new CodeArea();
+        codeArea.setEditable(false);
+        codeArea.setWrapText(false);
+        codeArea.setParagraphGraphicFactory(LineNumberFactory.get(codeArea));
+        codeArea.setStyle(
+            "-fx-background-color: #FAFAFA; " +
+            "-fx-font-family: 'Consolas', 'Monaco', 'Courier New', monospace; " +
+            "-fx-font-size: 13px;"
+        );
 
-        ScrollPane scrollPane = new ScrollPane(logArea);
-        scrollPane.setFitToWidth(true);
-        scrollPane.setFitToHeight(true);
-        scrollPane.setPrefHeight(550);
+        // 添加样式类
+        codeArea.getStyleClass().add("log-code-area");
 
+        // 右键菜单
+        ContextMenu contextMenu = new ContextMenu();
+        MenuItem copyItem = new MenuItem("复制");
+        copyItem.setOnAction(e -> {
+            String text = codeArea.getSelectedText();
+            if (text == null || text.isEmpty()) {
+                text = codeArea.getText();
+            }
+            if (text != null && !text.isEmpty()) {
+                Clipboard clipboard = Clipboard.getSystemClipboard();
+                ClipboardContent content = new ClipboardContent();
+                content.putString(text);
+                clipboard.setContent(content);
+            }
+        });
+        MenuItem selectAllItem = new MenuItem("全选");
+        selectAllItem.setOnAction(e -> codeArea.selectAll());
+        contextMenu.getItems().addAll(copyItem, selectAllItem);
+        codeArea.setContextMenu(contextMenu);
+
+        // 使用VirtualizedScrollPane包装
+        VirtualizedScrollPane<CodeArea> scrollPane = new VirtualizedScrollPane<>(codeArea);
+        scrollPane.setStyle("-fx-background-color: #FAFAFA; -fx-border-color: #E5E7EB; -fx-border-width: 1; -fx-border-radius: 6;");
+        VBox.setVgrow(scrollPane, Priority.ALWAYS);
+
+        // 工具栏
         Button refreshBtn = new Button("刷新");
         refreshBtn.setStyle(StyleUtil.secondaryButton());
-        refreshBtn.setOnAction(e -> loadLogContent(item.getId(), logArea, 0));
+        refreshBtn.setOnAction(e -> {
+            fromLineNum.set(0);
+            pullFailCount.set(0);
+            isLogEnd.set(false);
+            codeArea.clear();
+            loadLogContentAsync(item.getId(), codeArea, fromLineNum, pullFailCount, isLogEnd, scrollPane);
+        });
 
-        HBox buttonBox = new HBox(10, refreshBtn);
-        buttonBox.setAlignment(Pos.CENTER_LEFT);
+        ToggleButton autoRefreshBtn = new ToggleButton("自动刷新");
+        autoRefreshBtn.setSelected(true);
+        autoRefreshBtn.setStyle(StyleUtil.secondaryButton());
+        autoRefreshBtn.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            isAutoRefresh.set(newVal);
+            if (newVal) {
+                autoRefreshBtn.setText("自动刷新中");
+            } else {
+                autoRefreshBtn.setText("自动刷新");
+            }
+        });
 
-        content.getChildren().addAll(buttonBox, scrollPane);
+        Button scrollTopBtn = new Button("↑ 顶部");
+        scrollTopBtn.setStyle(StyleUtil.secondaryButton());
+        scrollTopBtn.setOnAction(e -> {
+            codeArea.moveTo(0);
+            codeArea.requestFollowCaret();
+        });
+
+        Button scrollBottomBtn = new Button("↓ 底部");
+        scrollBottomBtn.setStyle(StyleUtil.secondaryButton());
+        scrollBottomBtn.setOnAction(e -> {
+            codeArea.moveTo(codeArea.getLength());
+            codeArea.requestFollowCaret();
+        });
+
+        // 全屏按钮
+        Button fullscreenBtn = new Button("全屏");
+        fullscreenBtn.setStyle(StyleUtil.secondaryButton());
+        fullscreenBtn.setOnAction(e -> {
+            Stage stage = (Stage) dialog.getDialogPane().getScene().getWindow();
+            if (stage != null) {
+                if (isFullscreen.get()) {
+                    // 退出全屏
+                    stage.setWidth(1000);
+                    stage.setHeight(700);
+                    stage.centerOnScreen();
+                    fullscreenBtn.setText("全屏");
+                    isFullscreen.set(false);
+                } else {
+                    // 进入全屏
+                    Rectangle2D screenBounds = Screen.getPrimary().getVisualBounds();
+                    stage.setX(screenBounds.getMinX());
+                    stage.setY(screenBounds.getMinY());
+                    stage.setWidth(screenBounds.getWidth());
+                    stage.setHeight(screenBounds.getHeight());
+                    fullscreenBtn.setText("退出全屏");
+                    isFullscreen.set(true);
+                }
+            }
+        });
+
+        // 状态标签
+        Label statusLabel = new Label("正在加载...");
+        statusLabel.setFont(Font.font("System", FontWeight.NORMAL, 12));
+        statusLabel.setTextFill(Color.web(StyleUtil.GRAY_500));
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        HBox toolbar = new HBox(10, refreshBtn, autoRefreshBtn, scrollTopBtn, scrollBottomBtn, fullscreenBtn, spacer, statusLabel);
+        toolbar.setAlignment(Pos.CENTER_LEFT);
+        toolbar.setPadding(new Insets(0, 0, 10, 0));
+
+        VBox content = new VBox(10);
+        content.setPadding(new Insets(20));
+        content.setPrefWidth(1000);
+        content.setPrefHeight(700);
+        content.getChildren().addAll(toolbar, scrollPane);
 
         dialog.getDialogPane().setContent(content);
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
-        
+        dialog.setResizable(true);
+
+        // 添加CSS样式
+        try {
+            dialog.getDialogPane().getStylesheets().add(getClass().getResource("/styles.css").toExternalForm());
+        } catch (Exception ignored) {}
+
         // 初始加载日志
-        loadLogContent(item.getId(), logArea, 0);
-        
+        loadLogContentAsync(item.getId(), codeArea, fromLineNum, pullFailCount, isLogEnd, scrollPane);
+
+        // 启动自动刷新定时器
+        refreshTimer[0] = new Timer("log-refresh-timer", true);
+        refreshTimer[0].scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                if (isAutoRefresh.get() && !isLogEnd.get()) {
+                    loadLogContentAsync(item.getId(), codeArea, fromLineNum, pullFailCount, isLogEnd, scrollPane);
+                }
+                
+                // 更新状态
+                Platform.runLater(() -> {
+                    if (isLogEnd.get()) {
+                        statusLabel.setText("日志加载完成 [Rolling Log Finish]");
+                        statusLabel.setTextFill(Color.web("#10B981"));
+                    } else if (pullFailCount.get() > 20) {
+                        statusLabel.setText("日志拉取超时，已停止刷新");
+                        statusLabel.setTextFill(Color.web("#EF4444"));
+                        isLogEnd.set(true);
+                    } else {
+                        statusLabel.setText("正在监听日志... 行数: " + codeArea.getParagraphs().size());
+                        statusLabel.setTextFill(Color.web(StyleUtil.GRAY_500));
+                    }
+                });
+            }
+        }, 0, 2000);
+
+        // 对话框关闭时停止定时器
+        dialog.setOnCloseRequest(e -> {
+            if (refreshTimer[0] != null) {
+                refreshTimer[0].cancel();
+            }
+        });
+
         dialog.showAndWait();
+
+        // 确保关闭定时器
+        if (refreshTimer[0] != null) {
+            refreshTimer[0].cancel();
+        }
     }
 
-    private void loadLogContent(Long logId, TextArea logArea, int fromLineNum) {
-        logArea.setText("加载中...");
+    /**
+     * 异步加载日志内容
+     */
+    private void loadLogContentAsync(Long logId, CodeArea codeArea, AtomicInteger fromLineNum, 
+                                      AtomicInteger pullFailCount, AtomicBoolean isLogEnd,
+                                      VirtualizedScrollPane<CodeArea> scrollPane) {
         new Thread(() -> {
             try {
-                JobLogService.LogDetailResponse response = jobLogService.getLogDetail(logId, fromLineNum);
+                JobLogService.LogDetailResponse response = jobLogService.getLogDetail(logId, fromLineNum.get());
                 if (response.isSuccess() && response.getContent() != null) {
-                    String existingText = logArea.getText();
-                    if ("加载中...".equals(existingText)) {
-                        existingText = "";
+                    JobLogService.LogContent logContent = response.getContent();
+                    
+                    // 检查行号是否匹配
+                    if (fromLineNum.get() != logContent.getFromLineNum()) {
+                        logger.debug("pullLog fromLineNum not match");
+                        pullFailCount.incrementAndGet();
+                        return;
                     }
-                    String newContent = response.getContent().getLogContent();
-                    String finalText = existingText + (existingText.isEmpty() ? "" : "\n") + newContent;
                     
-                    Platform.runLater(() -> {
-                        logArea.setText(finalText);
-                        // 滚动到底部
-                        logArea.positionCaret(finalText.length());
-                    });
+                    // 检查是否已到达末尾
+                    if (fromLineNum.get() > logContent.getToLineNum()) {
+                        if (logContent.isEnd()) {
+                            isLogEnd.set(true);
+                        }
+                        return;
+                    }
                     
-                    // 如果还有更多日志，继续加载
-                    if (!response.getContent().isEnd()) {
-                        loadLogContent(logId, logArea, response.getContent().getToLineNum());
+                    String newContent = logContent.getLogContent();
+                    if (newContent != null && !newContent.isEmpty()) {
+                        // 解码HTML实体
+                        String decodedContent = decodeHtmlEntities(newContent);
+                        
+                        Platform.runLater(() -> {
+                            // 追加内容
+                            String currentText = codeArea.getText();
+                            if (!currentText.isEmpty() && !currentText.endsWith("\n")) {
+                                codeArea.appendText("\n");
+                            }
+                            codeArea.appendText(decodedContent);
+                            
+                            // 应用语法高亮
+                            applyLogHighlighting(codeArea);
+                            
+                            // 滚动到底部
+                            codeArea.moveTo(codeArea.getLength());
+                            codeArea.requestFollowCaret();
+                        });
+                        
+                        // 更新行号
+                        fromLineNum.set(logContent.getToLineNum() + 1);
+                        pullFailCount.set(0);
+                    }
+                    
+                    // 检查是否结束
+                    if (logContent.isEnd()) {
+                        isLogEnd.set(true);
                     }
                 } else {
-                    Platform.runLater(() -> logArea.setText("加载失败: " + (response.getMsg() != null ? response.getMsg() : "未知错误")));
+                    pullFailCount.incrementAndGet();
+                    if (response != null && response.getMsg() != null) {
+                        logger.warn("加载日志失败: " + response.getMsg());
+                    }
                 }
             } catch (Exception ex) {
-                Platform.runLater(() -> logArea.setText("加载失败: " + ex.getMessage()));
+                pullFailCount.incrementAndGet();
+                logger.error("加载日志异常", ex);
             }
         }, "load-log-content").start();
+    }
+
+    /**
+     * 解码HTML实体
+     */
+    private String decodeHtmlEntities(String text) {
+        if (text == null) return "";
+        try {
+            String decoded = StringEscapeUtils.unescapeHtml4(text);
+            // 替换 <br> 标签为换行符
+            decoded = decoded.replace("<br>", "\n")
+                             .replace("<br/>", "\n")
+                             .replace("<br />", "\n");
+            return decoded;
+        } catch (Exception e) {
+            return text;
+        }
+    }
+
+    /**
+     * 应用日志语法高亮
+     */
+    private void applyLogHighlighting(CodeArea codeArea) {
+        String text = codeArea.getText();
+        if (text == null || text.isEmpty()) return;
+
+        try {
+            StyleSpansBuilder<Collection<String>> spansBuilder = new StyleSpansBuilder<>();
+            
+            // 错误关键词模式
+            Pattern errorPattern = Pattern.compile(
+                "(?i)(error|exception|fail|failed|failure|caused by|RuntimeException|NullPointerException|" +
+                "IllegalArgumentException|IOException|SQLException|执行结果:失败|任务执行失败|\\[×\\])"
+            );
+            
+            // 警告关键词模式
+            Pattern warnPattern = Pattern.compile(
+                "(?i)(warn|warning|⚠|警告)"
+            );
+            
+            // 成功关键词模式
+            Pattern successPattern = Pattern.compile(
+                "(?i)(success|成功|执行结果:成功|任务执行成功|\\[✓\\]|completed|finish)"
+            );
+            
+            // 时间戳模式
+            Pattern timestampPattern = Pattern.compile(
+                "\\d{4}-\\d{2}-\\d{2}[T ]\\d{2}:\\d{2}:\\d{2}"
+            );
+
+            int lastEnd = 0;
+            String[] lines = text.split("\n");
+            int currentPos = 0;
+            
+            for (String line : lines) {
+                String lowerLine = line.toLowerCase();
+                int lineStart = currentPos;
+                int lineEnd = currentPos + line.length();
+                
+                // 判断整行是否为错误/警告/成功行
+                boolean isErrorLine = errorPattern.matcher(line).find();
+                boolean isWarnLine = !isErrorLine && warnPattern.matcher(line).find();
+                boolean isSuccessLine = !isErrorLine && !isWarnLine && successPattern.matcher(line).find();
+                
+                if (lineStart > lastEnd) {
+                    spansBuilder.add(Collections.emptyList(), lineStart - lastEnd);
+                }
+                
+                if (isErrorLine) {
+                    spansBuilder.add(Collections.singleton("log-error"), line.length());
+                } else if (isWarnLine) {
+                    spansBuilder.add(Collections.singleton("log-warn"), line.length());
+                } else if (isSuccessLine) {
+                    spansBuilder.add(Collections.singleton("log-success"), line.length());
+                } else {
+                    spansBuilder.add(Collections.emptyList(), line.length());
+                }
+                
+                lastEnd = lineEnd;
+                currentPos = lineEnd + 1; // +1 for newline
+            }
+            
+            // 处理剩余文本
+            if (lastEnd < text.length()) {
+                spansBuilder.add(Collections.emptyList(), text.length() - lastEnd);
+            }
+            
+            StyleSpans<Collection<String>> styleSpans = spansBuilder.create();
+            if (styleSpans.length() > 0) {
+                codeArea.setStyleSpans(0, styleSpans);
+            }
+        } catch (Exception e) {
+            logger.debug("应用语法高亮失败", e);
+        }
     }
 
     private void handleClear() {

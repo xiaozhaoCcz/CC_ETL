@@ -3,6 +3,7 @@ package com.cc.job.gui.view;
 import com.cc.job.gui.service.JobGroupService;
 import com.cc.job.gui.util.StyleUtil;
 import com.cc.job.xo.common.result.PageResult;
+import com.cc.job.xo.model.form.JobGroupForm;
 import com.cc.job.xo.model.query.JobGroupQuery;
 import com.cc.job.xo.model.vo.JobGroupVO;
 import javafx.application.Platform;
@@ -445,8 +446,144 @@ public class ShowExecutorListDialog extends Dialog<Void> {
     }
 
     private void handleAdd() {
-        // TODO: 打开新增执行器对话框
-        showInfo("新增功能待实现");
+        showExecutorFormDialog(null);
+    }
+    
+    /**
+     * 显示执行器表单对话框（新增/编辑）
+     */
+    private void showExecutorFormDialog(JobGroupVO editItem) {
+        Dialog<JobGroupForm> dialog = new Dialog<>();
+        dialog.setTitle(editItem == null ? "新增执行器" : "编辑执行器");
+        dialog.initOwner(getDialogPane().getScene().getWindow());
+        dialog.initModality(Modality.WINDOW_MODAL);
+        
+        // 创建表单
+        GridPane grid = new GridPane();
+        grid.setHgap(15);
+        grid.setVgap(15);
+        grid.setPadding(new Insets(20));
+        
+        String labelStyle = StyleUtil.body();
+        
+        // AppName
+        Label appNameLabel = new Label("AppName");
+        appNameLabel.setStyle(labelStyle);
+        TextField appNameInput = new TextField();
+        appNameInput.setPrefWidth(300);
+        appNameInput.setPromptText("请输入执行器AppName");
+        appNameInput.setStyle(StyleUtil.searchField());
+        
+        // 执行器名称
+        Label titleLabel = new Label("执行器名称");
+        titleLabel.setStyle(labelStyle);
+        TextField titleInput = new TextField();
+        titleInput.setPrefWidth(300);
+        titleInput.setPromptText("请输入执行器名称");
+        titleInput.setStyle(StyleUtil.searchField());
+        
+        // 注册方式
+        Label typeLabel = new Label("注册方式");
+        typeLabel.setStyle(labelStyle);
+        ComboBox<String> typeCombo = new ComboBox<>();
+        typeCombo.getItems().addAll("自动注册", "手动录入");
+        typeCombo.getSelectionModel().selectFirst();
+        typeCombo.setPrefWidth(300);
+        
+        // 机器地址
+        Label addressLabel = new Label("机器地址");
+        addressLabel.setStyle(labelStyle);
+        TextArea addressInput = new TextArea();
+        addressInput.setPrefWidth(300);
+        addressInput.setPrefRowCount(3);
+        addressInput.setPromptText("多个地址换行分隔");
+        addressInput.setWrapText(true);
+        
+        // 监听注册方式变化，控制地址输入框可用性
+        typeCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
+            addressInput.setDisable("自动注册".equals(newVal));
+        });
+        addressInput.setDisable(true); // 默认自动注册，禁用地址输入
+        
+        grid.add(appNameLabel, 0, 0);
+        grid.add(appNameInput, 1, 0);
+        grid.add(titleLabel, 0, 1);
+        grid.add(titleInput, 1, 1);
+        grid.add(typeLabel, 0, 2);
+        grid.add(typeCombo, 1, 2);
+        grid.add(addressLabel, 0, 3);
+        grid.add(addressInput, 1, 3);
+        
+        // 填充编辑数据
+        if (editItem != null) {
+            appNameInput.setText(safe(editItem.getAppName()));
+            titleInput.setText(safe(editItem.getTitle()));
+            Integer addrType = editItem.getAddressType();
+            if (addrType != null && addrType == 1) {
+                typeCombo.getSelectionModel().select("手动录入");
+                addressInput.setDisable(false);
+            }
+            addressInput.setText(safe(editItem.getAddressList()));
+        }
+        
+        dialog.getDialogPane().setContent(grid);
+        
+        ButtonType saveBtn = new ButtonType("保存", ButtonBar.ButtonData.OK_DONE);
+        ButtonType cancelBtn = new ButtonType("取消", ButtonBar.ButtonData.CANCEL_CLOSE);
+        dialog.getDialogPane().getButtonTypes().addAll(saveBtn, cancelBtn);
+        
+        // 设置按钮样式
+        Button saveBtnNode = (Button) dialog.getDialogPane().lookupButton(saveBtn);
+        if (saveBtnNode != null) {
+            saveBtnNode.setStyle(StyleUtil.primaryButton());
+        }
+        
+        dialog.setResultConverter(buttonType -> {
+            if (buttonType == saveBtn) {
+                // 验证
+                if (isBlank(appNameInput.getText())) {
+                    showError("验证失败", "请输入执行器AppName");
+                    return null;
+                }
+                if (isBlank(titleInput.getText())) {
+                    showError("验证失败", "请输入执行器名称");
+                    return null;
+                }
+                
+                JobGroupForm form = new JobGroupForm();
+                if (editItem != null) {
+                    form.setId(editItem.getId());
+                }
+                form.setAppName(appNameInput.getText().trim());
+                form.setTitle(titleInput.getText().trim());
+                form.setAddressType("手动录入".equals(typeCombo.getValue()) ? 1 : 0);
+                form.setAddressList(addressInput.getText() != null ? 
+                        addressInput.getText().trim().replace("\n", ",") : "");
+                return form;
+            }
+            return null;
+        });
+        
+        dialog.showAndWait().ifPresent(form -> {
+            if (form != null) {
+                saveExecutor(editItem != null, editItem != null ? editItem.getId() : null, form);
+            }
+        });
+    }
+    
+    /**
+     * 保存执行器
+     */
+    private void saveExecutor(boolean isEdit, Long id, JobGroupForm form) {
+        runAsync("保存执行器", () -> {
+            boolean ok;
+            if (isEdit) {
+                ok = jobGroupService.updateJobGroup(id, form);
+            } else {
+                ok = jobGroupService.saveJobGroup(form);
+            }
+            return ok ? "保存成功" : "保存失败";
+        });
     }
 
     private void handleDelete() {
@@ -485,8 +622,8 @@ public class ShowExecutorListDialog extends Dialog<Void> {
     }
 
     private void handleEdit(JobGroupVO item) {
-        // TODO: 打开编辑执行器对话框
-        showInfo("编辑功能待实现: " + safe(item.getTitle()));
+        if (item == null || item.getId() == null) return;
+        showExecutorFormDialog(item);
     }
 
     private void handleViewAddress(JobGroupVO item) {

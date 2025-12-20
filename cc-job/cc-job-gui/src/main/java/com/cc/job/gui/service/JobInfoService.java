@@ -365,5 +365,34 @@ public class JobInfoService extends BaseService {
         Result<JobEdge> result = httpClient.post("/api/v1/jobInfos/saveJobEdge", formData, JobEdge.class);
         return httpClient.extractData(result, "保存连线失败");
     }
+    
+    /**
+     * 批量删除任务
+     * @param ids 任务ID，多个以逗号分隔
+     * @return 是否删除成功
+     * @throws IOException 网络异常
+     */
+    public boolean deleteByIds(String ids) throws IOException {
+        if (ids == null || ids.trim().isEmpty()) {
+            throw new IllegalArgumentException("任务ID不能为空");
+        }
+        String path = "/api/v1/jobInfos/" + ids;
+        Result<Void> result = httpClient.delete(path, Void.class);
+        if (!Result.isSuccess(result)) {
+            throw new IOException("删除任务失败: " + result.getMsg());
+        }
+        return true;
+    }
+    
+    /**
+     * 更新任务
+     * @param id 任务ID
+     * @param formData 任务表单数据
+     * @return 是否更新成功
+     * @throws IOException 网络异常
+     */
+    public boolean updateJobInfo(Long id, JobInfoForm formData) throws IOException {
+        return httpClient.putForBoolean("/api/v1/jobInfos/" + id, formData);
+    }
 }
 

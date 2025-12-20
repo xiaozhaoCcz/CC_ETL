@@ -37,7 +37,7 @@ public class JobGroupController {
 
     @Operation(summary = "task_group分页列表")
     @GetMapping("/{id}")
-    public Result<JobGroup> getJobGroup(@PathVariable Long id) {
+    public Result<JobGroup> getJobGroup(@Parameter(description = "执行器ID") @PathVariable("id") Long id) {
         JobGroup jobGroup= jobGroupService.getById(id);
         return Result.success(jobGroup);
     }

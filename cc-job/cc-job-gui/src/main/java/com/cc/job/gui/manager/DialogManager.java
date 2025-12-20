@@ -216,6 +216,30 @@ public class DialogManager {
     }
     
     /**
+     * 显示数据源管理对话框
+     */
+    public void showDatasourceListDialog() {
+        ShowDatasourceListDialog dialog = new ShowDatasourceListDialog(ownerStage);
+        dialog.show();
+    }
+    
+    /**
+     * 显示数据源同步对话框
+     */
+    public void showDataxSyncDialog() {
+        ShowDataxSyncDialog dialog = new ShowDataxSyncDialog(ownerStage);
+        dialog.show();
+    }
+    
+    /**
+     * 显示多数据源同步对话框
+     */
+    public void showDataxGroupSyncDialog() {
+        ShowDataxGroupSyncDialog dialog = new ShowDataxGroupSyncDialog(ownerStage);
+        dialog.show();
+    }
+    
+    /**
      * 显示节点详情对话框
      * @param jobId 任务ID
      * @param taskGroupId 任务组ID

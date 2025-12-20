@@ -8,6 +8,7 @@ import com.xxl.job.core.biz.model.HandleCallbackParam;
 import com.xxl.job.core.biz.model.RegistryParam;
 import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.util.GsonTool;
+import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Controller;
@@ -102,7 +103,8 @@ public class JobApiController {
      * 建立SSE连接
      */
     @GetMapping("/sse/{jobId}/{randomId}")
-    public SseEmitter subscribeToEvents(@PathVariable Long jobId, @PathVariable String randomId) {
+    public SseEmitter subscribeToEvents(@Parameter(description = "任务组ID") @PathVariable("jobId") Long jobId,
+                                        @Parameter(description = "执行批次ID") @PathVariable("randomId") String randomId) {
         String connectionKey = jobId + ":" + randomId;
 
         SseEmitter emitter = new SseEmitter(0L); // 无超时时间

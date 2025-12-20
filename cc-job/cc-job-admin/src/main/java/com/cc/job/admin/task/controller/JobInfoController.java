@@ -127,14 +127,14 @@ public class JobInfoController {
 
     @Operation(summary = "启动")
     @GetMapping("/startJob/{id}")
-    public Result<Void> startJob(@PathVariable Long id) {
+    public Result<Void> startJob(@Parameter(description = "任务ID") @PathVariable("id") Long id) {
         boolean result = jobInfoService.startJob(id);
         return Result.judge(result);
     }
 
     @Operation(summary = "停止")
     @GetMapping("/stopJob/{id}")
-    public Result<Void> stopJob(@PathVariable Long id) {
+    public Result<Void> stopJob(@Parameter(description = "任务ID") @PathVariable("id") Long id) {
         boolean result = jobInfoService.stopJob(id);
         return Result.judge(result);
     }
@@ -166,7 +166,8 @@ public class JobInfoController {
 
     @Operation(summary = "停止任务集")
     @GetMapping("/stopJobCompose/{id}/{randomId}")
-    public Result<Void> stopJobCompose(@PathVariable Long id,@PathVariable String randomId) {
+    public Result<Void> stopJobCompose(@Parameter(description = "任务组ID") @PathVariable("id") Long id,
+                                        @Parameter(description = "执行批次ID") @PathVariable("randomId") String randomId) {
         boolean result = jobInfoService.stopJobCompose(id,randomId);
         return Result.judge(result);
     }
@@ -254,7 +255,7 @@ public class JobInfoController {
 
     @Operation(summary = "任务运行状态")
     @GetMapping("getJobStatus/{id}")
-    public Result<Boolean>  getJobStatus(@PathVariable Long id){
+    public Result<Boolean> getJobStatus(@Parameter(description = "任务ID") @PathVariable("id") Long id){
         JobInfo jobInfo = jobInfoService.getById(id);
         return Result.success(jobInfo.getTriggerStatus()>0);
     }

@@ -894,7 +894,6 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
         
         // 固定字段
         form.setJobType(0); // 普通任务
-        form.setFailStrategy("JOB_FAIL"); // 满足后端校验要求
         
         return form;
     }

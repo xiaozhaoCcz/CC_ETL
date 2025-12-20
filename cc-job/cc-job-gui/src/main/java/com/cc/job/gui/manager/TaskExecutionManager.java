@@ -97,7 +97,8 @@ public class TaskExecutionManager {
         RunningJobGroup runningJob = new RunningJobGroup(currentJobId, jobName, randomId, currentUserId);
         runningJobs.put(currentJobId, runningJob);
         
-        logPanel.addOrSwitchToTaskGroup(currentJobId, jobName);
+        // 重新执行任务组时，清空该任务组的历史日志并切换到该标签页
+        logPanel.restartTaskGroup(currentJobId, jobName);
         logPanel.info(currentJobId, "════════════════════════════════");
         logPanel.success(currentJobId, "✨ 开始执行任务组: " + jobName + " (ID: " + currentJobId + ")");
         logPanel.info(currentJobId, "执行批次ID: " + randomId);

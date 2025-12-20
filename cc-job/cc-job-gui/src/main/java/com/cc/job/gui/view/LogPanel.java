@@ -278,11 +278,43 @@ public class LogPanel extends VBox {
         }
     }
     
+    /**
+     * 添加或切换到任务组标签页（保留历史日志）
+     * 用于用户在不同任务组之间切换时调用
+     */
     public void addOrSwitchToTaskGroup(Long taskGroupId, String taskGroupName) {
         if (taskGroupId == null) return;
         
         Platform.runLater(() -> {
             tabManager.addOrSwitchToTaskGroup(taskGroupId, taskGroupName, tabContainer);
+            
+            LogContentManager tabData = tabManager.getTabData(taskGroupId);
+            if (tabData != null) {
+                logContainer.getChildren().clear();
+                logContainer.getChildren().add(tabData.getScrollPane());
+                tabData.render(currentSearchKeyword);
+                updateStatusBar(tabData);
+            }
+            
+            // 设置标签的点击和关闭回调
+            LogTabManager.LogTab tab = tabManager.getLogTab(taskGroupId);
+            if (tab != null) {
+                tab.setOnClick(() -> switchToTaskGroup(taskGroupId));
+                tab.setOnClose(() -> tabManager.removeTaskGroup(taskGroupId, tabContainer));
+            }
+        });
+    }
+    
+    /**
+     * 重新启动任务组（清空日志并切换到该标签页）
+     * 用于任务组重新执行时调用，会清空该任务组的历史日志
+     */
+    public void restartTaskGroup(Long taskGroupId, String taskGroupName) {
+        if (taskGroupId == null) return;
+        
+        Platform.runLater(() -> {
+            // 调用tabManager的restartTaskGroup方法，会清空日志并切换到该标签页
+            tabManager.restartTaskGroup(taskGroupId, taskGroupName, tabContainer);
             
             LogContentManager tabData = tabManager.getTabData(taskGroupId);
             if (tabData != null) {

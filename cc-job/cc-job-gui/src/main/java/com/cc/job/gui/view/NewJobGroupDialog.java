@@ -564,7 +564,6 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
         form.setGlueType("BEAN");
         form.setExecutorHandler("runJobGroupXxlJob"); // 任务组的固定Handler
         form.setJobType(2); // 任务组类型（jobType=2 表示任务组）
-        form.setFailStrategy("JOB_FAIL"); // 设置默认失败策略，满足后端校验要求
         
         return form;
     }

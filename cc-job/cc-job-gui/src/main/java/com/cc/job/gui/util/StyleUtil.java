@@ -37,6 +37,8 @@ public class StyleUtil {
     public static final String GRAY_700 = "#374151";
     public static final String GRAY_800 = "#1F2937";
     public static final String GRAY_900 = "#111827";
+    public static final String TEXT_PRIMARY = "#1F2937";
+    public static final String TEXT_SECONDARY = "#6B7280";
     
     // 背景色
     public static final String BG_PRIMARY = "#FFFFFF";
@@ -54,7 +56,8 @@ public class StyleUtil {
     public static final String RADIUS_SM = "4";
     public static final String RADIUS_MD = "6";
     public static final String RADIUS_LG = "8";
-    
+    public static final String BORDER = "";
+
     // ============ 按钮样式 ============
     
     /**

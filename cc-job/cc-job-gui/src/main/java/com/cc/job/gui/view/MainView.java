@@ -287,6 +287,21 @@ public class MainView extends BorderPane {
             }
 
             @Override
+            public void onDatasourceList() {
+                dialogManager.showDatasourceListDialog();
+            }
+
+            @Override
+            public void onDataxSync() {
+                dialogManager.showDataxSyncDialog();
+            }
+
+            @Override
+            public void onDataxGroupSync() {
+                dialogManager.showDataxGroupSyncDialog();
+            }
+
+            @Override
             public List<JobGroup> onRequestTaskList() {
                 try {
                     return jobGroupService.getAllJobGroupList();

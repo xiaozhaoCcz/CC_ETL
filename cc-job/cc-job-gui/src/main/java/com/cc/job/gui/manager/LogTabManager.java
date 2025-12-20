@@ -92,6 +92,44 @@ public class LogTabManager {
     }
     
     /**
+     * 清空指定任务组的日志内容（用于重新执行任务组时）
+     * @param taskGroupId 任务组ID
+     */
+    public void clearTaskGroupLogs(Long taskGroupId) {
+        LogContentManager tabData = tabDataMap.get(taskGroupId);
+        if (tabData != null) {
+            tabData.clearEntries();
+            tabData.status = "就绪";
+            tabData.statusColor = "#10B981";
+        }
+    }
+    
+    /**
+     * 重新启动任务组 - 清空日志并切换到该标签页
+     * 如果标签页不存在则创建新的
+     * @param taskGroupId 任务组ID
+     * @param taskGroupName 任务组名称
+     * @param tabContainer 标签页容器
+     */
+    public void restartTaskGroup(Long taskGroupId, String taskGroupName, HBox tabContainer) {
+        if (taskGroupId == null) return;
+        
+        // 如果标签页已存在，清空其日志
+        if (logTabs.containsKey(taskGroupId)) {
+            clearTaskGroupLogs(taskGroupId);
+        } else {
+            // 创建新标签页
+            LogTab tab = new LogTab(taskGroupId, taskGroupName);
+            logTabs.put(taskGroupId, tab);
+            tabContainer.getChildren().add(tab);
+            tabDataMap.put(taskGroupId, new LogContentManager());
+        }
+        
+        // 切换到该标签页
+        switchToTaskGroup(taskGroupId);
+    }
+    
+    /**
      * 日志标签页UI组件
      */
     public static class LogTab extends StackPane {
