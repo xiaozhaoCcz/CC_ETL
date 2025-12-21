@@ -163,6 +163,9 @@ public class MainView extends BorderPane {
         dataManager = new DataManager(canvas, logPanel, treeView);
         nodeCallbackConfigurator = new NodeCallbackConfigurator(nodeOperationManager, canvas, logPanel);
         
+        // 重要：设置对话框管理器的任务执行管理器（用于获取预测时间）
+        dialogManager.setTaskExecutionManager(taskExecutionManager);
+        
         // 重要：设置节点操作管理器的回调配置器（用于新增节点时自动配置回调）
         nodeOperationManager.setNodeCallbackConfigurator(nodeCallbackConfigurator);
         

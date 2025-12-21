@@ -30,14 +30,10 @@ public class JobDataxService extends BaseService {
      * 获取数据源的表列表
      */
     public List<String> getTables(Long datasourceId) throws IOException {
-        String url = apiUtil.getBaseUrl() + BASE_API + "/getTables/" + datasourceId;
+        String path = BASE_API + "/getTables/" + datasourceId;
         
-        Request request = new Request.Builder()
-                .url(url)
-                .get()
-                .build();
-        
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+        try (Response response = apiUtil.executeRequestWithRetry(path, url -> 
+                new Request.Builder().url(url).get().build())) {
             if (!response.isSuccessful()) {
                 throw new IOException("请求失败: " + response);
             }
@@ -56,7 +52,7 @@ public class JobDataxService extends BaseService {
      * 获取表的字段列表
      */
     public List<String> getColumns(Long datasourceId, String tableName, String querySql) throws IOException {
-        String url = apiUtil.getBaseUrl() + BASE_API + "/getColumns/" + datasourceId;
+        String path = BASE_API + "/getColumns/" + datasourceId;
         
         Map<String, String> params = new HashMap<>();
         if (tableName != null && !tableName.isEmpty()) {
@@ -68,12 +64,8 @@ public class JobDataxService extends BaseService {
         
         String json = apiUtil.getGson().toJson(params);
         
-        Request request = new Request.Builder()
-                .url(url)
-                .post(RequestBody.create(json, JSON))
-                .build();
-        
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+        try (Response response = apiUtil.executeRequestWithRetry(path, url -> 
+                new Request.Builder().url(url).post(RequestBody.create(json, JSON)).build())) {
             if (!response.isSuccessful()) {
                 throw new IOException("请求失败: " + response);
             }
@@ -92,15 +84,11 @@ public class JobDataxService extends BaseService {
      * 生成DataX JSON配置
      */
     public String getJson(DataXParams params) throws IOException {
-        String url = apiUtil.getBaseUrl() + BASE_API + "/getJson";
+        String path = BASE_API + "/getJson";
         String json = apiUtil.getGson().toJson(params);
         
-        Request request = new Request.Builder()
-                .url(url)
-                .post(RequestBody.create(json, JSON))
-                .build();
-        
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+        try (Response response = apiUtil.executeRequestWithRetry(path, url -> 
+                new Request.Builder().url(url).post(RequestBody.create(json, JSON)).build())) {
             if (!response.isSuccessful()) {
                 throw new IOException("请求失败: " + response);
             }
@@ -119,15 +107,11 @@ public class JobDataxService extends BaseService {
      * 批量生成DataX JSON配置
      */
     public String batchBuildJson(List<DataXParams> paramsList) throws IOException {
-        String url = apiUtil.getBaseUrl() + BASE_API + "/batchBuildJson";
+        String path = BASE_API + "/batchBuildJson";
         String json = apiUtil.getGson().toJson(paramsList);
         
-        Request request = new Request.Builder()
-                .url(url)
-                .post(RequestBody.create(json, JSON))
-                .build();
-        
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+        try (Response response = apiUtil.executeRequestWithRetry(path, url -> 
+                new Request.Builder().url(url).post(RequestBody.create(json, JSON)).build())) {
             if (!response.isSuccessful()) {
                 throw new IOException("请求失败: " + response);
             }

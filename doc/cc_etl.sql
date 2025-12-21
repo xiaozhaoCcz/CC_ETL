@@ -339,6 +339,7 @@ CREATE TABLE `job_log` (
   `handle_code` int NOT NULL COMMENT '执行-状态',
   `handle_msg` text COMMENT '执行-日志',
   `alarm_status` tinyint NOT NULL DEFAULT '0' COMMENT '告警状态：0-默认、1-无需告警、2-告警成功、3-告警失败',
+  `node_status` text COMMENT '节点执行状态（JSON格式）',
   `is_deleted` int DEFAULT '0',
   PRIMARY KEY (`id`),
   KEY `I_trigger_time` (`trigger_time`),

@@ -56,7 +56,6 @@ public class XxlJobConfig extends XxlJobSpringExecutor{
     @Value("${server.port:8500}")
     private int httpPort;
 
-
     /**
      * 初始化方法，相当于 @Bean(initMethod = "init")
      */

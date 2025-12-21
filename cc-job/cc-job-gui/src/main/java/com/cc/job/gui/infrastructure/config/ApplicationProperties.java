@@ -62,7 +62,26 @@ public class ApplicationProperties {
      */
     public static class Api {
         
+        /**
+         * 获取基础URL（单个，兼容旧代码）
+         * @deprecated 使用 getBaseUrls() 获取多个地址
+         */
+        @Deprecated
         public static String getBaseUrl() {
+            String urls = getBaseUrls();
+            if (urls != null && !urls.isEmpty()) {
+                // 返回第一个地址
+                String[] addresses = urls.split(",");
+                return addresses[0].trim();
+            }
+            return GuiConstants.Api.DEFAULT_BASE_URL;
+        }
+        
+        /**
+         * 获取基础URL列表（多个，以逗号分隔）
+         * @return 多个URL地址，以逗号分隔
+         */
+        public static String getBaseUrls() {
             return properties.getProperty("api.base.url", 
                     GuiConstants.Api.DEFAULT_BASE_URL);
         }

@@ -37,14 +37,8 @@ public class JobJdbcDatasourceService extends BaseService {
      * @throws IOException 网络异常
      */
     public List<JobJdbcDatasource> getDatasourceList() throws IOException {
-        String url = apiUtil.getBaseUrl() + LIST_API;
-        
-        Request request = new Request.Builder()
-                .url(url)
-                .get()
-                .build();
-        
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+        try (Response response = apiUtil.executeRequestWithRetry(LIST_API, url -> 
+                new Request.Builder().url(url).get().build())) {
             if (!response.isSuccessful()) {
                 throw new IOException("请求失败: " + response);
             }
@@ -67,25 +61,23 @@ public class JobJdbcDatasourceService extends BaseService {
      * 分页查询数据源
      */
     public PageResult<JobJdbcDatasourceVO> getDatasourcePage(JobJdbcDatasourceQuery query) throws IOException {
-        StringBuilder urlBuilder = new StringBuilder(apiUtil.getBaseUrl() + PAGE_API);
-        urlBuilder.append("?pageNum=").append(query.getPageNum());
-        urlBuilder.append("&pageSize=").append(query.getPageSize());
+        StringBuilder queryString = new StringBuilder();
+        queryString.append("?pageNum=").append(query.getPageNum());
+        queryString.append("&pageSize=").append(query.getPageSize());
         if (query.getDatasourceName() != null && !query.getDatasourceName().isEmpty()) {
-            urlBuilder.append("&datasourceName=").append(query.getDatasourceName());
+            queryString.append("&datasourceName=").append(query.getDatasourceName());
         }
         if (query.getDatasource() != null && !query.getDatasource().isEmpty()) {
-            urlBuilder.append("&datasource=").append(query.getDatasource());
+            queryString.append("&datasource=").append(query.getDatasource());
         }
         if (query.getDatabaseName() != null && !query.getDatabaseName().isEmpty()) {
-            urlBuilder.append("&databaseName=").append(query.getDatabaseName());
+            queryString.append("&databaseName=").append(query.getDatabaseName());
         }
         
-        Request request = new Request.Builder()
-                .url(urlBuilder.toString())
-                .get()
-                .build();
+        String path = PAGE_API + queryString.toString();
         
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+        try (Response response = apiUtil.executeRequestWithRetry(path, url -> 
+                new Request.Builder().url(url).get().build())) {
             if (!response.isSuccessful()) {
                 throw new IOException("请求失败: " + response);
             }
@@ -99,14 +91,10 @@ public class JobJdbcDatasourceService extends BaseService {
      * 获取数据源表单数据
      */
     public JobJdbcDatasourceForm getFormData(Long id) throws IOException {
-        String url = apiUtil.getBaseUrl() + BASE_API + "/" + id + "/form";
+        String path = BASE_API + "/" + id + "/form";
         
-        Request request = new Request.Builder()
-                .url(url)
-                .get()
-                .build();
-        
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+        try (Response response = apiUtil.executeRequestWithRetry(path, url -> 
+                new Request.Builder().url(url).get().build())) {
             if (!response.isSuccessful()) {
                 throw new IOException("请求失败: " + response);
             }
@@ -125,15 +113,11 @@ public class JobJdbcDatasourceService extends BaseService {
      * 新增数据源
      */
     public boolean saveDatasource(JobJdbcDatasourceForm form) throws IOException {
-        String url = apiUtil.getBaseUrl() + BASE_API;
+        String path = BASE_API;
         String json = apiUtil.getGson().toJson(form);
         
-        Request request = new Request.Builder()
-                .url(url)
-                .post(RequestBody.create(json, JSON))
-                .build();
-        
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+        try (Response response = apiUtil.executeRequestWithRetry(path, url -> 
+                new Request.Builder().url(url).post(RequestBody.create(json, JSON)).build())) {
             if (!response.isSuccessful()) {
                 throw new IOException("请求失败: " + response);
             }
@@ -148,15 +132,11 @@ public class JobJdbcDatasourceService extends BaseService {
      * 更新数据源
      */
     public boolean updateDatasource(Long id, JobJdbcDatasourceForm form) throws IOException {
-        String url = apiUtil.getBaseUrl() + BASE_API + "/" + id;
+        String path = BASE_API + "/" + id;
         String json = apiUtil.getGson().toJson(form);
         
-        Request request = new Request.Builder()
-                .url(url)
-                .put(RequestBody.create(json, JSON))
-                .build();
-        
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+        try (Response response = apiUtil.executeRequestWithRetry(path, url -> 
+                new Request.Builder().url(url).put(RequestBody.create(json, JSON)).build())) {
             if (!response.isSuccessful()) {
                 throw new IOException("请求失败: " + response);
             }
@@ -171,14 +151,10 @@ public class JobJdbcDatasourceService extends BaseService {
      * 批量删除数据源
      */
     public boolean deleteDatasources(String ids) throws IOException {
-        String url = apiUtil.getBaseUrl() + BASE_API + "/" + ids;
+        String path = BASE_API + "/" + ids;
         
-        Request request = new Request.Builder()
-                .url(url)
-                .delete()
-                .build();
-        
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+        try (Response response = apiUtil.executeRequestWithRetry(path, url -> 
+                new Request.Builder().url(url).delete().build())) {
             if (!response.isSuccessful()) {
                 throw new IOException("请求失败: " + response);
             }
@@ -193,15 +169,11 @@ public class JobJdbcDatasourceService extends BaseService {
      * 测试数据源连接
      */
     public boolean testConnection(JobJdbcDatasourceForm form) throws IOException {
-        String url = apiUtil.getBaseUrl() + CONNECT_API;
+        String path = CONNECT_API;
         String json = apiUtil.getGson().toJson(form);
         
-        Request request = new Request.Builder()
-                .url(url)
-                .post(RequestBody.create(json, JSON))
-                .build();
-        
-        try (Response response = apiUtil.getClient().newCall(request).execute()) {
+        try (Response response = apiUtil.executeRequestWithRetry(path, url -> 
+                new Request.Builder().url(url).post(RequestBody.create(json, JSON)).build())) {
             if (!response.isSuccessful()) {
                 throw new IOException("请求失败: " + response);
             }

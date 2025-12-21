@@ -12,10 +12,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import jakarta.annotation.PostConstruct;
+import java.net.URI;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Admin API 客户端
@@ -24,17 +28,157 @@ import java.util.Map;
  * @author xiaozhao
  */
 @Component
+@SuppressWarnings("unchecked")
 public class AdminApiClient {
     
     private static final Logger logger = LoggerFactory.getLogger(AdminApiClient.class);
     
-    //@Value("${cc-job.job.admin.addresses}")
-    private String adminAddress = "http://127.0.0.1:8989";
+    @Value("${cc-job.job.admin.addresses}")
+    private String adminAddresses;
     
     @Value("${cc-job.job.accessToken}")
     private String accessToken;
     
     private static final int TIMEOUT = 30000; // 30秒超时
+    
+    /**
+     * Admin地址列表（已规范化，只包含协议+主机+端口）
+     */
+    private List<String> normalizedAdminAddresses = new ArrayList<>();
+    
+    /**
+     * 初始化，解析和规范化Admin地址
+     */
+    @PostConstruct
+    public void init() {
+        if (adminAddresses == null || adminAddresses.trim().isEmpty()) {
+            logger.warn("[AdminApiClient] 未配置Admin地址，使用默认地址: http://127.0.0.1:8989");
+            normalizedAdminAddresses.add("http://127.0.0.1:8989");
+            return;
+        }
+        
+        // 按逗号分割地址
+        String[] addresses = adminAddresses.split(",");
+        normalizedAdminAddresses = Arrays.stream(addresses)
+                .map(String::trim)
+                .filter(addr -> !addr.isEmpty())
+                .map(this::normalizeAddress)
+                .filter(addr -> addr != null)
+                .collect(Collectors.toList());
+        
+        if (normalizedAdminAddresses.isEmpty()) {
+            logger.warn("[AdminApiClient] 解析后的Admin地址列表为空，使用默认地址: http://127.0.0.1:8989");
+            normalizedAdminAddresses.add("http://127.0.0.1:8989");
+        } else {
+            logger.info("[AdminApiClient] 初始化Admin地址列表: {}", normalizedAdminAddresses);
+        }
+    }
+    
+    /**
+     * 规范化地址，移除路径部分，只保留协议+主机+端口
+     * 例如: http://127.0.0.1:8989/xxl-job-admin -> http://127.0.0.1:8989
+     * 
+     * @param address 原始地址
+     * @return 规范化后的地址
+     */
+    private String normalizeAddress(String address) {
+        try {
+            URI uri = URI.create(address);
+            String scheme = uri.getScheme();
+            String host = uri.getHost();
+            int port = uri.getPort();
+            
+            if (scheme == null || host == null) {
+                logger.warn("[AdminApiClient] 无效的地址格式: {}", address);
+                return null;
+            }
+            
+            // 构建规范化地址：协议://主机:端口
+            if (port > 0) {
+                return scheme + "://" + host + ":" + port;
+            } else {
+                // 如果没有端口，使用默认端口
+                if ("https".equals(scheme)) {
+                    return scheme + "://" + host + ":443";
+                } else {
+                    return scheme + "://" + host + ":80";
+                }
+            }
+        } catch (Exception e) {
+            logger.error("[AdminApiClient] 解析地址失败: {}", address, e);
+            return null;
+        }
+    }
+    
+    /**
+     * 执行GET请求，尝试所有地址直到成功
+     * 
+     * @param path API路径（如 /api/v1/jobInfos/123）
+     * @return HttpResponse，如果所有地址都失败则返回null
+     */
+    private HttpResponse executeGet(String path) {
+        for (String baseAddress : normalizedAdminAddresses) {
+            try {
+                String url = baseAddress + path;
+                HttpResponse response = HttpRequest.get(url)
+                        .header("Authorization", accessToken)
+                        .timeout(TIMEOUT)
+                        .execute();
+                
+                if (response.isOk()) {
+                    logger.debug("[AdminApiClient] GET请求成功 - url: {}", url);
+                    return response;
+                } else {
+                    logger.warn("[AdminApiClient] GET请求失败 - url: {}, status: {}", url, response.getStatus());
+                }
+            } catch (Exception e) {
+                logger.warn("[AdminApiClient] GET请求异常 - address: {}, path: {}, error: {}", 
+                        baseAddress, path, e.getMessage());
+            }
+        }
+        
+        logger.error("[AdminApiClient] 所有Admin地址的GET请求都失败 - path: {}", path);
+        return null;
+    }
+    
+    /**
+     * 执行POST请求，尝试所有地址直到成功
+     * 
+     * @param path API路径
+     * @param body 请求体（JSON字符串），如果为空则不设置body
+     * @return HttpResponse，如果所有地址都失败则返回null
+     */
+    private HttpResponse executePost(String path, String body) {
+        for (String baseAddress : normalizedAdminAddresses) {
+            try {
+                String url = baseAddress + path;
+                HttpRequest request = HttpRequest.post(url)
+                        .header("Authorization", accessToken)
+                        .timeout(TIMEOUT);
+                
+                // 只有当body不为空时才设置Content-Type和body
+                if (body != null && !body.trim().isEmpty()) {
+                    request.header("Content-Type", "application/json")
+                           .body(body);
+                }
+                
+                HttpResponse response = request.execute();
+                
+                if (response.isOk()) {
+                    logger.debug("[AdminApiClient] POST请求成功 - url: {}", url);
+                    return response;
+                } else {
+                    logger.warn("[AdminApiClient] POST请求失败 - url: {}, status: {}", url, response.getStatus());
+                }
+            } catch (Exception e) {
+                logger.warn("[AdminApiClient] POST请求异常 - address: {}, path: {}, error: {}", 
+                        baseAddress, path, e.getMessage());
+            }
+        }
+        
+        logger.error("[AdminApiClient] 所有Admin地址的POST请求都失败 - path: {}", path);
+        return null;
+    }
     
     /**
      * 获取任务信息
@@ -44,13 +188,8 @@ public class AdminApiClient {
      */
     public JobInfo getJobInfo(Long jobId) {
         try {
-            String url = adminAddress + "/api/v1/jobInfos/" + jobId;
-            HttpResponse response = HttpRequest.get(url)
-                    .header("Authorization", accessToken)
-                    .timeout(TIMEOUT)
-                    .execute();
-            
-            if (response.isOk()) {
+            HttpResponse response = executeGet("/api/v1/jobInfos/" + jobId);
+            if (response != null && response.isOk()) {
                 // 解析Result包装的响应
                 Map<String, Object> resultMap = JSONUtil.toBean(response.body(), Map.class);
                 Object data = resultMap.get("data");
@@ -59,8 +198,7 @@ public class AdminApiClient {
                 }
                 return null;
             } else {
-                logger.error("[AdminApiClient] 获取任务信息失败 - jobId: {}, status: {}, body: {}", 
-                        jobId, response.getStatus(), response.body());
+                logger.error("[AdminApiClient] 获取任务信息失败 - jobId: {}", jobId);
                 return null;
             }
         } catch (Exception e) {
@@ -77,13 +215,8 @@ public class AdminApiClient {
      */
     public JobGroup getJobGroup(Long jobGroupId) {
         try {
-            String url = adminAddress + "/api/v1/jobGroups/" + jobGroupId;
-            HttpResponse response = HttpRequest.get(url)
-                    .header("Authorization", accessToken)
-                    .timeout(TIMEOUT)
-                    .execute();
-            
-            if (response.isOk()) {
+            HttpResponse response = executeGet("/api/v1/jobGroups/" + jobGroupId);
+            if (response != null && response.isOk()) {
                 // 解析Result包装的响应
                 Map<String, Object> resultMap = JSONUtil.toBean(response.body(), Map.class);
                 Object data = resultMap.get("data");
@@ -98,8 +231,7 @@ public class AdminApiClient {
                         jobGroupId, response.body());
                 return null;
             } else {
-                logger.error("[AdminApiClient] 获取执行器组失败 - jobGroupId: {}, status: {}, body: {}", 
-                        jobGroupId, response.getStatus(), response.body());
+                logger.error("[AdminApiClient] 获取执行器组失败 - jobGroupId: {}", jobGroupId);
                 return null;
             }
         } catch (Exception e) {
@@ -116,13 +248,8 @@ public class AdminApiClient {
      */
     public List<JobNode> getJobNodes(Long jobId) {
         try {
-            String url = adminAddress + "/api/v1/jobInfos/nodes/" + jobId;
-            HttpResponse response = HttpRequest.get(url)
-                    .header("Authorization", accessToken)
-                    .timeout(TIMEOUT)
-                    .execute();
-            
-            if (response.isOk()) {
+            HttpResponse response = executeGet("/api/v1/jobInfos/nodes/" + jobId);
+            if (response != null && response.isOk()) {
                 // 解析Result包装的响应
                 Map<String, Object> resultMap = JSONUtil.toBean(response.body(), Map.class);
                 Object data = resultMap.get("data");
@@ -131,8 +258,7 @@ public class AdminApiClient {
                 }
                 return new ArrayList<>();
             } else {
-                logger.error("[AdminApiClient] 获取任务节点失败 - jobId: {}, status: {}", 
-                        jobId, response.getStatus());
+                logger.error("[AdminApiClient] 获取任务节点失败 - jobId: {}", jobId);
                 return new ArrayList<>();
             }
         } catch (Exception e) {
@@ -149,13 +275,8 @@ public class AdminApiClient {
      */
     public List<JobEdge> getJobEdges(Long jobId) {
         try {
-            String url = adminAddress + "/api/v1/jobInfos/edges/" + jobId;
-            HttpResponse response = HttpRequest.get(url)
-                    .header("Authorization", accessToken)
-                    .timeout(TIMEOUT)
-                    .execute();
-            
-            if (response.isOk()) {
+            HttpResponse response = executeGet("/api/v1/jobInfos/edges/" + jobId);
+            if (response != null && response.isOk()) {
                 // 解析Result包装的响应
                 Map<String, Object> resultMap = JSONUtil.toBean(response.body(), Map.class);
                 Object data = resultMap.get("data");
@@ -164,8 +285,7 @@ public class AdminApiClient {
                 }
                 return new ArrayList<>();
             } else {
-                logger.error("[AdminApiClient] 获取任务边失败 - jobId: {}, status: {}", 
-                        jobId, response.getStatus());
+                logger.error("[AdminApiClient] 获取任务边失败 - jobId: {}", jobId);
                 return new ArrayList<>();
             }
         } catch (Exception e) {
@@ -186,7 +306,6 @@ public class AdminApiClient {
      */
     public boolean reportStatus(Long parentJobId, Long jobId, String randomId, Integer status, String message) {
         try {
-            String url = adminAddress + "/api/v1/jobInfos/status";
             Map<String, Object> params = new HashMap<>();
             params.put("parentJobId", parentJobId);
             params.put("jobId", jobId);
@@ -194,19 +313,12 @@ public class AdminApiClient {
             params.put("status", status);
             params.put("message", message);
             
-            HttpResponse response = HttpRequest.post(url)
-                    .header("Authorization", accessToken)
-                    .header("Content-Type", "application/json")
-                    .body(JSONUtil.toJsonStr(params))
-                    .timeout(TIMEOUT)
-                    .execute();
-            
-            if (response.isOk()) {
+            HttpResponse response = executePost("/api/v1/jobInfos/status", JSONUtil.toJsonStr(params));
+            if (response != null && response.isOk()) {
                 logger.debug("[AdminApiClient] 上报状态成功 - jobId: {}, status: {}", jobId, status);
                 return true;
             } else {
-                logger.error("[AdminApiClient] 上报状态失败 - jobId: {}, status: {}, responseStatus: {}", 
-                        jobId, status, response.getStatus());
+                logger.error("[AdminApiClient] 上报状态失败 - jobId: {}, status: {}", jobId, status);
                 return false;
             }
         } catch (Exception e) {
@@ -224,18 +336,13 @@ public class AdminApiClient {
      */
     public boolean updateRankTriggerStatus(Long jobId, Integer status) {
         try {
-            String url = adminAddress + "/api/v1/jobInfos/updateRankTriggerStatus/" + jobId + "?status=" + status;
-            HttpResponse response = HttpRequest.post(url)
-                    .header("Authorization", accessToken)
-                    .timeout(TIMEOUT)
-                    .execute();
-            
-            if (response.isOk()) {
+            String path = "/api/v1/jobInfos/updateRankTriggerStatus/" + jobId + "?status=" + status;
+            HttpResponse response = executePost(path, "");
+            if (response != null && response.isOk()) {
                 logger.debug("[AdminApiClient] 更新任务组运行状态成功 - jobId: {}, status: {}", jobId, status);
                 return true;
             } else {
-                logger.error("[AdminApiClient] 更新任务组运行状态失败 - jobId: {}, status: {}, responseStatus: {}", 
-                        jobId, status, response.getStatus());
+                logger.error("[AdminApiClient] 更新任务组运行状态失败 - jobId: {}, status: {}", jobId, status);
                 return false;
             }
         } catch (Exception e) {
@@ -253,13 +360,8 @@ public class AdminApiClient {
      */
     public Map<String, String> getSnapshot(Long jobId, String randomId) {
         try {
-            String url = adminAddress + "/api/job/snapshot/" + jobId + "/" + randomId;
-            HttpResponse response = HttpRequest.get(url)
-                    .header("Authorization", accessToken)
-                    .timeout(TIMEOUT)
-                    .execute();
-            
-            if (response.isOk()) {
+            HttpResponse response = executeGet("/api/job/snapshot/" + jobId + "/" + randomId);
+            if (response != null && response.isOk()) {
                 return JSONUtil.toBean(response.body(), Map.class);
             } else {
                 logger.debug("[AdminApiClient] 获取快照失败或不存在 - jobId: {}, randomId: {}", jobId, randomId);
@@ -284,15 +386,8 @@ public class AdminApiClient {
                 return new ArrayList<>();
             }
 
-            String url = adminAddress + "/api/v1/jobInfos/batch";
-            HttpResponse response = HttpRequest.post(url)
-                    .header("Authorization", accessToken)
-                    .header("Content-Type", "application/json")
-                    .body(JSONUtil.toJsonStr(jobIds))
-                    .timeout(TIMEOUT)
-                    .execute();
-
-            if (response.isOk()) {
+            HttpResponse response = executePost("/api/v1/jobInfos/batch", JSONUtil.toJsonStr(jobIds));
+            if (response != null && response.isOk()) {
                 // 解析Result包装的响应
                 Map<String, Object> resultMap = JSONUtil.toBean(response.body(), Map.class);
                 Object data = resultMap.get("data");
@@ -306,8 +401,7 @@ public class AdminApiClient {
                         jobIds, response.body());
                 return new ArrayList<>();
             } else {
-                logger.error("[AdminApiClient] 批量获取任务信息失败 - jobIds: {}, status: {}, body: {}",
-                        jobIds, response.getStatus(), response.body());
+                logger.error("[AdminApiClient] 批量获取任务信息失败 - jobIds: {}", jobIds);
                 return new ArrayList<>();
             }
         } catch (Exception e) {
@@ -326,26 +420,19 @@ public class AdminApiClient {
      */
     public boolean saveNodeStatus(Long taskGroupId, String executionBatchId, String nodeStatusJson) {
         try {
-            String url = adminAddress + "/api/v1/jobLogs/saveNodeStatus";
             Map<String, Object> params = new HashMap<>();
             params.put("taskGroupId", taskGroupId);
             params.put("executionBatchId", executionBatchId);
             params.put("nodeStatus", nodeStatusJson);
             
-            HttpResponse response = HttpRequest.post(url)
-                    .header("Authorization", accessToken)
-                    .header("Content-Type", "application/json")
-                    .body(JSONUtil.toJsonStr(params))
-                    .timeout(TIMEOUT)
-                    .execute();
-            
-            if (response.isOk()) {
+            HttpResponse response = executePost("/api/v1/jobLogs/saveNodeStatus", JSONUtil.toJsonStr(params));
+            if (response != null && response.isOk()) {
                 logger.debug("[AdminApiClient] 保存节点状态成功 - taskGroupId: {}, batchId: {}", 
                         taskGroupId, executionBatchId);
                 return true;
             } else {
-                logger.error("[AdminApiClient] 保存节点状态失败 - taskGroupId: {}, batchId: {}, responseStatus: {}", 
-                        taskGroupId, executionBatchId, response.getStatus());
+                logger.error("[AdminApiClient] 保存节点状态失败 - taskGroupId: {}, batchId: {}", 
+                        taskGroupId, executionBatchId);
                 return false;
             }
         } catch (Exception e) {
