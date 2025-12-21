@@ -401,7 +401,7 @@ public class MainView extends BorderPane {
         canvas.setOnRequestAddNode(() -> {
             Long taskGroupId = pageStoreHelper.getCurrentTaskGroupId();
             if (taskGroupId == null || taskGroupId == 0) {
-                logPanel.warn("⚠ 请先选择任务组");
+                NotificationToast.showWarning("请先选择任务组");
                 return;
             }
             String taskGroupName = getJobNameById(taskGroupId);
@@ -734,7 +734,7 @@ public class MainView extends BorderPane {
     private void handlePasteShortcut() {
         Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
         if (currentTaskGroupId == null) {
-            logPanel.warn("⚠ 请先选择任务组");
+            NotificationToast.showWarning("请先选择任务组");
             return;
         }
         nodeOperationManager.pasteNodes(currentTaskGroupId);

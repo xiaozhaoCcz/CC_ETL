@@ -65,7 +65,6 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
     
     private TextField executorTimeoutField;
     private ComboBox<RouteStrategy> routeStrategyCombo;
-    private ComboBox<MisfireStrategy> misfireStrategyCombo;
     private ComboBox<BlockStrategy> blockStrategyCombo;
     private ComboBox<FailStrategy> failStrategyCombo;
     private Spinner<Integer> executorFailRetryCountSpinner;
@@ -442,14 +441,6 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         routeStrategyCombo.getItems().addAll(RouteStrategy.values());
         routeStrategyCombo.setValue(RouteStrategy.FIRST);
         
-        // 调度过期策略
-        Label misfireStrategyLabel = createFormLabel("调度过期策略", true);
-        misfireStrategyCombo = new ComboBox<>();
-        misfireStrategyCombo.setPrefWidth(300);
-        misfireStrategyCombo.setPromptText("请选择过期策略");
-        misfireStrategyCombo.getItems().addAll(MisfireStrategy.values());
-        misfireStrategyCombo.setValue(MisfireStrategy.DO_NOTHING);
-        
         // 阻塞处理策略
         Label blockStrategyLabel = createFormLabel("阻塞处理策略", true);
         blockStrategyCombo = new ComboBox<>();
@@ -490,11 +481,9 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         grid.add(failStrategyCombo, 3, 0);
 
         
-        // 第二行：调度过期策略 + 任务超时时间
-        grid.add(misfireStrategyLabel, 0, 1);
-        grid.add(misfireStrategyCombo, 1, 1);
-        grid.add(timeoutLabel, 2, 1);
-        grid.add(executorTimeoutField, 3, 1);
+        // 第二行：任务超时时间
+        grid.add(timeoutLabel, 0, 1);
+        grid.add(executorTimeoutField, 1, 1);
         
         // 第三行：阻塞处理策略 + 失败重试次数
         grid.add(blockStrategyLabel, 0, 2);
@@ -861,9 +850,7 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         if (data.getExecutorRouteStrategy() != null && !data.getExecutorRouteStrategy().equals("FIRST")) {
             return true;
         }
-        if (data.getMisfireStrategy() != null && !data.getMisfireStrategy().equals("DO_NOTHING")) {
-            return true;
-        }
+        // 调度过期策略固定为DO_NOTHING，不需要检查
         if (data.getExecutorBlockStrategy() != null && !data.getExecutorBlockStrategy().equals("SERIAL_EXECUTION")) {
             return true;
         }
@@ -953,13 +940,7 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
                 routeStrategyCombo.setValue(RouteStrategy.FIRST);
             }
         }
-        if (data.getMisfireStrategy() != null) {
-            try {
-                misfireStrategyCombo.setValue(MisfireStrategy.valueOf(data.getMisfireStrategy()));
-            } catch (Exception e) {
-                misfireStrategyCombo.setValue(MisfireStrategy.DO_NOTHING);
-            }
-        }
+        // 调度过期策略固定为DO_NOTHING，不需要从表单数据填充
         if (data.getExecutorBlockStrategy() != null) {
             try {
                 blockStrategyCombo.setValue(BlockStrategy.valueOf(data.getExecutorBlockStrategy()));
@@ -1040,7 +1021,8 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         
         // 高级配置
         form.setExecutorRouteStrategy(routeStrategyCombo.getValue().getType());
-        form.setMisfireStrategy(misfireStrategyCombo.getValue().getType());
+        // 调度过期策略固定为DO_NOTHING
+        form.setMisfireStrategy(MisfireStrategy.DO_NOTHING.getType());
         form.setExecutorBlockStrategy(blockStrategyCombo.getValue().getType());
         
         try {
@@ -1100,9 +1082,6 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         }
         if (routeStrategyCombo.getValue() == null) {
             errors.append("• 请选择路由策略\n");
-        }
-        if (misfireStrategyCombo.getValue() == null) {
-            errors.append("• 请选择调度过期策略\n");
         }
         if (blockStrategyCombo.getValue() == null) {
             errors.append("• 请选择阻塞处理策略\n");
