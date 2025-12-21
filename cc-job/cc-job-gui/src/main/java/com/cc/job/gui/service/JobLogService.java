@@ -279,6 +279,22 @@ public class JobLogService extends BaseService {
         }
         return httpClient.deleteForBoolean("/api/v1/jobLogs", queryParams);
     }
+    
+    /**
+     * 根据任务组ID获取所有节点的执行历史日志
+     * @param taskGroupId 任务组ID
+     * @param pageNum 页码
+     * @param pageSize 每页大小
+     * @return 分页结果
+     * @throws IOException 网络异常
+     */
+    public PageResult<JobLogVO> getNodeHistoryLogs(Long taskGroupId, int pageNum, int pageSize) throws IOException {
+        JobLogQuery query = new JobLogQuery();
+        query.setPageNum(pageNum);
+        query.setPageSize(pageSize);
+        query.setJobId(taskGroupId);
+        return getJobLogPage(query);
+    }
 }
 
 

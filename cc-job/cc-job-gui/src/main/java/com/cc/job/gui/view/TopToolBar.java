@@ -44,6 +44,7 @@ public class TopToolBar extends VBox {
         void onZoomIn();
         void onZoomOut();
         void onZoomFit();
+        void onNodeHistory(); // 节点历史
         void onRun();
         void onStop(Long jobId);
         void onClear();
@@ -213,7 +214,8 @@ public class TopToolBar extends VBox {
             createIconButton(IconUtil.zoomInIcon(), "放大", "放大画布", () -> safeCall(ToolBarCallback::onZoomIn)),
             createIconButton(IconUtil.zoomOutIcon(), "缩小", "缩小画布", () -> safeCall(ToolBarCallback::onZoomOut)),
             zoomLabel,
-            createIconButton(IconUtil.expandIcon(), "适应", "适应窗口大小", () -> safeCall(ToolBarCallback::onZoomFit))
+            createIconButton(IconUtil.expandIcon(), "适应", "适应窗口大小", () -> safeCall(ToolBarCallback::onZoomFit)),
+            createIconButton(IconUtil.historyIcon(), "节点历史", "查看节点历史执行记录", () -> safeCall(ToolBarCallback::onNodeHistory))
         );
         
         // 右侧空白区域

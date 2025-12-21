@@ -10,6 +10,7 @@ import com.cc.job.executor.compose.core.service.TaskGraphBuilder;
 import com.cc.job.executor.compose.core.service.TaskWrapperFactory;
 import com.cc.job.executor.compose.engine.Async;
 import com.cc.job.executor.compose.engine.wrapper.WorkerWrapper;
+import com.cc.job.executor.compose.engine.worker.ResultState;
 import com.cc.job.executor.compose.handler.JobGroupUtils;
 import com.cc.job.xo.model.entity.JobEdge;
 import com.cc.job.xo.model.entity.JobInfo;
@@ -51,6 +52,9 @@ public class TaskGroupOrchestrator {
     
     /** 存储正在执行的任务组 */
     private static final Map<String, List<WorkerWrapper<Long, String>>> RUNNING_JOBS = new ConcurrentHashMap<>();
+    
+    /** 存储执行上下文，用于在任务组完成时收集节点状态 */
+    private static final Map<String, ExecutionContext> CONTEXT_MAP = new ConcurrentHashMap<>();
     
     /** 线程本地变量，用于存储 XxlJobContext */
     private static final InheritableThreadLocal<XxlJobContext> CONTEXT_HOLDER = new InheritableThreadLocal<>();
@@ -214,6 +218,9 @@ public class TaskGroupOrchestrator {
         // 保存到运行中的任务映射
         RUNNING_JOBS.put(context.getExecuteKey(), workerWrappers);
         
+        // 保存执行上下文，用于在任务组完成时收集节点状态
+        CONTEXT_MAP.put(context.getExecuteKey(), context);
+        
         return workerWrappers;
     }
     
@@ -306,20 +313,27 @@ public class TaskGroupOrchestrator {
         
         String executeKey = buildExecuteKey(taskGroupId, executionBatchId);
         
+        // ⚠️ 重要：在移除 RUNNING_JOBS 之前，先获取 WorkerWrapper 列表
+        // 因为需要从 WorkerWrapper 中获取节点的执行结果
+        List<WorkerWrapper<Long, String>> workerWrappers = RUNNING_JOBS.get(executeKey);
+        
         // 移除运行中的任务
         RUNNING_JOBS.remove(executeKey);
         
-        // 清理结果映射
-        Map<String, Boolean> jobResults = TaskWrapperFactory.getJobResults();
-        jobResults.entrySet().removeIf(entry -> entry.getKey().startsWith(taskGroupId + ":"));
+        // 获取执行上下文（用于收集节点状态）
+        ExecutionContext context = CONTEXT_MAP.remove(executeKey);
         
         // ⚠️ 重要：等待一段时间，确保所有子任务的日志都已经写入完成
         // 子任务执行完成后，日志通过异步回调写入，需要给日志写入留出时间
         // 否则前端收到完成状态后会停止日志轮询，导致日志未完全显示
         waitForLogsToFlush();
         
-        // 更新任务组运行状态
-        updateTaskGroupStatus(taskGroupId, executionBatchId);
+        // 更新任务组运行状态（包含收集和保存节点状态）
+        updateTaskGroupStatus(taskGroupId, executionBatchId, context, workerWrappers);
+        
+        // 清理结果映射（在保存节点状态之后）
+        Map<String, Boolean> jobResults = TaskWrapperFactory.getJobResults();
+        jobResults.entrySet().removeIf(entry -> entry.getKey().startsWith(taskGroupId + ":"));
         
         // 清理线程本地变量
         CONTEXT_HOLDER.remove();
@@ -352,6 +366,14 @@ public class TaskGroupOrchestrator {
      * 更新任务组状态
      */
     private void updateTaskGroupStatus(Long taskGroupId, String executionBatchId) {
+        updateTaskGroupStatus(taskGroupId, executionBatchId, null, null);
+    }
+    
+    /**
+     * 更新任务组状态（带节点状态收集）
+     */
+    private void updateTaskGroupStatus(Long taskGroupId, String executionBatchId, 
+                                      ExecutionContext context, List<WorkerWrapper<Long, String>> workerWrappers) {
         try {
             boolean success = adminApiClient.updateRankTriggerStatus(taskGroupId, 0);
             if (success) {
@@ -360,10 +382,114 @@ public class TaskGroupOrchestrator {
                 logger.error("[Orchestrator] 任务组运行状态更新失败 - taskGroupId: {}", taskGroupId);
             }
             
+            // 收集并保存节点执行状态
+            if (context != null && workerWrappers != null) {
+                collectAndSaveNodeStatus(taskGroupId, executionBatchId, context, workerWrappers);
+            }
+            
             // 上报完成状态
             adminApiClient.reportStatus(taskGroupId, taskGroupId, executionBatchId, 5, "任务组执行完成");
         } catch (Exception e) {
             logger.error("[Orchestrator] 更新任务组状态异常 - taskGroupId: {}", taskGroupId, e);
+        }
+    }
+    
+    /**
+     * 收集并保存节点执行状态
+     */
+    private void collectAndSaveNodeStatus(Long taskGroupId, String executionBatchId,
+                                         ExecutionContext context, List<WorkerWrapper<Long, String>> workerWrappers) {
+        try {
+            logger.info("[Orchestrator] 开始收集节点执行状态 - taskGroupId: {}, batchId: {}", 
+                    taskGroupId, executionBatchId);
+            
+            // 构建节点状态JSON
+            Map<String, Object> nodeStatusMap = new HashMap<>();
+            
+            // 获取任务信息映射（用于获取节点名称）
+            Map<Long, JobInfo> jobInfoMap = new HashMap<>();
+            if (context.getNodes() != null && !context.getNodes().isEmpty()) {
+                List<Long> jobIds = context.getNodes().stream()
+                        .map(JobNode::getJobId)
+                        .distinct()
+                        .collect(Collectors.toList());
+                try {
+                    List<JobInfo> jobInfos = adminApiClient.getJobInfos(jobIds);
+                    jobInfoMap = jobInfos.stream()
+                            .collect(Collectors.toMap(JobInfo::getId, jobInfo -> jobInfo));
+                } catch (Exception e) {
+                    logger.warn("[Orchestrator] 获取任务信息失败，将使用默认值 - taskGroupId: {}", taskGroupId, e);
+                }
+            }
+            
+            // 构建 WorkerWrapper 映射，以节点ID为key，方便查找
+            Map<String, WorkerWrapper<Long, String>> wrapperMap = new HashMap<>();
+            if (workerWrappers != null) {
+                for (WorkerWrapper<Long, String> wrapper : workerWrappers) {
+                    if (wrapper.getId() != null) {
+                        wrapperMap.put(wrapper.getId(), wrapper);
+                    }
+                }
+            }
+            
+            // 遍历所有节点，收集执行状态
+            for (JobNode node : context.getNodes()) {
+                Long nodeJobId = node.getJobId();
+                String nodeId = node.getId() != null ? String.valueOf(node.getId()) : String.valueOf(nodeJobId);
+                
+                // 从 WorkerWrapper 中获取执行状态
+                WorkerWrapper<Long, String> wrapper = wrapperMap.get(String.valueOf(node.getId()));
+                Integer status = 2; // 默认状态：2=运行中
+                
+                if (wrapper != null && wrapper.getWorkResult() != null) {
+                    ResultState resultState = wrapper.getWorkResult().getResultState();
+                    if (resultState == ResultState.SUCCESS) {
+                        status = 1; // 成功
+                    } else if (resultState == ResultState.EXCEPTION || resultState == ResultState.TIMEOUT) {
+                        status = 0; // 失败
+                    } else {
+                        status = 2; // 运行中或未执行
+                    }
+                    logger.debug("[Orchestrator] 节点执行状态 - nodeId: {}, jobId: {}, resultState: {}, status: {}", 
+                            node.getId(), nodeJobId, resultState, status);
+                } else {
+                    logger.warn("[Orchestrator] 未找到节点的 WorkerWrapper 或执行结果 - nodeId: {}, jobId: {}", 
+                            node.getId(), nodeJobId);
+                }
+                
+                // 构建节点状态信息
+                Map<String, Object> nodeStatus = new HashMap<>();
+                nodeStatus.put("jobId", nodeJobId);
+                
+                // 获取节点名称
+                JobInfo jobInfo = jobInfoMap.get(nodeJobId);
+                if (jobInfo != null && jobInfo.getJobDesc() != null) {
+                    nodeStatus.put("jobDesc", jobInfo.getJobDesc());
+                } else {
+                    nodeStatus.put("jobDesc", "节点 " + nodeJobId);
+                }
+                
+                // 设置状态：0=失败, 1=成功, 2=运行中
+                nodeStatus.put("status", status);
+                
+                // 使用节点ID作为key（如果节点ID为空，使用jobId）
+                String nodeKey = node.getId() != null ? String.valueOf(node.getId()) : String.valueOf(nodeJobId);
+                nodeStatusMap.put(nodeKey, nodeStatus);
+            }
+            
+            // 序列化为JSON
+            String nodeStatusJson = JSONUtil.toJsonStr(nodeStatusMap);
+            logger.debug("[Orchestrator] 节点状态JSON: {}", nodeStatusJson);
+            
+            // 调用admin接口保存节点状态
+            adminApiClient.saveNodeStatus(taskGroupId, executionBatchId, nodeStatusJson);
+            
+            logger.info("[Orchestrator] 节点执行状态已保存 - taskGroupId: {}, 节点数: {}", 
+                    taskGroupId, nodeStatusMap.size());
+            
+        } catch (Exception e) {
+            logger.error("[Orchestrator] 收集或保存节点状态失败 - taskGroupId: {}", taskGroupId, e);
+            // 不抛出异常，避免影响任务组完成流程
         }
     }
     

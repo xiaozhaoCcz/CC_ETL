@@ -66,8 +66,16 @@ public class ShowJobLogListDialog extends Dialog<Void> {
     private int pageNum = 1;
     private int pageSize = 10;
     private long total = 0;
+    
+    // 任务ID，用于过滤特定任务的日志
+    private Long jobId;
 
     public ShowJobLogListDialog(Stage ownerStage) {
+        this(ownerStage, null);
+    }
+    
+    public ShowJobLogListDialog(Stage ownerStage, Long jobId) {
+        this.jobId = jobId;
         setTitle("任务日志");
         initOwner(ownerStage);
         initModality(Modality.WINDOW_MODAL);
@@ -417,6 +425,11 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         JobLogQuery query = new JobLogQuery();
         query.setPageNum(pageNum);
         query.setPageSize(pageSize);
+        
+        // 如果指定了任务ID，则只查询该任务的日志
+        if (jobId != null) {
+            query.setJobId(jobId);
+        }
         
         JobGroup selectedGroup = jobGroupCombo.getSelectionModel().getSelectedItem();
         if (selectedGroup != null) {

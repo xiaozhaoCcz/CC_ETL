@@ -414,5 +414,22 @@ public class JobInfoService extends BaseService {
         }
         return null;
     }
+    
+    /**
+     * 获取任务组的所有节点
+     * @param taskGroupId 任务组ID
+     * @return 节点列表
+     * @throws IOException 网络异常
+     */
+    public List<JobNode> getJobNodes(Long taskGroupId) throws IOException {
+        if (taskGroupId == null) {
+            throw new IllegalArgumentException("任务组ID不能为空");
+        }
+        
+        String path = "/api/v1/jobInfos/nodes/" + taskGroupId;
+        TypeToken<List<JobNode>> typeToken = new TypeToken<List<JobNode>>(){};
+        Result<List<JobNode>> result = httpClient.get(path, typeToken);
+        return httpClient.extractData(result, "获取任务组节点列表失败");
+    }
 }
 

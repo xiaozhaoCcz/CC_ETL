@@ -69,6 +69,10 @@ public final class IconUtil {
         return createFeatherIcon(Feather.MAXIMIZE_2, SECONDARY_COLOR, 16);
     }
 
+    public static FontIcon historyIcon() {
+        return createFeatherIcon(Feather.CLOCK, SECONDARY_COLOR, 16);
+    }
+
     public static FontIcon selectIcon() {
         return createFeatherIcon(Feather.CROP, SECONDARY_COLOR, 16);
     }

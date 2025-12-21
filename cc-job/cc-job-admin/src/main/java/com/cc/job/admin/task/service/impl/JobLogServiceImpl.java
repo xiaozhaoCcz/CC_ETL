@@ -180,5 +180,75 @@ public class JobLogServiceImpl extends ServiceImpl<JobLogMapper, JobLog> impleme
             wrapper.between(JobLog::getTriggerTime, DateUtils.formatDate(queryParams.getFilterTime()[0]),  DateUtils.formatDate(queryParams.getFilterTime()[1]));
         }
     }
+    
+    /**
+     * 保存节点执行状态到 job_log 表
+     * 
+     * @param taskGroupId 任务组ID
+     * @param executionBatchId 执行批次ID（即 executorParam）
+     * @param nodeStatusJson 节点状态JSON字符串
+     * @return 是否保存成功
+     */
+    @Override
+    public boolean saveNodeStatus(Long taskGroupId, String executionBatchId, String nodeStatusJson) {
+        try {
+            log.info("[JobLogService] 保存节点状态 - taskGroupId: {}, batchId: {}", taskGroupId, executionBatchId);
+            
+            // 根据任务组ID和执行批次ID查找对应的 job_log 记录
+            // executorParam 字段存储的是 executionBatchId（randomId）
+            LambdaQueryWrapper<JobLog> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(JobLog::getJobId, taskGroupId)
+                   .eq(JobLog::getExecutorParam, executionBatchId)
+                   .orderByDesc(JobLog::getTriggerTime)
+                   .last("LIMIT 1");
+            
+            JobLog jobLog = this.getOne(wrapper);
+            
+            // 如果通过 executorParam 找不到，尝试查找最近的一条记录（兼容旧数据）
+            if (jobLog == null) {
+                log.warn("[JobLogService] 通过 executorParam 未找到记录，尝试查找最近的一条 - taskGroupId: {}, batchId: {}", 
+                        taskGroupId, executionBatchId);
+                wrapper = new LambdaQueryWrapper<>();
+                wrapper.eq(JobLog::getJobId, taskGroupId)
+                       .orderByDesc(JobLog::getTriggerTime)
+                       .last("LIMIT 1");
+                jobLog = this.getOne(wrapper);
+            }
+            
+            if (jobLog == null) {
+                log.warn("[JobLogService] 未找到对应的 job_log 记录 - taskGroupId: {}, batchId: {}", 
+                        taskGroupId, executionBatchId);
+                return false;
+            }
+            
+            // 更新 nodeStatus 字段
+            jobLog.setNodeStatus(nodeStatusJson);
+            boolean success = this.updateById(jobLog);
+            
+            if (success) {
+                // 简单统计节点数量（通过计算JSON中的节点数）
+                int nodeCount = 0;
+                if (nodeStatusJson != null && !nodeStatusJson.isEmpty()) {
+                    try {
+                        // 通过计算 "jobId" 出现的次数来估算节点数（不准确但简单）
+                        nodeCount = (nodeStatusJson.split("\"jobId\"").length - 1);
+                    } catch (Exception e) {
+                        // 忽略统计错误
+                    }
+                }
+                log.info("[JobLogService] 节点状态保存成功 - logId: {}, taskGroupId: {}, 节点数: {}", 
+                        jobLog.getId(), taskGroupId, nodeCount);
+            } else {
+                log.error("[JobLogService] 节点状态保存失败 - logId: {}, taskGroupId: {}", 
+                        jobLog.getId(), taskGroupId);
+            }
+            
+            return success;
+        } catch (Exception e) {
+            log.error("[JobLogService] 保存节点状态异常 - taskGroupId: {}, batchId: {}", 
+                    taskGroupId, executionBatchId, e);
+            return false;
+        }
+    }
 
 }

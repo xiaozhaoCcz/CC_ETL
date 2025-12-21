@@ -315,4 +315,43 @@ public class AdminApiClient {
             return new ArrayList<>();
         }
     }
+    
+    /**
+     * 保存节点执行状态到 job_log 表
+     * 
+     * @param taskGroupId 任务组ID
+     * @param executionBatchId 执行批次ID
+     * @param nodeStatusJson 节点状态JSON字符串
+     * @return 是否保存成功
+     */
+    public boolean saveNodeStatus(Long taskGroupId, String executionBatchId, String nodeStatusJson) {
+        try {
+            String url = adminAddress + "/api/v1/jobLogs/saveNodeStatus";
+            Map<String, Object> params = new HashMap<>();
+            params.put("taskGroupId", taskGroupId);
+            params.put("executionBatchId", executionBatchId);
+            params.put("nodeStatus", nodeStatusJson);
+            
+            HttpResponse response = HttpRequest.post(url)
+                    .header("Authorization", accessToken)
+                    .header("Content-Type", "application/json")
+                    .body(JSONUtil.toJsonStr(params))
+                    .timeout(TIMEOUT)
+                    .execute();
+            
+            if (response.isOk()) {
+                logger.debug("[AdminApiClient] 保存节点状态成功 - taskGroupId: {}, batchId: {}", 
+                        taskGroupId, executionBatchId);
+                return true;
+            } else {
+                logger.error("[AdminApiClient] 保存节点状态失败 - taskGroupId: {}, batchId: {}, responseStatus: {}", 
+                        taskGroupId, executionBatchId, response.getStatus());
+                return false;
+            }
+        } catch (Exception e) {
+            logger.error("[AdminApiClient] 保存节点状态异常 - taskGroupId: {}, batchId: {}", 
+                    taskGroupId, executionBatchId, e);
+            return false;
+        }
+    }
 }

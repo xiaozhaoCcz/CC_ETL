@@ -240,6 +240,17 @@ public class MainView extends BorderPane {
             }
 
             @Override
+            public void onNodeHistory() {
+                Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
+                if (currentTaskGroupId == null) {
+                    logPanel.warn("⚠ 请先选择一个任务组");
+                    return;
+                }
+                String taskGroupName = getJobNameById(currentTaskGroupId);
+                showNodeHistoryDialog(currentTaskGroupId, taskGroupName != null ? taskGroupName : "任务组" + currentTaskGroupId);
+            }
+
+            @Override
             public void onRun() {
                 Long jobId = pageStoreHelper.getCurrentTaskGroupId();
                 String jobName = getJobNameById(jobId);
@@ -1139,6 +1150,23 @@ public class MainView extends BorderPane {
                 });
             }
         }, "import-partition").start();
+    }
+    
+    /**
+     * 显示节点历史对话框
+     */
+    private void showNodeHistoryDialog(Long taskGroupId, String taskGroupName) {
+        Stage dialog = new Stage();
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        dialog.setTitle("节点执行历史 - " + taskGroupName);
+        
+        NodeHistoryView historyView = new NodeHistoryView(taskGroupId, taskGroupName);
+        
+        Scene scene = new Scene(historyView, 1000, 600);
+        dialog.setScene(scene);
+        dialog.show();
+        
+        logPanel.info("✓ 打开节点历史页面: " + taskGroupName);
     }
 
     // 页面状态管理辅助类

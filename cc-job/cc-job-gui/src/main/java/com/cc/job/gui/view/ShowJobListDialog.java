@@ -840,8 +840,8 @@ public class ShowJobListDialog extends Dialog<Void> {
     private void handleViewLog(JobInfoVO job) {
         if (job == null || job.getId() == null) return;
         try {
-            // 打开日志列表对话框
-            ShowJobLogListDialog logDialog = new ShowJobLogListDialog(ownerStage);
+            // 打开日志列表对话框，传递任务ID以只显示该任务的日志
+            ShowJobLogListDialog logDialog = new ShowJobLogListDialog(ownerStage, job.getId());
             logDialog.showAndWait();
         } catch (Exception e) {
             showError("打开日志对话框失败", e.getMessage());
