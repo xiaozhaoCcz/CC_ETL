@@ -17,8 +17,8 @@ import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobNode;
 import com.xxl.job.core.context.XxlJobContext;
 import com.xxl.job.core.context.XxlJobHelper;
+import com.xxl.job.core.executor.XxlJobExecutor;
 import com.xxl.job.core.util.IpUtil;
-import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +39,6 @@ import java.util.stream.Collectors;
  * @author cc-job-team
  */
 @Component
-@RequiredArgsConstructor
 public class TaskGroupOrchestrator {
     
     private static final Logger logger = LoggerFactory.getLogger(TaskGroupOrchestrator.class);
@@ -49,6 +48,14 @@ public class TaskGroupOrchestrator {
     private final TaskWrapperFactory wrapperFactory;
     private final TaskDependencyBuilder dependencyBuilder;
     private final JobGroupUtils jobGroupUtils;
+
+    public TaskGroupOrchestrator(AdminApiClient adminApiClient, TaskGraphBuilder graphBuilder, TaskWrapperFactory wrapperFactory, TaskDependencyBuilder dependencyBuilder, JobGroupUtils jobGroupUtils) {
+        this.adminApiClient = adminApiClient;
+        this.graphBuilder = graphBuilder;
+        this.wrapperFactory = wrapperFactory;
+        this.dependencyBuilder = dependencyBuilder;
+        this.jobGroupUtils = jobGroupUtils;
+    }
     
     /** 存储正在执行的任务组 */
     private static final Map<String, List<WorkerWrapper<Long, String>>> RUNNING_JOBS = new ConcurrentHashMap<>();
@@ -375,13 +382,6 @@ public class TaskGroupOrchestrator {
     private void updateTaskGroupStatus(Long taskGroupId, String executionBatchId, 
                                       ExecutionContext context, List<WorkerWrapper<Long, String>> workerWrappers) {
         try {
-            boolean success = adminApiClient.updateRankTriggerStatus(taskGroupId, 0);
-            if (success) {
-                logger.info("[Orchestrator] 任务组运行状态已更新 - taskGroupId: {}", taskGroupId);
-            } else {
-                logger.error("[Orchestrator] 任务组运行状态更新失败 - taskGroupId: {}", taskGroupId);
-            }
-            
             // 收集并保存节点执行状态
             if (context != null && workerWrappers != null) {
                 collectAndSaveNodeStatus(taskGroupId, executionBatchId, context, workerWrappers);
@@ -504,7 +504,7 @@ public class TaskGroupOrchestrator {
             logger.info("[Orchestrator] 停止任务组 - taskGroupId: {}", taskGroupId);
             Async.stopWork((List<WorkerWrapper>) (List<?>) workerWrappers);
             RUNNING_JOBS.remove(executeKey);
-            
+            XxlJobExecutor.removeJobThread(taskGroupId.intValue(),"");
             updateTaskGroupStatus(taskGroupId, executionBatchId);
         } else {
             logger.warn("[Orchestrator] 任务组不存在或已完成 - taskGroupId: {}", taskGroupId);

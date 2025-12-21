@@ -163,12 +163,15 @@ public class TaskExecutionManager {
         String jobName = runningJob.getJobName();
         String randomId = runningJob.getRandomId();
         
+        // 先调用后台停止接口
         try {
             jobInfoService.stopJobCompose(jobId, randomId);
+            logger.debug("已调用后台停止接口 - jobId: {}, randomId: {}", jobId, randomId);
         } catch (Exception e) {
             logger.error("后台停止接口调用失败 - jobId: {}, randomId: {}", jobId, randomId, e);
         }
         
+        // 更新UI状态
         Platform.runLater(() -> {
             logPanel.success("✓ 任务组 " + jobName + " 已停止");
             runningJob.cleanup();
@@ -178,6 +181,19 @@ public class TaskExecutionManager {
             canvas.setAllConnectionsRunning(false);
             canvas.syncPendingNodeStatus();
         });
+        
+        // 异步断开SSE连接，确保使用正确的randomId
+        new Thread(() -> {
+            try {
+                // 短暂延迟，确保UI更新完成
+                Thread.sleep(100);
+                // 断开当前randomId对应的SSE连接
+                SSEService.getInstance().disconnect(jobId, randomId);
+                logger.debug("已断开SSE连接 - jobId: {}, randomId: {}", jobId, randomId);
+            } catch (Exception e) {
+                logger.error("异步断开SSE连接失败 - jobId: {}, randomId: {}", jobId, randomId, e);
+            }
+        }, "SSE-Disconnect-Stop-" + jobId + "-" + randomId).start();
     }
     
     private void handleSSEMessage(SSEService.SSEMessage message, String expectedRandomId) {
@@ -296,14 +312,19 @@ public class TaskExecutionManager {
             canvas.syncPendingNodeStatus();
         });
         
+        // 异步断开SSE连接，确保使用正确的randomId
+        // 使用线程池异步执行，避免阻塞
         new Thread(() -> {
             try {
+                // 短暂延迟，确保UI更新完成
                 Thread.sleep(100);
+                // 断开当前randomId对应的SSE连接
                 SSEService.getInstance().disconnect(jobId, randomId);
+                logger.debug("已断开SSE连接 - jobId: {}, randomId: {}", jobId, randomId);
             } catch (Exception e) {
-                logger.error("异步断开SSE连接失败", e);
+                logger.error("异步断开SSE连接失败 - jobId: {}, randomId: {}", jobId, randomId, e);
             }
-        }).start();
+        }, "SSE-Disconnect-" + jobId + "-" + randomId).start();
     }
     
     private void updateToolBarRunningJobs() {
@@ -325,6 +346,19 @@ public class TaskExecutionManager {
     
     public Map<String, String[]> getPredictedNodeTimes() {
         return predictedNodeTimes;
+    }
+    
+    /**
+     * 检查任务组是否正在运行
+     * @param taskGroupId 任务组ID
+     * @return 是否正在运行
+     */
+    public boolean isTaskGroupRunning(Long taskGroupId) {
+        if (taskGroupId == null) {
+            return false;
+        }
+        RunningJobGroup runningJob = runningJobs.get(taskGroupId);
+        return runningJob != null && runningJob.isRunning();
     }
     
     public void cleanup() {

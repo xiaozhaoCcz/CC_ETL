@@ -11,7 +11,6 @@ import com.cc.job.xo.mapper.JobInfoMapper;
 import com.cc.job.xo.model.datax.DataxColumn;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobJdbcDatasource;
-import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,12 +36,15 @@ import static com.cc.job.xo.constant.DataxConstant.*;
  * @author cc-job-team
  */
 @Component
-@RequiredArgsConstructor
 public class IncrementalDataRefresher {
     
     private static final Logger logger = LoggerFactory.getLogger(IncrementalDataRefresher.class);
     
     private final JobInfoMapper jobInfoMapper;
+
+    public IncrementalDataRefresher(JobInfoMapper jobInfoMapper) {
+        this.jobInfoMapper = jobInfoMapper;
+    }
     
     /** Oracle 时间格式映射 */
     private static final Map<String, String> ORACLE_TIME_FORMAT_MAP = Map.of(

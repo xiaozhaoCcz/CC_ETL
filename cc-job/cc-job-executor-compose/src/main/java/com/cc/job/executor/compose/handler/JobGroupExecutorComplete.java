@@ -3,7 +3,6 @@ package com.cc.job.executor.compose.handler;
 import com.cc.job.executor.compose.core.orchestrator.TaskGroupOrchestrator;
 import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.handler.annotation.XxlJob;
-import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,12 +27,15 @@ import java.util.UUID;
  * @author cc-job-team
  */
 @Component("jobGroupExecutorComplete")
-@RequiredArgsConstructor
 public class JobGroupExecutorComplete {
     
     private static final Logger logger = LoggerFactory.getLogger(JobGroupExecutorComplete.class);
     
     private final TaskGroupOrchestrator orchestrator;
+
+    public JobGroupExecutorComplete(TaskGroupOrchestrator orchestrator) {
+        this.orchestrator = orchestrator;
+    }
     
     /**
      * 任务组执行入口

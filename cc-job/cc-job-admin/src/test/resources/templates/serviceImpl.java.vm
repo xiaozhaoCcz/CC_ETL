@@ -4,7 +4,8 @@ import ${package.Entity}.${entity};
 import ${package.Mapper}.${table.mapperName};
 import ${package.Service}.${table.serviceName};
 import ${superServiceImplClassPackage};
-import lombok.RequiredArgsConstructor;
+## Lombok已被移除，不再使用
+## import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import com.youlai.common.util.DateUtils;
 import ${package.Parent}.model.form.${entity}Form;
@@ -30,10 +31,13 @@ import cn.hutool.core.util.StrUtil;
  * @since ${date}
  */
 @Service
-@RequiredArgsConstructor
 public class ${table.serviceImplName} extends ${superServiceImplClass}<${table.mapperName}, ${entity}> implements ${table.serviceName} {
 
     private final ${entity}Converter ${firstCharLowerCaseEntity}Converter;
+
+    public ${table.serviceImplName}(${entity}Converter ${firstCharLowerCaseEntity}Converter) {
+        this.${firstCharLowerCaseEntity}Converter = ${firstCharLowerCaseEntity}Converter;
+    }
 
     /**
     * 获取$!{table.comment}分页列表

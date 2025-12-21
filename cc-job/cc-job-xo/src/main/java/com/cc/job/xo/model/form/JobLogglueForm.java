@@ -3,8 +3,6 @@ package com.cc.job.xo.model.form;
 import java.io.Serial;
 import java.io.Serializable;
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.Getter;
-import lombok.Setter;
 import java.time.LocalDateTime;
 import jakarta.validation.constraints.*;
 
@@ -14,8 +12,6 @@ import jakarta.validation.constraints.*;
  * @author ccjob
  * @since 2024-11-03 08:19
  */
-@Getter
-@Setter
 @Schema(description = "task_logglue表单对象")
 public class JobLogglueForm implements Serializable {
 
@@ -48,4 +44,59 @@ public class JobLogglueForm implements Serializable {
     private LocalDateTime updateTime;
 
 
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public Integer getJobId() {
+        return jobId;
+    }
+
+    public void setJobId(Integer jobId) {
+        this.jobId = jobId;
+    }
+
+    public String getGlueType() {
+        return glueType;
+    }
+
+    public void setGlueType(String glueType) {
+        this.glueType = glueType;
+    }
+
+    public String getGlueSource() {
+        return glueSource;
+    }
+
+    public void setGlueSource(String glueSource) {
+        this.glueSource = glueSource;
+    }
+
+    public String getGlueRemark() {
+        return glueRemark;
+    }
+
+    public void setGlueRemark(String glueRemark) {
+        this.glueRemark = glueRemark;
+    }
+
+    public LocalDateTime getAddTime() {
+        return addTime;
+    }
+
+    public void setAddTime(LocalDateTime addTime) {
+        this.addTime = addTime;
+    }
+
+    public LocalDateTime getUpdateTime() {
+        return updateTime;
+    }
+
+    public void setUpdateTime(LocalDateTime updateTime) {
+        this.updateTime = updateTime;
+    }
 }

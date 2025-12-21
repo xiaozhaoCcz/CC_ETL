@@ -2,8 +2,6 @@ package com.cc.job.xo.model.query;
 
 import com.cc.job.xo.common.BasePageQuery;
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.Getter;
-import lombok.Setter;
 
 /**
  * task_info分页查询对象
@@ -12,8 +10,6 @@ import lombok.Setter;
  * @since 2024-11-03 08:21
  */
 @Schema(description ="task_info查询对象")
-@Getter
-@Setter
 public class JobInfoQuery extends BasePageQuery {
 
     private Long jobGroup;
@@ -25,4 +21,44 @@ public class JobInfoQuery extends BasePageQuery {
     private String executorHandler;
 
     private String author;
+
+    public Long getJobGroup() {
+        return jobGroup;
+    }
+
+    public void setJobGroup(Long jobGroup) {
+        this.jobGroup = jobGroup;
+    }
+
+    public Integer getTriggerStatus() {
+        return triggerStatus;
+    }
+
+    public void setTriggerStatus(Integer triggerStatus) {
+        this.triggerStatus = triggerStatus;
+    }
+
+    public String getJobDesc() {
+        return jobDesc;
+    }
+
+    public void setJobDesc(String jobDesc) {
+        this.jobDesc = jobDesc;
+    }
+
+    public String getExecutorHandler() {
+        return executorHandler;
+    }
+
+    public void setExecutorHandler(String executorHandler) {
+        this.executorHandler = executorHandler;
+    }
+
+    public String getAuthor() {
+        return author;
+    }
+
+    public void setAuthor(String author) {
+        this.author = author;
+    }
 }

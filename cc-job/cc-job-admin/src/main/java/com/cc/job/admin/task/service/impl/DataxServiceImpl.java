@@ -14,18 +14,21 @@ import com.cc.job.xo.model.datax.DataXParams;
 import com.cc.job.admin.task.service.DataxService;
 import com.cc.job.xo.model.form.JobInfoForm;
 import com.cc.job.xo.model.form.JobJdbcDatasourceForm;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 
 @Service
-@RequiredArgsConstructor
 public class DataxServiceImpl implements DataxService {
 
     private final JobJdbcDatasourceService jobJdbcDatasourceService;
 
     private final JobInfoService jobInfoService;
+
+    public DataxServiceImpl(JobJdbcDatasourceService jobJdbcDatasourceService, JobInfoService jobInfoService) {
+        this.jobJdbcDatasourceService = jobJdbcDatasourceService;
+        this.jobInfoService = jobInfoService;
+    }
 
     @Override
     public String getJson(DataXParams dataXParams) {

@@ -4,13 +4,14 @@ package ${package.Parent}.model.vo;
 import ${pkg};
 #end
 import io.swagger.v3.oas.annotations.media.Schema;
-#if(${entityLombokModel})
-import lombok.Getter;
-import lombok.Setter;
-    #if(${chainModel})
-    import lombok.experimental.Accessors;
-    #end
-#end
+## Lombok已被移除，不再使用
+## #if(${entityLombokModel})
+## import lombok.Getter;
+## import lombok.Setter;
+##     #if(${chainModel})
+##     import lombok.experimental.Accessors;
+##     #end
+## #end
 
 /**
  * $!{table.comment} 分页VO
@@ -18,13 +19,14 @@ import lombok.Setter;
  * @author ${author}
  * @since ${date}
  */
-#if(${entityLombokModel})
-@Getter
-@Setter
-    #if(${chainModel})
-    @Accessors(chain = true)
-    #end
-#end
+## Lombok已被移除，不再使用
+## #if(${entityLombokModel})
+## @Getter
+## @Setter
+##     #if(${chainModel})
+##     @Accessors(chain = true)
+##     #end
+## #end
 @Schema( description = "$!{table.comment}分页视图对象")
 #if(${superEntityClass})
 public class ${entity}PageVO extends ${superEntityClass}#if(${activeRecord})<${entity}>#end {

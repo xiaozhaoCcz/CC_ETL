@@ -2,11 +2,9 @@ package com.cc.job.xo.model.entity;
 
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.cc.job.xo.common.BaseEntity;
-import lombok.Data;
 
 import java.io.Serial;
 
-@Data
 @TableName("job_part")
 public class JobPart extends BaseEntity {
 
@@ -16,4 +14,20 @@ public class JobPart extends BaseEntity {
     private String jobPartName;
 
     private Integer sort;
+
+    public String getJobPartName() {
+        return jobPartName;
+    }
+
+    public void setJobPartName(String jobPartName) {
+        this.jobPartName = jobPartName;
+    }
+
+    public Integer getSort() {
+        return sort;
+    }
+
+    public void setSort(Integer sort) {
+        this.sort = sort;
+    }
 }

@@ -2,9 +2,6 @@ package com.cc.job.xo.model.query;
 
 import com.cc.job.xo.common.BasePageQuery;
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.Getter;
-import lombok.Setter;
-
 /**
  * task_log分页查询对象
  *
@@ -12,8 +9,6 @@ import lombok.Setter;
  * @since 2024-11-03 08:20
  */
 @Schema(description ="task_log查询对象")
-@Getter
-@Setter
 public class JobLogQuery extends BasePageQuery {
 
     private Long jobId;
@@ -23,4 +18,36 @@ public class JobLogQuery extends BasePageQuery {
     private Integer logStatus;
 
     private String[] filterTime;
+
+    public Long getJobId() {
+        return jobId;
+    }
+
+    public void setJobId(Long jobId) {
+        this.jobId = jobId;
+    }
+
+    public Long getJobGroup() {
+        return jobGroup;
+    }
+
+    public void setJobGroup(Long jobGroup) {
+        this.jobGroup = jobGroup;
+    }
+
+    public Integer getLogStatus() {
+        return logStatus;
+    }
+
+    public void setLogStatus(Integer logStatus) {
+        this.logStatus = logStatus;
+    }
+
+    public String[] getFilterTime() {
+        return filterTime;
+    }
+
+    public void setFilterTime(String[] filterTime) {
+        this.filterTime = filterTime;
+    }
 }

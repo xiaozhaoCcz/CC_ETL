@@ -12,7 +12,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,10 +20,13 @@ import java.util.List;
 @Tag(name = "jdbcDatasource接口")
 @RestController
 @RequestMapping("/api/v1/jobJdbcDatasource")
-@RequiredArgsConstructor
 public class JobJdbcDatasourceController {
 
     private final JobJdbcDatasourceService jobJdbcDatasourceService;
+
+    public JobJdbcDatasourceController(JobJdbcDatasourceService jobJdbcDatasourceService) {
+        this.jobJdbcDatasourceService = jobJdbcDatasourceService;
+    }
 
     @Operation(summary = "jdbc数据源配置分页列表")
     @GetMapping("/page")

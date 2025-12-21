@@ -2,7 +2,6 @@ package com.cc.job.admin.task.controller;
 
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.admin.task.service.JobGroupService;
-import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.cc.job.xo.model.form.JobGroupForm;
@@ -29,10 +28,13 @@ import java.util.List;
 @Tag(name = "task_group接口")
 @RestController
 @RequestMapping("/api/v1/jobGroups")
-@RequiredArgsConstructor
 public class JobGroupController {
 
     private final JobGroupService jobGroupService;
+
+    public JobGroupController(JobGroupService jobGroupService) {
+        this.jobGroupService = jobGroupService;
+    }
 
 
     @Operation(summary = "task_group分页列表")

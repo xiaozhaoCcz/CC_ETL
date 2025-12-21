@@ -2,8 +2,6 @@ package com.cc.job.xo.model.entity;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.cc.job.xo.common.BaseEntity;
-import lombok.Getter;
-import lombok.Setter;
 import com.baomidou.mybatisplus.annotation.TableName;
 
 import java.util.ArrayList;
@@ -16,8 +14,6 @@ import java.util.List;
  * @author ccjob
  * @since 2024-11-03 08:21
  */
-@Getter
-@Setter
 @TableName("job_group")
 public class JobGroup extends BaseEntity {
 
@@ -42,6 +38,7 @@ public class JobGroup extends BaseEntity {
 
     @TableField(exist = false)
     private List<String> registryList;  // 执行器地址列表(系统注册)
+    
     public List<String> getRegistryList() {
         if (addressList!=null && addressList.trim().length()>0) {
             registryList = new ArrayList<String>(Arrays.asList(addressList.split(",")));
@@ -49,4 +46,39 @@ public class JobGroup extends BaseEntity {
         return registryList;
     }
 
+    public String getAppName() {
+        return appName;
+    }
+
+    public void setAppName(String appName) {
+        this.appName = appName;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public Integer getAddressType() {
+        return addressType;
+    }
+
+    public void setAddressType(Integer addressType) {
+        this.addressType = addressType;
+    }
+
+    public String getAddressList() {
+        return addressList;
+    }
+
+    public void setAddressList(String addressList) {
+        this.addressList = addressList;
+    }
+
+    public void setRegistryList(List<String> registryList) {
+        this.registryList = registryList;
+    }
 }

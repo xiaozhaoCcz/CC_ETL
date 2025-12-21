@@ -1,13 +1,12 @@
 package com.cc.job.executor.compose.interfaces.dto;
 
-import lombok.Data;
+import java.util.Objects;
 
 /**
  * 任务结果回调请求
  *
  * @author cc-job-team
  */
-@Data
 public class TaskResultCallbackRequest {
     
     /** 执行键（格式：jobId:randomId） */
@@ -21,5 +20,63 @@ public class TaskResultCallbackRequest {
     
     /** 执行耗时（毫秒） */
     private Long duration;
+
+    public String getExecuteKey() {
+        return executeKey;
+    }
+
+    public void setExecuteKey(String executeKey) {
+        this.executeKey = executeKey;
+    }
+
+    public Boolean getSuccess() {
+        return success;
+    }
+
+    public void setSuccess(Boolean success) {
+        this.success = success;
+    }
+
+    public String getErrorMessage() {
+        return errorMessage;
+    }
+
+    public void setErrorMessage(String errorMessage) {
+        this.errorMessage = errorMessage;
+    }
+
+    public Long getDuration() {
+        return duration;
+    }
+
+    public void setDuration(Long duration) {
+        this.duration = duration;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        TaskResultCallbackRequest that = (TaskResultCallbackRequest) o;
+        return Objects.equals(executeKey, that.executeKey) &&
+                Objects.equals(success, that.success) &&
+                Objects.equals(errorMessage, that.errorMessage) &&
+                Objects.equals(duration, that.duration);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(executeKey, success, errorMessage, duration);
+    }
+
+    @Override
+    public String toString() {
+        return "TaskResultCallbackRequest{" +
+                "executeKey='" + executeKey + '\'' +
+                ", success=" + success +
+                ", errorMessage='" + errorMessage + '\'' +
+                ", duration=" + duration +
+                '}';
+    }
 }
 

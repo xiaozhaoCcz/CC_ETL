@@ -4,8 +4,6 @@ import java.io.Serial;
 import java.io.Serializable;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.Getter;
-import lombok.Setter;
 
 /**
  * task_lock视图对象
@@ -13,8 +11,6 @@ import lombok.Setter;
  * @author ccjob
  * @since 2024-11-03 08:21
  */
-@Getter
-@Setter
 @Schema( description = "task_lock视图对象")
 public class JobLockVO implements Serializable {
 
@@ -23,4 +19,12 @@ public class JobLockVO implements Serializable {
 
     @Schema(description = "锁名称")
     private String lockName;
+
+    public String getLockName() {
+        return lockName;
+    }
+
+    public void setLockName(String lockName) {
+        this.lockName = lockName;
+    }
 }

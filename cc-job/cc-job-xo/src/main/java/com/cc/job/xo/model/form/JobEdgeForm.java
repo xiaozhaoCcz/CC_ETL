@@ -1,8 +1,6 @@
 package com.cc.job.xo.model.form;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.Getter;
-import lombok.Setter;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -14,8 +12,6 @@ import jakarta.validation.constraints.NotNull;
  * @author ccjob
  * @since 2024-12-XX
  */
-@Getter
-@Setter
 @Schema(description = "JobEdge表单对象")
 public class JobEdgeForm implements Serializable {
 
@@ -45,5 +41,61 @@ public class JobEdgeForm implements Serializable {
 
     @Schema(description = "连线点列表")
     private String pointsList;
+
+    public Long getJobParentId() {
+        return jobParentId;
+    }
+
+    public void setJobParentId(Long jobParentId) {
+        this.jobParentId = jobParentId;
+    }
+
+    public Long getFromNodeId() {
+        return fromNodeId;
+    }
+
+    public void setFromNodeId(Long fromNodeId) {
+        this.fromNodeId = fromNodeId;
+    }
+
+    public Long getEndNodeId() {
+        return endNodeId;
+    }
+
+    public void setEndNodeId(Long endNodeId) {
+        this.endNodeId = endNodeId;
+    }
+
+    public String getStartPoint() {
+        return startPoint;
+    }
+
+    public void setStartPoint(String startPoint) {
+        this.startPoint = startPoint;
+    }
+
+    public String getEndPoint() {
+        return endPoint;
+    }
+
+    public void setEndPoint(String endPoint) {
+        this.endPoint = endPoint;
+    }
+
+    public String getProperties() {
+        return properties;
+    }
+
+    public void setProperties(String properties) {
+        this.properties = properties;
+    }
+
+    public String getPointsList() {
+        return pointsList;
+    }
+
+    public void setPointsList(String pointsList) {
+        this.pointsList = pointsList;
+    }
 }
 

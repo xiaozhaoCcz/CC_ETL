@@ -3,14 +3,11 @@ package com.cc.job.xo.model.entity;
 import com.baomidou.mybatisplus.annotation.*;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
-import lombok.Getter;
-import lombok.Setter;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
 
-@Getter
-@Setter
+
 @TableName("job_compose")
 public class JobCompose implements Serializable {
 
@@ -38,4 +35,53 @@ public class JobCompose implements Serializable {
 
     @TableLogic
     private Integer isDeleted;
+
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getAppName() {
+        return appName;
+    }
+
+    public void setAppName(String appName) {
+        this.appName = appName;
+    }
+
+    public String getExecutorAddress() {
+        return executorAddress;
+    }
+
+    public void setExecutorAddress(String executorAddress) {
+        this.executorAddress = executorAddress;
+    }
+
+    public String getExecutorServerAddress() {
+        return executorServerAddress;
+    }
+
+    public void setExecutorServerAddress(String executorServerAddress) {
+        this.executorServerAddress = executorServerAddress;
+    }
+
+    public LocalDateTime getCreateTime() {
+        return createTime;
+    }
+
+    public void setCreateTime(LocalDateTime createTime) {
+        this.createTime = createTime;
+    }
+
+    public Integer getIsDeleted() {
+        return isDeleted;
+    }
+
+    public void setIsDeleted(Integer isDeleted) {
+        this.isDeleted = isDeleted;
+    }
 }

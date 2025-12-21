@@ -1,6 +1,7 @@
 package com.cc.job.gui.service;
 
 import com.cc.job.gui.util.ApiUtil;
+import com.cc.job.gui.util.NotificationToast;
 import com.cc.job.xo.common.result.PageResult;
 import com.cc.job.xo.common.result.Result;
 import com.google.gson.reflect.TypeToken;
@@ -474,9 +475,9 @@ public class HttpClientUtil {
         try (Response response = apiUtil.getClient().newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 String errorBody = response.body() != null ? response.body().string() : "";
+                NotificationToast.showError("请求失败: HTTP " + response.code() + " - " + errorBody);
                 throw new IOException("请求失败: HTTP " + response.code() + " - " + errorBody);
             }
-            
             String responseBody = response.body().string();
             return (T) apiUtil.getGson().fromJson(responseBody, resultType);
         }

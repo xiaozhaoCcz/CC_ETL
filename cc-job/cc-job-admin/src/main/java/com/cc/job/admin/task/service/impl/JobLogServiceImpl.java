@@ -11,7 +11,6 @@ import com.xxl.job.core.biz.ExecutorBiz;
 import com.xxl.job.core.biz.model.LogParam;
 import com.xxl.job.core.biz.model.LogResult;
 import com.xxl.job.core.biz.model.ReturnT;
-import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -31,7 +30,8 @@ import java.util.stream.Collectors;
 
 import org.springframework.util.StringUtils;
 import org.springframework.web.util.HtmlUtils;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * task_log服务实现类
@@ -39,11 +39,15 @@ import lombok.extern.slf4j.Slf4j;
  * @author ccjob
  * @since 2024-11-03 08:20
  */
-@Slf4j
 @Service
-@RequiredArgsConstructor
 public class JobLogServiceImpl extends ServiceImpl<JobLogMapper, JobLog> implements JobLogService {
+    private static final Logger log = LoggerFactory.getLogger(JobLogServiceImpl.class);
+    
     private final JobInfoService taskInfoService;
+
+    public JobLogServiceImpl(JobInfoService taskInfoService) {
+        this.taskInfoService = taskInfoService;
+    }
 
     /**
     * 获取task_log分页列表

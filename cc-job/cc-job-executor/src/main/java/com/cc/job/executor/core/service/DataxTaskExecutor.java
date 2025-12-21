@@ -8,7 +8,6 @@ import com.cc.job.executor.utils.DataxUtils;
 import com.cc.job.xo.mapper.JobInfoMapper;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.xxl.job.core.context.XxlJobHelper;
-import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,7 +21,6 @@ import org.springframework.stereotype.Component;
  * @author cc-job-team
  */
 @Component
-@RequiredArgsConstructor
 public class DataxTaskExecutor {
     
     private static final Logger logger = LoggerFactory.getLogger(DataxTaskExecutor.class);
@@ -37,6 +35,13 @@ public class DataxTaskExecutor {
     
     @Value("${cc-job.pypath}")
     private String dataxPy;
+
+    public DataxTaskExecutor(JobInfoMapper jobInfoMapper, DataxCommandBuilder commandBuilder, DataxProcessRunner processRunner, IncrementalDataRefresher dataRefresher) {
+        this.jobInfoMapper = jobInfoMapper;
+        this.commandBuilder = commandBuilder;
+        this.processRunner = processRunner;
+        this.dataRefresher = dataRefresher;
+    }
     
     /**
      * 执行 DataX 任务

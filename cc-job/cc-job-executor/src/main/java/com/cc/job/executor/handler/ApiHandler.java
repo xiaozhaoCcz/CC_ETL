@@ -6,7 +6,6 @@ import com.cc.job.xo.mapper.JobInfoMapper;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.handler.annotation.XxlJob;
-import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -19,13 +18,17 @@ import org.springframework.stereotype.Component;
  * @author cc-job-team
  */
 @Component
-@RequiredArgsConstructor
 public class ApiHandler {
     
     private static final Logger logger = LoggerFactory.getLogger(ApiHandler.class);
     
     private final JobInfoMapper jobInfoMapper;
     private final HttpTaskExecutor httpTaskExecutor;
+
+    public ApiHandler(JobInfoMapper jobInfoMapper, HttpTaskExecutor httpTaskExecutor) {
+        this.jobInfoMapper = jobInfoMapper;
+        this.httpTaskExecutor = httpTaskExecutor;
+    }
     
     /**
      * 执行 HTTP API 任务

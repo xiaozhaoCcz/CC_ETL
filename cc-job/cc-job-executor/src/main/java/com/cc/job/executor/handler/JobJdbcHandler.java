@@ -9,7 +9,6 @@ import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobJdbcDatasource;
 import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.handler.annotation.XxlJob;
-import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -22,7 +21,6 @@ import org.springframework.stereotype.Component;
  * @author cc-job-team
  */
 @Component
-@RequiredArgsConstructor
 public class JobJdbcHandler {
     
     private static final Logger logger = LoggerFactory.getLogger(JobJdbcHandler.class);
@@ -30,6 +28,12 @@ public class JobJdbcHandler {
     private final JobJdbcDatasourceMapper datasourceMapper;
     private final JobInfoMapper jobInfoMapper;
     private final JdbcTaskExecutor jdbcTaskExecutor;
+
+    public JobJdbcHandler(JobJdbcDatasourceMapper datasourceMapper, JobInfoMapper jobInfoMapper, JdbcTaskExecutor jdbcTaskExecutor) {
+        this.datasourceMapper = datasourceMapper;
+        this.jobInfoMapper = jobInfoMapper;
+        this.jdbcTaskExecutor = jdbcTaskExecutor;
+    }
     
     /**
      * 执行 JDBC 任务

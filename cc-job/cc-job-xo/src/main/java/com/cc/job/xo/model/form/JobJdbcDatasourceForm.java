@@ -5,8 +5,6 @@ import java.io.Serializable;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import lombok.Getter;
-import lombok.Setter;
 
 /**
  * jdbc数据源配置表单对象
@@ -14,8 +12,6 @@ import lombok.Setter;
  * @author ccjob
  * @since 2024-12-14 17:12
  */
-@Getter
-@Setter
 @Schema(description = "jdbc数据源配置表单对象")
 public class JobJdbcDatasourceForm implements Serializable {
 
@@ -67,4 +63,92 @@ public class JobJdbcDatasourceForm implements Serializable {
 
     @Schema(description = "备注")
     private String schemaName;
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getDatasourceName() {
+        return datasourceName;
+    }
+
+    public void setDatasourceName(String datasourceName) {
+        this.datasourceName = datasourceName;
+    }
+
+    public String getDatasource() {
+        return datasource;
+    }
+
+    public void setDatasource(String datasource) {
+        this.datasource = datasource;
+    }
+
+    public String getDatasourceGroup() {
+        return datasourceGroup;
+    }
+
+    public void setDatasourceGroup(String datasourceGroup) {
+        this.datasourceGroup = datasourceGroup;
+    }
+
+    public String getDatabaseName() {
+        return databaseName;
+    }
+
+    public void setDatabaseName(String databaseName) {
+        this.databaseName = databaseName;
+    }
+
+    public String getJdbcUsername() {
+        return jdbcUsername;
+    }
+
+    public void setJdbcUsername(String jdbcUsername) {
+        this.jdbcUsername = jdbcUsername;
+    }
+
+    public String getJdbcPassword() {
+        return jdbcPassword;
+    }
+
+    public void setJdbcPassword(String jdbcPassword) {
+        this.jdbcPassword = jdbcPassword;
+    }
+
+    public String getJdbcUrl() {
+        return jdbcUrl;
+    }
+
+    public void setJdbcUrl(String jdbcUrl) {
+        this.jdbcUrl = jdbcUrl;
+    }
+
+    public String getJdbcDriverClass() {
+        return jdbcDriverClass;
+    }
+
+    public void setJdbcDriverClass(String jdbcDriverClass) {
+        this.jdbcDriverClass = jdbcDriverClass;
+    }
+
+    public String getComments() {
+        return comments;
+    }
+
+    public void setComments(String comments) {
+        this.comments = comments;
+    }
+
+    public String getSchemaName() {
+        return schemaName;
+    }
+
+    public void setSchemaName(String schemaName) {
+        this.schemaName = schemaName;
+    }
 }

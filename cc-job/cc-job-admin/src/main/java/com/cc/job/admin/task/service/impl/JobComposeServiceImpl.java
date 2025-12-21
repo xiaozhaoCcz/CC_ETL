@@ -20,9 +20,8 @@ import com.cc.job.xo.model.form.JobGlueForm;
 import com.cc.job.xo.model.form.JobInfoForm;
 import com.cc.job.xo.model.vo.JobEdgeVo;
 import com.cc.job.xo.model.vo.JobNodeVo;
-import lombok.AllArgsConstructor;
-import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
+import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,7 +33,6 @@ import java.util.stream.Collectors;
 import static com.cc.job.admin.task.service.impl.JobInfoServiceImpl.NODE_TYPE_MAP;
 
 @Service
-@AllArgsConstructor
 public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobCompose>  implements JobComposeService {
 
     final JobInfoService jobInfoService;
@@ -43,8 +41,12 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
 
     final JobEdgeService jobEdgeService;
 
+    public JobComposeServiceImpl(JobInfoService jobInfoService, JobNodeService jobNodeService, JobEdgeService jobEdgeService) {
+        this.jobInfoService = jobInfoService;
+        this.jobNodeService = jobNodeService;
+        this.jobEdgeService = jobEdgeService;
+    }
 
-    @Data
     public static class LfNode {
         private String id;
         private String text;
@@ -53,9 +55,64 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
         private Double y;
         private String properties;
         private String children;
+
+        public String getId() {
+            return id;
+        }
+
+        public void setId(String id) {
+            this.id = id;
+        }
+
+        public String getText() {
+            return text;
+        }
+
+        public void setText(String text) {
+            this.text = text;
+        }
+
+        public String getType() {
+            return type;
+        }
+
+        public void setType(String type) {
+            this.type = type;
+        }
+
+        public Double getX() {
+            return x;
+        }
+
+        public void setX(Double x) {
+            this.x = x;
+        }
+
+        public Double getY() {
+            return y;
+        }
+
+        public void setY(Double y) {
+            this.y = y;
+        }
+
+        public String getProperties() {
+            return properties;
+        }
+
+        public void setProperties(String properties) {
+            this.properties = properties;
+        }
+
+        public String getChildren() {
+            return children;
+        }
+
+        public void setChildren(String children) {
+            this.children = children;
+        }
     }
 
-    @Data
     public static class LfEdge {
         private String id;
         private String pointsList;
@@ -67,6 +124,86 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
         private String endPoint;
         private String sourceAnchorId;
         private String targetAnchorId;
+
+        public String getId() {
+            return id;
+        }
+
+        public void setId(String id) {
+            this.id = id;
+        }
+
+        public String getPointsList() {
+            return pointsList;
+        }
+
+        public void setPointsList(String pointsList) {
+            this.pointsList = pointsList;
+        }
+
+        public String getProperties() {
+            return properties;
+        }
+
+        public void setProperties(String properties) {
+            this.properties = properties;
+        }
+
+        public String getSourceNodeId() {
+            return sourceNodeId;
+        }
+
+        public void setSourceNodeId(String sourceNodeId) {
+            this.sourceNodeId = sourceNodeId;
+        }
+
+        public String getTargetNodeId() {
+            return targetNodeId;
+        }
+
+        public void setTargetNodeId(String targetNodeId) {
+            this.targetNodeId = targetNodeId;
+        }
+
+        public String getType() {
+            return type;
+        }
+
+        public void setType(String type) {
+            this.type = type;
+        }
+
+        public String getStartPoint() {
+            return startPoint;
+        }
+
+        public void setStartPoint(String startPoint) {
+            this.startPoint = startPoint;
+        }
+
+        public String getEndPoint() {
+            return endPoint;
+        }
+
+        public void setEndPoint(String endPoint) {
+            this.endPoint = endPoint;
+        }
+
+        public String getSourceAnchorId() {
+            return sourceAnchorId;
+        }
+
+        public void setSourceAnchorId(String sourceAnchorId) {
+            this.sourceAnchorId = sourceAnchorId;
+        }
+
+        public String getTargetAnchorId() {
+            return targetAnchorId;
+        }
+
+        public void setTargetAnchorId(String targetAnchorId) {
+            this.targetAnchorId = targetAnchorId;
+        }
     }
 
     private final String DYNAMIC_GROUP = "CustomGroup";

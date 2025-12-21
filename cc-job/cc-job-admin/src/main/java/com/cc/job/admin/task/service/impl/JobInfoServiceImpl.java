@@ -25,14 +25,15 @@ import com.cc.job.admin.task.utils.I18nUtil;
 import com.cc.job.admin.config.XxlJobAdminConfig;
 import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.enums.ExecutorBlockStrategyEnum;
+import com.xxl.job.core.executor.XxlJobExecutor;
 import com.xxl.job.core.glue.GlueTypeEnum;
 import com.xxl.job.core.util.DateUtil;
 import com.xxl.job.core.util.IpUtil;
 import com.xxl.job.core.biz.model.RegistryParam;
 import com.xxl.job.core.enums.RegistryConfig;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -64,8 +65,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * @since 2024-11-03 08:21
  */
 @Service
-@Slf4j
 public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> implements JobInfoService {
+
+    private static final Logger log = LoggerFactory.getLogger(JobInfoServiceImpl.class);
 
     private final JobGroupService jobGroupService;
 
@@ -871,7 +873,6 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         try {
             // 1. 更新任务状态
             int flag = jobInfoMapper.stopJobCompose(id);
-            
             // 2. 获取任务信息和执行器组信息
             JobInfo jobInfo = this.getById(id);
             if (jobInfo == null) {
@@ -898,7 +899,6 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
             List<String> composeHttpAddresses = jobComposes.stream().map(JobCompose::getExecutorServerAddress).toList();
             if (composeHttpAddresses.isEmpty()) {
                 log.warn("停止任务组失败 - 未找到executor-compose服务地址 - jobId: {}, randomId: {}", id, randomId);
-                // 即使找不到executor-compose地址，也返回成功（因为数据库状态已更新）
                 return flag > 0;
             }
             
@@ -939,7 +939,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
                     }
                 });
             }
-            
+
             // ⭐ 立即返回，不等待 HTTP 调用完成
             return flag > 0;
         } catch (Exception e) {

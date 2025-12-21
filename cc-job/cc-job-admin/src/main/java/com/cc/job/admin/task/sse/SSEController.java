@@ -3,7 +3,6 @@ package com.cc.job.admin.task.sse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -19,12 +18,15 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @Tag(name = "SSE接口")
 @RestController
 @RequestMapping("/api/v1/sse")
-@RequiredArgsConstructor
 public class SSEController {
 
     private static final Logger log = LoggerFactory.getLogger(SSEController.class);
 
     private final SSEService sseService;
+
+    public SSEController(SSEService sseService) {
+        this.sseService = sseService;
+    }
 
     /**
      * 建立SSE连接

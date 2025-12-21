@@ -177,6 +177,11 @@ public class MainView extends BorderPane {
             Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
             if (currentTaskGroupId != null) {
                 nodeCallbackConfigurator.configureAllNodeCallbacks(currentTaskGroupId);
+                
+                // ⭐ 修复：切换任务组标签后，如果任务组正在运行，恢复边的运行状态
+                if (taskExecutionManager != null && taskExecutionManager.isTaskGroupRunning(currentTaskGroupId)) {
+                    canvas.setAllConnectionsRunning(true);
+                }
             }
         });
         

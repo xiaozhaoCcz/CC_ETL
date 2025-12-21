@@ -4,8 +4,6 @@ import java.io.Serial;
 import java.io.Serializable;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.Getter;
-import lombok.Setter;
 
 /**
  * task_group视图对象
@@ -13,8 +11,6 @@ import lombok.Setter;
  * @author ccjob
  * @since 2024-11-03 08:21
  */
-@Getter
-@Setter
 @Schema( description = "task_group视图对象")
 public class JobGroupVO implements Serializable {
 
@@ -34,4 +30,60 @@ public class JobGroupVO implements Serializable {
     private String createTime;
 
     private String updateTime;
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getAppName() {
+        return appName;
+    }
+
+    public void setAppName(String appName) {
+        this.appName = appName;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public Integer getAddressType() {
+        return addressType;
+    }
+
+    public void setAddressType(Integer addressType) {
+        this.addressType = addressType;
+    }
+
+    public String getAddressList() {
+        return addressList;
+    }
+
+    public void setAddressList(String addressList) {
+        this.addressList = addressList;
+    }
+
+    public String getCreateTime() {
+        return createTime;
+    }
+
+    public void setCreateTime(String createTime) {
+        this.createTime = createTime;
+    }
+
+    public String getUpdateTime() {
+        return updateTime;
+    }
+
+    public void setUpdateTime(String updateTime) {
+        this.updateTime = updateTime;
+    }
 }

@@ -10,8 +10,12 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 /**
@@ -25,6 +29,13 @@ public class SSEService {
     private static SSEService instance;
     private final Map<String, SSEConnection> connections = new ConcurrentHashMap<>();
     private final Gson gson = new Gson();
+    
+    // 用于异步关闭旧连接的线程池
+    private final ExecutorService cleanupExecutor = Executors.newCachedThreadPool(r -> {
+        Thread t = new Thread(r, "SSE-Cleanup-Thread");
+        t.setDaemon(true);
+        return t;
+    });
     
     /**
      * SSE消息接口
@@ -307,6 +318,9 @@ public class SSEService {
     
     /**
      * 连接SSE（使用任务组ID和随机ID）
+     * 支持同一个任务组有多个SSE连接（基于不同的randomId）
+     * 当建立新连接时，会异步关闭相同任务组的旧连接（不同randomId）
+     * 
      * @param jobId 任务组ID
      * @param randomId 随机ID
      * @param messageHandler 消息处理回调
@@ -314,19 +328,58 @@ public class SSEService {
     public void connect(Long jobId, String randomId, Consumer<SSEMessage> messageHandler) {
         String connectionId = jobId + ":" + randomId;
         
-        // 如果已存在连接，先断开
-        disconnect(jobId, randomId);
+        // 如果已存在相同connectionId的连接，先断开（同步断开，确保立即释放）
+        SSEConnection existingConnection = connections.get(connectionId);
+        if (existingConnection != null) {
+            logger.debug("发现已存在的连接，先断开 - connectionId: {}", connectionId);
+            existingConnection.disconnect();
+            connections.remove(connectionId);
+        }
         
+        // 查找相同任务组但不同randomId的旧连接，异步关闭它们
+        List<String> oldConnectionIds = new ArrayList<>();
+        for (String key : connections.keySet()) {
+            if (key.startsWith(jobId + ":")) {
+                // 找到相同任务组但不同randomId的连接
+                if (!key.equals(connectionId)) {
+                    oldConnectionIds.add(key);
+                }
+            }
+        }
+        
+        // 异步关闭旧连接（不阻塞新连接的建立）
+        if (!oldConnectionIds.isEmpty()) {
+            logger.debug("发现 {} 个旧连接，将异步关闭 - jobId: {}, newRandomId: {}", 
+                    oldConnectionIds.size(), jobId, randomId);
+            for (String oldConnectionId : oldConnectionIds) {
+                final String finalOldConnectionId = oldConnectionId;
+                cleanupExecutor.submit(() -> {
+                    try {
+                        SSEConnection oldConnection = connections.remove(finalOldConnectionId);
+                        if (oldConnection != null) {
+                            logger.debug("异步关闭旧SSE连接 - connectionId: {}", finalOldConnectionId);
+                            oldConnection.disconnect();
+                        }
+                    } catch (Exception e) {
+                        logger.debug("异步关闭旧SSE连接时发生异常 - connectionId: {}", finalOldConnectionId, e);
+                    }
+                });
+            }
+        }
+        
+        // 创建并启动新连接
         SSEConnection sseConnection = new SSEConnection(connectionId, messageHandler);
         connections.put(connectionId, sseConnection);
         sseConnection.connect();
         
+        logger.debug("已建立新的SSE连接 - connectionId: {}", connectionId);
         
         // 等待一段时间后检查连接状态
         new Thread(() -> {
             try {
                 Thread.sleep(2000); // 等待2秒
                 if (!sseConnection.isConnected()) {
+                    logger.debug("SSE连接检查 - connectionId: {}, 连接状态: {}", connectionId, sseConnection.isConnected());
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -363,6 +416,13 @@ public class SSEService {
     public void disconnectAll() {
         connections.values().forEach(SSEConnection::disconnect);
         connections.clear();
+    }
+    
+    /**
+     * 关闭清理线程池（在应用关闭时调用）
+     */
+    public void shutdown() {
+        cleanupExecutor.shutdown();
     }
 }
 

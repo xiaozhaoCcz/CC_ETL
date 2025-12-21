@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.cc.job.admin.task.service.JobGroupSnapshotService;
 import com.cc.job.xo.mapper.JobGroupSnapshotMapper;
 import com.cc.job.xo.model.entity.JobGroupSnapshot;
-import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -19,11 +18,13 @@ import java.time.LocalDateTime;
  * @since 2025-01-XX
  */
 @Service
-@RequiredArgsConstructor
 public class JobGroupSnapshotServiceImpl extends ServiceImpl<JobGroupSnapshotMapper, JobGroupSnapshot>
         implements JobGroupSnapshotService {
 
     private static final Logger log = LoggerFactory.getLogger(JobGroupSnapshotServiceImpl.class);
+
+    public JobGroupSnapshotServiceImpl() {
+    }
 
     @Override
     public Long createSnapshot(Long jobId, String randomId, String nodesJson, String edgesJson, String triggerUserId) {

@@ -8,8 +8,8 @@ import com.cc.job.xo.mapper.JobNodeMapper;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobNode;
 import com.cc.job.admin.task.service.JobNodeService;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -18,12 +18,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-@Slf4j
 @Service
-@RequiredArgsConstructor
 public class JobNodeServiceImpl extends ServiceImpl<JobNodeMapper, JobNode> implements JobNodeService {
+
+    private static final Logger log = LoggerFactory.getLogger(JobNodeServiceImpl.class);
     
     private final JobInfoMapper jobInfoMapper;
+
+    public JobNodeServiceImpl(JobInfoMapper jobInfoMapper) {
+        this.jobInfoMapper = jobInfoMapper;
+    }
     
     /**
      * 更新节点运行状态

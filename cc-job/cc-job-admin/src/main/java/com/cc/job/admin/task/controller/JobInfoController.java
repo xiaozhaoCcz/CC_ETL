@@ -13,7 +13,6 @@ import com.cc.job.xo.model.entity.JobNode;
 import com.cc.job.xo.model.form.JobEdgeForm;
 import com.cc.job.xo.model.form.JobGlueForm;
 import com.cc.job.admin.task.service.JobInfoService;
-import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.cc.job.xo.model.form.JobInfoForm;
@@ -42,7 +41,6 @@ import java.util.Map;
 @Tag(name = "任务管理接口")
 @RestController
 @RequestMapping("/api/v1/jobInfos")
-@RequiredArgsConstructor
 public class JobInfoController {
 
     private final JobInfoService jobInfoService;
@@ -54,6 +52,14 @@ public class JobInfoController {
     private final JobEdgeService jobEdgeService;
 
     private final SSEService sseService;
+
+    public JobInfoController(JobInfoService jobInfoService, JobComposeService jobComposeService, JobNodeService jobNodeService, JobEdgeService jobEdgeService, SSEService sseService) {
+        this.jobInfoService = jobInfoService;
+        this.jobComposeService = jobComposeService;
+        this.jobNodeService = jobNodeService;
+        this.jobEdgeService = jobEdgeService;
+        this.sseService = sseService;
+    }
 
     @Operation(summary = "initData")
     @GetMapping("initData")

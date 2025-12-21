@@ -10,7 +10,6 @@ import com.cc.job.executor.compose.service.JobExecutionMonitor;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobNode;
 import com.xxl.job.core.context.XxlJobHelper;
-import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -31,13 +30,17 @@ import static com.cc.job.executor.compose.infrastructure.constant.ExecutorConsta
  * @author cc-job-team
  */
 @Component
-@RequiredArgsConstructor
 public class TaskWrapperFactory {
     
     private static final Logger logger = LoggerFactory.getLogger(TaskWrapperFactory.class);
     
     private final AdminApiClient adminApiClient;
     private final TaskExecutor taskExecutor;
+
+    public TaskWrapperFactory(AdminApiClient adminApiClient, TaskExecutor taskExecutor) {
+        this.adminApiClient = adminApiClient;
+        this.taskExecutor = taskExecutor;
+    }
     
     /** 存储任务执行结果 */
     private static final Map<String, Boolean> JOB_RESULTS = new ConcurrentHashMap<>();

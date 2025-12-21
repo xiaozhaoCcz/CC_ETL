@@ -1,7 +1,6 @@
 package com.cc.job.admin.task.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -30,10 +29,13 @@ import cn.hutool.core.util.StrUtil;
  * @since 2024-11-03 08:21
  */
 @Service
-@RequiredArgsConstructor
 public class JobGroupServiceImpl extends ServiceImpl<JobGroupMapper, JobGroup> implements JobGroupService {
 
     private final TaskGroupConverter taskGroupConverter;
+
+    public JobGroupServiceImpl(TaskGroupConverter taskGroupConverter) {
+        this.taskGroupConverter = taskGroupConverter;
+    }
 
     /**
     * 获取task_group分页列表

@@ -1,7 +1,5 @@
 package com.cc.job.xo.common;
 
-import lombok.Data;
-
 import java.io.Serial;
 import java.io.Serializable;
 
@@ -11,7 +9,6 @@ import java.io.Serializable;
  * @author haoxr
  * @since 2021/2/28
  */
-@Data
 public class BasePageQuery implements Serializable {
 
     @Serial
@@ -20,4 +17,20 @@ public class BasePageQuery implements Serializable {
     private int pageNum = 1;
 
     private int pageSize = 10;
+
+    public int getPageNum() {
+        return pageNum;
+    }
+
+    public void setPageNum(int pageNum) {
+        this.pageNum = pageNum;
+    }
+
+    public int getPageSize() {
+        return pageSize;
+    }
+
+    public void setPageSize(int pageSize) {
+        this.pageSize = pageSize;
+    }
 }

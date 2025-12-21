@@ -4,8 +4,8 @@ package com.cc.job.admin.task.controller;
 import com.cc.job.xo.common.result.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -20,9 +20,9 @@ import java.util.List;
 @Tag(name = "04.菜单接口")
 @RestController
 @RequestMapping("/api/v1/menus")
-@RequiredArgsConstructor
-@Slf4j
 public class MenuController {
+
+    private static final Logger log = LoggerFactory.getLogger(MenuController.class);
 
 
     @Operation(summary = "菜单路由列表")

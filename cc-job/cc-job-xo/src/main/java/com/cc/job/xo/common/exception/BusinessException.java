@@ -2,7 +2,6 @@ package com.cc.job.xo.common.exception;
 
 
 import com.cc.job.xo.common.result.IResultCode;
-import lombok.Getter;
 import org.slf4j.helpers.MessageFormatter;
 
 /**
@@ -11,7 +10,6 @@ import org.slf4j.helpers.MessageFormatter;
  * @author Ray
  * @since 2022/7/31
  */
-@Getter
 public class BusinessException extends RuntimeException {
 
     public IResultCode resultCode;
@@ -19,6 +17,10 @@ public class BusinessException extends RuntimeException {
     public BusinessException(IResultCode errorCode) {
         super(errorCode.getMsg());
         this.resultCode = errorCode;
+    }
+
+    public IResultCode getResultCode() {
+        return resultCode;
     }
 
     public BusinessException(String message, Throwable cause) {

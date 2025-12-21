@@ -2,7 +2,8 @@ package ${package.Parent}.model.query;
 
 import com.youlai.common.base.BasePageQuery;
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.Data;
+## Lombok已被移除，不再使用
+## import lombok.Data;
 
 /**
  * $!{table.comment}分页查询对象
@@ -11,10 +12,18 @@ import lombok.Data;
  * @since ${date}
  */
 @Schema(description ="$!{table.comment}分页查询对象")
-@Data
+## Lombok已被移除，不再使用
+## @Data
 public class ${entity}PageQuery extends BasePageQuery {
 
     @Schema(description="关键字")
     private String keywords;
 
+    public String getKeywords() {
+        return keywords;
+    }
+
+    public void setKeywords(String keywords) {
+        this.keywords = keywords;
+    }
 }

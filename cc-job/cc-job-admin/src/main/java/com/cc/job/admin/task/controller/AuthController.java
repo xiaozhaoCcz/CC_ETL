@@ -7,8 +7,8 @@ import com.cc.job.xo.model.dto.LoginResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -20,11 +20,15 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "01.认证中心")
 @RestController
 @RequestMapping("/api/v1/auth")
-@RequiredArgsConstructor
-@Slf4j
 public class AuthController {
 
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
+
     private final JobUserService jobUserService;
+
+    public AuthController(JobUserService jobUserService) {
+        this.jobUserService = jobUserService;
+    }
 
     @Operation(summary = "登录")
     @PostMapping("/login")

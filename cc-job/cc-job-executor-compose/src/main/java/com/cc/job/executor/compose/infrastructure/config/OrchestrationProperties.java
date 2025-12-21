@@ -1,6 +1,5 @@
 package com.cc.job.executor.compose.infrastructure.config;
 
-import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
@@ -12,7 +11,6 @@ import org.springframework.stereotype.Component;
  * @author cc-job-team
  * @since 2025-12-02
  */
-@Data
 @Component
 @ConfigurationProperties(prefix = "cc-job.orchestration")
 public class OrchestrationProperties {
@@ -61,5 +59,77 @@ public class OrchestrationProperties {
      * 是否启用详细日志
      */
     private boolean enableDetailedLogging = false;
+
+    public long getDefaultTimeout() {
+        return defaultTimeout;
+    }
+
+    public void setDefaultTimeout(long defaultTimeout) {
+        this.defaultTimeout = defaultTimeout;
+    }
+
+    public int getCorePoolSize() {
+        return corePoolSize;
+    }
+
+    public void setCorePoolSize(int corePoolSize) {
+        this.corePoolSize = corePoolSize;
+    }
+
+    public int getMaxPoolSize() {
+        return maxPoolSize;
+    }
+
+    public void setMaxPoolSize(int maxPoolSize) {
+        this.maxPoolSize = maxPoolSize;
+    }
+
+    public int getQueueCapacity() {
+        return queueCapacity;
+    }
+
+    public void setQueueCapacity(int queueCapacity) {
+        this.queueCapacity = queueCapacity;
+    }
+
+    public long getKeepAliveTime() {
+        return keepAliveTime;
+    }
+
+    public void setKeepAliveTime(long keepAliveTime) {
+        this.keepAliveTime = keepAliveTime;
+    }
+
+    public long getStatusPollInterval() {
+        return statusPollInterval;
+    }
+
+    public void setStatusPollInterval(long statusPollInterval) {
+        this.statusPollInterval = statusPollInterval;
+    }
+
+    public long getMaxWaitTime() {
+        return maxWaitTime;
+    }
+
+    public void setMaxWaitTime(long maxWaitTime) {
+        this.maxWaitTime = maxWaitTime;
+    }
+
+    public boolean isEnablePrediction() {
+        return enablePrediction;
+    }
+
+    public void setEnablePrediction(boolean enablePrediction) {
+        this.enablePrediction = enablePrediction;
+    }
+
+    public boolean isEnableDetailedLogging() {
+        return enableDetailedLogging;
+    }
+
+    public void setEnableDetailedLogging(boolean enableDetailedLogging) {
+        this.enableDetailedLogging = enableDetailedLogging;
+    }
 }
 

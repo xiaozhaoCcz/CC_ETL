@@ -1,6 +1,7 @@
 package com.cc.job.admin.config;
 
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
@@ -15,8 +16,9 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * @since 2020/10/16
  */
 @Configuration
-@Slf4j
 public class WebMvcConfig implements WebMvcConfigurer {
+
+    private static final Logger log = LoggerFactory.getLogger(WebMvcConfig.class);
 
     @Bean
     public CorsFilter corsFilter()

@@ -223,6 +223,8 @@ public class CcJobGuiApplication extends Application {
                         
                         // 2. 断开所有SSE连接（快速操作，双重保险）
                         SSEService.getInstance().disconnectAll();
+                        // 关闭SSE清理线程池
+                        SSEService.getInstance().shutdown();
                         
                         // 3. 快速关闭NodeStatusSyncManager（已优化，最多阻塞1秒）
                         NodeStatusSyncManager.getInstance().shutdown();

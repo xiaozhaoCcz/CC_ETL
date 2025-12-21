@@ -6,7 +6,6 @@ import com.cc.job.admin.task.service.DataxService;
 import com.cc.job.admin.task.service.JobJdbcDatasourceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,12 +14,16 @@ import java.util.Map;
 @Tag(name = "datax接口")
 @RestController
 @RequestMapping("/api/v1/datax")
-@RequiredArgsConstructor
 public class JobDataxController {
 
     final JobJdbcDatasourceService jobJdbcDatasourceService;
 
     final DataxService dataxService;
+
+    public JobDataxController(JobJdbcDatasourceService jobJdbcDatasourceService, DataxService dataxService) {
+        this.jobJdbcDatasourceService = jobJdbcDatasourceService;
+        this.dataxService = dataxService;
+    }
 
     @Operation(summary = "根据数据源获取所有的表")
     @GetMapping("/getTables/{id}")

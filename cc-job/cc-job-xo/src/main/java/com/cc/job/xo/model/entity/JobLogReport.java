@@ -1,8 +1,6 @@
 package com.cc.job.xo.model.entity;
 
 import com.cc.job.xo.common.BaseEntity;
-import lombok.Getter;
-import lombok.Setter;
 import com.baomidou.mybatisplus.annotation.TableName;
 
 import java.time.LocalDateTime;
@@ -13,8 +11,6 @@ import java.time.LocalDateTime;
  * @author ccjob
  * @since 2024-11-03 08:20
  */
-@Getter
-@Setter
 @TableName("job_log_report")
 public class JobLogReport extends BaseEntity {
 
@@ -36,4 +32,36 @@ public class JobLogReport extends BaseEntity {
      * 执行失败-日志数量
      */
     private Integer failCount;
+
+    public LocalDateTime getTriggerDay() {
+        return triggerDay;
+    }
+
+    public void setTriggerDay(LocalDateTime triggerDay) {
+        this.triggerDay = triggerDay;
+    }
+
+    public Integer getRunningCount() {
+        return runningCount;
+    }
+
+    public void setRunningCount(Integer runningCount) {
+        this.runningCount = runningCount;
+    }
+
+    public Integer getSucCount() {
+        return sucCount;
+    }
+
+    public void setSucCount(Integer sucCount) {
+        this.sucCount = sucCount;
+    }
+
+    public Integer getFailCount() {
+        return failCount;
+    }
+
+    public void setFailCount(Integer failCount) {
+        this.failCount = failCount;
+    }
 }

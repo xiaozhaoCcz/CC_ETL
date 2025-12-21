@@ -6,8 +6,6 @@ import java.io.Serializable;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import lombok.Getter;
-import lombok.Setter;
 
 /**
  * task_group表单对象
@@ -15,8 +13,6 @@ import lombok.Setter;
  * @author ccjob
  * @since 2024-11-03 08:21
  */
-@Getter
-@Setter
 @Schema(description = "task_group表单对象")
 public class JobGroupForm implements Serializable {
 
@@ -40,4 +36,44 @@ public class JobGroupForm implements Serializable {
     @NotBlank(message = "执行器地址列表，多地址逗号分隔不能为空")
     @Size(max=65535, message="执行器地址列表，多地址逗号分隔长度不能超过65535个字符")
     private String addressList;
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getAppName() {
+        return appName;
+    }
+
+    public void setAppName(String appName) {
+        this.appName = appName;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public Integer getAddressType() {
+        return addressType;
+    }
+
+    public void setAddressType(Integer addressType) {
+        this.addressType = addressType;
+    }
+
+    public String getAddressList() {
+        return addressList;
+    }
+
+    public void setAddressList(String addressList) {
+        this.addressList = addressList;
+    }
 }

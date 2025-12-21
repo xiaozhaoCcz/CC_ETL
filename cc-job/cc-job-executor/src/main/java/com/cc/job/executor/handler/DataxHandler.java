@@ -4,7 +4,6 @@ import com.cc.job.executor.core.service.DataxTaskExecutor;
 import com.cc.job.executor.infrastructure.constant.ExecutorConstants;
 import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.handler.annotation.XxlJob;
-import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -17,12 +16,15 @@ import org.springframework.stereotype.Component;
  * @author cc-job-team
  */
 @Component
-@RequiredArgsConstructor
 public class DataxHandler {
     
     private static final Logger logger = LoggerFactory.getLogger(DataxHandler.class);
     
     private final DataxTaskExecutor dataxTaskExecutor;
+
+    public DataxHandler(DataxTaskExecutor dataxTaskExecutor) {
+        this.dataxTaskExecutor = dataxTaskExecutor;
+    }
     
     /**
      * 执行 DataX 任务

@@ -19,6 +19,7 @@ import javafx.scene.shape.Circle;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -381,13 +382,13 @@ public class TopToolBar extends VBox {
                         SessionManager.getInstance().logout();
                         
                         // 关闭当前窗口
-                        javafx.stage.Stage stage = (javafx.stage.Stage) getScene().getWindow();
+                        Stage stage = (Stage) getScene().getWindow();
                         stage.close();
                         
                         // 重新启动应用（显示登录界面）
-                        javafx.application.Platform.runLater(() -> {
+                        Platform.runLater(() -> {
                             try {
-                                new com.cc.job.gui.CcJobGuiApplication().start(new javafx.stage.Stage());
+                                new com.cc.job.gui.CcJobGuiApplication().start(new Stage());
                             } catch (Exception ex) {
                                 logger.error("重新启动失败: {}", ex.getMessage(), ex);
                             }

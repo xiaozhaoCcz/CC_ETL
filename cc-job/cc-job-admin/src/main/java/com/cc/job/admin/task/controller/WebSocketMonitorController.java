@@ -3,7 +3,6 @@ package com.cc.job.admin.task.controller;
 import com.cc.job.admin.task.websocket.WebSocketManager;
 import com.cc.job.admin.task.websocket.WebSocketServer;
 import com.cc.job.xo.common.result.Result;
-import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,12 +17,15 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/websocket")
-@RequiredArgsConstructor
 public class WebSocketMonitorController {
 
     private static final Logger log = LoggerFactory.getLogger(WebSocketMonitorController.class);
 
     private final WebSocketManager webSocketManager;
+
+    public WebSocketMonitorController(WebSocketManager webSocketManager) {
+        this.webSocketManager = webSocketManager;
+    }
 
     /**
      * 获取WebSocket连接统计信息

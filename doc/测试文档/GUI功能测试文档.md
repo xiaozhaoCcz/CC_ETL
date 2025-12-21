@@ -40,6 +40,10 @@
 
 ### 2.1 顶部工具栏测试
 
+<div align="center">
+  <img src="../imageGui/01top.png" width="80%" alt="PC端界面"/>
+</div>
+
 #### 2.1.1 菜单栏功能
 
 **测试用例 TC-M01-001: 文件菜单功能**
@@ -127,6 +131,10 @@
 ---
 
 ### 2.2 画布交互测试
+
+<div align="center">
+  <img src="../imageGui/02canvas.png" width="80%" alt="PC端界面"/>
+</div>
 
 #### 2.2.1 节点操作
 
@@ -245,6 +253,10 @@
 
 ### 2.3 树形视图测试
 
+<div align="center">
+  <img src="../imageGui/03tree.png" width="80%" alt="PC端界面"/>
+</div>
+
 #### 2.3.1 树形结构展示
 
 **测试用例 TC-M03-001: 树形视图加载**
@@ -323,6 +335,10 @@
 
 ### 2.4 任务导航栏测试
 
+<div align="center">
+  <img src="../imageGui/04jobNav.png" width="80%" alt="PC端界面"/>
+</div>
+
 #### 2.4.1 标签页管理
 
 **测试用例 TC-M04-001: 标签页创建**
@@ -379,6 +395,10 @@
 ---
 
 ### 2.5 日志面板测试
+
+<div align="center">
+  <img src="../imageGui/05log.png" width="80%" alt="PC端界面"/>
+</div>
 
 #### 2.5.1 日志输出功能
 
@@ -453,6 +473,10 @@
 
 ### 2.6 小地图测试
 
+<div align="center">
+  <img src="../imageGui/06minMap.png" width="80%" alt="PC端界面"/>
+</div>
+
 #### 2.6.1 小地图显示
 
 **测试用例 TC-M06-001: 缩略图显示**
@@ -509,6 +533,10 @@
 ---
 
 ### 2.7 面板操作测试
+
+<div align="center">
+  <img src="../imageGui/07canvas.png" width="80%" alt="PC端界面"/>
+</div>
 
 #### 2.7.1 面板展开/收起
 

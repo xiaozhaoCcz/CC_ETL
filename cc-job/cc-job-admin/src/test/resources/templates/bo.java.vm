@@ -3,13 +3,14 @@ package ${package.Parent}.model.bo;
 #foreach($pkg in ${table.importPackages})
 import ${pkg};
 #end
-#if(${entityLombokModel})
-import lombok.Getter;
-import lombok.Setter;
-#if(${chainModel})
-import lombok.experimental.Accessors;
-#end
-#end
+## Lombok已被移除，不再使用
+## #if(${entityLombokModel})
+## import lombok.Getter;
+## import lombok.Setter;
+## #if(${chainModel})
+## import lombok.experimental.Accessors;
+## #end
+## #end
 import java.time.LocalDateTime;
 
 /**
@@ -18,13 +19,14 @@ import java.time.LocalDateTime;
  * @author ${author}
  * @since ${date}
  */
-#if(${entityLombokModel})
-@Getter
-@Setter
-  #if(${chainModel})
-@Accessors(chain = true)
-  #end
-#end
+## Lombok已被移除，不再使用
+## #if(${entityLombokModel})
+## @Getter
+## @Setter
+##   #if(${chainModel})
+## @Accessors(chain = true)
+##   #end
+## #end
 #if(${superEntityClass})
 public class ${entity}BO extends ${superEntityClass}#if(${activeRecord})<${entity}>#end {
 #elseif(${activeRecord})

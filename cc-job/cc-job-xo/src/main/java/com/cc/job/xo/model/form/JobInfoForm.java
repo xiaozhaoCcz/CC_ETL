@@ -4,8 +4,6 @@ import java.io.Serial;
 import java.io.Serializable;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.Getter;
-import lombok.Setter;
 import java.time.LocalDateTime;
 import jakarta.validation.constraints.*;
 
@@ -15,8 +13,6 @@ import jakarta.validation.constraints.*;
  * @author ccjob
  * @since 2024-11-03 08:21
  */
-@Getter
-@Setter
 @Schema(description = "task_info表单对象")
 public class JobInfoForm implements Serializable {
 
@@ -132,4 +128,300 @@ public class JobInfoForm implements Serializable {
      * 最近一次运行耗时（毫秒），来自 job_info.run_time
      */
     private Long runTime;
+
+    public String getNodeId() {
+        return nodeId;
+    }
+
+    public void setNodeId(String nodeId) {
+        this.nodeId = nodeId;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public Long getJobGroup() {
+        return jobGroup;
+    }
+
+    public void setJobGroup(Long jobGroup) {
+        this.jobGroup = jobGroup;
+    }
+
+    public String getJobDesc() {
+        return jobDesc;
+    }
+
+    public void setJobDesc(String jobDesc) {
+        this.jobDesc = jobDesc;
+    }
+
+    public String getAuthor() {
+        return author;
+    }
+
+    public void setAuthor(String author) {
+        this.author = author;
+    }
+
+    public String getAlarmEmail() {
+        return alarmEmail;
+    }
+
+    public void setAlarmEmail(String alarmEmail) {
+        this.alarmEmail = alarmEmail;
+    }
+
+    public String getScheduleType() {
+        return scheduleType;
+    }
+
+    public void setScheduleType(String scheduleType) {
+        this.scheduleType = scheduleType;
+    }
+
+    public String getScheduleConf() {
+        return scheduleConf;
+    }
+
+    public void setScheduleConf(String scheduleConf) {
+        this.scheduleConf = scheduleConf;
+    }
+
+    public String getMisfireStrategy() {
+        return misfireStrategy;
+    }
+
+    public void setMisfireStrategy(String misfireStrategy) {
+        this.misfireStrategy = misfireStrategy;
+    }
+
+    public String getExecutorRouteStrategy() {
+        return executorRouteStrategy;
+    }
+
+    public void setExecutorRouteStrategy(String executorRouteStrategy) {
+        this.executorRouteStrategy = executorRouteStrategy;
+    }
+
+    public String getFailStrategy() {
+        return failStrategy;
+    }
+
+    public void setFailStrategy(String failStrategy) {
+        this.failStrategy = failStrategy;
+    }
+
+    public String getExecutorHandler() {
+        return executorHandler;
+    }
+
+    public void setExecutorHandler(String executorHandler) {
+        this.executorHandler = executorHandler;
+    }
+
+    public String getExecutorParam() {
+        return executorParam;
+    }
+
+    public void setExecutorParam(String executorParam) {
+        this.executorParam = executorParam;
+    }
+
+    public String getExecutorBlockStrategy() {
+        return executorBlockStrategy;
+    }
+
+    public void setExecutorBlockStrategy(String executorBlockStrategy) {
+        this.executorBlockStrategy = executorBlockStrategy;
+    }
+
+    public Integer getExecutorTimeout() {
+        return executorTimeout;
+    }
+
+    public void setExecutorTimeout(Integer executorTimeout) {
+        this.executorTimeout = executorTimeout;
+    }
+
+    public Integer getExecutorFailRetryCount() {
+        return executorFailRetryCount;
+    }
+
+    public void setExecutorFailRetryCount(Integer executorFailRetryCount) {
+        this.executorFailRetryCount = executorFailRetryCount;
+    }
+
+    public String getGlueType() {
+        return glueType;
+    }
+
+    public void setGlueType(String glueType) {
+        this.glueType = glueType;
+    }
+
+    public String getGlueSource() {
+        return glueSource;
+    }
+
+    public void setGlueSource(String glueSource) {
+        this.glueSource = glueSource;
+    }
+
+    public String getGlueRemark() {
+        return glueRemark;
+    }
+
+    public void setGlueRemark(String glueRemark) {
+        this.glueRemark = glueRemark;
+    }
+
+    public LocalDateTime getGlueUpdateTime() {
+        return glueUpdateTime;
+    }
+
+    public void setGlueUpdateTime(LocalDateTime glueUpdateTime) {
+        this.glueUpdateTime = glueUpdateTime;
+    }
+
+    public String getChildJobId() {
+        return childJobId;
+    }
+
+    public void setChildJobId(String childJobId) {
+        this.childJobId = childJobId;
+    }
+
+    public Integer getJobType() {
+        return jobType;
+    }
+
+    public void setJobType(Integer jobType) {
+        this.jobType = jobType;
+    }
+
+    public Long getParentId() {
+        return parentId;
+    }
+
+    public void setParentId(Long parentId) {
+        this.parentId = parentId;
+    }
+
+    public String getReqType() {
+        return reqType;
+    }
+
+    public void setReqType(String reqType) {
+        this.reqType = reqType;
+    }
+
+    public String getReqHeader() {
+        return reqHeader;
+    }
+
+    public void setReqHeader(String reqHeader) {
+        this.reqHeader = reqHeader;
+    }
+
+    public String getReqBody() {
+        return reqBody;
+    }
+
+    public void setReqBody(String reqBody) {
+        this.reqBody = reqBody;
+    }
+
+    public String getReqUrl() {
+        return reqUrl;
+    }
+
+    public void setReqUrl(String reqUrl) {
+        this.reqUrl = reqUrl;
+    }
+
+    public String getNodes() {
+        return nodes;
+    }
+
+    public void setNodes(String nodes) {
+        this.nodes = nodes;
+    }
+
+    public String getEdges() {
+        return edges;
+    }
+
+    public void setEdges(String edges) {
+        this.edges = edges;
+    }
+
+    public Long getJdbcDatasourceId() {
+        return jdbcDatasourceId;
+    }
+
+    public void setJdbcDatasourceId(Long jdbcDatasourceId) {
+        this.jdbcDatasourceId = jdbcDatasourceId;
+    }
+
+    public Integer getIncrementType() {
+        return incrementType;
+    }
+
+    public void setIncrementType(Integer incrementType) {
+        this.incrementType = incrementType;
+    }
+
+    public String getIncrementContent() {
+        return incrementContent;
+    }
+
+    public void setIncrementContent(String incrementContent) {
+        this.incrementContent = incrementContent;
+    }
+
+    public Integer getPauseStatus() {
+        return pauseStatus;
+    }
+
+    public void setPauseStatus(Integer pauseStatus) {
+        this.pauseStatus = pauseStatus;
+    }
+
+    public Integer getJobPartId() {
+        return jobPartId;
+    }
+
+    public void setJobPartId(Integer jobPartId) {
+        this.jobPartId = jobPartId;
+    }
+
+    public Double getNodePositionX() {
+        return nodePositionX;
+    }
+
+    public void setNodePositionX(Double nodePositionX) {
+        this.nodePositionX = nodePositionX;
+    }
+
+    public Double getNodePositionY() {
+        return nodePositionY;
+    }
+
+    public void setNodePositionY(Double nodePositionY) {
+        this.nodePositionY = nodePositionY;
+    }
+
+    public Long getRunTime() {
+        return runTime;
+    }
+
+    public void setRunTime(Long runTime) {
+        this.runTime = runTime;
+    }
 }

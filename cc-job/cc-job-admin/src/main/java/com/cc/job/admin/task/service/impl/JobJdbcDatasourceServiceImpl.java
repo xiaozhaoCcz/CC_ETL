@@ -13,7 +13,6 @@ import com.cc.job.xo.model.form.JobJdbcDatasourceForm;
 import com.cc.job.xo.model.query.JobJdbcDatasourceQuery;
 import com.cc.job.xo.model.vo.JobJdbcDatasourceVO;
 import com.cc.job.admin.task.service.JobJdbcDatasourceService;
-import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -37,8 +36,10 @@ import cn.hutool.core.util.StrUtil;
  * @since 2024-12-14 17:12
  */
 @Service
-@RequiredArgsConstructor
 public class JobJdbcDatasourceServiceImpl extends ServiceImpl<JobJdbcDatasourceMapper, JobJdbcDatasource> implements JobJdbcDatasourceService {
+
+    public JobJdbcDatasourceServiceImpl() {
+    }
 
     /**
      * 获取jdbc数据源配置分页列表

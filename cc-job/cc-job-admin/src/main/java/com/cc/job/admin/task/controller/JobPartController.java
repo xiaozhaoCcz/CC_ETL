@@ -6,7 +6,6 @@ import com.cc.job.xo.model.entity.JobPart;
 import com.cc.job.xo.model.vo.JobPartVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -17,10 +16,13 @@ import java.util.Objects;
 @Tag(name = "job_part接口")
 @RestController
 @RequestMapping("/api/v1/jobParts")
-@RequiredArgsConstructor
 public class JobPartController {
 
     private final JobPartService jobPartService;
+
+    public JobPartController(JobPartService jobPartService) {
+        this.jobPartService = jobPartService;
+    }
 
 
     @Operation(summary = "获取所有的树形数据")

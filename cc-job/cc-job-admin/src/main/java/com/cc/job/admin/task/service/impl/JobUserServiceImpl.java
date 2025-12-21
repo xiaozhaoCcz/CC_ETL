@@ -10,8 +10,8 @@ import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.xo.mapper.JobUserMapper;
 import com.cc.job.xo.model.dto.LoginResult;
 import com.cc.job.xo.model.entity.JobUser;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /**
@@ -20,10 +20,13 @@ import org.springframework.stereotype.Service;
  * @author ccjob
  * @since 2024-11-01
  */
-@Slf4j
 @Service
-@RequiredArgsConstructor
 public class JobUserServiceImpl extends ServiceImpl<JobUserMapper, JobUser> implements JobUserService {
+
+    private static final Logger log = LoggerFactory.getLogger(JobUserServiceImpl.class);
+
+    public JobUserServiceImpl() {
+    }
 
     /**
      * 用户登录

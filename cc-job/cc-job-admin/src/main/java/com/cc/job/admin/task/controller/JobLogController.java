@@ -3,7 +3,6 @@ package com.cc.job.admin.task.controller;
 import com.cc.job.admin.task.service.JobLogService;
 import com.xxl.job.core.biz.model.LogResult;
 import com.xxl.job.core.biz.model.ReturnT;
-import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.cc.job.xo.model.query.JobLogQuery;
@@ -26,10 +25,13 @@ import java.util.Map;
 @Tag(name = "task_log接口")
 @RestController
 @RequestMapping("/api/v1/jobLogs")
-@RequiredArgsConstructor
 public class JobLogController {
 
     private final JobLogService taskLogService;
+
+    public JobLogController(JobLogService taskLogService) {
+        this.taskLogService = taskLogService;
+    }
 
     @Operation(summary = "task_log分页列表")
     @GetMapping("/page")

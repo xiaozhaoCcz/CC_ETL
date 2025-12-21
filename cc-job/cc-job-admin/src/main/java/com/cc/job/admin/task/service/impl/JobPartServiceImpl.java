@@ -14,8 +14,8 @@ import com.cc.job.xo.model.entity.JobNode;
 import com.cc.job.xo.model.entity.JobPart;
 import com.cc.job.xo.model.vo.JobPartVo;
 import com.google.gson.Gson;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -35,15 +35,21 @@ import java.util.stream.Collectors;
  * @author xiaozhao
  */
 @Service
-@RequiredArgsConstructor
-@Slf4j
 public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> implements JobPartService {
+
+    private static final Logger log = LoggerFactory.getLogger(JobPartServiceImpl.class);
 
     private final JobInfoService jobInfoService;
 
     private final JobNodeService jobNodeService;
 
     private final JobEdgeService jobEdgeService;
+
+    public JobPartServiceImpl(JobInfoService jobInfoService, JobNodeService jobNodeService, JobEdgeService jobEdgeService) {
+        this.jobInfoService = jobInfoService;
+        this.jobNodeService = jobNodeService;
+        this.jobEdgeService = jobEdgeService;
+    }
 
     @Override
     public List<JobPartVo> getTree() {

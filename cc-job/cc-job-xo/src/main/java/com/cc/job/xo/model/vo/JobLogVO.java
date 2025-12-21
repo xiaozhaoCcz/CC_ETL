@@ -4,8 +4,6 @@ import java.io.Serial;
 import java.io.Serializable;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.Getter;
-import lombok.Setter;
 
 /**
  * task_log视图对象
@@ -13,8 +11,6 @@ import lombok.Setter;
  * @author ccjob
  * @since 2024-11-03 08:20
  */
-@Getter
-@Setter
 @Schema( description = "task_log视图对象")
 public class JobLogVO implements Serializable {
 
@@ -56,4 +52,148 @@ public class JobLogVO implements Serializable {
     private Integer jobType;
     @Schema(description = "节点执行状态（JSON格式）")
     private String nodeStatus;
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public Integer getJobGroup() {
+        return jobGroup;
+    }
+
+    public void setJobGroup(Integer jobGroup) {
+        this.jobGroup = jobGroup;
+    }
+
+    public Integer getJobId() {
+        return jobId;
+    }
+
+    public void setJobId(Integer jobId) {
+        this.jobId = jobId;
+    }
+
+    public String getJobDesc() {
+        return jobDesc;
+    }
+
+    public void setJobDesc(String jobDesc) {
+        this.jobDesc = jobDesc;
+    }
+
+    public String getExecutorAddress() {
+        return executorAddress;
+    }
+
+    public void setExecutorAddress(String executorAddress) {
+        this.executorAddress = executorAddress;
+    }
+
+    public String getExecutorHandler() {
+        return executorHandler;
+    }
+
+    public void setExecutorHandler(String executorHandler) {
+        this.executorHandler = executorHandler;
+    }
+
+    public String getExecutorParam() {
+        return executorParam;
+    }
+
+    public void setExecutorParam(String executorParam) {
+        this.executorParam = executorParam;
+    }
+
+    public String getExecutorShardingParam() {
+        return executorShardingParam;
+    }
+
+    public void setExecutorShardingParam(String executorShardingParam) {
+        this.executorShardingParam = executorShardingParam;
+    }
+
+    public Integer getExecutorFailRetryCount() {
+        return executorFailRetryCount;
+    }
+
+    public void setExecutorFailRetryCount(Integer executorFailRetryCount) {
+        this.executorFailRetryCount = executorFailRetryCount;
+    }
+
+    public String getTriggerTime() {
+        return triggerTime;
+    }
+
+    public void setTriggerTime(String triggerTime) {
+        this.triggerTime = triggerTime;
+    }
+
+    public Integer getTriggerCode() {
+        return triggerCode;
+    }
+
+    public void setTriggerCode(Integer triggerCode) {
+        this.triggerCode = triggerCode;
+    }
+
+    public String getTriggerMsg() {
+        return triggerMsg;
+    }
+
+    public void setTriggerMsg(String triggerMsg) {
+        this.triggerMsg = triggerMsg;
+    }
+
+    public String getHandleTime() {
+        return handleTime;
+    }
+
+    public void setHandleTime(String handleTime) {
+        this.handleTime = handleTime;
+    }
+
+    public Integer getHandleCode() {
+        return handleCode;
+    }
+
+    public void setHandleCode(Integer handleCode) {
+        this.handleCode = handleCode;
+    }
+
+    public String getHandleMsg() {
+        return handleMsg;
+    }
+
+    public void setHandleMsg(String handleMsg) {
+        this.handleMsg = handleMsg;
+    }
+
+    public Integer getAlarmStatus() {
+        return alarmStatus;
+    }
+
+    public void setAlarmStatus(Integer alarmStatus) {
+        this.alarmStatus = alarmStatus;
+    }
+
+    public Integer getJobType() {
+        return jobType;
+    }
+
+    public void setJobType(Integer jobType) {
+        this.jobType = jobType;
+    }
+
+    public String getNodeStatus() {
+        return nodeStatus;
+    }
+
+    public void setNodeStatus(String nodeStatus) {
+        this.nodeStatus = nodeStatus;
+    }
 }

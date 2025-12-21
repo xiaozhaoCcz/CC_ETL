@@ -1,7 +1,5 @@
 package com.cc.job.xo.model.entity;
 
-import lombok.Getter;
-import lombok.Setter;
 import com.baomidou.mybatisplus.annotation.TableName;
 
 /**
@@ -10,8 +8,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
  * @author ccjob
  * @since 2024-11-03 08:21
  */
-@Getter
-@Setter
+
 @TableName("job_lock")
 public class JobLock {
 
@@ -21,4 +18,12 @@ public class JobLock {
      * 锁名称
      */
     private String lockName;
+
+    public String getLockName() {
+        return lockName;
+    }
+
+    public void setLockName(String lockName) {
+        this.lockName = lockName;
+    }
 }

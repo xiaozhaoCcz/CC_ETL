@@ -4,8 +4,6 @@ import java.io.Serial;
 import java.io.Serializable;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Size;
-import lombok.Getter;
-import lombok.Setter;
 
 /**
  * task_lock表单对象
@@ -13,8 +11,6 @@ import lombok.Setter;
  * @author ccjob
  * @since 2024-11-03 08:21
  */
-@Getter
-@Setter
 @Schema(description = "task_lock表单对象")
 public class JobLockForm implements Serializable {
 
@@ -25,5 +21,11 @@ public class JobLockForm implements Serializable {
     @Size(max=50, message="锁名称长度不能超过50个字符")
     private String lockName;
 
+    public String getLockName() {
+        return lockName;
+    }
 
+    public void setLockName(String lockName) {
+        this.lockName = lockName;
+    }
 }
