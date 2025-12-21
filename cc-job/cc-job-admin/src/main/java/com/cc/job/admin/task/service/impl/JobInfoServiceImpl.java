@@ -4,6 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
 import cn.hutool.http.HttpRequest;
 import cn.hutool.http.HttpResponse;
+import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.admin.task.service.*;
@@ -31,6 +32,7 @@ import com.xxl.job.core.util.DateUtil;
 import com.xxl.job.core.util.IpUtil;
 import com.xxl.job.core.biz.model.RegistryParam;
 import com.xxl.job.core.enums.RegistryConfig;
+import com.xxl.job.core.util.XxlJobRemotingUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1194,9 +1196,9 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
                         String body = response.body();
                         if (body != null && !body.isEmpty()) {
                             // 解析返回的JSON，检查是否包含该任务组ID
-                            cn.hutool.json.JSONObject jsonObject = cn.hutool.json.JSONUtil.parseObj(body);
+                            JSONObject jsonObject = JSONUtil.parseObj(body);
                             if (jsonObject.getInt("code") == 200) {
-                                cn.hutool.json.JSONObject data = jsonObject.getJSONObject("data");
+                                JSONObject data = jsonObject.getJSONObject("data");
                                 if (data != null) {
                                     // 遍历所有运行中的任务组key（格式：jobId:randomId）
                                     for (String key : data.keySet()) {
