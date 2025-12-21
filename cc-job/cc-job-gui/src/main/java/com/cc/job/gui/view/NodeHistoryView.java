@@ -16,6 +16,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.Map;
 
 /**
@@ -36,9 +39,13 @@ public class NodeHistoryView extends VBox {
     private ScrollPane scrollPane;
     private VBox contentContainer;
     private Label statusLabel;
+    private Label pageLabel;
+    private Button nextButton;
     
     private int currentPage = 1;
+    private int totalPages = 1;
     private static final int PAGE_SIZE = 10;
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     
     public NodeHistoryView(Long taskGroupId, String taskGroupName) {
         this.taskGroupId = taskGroupId;
@@ -178,7 +185,7 @@ public class NodeHistoryView extends VBox {
         HBox header = new HBox(12);
         header.setAlignment(Pos.CENTER_LEFT);
         
-        Label timeLabel = new Label("执行时间: " + (log.getTriggerTime() != null ? log.getTriggerTime() : "未知"));
+        Label timeLabel = new Label("执行时间: " + formatTime(log.getTriggerTime()));
         timeLabel.setStyle(StyleUtil.body() + "-fx-font-weight: 600; -fx-text-fill: #1F2937;");
         
         Region spacer = new Region();
@@ -350,10 +357,10 @@ public class NodeHistoryView extends VBox {
             }
         });
         
-        Label pageLabel = new Label("第 " + currentPage + " 页");
+        pageLabel = new Label("第 " + currentPage + " 页");
         pageLabel.setStyle(StyleUtil.body() + "-fx-text-fill: #6B7280;");
         
-        Button nextButton = new Button("下一页");
+        nextButton = new Button("下一页");
         nextButton.setStyle(
             "-fx-background-color: #FFFFFF; " +
             "-fx-text-fill: #374151; " +
@@ -366,8 +373,10 @@ public class NodeHistoryView extends VBox {
             "-fx-cursor: hand;"
         );
         nextButton.setOnAction(e -> {
-            currentPage++;
-            loadData();
+            if (currentPage < totalPages) {
+                currentPage++;
+                loadData();
+            }
         });
         
         paginationBar.getChildren().addAll(prevButton, pageLabel, nextButton);
@@ -394,9 +403,13 @@ public class NodeHistoryView extends VBox {
                         }
                         
                         long total = result.getData().getTotal();
-                        int totalPages = (int) Math.ceil((double) total / PAGE_SIZE);
+                        totalPages = (int) Math.ceil((double) total / PAGE_SIZE);
                         statusLabel.setText(String.format("共 %d 条记录，第 %d/%d 页", 
                                                          total, currentPage, totalPages));
+                        // 更新分页标签
+                        if (pageLabel != null) {
+                            pageLabel.setText("第 " + currentPage + " 页");
+                        }
                     } else {
                         Label emptyLabel = new Label("暂无执行记录");
                         emptyLabel.setStyle(StyleUtil.body() + "-fx-text-fill: #9CA3AF; -fx-padding: 40;");
@@ -414,6 +427,42 @@ public class NodeHistoryView extends VBox {
                 });
             }
         }).start();
+    }
+    
+    /**
+     * 格式化时间字符串为 yyyy-MM-dd HH:mm:ss 格式
+     */
+    private String formatTime(String timeStr) {
+        if (timeStr == null || timeStr.trim().isEmpty()) {
+            return "未知";
+        }
+        
+        String trimmed = timeStr.trim();
+        
+        try {
+            // 移除毫秒部分（如果有）
+            String timeWithoutMillis = trimmed.split("\\.")[0];
+            
+            // 尝试解析 ISO 格式（如 2025-12-21T16:15:42）
+            if (timeWithoutMillis.contains("T")) {
+                LocalDateTime dateTime = LocalDateTime.parse(timeWithoutMillis);
+                return dateTime.format(DATE_FORMATTER);
+            }
+            
+            // 尝试解析标准格式（如 2025-12-21 16:15:42）
+            // 如果已经是目标格式，直接返回
+            if (timeWithoutMillis.matches("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}")) {
+                return timeWithoutMillis;
+            }
+            
+            // 尝试用标准格式解析
+            LocalDateTime dateTime = LocalDateTime.parse(timeWithoutMillis, DATE_FORMATTER);
+            return dateTime.format(DATE_FORMATTER);
+        } catch (DateTimeParseException e) {
+            // 如果解析失败，返回原始字符串
+            logger.debug("时间格式化失败: " + timeStr, e);
+            return trimmed;
+        }
     }
     
     private void showError(String title, String message) {
