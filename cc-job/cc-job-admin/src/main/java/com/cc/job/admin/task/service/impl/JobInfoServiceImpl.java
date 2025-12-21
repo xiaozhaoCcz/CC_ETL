@@ -329,10 +329,9 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
             throw new BusinessException("任务不存在");
         }
 
-        // 检查是否正在运行（使用行锁后，这里是线程安全的）
-        if (taskInfo.getJobType() == 2 && taskInfo.getTriggerOneStatus()==1) {
-            throw new BusinessException("当前任务正在运行中，请先停止任务运行");
-        }
+        // 对于任务组（jobType == 2），不再检查trigger_one_status来阻止启动
+        // 因为定时任务和手动启动可能使用不同的randomId，可以并行运行
+        // 允许同一个任务组有多个执行批次同时运行
 
         // force cover job param
         if (taskInfoTriggerDto.getExecutorParam() == null) {
@@ -1153,5 +1152,75 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
                 .eq(JobEdge::getIsDeleted, 0)
         );
         return JSONUtil.toJsonStr(edges);
+    }
+    
+    /**
+     * 检查任务组在执行器中是否正在运行
+     * 
+     * @param jobId 任务组ID
+     * @return 是否正在运行
+     */
+    @Override
+    public boolean checkJobGroupRunningInExecutor(Long jobId) {
+        try {
+            // 获取所有executor-compose服务地址
+            List<JobCompose> jobComposes = jobComposeMapper.selectList(null);
+            
+            if (jobComposes == null || jobComposes.isEmpty()) {
+                return false;
+            }
+            
+            // 遍历所有executor-compose实例，检查是否有该任务组正在运行
+            for (JobCompose jobCompose : jobComposes) {
+                String httpAddress = jobCompose.getExecutorServerAddress();
+                if (httpAddress == null || httpAddress.trim().isEmpty()) {
+                    continue;
+                }
+                
+                try {
+                    // 构建URL
+                    String url = httpAddress;
+                    if (!url.endsWith("/")) {
+                        url += "/";
+                    }
+                    url = url.replaceAll("/+$", "") + "/api/jobgroup/running";
+                    
+                    // 调用执行器接口获取所有运行中的任务组
+                    HttpResponse response = HttpRequest.get(url)
+                            .timeout(3000)
+                            .execute();
+                    
+                    if (response.isOk()) {
+                        String body = response.body();
+                        if (body != null && !body.isEmpty()) {
+                            // 解析返回的JSON，检查是否包含该任务组ID
+                            cn.hutool.json.JSONObject jsonObject = cn.hutool.json.JSONUtil.parseObj(body);
+                            if (jsonObject.getInt("code") == 200) {
+                                cn.hutool.json.JSONObject data = jsonObject.getJSONObject("data");
+                                if (data != null) {
+                                    // 遍历所有运行中的任务组key（格式：jobId:randomId）
+                                    for (String key : data.keySet()) {
+                                        if (key.startsWith(jobId + ":")) {
+                                            // 找到该任务组的运行实例
+                                            return true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    // 单个executor实例查询失败，继续查询其他实例
+                    log.debug("查询executor运行状态失败 - jobId: {}, address: {}, error: {}", 
+                            jobId, httpAddress, e.getMessage());
+                }
+            }
+            
+            return false;
+        } catch (Exception e) {
+            log.warn("检查任务组执行器运行状态异常 - jobId: {}", jobId, e);
+            // 异常情况下，回退到数据库状态检查
+            return false;
+        }
     }
 }

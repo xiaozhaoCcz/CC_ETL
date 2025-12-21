@@ -9,14 +9,11 @@
   <artifactId>cc-job-gui</artifactId>
   <description>JavaFX流程节点编辑器</description>
   <build>
+    <finalName>${project.artifactId}</finalName>
     <plugins>
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.11.0</version>
-        <configuration>
-          <source>17</source>
-          <target>17</target>
-        </configuration>
+        <configuration />
       </plugin>
       <plugin>
         <groupId>org.openjfx</groupId>
@@ -57,18 +54,7 @@
       </plugin>
     </plugins>
   </build>
-  <dependencies>
-    <dependency>
-      <groupId>org.projectlombok</groupId>
-      <artifactId>lombok</artifactId>
-      <version>1.18.30</version>
-      <scope>provided</scope>
-    </dependency>
-  </dependencies>
   <properties>
-    <maven.compiler.target>17</maven.compiler.target>
-    <maven.compiler.source>17</maven.compiler.source>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <javafx.version>21.0.1</javafx.version>
   </properties>
 </project>

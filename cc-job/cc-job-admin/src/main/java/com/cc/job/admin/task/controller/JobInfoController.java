@@ -6,10 +6,7 @@ import com.cc.job.admin.task.service.JobEdgeService;
 import com.cc.job.admin.task.service.JobNodeService;
 import com.cc.job.admin.task.sse.SSEService;
 import com.cc.job.xo.model.dto.JobInfoTriggerDto;
-import com.cc.job.xo.model.entity.JobEdge;
-import com.cc.job.xo.model.entity.JobInfo;
-import com.cc.job.xo.model.entity.JobLogglue;
-import com.cc.job.xo.model.entity.JobNode;
+import com.cc.job.xo.model.entity.*;
 import com.cc.job.xo.model.form.JobEdgeForm;
 import com.cc.job.xo.model.form.JobGlueForm;
 import com.cc.job.admin.task.service.JobInfoService;
@@ -263,7 +260,23 @@ public class JobInfoController {
     @GetMapping("getJobStatus/{id}")
     public Result<Boolean> getJobStatus(@Parameter(description = "任务ID") @PathVariable("id") Long id){
         JobInfo jobInfo = jobInfoService.getById(id);
-        return Result.success(jobInfo.getTriggerOneStatus()>0);
+        if (jobInfo == null) {
+            return Result.success(false);
+        }
+        
+        // 对于任务组（jobType == 2），需要检查执行器中的实际运行状态
+        // 因为定时任务和手动启动可能使用不同的randomId，可以并行运行
+        if (jobInfo.getJobType() == 2) {
+            // 检查执行器中是否有该任务组正在运行
+            boolean isRunningInExecutor = jobInfoService.checkJobGroupRunningInExecutor(id);
+            // 如果执行器中有运行中的任务，返回true
+            if (isRunningInExecutor) {
+                return Result.success(true);
+            }
+        }
+        
+        // 对于普通任务或执行器中没有运行的任务组，检查数据库状态
+        return Result.success(jobInfo.getTriggerOneStatus() > 0);
     }
 
     @Operation(summary = "修改任务节点")
