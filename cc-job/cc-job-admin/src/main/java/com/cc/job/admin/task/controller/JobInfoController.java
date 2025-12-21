@@ -183,7 +183,7 @@ public class JobInfoController {
             if (jobInfo == null) {
                 return Result.failed("任务不存在");
             }
-            jobInfo.setTriggerStatus(status);
+            jobInfo.setTriggerOneStatus(status);
             boolean success = jobInfoService.updateById(jobInfo);
             return Result.judge(success);
         } catch (Exception e) {
@@ -257,7 +257,7 @@ public class JobInfoController {
     @GetMapping("getJobStatus/{id}")
     public Result<Boolean> getJobStatus(@Parameter(description = "任务ID") @PathVariable("id") Long id){
         JobInfo jobInfo = jobInfoService.getById(id);
-        return Result.success(jobInfo.getTriggerStatus()>0);
+        return Result.success(jobInfo.getTriggerOneStatus()>0);
     }
 
     @Operation(summary = "修改任务节点")

@@ -99,6 +99,10 @@ public class JobInfo extends BaseEntity {
      */
     private Integer triggerStatus;
     /**
+     * 一次调度状态：0-停止，1-运行
+     */
+    private Integer triggerOneStatus;
+    /**
      * 上次调度时间
      */
     private Long triggerLastTime;
