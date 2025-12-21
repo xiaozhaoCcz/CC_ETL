@@ -471,25 +471,22 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         executorFailRetryCountSpinner.setPrefWidth(300);
         executorFailRetryCountSpinner.setEditable(true);
         
-        // 第一行：路由策略 + (子任务ID或失败策略)
+        // 第一行：路由策略 + 失败策略
         grid.add(routeStrategyLabel, 0, 0);
         grid.add(routeStrategyCombo, 1, 0);
-        
-
-        // 任务组内子节点：显示失败策略
         grid.add(failStrategyLabel, 2, 0);
         grid.add(failStrategyCombo, 3, 0);
 
         
-        // 第二行：任务超时时间
+        // 第二行：任务超时时间 + 阻塞处理策略
         grid.add(timeoutLabel, 0, 1);
         grid.add(executorTimeoutField, 1, 1);
+        grid.add(blockStrategyLabel, 2, 1);
+        grid.add(blockStrategyCombo, 3, 1);
         
-        // 第三行：阻塞处理策略 + 失败重试次数
-        grid.add(blockStrategyLabel, 0, 2);
-        grid.add(blockStrategyCombo, 1, 2);
-        grid.add(retryLabel, 2, 2);
-        grid.add(executorFailRetryCountSpinner, 3, 2);
+        // 第三行：失败重试次数
+        grid.add(retryLabel, 0, 2);
+        grid.add(executorFailRetryCountSpinner, 1, 2);
         
         section.getChildren().add(grid);
         return section;
