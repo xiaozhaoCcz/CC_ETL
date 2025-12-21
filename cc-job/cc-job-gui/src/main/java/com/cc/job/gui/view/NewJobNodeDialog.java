@@ -57,6 +57,8 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
     private TextArea executorParamArea;
     private ComboBox<String> reqTypeCombo;
     private TextField reqUrlField;
+    private Label reqBodyLabel;
+    private TextArea reqBodyArea;
     private ParameterTable bodyTable;
     
     private JobJdbcDatasourceService datasourceService;
@@ -525,10 +527,27 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         reqUrlField.setPrefWidth(400);
         reqUrlField.setPromptText("请输入请求地址");
 
+        // 请求体（POST/PUT时显示）
+        reqBodyLabel = createFormLabel("请求体", false);
+        reqBodyArea = new TextArea();
+        reqBodyArea.setPrefWidth(615);
+        reqBodyArea.setPrefRowCount(6);
+        reqBodyArea.setPromptText("请输入JSON格式的请求体");
+        reqBodyArea.setWrapText(true);
+        reqBodyArea.setVisible(false);
+        reqBodyArea.setManaged(false);
+
         grid.add(reqTypeLabel, 0, 0);
         grid.add(reqTypeCombo, 1, 0);
         grid.add(reqUrlLabel, 0, 1);
         grid.add(reqUrlField, 1, 1, 3, 1);
+        grid.add(reqBodyLabel, 0, 2);
+        grid.add(reqBodyArea, 1, 2, 3, 1);
+
+        // 监听请求类型变化，显示/隐藏请求体
+        reqTypeCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
+            updateRequestBodyVisibility(newVal);
+        });
 
         bodyTable = new ParameterTable("请求参数");
 
@@ -541,6 +560,21 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         executorParamLabel.setManaged(visible);
         executorParamArea.setVisible(visible);
         executorParamArea.setManaged(visible);
+    }
+    
+    /**
+     * 根据请求类型更新请求体输入框的可见性
+     */
+    private void updateRequestBodyVisibility(String reqType) {
+        boolean shouldShow = "POST".equals(reqType) || "PUT".equals(reqType);
+        if (reqBodyLabel != null) {
+            reqBodyLabel.setVisible(shouldShow);
+            reqBodyLabel.setManaged(shouldShow);
+        }
+        if (reqBodyArea != null) {
+            reqBodyArea.setVisible(shouldShow);
+            reqBodyArea.setManaged(shouldShow);
+        }
     }
 
     /**
@@ -591,6 +625,10 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
                 bodyTable.ensureAtLeastOneRow();
                 // 更新标签文本
                 updateHandlerLabel("JobHandler");
+                // 根据当前请求类型显示/隐藏请求体
+                if (reqTypeCombo != null) {
+                    updateRequestBodyVisibility(reqTypeCombo.getValue());
+                }
             }
             default -> {
                 // GLUE 模式：显示按钮，隐藏输入框
@@ -913,9 +951,14 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         if (glueType == GlueType.API) {
             if (data.getReqType() != null) {
                 reqTypeCombo.setValue(data.getReqType());
+                // 设置请求类型后，更新请求体可见性
+                updateRequestBodyVisibility(data.getReqType());
             }
             if (data.getReqUrl() != null) {
                 reqUrlField.setText(data.getReqUrl());
+            }
+            if (data.getReqBody() != null) {
+                reqBodyArea.setText(data.getReqBody());
             }
             // 只使用一个参数表格，优先使用executorParam，如果没有则使用reqHeader
             String paramData = data.getExecutorParam();
@@ -1007,6 +1050,13 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
             form.setReqType(reqType != null ? reqType : "GET");
             String reqUrl = reqUrlField.getText() != null ? reqUrlField.getText().trim() : "";
             form.setReqUrl(reqUrl);
+            // 如果是POST或PUT，设置请求体
+            if ("POST".equals(reqType) || "PUT".equals(reqType)) {
+                String reqBody = reqBodyArea.getText() != null ? reqBodyArea.getText().trim() : "";
+                form.setReqBody(reqBody.isEmpty() ? null : reqBody);
+            } else {
+                form.setReqBody(null);
+            }
             form.setReqHeader(null); // 不再使用请求头表格
             form.setExecutorParam(bodyTable.toJson());
         } else {

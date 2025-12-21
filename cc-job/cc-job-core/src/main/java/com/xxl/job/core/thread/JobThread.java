@@ -162,11 +162,11 @@ public class JobThread extends Thread{
 							Boolean tempResult = futureTask.get(triggerParam.getExecutorTimeout(), TimeUnit.SECONDS);
 						} catch (TimeoutException e) {
 
-							XxlJobHelper.log("<br>----------- xxl-job job execute timeout");
+							XxlJobHelper.log("<br>-----------["+triggerParam.getJobId()+"] xxl-job job execute timeout");
 							XxlJobHelper.log(e);
 
 							// handle result
-							XxlJobHelper.handleTimeout("job execute timeout ");
+							XxlJobHelper.handleTimeout("["+triggerParam.getJobId()+"] job execute timeout ");
 						} finally {
 							futureThread.interrupt();
 						}

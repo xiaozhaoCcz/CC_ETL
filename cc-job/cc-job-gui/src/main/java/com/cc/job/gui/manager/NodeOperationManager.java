@@ -385,6 +385,9 @@ public class NodeOperationManager {
             case "GLUE_GROOVY": return "Java";
             case "GLUE_SHELL": return "Shell";
             case "GLUE_PYTHON": return "Python";
+            case "GLUE_PHP": return "PHP";
+            case "GLUE_NODEJS": return "Node";
+            case "GLUE_POWERSHELL": return "PS";
             default: return "Bean";
         }
     }
