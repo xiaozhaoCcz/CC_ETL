@@ -10,12 +10,18 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * HTTP客户端工具类
  * 封装通用的HTTP请求和响应处理逻辑，减少代码重复
+ * 支持多地址配置和自动重试
  * 
  * @author xiaozhao
  */
@@ -25,18 +31,99 @@ public class HttpClientUtil {
     private static final MediaType JSON_MEDIA_TYPE = MediaType.get("application/json; charset=utf-8");
     
     private final ApiUtil apiUtil;
+    /**
+     * 规范化后的地址列表（只包含协议+主机+端口）
+     */
+    private final List<String> normalizedBaseUrls;
     
     public HttpClientUtil(ApiUtil apiUtil) {
         this.apiUtil = apiUtil;
+        this.normalizedBaseUrls = parseAndNormalizeUrls(apiUtil.getBaseUrls());
+        
+        if (!normalizedBaseUrls.isEmpty()) {
+            logger.info("[HttpClientUtil] 初始化API地址列表: {}", normalizedBaseUrls);
+        }
     }
     
     /**
-     * 构建完整的API URL
+     * 解析和规范化URL地址列表
+     * 支持逗号分隔的多个地址，自动移除路径部分
+     * 
+     * @param urls 逗号分隔的URL字符串
+     * @return 规范化后的地址列表
+     */
+    private List<String> parseAndNormalizeUrls(String urls) {
+        List<String> normalizedUrls = new ArrayList<>();
+        
+        if (urls == null || urls.trim().isEmpty()) {
+            logger.warn("[HttpClientUtil] 未配置API地址，使用默认地址");
+            return normalizedUrls;
+        }
+        
+        // 按逗号分割地址
+        String[] addresses = urls.split(",");
+        normalizedUrls = Arrays.stream(addresses)
+                .map(String::trim)
+                .filter(addr -> !addr.isEmpty())
+                .map(this::normalizeAddress)
+                .filter(addr -> addr != null)
+                .collect(Collectors.toList());
+        
+        if (normalizedUrls.isEmpty()) {
+            logger.warn("[HttpClientUtil] 解析后的API地址列表为空");
+        }
+        
+        return normalizedUrls;
+    }
+    
+    /**
+     * 规范化地址，移除路径部分，只保留协议+主机+端口
+     * 例如: http://127.0.0.1:8989/xxl-job-admin -> http://127.0.0.1:8989
+     * 
+     * @param address 原始地址
+     * @return 规范化后的地址
+     */
+    private String normalizeAddress(String address) {
+        try {
+            URI uri = URI.create(address);
+            String scheme = uri.getScheme();
+            String host = uri.getHost();
+            int port = uri.getPort();
+            
+            if (scheme == null || host == null) {
+                logger.warn("[HttpClientUtil] 无效的地址格式: {}", address);
+                return null;
+            }
+            
+            // 构建规范化地址：协议://主机:端口
+            if (port > 0) {
+                return scheme + "://" + host + ":" + port;
+            } else {
+                // 如果没有端口，使用默认端口
+                if ("https".equals(scheme)) {
+                    return scheme + "://" + host + ":443";
+                } else {
+                    return scheme + "://" + host + ":80";
+                }
+            }
+        } catch (Exception e) {
+            logger.error("[HttpClientUtil] 解析地址失败: {}", address, e);
+            return null;
+        }
+    }
+    
+    /**
+     * 构建完整的API URL（兼容旧代码，返回第一个地址）
+     * @deprecated 使用多地址功能，此方法返回第一个地址
      * @param path API路径（如 "/api/v1/jobInfos/page"）
      * @return 完整的URL
      */
+    @Deprecated
     public String buildUrl(String path) {
-        return apiUtil.getBaseUrl() + path;
+        if (normalizedBaseUrls.isEmpty()) {
+            return apiUtil.getBaseUrl() + path;
+        }
+        return normalizedBaseUrls.get(0) + path;
     }
     
     /**
@@ -59,19 +146,7 @@ public class HttpClientUtil {
      * @throws IOException 网络异常
      */
     public <T> Result<T> get(String path, Class<T> responseType, Map<String, String> queryParams) throws IOException {
-        String url = buildUrl(path);
-        HttpUrl.Builder urlBuilder = HttpUrl.parse(url).newBuilder();
-        
-        if (queryParams != null) {
-            queryParams.forEach(urlBuilder::addQueryParameter);
-        }
-        
-        Request request = new Request.Builder()
-                .url(urlBuilder.build())
-                .get()
-                .build();
-        
-        return executeRequest(request, responseType);
+        return executeRequestWithRetry(path, queryParams, null, "GET", responseType, null);
     }
     
     /**
@@ -94,19 +169,7 @@ public class HttpClientUtil {
      * @throws IOException 网络异常
      */
     public <T> Result<T> get(String path, TypeToken<T> responseTypeToken, Map<String, String> queryParams) throws IOException {
-        String url = buildUrl(path);
-        HttpUrl.Builder urlBuilder = HttpUrl.parse(url).newBuilder();
-        
-        if (queryParams != null) {
-            queryParams.forEach(urlBuilder::addQueryParameter);
-        }
-        
-        Request request = new Request.Builder()
-                .url(urlBuilder.build())
-                .get()
-                .build();
-        
-        return executeRequest(request, responseTypeToken);
+        return executeRequestWithRetry(path, queryParams, null, "GET", null, responseTypeToken);
     }
     
     /**
@@ -118,19 +181,34 @@ public class HttpClientUtil {
      * @throws IOException 网络异常
      */
     public <T> PageResult<T> getPage(String path, Class<T> itemType, Map<String, String> queryParams) throws IOException {
-        String url = buildUrl(path);
-        HttpUrl.Builder urlBuilder = HttpUrl.parse(url).newBuilder();
+        IOException lastException = null;
         
-        if (queryParams != null) {
-            queryParams.forEach(urlBuilder::addQueryParameter);
+        for (String baseUrl : normalizedBaseUrls) {
+            try {
+                String url = baseUrl + path;
+                HttpUrl.Builder urlBuilder = HttpUrl.parse(url).newBuilder();
+                
+                if (queryParams != null) {
+                    queryParams.forEach(urlBuilder::addQueryParameter);
+                }
+                
+                Request request = new Request.Builder()
+                        .url(urlBuilder.build())
+                        .get()
+                        .build();
+                
+                PageResult<T> result = executePageRequest(request, itemType);
+                logger.debug("[HttpClientUtil] GET请求成功 - url: {}", url);
+                return result;
+            } catch (IOException e) {
+                logger.warn("[HttpClientUtil] GET请求异常 - address: {}, path: {}, error: {}", 
+                        baseUrl, path, e.getMessage());
+                lastException = e;
+            }
         }
         
-        Request request = new Request.Builder()
-                .url(urlBuilder.build())
-                .get()
-                .build();
-        
-        return executePageRequest(request, itemType);
+        logger.error("[HttpClientUtil] 所有API地址的GET请求都失败 - path: {}", path);
+        throw lastException != null ? lastException : new IOException("所有API地址请求失败");
     }
     
     /**
@@ -142,16 +220,8 @@ public class HttpClientUtil {
      * @throws IOException 网络异常
      */
     public <T> Result<T> post(String path, Object requestBody, Class<T> responseType) throws IOException {
-        String url = buildUrl(path);
         String jsonBody = apiUtil.getGson().toJson(requestBody);
-        RequestBody body = RequestBody.create(jsonBody, JSON_MEDIA_TYPE);
-        
-        Request request = new Request.Builder()
-                .url(url)
-                .post(body)
-                .build();
-        
-        return executeRequest(request, responseType);
+        return executeRequestWithRetry(path, null, jsonBody, "POST", responseType, null);
     }
     
     /**
@@ -163,16 +233,8 @@ public class HttpClientUtil {
      * @throws IOException 网络异常
      */
     public <T> Result<T> post(String path, Object requestBody, TypeToken<T> responseTypeToken) throws IOException {
-        String url = buildUrl(path);
         String jsonBody = apiUtil.getGson().toJson(requestBody);
-        RequestBody body = RequestBody.create(jsonBody, JSON_MEDIA_TYPE);
-        
-        Request request = new Request.Builder()
-                .url(url)
-                .post(body)
-                .build();
-        
-        return executeRequest(request, responseTypeToken);
+        return executeRequestWithRetry(path, null, jsonBody, "POST", null, responseTypeToken);
     }
     
     /**
@@ -196,16 +258,8 @@ public class HttpClientUtil {
      * @throws IOException 网络异常
      */
     public <T> Result<T> put(String path, Object requestBody, Class<T> responseType) throws IOException {
-        String url = buildUrl(path);
         String jsonBody = apiUtil.getGson().toJson(requestBody);
-        RequestBody body = RequestBody.create(jsonBody, JSON_MEDIA_TYPE);
-        
-        Request request = new Request.Builder()
-                .url(url)
-                .put(body)
-                .build();
-        
-        return executeRequest(request, responseType);
+        return executeRequestWithRetry(path, null, jsonBody, "PUT", responseType, null);
     }
     
     /**
@@ -240,19 +294,7 @@ public class HttpClientUtil {
      * @throws IOException 网络异常
      */
     public <T> Result<T> delete(String path, Class<T> responseType, Map<String, String> queryParams) throws IOException {
-        String url = buildUrl(path);
-        HttpUrl.Builder urlBuilder = HttpUrl.parse(url).newBuilder();
-        
-        if (queryParams != null) {
-            queryParams.forEach(urlBuilder::addQueryParameter);
-        }
-        
-        Request request = new Request.Builder()
-                .url(urlBuilder.build())
-                .delete()
-                .build();
-        
-        return executeRequest(request, responseType);
+        return executeRequestWithRetry(path, queryParams, null, "DELETE", responseType, null);
     }
     
     /**
@@ -280,6 +322,7 @@ public class HttpClientUtil {
     /**
      * 执行自定义请求并返回Result<T>
      * @param requestBuilder 请求构建器函数
+     * @param path API路径
      * @param responseType 响应数据类型
      * @return Result包装的响应数据
      * @throws IOException 网络异常
@@ -287,9 +330,100 @@ public class HttpClientUtil {
     public <T> Result<T> executeCustomRequest(Function<String, Request.Builder> requestBuilder, 
                                                String path, 
                                                Class<T> responseType) throws IOException {
-        String url = buildUrl(path);
-        Request request = requestBuilder.apply(url).build();
-        return executeRequest(request, responseType);
+        IOException lastException = null;
+        
+        for (String baseUrl : normalizedBaseUrls) {
+            try {
+                String url = baseUrl + path;
+                Request request = requestBuilder.apply(url).build();
+                Result<T> result = executeRequest(request, responseType);
+                logger.debug("[HttpClientUtil] 自定义请求成功 - url: {}", url);
+                return result;
+            } catch (IOException e) {
+                logger.warn("[HttpClientUtil] 自定义请求异常 - address: {}, path: {}, error: {}", 
+                        baseUrl, path, e.getMessage());
+                lastException = e;
+            }
+        }
+        
+        logger.error("[HttpClientUtil] 所有API地址的自定义请求都失败 - path: {}", path);
+        throw lastException != null ? lastException : new IOException("所有API地址请求失败");
+    }
+    
+    /**
+     * 执行请求并重试多个地址
+     * @param path API路径
+     * @param queryParams 查询参数（可为null）
+     * @param jsonBody JSON请求体（可为null）
+     * @param method HTTP方法（GET, POST, PUT, DELETE）
+     * @param responseType 响应数据类型（可为null，如果使用TypeToken）
+     * @param responseTypeToken 响应数据类型Token（可为null，如果使用Class）
+     * @return Result包装的响应数据
+     * @throws IOException 网络异常
+     */
+    private <T> Result<T> executeRequestWithRetry(String path, 
+                                                    Map<String, String> queryParams,
+                                                    String jsonBody,
+                                                    String method,
+                                                    Class<T> responseType,
+                                                    TypeToken<T> responseTypeToken) throws IOException {
+        IOException lastException = null;
+        
+        for (String baseUrl : normalizedBaseUrls) {
+            try {
+                String url = baseUrl + path;
+                Request.Builder requestBuilder;
+                
+                // 构建URL和查询参数
+                if (queryParams != null && !queryParams.isEmpty()) {
+                    HttpUrl.Builder urlBuilder = HttpUrl.parse(url).newBuilder();
+                    queryParams.forEach(urlBuilder::addQueryParameter);
+                    url = urlBuilder.build().toString();
+                }
+                
+                // 根据方法构建请求
+                switch (method.toUpperCase()) {
+                    case "GET":
+                        requestBuilder = new Request.Builder().url(url).get();
+                        break;
+                    case "POST":
+                        RequestBody body = jsonBody != null ? 
+                                RequestBody.create(jsonBody, JSON_MEDIA_TYPE) : null;
+                        requestBuilder = new Request.Builder().url(url).post(body);
+                        break;
+                    case "PUT":
+                        RequestBody putBody = jsonBody != null ? 
+                                RequestBody.create(jsonBody, JSON_MEDIA_TYPE) : null;
+                        requestBuilder = new Request.Builder().url(url).put(putBody);
+                        break;
+                    case "DELETE":
+                        requestBuilder = new Request.Builder().url(url).delete();
+                        break;
+                    default:
+                        throw new IllegalArgumentException("不支持的HTTP方法: " + method);
+                }
+                
+                Request request = requestBuilder.build();
+                
+                // 根据类型执行请求
+                if (responseTypeToken != null) {
+                    Result<T> result = executeRequest(request, responseTypeToken);
+                    logger.debug("[HttpClientUtil] {}请求成功 - url: {}", method, url);
+                    return result;
+                } else {
+                    Result<T> result = executeRequest(request, responseType);
+                    logger.debug("[HttpClientUtil] {}请求成功 - url: {}", method, url);
+                    return result;
+                }
+            } catch (IOException e) {
+                logger.warn("[HttpClientUtil] {}请求异常 - address: {}, path: {}, error: {}", 
+                        method, baseUrl, path, e.getMessage());
+                lastException = e;
+            }
+        }
+        
+        logger.error("[HttpClientUtil] 所有API地址的{}请求都失败 - path: {}", method, path);
+        throw lastException != null ? lastException : new IOException("所有API地址请求失败");
     }
     
     /**

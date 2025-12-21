@@ -372,6 +372,10 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
                 jobLog.setTriggerTime(LocalDateTime.now());
                 jobLog.setTriggerCode(0);
                 jobLog.setHandleCode(0);
+                // 对于任务组，将 executorParam 设置为 randomId，用于后续查找和保存节点状态
+                if (taskInfo.getJobType() == 2 && StringUtils.isNotBlank(finalRandomId)) {
+                    jobLog.setExecutorParam(finalRandomId);
+                }
                 jobLogMapper.insert(jobLog);
                 
                 return jobLog.getId();

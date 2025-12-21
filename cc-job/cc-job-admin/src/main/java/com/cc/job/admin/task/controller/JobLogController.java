@@ -15,6 +15,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 /**
  * task_log前端控制层
  *
@@ -31,7 +33,7 @@ public class JobLogController {
 
     @Operation(summary = "task_log分页列表")
     @GetMapping("/page")
-    public PageResult<JobLogVO> getJobLogPage(JobLogQuery queryParams ) {
+    public PageResult<JobLogVO> getJobLogPage(JobLogQuery queryParams) {
         IPage<JobLogVO> result = taskLogService.getJobLogPage(queryParams);
         return PageResult.success(result);
     }
@@ -47,8 +49,23 @@ public class JobLogController {
 
     @Operation(summary = "查看log日志")
     @GetMapping("/logDetailCat")
-    public Result<ReturnT<LogResult>> getLogDetailCat(@RequestParam("logId") Long logId, int fromLineNum){
-        ReturnT<LogResult> result = taskLogService.getLogDetailCat(logId,fromLineNum);
+    public Result<ReturnT<LogResult>> getLogDetailCat(@RequestParam("logId") Long logId, int fromLineNum) {
+        ReturnT<LogResult> result = taskLogService.getLogDetailCat(logId, fromLineNum);
         return Result.success(result);
+    }
+
+    @Operation(summary = "保存节点执行状态（供执行器调用）")
+    @PostMapping("/saveNodeStatus")
+    public Result<Void> saveNodeStatus(@RequestBody Map<String, Object> params) {
+        try {
+            Long taskGroupId = Long.valueOf(params.get("taskGroupId").toString());
+            String executionBatchId = params.get("executionBatchId").toString();
+            String nodeStatusJson = params.get("nodeStatus").toString();
+
+            boolean success = taskLogService.saveNodeStatus(taskGroupId, executionBatchId, nodeStatusJson);
+            return Result.judge(success);
+        } catch (Exception e) {
+            return Result.failed("保存节点状态失败: " + e.getMessage());
+        }
     }
 }

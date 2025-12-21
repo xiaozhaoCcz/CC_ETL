@@ -54,4 +54,6 @@ public class JobLogVO implements Serializable {
     private Integer alarmStatus;
     @Schema(description = "任务类型")
     private Integer jobType;
+    @Schema(description = "节点执行状态（JSON格式）")
+    private String nodeStatus;
 }

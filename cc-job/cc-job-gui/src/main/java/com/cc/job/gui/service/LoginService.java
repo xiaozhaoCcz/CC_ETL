@@ -39,9 +39,22 @@ public class LoginService extends BaseService {
      * @return 登录结果
      */
     public LoginResult login(String username, String password) throws IOException, InterruptedException {
+        return login(username, password, null);
+    }
+    
+    /**
+     * 用户登录（指定后台地址）
+     * @param username 用户名
+     * @param password 密码
+     * @param baseUrl 后台地址（如果为null，则使用默认配置）
+     * @return 登录结果
+     */
+    public LoginResult login(String username, String password, String baseUrl) throws IOException, InterruptedException {
         try {
             // 获取API基础URL
-            String baseUrl = apiUtil.getBaseUrl();
+            if (baseUrl == null || baseUrl.trim().isEmpty()) {
+                baseUrl = apiUtil.getBaseUrl();
+            }
             
             // 构建URL参数（使用表单格式）
             String urlParams = String.format("username=%s&password=%s", 
@@ -133,9 +146,22 @@ public class LoginService extends BaseService {
      * @return 注册结果
      */
     public LoginResult register(String username, String password) throws IOException, InterruptedException {
+        return register(username, password, null);
+    }
+    
+    /**
+     * 用户注册（指定后台地址）
+     * @param username 用户名
+     * @param password 密码
+     * @param baseUrl 后台地址（如果为null，则使用默认配置）
+     * @return 注册结果
+     */
+    public LoginResult register(String username, String password, String baseUrl) throws IOException, InterruptedException {
         try {
             // 获取API基础URL
-            String baseUrl = apiUtil.getBaseUrl();
+            if (baseUrl == null || baseUrl.trim().isEmpty()) {
+                baseUrl = apiUtil.getBaseUrl();
+            }
             
             // 构建URL参数（使用表单格式）
             String urlParams = String.format("username=%s&password=%s", 

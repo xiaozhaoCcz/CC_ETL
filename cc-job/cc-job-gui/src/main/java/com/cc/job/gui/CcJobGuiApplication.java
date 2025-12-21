@@ -111,7 +111,7 @@ public class CcJobGuiApplication extends Application {
         
         // 创建登录窗口
         loginStage = new Stage();
-        loginStage.setTitle("NodeFx - 用户登录");
+        loginStage.setTitle("CcETL - 用户登录");
         loginStage.setScene(loginScene);
         loginStage.setResizable(false);
         loginStage.initStyle(StageStyle.UNDECORATED); // 无边框窗口
@@ -174,7 +174,7 @@ public class CcJobGuiApplication extends Application {
         }
         
         // 更新窗口内容
-        loginStage.setTitle("NodeFx - 用户注册");
+        loginStage.setTitle("CcETL - 用户注册");
         loginStage.setScene(registerScene);
     }
     
@@ -187,7 +187,7 @@ public class CcJobGuiApplication extends Application {
             MainView mainView = new MainView();
             
             // 创建场景
-            Scene scene = new Scene(mainView, 1400, 900);
+            Scene scene = new Scene(mainView, 1920, 1080);
             
             // 加载全局CSS样式
             try {
@@ -198,7 +198,7 @@ public class CcJobGuiApplication extends Application {
             
             // 设置窗口标题，显示用户名
             String username = SessionManager.getInstance().getUsername();
-            primaryStage.setTitle("CC_ETL - 流程节点编辑器 [" + username + "]");
+            primaryStage.setTitle("CcETL - 流程节点编辑器 [" + username + "]");
             primaryStage.setScene(scene);
             primaryStage.setMinWidth(1000);
             primaryStage.setMinHeight(700);

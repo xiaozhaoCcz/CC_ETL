@@ -1,6 +1,7 @@
 package com.cc.job.gui.view;
 
 import com.cc.job.gui.service.LoginService;
+import com.cc.job.gui.util.ConfigManager;
 import com.cc.job.gui.util.StyleUtil;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -23,6 +24,7 @@ public class LoginView extends StackPane {
     
     private TextField usernameField;
     private PasswordField passwordField;
+    private TextField serverUrlField;
     private Button loginButton;
     private Button registerButton;
     private Label errorLabel;
@@ -30,9 +32,11 @@ public class LoginView extends StackPane {
     private Consumer<LoginService.LoginResult> onLoginSuccess;
     private Runnable onRegister;
     private final LoginService loginService;
+    private final ConfigManager configManager;
     
     public LoginView() {
         this.loginService = new LoginService();
+        this.configManager = ConfigManager.getInstance();
         initializeUI();
     }
     
@@ -295,7 +299,60 @@ public class LoginView extends StackPane {
         
         passwordBox.getChildren().addAll(passwordLabel, passwordField);
         
-        form.getChildren().addAll(usernameBox, passwordBox);
+        // 后台地址输入框
+        VBox serverUrlBox = new VBox(8);
+        Label serverUrlLabel = new Label("后台地址");
+        serverUrlLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
+        serverUrlLabel.setTextFill(Color.web("#374151"));
+        
+        serverUrlField = new TextField();
+        serverUrlField.setPromptText("请输入后台地址，如: http://localhost:8989");
+        serverUrlField.setPrefHeight(44);
+        // 加载保存的配置
+        String savedUrl = configManager.getBaseUrl();
+        serverUrlField.setText(savedUrl != null ? savedUrl : "http://localhost:8989");
+        serverUrlField.setStyle(
+            "-fx-background-color: #F9FAFB; " +
+            "-fx-border-color: #E5E7EB; " +
+            "-fx-border-width: 1; " +
+            "-fx-border-radius: 8; " +
+            "-fx-background-radius: 8; " +
+            "-fx-padding: 12 16; " +
+            "-fx-font-size: 14px; " +
+            "-fx-text-fill: #111827;"
+        );
+        
+        // 聚焦时的样式
+        serverUrlField.focusedProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal) {
+                serverUrlField.setStyle(
+                    "-fx-background-color: white; " +
+                    "-fx-border-color: #667EEA; " +
+                    "-fx-border-width: 2; " +
+                    "-fx-border-radius: 8; " +
+                    "-fx-background-radius: 8; " +
+                    "-fx-padding: 12 16; " +
+                    "-fx-font-size: 14px; " +
+                    "-fx-text-fill: #111827; " +
+                    "-fx-effect: dropshadow(gaussian, rgba(102, 126, 234, 0.25), 8, 0, 0, 0);"
+                );
+            } else {
+                serverUrlField.setStyle(
+                    "-fx-background-color: #F9FAFB; " +
+                    "-fx-border-color: #E5E7EB; " +
+                    "-fx-border-width: 1; " +
+                    "-fx-border-radius: 8; " +
+                    "-fx-background-radius: 8; " +
+                    "-fx-padding: 12 16; " +
+                    "-fx-font-size: 14px; " +
+                    "-fx-text-fill: #111827;"
+                );
+            }
+        });
+        
+        serverUrlBox.getChildren().addAll(serverUrlLabel, serverUrlField);
+        
+        form.getChildren().addAll(usernameBox, passwordBox, serverUrlBox);
         
         return form;
     }
@@ -368,6 +425,7 @@ public class LoginView extends StackPane {
     private void handleLogin() {
         String username = usernameField.getText().trim();
         String password = passwordField.getText();
+        String serverUrl = serverUrlField.getText().trim();
         
         // 验证输入
         if (username.isEmpty()) {
@@ -382,6 +440,22 @@ public class LoginView extends StackPane {
             return;
         }
         
+        if (serverUrl.isEmpty()) {
+            showError("请输入后台地址");
+            serverUrlField.requestFocus();
+            return;
+        }
+        
+        // 验证URL格式
+        if (!serverUrl.startsWith("http://") && !serverUrl.startsWith("https://")) {
+            showError("后台地址格式错误，应以 http:// 或 https:// 开头");
+            serverUrlField.requestFocus();
+            return;
+        }
+        
+        // 保存后台地址配置
+        configManager.setBaseUrl(serverUrl);
+        
         // 显示加载状态
         setLoading(true);
         hideError();
@@ -389,7 +463,8 @@ public class LoginView extends StackPane {
         // 异步执行登录
         new Thread(() -> {
             try {
-                LoginService.LoginResult result = loginService.login(username, password);
+                // 使用新的后台地址登录
+                LoginService.LoginResult result = loginService.login(username, password, serverUrl);
                 
                 Platform.runLater(() -> {
                     setLoading(false);
@@ -441,6 +516,7 @@ public class LoginView extends StackPane {
         loginButton.setDisable(loading);
         usernameField.setDisable(loading);
         passwordField.setDisable(loading);
+        serverUrlField.setDisable(loading);
         
         if (loading) {
             loginButton.setText("登录中...");

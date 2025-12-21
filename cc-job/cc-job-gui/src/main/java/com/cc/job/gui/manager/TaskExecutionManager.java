@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 任务执行管理器 - 负责任务的执行、停止、日志获取等
@@ -318,7 +319,7 @@ public class TaskExecutionManager {
     
     private void ensurePredictedTimeCache() {
         if (predictedNodeTimes == null) {
-            predictedNodeTimes = new java.util.concurrent.ConcurrentHashMap<>();
+            predictedNodeTimes = new ConcurrentHashMap<>();
         }
     }
     

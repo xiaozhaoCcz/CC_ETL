@@ -24,6 +24,7 @@ public class DialogManager {
     
     private final Stage ownerStage;
     private final LogPanel logPanel;
+    private TaskExecutionManager taskExecutionManager;
     
     private final JobInfoService jobInfoService;
     private final JobGroupService jobGroupService;
@@ -35,6 +36,13 @@ public class DialogManager {
         this.jobInfoService = new JobInfoService();
         this.jobGroupService = new JobGroupService();
         this.jobPartService = new JobPartService();
+    }
+    
+    /**
+     * 设置任务执行管理器（用于获取预测时间）
+     */
+    public void setTaskExecutionManager(TaskExecutionManager taskExecutionManager) {
+        this.taskExecutionManager = taskExecutionManager;
     }
     
     /**
@@ -249,7 +257,7 @@ public class DialogManager {
      * @param nodeId 节点ID
      */
     public void showNodeDetailsDialog(Long jobId, Long taskGroupId, String nodeName, String nodeId) {
-        NodeDetailsDialog dialog = new NodeDetailsDialog(ownerStage, jobId, taskGroupId, nodeName, nodeId);
+        NodeDetailsDialog dialog = new NodeDetailsDialog(ownerStage, jobId, taskGroupId, nodeName, nodeId, taskExecutionManager);
         dialog.show();
     }
 }

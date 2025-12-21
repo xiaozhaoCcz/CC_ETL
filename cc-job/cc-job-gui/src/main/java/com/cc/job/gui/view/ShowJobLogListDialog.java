@@ -30,13 +30,15 @@ import org.fxmisc.richtext.CodeArea;
 import org.fxmisc.richtext.LineNumberFactory;
 import org.fxmisc.richtext.model.StyleSpans;
 import org.fxmisc.richtext.model.StyleSpansBuilder;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import javafx.scene.layout.FlowPane;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -66,8 +68,16 @@ public class ShowJobLogListDialog extends Dialog<Void> {
     private int pageNum = 1;
     private int pageSize = 10;
     private long total = 0;
+    
+    // 任务ID，用于过滤特定任务的日志
+    private Long jobId;
 
     public ShowJobLogListDialog(Stage ownerStage) {
+        this(ownerStage, null);
+    }
+    
+    public ShowJobLogListDialog(Stage ownerStage, Long jobId) {
+        this.jobId = jobId;
         setTitle("任务日志");
         initOwner(ownerStage);
         initModality(Modality.WINDOW_MODAL);
@@ -305,6 +315,43 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         handleCodeCol.setCellValueFactory(c -> new javafx.beans.property.SimpleStringProperty(
                 mapHandleCode(c.getValue().getHandleCode())));
 
+        // 节点状态列（只有任务组任务才显示）
+        TableColumn<JobLogVO, String> nodeStatusCol = new TableColumn<>("节点状态");
+        nodeStatusCol.setCellValueFactory(c -> {
+            JobLogVO item = c.getValue();
+            // 只有任务组任务（jobType == 2）且有 nodeStatus 时才显示
+            if (item.getJobType() != null && item.getJobType() == 2 
+                    && item.getNodeStatus() != null && !item.getNodeStatus().trim().isEmpty()) {
+                return new javafx.beans.property.SimpleStringProperty("查看");
+            }
+            return new javafx.beans.property.SimpleStringProperty("");
+        });
+        nodeStatusCol.setCellFactory(col -> new TableCell<>() {
+            private final Hyperlink viewLink = new Hyperlink("查看");
+            {
+                viewLink.setStyle("-fx-text-fill: " + StyleUtil.PRIMARY + ";");
+                viewLink.setOnAction(e -> {
+                    JobLogVO item = getTableView().getItems().get(getIndex());
+                    if (item != null) {
+                        handleViewNodeStatus(item);
+                    }
+                });
+            }
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null || item.isEmpty()) {
+                    setGraphic(null);
+                    setText(empty ? null : "");
+                } else {
+                    setGraphic(viewLink);
+                    setText(null);
+                }
+            }
+        });
+        nodeStatusCol.setPrefWidth(100);
+        nodeStatusCol.setMinWidth(100);
+
         // 操作列
         TableColumn<JobLogVO, Void> actionCol = new TableColumn<>("操作");
         actionCol.setCellFactory(col -> new TableCell<>() {
@@ -332,7 +379,7 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         actionCol.setMinWidth(100);
 
         tableView.getColumns().addAll(idxCol, jobIdCol, jobDescCol, triggerTimeCol, 
-                triggerCodeCol, triggerMsgCol, handleTimeCol, handleCodeCol, actionCol);
+                triggerCodeCol, triggerMsgCol, handleTimeCol, handleCodeCol, nodeStatusCol, actionCol);
 
         return tableView;
     }
@@ -417,6 +464,11 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         JobLogQuery query = new JobLogQuery();
         query.setPageNum(pageNum);
         query.setPageSize(pageSize);
+        
+        // 如果指定了任务ID，则只查询该任务的日志
+        if (jobId != null) {
+            query.setJobId(jobId);
+        }
         
         JobGroup selectedGroup = jobGroupCombo.getSelectionModel().getSelectedItem();
         if (selectedGroup != null) {
@@ -518,6 +570,167 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         
         // 显示执行日志对话框
         showExecutionLogDialog(item);
+    }
+
+    private void handleViewNodeStatus(JobLogVO item) {
+        if (item == null) return;
+        
+        String nodeStatusJson = item.getNodeStatus();
+        if (nodeStatusJson == null || nodeStatusJson.trim().isEmpty()) {
+            showInfo("暂无节点状态记录");
+            return;
+        }
+        
+        // 显示节点状态对话框
+        showNodeStatusDialog(item, nodeStatusJson);
+    }
+
+    private void showNodeStatusDialog(JobLogVO item, String nodeStatusJson) {
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("节点执行状态");
+        dialog.initOwner(getDialogPane().getScene().getWindow());
+        dialog.initModality(Modality.WINDOW_MODAL);
+
+        VBox content = new VBox(15);
+        content.setPadding(new Insets(20));
+        content.setPrefWidth(900);
+        content.setPrefHeight(600);
+
+        // 标题信息
+        Label titleLabel = new Label("任务组: " + safe(item.getJobDesc()));
+        titleLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #374151;");
+        
+        Label timeLabel = new Label("执行时间: " + safe(item.getHandleTime()));
+        timeLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #6B7280;");
+
+        // 节点状态网格
+        FlowPane nodeStatusGrid = createNodeStatusGrid(nodeStatusJson);
+
+        ScrollPane scrollPane = new ScrollPane(nodeStatusGrid);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setFitToHeight(true);
+        scrollPane.setPrefHeight(500);
+        scrollPane.setStyle("-fx-background-color: #F9FAFB;");
+
+        content.getChildren().addAll(titleLabel, timeLabel, scrollPane);
+
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        dialog.showAndWait();
+    }
+
+    /**
+     * 创建节点状态网格
+     */
+    private FlowPane createNodeStatusGrid(String nodeStatusJson) {
+        FlowPane grid = new FlowPane(12, 12);
+        grid.setPrefWrapLength(850);
+        grid.setPadding(new Insets(10));
+        
+        if (nodeStatusJson == null || nodeStatusJson.trim().isEmpty()) {
+            Label emptyLabel = new Label("暂无节点状态记录");
+            emptyLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #9CA3AF;");
+            grid.getChildren().add(emptyLabel);
+            return grid;
+        }
+        
+        try {
+            JsonObject nodeStatusObj = JsonParser.parseString(nodeStatusJson).getAsJsonObject();
+            
+            for (Map.Entry<String, com.google.gson.JsonElement> entry : nodeStatusObj.entrySet()) {
+                String nodeId = entry.getKey();
+                JsonObject nodeInfo = entry.getValue().getAsJsonObject();
+                
+                String nodeName = nodeInfo.has("jobDesc") ? 
+                    nodeInfo.get("jobDesc").getAsString() : ("节点 " + nodeId);
+                int status = nodeInfo.has("status") ? 
+                    nodeInfo.get("status").getAsInt() : -1;
+                
+                VBox nodeCard = createNodeCard(nodeName, status);
+                grid.getChildren().add(nodeCard);
+            }
+        } catch (Exception e) {
+            logger.error("解析节点状态JSON失败", e);
+            Label errorLabel = new Label("解析节点状态失败: " + e.getMessage());
+            errorLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #EF4444;");
+            grid.getChildren().add(errorLabel);
+        }
+        
+        return grid;
+    }
+    
+    /**
+     * 创建单个节点卡片
+     */
+    private VBox createNodeCard(String nodeName, int status) {
+        VBox nodeCard = new VBox(8);
+        nodeCard.setPadding(new Insets(12));
+        nodeCard.setPrefWidth(180);
+        nodeCard.setStyle(
+            "-fx-background-color: #F9FAFB; " +
+            "-fx-border-color: #E5E7EB; " +
+            "-fx-border-width: 1; " +
+            "-fx-border-radius: 6; " +
+            "-fx-background-radius: 6;"
+        );
+        
+        Label nameLabel = new Label(nodeName);
+        nameLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: 500; -fx-text-fill: #374151;");
+        nameLabel.setWrapText(true);
+        
+        Label statusLabel = createStatusLabel(status);
+        
+        nodeCard.getChildren().addAll(nameLabel, statusLabel);
+        return nodeCard;
+    }
+    
+    /**
+     * 创建状态标签
+     */
+    private Label createStatusLabel(int status) {
+        Label label = new Label();
+        if (status == 1) {
+            label.setText("成功");
+            label.setStyle(
+                "-fx-background-color: #D1FAE5; " +
+                "-fx-text-fill: #065F46; " +
+                "-fx-padding: 4 12 4 12; " +
+                "-fx-background-radius: 4; " +
+                "-fx-font-size: 12px; " +
+                "-fx-font-weight: 600;"
+            );
+        } else if (status == 0) {
+            label.setText("失败");
+            label.setStyle(
+                "-fx-background-color: #FEE2E2; " +
+                "-fx-text-fill: #991B1B; " +
+                "-fx-padding: 4 12 4 12; " +
+                "-fx-background-radius: 4; " +
+                "-fx-font-size: 12px; " +
+                "-fx-font-weight: 600;"
+            );
+        } else if (status == 2) {
+            label.setText("运行中");
+            label.setStyle(
+                "-fx-background-color: #DBEAFE; " +
+                "-fx-text-fill: #1E40AF; " +
+                "-fx-padding: 4 12 4 12; " +
+                "-fx-background-radius: 4; " +
+                "-fx-font-size: 12px; " +
+                "-fx-font-weight: 600;"
+            );
+        } else {
+            label.setText("未知");
+            label.setStyle(
+                "-fx-background-color: #F3F4F6; " +
+                "-fx-text-fill: #6B7280; " +
+                "-fx-padding: 4 12 4 12; " +
+                "-fx-background-radius: 4; " +
+                "-fx-font-size: 12px; " +
+                "-fx-font-weight: 600;"
+            );
+        }
+        return label;
     }
 
     /**

@@ -33,4 +33,14 @@ public interface JobLogService extends IService<JobLog> {
     boolean deleteJobLogs(JobLogQuery queryParams);
 
     ReturnT<LogResult> getLogDetailCat(Long logId, int fromLineNum);
+    
+    /**
+     * 保存节点执行状态到 job_log 表
+     * 
+     * @param taskGroupId 任务组ID
+     * @param executionBatchId 执行批次ID（即 executorParam）
+     * @param nodeStatusJson 节点状态JSON字符串
+     * @return 是否保存成功
+     */
+    boolean saveNodeStatus(Long taskGroupId, String executionBatchId, String nodeStatusJson);
 }

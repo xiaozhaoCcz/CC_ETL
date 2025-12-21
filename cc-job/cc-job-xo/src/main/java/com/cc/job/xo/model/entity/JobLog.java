@@ -81,6 +81,13 @@ public class JobLog {
      * 告警状态：0-默认、1-无需告警、2-告警成功、3-告警失败
      */
     private Integer alarmStatus;
+    
+    /**
+     * 节点执行状态（JSON格式）
+     * 格式：{"nodeId1": {"status": 1, "jobId": 123, "jobDesc": "节点名称"}, "nodeId2": {...}}
+     * status: 0-失败, 1-成功, 2-运行中
+     */
+    private String nodeStatus;
 
     @TableLogic
     private Integer isDeleted;

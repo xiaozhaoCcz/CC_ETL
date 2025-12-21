@@ -163,6 +163,9 @@ public class MainView extends BorderPane {
         dataManager = new DataManager(canvas, logPanel, treeView);
         nodeCallbackConfigurator = new NodeCallbackConfigurator(nodeOperationManager, canvas, logPanel);
         
+        // 重要：设置对话框管理器的任务执行管理器（用于获取预测时间）
+        dialogManager.setTaskExecutionManager(taskExecutionManager);
+        
         // 重要：设置节点操作管理器的回调配置器（用于新增节点时自动配置回调）
         nodeOperationManager.setNodeCallbackConfigurator(nodeCallbackConfigurator);
         
@@ -237,6 +240,17 @@ public class MainView extends BorderPane {
             @Override
             public void onZoomFit() {
                 zoomCanvas(1.0);
+            }
+
+            @Override
+            public void onNodeHistory() {
+                Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
+                if (currentTaskGroupId == null) {
+                    logPanel.warn("⚠ 请先选择一个任务组");
+                    return;
+                }
+                String taskGroupName = getJobNameById(currentTaskGroupId);
+                showNodeHistoryDialog(currentTaskGroupId, taskGroupName != null ? taskGroupName : "任务组" + currentTaskGroupId);
             }
 
             @Override
@@ -1139,6 +1153,23 @@ public class MainView extends BorderPane {
                 });
             }
         }, "import-partition").start();
+    }
+    
+    /**
+     * 显示节点历史对话框
+     */
+    private void showNodeHistoryDialog(Long taskGroupId, String taskGroupName) {
+        Stage dialog = new Stage();
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        dialog.setTitle("节点执行历史 - " + taskGroupName);
+        
+        NodeHistoryView historyView = new NodeHistoryView(taskGroupId, taskGroupName);
+        
+        Scene scene = new Scene(historyView, 1000, 600);
+        dialog.setScene(scene);
+        dialog.show();
+        
+        logPanel.info("✓ 打开节点历史页面: " + taskGroupName);
     }
 
     // 页面状态管理辅助类
