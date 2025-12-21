@@ -4,12 +4,14 @@ import javafx.animation.*;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
+import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.util.Duration;
@@ -28,6 +30,7 @@ public class NotificationToast {
     
     // 提示框类型
     public enum NotificationType {
+        SUCCESS,    // 成功
         WARNING,    // 警告
         ERROR       // 错误
     }
@@ -66,8 +69,8 @@ public class NotificationToast {
                 stage.setResizable(false);
                 
                 // 获取屏幕尺寸并居中显示
-                javafx.stage.Screen screen = javafx.stage.Screen.getPrimary();
-                javafx.geometry.Rectangle2D bounds = screen.getVisualBounds();
+                Screen screen = Screen.getPrimary();
+                Rectangle2D bounds = screen.getVisualBounds();
                 double screenWidth = bounds.getWidth();
                 double screenHeight = bounds.getHeight();
                 
@@ -86,6 +89,13 @@ public class NotificationToast {
                 String titleText;
                 
                 switch (type) {
+                    case SUCCESS:
+                        headerBgColor = "#E6FFFA";
+                        borderColor = "#34D399";
+                        iconText = "✓";
+                        iconColor = "#10B981";
+                        titleText = "成功";
+                        break;
                     case WARNING:
                         headerBgColor = "#EFF6FF";
                         borderColor = "#3B82F6";
@@ -318,4 +328,7 @@ public class NotificationToast {
     public static void showError(String message) {
         show(message, NotificationType.ERROR);
     }
+
+
+    public static void showSuccess(String message){show(message, NotificationType.SUCCESS);}
 }

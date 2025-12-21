@@ -16,11 +16,15 @@ import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.transform.Scale;
+import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.*;
 import java.util.Set;
 
@@ -152,15 +156,12 @@ public class MainView extends BorderPane {
     
     private void initializeManagers() {
         Stage ownerStage = (Stage) this.getScene().getWindow();
-        
+
+        dialogManager = new DialogManager(ownerStage, logPanel);
         taskExecutionManager = new TaskExecutionManager(canvas, logPanel, navigationBar, toolBar);
         nodeOperationManager = new NodeOperationManager(canvas, logPanel, treeView, ownerStage);
-        dialogManager = new DialogManager(ownerStage, logPanel);
         dataManager = new DataManager(canvas, logPanel, treeView);
         nodeCallbackConfigurator = new NodeCallbackConfigurator(nodeOperationManager, canvas, logPanel);
-        
-        // 重要：设置数据管理器的对话框管理器（用于显示消息弹出框）
-        dataManager.setDialogManager(dialogManager);
         
         // 重要：设置节点操作管理器的回调配置器（用于新增节点时自动配置回调）
         nodeOperationManager.setNodeCallbackConfigurator(nodeCallbackConfigurator);
@@ -199,7 +200,7 @@ public class MainView extends BorderPane {
             @Override
             public void onOpen() {
                 // 导入分区文件
-                logPanel.info("📂 打开文件功能");
+                importPartitionFile();
             }
 
             @Override
@@ -358,9 +359,29 @@ public class MainView extends BorderPane {
         });
 
         navigationBar.setOnTaskClose((taskGroupId, taskGroupName) -> {
-            if (taskGroupId != null && taskGroupId.equals(pageStoreHelper.getCurrentTaskGroupId())) {
+            Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
+            
+            // 如果关闭的是当前显示的任务组，需要清空画布
+            if (taskGroupId != null && taskGroupId.equals(currentTaskGroupId)) {
                 treeView.clearSelection();
+                // 清空画布
+                canvas.clear();
+                // 清空当前页面状态
+                pageStoreHelper.setCurrentPage(null);
+                toolBar.setCurrentTaskGroupId(null);
+                logPanel.info("📋 已关闭任务组: " + taskGroupName);
             }
+            
+            // 检查是否所有标签页都已关闭
+            Long remainingTaskGroupId = navigationBar.getCurrentTaskGroupId();
+            if (remainingTaskGroupId == null) {
+                // 所有标签页都已关闭，确保画布是空的
+                canvas.clear();
+                pageStoreHelper.setCurrentPage(null);
+                toolBar.setCurrentTaskGroupId(null);
+                logPanel.info("📋 所有任务组已关闭");
+            }
+            
             taskGroupNameToIdMap.remove(taskGroupName);
         });
 
@@ -492,17 +513,165 @@ public class MainView extends BorderPane {
                 if (action == TaskTreeView.TaskSelectionCallback.JobNodeAction.EDIT) {
                     ProcessNode targetNode = canvas.getNodeByJobId(jobId);
                     nodeOperationManager.editNode(jobId, targetNode, taskGroupId);
+                } else if (action == TaskTreeView.TaskSelectionCallback.JobNodeAction.LOCATE) {
+                    // 定位节点：先检查是否需要切换任务组
+                    locateNodeWithTaskGroupSwitch(jobId, nodeName, taskGroupId);
+                }
+            }
+            
+            /**
+             * 定位节点，如果需要则先切换到对应的任务组
+             */
+            private void locateNodeWithTaskGroupSwitch(Long jobId, String nodeName, Long targetTaskGroupId) {
+                Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
+                
+                // 如果目标任务组ID为空，尝试从当前画布查找节点
+                if (targetTaskGroupId == null) {
+                    ProcessNode targetNode = canvas.getNodeByJobId(jobId);
+                    if (targetNode != null) {
+                        // 节点在当前画布中，直接定位
+                        canvas.locateNode(targetNode);
+                        logPanel.info("📍 已定位到节点: " + nodeName);
+                        return;
+                    } else {
+                        // 节点不在当前画布中，无法定位
+                        logPanel.warn("⚠ 未找到节点: " + nodeName + "，请先打开对应的任务组");
+                        return;
+                    }
+                }
+                
+                // 检查是否需要切换任务组
+                if (currentTaskGroupId == null || !currentTaskGroupId.equals(targetTaskGroupId)) {
+                    // 需要切换任务组
+                    logPanel.info("🔄 切换到任务组: " + targetTaskGroupId);
+                    
+                    // 获取任务组名称
+                    String taskGroupName = getJobNameById(targetTaskGroupId);
+                    if (taskGroupName == null) {
+                        taskGroupName = "任务组 " + targetTaskGroupId;
+                    }
+                    
+                    // 切换到目标任务组
+                    taskGroupNameToIdMap.put(taskGroupName, targetTaskGroupId);
+                    pageStoreHelper.setCurrentPage(targetTaskGroupId);
+                    navigationBar.addOrSelectTask(taskGroupName, targetTaskGroupId);
+                    toolBar.setCurrentTaskGroupId(targetTaskGroupId);
+                    
+                    // 加载任务组数据，加载完成后定位节点
+                    dataManager.loadTaskGroupData(targetTaskGroupId, taskGroupName);
+                    
+                    // 延迟定位节点（等待数据加载完成）
+                    Platform.runLater(() -> {
+                        javafx.animation.PauseTransition delay = new javafx.animation.PauseTransition(javafx.util.Duration.millis(500));
+                        delay.setOnFinished(e -> {
+                            ProcessNode targetNode = canvas.getNodeByJobId(jobId);
+                            if (targetNode != null) {
+                                canvas.locateNode(targetNode);
+                                logPanel.info("📍 已定位到节点: " + nodeName);
+                            } else {
+                                logPanel.warn("⚠ 节点加载后仍未找到: " + nodeName);
+                            }
+                        });
+                        delay.play();
+                    });
+                } else {
+                    // 当前任务组已匹配，直接定位
+                    ProcessNode targetNode = canvas.getNodeByJobId(jobId);
+                    if (targetNode != null) {
+                        canvas.locateNode(targetNode);
+                        logPanel.info("📍 已定位到节点: " + nodeName);
+                    } else {
+                        logPanel.warn("⚠ 未找到节点: " + nodeName);
+                    }
                 }
             }
 
             @Override
-            public void onEdgeAction(Long edgeId, TaskTreeView.TaskSelectionCallback.EdgeAction action) {}
+            public void onEdgeAction(Long edgeId, TaskTreeView.TaskSelectionCallback.EdgeAction action) {
+                if (action == TaskTreeView.TaskSelectionCallback.EdgeAction.LOCATE) {
+                    // 定位连接线
+                    if (canvas.locateConnectionByEdgeId(edgeId != null ? edgeId.toString() : null)) {
+                        logPanel.info("📍 已定位到连接线");
+                    } else {
+                        logPanel.warn("⚠ 未找到连接线");
+                    }
+                }
+            }
 
             @Override
-            public void onEdgeAction(Long edgeId, Long taskGroupId, TaskTreeView.TaskSelectionCallback.EdgeAction action) {}
+            public void onEdgeAction(Long edgeId, Long taskGroupId, TaskTreeView.TaskSelectionCallback.EdgeAction action) {
+                if (action == TaskTreeView.TaskSelectionCallback.EdgeAction.LOCATE) {
+                    // 定位连接线：先检查是否需要切换任务组
+                    locateEdgeWithTaskGroupSwitch(edgeId, taskGroupId);
+                }
+            }
+            
+            /**
+             * 定位连接线，如果需要则先切换到对应的任务组
+             */
+            private void locateEdgeWithTaskGroupSwitch(Long edgeId, Long targetTaskGroupId) {
+                Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
+                
+                // 如果目标任务组ID为空，尝试在当前画布中查找连接线
+                if (targetTaskGroupId == null) {
+                    if (canvas.locateConnectionByEdgeId(edgeId != null ? edgeId.toString() : null)) {
+                        logPanel.info("📍 已定位到连接线");
+                        return;
+                    } else {
+                        logPanel.warn("⚠ 未找到连接线，请先打开对应的任务组");
+                        return;
+                    }
+                }
+                
+                // 检查是否需要切换任务组
+                if (currentTaskGroupId == null || !currentTaskGroupId.equals(targetTaskGroupId)) {
+                    // 需要切换任务组
+                    logPanel.info("🔄 切换到任务组: " + targetTaskGroupId);
+                    
+                    // 获取任务组名称
+                    String taskGroupName = getJobNameById(targetTaskGroupId);
+                    if (taskGroupName == null) {
+                        taskGroupName = "任务组 " + targetTaskGroupId;
+                    }
+                    
+                    // 切换到目标任务组
+                    taskGroupNameToIdMap.put(taskGroupName, targetTaskGroupId);
+                    pageStoreHelper.setCurrentPage(targetTaskGroupId);
+                    navigationBar.addOrSelectTask(taskGroupName, targetTaskGroupId);
+                    toolBar.setCurrentTaskGroupId(targetTaskGroupId);
+                    
+                    // 加载任务组数据，加载完成后定位连接线
+                    dataManager.loadTaskGroupData(targetTaskGroupId, taskGroupName);
+                    
+                    // 延迟定位连接线（等待数据加载完成）
+                    Platform.runLater(() -> {
+                        javafx.animation.PauseTransition delay = new javafx.animation.PauseTransition(javafx.util.Duration.millis(500));
+                        delay.setOnFinished(e -> {
+                            if (canvas.locateConnectionByEdgeId(edgeId != null ? edgeId.toString() : null)) {
+                                logPanel.info("📍 已定位到连接线");
+                            } else {
+                                logPanel.warn("⚠ 连接线加载后仍未找到");
+                            }
+                        });
+                        delay.play();
+                    });
+                } else {
+                    // 当前任务组已匹配，直接定位
+                    if (canvas.locateConnectionByEdgeId(edgeId != null ? edgeId.toString() : null)) {
+                        logPanel.info("📍 已定位到连接线");
+                    } else {
+                        logPanel.warn("⚠ 未找到连接线");
+                    }
+                }
+            }
 
             @Override
-            public void onPartitionAction(Long partitionId, String partitionName, TaskTreeView.TaskSelectionCallback.PartitionAction action) {}
+            public void onPartitionAction(Long partitionId, String partitionName, TaskTreeView.TaskSelectionCallback.PartitionAction action) {
+                if (action == TaskTreeView.TaskSelectionCallback.PartitionAction.EXPORT) {
+                    // 导出分区数据
+                    exportPartitionData(partitionId, partitionName);
+                }
+            }
 
             @Override
             public void onJobGroupEdit(Long taskGroupId, String taskGroupName) {
@@ -874,6 +1043,102 @@ public class MainView extends BorderPane {
 
     public void cleanup() {
         taskExecutionManager.cleanup();
+    }
+    
+    /**
+     * 导出分区数据
+     * @param partitionId 分区ID
+     * @param partitionName 分区名称
+     */
+    private void exportPartitionData(Long partitionId, String partitionName) {
+        if (partitionId == null) {
+            logPanel.warn("⚠ 分区ID无效");
+            return;
+        }
+        
+        Stage ownerStage = (Stage) this.getScene().getWindow();
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("导出分区数据");
+        fileChooser.setInitialFileName(partitionName != null ? partitionName + ".ce" : "partition_" + partitionId + ".ce");
+        
+        // 设置文件过滤器
+        FileChooser.ExtensionFilter extFilter = new FileChooser.ExtensionFilter("CE文件 (*.ce)", "*.ce");
+        fileChooser.getExtensionFilters().add(extFilter);
+        
+        File file = fileChooser.showSaveDialog(ownerStage);
+        if (file == null) {
+            return; // 用户取消了保存
+        }
+        
+        logPanel.info("📤 开始导出分区数据: " + partitionName);
+        
+        new Thread(() -> {
+            try {
+                JobPartService jobPartService = new JobPartService();
+                byte[] data = jobPartService.exportData(partitionId);
+                
+                // 保存文件
+                try (FileOutputStream fos = new FileOutputStream(file)) {
+                    fos.write(data);
+                    fos.flush();
+                }
+                
+                Platform.runLater(() -> {
+                    NotificationToast.showSuccess("分区数据已导出到: " + file.getAbsolutePath());
+                });
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    NotificationToast.showError("导出分区数据时发生错误: " + e.getMessage());
+                });
+            }
+        }, "export-partition").start();
+    }
+    
+    /**
+     * 导入分区文件
+     */
+    private void importPartitionFile() {
+        Stage ownerStage = (Stage) this.getScene().getWindow();
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("导入分区数据");
+        
+        // 设置文件过滤器
+        FileChooser.ExtensionFilter extFilter = new FileChooser.ExtensionFilter("CE文件 (*.ce)", "*.ce");
+        fileChooser.getExtensionFilters().add(extFilter);
+        
+        File file = fileChooser.showOpenDialog(ownerStage);
+        if (file == null) {
+            return; // 用户取消了选择
+        }
+        
+        if (!file.exists() || !file.isFile()) {
+            NotificationToast.showError("选择的文件不存在或无效");
+            return;
+        }
+        
+        logPanel.info("📥 开始导入分区数据: " + file.getName());
+        
+        new Thread(() -> {
+            try {
+                JobPartService jobPartService = new JobPartService();
+                boolean success = jobPartService.importData(file);
+                
+                Platform.runLater(() -> {
+                    if (success) {
+                        NotificationToast.showSuccess("分区数据已成功导入");
+                        // 刷新树形视图
+                        dataManager.refreshTreeView();
+                    } else {
+                        NotificationToast.showError("导入分区数据失败，请检查文件格式是否正确");
+                    }
+                });
+            } catch (Exception e) {
+                logger.error("导入分区数据失败", e);
+                Platform.runLater(() -> {
+                    NotificationToast.showError("导入分区数据时发生错误: " + e.getMessage());
+                });
+            }
+        }, "import-partition").start();
     }
 
     // 页面状态管理辅助类

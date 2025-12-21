@@ -394,5 +394,25 @@ public class JobInfoService extends BaseService {
     public boolean updateJobInfo(Long id, JobInfoForm formData) throws IOException {
         return httpClient.putForBoolean("/api/v1/jobInfos/" + id, formData);
     }
+    
+    /**
+     * 根据jobId查询节点所属的任务组ID
+     * @param jobId 任务ID
+     * @return 任务组ID，如果不存在则返回null
+     * @throws IOException 网络异常
+     */
+    public Long getTaskGroupIdByJobId(Long jobId) throws IOException {
+        if (jobId == null) {
+            return null;
+        }
+        
+        // 查询JobNode表，获取jobParentId
+        String path = "/api/v1/jobInfos/getTaskGroupIdByJobId/" + jobId;
+        Result<Long> result = httpClient.get(path, Long.class);
+        if (Result.isSuccess(result) && result.getData() != null) {
+            return result.getData();
+        }
+        return null;
+    }
 }
 

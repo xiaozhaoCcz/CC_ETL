@@ -4,6 +4,7 @@ import com.cc.job.gui.model.*;
 import com.cc.job.gui.service.*;
 import com.cc.job.gui.util.ApiUtil;
 import com.cc.job.gui.util.NodeStatusSyncManager;
+import com.cc.job.gui.util.NotificationToast;
 import com.cc.job.gui.view.*;
 import com.cc.job.xo.model.form.JobInfoForm;
 import javafx.application.Platform;
@@ -29,7 +30,6 @@ public class DataManager {
     private final ApiUtil apiUtil;
     
     private Runnable onDataLoadedCallback;
-    private DialogManager dialogManager;
     
     public DataManager(NodeCanvas canvas, LogPanel logPanel, TaskTreeView treeView) {
         this.canvas = canvas;
@@ -39,13 +39,7 @@ public class DataManager {
         this.jobInfoService = new JobInfoService();
         this.apiUtil = ApiUtil.getInstance();
     }
-    
-    /**
-     * 设置对话框管理器（用于显示消息弹出框）
-     */
-    public void setDialogManager(DialogManager dialogManager) {
-        this.dialogManager = dialogManager;
-    }
+
     
     /**
      * 设置数据加载完成后的回调
@@ -108,9 +102,7 @@ public class DataManager {
         logPanel.info("💾 开始保存任务组数据...");
         
         if (currentTaskGroupId == null || currentTaskGroupId == 0) {
-            if (dialogManager != null) {
-                dialogManager.showWarningAlert("未选择任务组", "请先选择一个任务组后再进行保存操作。");
-            }
+            NotificationToast.showWarning("请先选择一个任务组后再进行保存操作。");
             return;
         }
         

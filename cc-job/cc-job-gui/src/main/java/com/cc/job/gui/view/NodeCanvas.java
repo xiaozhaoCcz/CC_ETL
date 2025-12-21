@@ -1002,6 +1002,69 @@ public class NodeCanvas extends Pane {
     
     // ==================== 定位操作 ====================
     
+    /**
+     * 定位节点到视图中心并播放定位动画
+     * @param node 要定位的节点
+     * @return 是否成功定位
+     */
+    public boolean locateNode(ProcessNode node) {
+        if (node == null || hostingScrollPane == null) return false;
+        
+        // 播放定位动画
+        node.playLocateAnimation();
+        
+        // 滚动到节点位置（居中显示）
+        scrollToNode(node);
+        
+        return true;
+    }
+    
+    /**
+     * 定位节点到视图中心
+     * @param node 要定位的节点
+     */
+    public void scrollToNode(ProcessNode node) {
+        if (node == null || hostingScrollPane == null) return;
+        
+        double nodeX = node.getLayoutX();
+        double nodeY = node.getLayoutY();
+        double nodeWidth = node.getWidth() > 0 ? node.getWidth() : node.getPrefWidth();
+        double nodeHeight = node.getHeight() > 0 ? node.getHeight() : node.getPrefHeight();
+        
+        if (nodeWidth <= 0 || nodeHeight <= 0) return;
+        
+        // 节点中心点
+        double nodeCenterX = nodeX + nodeWidth / 2;
+        double nodeCenterY = nodeY + nodeHeight / 2;
+        
+        double viewportWidth = hostingScrollPane.getViewportBounds().getWidth();
+        double viewportHeight = hostingScrollPane.getViewportBounds().getHeight();
+        
+        double canvasWidth = getPrefWidth();
+        double canvasHeight = getPrefHeight();
+        
+        // 计算滚动值，使节点居中
+        double scrollableWidth = canvasWidth - viewportWidth;
+        double scrollableHeight = canvasHeight - viewportHeight;
+        
+        if (scrollableWidth > 0) {
+            double targetHValue = (nodeCenterX - viewportWidth / 2) / scrollableWidth;
+            targetHValue = Math.max(0, Math.min(1, targetHValue));
+            hostingScrollPane.setHvalue(targetHValue);
+        }
+        
+        if (scrollableHeight > 0) {
+            double targetVValue = (nodeCenterY - viewportHeight / 2) / scrollableHeight;
+            targetVValue = Math.max(0, Math.min(1, targetVValue));
+            hostingScrollPane.setVvalue(targetVValue);
+        }
+    }
+    
+    /**
+     * 定位连接线
+     * @param edgeId 连接线ID
+     * @return 是否成功定位
+     */
     public boolean locateConnectionByEdgeId(String edgeId) {
         if (edgeId == null) return false;
         
@@ -1010,6 +1073,36 @@ public class NodeCanvas extends Pane {
                 connection.toFront();
                 connection.setSelected(true);
                 connection.playLocateAnimation();
+                
+                // 定位到连接线的中心位置
+                ProcessNode sourceNode = connection.getSourceNode();
+                ProcessNode targetNode = connection.getTargetNode();
+                if (sourceNode != null && targetNode != null && hostingScrollPane != null) {
+                    double centerX = (sourceNode.getLayoutX() + targetNode.getLayoutX()) / 2;
+                    double centerY = (sourceNode.getLayoutY() + targetNode.getLayoutY()) / 2;
+                    
+                    // 直接计算滚动位置
+                    double viewportWidth = hostingScrollPane.getViewportBounds().getWidth();
+                    double viewportHeight = hostingScrollPane.getViewportBounds().getHeight();
+                    double canvasWidth = getPrefWidth();
+                    double canvasHeight = getPrefHeight();
+                    
+                    double scrollableWidth = canvasWidth - viewportWidth;
+                    double scrollableHeight = canvasHeight - viewportHeight;
+                    
+                    if (scrollableWidth > 0) {
+                        double targetHValue = (centerX - viewportWidth / 2) / scrollableWidth;
+                        targetHValue = Math.max(0, Math.min(1, targetHValue));
+                        hostingScrollPane.setHvalue(targetHValue);
+                    }
+                    
+                    if (scrollableHeight > 0) {
+                        double targetVValue = (centerY - viewportHeight / 2) / scrollableHeight;
+                        targetVValue = Math.max(0, Math.min(1, targetVValue));
+                        hostingScrollPane.setVvalue(targetVValue);
+                    }
+                }
+                
                 PauseTransition delay = new PauseTransition(Duration.seconds(1.2));
                 delay.setOnFinished(e -> connection.setSelected(false));
                 delay.play();

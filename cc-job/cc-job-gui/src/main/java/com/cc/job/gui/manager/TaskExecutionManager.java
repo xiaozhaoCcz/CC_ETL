@@ -54,7 +54,7 @@ public class TaskExecutionManager {
      */
     public void triggerJobExecution(Long currentJobId, String jobName) {
         if (currentJobId == null || currentJobId == 0) {
-            logPanel.warn("⚠ 请先选择一个任务组");
+            NotificationToast.showWarning("未选择任务组");
             return;
         }
         
