@@ -190,6 +190,7 @@ CREATE TABLE `job_info` (
   `glue_update_time` datetime DEFAULT NULL COMMENT 'GLUE更新时间',
   `child_job_id` varchar(255) DEFAULT NULL COMMENT '子任务ID，多个逗号分隔',
   `trigger_status` tinyint NOT NULL DEFAULT '0' COMMENT '调度状态：0-停止，1-运行',
+  `trigger_one_status` tinyint NOT NULL DEFAULT '0' COMMENT '任务组一次运行调度状态：0-停止，1-运行',
   `trigger_last_time` bigint NOT NULL DEFAULT '0' COMMENT '上次调度时间',
   `trigger_next_time` bigint NOT NULL DEFAULT '0' COMMENT '下次调度时间',
   `create_time` datetime DEFAULT NULL,
