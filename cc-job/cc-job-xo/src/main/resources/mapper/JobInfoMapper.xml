@@ -31,7 +31,7 @@
     </sql>
 
     <update id="stopJobCompose">
-		update job_info set trigger_status = 0 where id = #{id} and trigger_status = 1;
+		update job_info set trigger_one_status = 0 where id = #{id} and trigger_one_status = 1;
 	</update>
 
 	<update id="pauseJob">

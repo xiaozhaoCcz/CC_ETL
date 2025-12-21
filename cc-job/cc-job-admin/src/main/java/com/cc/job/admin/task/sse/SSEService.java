@@ -2,14 +2,18 @@ package com.cc.job.admin.task.sse;
 
 import com.cc.job.admin.task.websocket.model.Message;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.catalina.connector.ClientAbortException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -17,6 +21,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * SSE服务类
  * 用于管理SSE连接和推送消息
+ * 支持多个客户端同时连接同一个任务组
  * 
  * @author xiaozhao
  */
@@ -25,8 +30,8 @@ public class SSEService {
 
     private static final Logger log = LoggerFactory.getLogger(SSEService.class);
 
-    // SSE连接池：key = parentJobId:randomId, value = SseEmitter
-    private static final Map<String, SseEmitter> SSE_CONNECTIONS = new ConcurrentHashMap<>();
+    // SSE连接池：key = parentJobId:randomId, value = List<SseEmitter>（支持多个连接）
+    private static final Map<String, CopyOnWriteArrayList<SseEmitter>> SSE_CONNECTIONS = new ConcurrentHashMap<>();
 
     // JSON序列化器
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -63,6 +68,7 @@ public class SSEService {
 
     /**
      * 创建SSE连接
+     * 支持多个客户端同时连接同一个任务组
      * 
      * @param parentJobId 父任务ID
      * @param randomId 随机ID
@@ -71,39 +77,88 @@ public class SSEService {
     public SseEmitter createConnection(Long parentJobId, String randomId) {
         String connectionKey = parentJobId + ":" + randomId;
         
-        // 如果已存在连接，先关闭旧的
-        SseEmitter existingEmitter = SSE_CONNECTIONS.remove(connectionKey);
-        if (existingEmitter != null) {
-            try {
-                existingEmitter.complete();
-            } catch (Exception e) {
-                log.warn("关闭已存在的SSE连接失败: {}", connectionKey, e);
-            }
-        }
-
         // 创建新的SSE连接
         SseEmitter emitter = new SseEmitter(CONNECTION_TIMEOUT);
-        SSE_CONNECTIONS.put(connectionKey, emitter);
+        
+        // 添加到连接列表（支持多个连接）
+        CopyOnWriteArrayList<SseEmitter> emitters = SSE_CONNECTIONS.computeIfAbsent(
+            connectionKey, 
+            k -> new CopyOnWriteArrayList<>()
+        );
+        emitters.add(emitter);
 
         // 设置完成和超时回调
         emitter.onCompletion(() -> {
-            SSE_CONNECTIONS.remove(connectionKey);
+            removeConnection(connectionKey, emitter);
         });
 
         emitter.onTimeout(() -> {
-            SSE_CONNECTIONS.remove(connectionKey);
+            removeConnection(connectionKey, emitter);
         });
 
         emitter.onError((ex) -> {
-            SSE_CONNECTIONS.remove(connectionKey);
-            log.error("[SSE] 连接错误并移除 - key: {}", connectionKey, ex);
+            removeConnection(connectionKey, emitter);
+            // 客户端主动关闭连接是正常情况，只记录debug级别
+            if (isClientClosedException(ex)) {
+                log.debug("[SSE] 客户端关闭连接 - key: {}", connectionKey);
+            } else {
+                log.warn("[SSE] 连接错误并移除 - key: {}", connectionKey, ex);
+            }
         });
 
         return emitter;
     }
+    
+    /**
+     * 移除指定的连接
+     * 
+     * @param connectionKey 连接key
+     * @param emitter 要移除的emitter
+     */
+    private void removeConnection(String connectionKey, SseEmitter emitter) {
+        CopyOnWriteArrayList<SseEmitter> emitters = SSE_CONNECTIONS.get(connectionKey);
+        if (emitters != null) {
+            emitters.remove(emitter);
+            // 如果列表为空，移除整个key
+            if (emitters.isEmpty()) {
+                SSE_CONNECTIONS.remove(connectionKey);
+            }
+        }
+    }
+    
+    /**
+     * 判断是否是客户端主动关闭连接的异常
+     * 
+     * @param ex 异常
+     * @return true表示是客户端主动关闭
+     */
+    private boolean isClientClosedException(Throwable ex) {
+        if (ex == null) {
+            return false;
+        }
+        
+        // 检查IOException: Broken pipe
+        if (ex instanceof IOException) {
+            String message = ex.getMessage();
+            if (message != null && (message.contains("Broken pipe") || 
+                                    message.contains("Connection reset") ||
+                                    message.contains("Connection closed"))) {
+                return true;
+            }
+        }
+        
+        // 检查ClientAbortException
+        if (ex instanceof ClientAbortException) {
+            return true;
+        }
+        
+        // 检查cause
+        return isClientClosedException(ex.getCause());
+    }
 
     /**
      * 发送消息到指定连接
+     * 支持向多个连接同时发送消息
      * 
      * @param message 消息对象
      */
@@ -114,79 +169,156 @@ public class SSEService {
         }
 
         String connectionKey = message.getParentJobId() + ":" + message.getRandomId();
-
-        SseEmitter emitter = SSE_CONNECTIONS.get(connectionKey);
+        CopyOnWriteArrayList<SseEmitter> emitters = SSE_CONNECTIONS.get(connectionKey);
         
-        if (emitter != null) {
+        if (emitters == null || emitters.isEmpty()) {
+            log.debug("[SSE] ⚠️ 未找到连接 - key: {}, 当前连接数: {}", connectionKey, SSE_CONNECTIONS.size());
+            return;
+        }
+
+        // 准备要移除的失效连接
+        List<SseEmitter> deadEmitters = new ArrayList<>();
+        String messageJson;
+        
+        try {
+            messageJson = OBJECT_MAPPER.writeValueAsString(message);
+            if (messageJson == null) {
+                log.error("[SSE] 消息序列化结果为null - key: {}", connectionKey);
+                return;
+            }
+        } catch (Exception e) {
+            log.error("[SSE] 消息序列化失败 - key: {}", connectionKey, e);
+            return;
+        }
+
+        // 向所有连接发送消息
+        for (SseEmitter emitter : emitters) {
             try {
-                String messageJson = OBJECT_MAPPER.writeValueAsString(message);
                 emitter.send(SseEmitter.event()
                         .name("nodeStatus")
                         .data(messageJson));
-            } catch (IOException e) {
-                log.error("[SSE] ❌ 消息发送失败 - key: {}", connectionKey, e);
-                // 移除失效的连接
-                SSE_CONNECTIONS.remove(connectionKey);
+            } catch (Exception e) {
+                // 客户端主动关闭连接是正常情况，静默处理
+                if (isClientClosedException(e)) {
+                    log.debug("[SSE] 客户端已关闭连接，移除 - key: {}", connectionKey);
+                } else {
+                    log.warn("[SSE] 消息发送失败 - key: {}", connectionKey, e);
+                }
+                deadEmitters.add(emitter);
+                // 尝试完成连接
                 try {
-                    emitter.completeWithError(e);
+                    emitter.complete();
                 } catch (Exception ex) {
-                    log.error("[SSE] 完成连接时出错", ex);
+                    // 忽略完成时的异常
                 }
             }
-        } else {
-            log.warn("[SSE] ⚠️ 未找到连接 - key: {}, 当前连接数: {}", connectionKey, SSE_CONNECTIONS.size());
+        }
+
+        // 移除失效的连接
+        if (!deadEmitters.isEmpty()) {
+            emitters.removeAll(deadEmitters);
+            // 如果列表为空，移除整个key
+            if (emitters.isEmpty()) {
+                SSE_CONNECTIONS.remove(connectionKey);
+            }
         }
     }
 
     /**
-     * 关闭指定连接
+     * 关闭指定连接（关闭该key下的所有连接）
      * 
      * @param parentJobId 父任务ID
      * @param randomId 随机ID
      */
     public void closeConnection(Long parentJobId, String randomId) {
         String connectionKey = parentJobId + ":" + randomId;
-        SseEmitter emitter = SSE_CONNECTIONS.remove(connectionKey);
+        CopyOnWriteArrayList<SseEmitter> emitters = SSE_CONNECTIONS.remove(connectionKey);
         
-        if (emitter != null) {
-            try {
-                emitter.complete();
-            } catch (Exception e) {
-                log.error("[SSE] 关闭连接失败 - key: {}", connectionKey, e);
-            }
-        }
-    }
-
-    /**
-     * 清理过期连接
-     */
-    private static void cleanupExpiredConnections() {
-        int removedCount = 0;
-        for (Map.Entry<String, SseEmitter> entry : SSE_CONNECTIONS.entrySet()) {
-            SseEmitter emitter = entry.getValue();
-            try {
-                // 尝试发送心跳，如果失败则说明连接已失效
-                emitter.send(SseEmitter.event().name("ping").data("ping"));
-            } catch (Exception e) {
-                // 连接已失效，移除
-                SSE_CONNECTIONS.remove(entry.getKey());
-                removedCount++;
+        if (emitters != null && !emitters.isEmpty()) {
+            for (SseEmitter emitter : emitters) {
                 try {
                     emitter.complete();
-                } catch (Exception ex) {
-                    // 忽略
+                } catch (Exception e) {
+                    log.debug("[SSE] 关闭连接时出错 - key: {}", connectionKey, e);
                 }
             }
         }
     }
 
     /**
+     * 清理过期连接
+     * 遍历所有连接，尝试发送心跳，移除失效的连接
+     */
+    private static void cleanupExpiredConnections() {
+        int removedCount = 0;
+        List<String> keysToRemove = new ArrayList<>();
+        
+        for (Map.Entry<String, CopyOnWriteArrayList<SseEmitter>> entry : SSE_CONNECTIONS.entrySet()) {
+            String connectionKey = entry.getKey();
+            CopyOnWriteArrayList<SseEmitter> emitters = entry.getValue();
+            
+            if (emitters == null || emitters.isEmpty()) {
+                keysToRemove.add(connectionKey);
+                continue;
+            }
+            
+            List<SseEmitter> deadEmitters = new ArrayList<>();
+            
+            for (SseEmitter emitter : emitters) {
+                try {
+                    // 尝试发送心跳，如果失败则说明连接已失效
+                    emitter.send(SseEmitter.event().name("ping").data("ping"));
+                } catch (Exception e) {
+                    // 连接已失效，标记为待移除
+                    deadEmitters.add(emitter);
+                    try {
+                        emitter.complete();
+                    } catch (Exception ex) {
+                        // 忽略完成时的异常
+                    }
+                }
+            }
+            
+            // 移除失效的连接
+            if (!deadEmitters.isEmpty()) {
+                emitters.removeAll(deadEmitters);
+                removedCount += deadEmitters.size();
+            }
+            
+            // 如果列表为空，标记为待移除
+            if (emitters.isEmpty()) {
+                keysToRemove.add(connectionKey);
+            }
+        }
+        
+        // 移除空的key
+        for (String key : keysToRemove) {
+            SSE_CONNECTIONS.remove(key);
+        }
+        
+        if (removedCount > 0) {
+            log.debug("[SSE] 清理过期连接完成 - 移除连接数: {}, 剩余连接数: {}", removedCount, SSE_CONNECTIONS.size());
+        }
+    }
+
+    /**
      * 获取连接统计信息
      * 
-     * @return 连接数
+     * @return 连接数（key的数量）
      */
     public int getConnectionCount() {
         return SSE_CONNECTIONS.size();
+    }
+    
+    /**
+     * 获取总连接数（所有emitter的数量）
+     * 
+     * @return 总连接数
+     */
+    public int getTotalEmitterCount() {
+        return SSE_CONNECTIONS.values().stream()
+                .mapToInt(List::size)
+                .sum();
     }
 
     /**
@@ -229,4 +361,5 @@ public class SSEService {
         sendMessage(sseMessage);
     }
 }
+
 

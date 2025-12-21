@@ -9,6 +9,7 @@ import com.cc.job.xo.model.query.JobLogQuery;
 import com.cc.job.xo.model.vo.JobLogVO;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
+import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -35,7 +36,9 @@ import com.google.gson.JsonParser;
 import javafx.scene.layout.FlowPane;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -47,6 +50,8 @@ import java.util.TimerTask;
  * 展示任务日志列表
  */
 public class ShowJobLogListDialog extends Dialog<Void> {
+
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final JobLogService jobLogService = new JobLogService();
     private final JobGroupService jobGroupService = new JobGroupService();
@@ -68,14 +73,14 @@ public class ShowJobLogListDialog extends Dialog<Void> {
     private int pageNum = 1;
     private int pageSize = 10;
     private long total = 0;
-    
+
     // 任务ID，用于过滤特定任务的日志
     private Long jobId;
 
     public ShowJobLogListDialog(Stage ownerStage) {
         this(ownerStage, null);
     }
-    
+
     public ShowJobLogListDialog(Stage ownerStage, Long jobId) {
         this.jobId = jobId;
         setTitle("任务日志");
@@ -124,14 +129,14 @@ public class ShowJobLogListDialog extends Dialog<Void> {
                 stage.setResizable(true);
                 stage.setMinWidth(1400);
                 stage.setMinHeight(800);
-                
+
                 try {
                     String css = getClass().getResource("/styles.css").toExternalForm();
                     stage.getScene().getStylesheets().add(css);
                 } catch (Exception e) {
                     // CSS文件加载失败，忽略
                 }
-                
+
                 stage.setOnCloseRequest(event -> close());
             }
         });
@@ -260,27 +265,27 @@ public class ShowJobLogListDialog extends Dialog<Void> {
 
         // 任务id列
         TableColumn<JobLogVO, String> jobIdCol = new TableColumn<>("任务id");
-        jobIdCol.setCellValueFactory(c -> new javafx.beans.property.SimpleStringProperty(
+        jobIdCol.setCellValueFactory(c -> new SimpleStringProperty(
                 c.getValue().getJobId() != null ? String.valueOf(c.getValue().getJobId()) : ""));
 
         // 任务名称列
         TableColumn<JobLogVO, String> jobDescCol = new TableColumn<>("任务名称");
-        jobDescCol.setCellValueFactory(c -> new javafx.beans.property.SimpleStringProperty(safe(c.getValue().getJobDesc())));
+        jobDescCol.setCellValueFactory(c -> new SimpleStringProperty(safe(c.getValue().getJobDesc())));
 
         // 调度时间列
         TableColumn<JobLogVO, String> triggerTimeCol = new TableColumn<>("调度时间");
-        triggerTimeCol.setCellValueFactory(c -> new javafx.beans.property.SimpleStringProperty(safe(c.getValue().getTriggerTime())));
+        triggerTimeCol.setCellValueFactory(c -> new SimpleStringProperty(formatTime(c.getValue().getTriggerTime())));
 
         // 调度结果列
         TableColumn<JobLogVO, String> triggerCodeCol = new TableColumn<>("调度结果");
-        triggerCodeCol.setCellValueFactory(c -> new javafx.beans.property.SimpleStringProperty(
+        triggerCodeCol.setCellValueFactory(c -> new SimpleStringProperty(
                 mapTriggerCode(c.getValue().getTriggerCode())));
 
         // 调度备注列
         TableColumn<JobLogVO, String> triggerMsgCol = new TableColumn<>("调度备注");
         triggerMsgCol.setCellValueFactory(c -> {
             String msg = safe(c.getValue().getTriggerMsg());
-            return new javafx.beans.property.SimpleStringProperty(msg != null && !msg.isEmpty() ? "查看" : "");
+            return new SimpleStringProperty(msg != null && !msg.isEmpty() ? "查看" : "");
         });
         triggerMsgCol.setCellFactory(col -> new TableCell<>() {
             private final Hyperlink viewLink = new Hyperlink("查看");
@@ -308,11 +313,11 @@ public class ShowJobLogListDialog extends Dialog<Void> {
 
         // 执行时间列
         TableColumn<JobLogVO, String> handleTimeCol = new TableColumn<>("执行时间");
-        handleTimeCol.setCellValueFactory(c -> new javafx.beans.property.SimpleStringProperty(safe(c.getValue().getHandleTime())));
+        handleTimeCol.setCellValueFactory(c -> new SimpleStringProperty(formatTime(c.getValue().getHandleTime())));
 
         // 执行结果列
         TableColumn<JobLogVO, String> handleCodeCol = new TableColumn<>("执行结果");
-        handleCodeCol.setCellValueFactory(c -> new javafx.beans.property.SimpleStringProperty(
+        handleCodeCol.setCellValueFactory(c -> new SimpleStringProperty(
                 mapHandleCode(c.getValue().getHandleCode())));
 
         // 节点状态列（只有任务组任务才显示）
@@ -320,11 +325,11 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         nodeStatusCol.setCellValueFactory(c -> {
             JobLogVO item = c.getValue();
             // 只有任务组任务（jobType == 2）且有 nodeStatus 时才显示
-            if (item.getJobType() != null && item.getJobType() == 2 
+            if (item.getJobType() != null && item.getJobType() == 2
                     && item.getNodeStatus() != null && !item.getNodeStatus().trim().isEmpty()) {
-                return new javafx.beans.property.SimpleStringProperty("查看");
+                return new SimpleStringProperty("查看");
             }
-            return new javafx.beans.property.SimpleStringProperty("");
+            return new SimpleStringProperty("");
         });
         nodeStatusCol.setCellFactory(col -> new TableCell<>() {
             private final Hyperlink viewLink = new Hyperlink("查看");
@@ -600,7 +605,7 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         Label titleLabel = new Label("任务组: " + safe(item.getJobDesc()));
         titleLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #374151;");
         
-        Label timeLabel = new Label("执行时间: " + safe(item.getHandleTime()));
+        Label timeLabel = new Label("执行时间: " + formatTime(item.getHandleTime()));
         timeLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #6B7280;");
 
         // 节点状态网格
@@ -882,7 +887,7 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         // 初始加载日志
         loadLogContentAsync(item.getId(), codeArea, fromLineNum, pullFailCount, isLogEnd, scrollPane);
 
-        // 启动自动刷新定时器
+        // 启动自动刷新定时器（延迟2000ms后开始，避免与初始加载重复）
         refreshTimer[0] = new Timer("log-refresh-timer", true);
         refreshTimer[0].scheduleAtFixedRate(new TimerTask() {
             @Override
@@ -906,7 +911,7 @@ public class ShowJobLogListDialog extends Dialog<Void> {
                     }
                 });
             }
-        }, 0, 2000);
+        }, 2000, 2000);
 
         // 对话框关闭时停止定时器
         dialog.setOnCloseRequest(e -> {
@@ -1159,6 +1164,42 @@ public class ShowJobLogListDialog extends Dialog<Void> {
 
     private String safe(String v) {
         return v == null ? "" : v;
+    }
+
+    /**
+     * 格式化时间字符串为 yyyy-MM-dd HH:mm:ss 格式
+     */
+    private String formatTime(String timeStr) {
+        if (timeStr == null || timeStr.trim().isEmpty()) {
+            return "";
+        }
+        
+        String trimmed = timeStr.trim();
+        
+        try {
+            // 移除毫秒部分（如果有）
+            String timeWithoutMillis = trimmed.split("\\.")[0];
+            
+            // 尝试解析 ISO 格式（如 2025-12-21T16:15:42）
+            if (timeWithoutMillis.contains("T")) {
+                LocalDateTime dateTime = LocalDateTime.parse(timeWithoutMillis);
+                return dateTime.format(DATE_FORMATTER);
+            }
+            
+            // 尝试解析标准格式（如 2025-12-21 16:15:42）
+            // 如果已经是目标格式，直接返回
+            if (timeWithoutMillis.matches("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}")) {
+                return timeWithoutMillis;
+            }
+            
+            // 尝试用标准格式解析
+            LocalDateTime dateTime = LocalDateTime.parse(timeWithoutMillis, DATE_FORMATTER);
+            return dateTime.format(DATE_FORMATTER);
+        } catch (DateTimeParseException e) {
+            // 如果解析失败，返回原始字符串
+            logger.debug("时间格式化失败: " + timeStr, e);
+            return trimmed;
+        }
     }
 
     private void showError(String title, String msg) {

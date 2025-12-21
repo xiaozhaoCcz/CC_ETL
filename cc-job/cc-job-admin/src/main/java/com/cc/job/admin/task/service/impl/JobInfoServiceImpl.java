@@ -328,8 +328,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         }
 
         // 检查是否正在运行（使用行锁后，这里是线程安全的）
-        if (taskInfo.getJobType() == 2 && taskInfo.getTriggerStatus() == 1) {
-            throw new BusinessException("当前任务正在运行中，请等待完成后再运行");
+        if (taskInfo.getJobType() == 2 && taskInfo.getTriggerOneStatus()==1) {
+            throw new BusinessException("当前任务正在运行中，请先停止任务运行");
         }
 
         // force cover job param
@@ -396,8 +396,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         }
         
         // 原子性设置运行状态（在事务中，行锁保护）
-        if (taskInfo.getJobType() == 2 && taskInfo.getTriggerStatus() == 0) {
-            taskInfo.setTriggerStatus(1);
+        if (taskInfo.getJobType() == 2 && taskInfo.getTriggerOneStatus() == 0) {
+            taskInfo.setTriggerOneStatus(1);
             this.updateById(taskInfo);
         }
 
