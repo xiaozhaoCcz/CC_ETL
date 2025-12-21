@@ -1190,7 +1190,8 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
         GLUE_PYTHON("GLUE_PYTHON", "GLUE(Python)", true),
         GLUE_PHP("GLUE_PHP", "GLUE(PHP)", true),
         GLUE_NODEJS("GLUE_NODEJS", "GLUE(Nodejs)", true),
-        GLUE_POWERSHELL("GLUE_POWERSHELL", "GLUE(PowerShell)", true);
+        GLUE_POWERSHELL("GLUE_POWERSHELL", "GLUE(PowerShell)", true),
+        GLUE_CSHARP("GLUE_CSHARP", "GLUE(C#)", true);
         
         private final String type;
         private final String title;

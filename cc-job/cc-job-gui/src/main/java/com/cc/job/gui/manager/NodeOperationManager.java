@@ -388,6 +388,7 @@ public class NodeOperationManager {
             case "GLUE_PHP": return "PHP";
             case "GLUE_NODEJS": return "Node";
             case "GLUE_POWERSHELL": return "PS";
+            case "GLUE_CSHARP": return "C#";
             default: return "Bean";
         }
     }

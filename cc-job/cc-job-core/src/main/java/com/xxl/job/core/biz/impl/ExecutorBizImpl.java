@@ -11,6 +11,7 @@ import com.xxl.job.core.glue.GlueTypeEnum;
 import com.xxl.job.core.handler.IJobHandler;
 import com.xxl.job.core.handler.impl.GlueJobHandler;
 import com.xxl.job.core.handler.impl.ScriptJobHandler;
+import com.xxl.job.core.handler.impl.CSharpGlueJobHandler;
 import com.xxl.job.core.log.XxlJobFileAppender;
 import com.xxl.job.core.thread.JobThread;
 import com.xxl.job.core.util.GsonTool;
@@ -94,6 +95,28 @@ public class ExecutorBizImpl implements ExecutorBiz {
                 try {
                     IJobHandler originJobHandler = GlueFactory.getInstance().loadNewInstance(triggerParam.getGlueSource());
                     jobHandler = new GlueJobHandler(originJobHandler, triggerParam.getGlueUpdateTime());
+                } catch (Exception e) {
+                    logger.error(e.getMessage(), e);
+                    return new ReturnT<String>(ReturnT.FAIL_CODE, e.getMessage());
+                }
+            }
+        } else if (GlueTypeEnum.GLUE_CSHARP == glueTypeEnum) {
+
+            // valid old jobThread
+            if (jobThread != null &&
+                    !(jobThread.getHandler() instanceof CSharpGlueJobHandler
+                        && ((CSharpGlueJobHandler) jobThread.getHandler()).getGlueUpdatetime()==triggerParam.getGlueUpdateTime() )) {
+                // change C# glue source, need kill old thread
+                removeOldReason = "change C# glue source, and terminate the old job thread.";
+
+                jobThread = null;
+                jobHandler = null;
+            }
+
+            // valid handler
+            if (jobHandler == null) {
+                try {
+                    jobHandler = new CSharpGlueJobHandler(triggerParam.getJobId(), triggerParam.getGlueUpdateTime(), triggerParam.getGlueSource());
                 } catch (Exception e) {
                     logger.error(e.getMessage(), e);
                     return new ReturnT<String>(ReturnT.FAIL_CODE, e.getMessage());
