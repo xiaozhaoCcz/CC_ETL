@@ -51,6 +51,10 @@ public class JobInfo extends BaseEntity {
      */
     private String executorRouteStrategy;
     /**
+     * 失败策略
+     */
+    private String failStrategy;
+    /**
      * 执行器任务handler
      */
     private String executorHandler;

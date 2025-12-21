@@ -62,10 +62,10 @@ public class SampleXxlJob {
             System.out.println("demoJobHandler2 beat at:" + i);
             TimeUnit.MILLISECONDS.sleep(500);
         }
-        //throw  new RuntimeException();
+        throw  new RuntimeException();
         //default success
-        XxlJobHelper.log(">>>>>>>> demoJobHandler2 end");
-        System.out.println(">>>>>>>> demoJobHandler2 end");
+//        XxlJobHelper.log(">>>>>>>> demoJobHandler2 end");
+//        System.out.println(">>>>>>>> demoJobHandler2 end");
     }
 
     static  int retryCount = 0;
@@ -83,10 +83,10 @@ public class SampleXxlJob {
         }
 //        if(retryCount<2){
 //            retryCount++;
-            throw new RuntimeException();
+            //throw new RuntimeException();
        // }
-//        XxlJobHelper.log(">>>>>>>> demoJobHandler3 end");
-//        System.out.println(">>>>>>>> demoJobHandler3 end");
+        XxlJobHelper.log(">>>>>>>> demoJobHandler3 end");
+        System.out.println(">>>>>>>> demoJobHandler3 end");
     }
 
     @XxlJob("demoJobHandler4")
@@ -328,9 +328,10 @@ public class SampleXxlJob {
             System.out.println("demoJobHandler18 beat at:" + i);
             TimeUnit.MILLISECONDS.sleep(500);
         }
+        throw new RuntimeException("节点18运行失败");
         //default success
-        XxlJobHelper.log(">>>>>>>> demoJobHandler18 end");
-        System.out.println(">>>>>>>> demoJobHandler18 end");
+//        XxlJobHelper.log(">>>>>>>> demoJobHandler18 end");
+//        System.out.println(">>>>>>>> demoJobHandler18 end");
     }
 
     @XxlJob("demoJobHandler19")

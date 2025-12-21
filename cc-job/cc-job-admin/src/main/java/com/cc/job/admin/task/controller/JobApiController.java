@@ -8,6 +8,7 @@ import com.xxl.job.core.biz.model.HandleCallbackParam;
 import com.xxl.job.core.biz.model.RegistryParam;
 import com.xxl.job.core.biz.model.ReturnT;
 import com.xxl.job.core.util.GsonTool;
+import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Controller;
@@ -84,6 +85,14 @@ public class JobApiController {
             String executorServerAddress = params.get("executorServerAddress");
             return JobRegistryHelper.getInstance()
                     .updateRegistryValue(appName, executorAddress, executorServerAddress);
+        } else if ("removeRegistryValue".equals(uri)) {
+            // ⭐ 删除注册信息的registryValue（用于executor-compose停止时清理HTTP端口信息）
+            Map<String, String> params = GsonTool.fromJson(data, Map.class);
+            String appName = params.get("appName");
+            String executorAddress = params.get("executorAddress");
+            String executorServerAddress = params.get("executorServerAddress");
+            return JobRegistryHelper.getInstance()
+                    .removeRegistryValue(appName, executorAddress, executorServerAddress);
         } else {
             return new ReturnT<>(ReturnT.FAIL_CODE, "invalid request, uri-mapping(" + uri + ") not found.");
         }
@@ -94,7 +103,8 @@ public class JobApiController {
      * 建立SSE连接
      */
     @GetMapping("/sse/{jobId}/{randomId}")
-    public SseEmitter subscribeToEvents(@PathVariable Long jobId, @PathVariable String randomId) {
+    public SseEmitter subscribeToEvents(@Parameter(description = "任务组ID") @PathVariable("jobId") Long jobId,
+                                        @Parameter(description = "执行批次ID") @PathVariable("randomId") String randomId) {
         String connectionKey = jobId + ":" + randomId;
 
         SseEmitter emitter = new SseEmitter(0L); // 无超时时间

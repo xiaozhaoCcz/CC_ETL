@@ -1,0 +1,25 @@
+using System;
+
+namespace XxlJob.Service.Handler
+{
+    public class DemoGlueJobHandler
+    {
+        public void Execute()
+        {
+            // 使用 XxlJobHelper，方法与 Java 版本保持一致
+            XxlJobHelper.log("XXL-JOB, Hello C# World.");
+            
+            // 获取任务参数
+            string jobParam = XxlJobHelper.getJobParam();
+            int shardIndex = XxlJobHelper.getShardIndex();
+            int shardTotal = XxlJobHelper.getShardTotal();
+            
+            XxlJobHelper.log("任务参数: {0}", jobParam);
+            XxlJobHelper.log("分片序号: {0}, 分片总数: {1}", shardIndex, shardTotal);
+            Console.WriteLine("XXL-JOB, Hello C# World.");
+            // 在这里编写您的业务逻辑
+            // 例如：数据库操作、API 调用、文件处理等
+        }
+    }
+}
+

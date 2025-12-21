@@ -243,4 +243,32 @@ public class JobRegistryHelper {
 		return ReturnT.SUCCESS;
 	}
 
+    /**
+     * 删除注册信息的registryValue（用于executor-compose关闭时清理HTTP端口信息）
+     **/
+    public ReturnT<String> removeRegistryValue(String appName, String executorAddress,
+                                              String executorServerAddress) {
+        if (!StringUtils.hasText(appName)
+                || !StringUtils.hasText(executorAddress)
+                || !StringUtils.hasText(executorServerAddress)) {
+            return new ReturnT<String>(ReturnT.FAIL_CODE, "Illegal Argument.");
+        }
+
+        registryOrRemoveThreadPool.execute(new Runnable() {
+            @Override
+            public void run() {
+                JobComposeMapper jobComposeMapper = XxlJobAdminConfig.getAdminConfig().getJobComposeMapper();
+                int deleteCount = jobComposeMapper.delete(new LambdaQueryWrapper<JobCompose>()
+                        .eq(JobCompose::getAppName, appName)
+                        .eq(JobCompose::getExecutorAddress, executorAddress)
+                        .eq(JobCompose::getExecutorServerAddress, executorServerAddress));
+                logger.info("删除注册信息{} - appName: {}, executorAddress: {}, executorServerAddress: {}",
+                        deleteCount > 0 ? "成功" : "无匹配记录",
+                        appName, executorAddress, executorServerAddress);
+            }
+        });
+
+        return ReturnT.SUCCESS;
+    }
+
 }

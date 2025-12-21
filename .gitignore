@@ -21,9 +21,75 @@
 
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
+replay_pid*
+
+# IDE directories and files
 .idea/
 .vscode/
-node_modules/
-target/
-dist-electron/
 *.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.bak
+*~
+
+# Build output directories
+target/
+out/
+build/
+dist/
+dist-ssr/
+dist-electron/
+
+# Frontend dependencies and build
+node_modules/
+.pnp/
+.pnp.js
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+.yarn/
+.cache/
+.temp/
+.tmp/
+
+# Frontend misc
+.DS_Store
+.history
+*.local
+stats.html
+.eslintcache
+
+# Maven specific
+.mvn/wrapper/maven-wrapper.jar
+.mvn/timing.properties
+dependency-reduced-pom.xml
+.flattened-pom.xml
+
+# DataX and job related temporary files
+jsons/
+jobTmp-*.conf
+
+# Test output
+test-output/
+*.tmp
+
+# Environment files
+.env.local
+.env.*.local
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

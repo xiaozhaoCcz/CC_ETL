@@ -17,6 +17,16 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.io.UnsupportedEncodingException;
+import java.util.SortedMap;
+import java.util.TreeMap;
+import java.util.HashMap;
+import java.util.Random;
+import java.util.LinkedHashMap;
+import java.util.Collections;
+import java.util.ArrayList;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -43,6 +53,31 @@ public class JobTriggerService {
      * 执行器客户端缓存
      */
     private static final ConcurrentMap<String, ExecutorBiz> EXECUTOR_BIZ_CACHE = new ConcurrentHashMap<>();
+    
+    /**
+     * LFU策略缓存: jobId -> (address -> count)
+     */
+    private static final ConcurrentMap<Integer, HashMap<String, Integer>> JOB_LFU_MAP = new ConcurrentHashMap<>();
+    
+    /**
+     * LRU策略缓存: jobId -> LinkedHashMap(address -> address)
+     */
+    private static final ConcurrentMap<Integer, LinkedHashMap<String, String>> JOB_LRU_MAP = new ConcurrentHashMap<>();
+    
+    /**
+     * 轮询策略计数器
+     */
+    private static final ConcurrentMap<Integer, Integer> ROUND_COUNT_MAP = new ConcurrentHashMap<>();
+    
+    /**
+     * 缓存有效时间（24小时）
+     */
+    private static long CACHE_VALID_TIME = 0;
+    
+    /**
+     * 一致性哈希虚拟节点数
+     */
+    private static final int VIRTUAL_NODE_NUM = 100;
     
     public JobTriggerService(AdminApiClient adminApiClient) {
         this.adminApiClient = adminApiClient;
@@ -209,7 +244,7 @@ public class JobTriggerService {
                 XxlJobHelper.log(xxlJobContext, "任务ID: {}, 错误信息: {}", jobInfo.getId(), returnT.getMsg());
                 
                 // 判断是否需要抛出异常
-                if (!ExecutorConstants.ExecutionResult.DO_NOTHING.equalsIgnoreCase(jobInfo.getExecutorBlockStrategy())) {
+                if (!ExecutorConstants.ExecutionResult.DO_NOTHING.equalsIgnoreCase(jobInfo.getFailStrategy())) {
                     return false;
                 }
             } else {
@@ -228,13 +263,21 @@ public class JobTriggerService {
     
     /**
      * 路由选择执行器地址
+     * 完整实现XXL-JOB原生支持的所有路由策略
      */
     private String selectAddress(TriggerParam triggerParam, List<String> registryList, String routeStrategy) {
         if (registryList.isEmpty()) {
             return null;
         }
         
-        // 简化实现：根据路由策略选择地址
+        // 清理过期缓存（24小时）
+        if (System.currentTimeMillis() > CACHE_VALID_TIME) {
+            JOB_LFU_MAP.clear();
+            JOB_LRU_MAP.clear();
+            ROUND_COUNT_MAP.clear();
+            CACHE_VALID_TIME = System.currentTimeMillis() + 1000L * 60 * 60 * 24;
+        }
+        
         switch (routeStrategy.toUpperCase()) {
             case "FIRST":
                 // 第一个
@@ -245,20 +288,188 @@ public class JobTriggerService {
                 return registryList.get(registryList.size() - 1);
                 
             case "ROUND":
-                // 轮询（简化实现：使用任务ID取模）
-                int index = Math.abs(triggerParam.getJobId() % registryList.size());
-                return registryList.get(index);
+                // 轮询
+                return routeRound(triggerParam.getJobId(), registryList);
                 
             case "RANDOM":
                 // 随机
-                int randomIndex = (int) (Math.random() * registryList.size());
-                return registryList.get(randomIndex);
+                return registryList.get(new Random().nextInt(registryList.size()));
+                
+            case "CONSISTENT_HASH":
+                // 一致性哈希
+                return routeConsistentHash(triggerParam.getJobId(), registryList);
+                
+            case "LEAST_FREQUENTLY_USED":
+                // 最不经常使用 (LFU)
+                return routeLFU(triggerParam.getJobId(), registryList);
+                
+            case "LEAST_RECENTLY_USED":
+                // 最近最久未使用 (LRU)
+                return routeLRU(triggerParam.getJobId(), registryList);
+                
+            case "FAILOVER":
+                // 故障转移：选择第一个健康的执行器
+                return routeFailover(triggerParam.getJobId(), registryList);
+                
+            case "BUSYOVER":
+                // 忙碌转移：选择第一个空闲的执行器
+                return routeBusyover(triggerParam.getJobId(), registryList);
                 
             default:
-                // 默认使用第一个
                 logger.warn("[JobTrigger] 未知路由策略: {}, 使用 FIRST", routeStrategy);
                 return registryList.get(0);
         }
+    }
+    
+    /**
+     * 轮询路由
+     */
+    private String routeRound(int jobId, List<String> addressList) {
+        Integer count = ROUND_COUNT_MAP.get(jobId);
+        if (count == null || count > 1000000) {
+            count = new Random().nextInt(100);
+        } else {
+            count++;
+        }
+        ROUND_COUNT_MAP.put(jobId, count);
+        return addressList.get(count % addressList.size());
+    }
+    
+    /**
+     * 一致性哈希路由
+     */
+    private String routeConsistentHash(int jobId, List<String> addressList) {
+        TreeMap<Long, String> addressRing = new TreeMap<>();
+        for (String address : addressList) {
+            for (int i = 0; i < VIRTUAL_NODE_NUM; i++) {
+                long addressHash = hash("SHARD-" + address + "-NODE-" + i);
+                addressRing.put(addressHash, address);
+            }
+        }
+        long jobHash = hash(String.valueOf(jobId));
+        SortedMap<Long, String> lastRing = addressRing.tailMap(jobHash);
+        if (!lastRing.isEmpty()) {
+            return lastRing.get(lastRing.firstKey());
+        }
+        return addressRing.firstEntry().getValue();
+    }
+    
+    /**
+     * MD5散列计算hash值
+     */
+    private long hash(String key) {
+        MessageDigest md5;
+        try {
+            md5 = MessageDigest.getInstance("MD5");
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("MD5 not supported", e);
+        }
+        md5.reset();
+        byte[] keyBytes;
+        try {
+            keyBytes = key.getBytes("UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException("Unknown string: " + key, e);
+        }
+        md5.update(keyBytes);
+        byte[] digest = md5.digest();
+        long hashCode = ((long) (digest[3] & 0xFF) << 24)
+                | ((long) (digest[2] & 0xFF) << 16)
+                | ((long) (digest[1] & 0xFF) << 8)
+                | (digest[0] & 0xFF);
+        return hashCode & 0xffffffffL;
+    }
+    
+    /**
+     * LFU路由：最不经常使用
+     */
+    private String routeLFU(int jobId, List<String> addressList) {
+        HashMap<String, Integer> lfuItemMap = JOB_LFU_MAP.computeIfAbsent(jobId, k -> new HashMap<>());
+        
+        // 添加新地址
+        for (String address : addressList) {
+            if (!lfuItemMap.containsKey(address) || lfuItemMap.get(address) > 1000000) {
+                lfuItemMap.put(address, new Random().nextInt(addressList.size()));
+            }
+        }
+        // 移除旧地址
+        lfuItemMap.keySet().removeIf(key -> !addressList.contains(key));
+        
+        // 找到使用次数最少的地址
+        String minAddress = null;
+        int minCount = Integer.MAX_VALUE;
+        for (java.util.Map.Entry<String, Integer> entry : lfuItemMap.entrySet()) {
+            if (entry.getValue() < minCount) {
+                minCount = entry.getValue();
+                minAddress = entry.getKey();
+            }
+        }
+        // 增加使用计数
+        if (minAddress != null) {
+            lfuItemMap.put(minAddress, minCount + 1);
+        }
+        return minAddress != null ? minAddress : addressList.get(0);
+    }
+    
+    /**
+     * LRU路由：最近最久未使用
+     */
+    private String routeLRU(int jobId, List<String> addressList) {
+        LinkedHashMap<String, String> lruItem = JOB_LRU_MAP.computeIfAbsent(jobId, 
+                k -> new LinkedHashMap<>(16, 0.75f, true));
+        
+        // 添加新地址
+        for (String address : addressList) {
+            if (!lruItem.containsKey(address)) {
+                lruItem.put(address, address);
+            }
+        }
+        // 移除旧地址
+        lruItem.keySet().removeIf(key -> !addressList.contains(key));
+        
+        // 获取最早插入的地址（最久未使用）
+        String eldestKey = lruItem.keySet().iterator().next();
+        return lruItem.get(eldestKey);
+    }
+    
+    /**
+     * 故障转移路由：选择第一个健康的执行器
+     */
+    private String routeFailover(int jobId, List<String> addressList) {
+        for (String address : addressList) {
+            try {
+                ExecutorBiz executorBiz = getExecutorBiz(address);
+                ReturnT<String> beatResult = executorBiz.beat();
+                if (beatResult.getCode() == ReturnT.SUCCESS_CODE) {
+                    logger.debug("[JobTrigger] 故障转移选择执行器 - jobId: {}, address: {}", jobId, address);
+                    return address;
+                }
+            } catch (Exception e) {
+                logger.warn("[JobTrigger] 执行器心跳检查失败 - address: {}, error: {}", address, e.getMessage());
+            }
+        }
+        logger.warn("[JobTrigger] 故障转移未找到健康执行器 - jobId: {}, 使用第一个", jobId);
+        return addressList.get(0);
+    }
+    
+    /**
+     * 忙碌转移路由：选择第一个空闲的执行器
+     */
+    private String routeBusyover(int jobId, List<String> addressList) {
+        for (String address : addressList) {
+            try {
+                ExecutorBiz executorBiz = getExecutorBiz(address);
+                ReturnT<String> idleBeatResult = executorBiz.idleBeat(new com.xxl.job.core.biz.model.IdleBeatParam(jobId));
+                if (idleBeatResult.getCode() == ReturnT.SUCCESS_CODE) {
+                    logger.debug("[JobTrigger] 忙碌转移选择空闲执行器 - jobId: {}, address: {}", jobId, address);
+                    return address;
+                }
+            } catch (Exception e) {
+                logger.warn("[JobTrigger] 执行器空闲检查失败 - address: {}, error: {}", address, e.getMessage());
+            }
+        }
+        logger.warn("[JobTrigger] 忙碌转移未找到空闲执行器 - jobId: {}, 使用第一个", jobId);
+        return addressList.get(0);
     }
     
     /**

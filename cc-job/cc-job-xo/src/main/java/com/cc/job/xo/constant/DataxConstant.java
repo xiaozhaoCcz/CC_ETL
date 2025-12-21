@@ -64,7 +64,7 @@ public interface DataxConstant {
     String ERROR_INCREMENT_CONTENT_EMPTY = "增量同步内容不能为空";
 
 
-    String PYTHON = "python";
+    String PYTHON = "python3";
 
     String PARAM = "-p";
 

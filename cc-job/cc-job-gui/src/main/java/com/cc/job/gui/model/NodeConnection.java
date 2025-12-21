@@ -5,6 +5,7 @@ import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
 import javafx.beans.binding.DoubleBinding;
 import javafx.beans.property.SimpleObjectProperty;
+import javafx.geometry.Point2D;
 import javafx.scene.Node;
 import javafx.scene.Group;
 import javafx.scene.paint.Color;
@@ -12,6 +13,7 @@ import javafx.scene.shape.Circle;
 import javafx.scene.shape.CubicCurve;
 import javafx.scene.shape.Polygon;
 import javafx.scene.layout.Pane;
+import javafx.scene.transform.Rotate;
 import javafx.util.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -158,12 +160,12 @@ public class NodeConnection extends Group {
             @Override
             protected double computeValue() {
                 // Circle在Pane中：layoutX/layoutY 指定的是圆心位置
-                javafx.geometry.Point2D connectorCenter = new javafx.geometry.Point2D(
+                Point2D connectorCenter = new Point2D(
                     connector.getLayoutX(),
                     connector.getLayoutY()
                 );
-                javafx.geometry.Point2D nodeLocal = connectorParent.localToParent(connectorCenter);
-                javafx.geometry.Point2D parentLocal = owner.localToParent(nodeLocal);
+                Point2D nodeLocal = connectorParent.localToParent(connectorCenter);
+                Point2D parentLocal = owner.localToParent(nodeLocal);
                 return parentLocal.getX();
             }
         };
@@ -180,12 +182,12 @@ public class NodeConnection extends Group {
             @Override
             protected double computeValue() {
                 // Circle在Pane中：layoutX/layoutY 指定的是圆心位置
-                javafx.geometry.Point2D connectorCenter = new javafx.geometry.Point2D(
+                Point2D connectorCenter = new Point2D(
                     connector.getLayoutX(),
                     connector.getLayoutY()
                 );
-                javafx.geometry.Point2D nodeLocal = connectorParent.localToParent(connectorCenter);
-                javafx.geometry.Point2D parentLocal = owner.localToParent(nodeLocal);
+                Point2D nodeLocal = connectorParent.localToParent(connectorCenter);
+                Point2D parentLocal = owner.localToParent(nodeLocal);
                 return parentLocal.getY();
             }
         };
@@ -214,7 +216,7 @@ public class NodeConnection extends Group {
         double angle = Math.toDegrees(Math.atan2(endY - ctrlY2, endX - ctrlX2));
         
         arrowHead.getTransforms().clear();
-        arrowHead.getTransforms().add(new javafx.scene.transform.Rotate(angle, 0, 0));
+        arrowHead.getTransforms().add(new Rotate(angle, 0, 0));
     }
     
     private void setupHoverEffect() {
@@ -253,11 +255,11 @@ public class NodeConnection extends Group {
     /**
      * 获取所有者名称（支持 ProcessNode 和 GroupContainer）
      */
-    private String getOwnerName(javafx.scene.Node owner) {
+    private String getOwnerName(Node owner) {
         if (owner instanceof ProcessNode) {
             return ((ProcessNode) owner).getJobHandlerName();
-        } else if (owner instanceof com.cc.job.gui.model.GroupContainer) {
-            return ((com.cc.job.gui.model.GroupContainer) owner).getGroupName();
+        } else if (owner instanceof GroupContainer) {
+            return ((GroupContainer) owner).getGroupName();
         }
         return "未知";
     }

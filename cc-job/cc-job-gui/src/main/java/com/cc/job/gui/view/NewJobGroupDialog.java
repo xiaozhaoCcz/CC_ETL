@@ -564,7 +564,7 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
         form.setGlueType("BEAN");
         form.setExecutorHandler("runJobGroupXxlJob"); // 任务组的固定Handler
         form.setJobType(2); // 任务组类型（jobType=2 表示任务组）
-        
+        form.setFailStrategy("JOB_FAIL");
         return form;
     }
     
@@ -704,11 +704,11 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
         ROUND("ROUND", "轮询"),
         RANDOM("RANDOM", "随机"),
         CONSISTENT_HASH("CONSISTENT_HASH", "一致性哈希"),
-        LEASTY_FREQUENTY_USED("LEASTY_FREQUENTY_USED", "最不经常使用"),
-        LEASTY_RECENTLY_USED("LEASTY_RECENTLY_USED", "最近最久未使用"),
+        LEAST_FREQUENTLY_USED("LEAST_FREQUENTLY_USED", "最不经常使用"),
+        LEAST_RECENTLY_USED("LEAST_RECENTLY_USED", "最近最久未使用"),
         FAILOVER("FAILOVER", "故障转移"),
         BUSYOVER("BUSYOVER", "忙碌转移"),
-        SHARDING_BORADCAST("SHARDING_BORADCAST", "分片广播");
+        SHARDING_BROADCAST("SHARDING_BROADCAST", "分片广播");
         
         private final String type;
         private final String title;

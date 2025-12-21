@@ -645,3 +645,79 @@
     -fx-stroke: #FFFFFF;
 }
 
+/* ============ 执行日志CodeArea样式 ============ */
+
+.log-code-area {
+    -fx-font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    -fx-font-size: 13px;
+    -fx-background-color: #FAFAFA;
+    -fx-text-fill: #1F2937;
+}
+
+.log-code-area .text {
+    -fx-fill: #1F2937;
+}
+
+/* 行号样式 */
+.log-code-area .lineno {
+    -fx-background-color: #F3F4F6;
+    -fx-text-fill: #9CA3AF;
+    -fx-font-size: 12px;
+    -fx-padding: 0 8 0 8;
+}
+
+/* 错误日志行样式 - 红色 */
+.log-error {
+    -fx-fill: #DC2626;
+    -rtfx-background-color: rgba(220, 38, 38, 0.08);
+}
+
+/* 警告日志行样式 - 橙色 */
+.log-warn {
+    -fx-fill: #D97706;
+    -rtfx-background-color: rgba(217, 119, 6, 0.08);
+}
+
+/* 成功日志行样式 - 绿色 */
+.log-success {
+    -fx-fill: #059669;
+    -rtfx-background-color: rgba(5, 150, 105, 0.08);
+}
+
+/* 时间戳样式 - 灰色 */
+.log-timestamp {
+    -fx-fill: #9CA3AF;
+}
+
+/* 选中文本样式 */
+.log-code-area .selection {
+    -fx-fill: #C7D2FE;
+}
+
+/* 光标样式 */
+.log-code-area .caret {
+    -fx-stroke: #6366F1;
+}
+
+/* CodeArea内部滚动条 */
+.log-code-area .scroll-bar:vertical .track {
+    -fx-background-color: #F3F4F6;
+}
+
+.log-code-area .scroll-bar:vertical .thumb {
+    -fx-background-color: #D1D5DB;
+    -fx-background-radius: 4;
+}
+
+.log-code-area .scroll-bar:vertical .thumb:hover {
+    -fx-background-color: #9CA3AF;
+}
+
+/* VirtualizedScrollPane样式 */
+.virtualized-scroll-pane {
+    -fx-background-color: #FAFAFA;
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 1;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+}

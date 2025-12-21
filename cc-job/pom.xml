@@ -31,7 +31,7 @@
         <druid.version>1.2.23</druid.version>
         <mybatis-plus.version>3.5.3</mybatis-plus.version>
         <knife4j.version>4.5.0</knife4j.version>
-        <mapstruct.version>1.6.3</mapstruct.version>
+        <mapstruct.version>1.5.5.Final</mapstruct.version>
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
         <easyexcel.version>3.2.1</easyexcel.version>
         <okhttp3.version>4.12.0</okhttp3.version>
@@ -74,7 +74,7 @@
             <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
             <maven-javadoc-plugin.version>3.6.3</maven-javadoc-plugin.version>
             <maven-gpg-plugin.version>3.2.3</maven-gpg-plugin.version>
-            <lombok.version>1.18.30</lombok.version>
+            <lombok.version>1.18.42</lombok.version>
     </properties>
 
     <dependencyManagement>
@@ -187,11 +187,25 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
-                    <version>3.11.0</version>
+                    <version>3.13.0</version>
                     <configuration>
                         <source>${maven.compiler.source}</source>
                         <target>${maven.compiler.target}</target>
                         <encoding>${project.build.sourceEncoding}</encoding>
+                        <!-- 允许 Lombok 访问 JDK 内部 API，解决 JDK 17+ 兼容性问题 -->
+                        <fork>true</fork>
+                        <compilerArgs>
+                            <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
+                            <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
+                            <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
+                            <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>
+                            <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED</arg>
+                            <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED</arg>
+                            <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</arg>
+                            <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
+                            <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
+                            <arg>-parameters</arg>
+                        </compilerArgs>
                     </configuration>
                 </plugin>
             </plugins>

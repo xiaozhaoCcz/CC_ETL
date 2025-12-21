@@ -165,7 +165,7 @@ public class TaskExecutor {
     private String handleTriggerFailure(JobInfo jobInfo) {
         logger.error("[TaskExecutor] 任务触发失败 - jobId: {}", jobInfo.getId());
         
-        if (!DO_NOTHING.equalsIgnoreCase(jobInfo.getExecutorBlockStrategy())) {
+        if (!DO_NOTHING.equalsIgnoreCase(jobInfo.getFailStrategy())) {
             return FAIL_RETRY;
         } else {
             logger.warn("[TaskExecutor] 任务触发失败但忽略继续执行 - jobId: {}", jobInfo.getId());
@@ -180,7 +180,7 @@ public class TaskExecutor {
         logger.error("[TaskExecutor] 任务执行超时 - jobId: {}, nodeId: {}, 超时: {}秒",
                 jobInfo.getId(), node.getId(), jobInfo.getExecutorTimeout());
 
-        if (!DO_NOTHING.equalsIgnoreCase(jobInfo.getExecutorBlockStrategy())) {
+        if (!DO_NOTHING.equalsIgnoreCase(jobInfo.getFailStrategy())) {
             throw new RuntimeException("任务执行超时");
         } else {
             logger.warn("[TaskExecutor] 任务执行超时但忽略继续执行 - jobId: {}", jobInfo.getId());

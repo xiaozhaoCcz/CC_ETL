@@ -104,12 +104,12 @@ public class JobExecutionMonitor implements Callable<String> {
             if (currentRetryCount < jobInfo.getExecutorFailRetryCount()) {
                 logger.warn("[JobMonitor] 任务执行失败，准备重试 - jobId: {}, 当前重试次数: {}/{}", 
                         jobInfo.getId(), currentRetryCount, jobInfo.getExecutorFailRetryCount());
-                if(ExecutorConstants.ExecutionResult.DO_NOTHING.equals(jobInfo.getExecutorBlockStrategy())) {
+                if(ExecutorConstants.ExecutionResult.DO_NOTHING.equals(jobInfo.getFailStrategy())) {
                     return ExecutorConstants.ExecutionResult.DO_NOTHING;
                 }
                 return ExecutorConstants.ExecutionResult.FAIL_RETRY;
             } else {
-                if(ExecutorConstants.ExecutionResult.DO_NOTHING.equals(jobInfo.getExecutorBlockStrategy())) {
+                if(ExecutorConstants.ExecutionResult.DO_NOTHING.equals(jobInfo.getFailStrategy())) {
                     return ExecutorConstants.ExecutionResult.DO_NOTHING;
                 }
                 return ExecutorConstants.ExecutionResult.FAIL_COMPLETE;

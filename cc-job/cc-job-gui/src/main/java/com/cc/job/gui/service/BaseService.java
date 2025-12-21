@@ -11,9 +11,11 @@ import com.cc.job.gui.util.ApiUtil;
  */
 public abstract class BaseService {
 
-    public ApiUtil apiUtil;
+    protected ApiUtil apiUtil;
+    protected HttpClientUtil httpClient;
 
     public BaseService() {
         this.apiUtil = ApiUtil.getInstance();
+        this.httpClient = new HttpClientUtil(apiUtil);
     }
 }

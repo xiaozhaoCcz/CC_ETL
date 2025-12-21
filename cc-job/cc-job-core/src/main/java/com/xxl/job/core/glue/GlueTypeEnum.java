@@ -10,10 +10,11 @@ public enum GlueTypeEnum {
     BEAN("BEAN", false, null, null),
     GLUE_GROOVY("GLUE(Java)", false, null, null),
     GLUE_SHELL("GLUE(Shell)", true, "bash", ".sh"),
-    GLUE_PYTHON("GLUE(Python)", true, "python", ".py"),
+    GLUE_PYTHON("GLUE(Python)", true, "python3", ".py"),
     GLUE_PHP("GLUE(PHP)", true, "php", ".php"),
     GLUE_NODEJS("GLUE(Nodejs)", true, "node", ".js"),
-    GLUE_POWERSHELL("GLUE(PowerShell)", true, "powershell", ".ps1");
+    GLUE_POWERSHELL("GLUE(PowerShell)", true, "powershell", ".ps1"),
+    GLUE_CSHARP("GLUE(C#)", false, null, null);
 
     private String desc;
     private boolean isScript;

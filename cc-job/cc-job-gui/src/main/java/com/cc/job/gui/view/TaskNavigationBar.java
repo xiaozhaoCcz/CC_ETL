@@ -327,18 +327,18 @@ public class TaskNavigationBar extends HBox {
             // 判断是否是关闭当前标签页
             boolean isClosingCurrentTab = taskGroupId.equals(currentTaskGroupId);
             
-            // 触发关闭回调，通知外部清除树形视图的选中状态
-            // 注意：如果关闭的是当前标签页，会立即切换到新标签页，不需要清除选中状态
-            if (closeCallback != null && !isClosingCurrentTab && taskGroupName != null) {
-                closeCallback.onTaskClose(taskGroupId, taskGroupName);
-            }
-            
             // 如果删除的是当前标签，切换到第一个标签
             if (isClosingCurrentTab && !tabs.isEmpty()) {
                 Long firstTabId = tabs.keySet().iterator().next();
                 switchToTaskGroup(firstTabId);
             } else if (tabs.isEmpty()) {
                 currentTaskGroupId = null;
+            }
+            
+            // 触发关闭回调，通知外部处理（包括清空画布等）
+            // 注意：无论是否关闭当前标签页，都需要触发回调，以便外部可以检查是否所有标签页都已关闭
+            if (closeCallback != null && taskGroupName != null) {
+                closeCallback.onTaskClose(taskGroupId, taskGroupName);
             }
         }
     }

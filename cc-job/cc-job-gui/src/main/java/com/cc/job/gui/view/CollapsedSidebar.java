@@ -66,6 +66,11 @@ public class CollapsedSidebar extends VBox {
         });
         
         getChildren().addAll(treeViewButton, miniMapButton, logPanelButton);
+        
+        // 初始状态：所有面板都可见，所以所有恢复按钮都隐藏
+        showTreeViewButton(false);
+        showMiniMapButton(false);
+        showLogPanelButton(false);
     }
     
     private Button createIconButton(FontIcon icon, String tooltipText) {

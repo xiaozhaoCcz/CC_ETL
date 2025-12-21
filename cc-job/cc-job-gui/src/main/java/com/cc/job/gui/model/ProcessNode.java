@@ -40,6 +40,10 @@ public class ProcessNode extends StackPane {
     private double initialLayoutX;
     private double initialLayoutY;
     
+    // 拖拽优化：记录节点内部偏移
+    private double mouseOffsetInNodeX;
+    private double mouseOffsetInNodeY;
+    
     // 连接点
     private Circle topConnector;
     private Circle bottomConnector;
@@ -68,6 +72,8 @@ public class ProcessNode extends StackPane {
     
     // 禁用/启用节点回调
     private DisableNodeCallback onDisable;
+
+
     
     public interface DisableNodeCallback {
         void onDisableNode(Long jobId, boolean isDisabled);
@@ -283,8 +289,16 @@ public class ProcessNode extends StackPane {
             if (e.isPrimaryButtonDown() && !isConnectorClick(e.getTarget())) {
                 initialLayoutX = this.getLayoutX();
                 initialLayoutY = this.getLayoutY();
+                
+                // 优化：记录鼠标在节点内部的偏移位置（使用节点局部坐标）
+                // 这样当画布扩展或滚动时，拖拽计算不会受到影响
+                mouseOffsetInNodeX = e.getX();
+                mouseOffsetInNodeY = e.getY();
+                
+                // 同时保留旧的计算方式作为备份
                 dragStartX = e.getSceneX() - this.getLayoutX();
                 dragStartY = e.getSceneY() - this.getLayoutY();
+                
                 this.setCursor(Cursor.CLOSED_HAND);
                 this.toFront(); // 拖拽时置于顶层
                 if (onDragStarted != null) {
@@ -297,30 +311,38 @@ public class ProcessNode extends StackPane {
         // 拖拽中
         this.setOnMouseDragged(e -> {
             if (e.isPrimaryButtonDown() && !isConnectorClick(e.getTarget())) {
-                double newX = e.getSceneX() - dragStartX;
-                double newY = e.getSceneY() - dragStartY;
-
-                double adjustedX = Math.max(0, newX);
-                double adjustedY = Math.max(0, newY);
-
-                if (positionAdjuster != null) {
-                    Point2D adjustedPoint = positionAdjuster.adjust(this, adjustedX, adjustedY);
-                    if (adjustedPoint != null) {
-                        adjustedX = adjustedPoint.getX();
-                        adjustedY = adjustedPoint.getY();
+                // 优化：使用父容器坐标系计算新位置
+                // 将场景坐标转换为父容器（画布）坐标
+                javafx.scene.Node parent = this.getParent();
+                if (parent != null) {
+                    Point2D parentCoords = parent.sceneToLocal(e.getSceneX(), e.getSceneY());
+                    
+                    // 新位置 = 鼠标在父容器中的位置 - 鼠标在节点内的偏移
+                    double newX = parentCoords.getX() - mouseOffsetInNodeX;
+                    double newY = parentCoords.getY() - mouseOffsetInNodeY;
+                    
+                    double adjustedX = Math.max(0, newX);
+                    double adjustedY = Math.max(0, newY);
+                    
+                    if (positionAdjuster != null) {
+                        Point2D adjustedPoint = positionAdjuster.adjust(this, adjustedX, adjustedY);
+                        if (adjustedPoint != null) {
+                            adjustedX = adjustedPoint.getX();
+                            adjustedY = adjustedPoint.getY();
+                        }
                     }
-                }
-
-                this.setLayoutX(adjustedX);
-                this.setLayoutY(adjustedY);
-
-                if (onPositionChanged != null) {
-                    onPositionChanged.accept(this);
-                }
-                
-                // 触发拖动回调
-                if (onDragged != null) {
-                    onDragged.run();
+                    
+                    this.setLayoutX(adjustedX);
+                    this.setLayoutY(adjustedY);
+                    
+                    if (onPositionChanged != null) {
+                        onPositionChanged.accept(this);
+                    }
+                    
+                    // 触发拖动回调
+                    if (onDragged != null) {
+                        onDragged.run();
+                    }
                 }
                 
                 e.consume();
@@ -573,6 +595,16 @@ public class ProcessNode extends StackPane {
     
     public void setOnDisable(DisableNodeCallback callback) {
         this.onDisable = callback;
+    }
+    
+    /**
+     * 调整拖拽起始点，用于在画布扩展时保持拖拽位置的正确性
+     * @param deltaX X方向的偏移量
+     * @param deltaY Y方向的偏移量
+     */
+    public void adjustDragStart(double deltaX, double deltaY) {
+        dragStartX += deltaX;
+        dragStartY += deltaY;
     }
 
     public interface DragFinishedListener {

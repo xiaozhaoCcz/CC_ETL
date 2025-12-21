@@ -11,6 +11,7 @@ import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
@@ -56,6 +57,8 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
     private TextArea executorParamArea;
     private ComboBox<String> reqTypeCombo;
     private TextField reqUrlField;
+    private Label reqBodyLabel;
+    private TextArea reqBodyArea;
     private ParameterTable bodyTable;
     
     private JobJdbcDatasourceService datasourceService;
@@ -65,7 +68,11 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
     private TextField executorTimeoutField;
     private ComboBox<RouteStrategy> routeStrategyCombo;
     private ComboBox<BlockStrategy> blockStrategyCombo;
+    private ComboBox<FailStrategy> failStrategyCombo;
     private Spinner<Integer> executorFailRetryCountSpinner;
+    
+    // 高级配置中需要根据节点类型切换显示的组件
+    private Label failStrategyLabel;
     private TextArea glueEditorArea;
     private String glueRemark; // 存储 GLUE 备注
     private GlueType lastGlueType = null; // 记录上一次的GLUE类型，用于检测类型变化
@@ -139,7 +146,7 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
             Button saveButton = (Button) getDialogPane().lookupButton(saveButtonType);
             if (saveButton != null) {
                 // 拦截ActionEvent（按钮的默认行为），验证失败时阻止对话框关闭
-                saveButton.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+                saveButton.addEventFilter(ActionEvent.ACTION, event -> {
                     if (!validateForm()) {
                         event.consume(); // 验证失败，阻止事件传播，防止对话框关闭
                     }
@@ -419,9 +426,7 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         });
     }
     
-    /**
-     * 创建高级配置部分
-     */
+
     private VBox createAdvancedSection() {
         VBox section = createSection("高级配置", IconUtil.wrenchIcon());
         
@@ -438,6 +443,23 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         routeStrategyCombo.getItems().addAll(RouteStrategy.values());
         routeStrategyCombo.setValue(RouteStrategy.FIRST);
         
+        // 阻塞处理策略
+        Label blockStrategyLabel = createFormLabel("阻塞处理策略", true);
+        blockStrategyCombo = new ComboBox<>();
+        blockStrategyCombo.setPrefWidth(300);
+        blockStrategyCombo.setPromptText("请选择阻塞策略");
+        blockStrategyCombo.getItems().addAll(BlockStrategy.values());
+        blockStrategyCombo.setValue(BlockStrategy.SERIAL_EXECUTION);
+        
+        // 失败策略（任务组内子节点显示）
+        failStrategyLabel = createFormLabel("失败策略", true);
+        failStrategyCombo = new ComboBox<>();
+        failStrategyCombo.setPrefWidth(300);
+        failStrategyCombo.setPromptText("请选择失败策略");
+        failStrategyCombo.getItems().addAll(FailStrategy.values());
+        failStrategyCombo.setValue(FailStrategy.JOB_FAIL);
+
+        
         // 任务超时时间
         Label timeoutLabel = createFormLabel("任务超时时间(秒)", false);
         executorTimeoutField = new TextField();
@@ -445,29 +467,28 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         executorTimeoutField.setPromptText("单位：秒");
         executorTimeoutField.setText("300");
         
-        // 任务失败策略
-        Label blockStrategyLabel = createFormLabel("任务失败策略", true);
-        blockStrategyCombo = new ComboBox<>();
-        blockStrategyCombo.setPrefWidth(300);
-        blockStrategyCombo.setPromptText("请选择失败策略");
-        blockStrategyCombo.getItems().addAll(BlockStrategy.values());
-        blockStrategyCombo.setValue(BlockStrategy.SERIAL_EXECUTION);
-        
-        // 任务重试次数
-        Label retryLabel = createFormLabel("任务重试次数", false);
+        // 失败重试次数
+        Label retryLabel = createFormLabel("失败重试次数", false);
         executorFailRetryCountSpinner = new Spinner<>(0, 10, 0);
         executorFailRetryCountSpinner.setPrefWidth(300);
         executorFailRetryCountSpinner.setEditable(true);
         
+        // 第一行：路由策略 + 失败策略
         grid.add(routeStrategyLabel, 0, 0);
         grid.add(routeStrategyCombo, 1, 0);
-        grid.add(timeoutLabel, 2, 0);
-        grid.add(executorTimeoutField, 3, 0);
+        grid.add(failStrategyLabel, 2, 0);
+        grid.add(failStrategyCombo, 3, 0);
+
         
-        grid.add(blockStrategyLabel, 0, 1);
-        grid.add(blockStrategyCombo, 1, 1);
-        grid.add(retryLabel, 2, 1);
-        grid.add(executorFailRetryCountSpinner, 3, 1);
+        // 第二行：任务超时时间 + 阻塞处理策略
+        grid.add(timeoutLabel, 0, 1);
+        grid.add(executorTimeoutField, 1, 1);
+        grid.add(blockStrategyLabel, 2, 1);
+        grid.add(blockStrategyCombo, 3, 1);
+        
+        // 第三行：失败重试次数
+        grid.add(retryLabel, 0, 2);
+        grid.add(executorFailRetryCountSpinner, 1, 2);
         
         section.getChildren().add(grid);
         return section;
@@ -506,10 +527,27 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         reqUrlField.setPrefWidth(400);
         reqUrlField.setPromptText("请输入请求地址");
 
+        // 请求体（POST/PUT时显示）
+        reqBodyLabel = createFormLabel("请求体", false);
+        reqBodyArea = new TextArea();
+        reqBodyArea.setPrefWidth(615);
+        reqBodyArea.setPrefRowCount(6);
+        reqBodyArea.setPromptText("请输入JSON格式的请求体");
+        reqBodyArea.setWrapText(true);
+        reqBodyArea.setVisible(false);
+        reqBodyArea.setManaged(false);
+
         grid.add(reqTypeLabel, 0, 0);
         grid.add(reqTypeCombo, 1, 0);
         grid.add(reqUrlLabel, 0, 1);
         grid.add(reqUrlField, 1, 1, 3, 1);
+        grid.add(reqBodyLabel, 0, 2);
+        grid.add(reqBodyArea, 1, 2, 3, 1);
+
+        // 监听请求类型变化，显示/隐藏请求体
+        reqTypeCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
+            updateRequestBodyVisibility(newVal);
+        });
 
         bodyTable = new ParameterTable("请求参数");
 
@@ -522,6 +560,21 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         executorParamLabel.setManaged(visible);
         executorParamArea.setVisible(visible);
         executorParamArea.setManaged(visible);
+    }
+    
+    /**
+     * 根据请求类型更新请求体输入框的可见性
+     */
+    private void updateRequestBodyVisibility(String reqType) {
+        boolean shouldShow = "POST".equals(reqType) || "PUT".equals(reqType);
+        if (reqBodyLabel != null) {
+            reqBodyLabel.setVisible(shouldShow);
+            reqBodyLabel.setManaged(shouldShow);
+        }
+        if (reqBodyArea != null) {
+            reqBodyArea.setVisible(shouldShow);
+            reqBodyArea.setManaged(shouldShow);
+        }
     }
 
     /**
@@ -572,6 +625,10 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
                 bodyTable.ensureAtLeastOneRow();
                 // 更新标签文本
                 updateHandlerLabel("JobHandler");
+                // 根据当前请求类型显示/隐藏请求体
+                if (reqTypeCombo != null) {
+                    updateRequestBodyVisibility(reqTypeCombo.getValue());
+                }
             }
             default -> {
                 // GLUE 模式：显示按钮，隐藏输入框
@@ -828,6 +885,7 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         if (data.getExecutorRouteStrategy() != null && !data.getExecutorRouteStrategy().equals("FIRST")) {
             return true;
         }
+        // 调度过期策略固定为DO_NOTHING，不需要检查
         if (data.getExecutorBlockStrategy() != null && !data.getExecutorBlockStrategy().equals("SERIAL_EXECUTION")) {
             return true;
         }
@@ -835,6 +893,14 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
             return true;
         }
         if (data.getExecutorFailRetryCount() != null && data.getExecutorFailRetryCount() != 0) {
+            return true;
+        }
+        // 普通任务/任务组：检查子任务ID
+        if (parentJobId == null && data.getChildJobId() != null && !data.getChildJobId().trim().isEmpty()) {
+            return true;
+        }
+        // 任务组内子节点：检查失败策略
+        if (parentJobId != null && data.getFailStrategy() != null && !data.getFailStrategy().equals("JOB_FAIL")) {
             return true;
         }
         return false;
@@ -885,9 +951,14 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         if (glueType == GlueType.API) {
             if (data.getReqType() != null) {
                 reqTypeCombo.setValue(data.getReqType());
+                // 设置请求类型后，更新请求体可见性
+                updateRequestBodyVisibility(data.getReqType());
             }
             if (data.getReqUrl() != null) {
                 reqUrlField.setText(data.getReqUrl());
+            }
+            if (data.getReqBody() != null) {
+                reqBodyArea.setText(data.getReqBody());
             }
             // 只使用一个参数表格，优先使用executorParam，如果没有则使用reqHeader
             String paramData = data.getExecutorParam();
@@ -909,6 +980,7 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
                 routeStrategyCombo.setValue(RouteStrategy.FIRST);
             }
         }
+        // 调度过期策略固定为DO_NOTHING，不需要从表单数据填充
         if (data.getExecutorBlockStrategy() != null) {
             try {
                 blockStrategyCombo.setValue(BlockStrategy.valueOf(data.getExecutorBlockStrategy()));
@@ -918,6 +990,15 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         }
         if (data.getExecutorTimeout() != null) executorTimeoutField.setText(String.valueOf(data.getExecutorTimeout()));
         if (data.getExecutorFailRetryCount() != null) executorFailRetryCountSpinner.getValueFactory().setValue(data.getExecutorFailRetryCount());
+
+        // 任务组内子节点：填充失败策略
+        if (data.getFailStrategy() != null) {
+            try {
+                failStrategyCombo.setValue(FailStrategy.valueOf(data.getFailStrategy()));
+            } catch (Exception e) {
+                failStrategyCombo.setValue(FailStrategy.JOB_FAIL);
+            }
+        }
     }
     
     /**
@@ -969,6 +1050,13 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
             form.setReqType(reqType != null ? reqType : "GET");
             String reqUrl = reqUrlField.getText() != null ? reqUrlField.getText().trim() : "";
             form.setReqUrl(reqUrl);
+            // 如果是POST或PUT，设置请求体
+            if ("POST".equals(reqType) || "PUT".equals(reqType)) {
+                String reqBody = reqBodyArea.getText() != null ? reqBodyArea.getText().trim() : "";
+                form.setReqBody(reqBody.isEmpty() ? null : reqBody);
+            } else {
+                form.setReqBody(null);
+            }
             form.setReqHeader(null); // 不再使用请求头表格
             form.setExecutorParam(bodyTable.toJson());
         } else {
@@ -980,6 +1068,8 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         
         // 高级配置
         form.setExecutorRouteStrategy(routeStrategyCombo.getValue().getType());
+        // 调度过期策略固定为DO_NOTHING
+        form.setMisfireStrategy(MisfireStrategy.DO_NOTHING.getType());
         form.setExecutorBlockStrategy(blockStrategyCombo.getValue().getType());
         
         try {
@@ -989,12 +1079,14 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         }
         
         form.setExecutorFailRetryCount(executorFailRetryCountSpinner.getValue());
-        
+
+        // 任务组内子节点：设置失败策略
+        form.setFailStrategy(failStrategyCombo.getValue().getType());
+        form.setChildJobId(null); // 子节点不需要子任务ID
+
         // 固定字段
-        form.setMisfireStrategy("DO_NOTHING");
         form.setScheduleType("NONE");
         form.setJobType(0); // 普通任务节点
-        // 路由策略已经在高级配置部分设置，不需要在这里覆盖
 
         return form;
     }
@@ -1039,7 +1131,11 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
             errors.append("• 请选择路由策略\n");
         }
         if (blockStrategyCombo.getValue() == null) {
-            errors.append("• 请选择任务失败策略\n");
+            errors.append("• 请选择阻塞处理策略\n");
+        }
+        // 任务组内子节点需要验证失败策略
+        if (parentJobId != null && failStrategyCombo.getValue() == null) {
+            errors.append("• 请选择失败策略\n");
         }
         
         if (errors.length() > 0) {
@@ -1262,7 +1358,8 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         GLUE_PYTHON("GLUE_PYTHON", "GLUE(Python)", true, false),
         GLUE_PHP("GLUE_PHP", "GLUE(PHP)", true, false),
         GLUE_NODEJS("GLUE_NODEJS", "GLUE(Nodejs)", true, false),
-        GLUE_POWERSHELL("GLUE_POWERSHELL", "GLUE(PowerShell)", true, false);
+        GLUE_POWERSHELL("GLUE_POWERSHELL", "GLUE(PowerShell)", true, false),
+        GLUE_CSHARP("GLUE_CSHARP", "GLUE(C#)", true, false);
         
         private final String type;
         private final String title;
@@ -1301,11 +1398,11 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         ROUND("ROUND", "轮询"),
         RANDOM("RANDOM", "随机"),
         CONSISTENT_HASH("CONSISTENT_HASH", "一致性哈希"),
-        LEASTY_FREQUENTY_USED("LEASTY_FREQUENTY_USED", "最不经常使用"),
-        LEASTY_RECENTLY_USED("LEASTY_RECENTLY_USED", "最近最久未使用"),
+        LEAST_FREQUENTLY_USED("LEAST_FREQUENTLY_USED", "最不经常使用"),
+        LEAST_RECENTLY_USED("LEAST_RECENTLY_USED", "最近最久未使用"),
         FAILOVER("FAILOVER", "故障转移"),
         BUSYOVER("BUSYOVER", "忙碌转移"),
-        SHARDING_BORADCAST("SHARDING_BORADCAST", "分片广播");
+        SHARDING_BROADCAST("SHARDING_BROADCAST", "分片广播");
         
         private final String type;
         private final String title;
@@ -1320,9 +1417,44 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         public String toString() { return title; }
     }
     
+    public enum MisfireStrategy {
+        DO_NOTHING("DO_NOTHING", "忽略"),
+        FIRE_ONCE_NOW("FIRE_ONCE_NOW", "立即执行一次");
+        
+        private final String type;
+        private final String title;
+        
+        MisfireStrategy(String type, String title) {
+            this.type = type;
+            this.title = title;
+        }
+        
+        public String getType() { return type; }
+        @Override
+        public String toString() { return title; }
+    }
+    
+    public enum FailStrategy {
+        DO_NOTHING("DO_NOTHING", "忽略"),
+        JOB_FAIL("JOB_FAIL", "失败");
+        
+        private final String type;
+        private final String title;
+        
+        FailStrategy(String type, String title) {
+            this.type = type;
+            this.title = title;
+        }
+        
+        public String getType() { return type; }
+        @Override
+        public String toString() { return title; }
+    }
+    
     public enum BlockStrategy {
         SERIAL_EXECUTION("SERIAL_EXECUTION", "单机串行"),
-        DO_NOTHING("DO_NOTHING", "忽略");
+        DISCARD_LATER("DISCARD_LATER", "丢弃后续调度"),
+        COVER_EARLY("COVER_EARLY", "覆盖之前调度");
         
         private final String type;
         private final String title;
