@@ -10,6 +10,7 @@ import com.cc.job.xo.model.entity.*;
 import com.cc.job.xo.model.form.JobEdgeForm;
 import com.cc.job.xo.model.form.JobGlueForm;
 import com.cc.job.admin.task.service.JobInfoService;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.cc.job.xo.model.form.JobInfoForm;
@@ -408,14 +409,14 @@ public class JobInfoController {
                     }
                 } catch (Exception e) {
                     // 查询失败时，使用 jobId 作为 parentJobId
-                    org.slf4j.LoggerFactory.getLogger(getClass()).warn(
+                    LoggerFactory.getLogger(getClass()).warn(
                             "查询 parentJobId 失败，使用 jobId 作为 parentJobId - jobId: {}", jobId, e);
                     parentJobId = jobId;
                 }
             }
             
             // 记录日志
-            org.slf4j.LoggerFactory.getLogger(getClass()).info(
+           LoggerFactory.getLogger(getClass()).info(
                     "收到任务状态上报 - parentJobId: {}, jobId: {}, randomId: {}, status: {}, message: {}", 
                     parentJobId, jobId, randomId, status, message);
             

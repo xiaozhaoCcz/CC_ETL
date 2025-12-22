@@ -382,6 +382,12 @@ public class TaskGroupOrchestrator {
     private void updateTaskGroupStatus(Long taskGroupId, String executionBatchId, 
                                       ExecutionContext context, List<WorkerWrapper<Long, String>> workerWrappers) {
         try {
+            boolean success = adminApiClient.updateRankTriggerStatus(taskGroupId, 0);
+            if (success) {
+                logger.info("[Orchestrator] 任务组运行状态已更新 - taskGroupId: {}", taskGroupId);
+            } else {
+                logger.error("[Orchestrator] 任务组运行状态更新失败 - taskGroupId: {}", taskGroupId);
+            }
             // 收集并保存节点执行状态
             if (context != null && workerWrappers != null) {
                 collectAndSaveNodeStatus(taskGroupId, executionBatchId, context, workerWrappers);
