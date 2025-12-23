@@ -885,7 +885,7 @@ xxl:
 
 #### ⚙️ 执行器配置
 
-编辑 `cc-job/cc-job-executor-samples/cc-job-executor-sample-springboot/src/main/resources/application.yml`：
+编辑 `cc-job/cc-job-executor/cc-job-executor-sample-springboot/src/main/resources/application.yml`：
 
 ```yaml
 server:
@@ -912,6 +912,33 @@ xxl:
       logretentiondays: 30
 ```
 
+#### ⚙️ 执行器配置
+```yaml
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/cc_job_admin?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    username: your_username
+    password: your_password
+    
+cc-job:
+  job:
+    admin:
+      ### datax admin address list, such as "http://address" or "http://address01,http://address02"
+      #addresses: http://127.0.0.1:8080
+      addresses: http://127.0.0.1:8989/xxl-job-admin
+    executor:
+      appname: cc-job-executor-compose
+      address:
+      ip:
+      port: 15000
+      ### job log path
+      logpath: your_logPath
+      ### job log retention days
+      logretentiondays: 30
+    ### job, access token
+    accessToken: default_token
+```
 
 #### 2.3 启动后端服务
 
@@ -930,10 +957,19 @@ mvn spring-boot:run
 
 ```bash
 # 方式一：使用 IDE 运行
-# 运行 cc-job-executor-sample-springboot 模块的启动类
+# 运行 cc-job-executor-springboot 模块的启动类
 
 # 方式二：使用命令行
-cd cc-job/cc-job-executor-samples/cc-job-executor-sample-springboot
+cd cc-job/cc-job-executor/cc-job-executor-springboot
+mvn spring-boot:run
+```
+**启动 Compose 服务**：
+```bash
+# 方式一：使用 IDE 运行
+# 运行 cc-job-executor-compose-springboot 模块的启动类
+
+# 方式二：使用命令行
+cd cc-job/cc-job-executor-compose/cc-job-executor-compose-springboot
 mvn spring-boot:run
 ```
 
@@ -944,7 +980,20 @@ mvn spring-boot:run
 
 ### 4️⃣ PC 端启动
 
-PC 端为 JavaFX 应用，直接运行主类即可：
+PC 端为 JavaFX 应用，添加VM参数后直接运行主类即可：
+```bash
+#MAC 注意替换为自己MAVEN仓库地址
+--module-path
+/Users/xiaozhao/.m2/repository/org/openjfx/javafx-controls/21.0.1/javafx-controls-21.0.1-mac-aarch64.jar:/Users/xiaozhao/.m2/repository/org/openjfx/javafx-graphics/21.0.1/javafx-graphics-21.0.1-mac-aarch64.jar:/Users/xiaozhao/.m2/repository/org/openjfx/javafx-base/21.0.1/javafx-base-21.0.1-mac-aarch64.jar:/Users/xiaozhao/.m2/repository/org/openjfx/javafx-fxml/21.0.1/javafx-fxml-21.0.1-mac-aarch64.jar
+--add-modules
+javafx.controls,javafx.fxml
+
+#WIN 注意替换为自己MAVEN仓库地址
+--module-path
+D:/Software/maven/repository/org/openjfx/javafx-controls/21.0.1/javafx-controls-21.0.1-win.jar;D:/Software/maven/repository/org/openjfx/javafx-graphics/21.0.1/javafx-graphics-21.0.1-win.jar;D:/Software/maven/repository/org/openjfx/javafx-base/21.0.1/javafx-base-21.0.1-win.jar;D:/Software/maven/repository/org/openjfx/javafx-fxml/21.0.1/javafx-fxml-21.0.1-win.jar
+--add-modules
+javafx.controls,javafx.fxml
+```
 
 ```bash
 cd cc-job/cc-job-gui
@@ -970,7 +1019,7 @@ python ./bin/datax.py ./job/job.json
 
 #### 5.3 配置 Executor 中的 DataX 路径
 
-在 Executor 配置文件中添加：
+在 cc-job-executor 配置文件中添加：
 
 ```yaml
 cc-job:
