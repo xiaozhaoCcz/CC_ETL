@@ -267,7 +267,7 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
                         collectGroupNodeIdsRecursively(childNodes, allNodes, allGroupNodeIds, allChildNodeIds);
                     }
                 } catch (Exception e) {
-                    System.out.println("【collectGroupNodeIdsRecursively】解析子节点ID失败: " + childrenStr + ", 错误: " + e.getMessage());
+                    throw new BusinessException("解析子节点ID失败: " + childrenStr+ ", 错误: " + e.getMessage());
                 }
             }
         }
@@ -523,8 +523,6 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
         // 将去重后的节点列表重新赋值
         lfNodes = new ArrayList<>(nodeMap.values());
         
-        // ⭐ 调试日志：记录去重前后的节点数量
-        System.out.println("【updateJobCompose】前端发送的节点数量（去重后）: " + lfNodes.size() + ", 边数量: " + lfEdges.size());
 
         // ⭐ 修复：递归收集所有层级的任务组节点ID和子节点ID，确保嵌套的任务组节点也能被正确处理
         Set<String> allGroupNodeIds = new HashSet<>(); // 所有层级的任务组节点ID
@@ -536,8 +534,6 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
         
         // 递归收集任务组节点ID和子节点ID
         collectGroupNodeIdsRecursively(lfNodes, allNodesMap, allGroupNodeIds, allChildNodeIds);
-        
-        System.out.println("【updateJobCompose】收集到的任务组节点数量: " + allGroupNodeIds.size() + ", 子节点数量: " + allChildNodeIds.size());
 
         // ⭐ 修复：过滤掉任务组节点的子节点，但保留所有层级的任务组节点本身
         // 子节点会通过任务组节点的children属性传递，后端会递归处理
@@ -555,23 +551,19 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
         Map<String, Long> nodeIdMap = new HashMap<>();
         List<JobNode> nodeFromDb = jobNodeService.list(new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, jobInfo.getId()));
         List<JobNode> updateNodes = new ArrayList<>();
-        
-        // ⭐ 调试日志：记录数据库中的节点数量和前端发送的节点数量
-        System.out.println("【operateToUpdateJobCompose】数据库中的节点数量: " + nodeFromDb.size() + ", 前端发送的节点数量: " + nodeList.size());
+
 
         List<LfNode> filterNodelList = nodeList.stream().filter(f -> nodeFromDb.stream().map(JobNode::getId).toList().contains(Long.parseLong(f.getId()))).toList();
         for (LfNode node : filterNodelList) {
             Map<String, Object> properties = JSONUtil.toBean(node.getProperties(), Map.class);
             Object jobIdObj = properties.get(JOB_ID);
             if (jobIdObj == null) {
-                System.out.println("【operateToUpdateJobCompose】警告：节点 " + node.getId() + " 没有 jobId，跳过该节点");
                 continue;  // 跳过没有 jobId 的节点
             }
             Long jobId = Long.parseLong(String.valueOf(jobIdObj));
             JobInfo jobInfo1 = jobInfoService.getById(jobId);
             // ⭐ 修复：如果 jobInfo1 为 null，跳过该节点并记录警告（而不是抛出异常）
             if (jobInfo1 == null) {
-                System.out.println("【operateToUpdateJobCompose】警告：节点关联的任务不存在，jobId: " + jobId + ", nodeId: " + node.getId() + "，跳过该节点");
                 continue;  // 跳过关联任务不存在的节点，避免整个保存失败
             }
             if (node.getId().contains("-")) {
@@ -622,17 +614,11 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
                         Long nodeJobId = Long.parseLong(String.valueOf(nodeJobIdObj));
                         // 通过jobId查找节点（粘贴的节点可能已经保存）
                         jobNode = nodeFromDb.stream().filter(n -> n.getJobId().equals(nodeJobId)).findFirst().orElse(null);
-                        if (jobNode != null) {
-                            System.out.println("【operateToUpdateJobCompose】通过jobId找到节点: jobId=" + nodeJobId + ", nodeId=" + jobNode.getId());
-                        } else {
-                            System.out.println("【operateToUpdateJobCompose】通过jobId未找到节点: jobId=" + nodeJobId);
-                        }
                     }
                 }
                 
                 // ⭐ 修复：如果找不到已存在的节点，可能是新粘贴的节点，需要创建新节点 ！！！！废弃代码
                 if (jobNode == null) {
-                    System.out.println("【operateToUpdateJobCompose】创建新节点: nodeId=" + node.getId() + ", jobId=" + jobId);
                     // 创建新节点（类似包含"-"的逻辑）
                     JobInfo copyJobInfo = BeanUtil.copyProperties(jobInfo1, JobInfo.class, "id");
                     // ⭐ 修复：检查 copyJobInfo 是否为 null
