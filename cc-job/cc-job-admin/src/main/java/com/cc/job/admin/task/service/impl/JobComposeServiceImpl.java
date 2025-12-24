@@ -21,9 +21,12 @@ import com.cc.job.xo.model.form.JobInfoForm;
 import com.cc.job.xo.model.vo.JobEdgeVo;
 import com.cc.job.xo.model.vo.JobNodeVo;
 import org.apache.commons.lang3.StringUtils;
-import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Objects;
 
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
@@ -34,7 +37,9 @@ import static com.cc.job.admin.task.service.impl.JobInfoServiceImpl.NODE_TYPE_MA
 
 @Service
 public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobCompose>  implements JobComposeService {
-
+    
+    private static final Logger logger = LoggerFactory.getLogger(JobComposeServiceImpl.class);
+    
     final JobInfoService jobInfoService;
 
     final JobNodeService jobNodeService;
@@ -696,6 +701,10 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
                     Map<String, Object> propertiesMap = JSONUtil.toBean(node.properties, Map.class);
                     jobNode.setNodePositionX(node.x);
                     jobNode.setNodePositionY(node.y);
+                    
+                    // ⭐ 关键修复：不更新 trigger_status 字段，保留数据库中的值
+                    // 因为运行时会由执行器更新状态，这里只更新位置和配置
+                    // trigger_status 应该由任务执行流程控制，而不是由保存操作覆盖
                     // ⭐ 修复：统一规范化节点类型，确保任务组节点类型为 "CustomGroup"（大写）
                     String normalizedType = node.type;
                     if (DYNAMIC_GROUP.equalsIgnoreCase(node.type) || "custom-group".equalsIgnoreCase(node.type)) {
@@ -777,7 +786,13 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
         
         // ⭐ 修复：只有当有需要更新的节点时，才执行批量更新
         if (!updateNodes.isEmpty()) {
+            // ⭐ 关键修复：批量更新前，将所有节点的 trigger_status 设置为 null
+            // 这样 MyBatis-Plus 就不会更新这个字段，保留数据库中的实际状态
+            // trigger_status 应该由任务执行流程控制，而不是由保存操作覆盖
+            updateNodes.forEach(node -> node.setTriggerStatus(null));
+            
             jobNodeService.updateBatchById(updateNodes);
+
         }
 
         // 处理边

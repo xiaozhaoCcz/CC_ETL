@@ -165,7 +165,6 @@ public class NodeCanvas extends Pane {
      */
     public void setOnRequestSave(Runnable callback) {
         this.onRequestSave = callback;
-        log("✅ 自动保存回调已设置");
     }
     
     // ==================== Getters ====================
@@ -708,20 +707,11 @@ public class NodeCanvas extends Pane {
         autoSaveTransition = new PauseTransition(Duration.seconds(AUTO_SAVE_DELAY_SECONDS));
         autoSaveTransition.setOnFinished(e -> {
             
-            // 双重检查：确保自动保存仍然启用且有未保存更改
-            if (autoSaveEnabled && hasUnsavedChanges && onRequestSave != null) {
-                onRequestSave.run();
-                hasUnsavedChanges = false;
-            } else {
-                // 详细记录为什么没有保存
-                if (!autoSaveEnabled) {
-                    log("⚠️ 自动保存已被禁用，取消保存");
-                } else if (!hasUnsavedChanges) {
-                    log("ℹ️ 没有未保存的更改，取消保存");
-                } else if (onRequestSave == null) {
-                    log("❌ 保存回调未设置，无法保存");
-                }
-            }
+              // 双重检查：确保自动保存仍然启用且有未保存更改
+              if (autoSaveEnabled && hasUnsavedChanges && onRequestSave != null) {
+                  onRequestSave.run();
+                  hasUnsavedChanges = false;
+              }
         });
         
         // 监听鼠标离开画布事件
@@ -760,20 +750,10 @@ public class NodeCanvas extends Pane {
      * 触发自动保存
      */
     private void triggerAutoSave() {
-
-        
         // 只在自动保存启用且有未保存更改时触发
         if (autoSaveEnabled && hasUnsavedChanges && onRequestSave != null) {
             // 延迟触发保存，避免频繁保存
             autoSaveTransition.playFromStart();
-        } else {
-            if (!autoSaveEnabled) {
-                log("⚠️ 自动保存已禁用，跳过");
-            } else if (!hasUnsavedChanges) {
-                log("ℹ️ 无未保存更改，跳过");
-            } else if (onRequestSave == null) {
-                log("❌ 保存回调未设置，跳过");
-            }
         }
     }
     
@@ -793,11 +773,7 @@ public class NodeCanvas extends Pane {
     public void markAsUnsaved() {
         // 只在自动保存启用时才标记（避免在加载数据时误标记）
         if (autoSaveEnabled) {
-            if (!this.hasUnsavedChanges) {
-                this.hasUnsavedChanges = true;
-            }
-        } else {
-            log("⚠️ 自动保存已禁用，跳过标记未保存");
+            this.hasUnsavedChanges = true;
         }
     }
     
@@ -829,13 +805,6 @@ public class NodeCanvas extends Pane {
      */
     public boolean hasUnsavedChanges() {
         return this.hasUnsavedChanges;
-    }
-    
-    /**
-     * 测试方法：手动触发自动保存（用于调试）
-     */
-    public void testTriggerAutoSave() {
-        triggerAutoSave();
     }
     
     // ==================== 画布右键菜单 ====================
@@ -1349,8 +1318,6 @@ public class NodeCanvas extends Pane {
     }
     
     private void log(String message) { 
-        // 同时输出到控制台和GUI日志面板
-        System.out.println("[NodeCanvas] " + message);
         if (logCallback != null) {
             logCallback.log(message);
         }

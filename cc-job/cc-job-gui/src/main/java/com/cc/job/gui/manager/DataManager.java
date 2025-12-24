@@ -112,11 +112,28 @@ public class DataManager {
     }
     
     /**
-     * 保存或更新任务组
+     * 保存或更新任务组（异步执行，不阻塞调用线程）
      */
     public void saveOrUpdateJob(Long currentTaskGroupId) {
+        saveOrUpdateJobInternal(currentTaskGroupId, true);
+    }
+    
+    /**
+     * 保存或更新任务组（同步执行，会阻塞调用线程）
+     * ⚠️ 此方法会阻塞，必须在后台线程中调用，不要在JavaFX主线程中调用
+     */
+    public void saveOrUpdateJobSync(Long currentTaskGroupId) {
+        saveOrUpdateJobInternal(currentTaskGroupId, false);
+    }
+    
+    /**
+     * 保存或更新任务组（内部方法）
+     * @param currentTaskGroupId 任务组ID
+     * @param async 是否异步执行
+     */
+    private void saveOrUpdateJobInternal(Long currentTaskGroupId, boolean async) {
         logPanel.info("════════════════════════════════");
-        logPanel.info("💾 开始保存任务组数据...");
+        logPanel.info("💾 开始保存任务组数据... (" + (async ? "异步" : "同步") + ")");
         
         if (currentTaskGroupId == null || currentTaskGroupId == 0) {
             NotificationToast.showWarning("请先选择一个任务组后再进行保存操作。");
@@ -127,33 +144,15 @@ public class DataManager {
         List<NodeConnection> connections = canvas.getConnections();
         List<GroupContainer> groups = canvas.getGroupContainers();
         
-        // 过滤出有效节点（必须有jobId）
-        List<ProcessNode> validNodes = nodes.stream()
-            .filter(node -> node.getJobId() != null)
-            .toList();
-        
-        // 检查是否所有节点都有jobId，如果有节点没有jobId则警告
-        if (validNodes.size() < nodes.size()) {
-            int invalidCount = nodes.size() - validNodes.size();
-            logPanel.warn(String.format("⚠ 检测到 %d 个节点没有jobId，将跳过保存这些节点", invalidCount));
-        }
-        
-        // 如果没有任何有效数据，不执行保存
-        if (validNodes.isEmpty() && groups.isEmpty() && connections.isEmpty()) {
-            logPanel.warn("⚠ 画布为空，取消保存操作");
-            logPanel.info("════════════════════════════════");
-            return;
-        }
-        
-        logPanel.info(String.format("节点: %d (有效: %d), 连接: %d, 任务组: %d", 
-            nodes.size(), validNodes.size(), connections.size(), groups.size()));
+        logPanel.info(String.format("节点: %d, 连接: %d, 任务组: %d", 
+            nodes.size(), connections.size(), groups.size()));
         
         try {
-            // 构建节点数据（只保存有效节点）
+            // 构建节点数据
             Set<String> addedNodeIds = new HashSet<>();
             List<Map<String, Object>> nodesData = new ArrayList<>();
             
-            for (ProcessNode node : validNodes) {
+            for (ProcessNode node : nodes) {
                 if (node.getNodeId() == null || addedNodeIds.contains(node.getNodeId())) continue;
                 
                 Map<String, Object> nodeData = new HashMap<>();
@@ -163,7 +162,9 @@ public class DataManager {
                 nodeData.put("y", node.getY());
                 
                 Map<String, Object> propertiesMap = new HashMap<>();
-                propertiesMap.put("jobId", node.getJobId());
+                if (node.getJobId() != null) {
+                    propertiesMap.put("jobId", node.getJobId());
+                }
                 nodeData.put("properties", apiUtil.getGson().toJson(propertiesMap));
                 
                 nodesData.add(nodeData);
@@ -225,7 +226,8 @@ public class DataManager {
             String nodesJson = apiUtil.getGson().toJson(nodesData);
             String edgesJson = apiUtil.getGson().toJson(edgesData);
             
-            new Thread(() -> {
+            // 保存逻辑封装为 Runnable
+            Runnable saveTask = () -> {
                 try {
                     JobInfoForm formData = jobInfoService.getFormData(currentTaskGroupId);
                     if (formData == null) {
@@ -257,7 +259,14 @@ public class DataManager {
                         logPanel.info("════════════════════════════════");
                     });
                 }
-            }).start();
+            };
+            
+            // 根据参数决定同步或异步执行
+            if (async) {
+                new Thread(saveTask).start();
+            } else {
+                saveTask.run();
+            }
             
         } catch (Exception e) {
             logger.error("转换数据失败", e);

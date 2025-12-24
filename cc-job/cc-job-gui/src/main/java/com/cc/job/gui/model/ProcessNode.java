@@ -958,6 +958,10 @@ public class ProcessNode extends StackPane {
         }
         
         switch (statusCode) {
+            case -1:
+                // 未运行状态（任务组启动时会将所有子节点重置为此状态）
+                updateStatus(NodeStatus.IDLE);
+                break;
             case 0:
                 updateStatus(NodeStatus.FAILED);
                 break;

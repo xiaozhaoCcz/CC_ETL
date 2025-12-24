@@ -6,6 +6,7 @@ import com.cc.job.gui.service.JobInfoService;
 import com.cc.job.gui.service.JobLogService;
 import com.cc.job.gui.service.SSEService;
 import com.cc.job.gui.util.ApiUtil;
+import com.cc.job.gui.util.NodeStatusSyncManager;
 import com.cc.job.gui.util.NotificationToast;
 import com.cc.job.gui.util.SessionManager;
 import com.cc.job.gui.util.SnowflakeIdGenerator;
@@ -56,6 +57,7 @@ public class TaskExecutionManager {
     public void triggerJobExecution(Long currentJobId, String jobName) {
         if (currentJobId == null || currentJobId == 0) {
             NotificationToast.showWarning("未选择任务组");
+            toolBar.setRunButtonLoading(false);
             return;
         }
         
@@ -64,6 +66,7 @@ public class TaskExecutionManager {
         if (existingJob != null && existingJob.isRunning()) {
            NotificationToast.show("任务组"+ currentJobId + " 正在运行中，请稍后再试",
                NotificationToast.NotificationType.WARNING);
+            toolBar.setRunButtonLoading(false);
             return;
         }
         
@@ -77,6 +80,10 @@ public class TaskExecutionManager {
                         NotificationToast.show("任务组"+ currentJobId + " 正在运行中，请稍后再试",
                            NotificationToast.NotificationType.WARNING);
                         logPanel.info("提示：该任务组可能正在其他客户端或服务器实例上运行");
+                        toolBar.setRunButtonLoading(false);
+                        
+                        // ⭐ 从服务器同步节点状态（任务可能正在运行）
+                        canvas.syncPendingNodeStatus();
                         return;
                     }
                     continueJobExecution(currentJobId, jobName);
@@ -86,6 +93,10 @@ public class TaskExecutionManager {
                 Platform.runLater(() -> {
                     logPanel.warn("⚠ 检查任务组运行状态失败: " + e.getMessage());
                     logPanel.warn("为安全起见，取消本次任务启动");
+                    toolBar.setRunButtonLoading(false);
+                    
+                    // ⭐ 检查失败时，同步节点状态（显示实际状态）
+                    canvas.syncPendingNodeStatus();
                 });
             }
         }).start();
@@ -108,13 +119,6 @@ public class TaskExecutionManager {
         updateToolBarRunningJobs();
         canvas.setAllConnectionsRunning(true);
         
-        // 重置所有节点状态为空闲
-        Platform.runLater(() -> {
-            for (ProcessNode node : canvas.getNodes()) {
-                node.updateStatus(ProcessNode.NodeStatus.IDLE);
-            }
-        });
-        
         // 连接SSE
         SSEService.getInstance().connect(currentJobId, randomId, message -> {
             handleSSEMessage(message, randomId);
@@ -128,6 +132,9 @@ public class TaskExecutionManager {
                 
                 Platform.runLater(() -> {
                     logPanel.success("✓ 任务已提交，日志ID: " + logId);
+                    
+                    // 任务提交成功后，同步节点状态（后端已将所有子节点状态设置为-1）
+                    canvas.syncPendingNodeStatus();
                 });
                 
                 startLogPolling(runningJob);
@@ -136,10 +143,20 @@ public class TaskExecutionManager {
                 logger.error("触发任务执行失败: {}", e.getMessage(), e);
                 Platform.runLater(() -> {
                     logPanel.error("✗ 任务执行失败: " + e.getMessage());
+                    
+                    // ⭐ 任务触发失败时，清除节点状态缓存并刷新显示
+                    NodeStatusSyncManager.getInstance().clearCacheForTaskGroupSwitch();
+                    
+                    // ⭐ 将所有节点状态设置为失败（红色）
+                    for (ProcessNode node : canvas.getNodes()) {
+                        node.updateStatus(ProcessNode.NodeStatus.FAILED);
+                    }
+                    
                     runningJob.cleanup();
                     runningJobs.remove(currentJobId);
                     updateToolBarRunningJobs();
                     canvas.setAllConnectionsRunning(false);
+                    toolBar.setRunButtonLoading(false);
                 });
             }
         }).start();

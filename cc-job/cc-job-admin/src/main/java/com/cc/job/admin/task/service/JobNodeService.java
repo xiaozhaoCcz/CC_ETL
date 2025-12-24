@@ -3,6 +3,8 @@ package com.cc.job.admin.task.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.cc.job.xo.model.entity.JobNode;
 
+import java.util.Map;
+
 public interface JobNodeService extends IService<JobNode> {
     
     /**
@@ -18,7 +20,7 @@ public interface JobNodeService extends IService<JobNode> {
      * @param statusMap 节点状态映射 Map<jobId, triggerStatus>
      * @return 成功更新的数量
      */
-    int batchUpdateNodeStatus(java.util.Map<Long, Integer> statusMap);
+    int batchUpdateNodeStatus(Map<Long, Integer> statusMap);
     
     /**
      * 重置任务组中所有节点的运行状态为未运行状态（-1）

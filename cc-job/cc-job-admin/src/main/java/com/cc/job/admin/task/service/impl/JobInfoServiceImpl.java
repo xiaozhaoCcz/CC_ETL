@@ -352,6 +352,41 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         String finalRandomId = randomId;
         Long logId = transactionTemplate.execute(status -> {
             try {
+                // ⭐ 【重要】如果是任务组，先重置所有子节点状态为-1（未运行）
+                // 必须在事务中执行，确保状态更新被提交
+                if (taskInfo.getJobType() == 2) {
+                    List<JobNode> childNodes = jobNodeService.list(
+                        new LambdaQueryWrapper<JobNode>()
+                            .eq(JobNode::getJobParentId, jobId)
+                            .eq(JobNode::getIsDeleted, 0)
+                    );
+                    
+                    if (childNodes != null && !childNodes.isEmpty()) {
+                        log.info("[JobGroup] 准备重置子节点状态 - jobId: {}, 节点数: {}", jobId, childNodes.size());
+                        
+                        // ⭐ 关键修复：逐个更新而不是批量更新，确保在事务中生效
+                        int updateCount = 0;
+                        for (JobNode node : childNodes) {
+                            log.debug("[JobGroup] 节点ID: {}, JobID: {}, 重置前状态: {} -> 重置后: -1", 
+                                node.getId(), node.getJobId(), node.getTriggerStatus());
+                            
+                            node.setTriggerStatus(-1);
+                            boolean updated = jobNodeService.updateById(node);
+                            if (updated) {
+                                updateCount++;
+                            } else {
+                                log.warn("[JobGroup] 节点状态更新失败 - nodeId: {}, jobId: {}", 
+                                    node.getId(), node.getJobId());
+                            }
+                        }
+                        
+                        log.info("[JobGroup] ✓ 成功重置 {}/{} 个子节点状态为未运行(-1) - jobId: {}", 
+                            updateCount, childNodes.size(), jobId);
+                    } else {
+                        log.warn("[JobGroup] 未找到子节点 - jobId: {}", jobId);
+                    }
+                }
+                
                 // 【快照模式】如果是任务组，创建快照
                 if (taskInfo.getJobType() == 2 && StringUtils.isNotBlank(finalRandomId)) {
                     String nodesJson = getNodesJsonForSnapshot(jobId);

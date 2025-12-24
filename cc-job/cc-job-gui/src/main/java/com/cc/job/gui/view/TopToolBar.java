@@ -5,6 +5,9 @@ import com.cc.job.gui.util.IconUtil;
 import com.cc.job.gui.util.SessionManager;
 import com.cc.job.gui.util.StyleUtil;
 import com.cc.job.xo.model.entity.JobGroup;
+import javafx.animation.Animation;
+import javafx.animation.Interpolator;
+import javafx.animation.RotateTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -20,6 +23,7 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -684,6 +688,46 @@ public class TopToolBar extends VBox {
     }
     
     /**
+     * 设置运行按钮的加载状态
+     * @param loading true显示加载动画，false恢复正常
+     */
+    public void setRunButtonLoading(boolean loading) {
+        Platform.runLater(() -> {
+            if (loading) {
+                // 显示加载中状态
+                runButton.setText("准备中");
+                runButton.setGraphic(createSpinnerIcon());
+                runButton.setDisable(true);
+            } else {
+                // 恢复正常状态
+                runButton.setText("开始");
+                runButton.setGraphic(IconUtil.playIcon());
+                runButton.setDisable(false);
+            }
+        });
+    }
+    
+    /**
+     * 创建旋转的加载图标
+     */
+    private Node createSpinnerIcon() {
+        Circle circle = new Circle(6);
+        circle.setFill(Color.TRANSPARENT);
+        circle.setStroke(Color.WHITE);
+        circle.setStrokeWidth(2);
+        circle.getStrokeDashArray().addAll(3.0, 2.0);
+        
+        // 创建旋转动画
+        RotateTransition rotateTransition = new RotateTransition(Duration.seconds(1), circle);
+        rotateTransition.setByAngle(360);
+        rotateTransition.setCycleCount(Animation.INDEFINITE);
+        rotateTransition.setInterpolator(Interpolator.LINEAR);
+        rotateTransition.play();
+        
+        return circle;
+    }
+    
+    /**
      * 更新按钮状态
      */
     private void updateButtonState() {
@@ -692,6 +736,13 @@ public class TopToolBar extends VBox {
             boolean isCurrentRunning = currentTaskGroupId != null && 
                 runningJobs.containsKey(currentTaskGroupId) && 
                 runningJobs.get(currentTaskGroupId).isRunning();
+            
+            // 如果任务开始运行了，清除加载状态
+            if (isCurrentRunning) {
+                // 恢复按钮正常状态（如果之前是加载状态）
+                runButton.setText("开始");
+                runButton.setGraphic(IconUtil.playIcon());
+            }
             
             // 获取当前登录用户ID
             String currentUserId = SessionManager.getInstance().getUserId();
@@ -719,6 +770,9 @@ public class TopToolBar extends VBox {
                     "-fx-cursor: default;"
                 );
             } else {
+                // 任务未运行时，恢复按钮正常状态（清除可能的加载状态）
+                runButton.setText("开始");
+                runButton.setGraphic(IconUtil.playIcon());
                 runButton.setDisable(false);
                 StyleUtil.applySuccessButtonHover(runButton);
             }
