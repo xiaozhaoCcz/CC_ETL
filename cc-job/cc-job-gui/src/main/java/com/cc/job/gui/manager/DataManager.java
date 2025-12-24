@@ -55,6 +55,9 @@ public class DataManager {
         logPanel.info("════════════════════════════════");
         logPanel.info("开始加载任务组: " + taskName);
         
+        // 在加载前禁用自动保存，防止加载过程中误触发保存
+        canvas.disableAutoSave();
+        
         new Thread(() -> {
             try {
                 canvas.syncPendingNodeStatusBlocking();
@@ -63,32 +66,46 @@ public class DataManager {
                 JobComposeData composeData = jobPartService.getJobCompose(taskId);
                 
                 Platform.runLater(() -> {
-                    NodeStatusSyncManager.getInstance().clearCacheForTaskGroupSwitch();
-                    
-                    if (composeData != null) {
-                        canvas.loadFromComposeData(composeData);
-                        setupEditCallbacks(composeData);
+                    try {
+                        NodeStatusSyncManager.getInstance().clearCacheForTaskGroupSwitch();
                         
-                        int nodeCount = composeData.getNodes() != null ? composeData.getNodes().size() : 0;
-                        int edgeCount = composeData.getEdges() != null ? composeData.getEdges().size() : 0;
-                        
-                        logPanel.success("✓ 任务组加载成功！");
-                        logPanel.info("节点数: " + nodeCount + ", 连接数: " + edgeCount);
-                        
-                        // 调用数据加载完成回调
-                        if (onDataLoadedCallback != null) {
-                            onDataLoadedCallback.run();
+                        if (composeData != null) {
+                            canvas.loadFromComposeData(composeData);
+                            setupEditCallbacks(composeData);
+                            
+                            int nodeCount = composeData.getNodes() != null ? composeData.getNodes().size() : 0;
+                            int edgeCount = composeData.getEdges() != null ? composeData.getEdges().size() : 0;
+                            
+                            logPanel.success("✓ 任务组加载成功！");
+                            logPanel.info("节点数: " + nodeCount + ", 连接数: " + edgeCount);
+                            
+                            // 清除未保存标记（刚加载的数据是已保存状态）
+                            canvas.markAsSaved();
+                            
+                            // 调用数据加载完成回调
+                            if (onDataLoadedCallback != null) {
+                                onDataLoadedCallback.run();
+                            }
+                        } else {
+                            logPanel.warn("⚠ 任务组数据为空");
+                            canvas.clear();
+                            canvas.markAsSaved();
                         }
-                    } else {
-                        logPanel.warn("⚠ 任务组数据为空");
-                        canvas.clear();
+                    } finally {
+                        // 确保无论如何都重新启用自动保存
+                        canvas.enableAutoSave();
+                        logPanel.info("════════════════════════════════");
                     }
-                    logPanel.info("════════════════════════════════");
                 });
             } catch (Exception e) {
                 logger.error("加载任务组数据失败", e);
                 Platform.runLater(() -> {
-                    logPanel.error("✗ 加载失败: " + e.getMessage());
+                    try {
+                        logPanel.error("✗ 加载失败: " + e.getMessage());
+                    } finally {
+                        // 确保即使加载失败也要重新启用自动保存
+                        canvas.enableAutoSave();
+                    }
                 });
             }
         }).start();
@@ -110,14 +127,33 @@ public class DataManager {
         List<NodeConnection> connections = canvas.getConnections();
         List<GroupContainer> groups = canvas.getGroupContainers();
         
-        logPanel.info(String.format("节点: %d, 连接: %d, 任务组: %d", nodes.size(), connections.size(), groups.size()));
+        // 过滤出有效节点（必须有jobId）
+        List<ProcessNode> validNodes = nodes.stream()
+            .filter(node -> node.getJobId() != null)
+            .toList();
+        
+        // 检查是否所有节点都有jobId，如果有节点没有jobId则警告
+        if (validNodes.size() < nodes.size()) {
+            int invalidCount = nodes.size() - validNodes.size();
+            logPanel.warn(String.format("⚠ 检测到 %d 个节点没有jobId，将跳过保存这些节点", invalidCount));
+        }
+        
+        // 如果没有任何有效数据，不执行保存
+        if (validNodes.isEmpty() && groups.isEmpty() && connections.isEmpty()) {
+            logPanel.warn("⚠ 画布为空，取消保存操作");
+            logPanel.info("════════════════════════════════");
+            return;
+        }
+        
+        logPanel.info(String.format("节点: %d (有效: %d), 连接: %d, 任务组: %d", 
+            nodes.size(), validNodes.size(), connections.size(), groups.size()));
         
         try {
-            // 构建节点数据
+            // 构建节点数据（只保存有效节点）
             Set<String> addedNodeIds = new HashSet<>();
             List<Map<String, Object>> nodesData = new ArrayList<>();
             
-            for (ProcessNode node : nodes) {
+            for (ProcessNode node : validNodes) {
                 if (node.getNodeId() == null || addedNodeIds.contains(node.getNodeId())) continue;
                 
                 Map<String, Object> nodeData = new HashMap<>();
@@ -127,9 +163,7 @@ public class DataManager {
                 nodeData.put("y", node.getY());
                 
                 Map<String, Object> propertiesMap = new HashMap<>();
-                if (node.getJobId() != null) {
-                    propertiesMap.put("jobId", node.getJobId());
-                }
+                propertiesMap.put("jobId", node.getJobId());
                 nodeData.put("properties", apiUtil.getGson().toJson(propertiesMap));
                 
                 nodesData.add(nodeData);
