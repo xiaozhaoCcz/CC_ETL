@@ -363,25 +363,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
                     
                     if (childNodes != null && !childNodes.isEmpty()) {
                         log.info("[JobGroup] 准备重置子节点状态 - jobId: {}, 节点数: {}", jobId, childNodes.size());
-                        
-                        // ⭐ 关键修复：逐个更新而不是批量更新，确保在事务中生效
-                        int updateCount = 0;
-                        for (JobNode node : childNodes) {
-                            log.debug("[JobGroup] 节点ID: {}, JobID: {}, 重置前状态: {} -> 重置后: -1", 
-                                node.getId(), node.getJobId(), node.getTriggerStatus());
-                            
-                            node.setTriggerStatus(-1);
-                            boolean updated = jobNodeService.updateById(node);
-                            if (updated) {
-                                updateCount++;
-                            } else {
-                                log.warn("[JobGroup] 节点状态更新失败 - nodeId: {}, jobId: {}", 
-                                    node.getId(), node.getJobId());
-                            }
-                        }
-                        
-                        log.info("[JobGroup] ✓ 成功重置 {}/{} 个子节点状态为未运行(-1) - jobId: {}", 
-                            updateCount, childNodes.size(), jobId);
+                        childNodes.forEach(node->node.setTriggerStatus(-1));
+                        jobNodeService.updateBatchById(childNodes);
                     } else {
                         log.warn("[JobGroup] 未找到子节点 - jobId: {}", jobId);
                     }
