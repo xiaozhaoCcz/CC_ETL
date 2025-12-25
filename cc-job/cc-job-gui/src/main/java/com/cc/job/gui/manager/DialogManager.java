@@ -30,6 +30,14 @@ public class DialogManager {
     private final JobGroupService jobGroupService;
     private final JobPartService jobPartService;
     
+    // 对话框实例缓存，避免重复创建
+    private ShowJobListDialog jobListDialog;
+    private ShowExecutorListDialog executorListDialog;
+    private ShowJobLogListDialog jobLogListDialog;
+    private ShowDatasourceListDialog datasourceListDialog;
+    private ShowDataxSyncDialog dataxSyncDialog;
+    private ShowDataxGroupSyncDialog dataxGroupSyncDialog;
+    
     public DialogManager(Stage ownerStage, LogPanel logPanel) {
         this.ownerStage = ownerStage;
         this.logPanel = logPanel;
@@ -205,48 +213,114 @@ public class DialogManager {
      * 显示任务列表对话框
      */
     public void showJobListDialog() {
-        ShowJobListDialog dialog = new ShowJobListDialog(ownerStage);
-        dialog.show();
+        // 如果对话框已经打开，直接将其置于前台
+        if (jobListDialog != null && jobListDialog.isShowing()) {
+            jobListDialog.getDialogPane().getScene().getWindow().requestFocus();
+            return;
+        }
+        
+        // 创建新对话框
+        jobListDialog = new ShowJobListDialog(ownerStage);
+        
+        // 监听对话框关闭事件，清空缓存
+        jobListDialog.setOnHidden(event -> jobListDialog = null);
+        
+        jobListDialog.show();
     }
     
     /**
      * 显示执行器列表对话框
      */
     public void showJobGroupListDialog() {
-        ShowExecutorListDialog dialog = new ShowExecutorListDialog(ownerStage);
-        dialog.show();
+        // 如果对话框已经打开，直接将其置于前台
+        if (executorListDialog != null && executorListDialog.isShowing()) {
+            executorListDialog.getDialogPane().getScene().getWindow().requestFocus();
+            return;
+        }
+        
+        // 创建新对话框
+        executorListDialog = new ShowExecutorListDialog(ownerStage);
+        
+        // 监听对话框关闭事件，清空缓存
+        executorListDialog.setOnHidden(event -> executorListDialog = null);
+        
+        executorListDialog.show();
     }
     
     /**
      * 显示任务日志列表对话框
      */
     public void showJobLogListDialog() {
-        ShowJobLogListDialog dialog = new ShowJobLogListDialog(ownerStage);
-        dialog.show();
+        // 如果对话框已经打开，直接将其置于前台
+        if (jobLogListDialog != null && jobLogListDialog.isShowing()) {
+            jobLogListDialog.getDialogPane().getScene().getWindow().requestFocus();
+            return;
+        }
+        
+        // 创建新对话框
+        jobLogListDialog = new ShowJobLogListDialog(ownerStage);
+        
+        // 监听对话框关闭事件，清空缓存
+        jobLogListDialog.setOnHidden(event -> jobLogListDialog = null);
+        
+        jobLogListDialog.show();
     }
     
     /**
      * 显示数据源管理对话框
      */
     public void showDatasourceListDialog() {
-        ShowDatasourceListDialog dialog = new ShowDatasourceListDialog(ownerStage);
-        dialog.show();
+        // 如果对话框已经打开，直接将其置于前台
+        if (datasourceListDialog != null && datasourceListDialog.isShowing()) {
+            datasourceListDialog.getDialogPane().getScene().getWindow().requestFocus();
+            return;
+        }
+        
+        // 创建新对话框
+        datasourceListDialog = new ShowDatasourceListDialog(ownerStage);
+        
+        // 监听对话框关闭事件，清空缓存
+        datasourceListDialog.setOnHidden(event -> datasourceListDialog = null);
+        
+        datasourceListDialog.show();
     }
     
     /**
      * 显示数据源同步对话框
      */
     public void showDataxSyncDialog() {
-        ShowDataxSyncDialog dialog = new ShowDataxSyncDialog(ownerStage);
-        dialog.show();
+        // 如果对话框已经打开，直接将其置于前台
+        if (dataxSyncDialog != null && dataxSyncDialog.isShowing()) {
+            dataxSyncDialog.getDialogPane().getScene().getWindow().requestFocus();
+            return;
+        }
+        
+        // 创建新对话框
+        dataxSyncDialog = new ShowDataxSyncDialog(ownerStage);
+        
+        // 监听对话框关闭事件，清空缓存
+        dataxSyncDialog.setOnHidden(event -> dataxSyncDialog = null);
+        
+        dataxSyncDialog.show();
     }
     
     /**
      * 显示多数据源同步对话框
      */
     public void showDataxGroupSyncDialog() {
-        ShowDataxGroupSyncDialog dialog = new ShowDataxGroupSyncDialog(ownerStage);
-        dialog.show();
+        // 如果对话框已经打开，直接将其置于前台
+        if (dataxGroupSyncDialog != null && dataxGroupSyncDialog.isShowing()) {
+            dataxGroupSyncDialog.getDialogPane().getScene().getWindow().requestFocus();
+            return;
+        }
+        
+        // 创建新对话框
+        dataxGroupSyncDialog = new ShowDataxGroupSyncDialog(ownerStage);
+        
+        // 监听对话框关闭事件，清空缓存
+        dataxGroupSyncDialog.setOnHidden(event -> dataxGroupSyncDialog = null);
+        
+        dataxGroupSyncDialog.show();
     }
     
     /**

@@ -1,10 +1,14 @@
 package com.cc.job.admin.task.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cc.job.xo.model.entity.JobInfo;
+import com.cc.job.xo.model.entity.JobNode;
 import com.cc.job.admin.task.scheduler.XxlJobScheduler;
 import com.cc.job.admin.task.service.JobInfoService;
+import com.cc.job.admin.task.service.JobNodeService;
 import com.cc.job.admin.task.utils.DateUtils;
 import com.cc.job.admin.task.utils.I18nUtil;
 import com.xxl.job.core.biz.ExecutorBiz;
@@ -28,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.util.HtmlUtils;
 import org.slf4j.Logger;
@@ -44,9 +49,11 @@ public class JobLogServiceImpl extends ServiceImpl<JobLogMapper, JobLog> impleme
     private static final Logger log = LoggerFactory.getLogger(JobLogServiceImpl.class);
     
     private final JobInfoService taskInfoService;
+    private final JobNodeService jobNodeService;
 
-    public JobLogServiceImpl(JobInfoService taskInfoService) {
+    public JobLogServiceImpl(JobInfoService taskInfoService, JobNodeService jobNodeService) {
         this.taskInfoService = taskInfoService;
+        this.jobNodeService = jobNodeService;
     }
 
     /**
@@ -194,6 +201,7 @@ public class JobLogServiceImpl extends ServiceImpl<JobLogMapper, JobLog> impleme
      * @return 是否保存成功
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public boolean saveNodeStatus(Long taskGroupId, String executionBatchId, String nodeStatusJson) {
         try {
             log.info("[JobLogService] 保存节点状态 - taskGroupId: {}, batchId: {}", taskGroupId, executionBatchId);
@@ -225,11 +233,14 @@ public class JobLogServiceImpl extends ServiceImpl<JobLogMapper, JobLog> impleme
                 return false;
             }
             
-            // 更新 nodeStatus 字段
+            // 更新 nodeStatus 字段到 JobLog
             jobLog.setNodeStatus(nodeStatusJson);
             boolean success = this.updateById(jobLog);
             
             if (success) {
+                // ⭐ 重要：将节点状态同步更新到 job_node 表
+                updateJobNodeStatuses(taskGroupId, nodeStatusJson);
+                
                 // 简单统计节点数量（通过计算JSON中的节点数）
                 int nodeCount = 0;
                 if (nodeStatusJson != null && !nodeStatusJson.isEmpty()) {
@@ -252,6 +263,100 @@ public class JobLogServiceImpl extends ServiceImpl<JobLogMapper, JobLog> impleme
             log.error("[JobLogService] 保存节点状态异常 - taskGroupId: {}, batchId: {}", 
                     taskGroupId, executionBatchId, e);
             return false;
+        }
+    }
+    
+    /**
+     * 将节点状态更新到 job_node 表
+     * 
+     * @param taskGroupId 任务组ID
+     * @param nodeStatusJson 节点状态JSON（格式：{"nodeId": {"jobId": xxx, "status": 0/1/2}, ...}）
+     */
+    private void updateJobNodeStatuses(Long taskGroupId, String nodeStatusJson) {
+        try {
+            if (nodeStatusJson == null || nodeStatusJson.isEmpty()) {
+                return;
+            }
+            
+            // 解析 JSON 获取节点状态映射
+            JSONObject statusMap = JSONUtil.parseObj(nodeStatusJson);
+            if (statusMap == null || statusMap.isEmpty()) {
+                return;
+            }
+            
+            log.info("[JobLogService] 开始更新节点状态到 job_node 表 - taskGroupId: {}, 节点数: {}", 
+                    taskGroupId, statusMap.size());
+            
+            // 获取所有子节点
+            List<JobNode> childNodes = jobNodeService.list(
+                new LambdaQueryWrapper<JobNode>()
+                    .eq(JobNode::getJobParentId, taskGroupId)
+                    .eq(JobNode::getIsDeleted, 0)
+            );
+            
+            if (childNodes == null || childNodes.isEmpty()) {
+                log.warn("[JobLogService] 未找到任务组的子节点 - taskGroupId: {}", taskGroupId);
+                return;
+            }
+            
+            // 创建 jobId 到 JobNode 的映射
+            Map<Long, JobNode> jobNodeMap = childNodes.stream()
+                .collect(Collectors.toMap(JobNode::getJobId, node -> node));
+            
+            int updatedCount = 0;
+            
+            // 遍历状态JSON，更新对应节点的状态
+            for (Map.Entry<String, Object> entry : statusMap.entrySet()) {
+                try {
+                    if (!(entry.getValue() instanceof JSONObject)) {
+                        continue;
+                    }
+                    
+                    JSONObject nodeInfo = (JSONObject) entry.getValue();
+                    
+                    Long jobId = nodeInfo.getLong("jobId");
+                    Integer status = nodeInfo.getInt("status");
+                    
+                    // 如果有 jobId 和 status，更新对应节点
+                    if (jobId != null && status != null && jobNodeMap.containsKey(jobId)) {
+                        JobNode node = jobNodeMap.get(jobId);
+                        node.setTriggerStatus(status);
+                        updatedCount++;
+                    }
+                    
+                } catch (Exception e) {
+                    log.warn("[JobLogService] 解析单个节点状态失败 - nodeId: {}", entry.getKey(), e);
+                }
+            }
+            
+            // ⭐ 关键修复：逐个更新而不是批量更新，避免 "Transaction not enabled" 警告
+            if (updatedCount > 0) {
+                int successCount = 0;
+                for (JobNode node : childNodes) {
+                    if (node.getTriggerStatus() != null) {
+                        boolean updated = jobNodeService.updateById(node);
+                        if (updated) {
+                            successCount++;
+                            log.debug("[JobLogService] 更新节点状态 - nodeId: {}, jobId: {}, status: {}", 
+                                node.getId(), node.getJobId(), node.getTriggerStatus());
+                        } else {
+                            log.warn("[JobLogService] 节点状态更新失败 - nodeId: {}, jobId: {}", 
+                                node.getId(), node.getJobId());
+                        }
+                    }
+                }
+                
+                if (successCount > 0) {
+                    log.info("[JobLogService] ✓ 成功将 {} 个节点的最终状态更新到 job_node 表 - taskGroupId: {}", 
+                            successCount, taskGroupId);
+                } else {
+                    log.error("[JobLogService] ✗ 所有节点状态更新均失败 - taskGroupId: {}", taskGroupId);
+                }
+            }
+            
+        } catch (Exception e) {
+            log.error("[JobLogService] 更新节点状态到 job_node 表异常 - taskGroupId: {}", taskGroupId, e);
+            // 不抛出异常，避免影响主流程
         }
     }
 

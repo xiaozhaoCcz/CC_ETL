@@ -17,6 +17,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class JobNodeServiceImpl extends ServiceImpl<JobNodeMapper, JobNode> implements JobNodeService {
@@ -74,7 +75,7 @@ public class JobNodeServiceImpl extends ServiceImpl<JobNodeMapper, JobNode> impl
      * @return 成功更新的数量
      */
     @Override
-    public int batchUpdateNodeStatus(java.util.Map<Long, Integer> statusMap) {
+    public int batchUpdateNodeStatus(Map<Long, Integer> statusMap) {
         if (statusMap == null || statusMap.isEmpty()) {
             log.warn("批量更新节点状态 - 参数为空");
             return 0;
@@ -89,11 +90,11 @@ public class JobNodeServiceImpl extends ServiceImpl<JobNodeMapper, JobNode> impl
             
             // 2. 构建 jobId -> JobNode 的映射
             Map<Long, JobNode> nodeMap = nodes.stream()
-                .collect(java.util.stream.Collectors.toMap(JobNode::getJobId, n -> n, (existing, replacement) -> existing));
+                .collect(Collectors.toMap(JobNode::getJobId, n -> n, (existing, replacement) -> existing));
             
             // 3. 批量更新节点状态
             List<JobNode> updateNodes = new ArrayList<>();
-            for (java.util.Map.Entry<Long, Integer> entry : statusMap.entrySet()) {
+            for (Map.Entry<Long, Integer> entry : statusMap.entrySet()) {
                 Long jobId = entry.getKey();
                 Integer triggerStatus = entry.getValue();
                 

@@ -445,7 +445,7 @@ public class TaskGroupOrchestrator {
                 
                 // 从 WorkerWrapper 中获取执行状态
                 WorkerWrapper<Long, String> wrapper = wrapperMap.get(String.valueOf(node.getId()));
-                Integer status = 2; // 默认状态：2=运行中
+                Integer status = -1; // 未执行
                 
                 if (wrapper != null && wrapper.getWorkResult() != null) {
                     ResultState resultState = wrapper.getWorkResult().getResultState();
@@ -453,14 +453,24 @@ public class TaskGroupOrchestrator {
                         status = 1; // 成功
                     } else if (resultState == ResultState.EXCEPTION || resultState == ResultState.TIMEOUT) {
                         status = 0; // 失败
+                    } else if (resultState == ResultState.DEFAULT) {
+                        // ⭐ 修复：如果是默认状态（未执行），保持为 null，不保存
+                        status = -1;
                     } else {
-                        status = 2; // 运行中或未执行
+                        status = 2; // 运行中
                     }
                     logger.debug("[Orchestrator] 节点执行状态 - nodeId: {}, jobId: {}, resultState: {}, status: {}", 
                             node.getId(), nodeJobId, resultState, status);
                 } else {
-                    logger.warn("[Orchestrator] 未找到节点的 WorkerWrapper 或执行结果 - nodeId: {}, jobId: {}", 
+                    logger.warn("[Orchestrator] 未找到节点的 WorkerWrapper 或执行结果（节点未执行）- nodeId: {}, jobId: {}", 
                             node.getId(), nodeJobId);
+                }
+                
+                // ⭐ 修复：只保存真正执行过的节点（status 不为 null）
+                if (status == -1) {
+                    logger.info("[Orchestrator] 跳过未执行的节点 - nodeId: {}, jobId: {}", 
+                            node.getId(), nodeJobId);
+                    continue; // 跳过，不添加到 nodeStatusMap
                 }
                 
                 // 构建节点状态信息

@@ -238,6 +238,7 @@ public class Async {
         logger.info("[Async] 开始任务调度，总任务数: {}, 初始可执行任务数: {}", 
                 remaining.get(), zeroQueue.size());
 
+        // 图算法：拓扑排序算法
         while (true) {
             String id;
             try {

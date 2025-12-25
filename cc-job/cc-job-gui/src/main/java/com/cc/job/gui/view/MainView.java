@@ -213,6 +213,7 @@ public class MainView extends BorderPane {
 
             @Override
             public void onSave() {
+                // 异步保存，不阻塞主线程
                 dataManager.saveOrUpdateJob(pageStoreHelper.getCurrentTaskGroupId());
             }
 
@@ -262,7 +263,49 @@ public class MainView extends BorderPane {
             public void onRun() {
                 Long jobId = pageStoreHelper.getCurrentTaskGroupId();
                 String jobName = getJobNameById(jobId);
-                taskExecutionManager.triggerJobExecution(jobId, jobName != null ? jobName : "任务组" + jobId);
+                
+                // ⭐ 清除节点状态缓存（避免旧状态影响）
+                NodeStatusSyncManager.getInstance().clearCacheForTaskGroupSwitch();
+                
+                // ⭐ 立即重置所有节点状态为空闲（让用户立即看到变化）
+                for (ProcessNode node : canvas.getNodes()) {
+                    node.updateStatus(ProcessNode.NodeStatus.IDLE);
+                }
+                
+                // 立即显示加载状态（转圈圈）
+                toolBar.setRunButtonLoading(true);
+                
+                // 如果有未保存的更改，在后台同步保存（等待完成后再运行）
+                if (canvas.hasUnsavedChanges()) {
+                    logPanel.info("💾 运行前保存数据...");
+                    
+                    // ⭐ 关键修复：在新线程中同步保存数据，确保保存完成后再触发运行
+                    // 避免保存和运行的时序竞态问题
+                    new Thread(() -> {
+                        try {
+                            // 同步保存（会阻塞当前线程，直到保存完成）
+                            dataManager.saveOrUpdateJobSync(jobId);
+                            
+                            Platform.runLater(() -> {
+                                canvas.markAsSaved();
+                                logPanel.info("✓ 保存完成，开始运行任务");
+                                // 保存完成后开始运行
+                                taskExecutionManager.triggerJobExecution(jobId, jobName != null ? jobName : "任务组" + jobId);
+                            });
+                        } catch (Exception e) {
+                            Platform.runLater(() -> {
+                                toolBar.setRunButtonLoading(false);
+                                logPanel.error("保存失败: " + e.getMessage());
+                                
+                                // ⭐ 保存失败时，从服务器同步节点状态（恢复为实际状态）
+                                canvas.syncPendingNodeStatus();
+                            });
+                        }
+                    }).start();
+                } else {
+                    // 没有未保存更改，直接运行
+                    taskExecutionManager.triggerJobExecution(jobId, jobName != null ? jobName : "任务组" + jobId);
+                }
             }
 
             @Override
@@ -272,7 +315,9 @@ public class MainView extends BorderPane {
 
             @Override
             public void onClear() {
+                canvas.disableAutoSave();
                 canvas.clear();
+                canvas.enableAutoSave();
                 logPanel.warn("画布已清空");
             }
 
@@ -345,6 +390,13 @@ public class MainView extends BorderPane {
                     return;
                 }
                 
+                // 切换任务组前，先保存当前任务组的数据
+                Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
+                if (currentTaskGroupId != null && currentTaskGroupId != 0 && !currentTaskGroupId.equals(taskGroupId) && canvas.hasUnsavedChanges()) {
+                    dataManager.saveOrUpdateJob(currentTaskGroupId);
+                    canvas.markAsSaved();
+                }
+                
                 String displayName = (taskGroupName != null && !taskGroupName.isBlank())
                     ? taskGroupName
                     : ("任务组 " + taskGroupId);
@@ -360,6 +412,13 @@ public class MainView extends BorderPane {
 
         // 导航栏回调
         navigationBar.setOnTaskSwitch((taskGroupName, taskGroupId) -> {
+            // 切换任务组前，先保存当前任务组的数据（只在有未保存更改时）
+            Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
+            if (currentTaskGroupId != null && currentTaskGroupId != 0 && canvas.hasUnsavedChanges()) {
+                dataManager.saveOrUpdateJob(currentTaskGroupId);
+            }
+            canvas.markAsSaved();
+            
             Long resolvedTaskId = taskGroupId != null ? taskGroupId : findTaskGroupIdByName(taskGroupName);
             
             if (resolvedTaskId != null) {
@@ -380,11 +439,19 @@ public class MainView extends BorderPane {
         navigationBar.setOnTaskClose((taskGroupId, taskGroupName) -> {
             Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
             
-            // 如果关闭的是当前显示的任务组，需要清空画布
+            // 如果关闭的是当前显示的任务组，先保存数据再清空画布
             if (taskGroupId != null && taskGroupId.equals(currentTaskGroupId)) {
+                // 保存当前任务组的数据（只在有未保存更改时）
+                if (canvas.hasUnsavedChanges()) {
+                    dataManager.saveOrUpdateJob(currentTaskGroupId);
+                }
+                canvas.markAsSaved();
+                
                 treeView.clearSelection();
                 // 清空画布
+                canvas.disableAutoSave();
                 canvas.clear();
+                canvas.enableAutoSave();
                 // 清空当前页面状态
                 pageStoreHelper.setCurrentPage(null);
                 toolBar.setCurrentTaskGroupId(null);
@@ -395,7 +462,9 @@ public class MainView extends BorderPane {
             Long remainingTaskGroupId = navigationBar.getCurrentTaskGroupId();
             if (remainingTaskGroupId == null) {
                 // 所有标签页都已关闭，确保画布是空的
+                canvas.disableAutoSave();
                 canvas.clear();
+                canvas.enableAutoSave();
                 pageStoreHelper.setCurrentPage(null);
                 toolBar.setCurrentTaskGroupId(null);
                 logPanel.info("📋 所有任务组已关闭");
@@ -414,6 +483,16 @@ public class MainView extends BorderPane {
         canvas.setOnSelectionModeChanged(isActive -> {
             if (toolBar != null) {
                 toolBar.updateSelectionButtonState(isActive);
+            }
+        });
+        
+        // 设置自动保存回调（鼠标移开画布时自动保存）
+        canvas.setOnRequestSave(() -> {
+            Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
+            if (currentTaskGroupId != null && currentTaskGroupId != 0) {
+                // 异步保存，不阻塞主线程
+                dataManager.saveOrUpdateJob(currentTaskGroupId);
+                canvas.markAsSaved();
             }
         });
         
@@ -499,6 +578,13 @@ public class MainView extends BorderPane {
             @Override
             public void onTaskSelected(Long taskId, String taskName, Integer type) {
                 if (type != null && type == 1 && taskId != null) {
+                    // 切换任务组前，先保存当前任务组的数据
+                    Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
+                    if (currentTaskGroupId != null && currentTaskGroupId != 0 && !currentTaskGroupId.equals(taskId) && canvas.hasUnsavedChanges()) {
+                        dataManager.saveOrUpdateJob(currentTaskGroupId);
+                        canvas.markAsSaved();
+                    }
+                    
                     taskGroupNameToIdMap.put(taskName, taskId);
                     pageStoreHelper.setCurrentPage(taskId);
                     navigationBar.addOrSelectTask(taskName, taskId);

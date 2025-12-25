@@ -55,6 +55,9 @@ public class DataManager {
         logPanel.info("════════════════════════════════");
         logPanel.info("开始加载任务组: " + taskName);
         
+        // 在加载前禁用自动保存，防止加载过程中误触发保存
+        canvas.disableAutoSave();
+        
         new Thread(() -> {
             try {
                 canvas.syncPendingNodeStatusBlocking();
@@ -63,43 +66,74 @@ public class DataManager {
                 JobComposeData composeData = jobPartService.getJobCompose(taskId);
                 
                 Platform.runLater(() -> {
-                    NodeStatusSyncManager.getInstance().clearCacheForTaskGroupSwitch();
-                    
-                    if (composeData != null) {
-                        canvas.loadFromComposeData(composeData);
-                        setupEditCallbacks(composeData);
+                    try {
+                        NodeStatusSyncManager.getInstance().clearCacheForTaskGroupSwitch();
                         
-                        int nodeCount = composeData.getNodes() != null ? composeData.getNodes().size() : 0;
-                        int edgeCount = composeData.getEdges() != null ? composeData.getEdges().size() : 0;
-                        
-                        logPanel.success("✓ 任务组加载成功！");
-                        logPanel.info("节点数: " + nodeCount + ", 连接数: " + edgeCount);
-                        
-                        // 调用数据加载完成回调
-                        if (onDataLoadedCallback != null) {
-                            onDataLoadedCallback.run();
+                        if (composeData != null) {
+                            canvas.loadFromComposeData(composeData);
+                            setupEditCallbacks(composeData);
+                            
+                            int nodeCount = composeData.getNodes() != null ? composeData.getNodes().size() : 0;
+                            int edgeCount = composeData.getEdges() != null ? composeData.getEdges().size() : 0;
+                            
+                            logPanel.success("✓ 任务组加载成功！");
+                            logPanel.info("节点数: " + nodeCount + ", 连接数: " + edgeCount);
+                            
+                            // 清除未保存标记（刚加载的数据是已保存状态）
+                            canvas.markAsSaved();
+                            
+                            // 调用数据加载完成回调
+                            if (onDataLoadedCallback != null) {
+                                onDataLoadedCallback.run();
+                            }
+                        } else {
+                            logPanel.warn("⚠ 任务组数据为空");
+                            canvas.clear();
+                            canvas.markAsSaved();
                         }
-                    } else {
-                        logPanel.warn("⚠ 任务组数据为空");
-                        canvas.clear();
+                    } finally {
+                        // 确保无论如何都重新启用自动保存
+                        canvas.enableAutoSave();
+                        logPanel.info("════════════════════════════════");
                     }
-                    logPanel.info("════════════════════════════════");
                 });
             } catch (Exception e) {
                 logger.error("加载任务组数据失败", e);
                 Platform.runLater(() -> {
-                    logPanel.error("✗ 加载失败: " + e.getMessage());
+                    try {
+                        logPanel.error("✗ 加载失败: " + e.getMessage());
+                    } finally {
+                        // 确保即使加载失败也要重新启用自动保存
+                        canvas.enableAutoSave();
+                    }
                 });
             }
         }).start();
     }
     
     /**
-     * 保存或更新任务组
+     * 保存或更新任务组（异步执行，不阻塞调用线程）
      */
     public void saveOrUpdateJob(Long currentTaskGroupId) {
+        saveOrUpdateJobInternal(currentTaskGroupId, true);
+    }
+    
+    /**
+     * 保存或更新任务组（同步执行，会阻塞调用线程）
+     * ⚠️ 此方法会阻塞，必须在后台线程中调用，不要在JavaFX主线程中调用
+     */
+    public void saveOrUpdateJobSync(Long currentTaskGroupId) {
+        saveOrUpdateJobInternal(currentTaskGroupId, false);
+    }
+    
+    /**
+     * 保存或更新任务组（内部方法）
+     * @param currentTaskGroupId 任务组ID
+     * @param async 是否异步执行
+     */
+    private void saveOrUpdateJobInternal(Long currentTaskGroupId, boolean async) {
         logPanel.info("════════════════════════════════");
-        logPanel.info("💾 开始保存任务组数据...");
+        logPanel.info("💾 开始保存任务组数据... (" + (async ? "异步" : "同步") + ")");
         
         if (currentTaskGroupId == null || currentTaskGroupId == 0) {
             NotificationToast.showWarning("请先选择一个任务组后再进行保存操作。");
@@ -110,7 +144,8 @@ public class DataManager {
         List<NodeConnection> connections = canvas.getConnections();
         List<GroupContainer> groups = canvas.getGroupContainers();
         
-        logPanel.info(String.format("节点: %d, 连接: %d, 任务组: %d", nodes.size(), connections.size(), groups.size()));
+        logPanel.info(String.format("节点: %d, 连接: %d, 任务组: %d", 
+            nodes.size(), connections.size(), groups.size()));
         
         try {
             // 构建节点数据
@@ -191,7 +226,8 @@ public class DataManager {
             String nodesJson = apiUtil.getGson().toJson(nodesData);
             String edgesJson = apiUtil.getGson().toJson(edgesData);
             
-            new Thread(() -> {
+            // 保存逻辑封装为 Runnable
+            Runnable saveTask = () -> {
                 try {
                     JobInfoForm formData = jobInfoService.getFormData(currentTaskGroupId);
                     if (formData == null) {
@@ -223,7 +259,14 @@ public class DataManager {
                         logPanel.info("════════════════════════════════");
                     });
                 }
-            }).start();
+            };
+            
+            // 根据参数决定同步或异步执行
+            if (async) {
+                new Thread(saveTask).start();
+            } else {
+                saveTask.run();
+            }
             
         } catch (Exception e) {
             logger.error("转换数据失败", e);

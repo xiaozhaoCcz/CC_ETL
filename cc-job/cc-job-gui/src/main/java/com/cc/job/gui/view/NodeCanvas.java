@@ -42,6 +42,7 @@ public class NodeCanvas extends Pane {
     
     private UndoRedoManager undoRedoManager;
     private boolean historyEnabled = true;
+    private boolean autoSaveEnabled = true; // 控制自动保存标记是否启用
     
     // 回调
     private Runnable onRequestAddNode;
@@ -51,6 +52,7 @@ public class NodeCanvas extends Pane {
     private LogCallback logCallback;
     private Runnable onNodeMoved;
     private java.util.function.Consumer<Boolean> onSelectionModeChanged;
+    private Runnable onRequestSave; // 保存数据回调
     
     // 临时连线相关
     private Object startOwner;
@@ -88,6 +90,11 @@ public class NodeCanvas extends Pane {
     private boolean dotsBackgroundListenersAdded = false; // 标记是否已添加监听器
     private boolean gridBackgroundListenersAdded = false; // 标记是否已添加监听器
     
+    // 自动保存相关
+    private PauseTransition autoSaveTransition; // 自动保存延迟触发器
+    private static final double AUTO_SAVE_DELAY_SECONDS = 0.5; // 保存延迟时间（秒）
+    private boolean hasUnsavedChanges = false; // 标记是否有未保存的更改
+    
     public interface LogCallback {
         void log(String message);
     }
@@ -99,6 +106,7 @@ public class NodeCanvas extends Pane {
         initializeManagers();
         setupCanvasContextMenu();
         setupSelectionHandlers();
+        setupAutoSave();
     }
     
     private void initializeManagers() {
@@ -150,6 +158,15 @@ public class NodeCanvas extends Pane {
         this.undoRedoManager = undoRedoManager;
     }
     
+    /**
+     * 设置自动保存回调
+     * 当鼠标移开画布且有未保存更改时，会自动调用此回调
+     * @param callback 保存操作的回调函数
+     */
+    public void setOnRequestSave(Runnable callback) {
+        this.onRequestSave = callback;
+    }
+    
     // ==================== Getters ====================
     
     public List<ProcessNode> getNodes() {
@@ -190,6 +207,9 @@ public class NodeCanvas extends Pane {
         if (recordHistory) {
             pushAction(new AddNodeAction(node));
         }
+        
+        // 标记有未保存的更改
+        markAsUnsaved();
     }
     
     public void removeNode(ProcessNode node, boolean recordHistory) {
@@ -207,6 +227,9 @@ public class NodeCanvas extends Pane {
         if (recordHistory) {
             pushAction(new RemoveNodeAction(node, oldX, oldY, attachedConnections));
         }
+        
+        // 标记有未保存的更改
+        markAsUnsaved();
     }
     
     private void setupNodeCallbacks(ProcessNode node) {
@@ -260,6 +283,12 @@ public class NodeCanvas extends Pane {
             if (undoRedoManager != null && historyEnabled && !isClick) {
                 pushAction(new MoveNodeAction(node, oldX, oldY, newX, newY));
             }
+            
+            // 节点位置改变，标记有未保存的更改
+            if (!isClick) {
+                markAsUnsaved();
+            }
+            
             notifyNodeStructureChanged();
         });
         
@@ -486,6 +515,8 @@ public class NodeCanvas extends Pane {
         if (recordHistory) {
             pushAction(new AddConnectionAction(connection));
         }
+        // 标记有未保存的更改
+        markAsUnsaved();
         return connection;
     }
     
@@ -498,10 +529,17 @@ public class NodeCanvas extends Pane {
         if (recordHistory) {
             pushAction(new RemoveConnectionAction(connection));
         }
+        // 标记有未保存的更改
+        markAsUnsaved();
     }
     
     public boolean removeConnectionByEdgeId(String edgeId) {
-        return connectionManager.removeConnectionByEdgeId(edgeId);
+        boolean removed = connectionManager.removeConnectionByEdgeId(edgeId);
+        if (removed) {
+            // 标记有未保存的更改
+            markAsUnsaved();
+        }
+        return removed;
     }
     
     public void setAllConnectionsRunning(boolean running) {
@@ -654,6 +692,119 @@ public class NodeCanvas extends Pane {
             current = current.getParent();
         }
         return false;
+    }
+    
+    // ==================== 自动保存设置 ====================
+    
+    /**
+     * 设置自动保存功能
+     * 监听鼠标离开画布事件和焦点变化事件，延迟触发保存操作
+     */
+    private void setupAutoSave() {
+
+        
+        // 初始化延迟保存触发器
+        autoSaveTransition = new PauseTransition(Duration.seconds(AUTO_SAVE_DELAY_SECONDS));
+        autoSaveTransition.setOnFinished(e -> {
+            
+              // 双重检查：确保自动保存仍然启用且有未保存更改
+              if (autoSaveEnabled && hasUnsavedChanges && onRequestSave != null) {
+                  onRequestSave.run();
+                  hasUnsavedChanges = false;
+              }
+        });
+        
+        // 监听鼠标离开画布事件
+        this.setOnMouseExited(e -> {
+            triggerAutoSave();
+        });
+        
+        // 监听鼠标进入画布事件，取消待执行的保存
+        this.setOnMouseEntered(e -> {
+            cancelAutoSave();
+        });
+        
+        // 监听画布焦点变化，当失去焦点时触发自动保存（用户点击其他控件时）
+        this.focusedProperty().addListener((obs, wasFocused, isNowFocused) -> {
+            if (wasFocused && !isNowFocused) {
+                // 画布失去焦点，触发自动保存
+                triggerAutoSave();
+            }
+        });
+        
+        // 监听鼠标按下事件，用于捕获点击其他区域的行为
+        this.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null) {
+                newScene.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> {
+                    // 检查点击是否在画布外部
+                    if (!this.contains(this.sceneToLocal(e.getSceneX(), e.getSceneY()))) {
+                        // 点击在画布外部，触发自动保存
+                        triggerAutoSave();
+                    }
+                });
+            }
+        });
+    }
+    
+    /**
+     * 触发自动保存
+     */
+    private void triggerAutoSave() {
+        // 只在自动保存启用且有未保存更改时触发
+        if (autoSaveEnabled && hasUnsavedChanges && onRequestSave != null) {
+            // 延迟触发保存，避免频繁保存
+            autoSaveTransition.playFromStart();
+        }
+    }
+    
+    /**
+     * 取消待执行的自动保存
+     */
+    private void cancelAutoSave() {
+        if (autoSaveTransition != null && autoSaveTransition.getStatus() == javafx.animation.Animation.Status.RUNNING) {
+            autoSaveTransition.stop();
+        }
+    }
+    
+    /**
+     * 标记画布有未保存的更改
+     * 此方法应该在节点位置变化、添加/删除节点、添加/删除连接等操作后调用
+     */
+    public void markAsUnsaved() {
+        // 只在自动保存启用时才标记（避免在加载数据时误标记）
+        if (autoSaveEnabled) {
+            this.hasUnsavedChanges = true;
+        }
+    }
+    
+    /**
+     * 清除未保存标记
+     */
+    public void markAsSaved() {
+        this.hasUnsavedChanges = false;
+    }
+    
+    /**
+     * 禁用自动保存（用于数据加载等场景）
+     */
+    public void disableAutoSave() {
+        this.autoSaveEnabled = false;
+        // 停止所有待执行的自动保存
+        cancelAutoSave();
+    }
+    
+    /**
+     * 启用自动保存
+     */
+    public void enableAutoSave() {
+        this.autoSaveEnabled = true;
+    }
+    
+    /**
+     * 检查是否有未保存的更改
+     */
+    public boolean hasUnsavedChanges() {
+        return this.hasUnsavedChanges;
     }
     
     // ==================== 画布右键菜单 ====================
@@ -969,6 +1120,9 @@ public class NodeCanvas extends Pane {
             selectionManager.reattachToCanvas();
         }
         
+        // 清空后清除未保存标记
+        hasUnsavedChanges = false;
+        
         log("✓ 画布已清空");
     }
     
@@ -979,6 +1133,10 @@ public class NodeCanvas extends Pane {
         groupContainers.forEach(this.getChildren()::remove);
         groupContainers.clear();
         selectionManager.clearSelection();
+        
+        // 清空后清除未保存标记
+        hasUnsavedChanges = false;
+        
         log("✓ 已清空页面");
     }
     
@@ -1153,14 +1311,30 @@ public class NodeCanvas extends Pane {
     
     // ==================== 辅助方法 ====================
     
-    private void notifyNodeStructureChanged() { if (onNodeMoved != null) onNodeMoved.run(); }
-    private void log(String message) { if (logCallback != null) logCallback.log(message); }
+    private void notifyNodeStructureChanged() { 
+        if (onNodeMoved != null) onNodeMoved.run();
+        // 结构变化时标记为未保存
+        markAsUnsaved();
+    }
+    
+    private void log(String message) { 
+        if (logCallback != null) {
+            logCallback.log(message);
+        }
+    }
+    
     private void pushAction(CanvasAction action) { if (undoRedoManager != null && historyEnabled && action != null) undoRedoManager.push(action); }
     
     private void runWithoutHistory(Runnable runnable) {
-        boolean previous = historyEnabled;
+        boolean previousHistory = historyEnabled;
         historyEnabled = false;
-        try { runnable.run(); } finally { historyEnabled = previous; }
+        // 注意：不在这里管理 autoSaveEnabled，因为它由外部 disableAutoSave/enableAutoSave 控制
+        // 避免与外部控制冲突导致自动保存失效
+        try { 
+            runnable.run(); 
+        } finally { 
+            historyEnabled = previousHistory;
+        }
     }
     
     /**
