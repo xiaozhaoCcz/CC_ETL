@@ -836,8 +836,7 @@ public class ProcessNode extends StackPane {
             changeNodeColor(currentColor);
             this.setOpacity(1.0);
         } else {
-            // 禁用状态：灰色半透明
-            background.setFill(Color.web("#F3F4F6"));
+            background.setFill(Color.web("#4169E1"));
             background.setStroke(Color.web("#9CA3AF"));
             background.setStrokeWidth(2);
             this.setOpacity(0.6);
@@ -863,7 +862,7 @@ public class ProcessNode extends StackPane {
             this.setOpacity(1.0);
         } else {
             // 禁用状态：灰色半透明
-            background.setFill(Color.web("#F3F4F6"));
+            background.setFill(Color.web("#4169E1"));
             background.setStroke(Color.web("#9CA3AF"));
             background.setStrokeWidth(2);
             this.setOpacity(0.6);
