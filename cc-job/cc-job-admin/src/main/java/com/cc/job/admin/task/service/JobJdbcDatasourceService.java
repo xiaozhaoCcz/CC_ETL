@@ -2,6 +2,7 @@ package com.cc.job.admin.task.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.cc.job.xo.model.datax.DataxTable;
 import com.cc.job.xo.model.entity.JobJdbcDatasource;
 import com.cc.job.xo.model.form.JobJdbcDatasourceForm;
 import com.cc.job.xo.model.query.JobJdbcDatasourceQuery;
@@ -23,9 +24,9 @@ public interface JobJdbcDatasourceService extends IService<JobJdbcDatasource>  {
 
     boolean deleteJdbcDatasources(String ids);
 
-    List<String> getColumns(Long id, Map<String, String> params);
+    List<String> getColumns(Long id, Map<String,Object> params);
 
-    List<String> getTables(Long id);
+    List<DataxTable> getTables(Long id);
 
     boolean isConnect(@Valid JobJdbcDatasourceForm formData);
 }

@@ -178,9 +178,6 @@ public class TopToolBar extends VBox {
                 new SeparatorMenuItem(), datasourceMenuList, 
                 new SeparatorMenuItem(), dataxSyncMenuItem, dataxGroupSyncMenuItem);
 
-//
-
-
         menuBar.getMenus().addAll(fileMenu, editMenu, jobMenu);
         return menuBar;
     }

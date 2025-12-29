@@ -3,6 +3,7 @@ package com.cc.job.gui.view;
 import com.cc.job.gui.service.JobDataxService;
 import com.cc.job.gui.service.JobJdbcDatasourceService;
 import com.cc.job.gui.util.StyleUtil;
+import com.cc.job.xo.model.datax.DataxTable;
 import com.cc.job.xo.model.entity.JobJdbcDatasource;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -10,12 +11,12 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
+import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.*;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
@@ -38,7 +39,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     // Step 1 - Reader配置
     private ComboBox<String> readerDsTypeCombo;
     private ComboBox<JobJdbcDatasource> readerDatasourceCombo;
-    private ListView<String> readerTableList;
+    private TableView<DataxTable> readerTableView;
     private TextArea readerSqlArea;
     private ListView<String> readerColumnList;
     private ComboBox<String> incrTypeCombo;
@@ -46,7 +47,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     // Step 2 - Writer配置
     private ComboBox<String> writerDsTypeCombo;
     private ComboBox<JobJdbcDatasource> writerDatasourceCombo;
-    private ListView<String> writerTableList;
+    private TableView<DataxTable> writerTableView;
     private TextArea writerSqlArea;
     private ListView<String> writerColumnList;
     private ComboBox<String> writeModeCombo;
@@ -223,10 +224,17 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         // 表列表
         Label tableLabel = new Label("数据表");
         tableLabel.setStyle(labelStyle);
-        readerTableList = new ListView<>();
-        readerTableList.setPrefHeight(120);
-        readerTableList.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
-        readerTableList.getSelectionModel().selectedItemProperty().addListener((obs, old, val) -> {
+        readerTableView = new TableView<>();
+        TableColumn<DataxTable, String> tableSchemaColumn = new TableColumn<>("TableSchema");
+        tableSchemaColumn.setCellValueFactory(new PropertyValueFactory<DataxTable,String>("TableSchema"));
+        tableSchemaColumn.setMinWidth(300);
+        TableColumn<DataxTable, String> tableNameColumn = new TableColumn<>("TableName");
+        tableNameColumn.setCellValueFactory(new PropertyValueFactory<DataxTable,String>("TableName"));
+        tableNameColumn.setMinWidth(300);
+        readerTableView.getColumns().addAll(tableSchemaColumn,tableNameColumn);
+        readerTableView.setPrefHeight(120);
+        readerTableView.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
+        readerTableView.getSelectionModel().selectedItemProperty().addListener((obs, old, val) -> {
             if (val != null) loadReaderColumns();
         });
 
@@ -265,7 +273,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         grid.add(dsLabel, 0, 1);
         grid.add(readerDatasourceCombo, 1, 1);
         grid.add(tableLabel, 0, 2);
-        grid.add(readerTableList, 1, 2);
+        grid.add(readerTableView, 1, 2);
         grid.add(sqlLabel, 0, 3);
         HBox sqlBox = new HBox(8, readerSqlArea, parseSqlBtn);
         HBox.setHgrow(readerSqlArea, Priority.ALWAYS);
@@ -317,10 +325,18 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         // 表列表
         Label tableLabel = new Label("数据表");
         tableLabel.setStyle(labelStyle);
-        writerTableList = new ListView<>();
-        writerTableList.setPrefHeight(120);
-        writerTableList.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
-        writerTableList.getSelectionModel().selectedItemProperty().addListener((obs, old, val) -> {
+        writerTableView = new TableView<>();
+        TableColumn<DataxTable, String> tableSchemaColumn = new TableColumn<>("TableSchema");
+        tableSchemaColumn.setCellValueFactory(new PropertyValueFactory<DataxTable,String>("TableSchema"));
+        tableSchemaColumn.setMinWidth(300);
+        TableColumn<DataxTable, String> tableNameColumn = new TableColumn<>("TableName");
+        tableNameColumn.setCellValueFactory(new PropertyValueFactory<DataxTable,String>("TableName"));
+        tableNameColumn.setMinWidth(300);
+        writerTableView.getColumns().addAll(tableSchemaColumn,tableNameColumn);
+        writerTableView.setPrefHeight(120);
+        writerTableView.setPrefHeight(120);
+        writerTableView.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
+        writerTableView.getSelectionModel().selectedItemProperty().addListener((obs, old, val) -> {
             if (val != null) loadWriterColumns();
         });
 
@@ -358,7 +374,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         grid.add(dsLabel, 0, 1);
         grid.add(writerDatasourceCombo, 1, 1);
         grid.add(tableLabel, 0, 2);
-        grid.add(writerTableList, 1, 2);
+        grid.add(writerTableView, 1, 2);
         grid.add(sqlLabel, 0, 3);
         HBox sqlBox = new HBox(8, writerSqlArea, parseSqlBtn);
         HBox.setHgrow(writerSqlArea, Priority.ALWAYS);
@@ -440,7 +456,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                 readerParams.setUsername(readerDs.getJdbcUsername());
                 readerParams.setPassword(readerDs.getJdbcPassword());
                 readerParams.setDbName(readerDs.getDatabaseName());
-                readerParams.setTableName(readerTableList.getSelectionModel().getSelectedItem());
+                readerParams.setTableName(readerTableView.getSelectionModel().getSelectedItem().getTableName());
                 String[] readerIpPort = parseIpPort(readerDs.getJdbcUrl());
                 readerParams.setIp(readerIpPort[0]);
                 readerParams.setPort(readerIpPort[1]);
@@ -455,7 +471,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                 writerParams.setUsername(writerDs.getJdbcUsername());
                 writerParams.setPassword(writerDs.getJdbcPassword());
                 writerParams.setDbName(writerDs.getDatabaseName());
-                writerParams.setTableName(writerTableList.getSelectionModel().getSelectedItem());
+                writerParams.setTableName(writerTableView.getSelectionModel().getSelectedItem().getTableName());
                 String[] writerIpPort = parseIpPort(writerDs.getJdbcUrl());
                 writerParams.setIp(writerIpPort[0]);
                 writerParams.setPort(writerIpPort[1]);
@@ -505,7 +521,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         updateStepView();
         if (readerDsTypeCombo != null) readerDsTypeCombo.getSelectionModel().clearSelection();
         if (readerDatasourceCombo != null) readerDatasourceCombo.getItems().clear();
-        if (readerTableList != null) readerTableList.getItems().clear();
+        if (readerTableView != null) readerTableView.getItems().clear();
         if (readerColumnList != null) readerColumnList.getItems().clear();
         if (readerSqlArea != null) readerSqlArea.clear();
     }
@@ -543,8 +559,8 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         if (ds == null) return;
         new Thread(() -> {
             try {
-                List<String> tables = dataxService.getTables(ds.getId());
-                Platform.runLater(() -> readerTableList.setItems(FXCollections.observableArrayList(tables)));
+                List<DataxTable> tables = dataxService.getTables(ds.getId());
+                Platform.runLater(() -> readerTableView.setItems(FXCollections.observableArrayList(tables)));
             } catch (Exception e) {
                 Platform.runLater(() -> showError("加载表失败", e.getMessage()));
             }
@@ -556,8 +572,8 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         if (ds == null) return;
         new Thread(() -> {
             try {
-                List<String> tables = dataxService.getTables(ds.getId());
-                Platform.runLater(() -> writerTableList.setItems(FXCollections.observableArrayList(tables)));
+                List<DataxTable> tables = dataxService.getTables(ds.getId());
+                Platform.runLater(() -> writerTableView.setItems(FXCollections.observableArrayList(tables)));
             } catch (Exception e) {
                 Platform.runLater(() -> showError("加载表失败", e.getMessage()));
             }
@@ -567,11 +583,12 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     private void loadReaderColumns() {
         JobJdbcDatasource ds = readerDatasourceCombo.getValue();
         if (ds == null) return;
-        String table = readerTableList.getSelectionModel().getSelectedItem();
+        String table = readerTableView.getSelectionModel().getSelectedItem().getTableName();
+        String schema = readerTableView.getSelectionModel().getSelectedItem().getTableSchema();
         String sql = readerSqlArea.getText();
         new Thread(() -> {
             try {
-                List<String> columns = dataxService.getColumns(ds.getId(), table, sql);
+                List<String> columns = dataxService.getColumns(ds.getId(), table, schema, sql);
                 Platform.runLater(() -> readerColumnList.setItems(FXCollections.observableArrayList(columns)));
             } catch (Exception e) {
                 Platform.runLater(() -> showError("加载字段失败", e.getMessage()));
@@ -582,11 +599,12 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     private void loadWriterColumns() {
         JobJdbcDatasource ds = writerDatasourceCombo.getValue();
         if (ds == null) return;
-        String table = writerTableList.getSelectionModel().getSelectedItem();
+        String table = writerTableView.getSelectionModel().getSelectedItem().getTableName();
+        String schema = writerTableView.getSelectionModel().getSelectedItem().getTableSchema();
         String sql = writerSqlArea.getText();
         new Thread(() -> {
             try {
-                List<String> columns = dataxService.getColumns(ds.getId(), table, sql);
+                List<String> columns = dataxService.getColumns(ds.getId(), table, schema, sql);
                 Platform.runLater(() -> writerColumnList.setItems(FXCollections.observableArrayList(columns)));
             } catch (Exception e) {
                 Platform.runLater(() -> showError("加载字段失败", e.getMessage()));
