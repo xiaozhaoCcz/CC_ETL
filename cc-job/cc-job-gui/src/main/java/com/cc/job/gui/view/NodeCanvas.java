@@ -237,12 +237,22 @@ public class NodeCanvas extends Pane {
         // 这里只设置画布内部的回调
         node.setOnDelete(() -> removeNode(node, true));
         
+        // 设置节点状态变化回调，用于状态传播
+        node.setOnStateChange((changedNode, oldState, newState) -> {
+            handleNodeStateChange(changedNode, oldState, newState);
+        });
+        
         node.setOnDragged(() -> {
             if (onNodeMoved != null) onNodeMoved.run();
             // 优化：使用节流检查画布扩展和滚动
             throttledCheckAndExpandCanvas(node);
             throttledCheckAndScrollViewport(node);
             handleNodeDrag(node);
+            
+            // 如果节点被选中，更新选择框位置
+            if (selectionManager.getSelectedNodes().contains(node)) {
+                selectionManager.updateSelectionBoundingBox();
+            }
         });
         
         node.setOnDragStarted(() -> {
@@ -287,6 +297,11 @@ public class NodeCanvas extends Pane {
             // 节点位置改变，标记有未保存的更改
             if (!isClick) {
                 markAsUnsaved();
+            }
+            
+            // 如果节点被选中，确保选择框位置正确
+            if (selectionManager.getSelectedNodes().contains(node)) {
+                selectionManager.updateSelectionBoundingBox();
             }
             
             notifyNodeStructureChanged();
@@ -660,10 +675,20 @@ public class NodeCanvas extends Pane {
     
     private void setupSelectionHandlers() {
         this.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> {
-            if (e.isPrimaryButtonDown() && selectionManager.isSelectionMode() && !isClickOnNodeOrEdge((javafx.scene.Node) e.getTarget())) {
-                Point2D localPoint = sceneToLocal(e.getSceneX(), e.getSceneY());
-                selectionManager.startSelection(localPoint.getX(), localPoint.getY());
-                e.consume();
+            if (e.isPrimaryButtonDown()) {
+                boolean isClickOnNodeOrEdge = isClickOnNodeOrEdge((javafx.scene.Node) e.getTarget());
+                
+                if (selectionManager.isSelectionMode() && !isClickOnNodeOrEdge) {
+                    // 选择模式下，点击空白区域开始框选
+                    Point2D localPoint = sceneToLocal(e.getSceneX(), e.getSceneY());
+                    selectionManager.startSelection(localPoint.getX(), localPoint.getY());
+                    e.consume();
+                } else if (!selectionManager.isSelectionMode() && !isClickOnNodeOrEdge) {
+                    // 非选择模式下，点击空白区域清除选择
+                    if (!selectionManager.getSelectedNodes().isEmpty()) {
+                        selectionManager.clearSelection();
+                    }
+                }
             }
         });
         
@@ -1307,6 +1332,200 @@ public class NodeCanvas extends Pane {
         
         log("✓ 删除任务组容器: " + container.getGroupName());
         notifyNodeStructureChanged();
+    }
+    
+    // ==================== 节点状态管理 ====================
+    
+    /**
+     * 处理节点状态变化，实现状态传播逻辑
+     * 开始节点影响所有前驱节点（使其变为阻塞状态）
+     * 终止节点影响所有后继节点（使其变为阻塞状态）
+     */
+    private void handleNodeStateChange(ProcessNode changedNode, ProcessNode.GraphNodeState oldState, ProcessNode.GraphNodeState newState) {
+        
+        // 先恢复旧状态的影响（重新计算所有受影响节点的阻塞状态）
+        if (oldState == ProcessNode.GraphNodeState.START) {
+            // 恢复所有前驱节点的阻塞状态（BFS遍历所有前驱）
+            Set<ProcessNode> allPredecessors = getAllPredecessors(changedNode);
+            for (ProcessNode pred : allPredecessors) {
+                updateBlockedState(pred);
+            }
+        } else if (oldState == ProcessNode.GraphNodeState.STOP) {
+            // 恢复所有后继节点的阻塞状态（BFS遍历所有后继）
+            Set<ProcessNode> allSuccessors = getAllSuccessors(changedNode);
+            for (ProcessNode succ : allSuccessors) {
+                updateBlockedState(succ);
+            }
+        }
+        
+        // 应用新状态的影响
+        if (newState == ProcessNode.GraphNodeState.START) {
+            // 开始节点：影响所有前驱节点（BFS遍历所有前驱）
+            Set<ProcessNode> allPredecessors = getAllPredecessors(changedNode);
+            for (ProcessNode pred : allPredecessors) {
+                // 如果前驱节点不是开始节点或终止节点，则设置为阻塞
+                if (pred.getGraphState() == ProcessNode.GraphNodeState.NORMAL || 
+                    pred.getGraphState() == ProcessNode.GraphNodeState.BLOCKED) {
+                    pred.setGraphState(ProcessNode.GraphNodeState.BLOCKED);
+                }
+            }
+        } else if (newState == ProcessNode.GraphNodeState.STOP) {
+            // 终止节点：影响所有后继节点（BFS遍历所有后继）
+            Set<ProcessNode> allSuccessors = getAllSuccessors(changedNode);
+            for (ProcessNode succ : allSuccessors) {
+                // 如果后继节点不是开始节点或终止节点，则设置为阻塞
+                if (succ.getGraphState() == ProcessNode.GraphNodeState.NORMAL || 
+                    succ.getGraphState() == ProcessNode.GraphNodeState.BLOCKED) {
+                    succ.setGraphState(ProcessNode.GraphNodeState.BLOCKED);
+                }
+            }
+        } else if (newState == ProcessNode.GraphNodeState.NORMAL) {
+            // 恢复为普通节点：检查是否仍应保持阻塞状态
+            updateBlockedState(changedNode);
+        }
+        
+        // 标记有未保存的更改
+        markAsUnsaved();
+    }
+    
+    /**
+     * 更新节点的阻塞状态
+     * 检查节点是否应该被阻塞（是否有开始节点作为后继，或有终止节点作为前驱）
+     * 使用BFS遍历检查所有间接的前驱和后继
+     */
+    private void updateBlockedState(ProcessNode node) {
+        // 如果节点是开始节点或终止节点，不更新
+        if (node.getGraphState() == ProcessNode.GraphNodeState.START || 
+            node.getGraphState() == ProcessNode.GraphNodeState.STOP) {
+            return;
+        }
+        
+        // 检查是否有开始节点作为后继（BFS遍历所有后继）
+        Set<ProcessNode> allSuccessors = getAllSuccessors(node);
+        boolean hasStartSuccessor = false;
+        for (ProcessNode succ : allSuccessors) {
+            if (succ.getGraphState() == ProcessNode.GraphNodeState.START) {
+                hasStartSuccessor = true;
+                break;
+            }
+        }
+        
+        // 检查是否有终止节点作为前驱（BFS遍历所有前驱）
+        Set<ProcessNode> allPredecessors = getAllPredecessors(node);
+        boolean hasStopPredecessor = false;
+        for (ProcessNode pred : allPredecessors) {
+            if (pred.getGraphState() == ProcessNode.GraphNodeState.STOP) {
+                hasStopPredecessor = true;
+                break;
+            }
+        }
+        
+        // 如果应该被阻塞，设置为阻塞状态；否则恢复为普通状态
+        if (hasStartSuccessor || hasStopPredecessor) {
+            if (node.getGraphState() != ProcessNode.GraphNodeState.BLOCKED) {
+                // 使用内部方法设置状态，不触发回调，避免循环调用
+                node.setGraphStateInternal(ProcessNode.GraphNodeState.BLOCKED);
+            }
+        } else {
+            if (node.getGraphState() == ProcessNode.GraphNodeState.BLOCKED) {
+                // 使用内部方法设置状态，不触发回调，避免循环调用
+                node.setGraphStateInternal(ProcessNode.GraphNodeState.NORMAL);
+            }
+        }
+    }
+    
+    /**
+     * 获取节点的所有前驱节点（通过连接线，BFS遍历）
+     */
+    private Set<ProcessNode> getAllPredecessors(ProcessNode node) {
+        Set<ProcessNode> result = new HashSet<>();
+        Queue<ProcessNode> queue = new LinkedList<>();
+        Set<ProcessNode> visited = new HashSet<>();
+        
+        queue.add(node);
+        visited.add(node);
+        
+        while (!queue.isEmpty()) {
+            ProcessNode current = queue.poll();
+            
+            // 获取当前节点的直接前驱
+            for (NodeConnection conn : connections) {
+                if (conn.getTargetNode() == current && conn.getSourceNode() != null) {
+                    ProcessNode pred = conn.getSourceNode();
+                    if (visited.add(pred)) {
+                        result.add(pred);
+                        queue.add(pred);
+                    }
+                }
+            }
+        }
+        
+        // 移除起始节点本身
+        result.remove(node);
+        return result;
+    }
+    
+    /**
+     * 获取节点的所有后继节点（通过连接线，BFS遍历）
+     */
+    private Set<ProcessNode> getAllSuccessors(ProcessNode node) {
+        Set<ProcessNode> result = new HashSet<>();
+        Queue<ProcessNode> queue = new LinkedList<>();
+        Set<ProcessNode> visited = new HashSet<>();
+        
+        queue.add(node);
+        visited.add(node);
+        
+        while (!queue.isEmpty()) {
+            ProcessNode current = queue.poll();
+            
+            // 获取当前节点的直接后继
+            for (NodeConnection conn : connections) {
+                if (conn.getSourceNode() == current && conn.getTargetNode() != null) {
+                    ProcessNode succ = conn.getTargetNode();
+                    if (visited.add(succ)) {
+                        result.add(succ);
+                        queue.add(succ);
+                    }
+                }
+            }
+        }
+        
+        // 移除起始节点本身
+        result.remove(node);
+        return result;
+    }
+    
+    /**
+     * 获取节点的直接前驱节点（仅一层）
+     */
+    private List<ProcessNode> getPredecessors(ProcessNode node) {
+        List<ProcessNode> predecessors = new ArrayList<>();
+        for (NodeConnection conn : connections) {
+            if (conn.getTargetNode() == node && conn.getSourceNode() != null) {
+                ProcessNode sourceNode = conn.getSourceNode();
+                if (!predecessors.contains(sourceNode)) {
+                    predecessors.add(sourceNode);
+                }
+            }
+        }
+        return predecessors;
+    }
+    
+    /**
+     * 获取节点的直接后继节点（仅一层）
+     */
+    private List<ProcessNode> getSuccessors(ProcessNode node) {
+        List<ProcessNode> successors = new ArrayList<>();
+        for (NodeConnection conn : connections) {
+            if (conn.getSourceNode() == node && conn.getTargetNode() != null) {
+                ProcessNode targetNode = conn.getTargetNode();
+                if (!successors.contains(targetNode)) {
+                    successors.add(targetNode);
+                }
+            }
+        }
+        return successors;
     }
     
     // ==================== 辅助方法 ====================

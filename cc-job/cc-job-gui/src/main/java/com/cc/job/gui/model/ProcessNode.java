@@ -72,11 +72,16 @@ public class ProcessNode extends StackPane {
     
     // 禁用/启用节点回调
     private DisableNodeCallback onDisable;
-
-
+    
+    // 节点状态设置回调
+    private NodeStateChangeCallback onStateChange;
     
     public interface DisableNodeCallback {
         void onDisableNode(Long jobId, boolean isDisabled);
+    }
+    
+    public interface NodeStateChangeCallback {
+        void onNodeStateChange(ProcessNode node, GraphNodeState oldState, GraphNodeState newState);
     }
     
     // 节点状态
@@ -84,6 +89,7 @@ public class ProcessNode extends StackPane {
     private String currentColor = "#8B5CF6"; // 默认紫色
     private String type = "Bean"; // 节点类型：Bean, API, SQL等
     private NodeStatus status = NodeStatus.IDLE; // 节点运行状态
+    private GraphNodeState graphState = GraphNodeState.NORMAL; // 图节点状态（开始/终止/阻塞）
     
     // UI元素引用
     private javafx.scene.shape.Rectangle background;
@@ -442,6 +448,32 @@ public class ProcessNode extends StackPane {
             toggleNodeEnabled();
             toggleItem.setText(isEnabled() ? "禁用节点" : "启用节点");
         });
+        
+        // 分隔符
+        SeparatorMenuItem separatorState = new SeparatorMenuItem();
+        
+        // 节点状态菜单
+        Menu stateMenu = new Menu("节点状态");
+        
+        // 设置为开始节点
+        MenuItem startNodeItem = new MenuItem("设置为开始节点");
+        startNodeItem.setOnAction(e -> {
+            setGraphState(GraphNodeState.START);
+        });
+        
+        // 设置为终止节点
+        MenuItem stopNodeItem = new MenuItem("设置为终止节点");
+        stopNodeItem.setOnAction(e -> {
+            setGraphState(GraphNodeState.STOP);
+        });
+        
+        // 取消特殊状态（恢复为普通节点）
+        MenuItem normalNodeItem = new MenuItem("取消特殊状态");
+        normalNodeItem.setOnAction(e -> {
+            setGraphState(GraphNodeState.NORMAL);
+        });
+        
+        stateMenu.getItems().addAll(startNodeItem, stopNodeItem, normalNodeItem);
 
         // 分隔符
         SeparatorMenuItem separator2 = new SeparatorMenuItem();
@@ -462,6 +494,8 @@ public class ProcessNode extends StackPane {
             separator1,
             colorMenu,
             toggleItem,
+            separatorState,
+            stateMenu,
             separator2,
             deleteItem
         );
@@ -597,6 +631,122 @@ public class ProcessNode extends StackPane {
         this.onDisable = callback;
     }
     
+    public void setOnStateChange(NodeStateChangeCallback callback) {
+        this.onStateChange = callback;
+    }
+    
+    /**
+     * 获取图节点状态
+     */
+    public GraphNodeState getGraphState() {
+        return graphState;
+    }
+    
+    /**
+     * 设置图节点状态（开始/终止/阻塞）
+     */
+    public void setGraphState(GraphNodeState newState) {
+        if (this.graphState == newState) {
+            return;
+        }
+        
+        GraphNodeState oldState = this.graphState;
+        this.graphState = newState;
+        
+        // 更新节点样式
+        updateGraphStateStyle();
+        
+        // 通知外部（NodeCanvas）状态变化，以便更新相关节点
+        if (onStateChange != null) {
+            onStateChange.onNodeStateChange(this, oldState, newState);
+        }
+    }
+    
+    /**
+     * 内部方法：设置图节点状态但不触发回调（用于避免循环调用）
+     * 仅在 NodeCanvas 的状态传播逻辑中使用
+     * @param newState 新的图节点状态
+     */
+    public void setGraphStateInternal(GraphNodeState newState) {
+        if (this.graphState == newState) {
+            return;
+        }
+        
+        this.graphState = newState;
+        // 只更新样式，不触发回调
+        updateGraphStateStyle();
+        
+        // 强制刷新样式，确保阻塞节点的背景颜色被正确应用
+        if (newState == GraphNodeState.BLOCKED && background != null) {
+            background.setFill(Color.web("#F3F4F6"));
+        }
+    }
+    
+    /**
+     * 根据图节点状态更新样式
+     */
+    private void updateGraphStateStyle() {
+        if (background == null) {
+            return;
+        }
+        
+        // 根据图节点状态设置样式
+        switch (graphState) {
+            case START:
+                // 开始节点：绿色边框，浅绿色背景
+                background.setStroke(Color.web("#10B981"));
+                background.setFill(Color.web("#D1FAE5"));
+                background.setStrokeWidth(3);
+                // 更新连接点颜色
+                if (topConnector != null) {
+                    topConnector.setFill(Color.web("#10B981"));
+                    bottomConnector.setFill(Color.web("#10B981"));
+                    leftConnector.setFill(Color.web("#10B981"));
+                    rightConnector.setFill(Color.web("#10B981"));
+                }
+                break;
+            case STOP:
+                // 终止节点：红色边框，浅红色背景
+                background.setStroke(Color.web("#EF4444"));
+                background.setFill(Color.web("#FEE2E2"));
+                background.setStrokeWidth(3);
+                // 更新连接点颜色
+                if (topConnector != null) {
+                    topConnector.setFill(Color.web("#EF4444"));
+                    bottomConnector.setFill(Color.web("#EF4444"));
+                    leftConnector.setFill(Color.web("#EF4444"));
+                    rightConnector.setFill(Color.web("#EF4444"));
+                }
+                break;
+            case BLOCKED:
+                // 阻塞节点：只设置背景颜色，保持原有的边框和连接点颜色
+                background.setFill(Color.web("#F3F4F6"));
+                // 不改变边框颜色和连接点颜色，保持原有样式
+                break;
+            case NORMAL:
+            default:
+                // 普通节点：根据运行状态或类型设置颜色
+                if (status != NodeStatus.IDLE) {
+                    // 如果节点正在运行，使用运行状态的颜色
+                    // 注意：updateStatus 内部会检查 graphState，如果是特殊状态不会更新
+                    updateStatus(status);
+                } else {
+                    // 否则使用类型颜色
+                    background.setStroke(Color.web(currentColor));
+                    background.setFill(Color.WHITE);
+                    background.setStrokeWidth(2);
+                    // 更新连接点颜色
+                    if (topConnector != null) {
+                        topConnector.setFill(Color.web(currentColor));
+                        bottomConnector.setFill(Color.web(currentColor));
+                        leftConnector.setFill(Color.web(currentColor));
+                        rightConnector.setFill(Color.web(currentColor));
+                    }
+                }
+                break;
+        }
+    }
+    
     /**
      * 调整拖拽起始点，用于在画布扩展时保持拖拽位置的正确性
      * @param deltaX X方向的偏移量
@@ -659,13 +809,13 @@ public class ProcessNode extends StackPane {
             default -> "#8B5CF6";          // 默认紫色
         };
         
-        // 如果背景已创建，更新边框颜色
-        if (background != null) {
+        // 只有在普通状态下才更新边框颜色，特殊状态（开始/终止/阻塞）保持其样式
+        if (graphState == GraphNodeState.NORMAL && background != null) {
             background.setStroke(Color.web(currentColor));
         }
         
-        // 更新连接点颜色
-        if (topConnector != null) {
+        // 只有在普通状态下才更新连接点颜色
+        if (graphState == GraphNodeState.NORMAL && topConnector != null) {
             topConnector.setFill(Color.web(currentColor));
             bottomConnector.setFill(Color.web(currentColor));
             leftConnector.setFill(Color.web(currentColor));
@@ -761,8 +911,14 @@ public class ProcessNode extends StackPane {
         locateAnimation.setAutoReverse(true);
         locateAnimation.setCycleCount(4);
         locateAnimation.setOnFinished(e -> {
-            background.setStroke(Color.web(currentColor));
-            background.setStrokeWidth(2);
+            // 动画结束后，根据当前图节点状态恢复样式
+            if (graphState == GraphNodeState.NORMAL) {
+                background.setStroke(Color.web(currentColor));
+                background.setStrokeWidth(2);
+            } else {
+                // 如果是特殊状态，重新应用特殊状态样式
+                updateGraphStateStyle();
+            }
         });
         locateAnimation.play();
     }
@@ -780,6 +936,12 @@ public class ProcessNode extends StackPane {
      */
     private void changeNodeColor(String color) {
         this.currentColor = color;
+        
+        // 只有在普通状态下才更新颜色，特殊状态（开始/终止/阻塞）保持其样式
+        if (graphState != GraphNodeState.NORMAL) {
+            return;
+        }
+        
         // 更新边框颜色
         background.setStroke(Color.web(color));
         // 手动更改颜色时保持白色背景（除非是状态相关的颜色）
@@ -801,6 +963,11 @@ public class ProcessNode extends StackPane {
      * @param newStatus 新的状态
      */
     private void updateBackgroundColorByStatus(NodeStatus newStatus) {
+        // 如果节点是特殊状态（开始/终止/阻塞），不更新背景颜色
+        if (graphState != GraphNodeState.NORMAL) {
+            return;
+        }
+        
         switch (newStatus) {
             case RUNNING:
                 // 运行中：黄色背景
@@ -832,10 +999,16 @@ public class ProcessNode extends StackPane {
         enabled = newEnabledState;
         
         if (enabled) {
-            // 启用状态：根据当前状态恢复颜色
-            changeNodeColor(currentColor);
+            // 启用状态：根据当前图节点状态恢复样式
+            if (graphState == GraphNodeState.NORMAL) {
+                changeNodeColor(currentColor);
+            } else {
+                // 如果是特殊状态，重新应用特殊状态样式
+                updateGraphStateStyle();
+            }
             this.setOpacity(1.0);
         } else {
+            // 禁用状态：灰色半透明（覆盖所有状态）
             background.setFill(Color.web("#4169E1"));
             background.setStroke(Color.web("#9CA3AF"));
             background.setStrokeWidth(2);
@@ -857,11 +1030,16 @@ public class ProcessNode extends StackPane {
         enabled = targetEnabledState;
         
         if (enabled) {
-            // 启用状态：根据当前状态恢复颜色
-            changeNodeColor(currentColor);
+            // 启用状态：根据当前图节点状态恢复样式
+            if (graphState == GraphNodeState.NORMAL) {
+                changeNodeColor(currentColor);
+            } else {
+                // 如果是特殊状态，重新应用特殊状态样式
+                updateGraphStateStyle();
+            }
             this.setOpacity(1.0);
         } else {
-            // 禁用状态：灰色半透明
+            // 禁用状态：灰色半透明（覆盖所有状态）
             background.setFill(Color.web("#4169E1"));
             background.setStroke(Color.web("#9CA3AF"));
             background.setStrokeWidth(2);
@@ -901,6 +1079,16 @@ public class ProcessNode extends StackPane {
     }
     
     /**
+     * 图节点状态枚举（用于开始节点、终止节点、阻塞节点）
+     */
+    public enum GraphNodeState {
+        NORMAL,    // 普通节点（默认）
+        START,     // 开始节点（绿色边框，绿色背景）
+        STOP,      // 终止节点（红色边框，红色背景）
+        BLOCKED    // 阻塞节点（灰色边框，灰色背景）
+    }
+    
+    /**
      * 更新节点状态（根据运行状态改变颜色）
      * @param newStatus 新的状态
      */
@@ -925,18 +1113,22 @@ public class ProcessNode extends StackPane {
                 break;
         }
         
-        // 更新边框颜色和连接点颜色
-        background.setStroke(Color.web(statusColor));
-        topConnector.setFill(Color.web(statusColor));
-        bottomConnector.setFill(Color.web(statusColor));
-        leftConnector.setFill(Color.web(statusColor));
-        rightConnector.setFill(Color.web(statusColor));
-        
-        // 更新背景填充颜色（直接根据状态设置，不依赖其他字段）
-        updateBackgroundColorByStatus(newStatus);
-        
-        // 更新当前颜色
-        this.currentColor = statusColor;
+        // 如果节点不是特殊状态（开始/终止/阻塞），才更新运行状态的颜色
+        if (graphState == GraphNodeState.NORMAL) {
+            // 更新边框颜色和连接点颜色
+            background.setStroke(Color.web(statusColor));
+            topConnector.setFill(Color.web(statusColor));
+            bottomConnector.setFill(Color.web(statusColor));
+            leftConnector.setFill(Color.web(statusColor));
+            rightConnector.setFill(Color.web(statusColor));
+            
+            // 更新背景填充颜色（直接根据状态设置，不依赖其他字段）
+            updateBackgroundColorByStatus(newStatus);
+            
+            // 更新当前颜色
+            this.currentColor = statusColor;
+        }
+        // 如果节点是特殊状态，保持特殊状态的样式不变
         
     }
     
