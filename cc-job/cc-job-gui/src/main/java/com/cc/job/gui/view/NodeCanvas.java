@@ -14,6 +14,7 @@ import javafx.geometry.Point2D;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.ScrollPane;
@@ -218,9 +219,9 @@ public class NodeCanvas extends Pane {
         double oldX = node.getLayoutX();
         double oldY = node.getLayoutY();
         
-        // 从全局管理器移除节点状态
+        // 从全局管理器移除节点所有状态（图状态和启用/禁用状态）
         if (node.getJobId() != null) {
-            com.cc.job.gui.util.NodeGraphStateManager.getInstance().removeNodeState(node.getJobId());
+            com.cc.job.gui.util.NodeGraphStateManager.getInstance().removeAllNodeStates(node.getJobId());
         }
         
         List<NodeConnection> attachedConnections = nodeManager.removeNode(node, connections);
@@ -861,7 +862,19 @@ public class NodeCanvas extends Pane {
         dotsThemeItem.setOnAction(e -> setTheme("dots"));
         themeMenu.getItems().addAll(defaultThemeItem, gridThemeItem, dotsThemeItem);
         
-        menu.getItems().addAll(addNodeItem, clearItem, runGroupItem, themeMenu);
+        // 分隔符
+        SeparatorMenuItem separatorState = new SeparatorMenuItem();
+        
+        // 重置节点状态
+        MenuItem resetNodeStatesItem = new MenuItem("重置节点状态");
+        resetNodeStatesItem.setOnAction(e -> resetAllNodeStates());
+        
+        // 恢复所有节点运行状态
+        MenuItem restoreAllNodesItem = new MenuItem("恢复节点运行");
+        restoreAllNodesItem.setOnAction(e -> restoreAllNodesEnabled());
+        
+        menu.getItems().addAll(addNodeItem, clearItem, runGroupItem, themeMenu, 
+                               separatorState, resetNodeStatesItem, restoreAllNodesItem);
         
         this.setOnContextMenuRequested(e -> {
             if (!isClickOnNodeOrEdge((javafx.scene.Node) e.getTarget())) {
@@ -1091,11 +1104,21 @@ public class NodeCanvas extends Pane {
                 
                 // 从全局管理器恢复节点状态（开始/终止/阻塞）
                 if (node.getJobId() != null) {
-                    ProcessNode.GraphNodeState savedState = com.cc.job.gui.util.NodeGraphStateManager.getInstance()
-                        .getNodeState(node.getJobId());
+                    com.cc.job.gui.util.NodeGraphStateManager stateManager = 
+                        com.cc.job.gui.util.NodeGraphStateManager.getInstance();
+                    
+                    // 恢复图节点状态（开始/终止/阻塞）
+                    ProcessNode.GraphNodeState savedState = stateManager.getNodeState(node.getJobId());
                     if (savedState != ProcessNode.GraphNodeState.NORMAL) {
                         // 使用内部方法设置状态，不触发回调（避免在加载时触发状态传播）
                         node.setGraphStateInternal(savedState);
+                    }
+                    
+                    // 恢复启用/禁用状态
+                    boolean savedEnabled = stateManager.getNodeEnabled(node.getJobId());
+                    if (!savedEnabled) {
+                        // 如果节点是禁用状态，恢复禁用状态
+                        node.restoreEnabledState(false);
                     }
                 }
             });
@@ -1356,6 +1379,69 @@ public class NodeCanvas extends Pane {
     }
     
     // ==================== 节点状态管理 ====================
+    
+    /**
+     * 重置所有节点的图状态为普通状态
+     * 清除所有开始节点、终止节点和阻塞节点状态
+     */
+    public void resetAllNodeStates() {
+        int resetCount = 0;
+        
+        // 第一步：先清除所有开始节点和终止节点，并恢复它们影响的阻塞节点
+        List<ProcessNode> startAndStopNodes = new ArrayList<>();
+        for (ProcessNode node : new ArrayList<>(nodes)) {
+            ProcessNode.GraphNodeState currentState = node.getGraphState();
+            if (currentState == ProcessNode.GraphNodeState.START || 
+                currentState == ProcessNode.GraphNodeState.STOP) {
+                startAndStopNodes.add(node);
+            }
+        }
+        
+        // 清除开始节点和终止节点，这会自动恢复它们影响的阻塞节点
+        for (ProcessNode node : startAndStopNodes) {
+            node.setGraphState(ProcessNode.GraphNodeState.NORMAL);
+            resetCount++;
+        }
+        
+        // 第二步：清除所有剩余的阻塞节点
+        for (ProcessNode node : new ArrayList<>(nodes)) {
+            if (node.getGraphState() == ProcessNode.GraphNodeState.BLOCKED) {
+                node.setGraphState(ProcessNode.GraphNodeState.NORMAL);
+                resetCount++;
+            }
+        }
+        
+        if (resetCount > 0) {
+            log("✓ 已重置 " + resetCount + " 个节点的状态为普通状态");
+            markAsUnsaved();
+        } else {
+            log("ℹ 没有需要重置的节点状态");
+        }
+    }
+    
+    /**
+     * 恢复所有节点的运行状态（启用所有节点）
+     * 清除所有暂停节点状态
+     */
+    public void restoreAllNodesEnabled() {
+        int restoredCount = 0;
+        
+        // 遍历所有节点，恢复为启用状态
+        for (ProcessNode node : new ArrayList<>(nodes)) {
+            if (!node.getEnabled()) {
+                // 恢复节点为启用状态
+                node.restoreEnabledState(true);
+                restoredCount++;
+            }
+        }
+        
+        if (restoredCount > 0) {
+            log("✓ 已恢复 " + restoredCount + " 个节点的运行状态");
+            markAsUnsaved();
+        } else {
+            log("ℹ 没有需要恢复的暂停节点");
+        }
+    }
     
     /**
      * 在数据加载完成后应用状态传播逻辑

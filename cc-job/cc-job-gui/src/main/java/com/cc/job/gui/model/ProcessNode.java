@@ -733,9 +733,12 @@ public class ProcessNode extends StackPane {
         // 如果节点被禁用，显示暂停图标
         if (!enabled) {
             stateIcon.setIconCode(Feather.PAUSE);
-            stateIcon.setIconColor(Color.web("#6B7280")); // 更深的灰色，更明显
+            stateIcon.setIconColor(Color.web("#FFFFFF")); // 白色图标
             stateIcon.setVisible(true);
-            iconBackground.setVisible(true); // 显示背景圆圈
+            // 图标背景圆圈：灰色背景，灰色边框
+            iconBackground.setFill(Color.web("#6B7280")); // 灰色背景
+            iconBackground.setStroke(Color.web("#4B5563")); // 深灰色边框
+            iconBackground.setVisible(true);
             stateIconContainer.setVisible(true);
             return;
         }
@@ -744,23 +747,32 @@ public class ProcessNode extends StackPane {
         switch (graphState) {
             case START:
                 stateIcon.setIconCode(Feather.PLAY);
-                stateIcon.setIconColor(Color.web("#059669")); // 更深的绿色，更明显
+                stateIcon.setIconColor(Color.web("#FFFFFF")); // 白色图标
                 stateIcon.setVisible(true);
-                iconBackground.setVisible(true); // 显示背景圆圈
+                // 图标背景圆圈：绿色背景，深绿色边框
+                iconBackground.setFill(Color.web("#10B981")); // 绿色背景
+                iconBackground.setStroke(Color.web("#059669")); // 深绿色边框
+                iconBackground.setVisible(true);
                 stateIconContainer.setVisible(true);
                 break;
             case STOP:
                 stateIcon.setIconCode(Feather.SQUARE);
-                stateIcon.setIconColor(Color.web("#DC2626")); // 更深的红色，更明显
+                stateIcon.setIconColor(Color.web("#FFFFFF")); // 白色图标
                 stateIcon.setVisible(true);
-                iconBackground.setVisible(true); // 显示背景圆圈
+                // 图标背景圆圈：红色背景，深红色边框
+                iconBackground.setFill(Color.web("#EF4444")); // 红色背景
+                iconBackground.setStroke(Color.web("#DC2626")); // 深红色边框
+                iconBackground.setVisible(true);
                 stateIconContainer.setVisible(true);
                 break;
             case BLOCKED:
                 stateIcon.setIconCode(Feather.LOCK);
-                stateIcon.setIconColor(Color.web("#4B5563")); // 更深的灰色，更明显
+                stateIcon.setIconColor(Color.web("#FFFFFF")); // 白色图标
                 stateIcon.setVisible(true);
-                iconBackground.setVisible(true); // 显示背景圆圈
+                // 图标背景圆圈：灰色背景，深灰色边框
+                iconBackground.setFill(Color.web("#6B7280")); // 灰色背景
+                iconBackground.setStroke(Color.web("#4B5563")); // 深灰色边框
+                iconBackground.setVisible(true);
                 stateIconContainer.setVisible(true);
                 break;
             case NORMAL:
@@ -784,11 +796,16 @@ public class ProcessNode extends StackPane {
         // 根据图节点状态设置样式
         switch (graphState) {
             case START:
-                // 开始节点：绿色边框，浅绿色背景
-                background.setStroke(Color.web("#10B981"));
-                background.setFill(Color.web("#D1FAE5"));
-                background.setStrokeWidth(3);
-                // 更新连接点颜色
+                // 开始节点：不改变背景颜色，只改变边框颜色和图标
+                // 保持原有的背景颜色（根据运行状态或类型）
+                // 如果节点有运行状态，保持运行状态的背景颜色
+                if (status != NodeStatus.IDLE) {
+                    updateBackgroundColorByStatus(status);
+                }
+                // 只改变边框颜色为绿色，表示开始节点
+                background.setStroke(Color.web("#10B981")); // 绿色边框
+                background.setStrokeWidth(3); // 加粗边框
+                // 更新连接点颜色为绿色
                 if (topConnector != null) {
                     topConnector.setFill(Color.web("#10B981"));
                     bottomConnector.setFill(Color.web("#10B981"));
@@ -797,11 +814,16 @@ public class ProcessNode extends StackPane {
                 }
                 break;
             case STOP:
-                // 终止节点：红色边框，浅红色背景
-                background.setStroke(Color.web("#EF4444"));
-                background.setFill(Color.web("#FEE2E2"));
-                background.setStrokeWidth(3);
-                // 更新连接点颜色
+                // 终止节点：不改变背景颜色，只改变边框颜色和图标
+                // 保持原有的背景颜色（根据运行状态或类型）
+                // 如果节点有运行状态，保持运行状态的背景颜色
+                if (status != NodeStatus.IDLE) {
+                    updateBackgroundColorByStatus(status);
+                }
+                // 只改变边框颜色为红色，表示终止节点
+                background.setStroke(Color.web("#EF4444")); // 红色边框
+                background.setStrokeWidth(3); // 加粗边框
+                // 更新连接点颜色为红色
                 if (topConnector != null) {
                     topConnector.setFill(Color.web("#EF4444"));
                     bottomConnector.setFill(Color.web("#EF4444"));
@@ -1105,6 +1127,11 @@ public class ProcessNode extends StackPane {
         // 先更新UI状态（乐观更新）
         enabled = newEnabledState;
         
+        // 保存状态到全局管理器（不保存到数据库）
+        if (jobId != null) {
+            com.cc.job.gui.util.NodeGraphStateManager.getInstance().setNodeEnabled(jobId, newEnabledState);
+        }
+        
         if (enabled) {
             // 启用状态：根据当前图节点状态恢复样式
             if (graphState == GraphNodeState.NORMAL) {
@@ -1115,29 +1142,32 @@ public class ProcessNode extends StackPane {
             }
             this.setOpacity(1.0);
         } else {
-            // 禁用状态：灰色半透明（覆盖所有状态）
-            background.setFill(Color.web("#4169E1"));
-            background.setStroke(Color.web("#9CA3AF"));
-            background.setStrokeWidth(2);
-            this.setOpacity(0.6);
+            // 禁用状态：不改变背景颜色，只改变透明度和图标
+            // 保持原有的背景颜色和边框颜色
+            this.setOpacity(0.6); // 降低透明度表示禁用
         }
         
         // 更新状态图标（显示/隐藏暂停图标）
         updateStateIcon();
         
-        // 调用回调，通知外部（如调用后端API）
-        // 回调在后台线程中执行，如果失败，会恢复UI状态
-        if (onDisable != null && jobId != null) {
-            onDisable.onDisableNode(jobId, !enabled);
-        }
+        // 注意：不再调用后端API保存禁用状态，因为状态只保存在内存中
+        // 如果需要调用后端API，可以保留以下代码，但状态不会持久化到数据库
+        // if (onDisable != null && jobId != null) {
+        //     onDisable.onDisableNode(jobId, !enabled);
+        // }
     }
     
     /**
-     * 恢复节点的启用/禁用状态（用于回调失败时恢复）
+     * 恢复节点的启用/禁用状态（用于从全局管理器恢复状态）
      * @param targetEnabledState 目标启用状态
      */
     public void restoreEnabledState(boolean targetEnabledState) {
         enabled = targetEnabledState;
+        
+        // 保存状态到全局管理器（确保状态同步）
+        if (jobId != null) {
+            com.cc.job.gui.util.NodeGraphStateManager.getInstance().setNodeEnabled(jobId, targetEnabledState);
+        }
         
         if (enabled) {
             // 启用状态：根据当前图节点状态恢复样式
@@ -1149,11 +1179,9 @@ public class ProcessNode extends StackPane {
             }
             this.setOpacity(1.0);
         } else {
-            // 禁用状态：灰色半透明（覆盖所有状态）
-            background.setFill(Color.web("#4169E1"));
-            background.setStroke(Color.web("#9CA3AF"));
-            background.setStrokeWidth(2);
-            this.setOpacity(0.6);
+            // 禁用状态：不改变背景颜色，只改变透明度和图标
+            // 保持原有的背景颜色和边框颜色
+            this.setOpacity(0.6); // 降低透明度表示禁用
         }
         
         // 更新状态图标（显示/隐藏暂停图标）
