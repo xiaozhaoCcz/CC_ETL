@@ -1,6 +1,7 @@
 package com.cc.job.gui.manager;
 
 import com.cc.job.gui.model.ProcessNode;
+import com.cc.job.gui.model.ProcessNode.GraphNodeState;
 import com.cc.job.gui.model.RunningJobGroup;
 import com.cc.job.gui.service.JobInfoService;
 import com.cc.job.gui.service.JobLogService;
@@ -124,10 +125,15 @@ public class TaskExecutionManager {
             handleSSEMessage(message, randomId);
         });
         
+        // 统计节点ID列表
+        List<Integer> jobFlowPositionIds = collectNonBlockedNodeIds();
+        List<Integer> jobPauseStatusIds = collectPausedNodeIds();
+        
         // 触发任务
         new Thread(() -> {
             try {
-                Long logId = jobInfoService.triggerJob(currentJobId, randomId);
+                Long logId = jobInfoService.triggerJob(currentJobId, randomId, 
+                                                      jobFlowPositionIds, jobPauseStatusIds);
                 runningJob.setLogId(logId);
                 
                 Platform.runLater(() -> {
@@ -389,6 +395,60 @@ public class TaskExecutionManager {
             }
         }
         runningJobs.clear();
+    }
+    
+    /**
+     * 收集除阻塞节点外的其他节点ID列表
+     * @return 节点ID列表（转换为Integer，过滤掉null）
+     */
+    private List<Integer> collectNonBlockedNodeIds() {
+        List<Integer> nodeIds = new ArrayList<>();
+        List<ProcessNode> nodes = canvas.getNodes();
+        
+        for (ProcessNode node : nodes) {
+            // 排除阻塞节点
+            if (node.getGraphState() != GraphNodeState.BLOCKED) {
+                Long jobId = node.getJobId();
+                if (jobId != null) {
+                    try {
+                        // 将Long转换为Integer
+                        nodeIds.add(jobId.intValue());
+                    } catch (ArithmeticException e) {
+                        // 如果jobId超出Integer范围，跳过该节点
+                        logger.warn("节点jobId超出Integer范围，跳过: {}", jobId);
+                    }
+                }
+            }
+        }
+        
+        return nodeIds;
+    }
+    
+    /**
+     * 收集暂停节点ID列表（enabled=false的节点）
+     * @return 暂停节点ID列表（转换为Integer，过滤掉null）
+     */
+    private List<Integer> collectPausedNodeIds() {
+        List<Integer> nodeIds = new ArrayList<>();
+        List<ProcessNode> nodes = canvas.getNodes();
+        
+        for (ProcessNode node : nodes) {
+            // 收集暂停节点（enabled=false）
+            if (!node.getEnabled()) {
+                Long jobId = node.getJobId();
+                if (jobId != null) {
+                    try {
+                        // 将Long转换为Integer
+                        nodeIds.add(jobId.intValue());
+                    } catch (ArithmeticException e) {
+                        // 如果jobId超出Integer范围，跳过该节点
+                        logger.warn("节点jobId超出Integer范围，跳过: {}", jobId);
+                    }
+                }
+            }
+        }
+        
+        return nodeIds;
     }
 }
 

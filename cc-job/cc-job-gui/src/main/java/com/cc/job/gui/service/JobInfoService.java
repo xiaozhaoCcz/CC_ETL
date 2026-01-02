@@ -35,10 +35,14 @@ public class JobInfoService extends BaseService {
      * 触发任务执行
      * @param jobId 任务组ID
      * @param executorParam 执行参数（randomId）
+     * @param jobFlowPositionIds 排除阻塞节点的其他节点ID列表（可为null）
+     * @param jobPauseStatusIds 暂停节点ID列表（可为null）
      * @return 执行日志ID
      * @throws IOException 网络异常
      */
-    public Long triggerJob(Long jobId, String executorParam) throws IOException {
+    public Long triggerJob(Long jobId, String executorParam, 
+                          List<Integer> jobFlowPositionIds, 
+                          List<Integer> jobPauseStatusIds) throws IOException {
         // 构建请求参数
         Map<String, Object> requestMap = new HashMap<>();
         requestMap.put("id", jobId);
@@ -53,6 +57,16 @@ public class JobInfoService extends BaseService {
             } catch (NumberFormatException e) {
                 // 忽略解析错误
             }
+        }
+        
+        // 添加排除阻塞节点的其他节点ID列表
+        if (jobFlowPositionIds != null && !jobFlowPositionIds.isEmpty()) {
+            requestMap.put("jobFlowPositionIds", jobFlowPositionIds);
+        }
+        
+        // 添加暂停节点ID列表
+        if (jobPauseStatusIds != null && !jobPauseStatusIds.isEmpty()) {
+            requestMap.put("jobPauseStatusIds", jobPauseStatusIds);
         }
         
         Result<String> result = httpClient.post("/api/v1/jobInfos/trigger", requestMap, String.class);

@@ -1,5 +1,6 @@
 package com.cc.job.xo.model.dto;
 
+import java.util.List;
 import java.util.Objects;
 
 public class JobInfoTriggerDto {
@@ -14,6 +15,10 @@ public class JobInfoTriggerDto {
      * 触发任务的用户ID
      */
     private Integer triggerUserId;
+
+    private List<Integer> jobFlowPositionIds;
+
+    private List<Integer> jobPauseStatusIds;
 
     public Long getId() {
         return id;
@@ -47,29 +52,19 @@ public class JobInfoTriggerDto {
         this.triggerUserId = triggerUserId;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        JobInfoTriggerDto that = (JobInfoTriggerDto) o;
-        return Objects.equals(id, that.id) &&
-                Objects.equals(executorParam, that.executorParam) &&
-                Objects.equals(addressList, that.addressList) &&
-                Objects.equals(triggerUserId, that.triggerUserId);
+    public List<Integer> getJobFlowPositionIds() {
+        return jobFlowPositionIds;
     }
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(id, executorParam, addressList, triggerUserId);
+    public void setJobFlowPositionIds(List<Integer> jobFlowPositionIds) {
+        this.jobFlowPositionIds = jobFlowPositionIds;
     }
 
-    @Override
-    public String toString() {
-        return "JobInfoTriggerDto{" +
-                "id=" + id +
-                ", executorParam='" + executorParam + '\'' +
-                ", addressList='" + addressList + '\'' +
-                ", triggerUserId=" + triggerUserId +
-                '}';
+    public List<Integer> getJobPauseStatusIds() {
+        return jobPauseStatusIds;
+    }
+
+    public void setJobPauseStatusIds(List<Integer> jobPauseStatusIds) {
+        this.jobPauseStatusIds = jobPauseStatusIds;
     }
 }

@@ -687,6 +687,11 @@ public class ProcessNode extends StackPane {
         GraphNodeState oldState = this.graphState;
         this.graphState = newState;
         
+        // 保存状态到全局管理器（不保存到数据库）
+        if (jobId != null) {
+            com.cc.job.gui.util.NodeGraphStateManager.getInstance().setNodeState(jobId, newState);
+        }
+        
         // 更新节点样式
         updateGraphStateStyle();
         
@@ -707,6 +712,12 @@ public class ProcessNode extends StackPane {
         }
         
         this.graphState = newState;
+        
+        // 保存状态到全局管理器（不保存到数据库）
+        if (jobId != null) {
+            com.cc.job.gui.util.NodeGraphStateManager.getInstance().setNodeState(jobId, newState);
+        }
+        
         // 只更新样式，不触发回调
         updateGraphStateStyle();
     }

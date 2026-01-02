@@ -218,6 +218,11 @@ public class NodeCanvas extends Pane {
         double oldX = node.getLayoutX();
         double oldY = node.getLayoutY();
         
+        // 从全局管理器移除节点状态
+        if (node.getJobId() != null) {
+            com.cc.job.gui.util.NodeGraphStateManager.getInstance().removeNodeState(node.getJobId());
+        }
+        
         List<NodeConnection> attachedConnections = nodeManager.removeNode(node, connections);
         
         for (NodeConnection conn : attachedConnections) {
@@ -1083,6 +1088,22 @@ public class NodeCanvas extends Pane {
             Map<String, ProcessNode> nodeMap = dataLoader.loadNodes(composeData.getNodes(), node -> {
                 nodeManager.addNode(node);
                 setupNodeCallbacks(node);
+                
+                // 从全局管理器恢复节点状态（开始/终止/阻塞）
+                if (node.getJobId() != null) {
+                    ProcessNode.GraphNodeState savedState = com.cc.job.gui.util.NodeGraphStateManager.getInstance()
+                        .getNodeState(node.getJobId());
+                    if (savedState != ProcessNode.GraphNodeState.NORMAL) {
+                        // 使用内部方法设置状态，不触发回调（避免在加载时触发状态传播）
+                        node.setGraphStateInternal(savedState);
+                    }
+                }
+            });
+            
+            // 加载连接后，需要重新应用状态传播逻辑（因为状态可能影响其他节点）
+            // 延迟执行状态传播，确保所有节点和连接都已加载完成
+            javafx.application.Platform.runLater(() -> {
+                applyStatePropagationAfterLoad();
             });
             
             // 加载连接
@@ -1335,6 +1356,21 @@ public class NodeCanvas extends Pane {
     }
     
     // ==================== 节点状态管理 ====================
+    
+    /**
+     * 在数据加载完成后应用状态传播逻辑
+     * 遍历所有节点，对开始节点和终止节点应用状态传播
+     */
+    private void applyStatePropagationAfterLoad() {
+        // 遍历所有节点，对开始节点和终止节点应用状态传播
+        for (ProcessNode node : nodes) {
+            ProcessNode.GraphNodeState state = node.getGraphState();
+            if (state == ProcessNode.GraphNodeState.START || state == ProcessNode.GraphNodeState.STOP) {
+                // 触发状态传播逻辑（使用内部方法，避免重复保存到全局管理器）
+                handleNodeStateChange(node, ProcessNode.GraphNodeState.NORMAL, state);
+            }
+        }
+    }
     
     /**
      * 处理节点状态变化，实现状态传播逻辑
