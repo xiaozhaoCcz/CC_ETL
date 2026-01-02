@@ -1,5 +1,7 @@
 package com.xxl.job.core.context;
 
+import java.util.List;
+
 /**
  * xxl-job context
  *
@@ -61,6 +63,11 @@ public class XxlJobContext {
     private String handleMsg;
 
 
+    private List<Integer>  jobPauseStatusIds;
+
+    private List<Integer> jobFlowPositionIds;
+
+
     public XxlJobContext(long jobId, String jobParam, String jobLogFileName, int shardIndex, int shardTotal) {
         this.jobId = jobId;
         this.jobParam = jobParam;
@@ -69,6 +76,20 @@ public class XxlJobContext {
         this.shardTotal = shardTotal;
 
         this.handleCode = HANDLE_CODE_SUCCESS;  // default success
+    }
+
+    public XxlJobContext(long jobId, String jobParam, String jobLogFileName, int shardIndex, int shardTotal,List<Integer> jobFlowPositionIds,List<Integer>  jobPauseStatusIds) {
+        this.jobId = jobId;
+        this.jobParam = jobParam;
+        this.jobLogFileName = jobLogFileName;
+        this.shardIndex = shardIndex;
+        this.shardTotal = shardTotal;
+
+        this.handleCode = HANDLE_CODE_SUCCESS;  // default success
+
+        this.jobFlowPositionIds = jobFlowPositionIds;
+
+        this.jobPauseStatusIds = jobPauseStatusIds;
     }
 
     public long getJobId() {
@@ -109,6 +130,22 @@ public class XxlJobContext {
 
     public String getHandleMsg() {
         return handleMsg;
+    }
+
+    public List<Integer> getJobPauseStatusIds() {
+        return jobPauseStatusIds;
+    }
+
+    public void setJobPauseStatusIds(List<Integer> jobPauseStatusIds) {
+        this.jobPauseStatusIds = jobPauseStatusIds;
+    }
+
+    public List<Integer> getJobFlowPositionIds() {
+        return jobFlowPositionIds;
+    }
+
+    public void setJobFlowPositionIds(List<Integer> jobFlowPositionIds) {
+        this.jobFlowPositionIds = jobFlowPositionIds;
     }
 
     // ---------------------- tool ----------------------

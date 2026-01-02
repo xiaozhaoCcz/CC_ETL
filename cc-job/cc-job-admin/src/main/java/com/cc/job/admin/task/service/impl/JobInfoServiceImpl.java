@@ -409,7 +409,15 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
         log.debug("[JobInfoService] 创建任务日志记录 - jobId: {}, logId: {}", taskInfo.getId(), logId);
 
-        JobTriggerPoolHelper.trigger(taskInfoTriggerDto.getId().intValue(), TriggerTypeEnum.MANUAL, -1, null, taskInfoTriggerDto.getExecutorParam(), taskInfoTriggerDto.getAddressList(), logId);
+        JobTriggerPoolHelper.trigger(taskInfoTriggerDto.getId().intValue(),
+                TriggerTypeEnum.MANUAL,
+                -1,
+                null,
+                taskInfoTriggerDto.getExecutorParam(),
+                taskInfoTriggerDto.getAddressList(),
+                logId,
+                taskInfoTriggerDto.getJobFlowPositionIds(),
+                taskInfoTriggerDto.getJobPauseStatusIds());
 
         // 只在任务组（jobType == 2）时记录触发用户ID
         if (taskInfo.getJobType() == 2 && taskInfoTriggerDto.getTriggerUserId() != null) {

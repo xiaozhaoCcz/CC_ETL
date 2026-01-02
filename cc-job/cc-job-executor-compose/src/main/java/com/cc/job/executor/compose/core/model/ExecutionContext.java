@@ -38,10 +38,12 @@ public class ExecutionContext {
     /** 执行键 */
     private String executeKey;
 
+    private List<Integer> jobPauseStatusIds;
+
     public ExecutionContext() {
     }
 
-    public ExecutionContext(Long taskGroupId, String executionBatchId, JobInfo taskGroupInfo, List<JobNode> nodes, List<JobEdge> edges, XxlJobContext xxlJobContext, String executeKey) {
+    public ExecutionContext(Long taskGroupId, String executionBatchId, JobInfo taskGroupInfo, List<JobNode> nodes, List<JobEdge> edges, XxlJobContext xxlJobContext, String executeKey,List<Integer> jobPauseStatusIds) {
         this.taskGroupId = taskGroupId;
         this.executionBatchId = executionBatchId;
         this.taskGroupInfo = taskGroupInfo;
@@ -49,6 +51,7 @@ public class ExecutionContext {
         this.edges = edges;
         this.xxlJobContext = xxlJobContext;
         this.executeKey = executeKey;
+        this.jobPauseStatusIds = jobPauseStatusIds;
     }
 
     public static ExecutionContextBuilder builder() {
@@ -111,37 +114,14 @@ public class ExecutionContext {
         this.executeKey = executeKey;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        ExecutionContext that = (ExecutionContext) o;
-        return Objects.equals(taskGroupId, that.taskGroupId) &&
-                Objects.equals(executionBatchId, that.executionBatchId) &&
-                Objects.equals(taskGroupInfo, that.taskGroupInfo) &&
-                Objects.equals(nodes, that.nodes) &&
-                Objects.equals(edges, that.edges) &&
-                Objects.equals(xxlJobContext, that.xxlJobContext) &&
-                Objects.equals(executeKey, that.executeKey);
+    public List<Integer> getJobPauseStatusIds() {
+        return jobPauseStatusIds;
     }
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(taskGroupId, executionBatchId, taskGroupInfo, nodes, edges, xxlJobContext, executeKey);
+    public void setJobPauseStatusIds(List<Integer> jobPauseStatusIds) {
+        this.jobPauseStatusIds = jobPauseStatusIds;
     }
 
-    @Override
-    public String toString() {
-        return "ExecutionContext{" +
-                "taskGroupId=" + taskGroupId +
-                ", executionBatchId='" + executionBatchId + '\'' +
-                ", taskGroupInfo=" + taskGroupInfo +
-                ", nodes=" + nodes +
-                ", edges=" + edges +
-                ", xxlJobContext=" + xxlJobContext +
-                ", executeKey='" + executeKey + '\'' +
-                '}';
-    }
 
     public static class ExecutionContextBuilder {
         private Long taskGroupId;
@@ -151,6 +131,7 @@ public class ExecutionContext {
         private List<JobEdge> edges;
         private XxlJobContext xxlJobContext;
         private String executeKey;
+        private List<Integer> jobPauseStatusIds;
 
         ExecutionContextBuilder() {
         }
@@ -190,8 +171,13 @@ public class ExecutionContext {
             return this;
         }
 
+        public ExecutionContextBuilder jobPauseStatusIds(List<Integer> jobPauseStatusIds){
+            this.jobPauseStatusIds = jobPauseStatusIds;
+            return this;
+        }
+
         public ExecutionContext build() {
-            return new ExecutionContext(taskGroupId, executionBatchId, taskGroupInfo, nodes, edges, xxlJobContext, executeKey);
+            return new ExecutionContext(taskGroupId, executionBatchId, taskGroupInfo, nodes, edges, xxlJobContext, executeKey,jobPauseStatusIds);
         }
     }
 }

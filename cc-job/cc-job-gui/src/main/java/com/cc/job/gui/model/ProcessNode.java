@@ -490,15 +490,21 @@ public class ProcessNode extends StackPane {
         Menu stateMenu = new Menu("节点状态");
         
         // 设置为开始节点
-        MenuItem startNodeItem = new MenuItem("设置为开始节点");
+        MenuItem startNodeItem = new MenuItem("开始节点");
         startNodeItem.setOnAction(e -> {
             setGraphState(GraphNodeState.START);
         });
         
         // 设置为终止节点
-        MenuItem stopNodeItem = new MenuItem("设置为终止节点");
+        MenuItem stopNodeItem = new MenuItem("终止节点");
         stopNodeItem.setOnAction(e -> {
             setGraphState(GraphNodeState.STOP);
+        });
+        
+        // 设置为阻塞节点
+        MenuItem blockedNodeItem = new MenuItem("阻塞节点");
+        blockedNodeItem.setOnAction(e -> {
+            setGraphState(GraphNodeState.BLOCKED);
         });
         
         // 取消特殊状态（恢复为普通节点）
@@ -507,7 +513,7 @@ public class ProcessNode extends StackPane {
             setGraphState(GraphNodeState.NORMAL);
         });
         
-        stateMenu.getItems().addAll(startNodeItem, stopNodeItem, normalNodeItem);
+        stateMenu.getItems().addAll(startNodeItem, stopNodeItem, blockedNodeItem, normalNodeItem);
 
         // 分隔符
         SeparatorMenuItem separator2 = new SeparatorMenuItem();
@@ -520,14 +526,15 @@ public class ProcessNode extends StackPane {
                 onDelete.run();
             }
         });
-        
+
+        //删除禁用节点的功能
         contextMenu.getItems().addAll(
             editItem,
             copyItem,
             detailsItem,
             separator1,
             colorMenu,
-            toggleItem,
+            //toggleItem,
             separatorState,
             stateMenu,
             separator2,

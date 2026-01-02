@@ -47,7 +47,9 @@ public class XxlJobTrigger {
                                               String executorShardingParam,
                                               String executorParam,
                                               String addressList,
-                                              long logId) {
+                                              long logId,
+                                              List<Integer> jobFlowPositionIds,
+                                              List<Integer> jobPauseStatusIds) {
 
         // load data
         JobInfo jobInfo = XxlJobAdminConfig.getAdminConfig().getJobInfoMapper().selectById(jobId);
@@ -81,13 +83,13 @@ public class XxlJobTrigger {
                 && group.getRegistryList() != null && !group.getRegistryList().isEmpty()
                 && shardingParam == null) {
             for (int i = 0; i < group.getRegistryList().size(); i++) {
-                processTrigger(group, jobInfo, finalFailRetryCount, triggerType, i, group.getRegistryList().size(), logId);
+                processTrigger(group, jobInfo, finalFailRetryCount, triggerType, i, group.getRegistryList().size(), logId,jobFlowPositionIds,jobPauseStatusIds);
             }
         } else {
             if (shardingParam == null) {
                 shardingParam = new int[]{0, 1};
             }
-            processTrigger(group, jobInfo, finalFailRetryCount, triggerType, shardingParam[0], shardingParam[1], logId);
+            processTrigger(group, jobInfo, finalFailRetryCount, triggerType, shardingParam[0], shardingParam[1], logId,jobFlowPositionIds,jobPauseStatusIds);
         }
     }
 
@@ -108,7 +110,7 @@ public class XxlJobTrigger {
      * @param index               sharding index
      * @param total               sharding index
      */
-    private static void processTrigger(JobGroup group, JobInfo jobInfo, int finalFailRetryCount, TriggerTypeEnum triggerType, int index, int total, long logId) {
+    private static void processTrigger(JobGroup group, JobInfo jobInfo, int finalFailRetryCount, TriggerTypeEnum triggerType, int index, int total, long logId,List<Integer> jobFlowPositionIds,List<Integer> jobPauseStatusIds) {
 
         // param
         ExecutorBlockStrategyEnum blockStrategy = ExecutorBlockStrategyEnum.match(jobInfo.getExecutorBlockStrategy(), ExecutorBlockStrategyEnum.SERIAL_EXECUTION);  // block strategy
@@ -182,6 +184,9 @@ public class XxlJobTrigger {
         triggerParam.setReqHeader(jobInfo.getReqHeader());
         triggerParam.setReqType(jobInfo.getReqType());
         triggerParam.setReqUrl(jobInfo.getReqUrl());
+        //设置暂停任务组和节点状态
+        triggerParam.setJobFlowPositionIds(jobFlowPositionIds);
+        triggerParam.setJobPauseStatusIds(jobPauseStatusIds);
 
 
         // 3、init address

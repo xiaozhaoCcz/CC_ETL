@@ -12,6 +12,7 @@ import com.cc.job.executor.compose.engine.Async;
 import com.cc.job.executor.compose.engine.wrapper.WorkerWrapper;
 import com.cc.job.executor.compose.engine.worker.ResultState;
 import com.cc.job.executor.compose.handler.JobGroupUtils;
+import com.cc.job.xo.common.BaseEntity;
 import com.cc.job.xo.model.entity.JobEdge;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobNode;
@@ -137,13 +138,13 @@ public class TaskGroupOrchestrator {
      * @param taskGroupId 任务组ID
      * @param executionBatchId 执行批次ID
      */
-    public void execute(Long taskGroupId, String executionBatchId) {
+    public void execute(Long taskGroupId, String executionBatchId,List<Integer> jobFlowPositionIds,List<Integer> jobPauseStatusIds) {
         logger.info("[Orchestrator] ========== 开始执行任务组 ==========");
         logger.info("[Orchestrator] 任务组ID: {}, 批次ID: {}", taskGroupId, executionBatchId);
         
         try {
             // 1. 准备执行上下文
-            ExecutionContext context = prepareExecution(taskGroupId, executionBatchId);
+            ExecutionContext context = prepareExecution(taskGroupId, executionBatchId,jobFlowPositionIds,jobPauseStatusIds);
             
             // 2. 构建执行计划
             List<WorkerWrapper<Long, String>> workerWrappers = buildExecutionPlan(context);
@@ -166,7 +167,7 @@ public class TaskGroupOrchestrator {
     /**
      * 准备执行上下文
      */
-    private ExecutionContext prepareExecution(Long taskGroupId, String executionBatchId) {
+    private ExecutionContext prepareExecution(Long taskGroupId, String executionBatchId,List<Integer> jobFlowPositionIds,List<Integer> jobPauseStatusIds) {
         logger.debug("[Orchestrator] 准备执行上下文 - taskGroupId: {}", taskGroupId);
         
         // 获取任务组信息
@@ -183,6 +184,16 @@ public class TaskGroupOrchestrator {
             logger.warn("[Orchestrator] 任务组没有节点 - taskGroupId: {}", taskGroupId);
             XxlJobHelper.handleSuccess("任务组没有节点，跳过执行");
             throw new RuntimeException("任务组没有节点");
+        }
+
+        // 过滤节点和边
+        if(jobFlowPositionIds!=null&&!jobFlowPositionIds.isEmpty()){
+           nodes =  nodes.stream().filter(n->jobFlowPositionIds.contains(n.getJobId().intValue())).toList();
+           if(!nodes.isEmpty()){
+               //过滤边
+               List<Long> nodeIds = nodes.stream().map(BaseEntity::getId).toList();
+               edges = edges.stream().filter(e->nodeIds.contains(e.getFromNodeId())&&nodeIds.contains(e.getEndNodeId())).toList();
+           }
         }
         
         logger.info("[Orchestrator] 获取到 {} 个节点，{} 条边", nodes.size(), edges.size());
@@ -202,6 +213,7 @@ public class TaskGroupOrchestrator {
                 .edges(edges)
                 .xxlJobContext(xxlJobContext)
                 .executeKey(buildExecuteKey(taskGroupId, executionBatchId))
+                .jobPauseStatusIds(jobPauseStatusIds)
                 .build();
     }
     

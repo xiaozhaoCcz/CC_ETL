@@ -229,8 +229,10 @@ public class JobInfoController {
         return Result.success(result);
     }
 
+    //废弃功能
     @Operation(summary = "暂停任务")
     @GetMapping("pauseJob/{id}")
+    @Deprecated
     public Result<Void>  pauseJob(@PathVariable Long id,Integer pauseStatus){
         boolean result = jobInfoService.pauseJob(id,pauseStatus);
         return Result.judge(result);

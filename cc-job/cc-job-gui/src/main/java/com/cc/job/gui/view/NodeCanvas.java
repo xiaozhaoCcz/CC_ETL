@@ -1501,6 +1501,10 @@ public class NodeCanvas extends Pane {
                     succ.setGraphState(ProcessNode.GraphNodeState.BLOCKED);
                 }
             }
+        } else if (newState == ProcessNode.GraphNodeState.BLOCKED) {
+            // 手动设置为阻塞节点：如果之前是开始节点或终止节点，已经恢复了它们的影响
+            // 阻塞节点本身不会影响其他节点，所以不需要额外的状态传播
+            // 状态传播逻辑已经在上面处理了（恢复旧状态的影响）
         } else if (newState == ProcessNode.GraphNodeState.NORMAL) {
             // 恢复为普通节点：检查是否仍应保持阻塞状态
             updateBlockedState(changedNode);

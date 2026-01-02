@@ -132,7 +132,9 @@ public class JobThread extends Thread{
 								triggerParam.getExecutorParams(),
 								logFileName,
 								triggerParam.getBroadcastIndex(),
-								triggerParam.getBroadcastTotal());
+								triggerParam.getBroadcastTotal(),
+								triggerParam.getJobFlowPositionIds(),
+								triggerParam.getJobPauseStatusIds());
 					}
 					// init job context
 					XxlJobContext.setXxlJobContext(xxlJobContext);

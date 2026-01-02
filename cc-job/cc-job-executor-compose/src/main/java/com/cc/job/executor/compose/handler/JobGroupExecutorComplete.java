@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -51,7 +52,9 @@ public class JobGroupExecutorComplete {
         // 1. 获取参数
         long taskGroupId = XxlJobHelper.getJobId();
         String executeParam = XxlJobHelper.getJobParam();
-        
+        List<Integer> jobFlowPositionIds = XxlJobHelper.getJobFlowPositionIds();
+        List<Integer> jobPauseStatusIds = XxlJobHelper.getJobPauseStatusIds();
+
         logger.info("[JobGroupExecutor] ========== 开始执行任务组 ==========");
         logger.info("[JobGroupExecutor] 任务组ID: {}, 执行参数: {}", taskGroupId, executeParam);
         
@@ -67,7 +70,7 @@ public class JobGroupExecutorComplete {
         logger.info("[JobGroupExecutor] 批次ID: {}", executionBatchId);
         
         // 4. 委托给编排器执行
-        orchestrator.execute(taskGroupId, executionBatchId);
+        orchestrator.execute(taskGroupId, executionBatchId,jobFlowPositionIds,jobPauseStatusIds);
     }
     
     /**
