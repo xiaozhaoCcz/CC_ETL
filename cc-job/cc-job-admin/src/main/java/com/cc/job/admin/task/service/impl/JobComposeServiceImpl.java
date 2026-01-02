@@ -607,8 +607,7 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
                 JobNode jobNode = nodeFromDb.stream().filter(n -> n.getId().equals(nodeIdLong)).findFirst().orElse(null);
 
                 // 如果通过nodeId找不到，尝试通过jobId查找（粘贴的节点可能已经保存，但nodeId可能不匹配）！！！！废弃代码
-                if (jobNode == null) {
-                    Map<String, Object> nodeProperties = JSONUtil.toBean(node.getProperties(), Map.class);
+                if (jobNode == null) {                    Map<String, Object> nodeProperties = JSONUtil.toBean(node.getProperties(), Map.class);
                     Object nodeJobIdObj = nodeProperties.get(JOB_ID);
                     if (nodeJobIdObj != null) {
                         Long nodeJobId = Long.parseLong(String.valueOf(nodeJobIdObj));

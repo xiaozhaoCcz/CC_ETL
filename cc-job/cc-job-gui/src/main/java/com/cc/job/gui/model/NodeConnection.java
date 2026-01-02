@@ -72,6 +72,14 @@ public class NodeConnection extends Group {
         this.targetConnectorParent = targetConnectorParent;
         this.sourceConnector = sourceConnector;
         this.targetConnector = targetConnector;
+        
+        // 如果拥有者是 ProcessNode，同时设置 sourceNode 和 targetNode
+        if (sourceOwner instanceof ProcessNode) {
+            this.sourceNode = (ProcessNode) sourceOwner;
+        }
+        if (targetOwner instanceof ProcessNode) {
+            this.targetNode = (ProcessNode) targetOwner;
+        }
 
         initializeUI();
         bindConnection();

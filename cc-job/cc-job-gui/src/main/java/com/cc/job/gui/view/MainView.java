@@ -621,6 +621,17 @@ public class MainView extends BorderPane {
                 } else if (action == TaskTreeView.TaskSelectionCallback.JobNodeAction.LOCATE) {
                     // 定位节点：先检查是否需要切换任务组
                     locateNodeWithTaskGroupSwitch(jobId, nodeName, taskGroupId);
+                } else if (action == TaskTreeView.TaskSelectionCallback.JobNodeAction.PROPERTIES) {
+                    // 属性功能：显示节点详情对话框，与右键菜单的查看详情功能一致
+                    ProcessNode targetNode = canvas.getNodeByJobId(jobId);
+                    String nodeId = targetNode != null ? targetNode.getNodeId() : null;
+                    if (dialogManager != null) {
+                        Platform.runLater(() -> {
+                            dialogManager.showNodeDetailsDialog(jobId, taskGroupId, nodeName, nodeId);
+                        });
+                    } else {
+                        logPanel.warn("⚠ 对话框管理器未设置，无法显示详情");
+                    }
                 }
             }
             

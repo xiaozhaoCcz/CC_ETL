@@ -12,6 +12,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.effect.DropShadow;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.Pane;
@@ -96,6 +97,9 @@ public class ProcessNode extends StackPane {
     private Label typeLabel;    // 类型标签引用
     private Label handlerLabel; // 处理器名称标签引用
     private FontIcon typeIcon;  // 节点类型图标
+    private FontIcon stateIcon; // 状态图标（开始/停止/阻塞/暂停）
+    private Pane stateIconContainer; // 状态图标容器（左上角）
+    private javafx.scene.shape.Circle iconBackground; // 状态图标背景圆圈
     private Timeline locateAnimation;
     
     private static final double NODE_WIDTH = 180;
@@ -177,11 +181,41 @@ public class ProcessNode extends StackPane {
         // 添加阴影效果
         this.setStyle("-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 5, 0, 0, 2);");
         
-        // 按顺序添加：背景 -> 内容 -> 连接点容器
-        this.getChildren().addAll(background, contentBox, connectorPane);
+        // 创建状态图标容器（左上角），使用 Pane 进行绝对定位
+        stateIconContainer = new Pane();
+        stateIconContainer.setPrefSize(28, 28);
+        stateIconContainer.setLayoutX(6);
+        stateIconContainer.setLayoutY(6);
+        stateIconContainer.setMouseTransparent(true); // 不拦截鼠标事件
+        
+        // 创建状态图标背景（圆形，白色背景，带阴影效果使其更明显）
+        // 背景圆圈中心在容器的 (14, 14) 位置
+        iconBackground = new Circle(14, 14, 12);
+        iconBackground.setFill(Color.web("#FFFFFF"));
+        iconBackground.setOpacity(0.95);
+        iconBackground.setStroke(Color.web("#D1D5DB"));
+        iconBackground.setStrokeWidth(1.5);
+        // 添加阴影效果，使图标更明显
+        iconBackground.setEffect(new DropShadow(3, Color.web("#000000", 0.4)));
+        
+        // 创建状态图标，定位在背景圆圈中心
+        // FontIcon 的基准点在左上角，所以需要计算位置使其在圆圈中心
+        stateIcon = new FontIcon();
+        stateIcon.setIconSize(18); // 增大图标尺寸使其更明显
+        // 图标中心应该在 (14, 14)，FontIcon 的基准点在左上角，所以需要减去图标尺寸的一半
+        stateIcon.setLayoutX(5);
+        stateIcon.setLayoutY(21);
+        
+        stateIconContainer.getChildren().addAll(iconBackground, stateIcon);
+        
+        // 按顺序添加：背景 -> 内容 -> 连接点容器 -> 状态图标容器
+        this.getChildren().addAll(background, contentBox, connectorPane, stateIconContainer);
         
         // 最后创建连接点并添加到独立容器中
         createConnectors();
+        
+        // 初始化状态图标
+        updateStateIcon();
     }
     
     private void createConnectors() {
@@ -675,10 +709,56 @@ public class ProcessNode extends StackPane {
         this.graphState = newState;
         // 只更新样式，不触发回调
         updateGraphStateStyle();
+    }
+    
+    /**
+     * 更新状态图标（左上角）
+     */
+    private void updateStateIcon() {
+        if (stateIcon == null || iconBackground == null) {
+            return;
+        }
         
-        // 强制刷新样式，确保阻塞节点的背景颜色被正确应用
-        if (newState == GraphNodeState.BLOCKED && background != null) {
-            background.setFill(Color.web("#F3F4F6"));
+        // 如果节点被禁用，显示暂停图标
+        if (!enabled) {
+            stateIcon.setIconCode(Feather.PAUSE);
+            stateIcon.setIconColor(Color.web("#6B7280")); // 更深的灰色，更明显
+            stateIcon.setVisible(true);
+            iconBackground.setVisible(true); // 显示背景圆圈
+            stateIconContainer.setVisible(true);
+            return;
+        }
+        
+        // 根据图节点状态显示不同图标
+        switch (graphState) {
+            case START:
+                stateIcon.setIconCode(Feather.PLAY);
+                stateIcon.setIconColor(Color.web("#059669")); // 更深的绿色，更明显
+                stateIcon.setVisible(true);
+                iconBackground.setVisible(true); // 显示背景圆圈
+                stateIconContainer.setVisible(true);
+                break;
+            case STOP:
+                stateIcon.setIconCode(Feather.SQUARE);
+                stateIcon.setIconColor(Color.web("#DC2626")); // 更深的红色，更明显
+                stateIcon.setVisible(true);
+                iconBackground.setVisible(true); // 显示背景圆圈
+                stateIconContainer.setVisible(true);
+                break;
+            case BLOCKED:
+                stateIcon.setIconCode(Feather.LOCK);
+                stateIcon.setIconColor(Color.web("#4B5563")); // 更深的灰色，更明显
+                stateIcon.setVisible(true);
+                iconBackground.setVisible(true); // 显示背景圆圈
+                stateIconContainer.setVisible(true);
+                break;
+            case NORMAL:
+            default:
+                // 普通节点不显示状态图标和背景圆圈
+                stateIcon.setVisible(false);
+                iconBackground.setVisible(false);
+                stateIconContainer.setVisible(false);
+                break;
         }
     }
     
@@ -719,9 +799,17 @@ public class ProcessNode extends StackPane {
                 }
                 break;
             case BLOCKED:
-                // 阻塞节点：只设置背景颜色，保持原有的边框和连接点颜色
-                background.setFill(Color.web("#F3F4F6"));
-                // 不改变边框颜色和连接点颜色，保持原有样式
+                // 阻塞节点：深灰色背景，灰色边框，使其与画布背景明显区分
+                background.setFill(Color.web("#D1D5DB")); // 更深的灰色背景，与画布背景 #F3F4F6 区分明显
+                background.setStroke(Color.web("#9CA3AF")); // 灰色边框，增强视觉效果
+                background.setStrokeWidth(2.5); // 稍微加粗边框
+                // 更新连接点颜色为灰色，表示阻塞状态
+                if (topConnector != null) {
+                    topConnector.setFill(Color.web("#9CA3AF"));
+                    bottomConnector.setFill(Color.web("#9CA3AF"));
+                    leftConnector.setFill(Color.web("#9CA3AF"));
+                    rightConnector.setFill(Color.web("#9CA3AF"));
+                }
                 break;
             case NORMAL:
             default:
@@ -745,6 +833,9 @@ public class ProcessNode extends StackPane {
                 }
                 break;
         }
+        
+        // 更新状态图标
+        updateStateIcon();
     }
     
     /**
@@ -785,6 +876,11 @@ public class ProcessNode extends StackPane {
         // 更新边框颜色和图标
         updateBorderColorByType();
         updateTypeIcon();
+        
+        // 如果节点处于运行状态，需要重新应用样式以确保边框颜色正确
+        if (graphState == GraphNodeState.NORMAL && status != NodeStatus.IDLE) {
+            updateStatus(status);
+        }
     }
     
     /**
@@ -970,20 +1066,20 @@ public class ProcessNode extends StackPane {
         
         switch (newStatus) {
             case RUNNING:
-                // 运行中：黄色背景
-                background.setFill(Color.web("#F59E0B"));
+                // 运行中：加深的黄色背景，边框保持节点类型颜色，更容易观察运行状态
+                background.setFill(Color.web("#FCD34D")); // 更深的黄色，保持与边框的对比度
                 break;
             case SUCCESS:
-                // 成功：绿色背景
-                background.setFill(Color.web("#10B981"));
+                // 成功：加深的绿色背景，边框保持节点类型颜色，更容易观察成功状态
+                background.setFill(Color.web("#86EFAC")); // 更深的绿色，保持与边框的对比度
                 break;
             case FAILED:
-                // 失败：红色背景
-                background.setFill(Color.web("#EF4444"));
+                // 失败：加深的红色背景，边框保持节点类型颜色，更容易观察失败状态
+                background.setFill(Color.web("#FCA5A5")); // 更深的红色，保持与边框的对比度
                 break;
             case IDLE:
             default:
-                // 空闲：白色背景
+                // 空闲：白色背景，边框使用节点类型颜色
                 background.setFill(Color.WHITE);
                 break;
         }
@@ -1015,6 +1111,9 @@ public class ProcessNode extends StackPane {
             this.setOpacity(0.6);
         }
         
+        // 更新状态图标（显示/隐藏暂停图标）
+        updateStateIcon();
+        
         // 调用回调，通知外部（如调用后端API）
         // 回调在后台线程中执行，如果失败，会恢复UI状态
         if (onDisable != null && jobId != null) {
@@ -1045,6 +1144,9 @@ public class ProcessNode extends StackPane {
             background.setStrokeWidth(2);
             this.setOpacity(0.6);
         }
+        
+        // 更新状态图标（显示/隐藏暂停图标）
+        updateStateIcon();
     }
     
     /**
@@ -1096,40 +1198,28 @@ public class ProcessNode extends StackPane {
         NodeStatus oldStatus = this.status;
         this.status = newStatus;
         
-        String statusColor;
-        switch (newStatus) {
-            case RUNNING:
-                statusColor = "#F59E0B"; // 黄色（运行中）
-                break;
-            case SUCCESS:
-                statusColor = "#10B981"; // 绿色（成功）
-                break;
-            case FAILED:
-                statusColor = "#EF4444"; // 红色（失败）
-                break;
-            case IDLE:
-            default:
-                statusColor = "#8B5CF6"; // 紫色（默认/空闲）
-                break;
-        }
-        
         // 如果节点不是特殊状态（开始/终止/阻塞），才更新运行状态的颜色
         if (graphState == GraphNodeState.NORMAL) {
-            // 更新边框颜色和连接点颜色
-            background.setStroke(Color.web(statusColor));
-            topConnector.setFill(Color.web(statusColor));
-            bottomConnector.setFill(Color.web(statusColor));
-            leftConnector.setFill(Color.web(statusColor));
-            rightConnector.setFill(Color.web(statusColor));
-            
+            // 优化：运行状态只改变背景颜色，边框保持节点类型颜色，便于区分节点类型
             // 更新背景填充颜色（直接根据状态设置，不依赖其他字段）
             updateBackgroundColorByStatus(newStatus);
             
-            // 更新当前颜色
-            this.currentColor = statusColor;
+            // 边框颜色保持节点类型颜色，不随运行状态改变
+            // 这样可以在运行状态下也能区分节点类型（Bean、Java、API等）
+            if (background != null) {
+                background.setStroke(Color.web(currentColor));
+                background.setStrokeWidth(2);
+            }
+            
+            // 连接点颜色也保持节点类型颜色
+            if (topConnector != null) {
+                topConnector.setFill(Color.web(currentColor));
+                bottomConnector.setFill(Color.web(currentColor));
+                leftConnector.setFill(Color.web(currentColor));
+                rightConnector.setFill(Color.web(currentColor));
+            }
         }
         // 如果节点是特殊状态，保持特殊状态的样式不变
-        
     }
     
     /**

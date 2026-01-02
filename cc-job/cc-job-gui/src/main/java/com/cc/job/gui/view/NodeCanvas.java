@@ -1495,39 +1495,6 @@ public class NodeCanvas extends Pane {
         result.remove(node);
         return result;
     }
-    
-    /**
-     * 获取节点的直接前驱节点（仅一层）
-     */
-    private List<ProcessNode> getPredecessors(ProcessNode node) {
-        List<ProcessNode> predecessors = new ArrayList<>();
-        for (NodeConnection conn : connections) {
-            if (conn.getTargetNode() == node && conn.getSourceNode() != null) {
-                ProcessNode sourceNode = conn.getSourceNode();
-                if (!predecessors.contains(sourceNode)) {
-                    predecessors.add(sourceNode);
-                }
-            }
-        }
-        return predecessors;
-    }
-    
-    /**
-     * 获取节点的直接后继节点（仅一层）
-     */
-    private List<ProcessNode> getSuccessors(ProcessNode node) {
-        List<ProcessNode> successors = new ArrayList<>();
-        for (NodeConnection conn : connections) {
-            if (conn.getSourceNode() == node && conn.getTargetNode() != null) {
-                ProcessNode targetNode = conn.getTargetNode();
-                if (!successors.contains(targetNode)) {
-                    successors.add(targetNode);
-                }
-            }
-        }
-        return successors;
-    }
-    
     // ==================== 辅助方法 ====================
     
     private void notifyNodeStructureChanged() { 
