@@ -1413,6 +1413,8 @@ public class NodeCanvas extends Pane {
         
         if (resetCount > 0) {
             log("✓ 已重置 " + resetCount + " 个节点的状态为普通状态");
+            // 重置节点状态后，更新所有连接线的样式
+            updateAllConnectionBlockedStates();
             markAsUnsaved();
         } else {
             log("ℹ 没有需要重置的节点状态");
@@ -1456,6 +1458,19 @@ public class NodeCanvas extends Pane {
                 handleNodeStateChange(node, ProcessNode.GraphNodeState.NORMAL, state);
             }
         }
+        
+        // 加载完成后，统一更新所有连接线的阻塞状态
+        updateAllConnectionBlockedStates();
+    }
+    
+    /**
+     * 更新所有连接线的阻塞状态
+     * 根据连接两端节点的状态，统一更新所有连接线的样式
+     */
+    private void updateAllConnectionBlockedStates() {
+        for (NodeConnection conn : connections) {
+            updateConnectionBlockedState(conn);
+        }
     }
     
     /**
@@ -1472,12 +1487,19 @@ public class NodeCanvas extends Pane {
             for (ProcessNode pred : allPredecessors) {
                 updateBlockedState(pred);
             }
+            // 开始节点的边不变成虚线，更新所有连接线的阻塞状态
+            updateAllConnectionBlockedStates();
         } else if (oldState == ProcessNode.GraphNodeState.STOP) {
             // 恢复所有后继节点的阻塞状态（BFS遍历所有后继）
             Set<ProcessNode> allSuccessors = getAllSuccessors(changedNode);
             for (ProcessNode succ : allSuccessors) {
                 updateBlockedState(succ);
             }
+            // 终止节点的边不变成虚线，更新所有连接线的阻塞状态
+            updateAllConnectionBlockedStates();
+        } else if (oldState == ProcessNode.GraphNodeState.BLOCKED) {
+            // 恢复阻塞节点的连接线样式
+            updateConnectionStylesForBlockedNode(changedNode, false);
         }
         
         // 应用新状态的影响
@@ -1491,6 +1513,9 @@ public class NodeCanvas extends Pane {
                     pred.setGraphState(ProcessNode.GraphNodeState.BLOCKED);
                 }
             }
+            // 开始节点的边不变成虚线，只有阻塞节点的边才变成虚线
+            // 更新所有连接线的阻塞状态（因为可能有节点变成了阻塞状态）
+            updateAllConnectionBlockedStates();
         } else if (newState == ProcessNode.GraphNodeState.STOP) {
             // 终止节点：影响所有后继节点（BFS遍历所有后继）
             Set<ProcessNode> allSuccessors = getAllSuccessors(changedNode);
@@ -1501,17 +1526,116 @@ public class NodeCanvas extends Pane {
                     succ.setGraphState(ProcessNode.GraphNodeState.BLOCKED);
                 }
             }
+            // 终止节点的边不变成虚线，只有阻塞节点的边才变成虚线
+            // 更新所有连接线的阻塞状态（因为可能有节点变成了阻塞状态）
+            updateAllConnectionBlockedStates();
         } else if (newState == ProcessNode.GraphNodeState.BLOCKED) {
             // 手动设置为阻塞节点：如果之前是开始节点或终止节点，已经恢复了它们的影响
             // 阻塞节点本身不会影响其他节点，所以不需要额外的状态传播
             // 状态传播逻辑已经在上面处理了（恢复旧状态的影响）
+            // 更新连接线样式：只有阻塞节点的所有入边和出边变为虚线
+            updateConnectionStylesForBlockedNode(changedNode, true);
         } else if (newState == ProcessNode.GraphNodeState.NORMAL) {
             // 恢复为普通节点：检查是否仍应保持阻塞状态
             updateBlockedState(changedNode);
+            // 恢复连接线样式：与节点相关的连接线恢复为实线（如果不再被阻塞）
+            updateConnectionStylesForNode(changedNode, null, false);
         }
         
         // 标记有未保存的更改
         markAsUnsaved();
+    }
+    
+    /**
+     * 更新节点相关的连接线样式
+     * @param node 节点
+     * @param affectedNodes 受影响的节点集合（如果为null，则更新所有相关连接线）
+     * @param blocked 是否设置为阻塞（虚线）- 如果为false，则重新计算连接线的阻塞状态
+     */
+    private void updateConnectionStylesForNode(ProcessNode node, Set<ProcessNode> affectedNodes, boolean blocked) {
+        for (NodeConnection conn : connections) {
+            ProcessNode sourceNode = conn.getSourceNode();
+            ProcessNode targetNode = conn.getTargetNode();
+            
+            if (sourceNode == null || targetNode == null) {
+                continue;
+            }
+            
+            // 检查连接是否与节点相关
+            boolean isRelated = false;
+            if (affectedNodes != null) {
+                // 如果指定了受影响的节点集合，只更新与这些节点之间的连接
+                if (sourceNode == node && affectedNodes.contains(targetNode)) {
+                    isRelated = true;
+                } else if (targetNode == node && affectedNodes.contains(sourceNode)) {
+                    isRelated = true;
+                }
+            } else {
+                // 如果没有指定，更新所有与节点相关的连接
+                if (sourceNode == node || targetNode == node) {
+                    isRelated = true;
+                }
+            }
+            
+            if (isRelated) {
+                if (blocked) {
+                    // 设置为阻塞（虚线）
+                    conn.setBlocked(true);
+                } else {
+                    // 重新计算连接线的阻塞状态
+                    updateConnectionBlockedState(conn);
+                }
+            }
+        }
+    }
+    
+    /**
+     * 更新阻塞节点相关的连接线样式
+     * @param blockedNode 阻塞节点
+     * @param blocked 是否设置为阻塞（虚线）- 如果为false，则重新计算连接线的阻塞状态
+     */
+    private void updateConnectionStylesForBlockedNode(ProcessNode blockedNode, boolean blocked) {
+        for (NodeConnection conn : connections) {
+            ProcessNode sourceNode = conn.getSourceNode();
+            ProcessNode targetNode = conn.getTargetNode();
+            
+            if (sourceNode == null || targetNode == null) {
+                continue;
+            }
+            
+            // 检查连接是否与阻塞节点相关
+            if (sourceNode == blockedNode || targetNode == blockedNode) {
+                if (blocked) {
+                    // 设置为阻塞（虚线）
+                    conn.setBlocked(true);
+                } else {
+                    // 重新计算连接线的阻塞状态
+                    updateConnectionBlockedState(conn);
+                }
+            }
+        }
+    }
+    
+    /**
+     * 更新连接线的阻塞状态（根据连接两端节点的状态）
+     * 只有阻塞节点的所有入边和出边会变成虚线
+     * @param conn 连接线
+     */
+    private void updateConnectionBlockedState(NodeConnection conn) {
+        ProcessNode sourceNode = conn.getSourceNode();
+        ProcessNode targetNode = conn.getTargetNode();
+        
+        if (sourceNode == null || targetNode == null) {
+            return;
+        }
+        
+        // 只有连接的一端或两端是阻塞节点时，才设置为虚线
+        // 开始节点和终止节点的边不变成虚线
+        boolean sourceBlocked = sourceNode.getGraphState() == ProcessNode.GraphNodeState.BLOCKED;
+        boolean targetBlocked = targetNode.getGraphState() == ProcessNode.GraphNodeState.BLOCKED;
+        
+        // 如果连接的一端或两端是阻塞节点，设置为虚线
+        conn.setBlocked(sourceBlocked || targetBlocked);
     }
     
     /**
@@ -1551,11 +1675,15 @@ public class NodeCanvas extends Pane {
             if (node.getGraphState() != ProcessNode.GraphNodeState.BLOCKED) {
                 // 使用内部方法设置状态，不触发回调，避免循环调用
                 node.setGraphStateInternal(ProcessNode.GraphNodeState.BLOCKED);
+                // 更新连接线样式
+                updateConnectionStylesForBlockedNode(node, true);
             }
         } else {
             if (node.getGraphState() == ProcessNode.GraphNodeState.BLOCKED) {
                 // 使用内部方法设置状态，不触发回调，避免循环调用
                 node.setGraphStateInternal(ProcessNode.GraphNodeState.NORMAL);
+                // 更新连接线样式（重新计算）
+                updateConnectionStylesForBlockedNode(node, false);
             }
         }
     }

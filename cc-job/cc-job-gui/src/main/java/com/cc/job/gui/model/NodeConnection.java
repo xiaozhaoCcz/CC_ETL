@@ -230,20 +230,32 @@ public class NodeConnection extends Group {
     private void setupHoverEffect() {
         // 整个Group的悬停效果
         this.setOnMouseEntered(e -> {
-            if (!isRunning && !isSelected()) {
+            if (!isRunning && !isSelected() && !isBlocked) {
+                // 只有在非阻塞状态下才显示紫色悬停效果
                 curve.setStroke(Color.web("#8B5CF6"));
                 curve.setStrokeWidth(3.0);
                 arrowHead.setFill(Color.web("#8B5CF6"));
                 arrowHead.setStroke(Color.web("#8B5CF6"));
             }
+            // 阻塞状态下保持灰色，不改变颜色
         });
         
         this.setOnMouseExited(e -> {
             if (!isRunning && !isSelected()) {
-                curve.setStroke(Color.web("#374151"));
-                curve.setStrokeWidth(2.5);
-                arrowHead.setFill(Color.web("#374151"));
-                arrowHead.setStroke(Color.web("#374151"));
+                // 根据当前状态恢复颜色
+                if (isBlocked) {
+                    // 阻塞状态：保持灰色
+                    curve.setStroke(Color.web("#9CA3AF"));
+                    curve.setStrokeWidth(2.5);
+                    arrowHead.setFill(Color.web("#9CA3AF"));
+                    arrowHead.setStroke(Color.web("#9CA3AF"));
+                } else {
+                    // 普通状态：恢复为深灰色
+                    curve.setStroke(Color.web("#374151"));
+                    curve.setStrokeWidth(2.5);
+                    arrowHead.setFill(Color.web("#374151"));
+                    arrowHead.setStroke(Color.web("#374151"));
+                }
             }
         });
     }
@@ -303,6 +315,7 @@ public class NodeConnection extends Group {
     }
 
     private boolean selected = false;
+    private boolean isBlocked = false; // 是否处于阻塞状态（被开始/终止/阻塞节点影响）
 
     public void setSelected(boolean selected) {
         this.selected = selected;
@@ -311,6 +324,19 @@ public class NodeConnection extends Group {
 
     public boolean isSelected() {
         return selected;
+    }
+    
+    /**
+     * 设置阻塞状态（显示虚线，表示连接被阻塞）
+     * @param blocked 是否阻塞
+     */
+    public void setBlocked(boolean blocked) {
+        this.isBlocked = blocked;
+        updateStyle();
+    }
+    
+    public boolean isBlocked() {
+        return isBlocked;
     }
 
     private void updateStyle() {
@@ -321,8 +347,20 @@ public class NodeConnection extends Group {
             curve.setStrokeWidth(3.5);
             arrowHead.setFill(Color.web("#2563EB"));
             arrowHead.setStroke(Color.web("#2563EB"));
+        } else if (isBlocked) {
+            // 阻塞状态：灰色虚线，不带动画（优先级高于运行状态）
+            // 即使设置了运行状态，如果连接线连接到阻塞节点，也不显示运行动画
+            stopDashAnimation();
+            curve.getStrokeDashArray().clear();
+            curve.getStrokeDashArray().addAll(8.0, 4.0); // 虚线样式
+            curve.setStroke(Color.web("#9CA3AF")); // 灰色，与阻塞节点颜色一致
+            curve.setStrokeWidth(2.5);
+            arrowHead.setFill(Color.web("#9CA3AF"));
+            arrowHead.setStroke(Color.web("#9CA3AF"));
+            arrowHead.setStrokeWidth(1);
         } else if (isRunning) {
             // 运行状态：橙色虚线，带滚动动画
+            // 只有在非阻塞状态下才显示运行动画
             curve.getStrokeDashArray().clear();
             curve.getStrokeDashArray().addAll(10.0, 5.0);
             curve.setStroke(Color.web("#F59E0B"));

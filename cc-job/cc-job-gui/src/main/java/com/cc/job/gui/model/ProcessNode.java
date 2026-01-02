@@ -804,10 +804,12 @@ public class ProcessNode extends StackPane {
         switch (graphState) {
             case START:
                 // 开始节点：不改变背景颜色，只改变边框颜色和图标
-                // 保持原有的背景颜色（根据运行状态或类型）
                 // 如果节点有运行状态，保持运行状态的背景颜色
                 if (status != NodeStatus.IDLE) {
                     updateBackgroundColorByStatus(status);
+                } else {
+                    // 如果节点是空闲状态，设置背景颜色为白色（清除之前的阻塞状态背景颜色）
+                    background.setFill(Color.WHITE);
                 }
                 // 只改变边框颜色为绿色，表示开始节点
                 background.setStroke(Color.web("#10B981")); // 绿色边框
@@ -822,10 +824,12 @@ public class ProcessNode extends StackPane {
                 break;
             case STOP:
                 // 终止节点：不改变背景颜色，只改变边框颜色和图标
-                // 保持原有的背景颜色（根据运行状态或类型）
                 // 如果节点有运行状态，保持运行状态的背景颜色
                 if (status != NodeStatus.IDLE) {
                     updateBackgroundColorByStatus(status);
+                } else {
+                    // 如果节点是空闲状态，设置背景颜色为白色（清除之前的阻塞状态背景颜色）
+                    background.setFill(Color.WHITE);
                 }
                 // 只改变边框颜色为红色，表示终止节点
                 background.setStroke(Color.web("#EF4444")); // 红色边框
@@ -1264,8 +1268,32 @@ public class ProcessNode extends StackPane {
                 leftConnector.setFill(Color.web(currentColor));
                 rightConnector.setFill(Color.web(currentColor));
             }
+        } else if (graphState == GraphNodeState.START || graphState == GraphNodeState.STOP) {
+            // 开始节点或终止节点：当状态为IDLE时，背景颜色应该变成白色
+            // 但保持边框颜色和连接点颜色不变（保持开始/终止节点的特征）
+            if (background != null) {
+                if (newStatus == NodeStatus.IDLE) {
+                    background.setFill(Color.WHITE);
+                } else {
+                    // 如果节点有运行状态，根据运行状态设置背景颜色
+                    switch (newStatus) {
+                        case RUNNING:
+                            background.setFill(Color.web("#FCD34D")); // 黄色
+                            break;
+                        case SUCCESS:
+                            background.setFill(Color.web("#86EFAC")); // 绿色
+                            break;
+                        case FAILED:
+                            background.setFill(Color.web("#FCA5A5")); // 红色
+                            break;
+                        default:
+                            background.setFill(Color.WHITE);
+                            break;
+                    }
+                }
+            }
         }
-        // 如果节点是特殊状态，保持特殊状态的样式不变
+        // 阻塞节点保持阻塞状态的样式不变
     }
     
     /**
