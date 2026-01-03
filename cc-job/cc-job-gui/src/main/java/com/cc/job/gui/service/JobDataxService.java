@@ -1,6 +1,7 @@
 package com.cc.job.gui.service;
 
 import com.cc.job.xo.common.result.Result;
+import com.cc.job.xo.model.datax.DataxTable;
 import com.google.gson.JsonArray;
 import com.google.gson.reflect.TypeToken;
 import okhttp3.MediaType;
@@ -29,7 +30,7 @@ public class JobDataxService extends BaseService {
     /**
      * 获取数据源的表列表
      */
-    public List<String> getTables(Long datasourceId) throws IOException {
+    public List<DataxTable> getTables(Long datasourceId) throws IOException {
         String path = BASE_API + "/getTables/" + datasourceId;
         
         try (Response response = apiUtil.executeRequestWithRetry(path, url -> 
@@ -38,8 +39,8 @@ public class JobDataxService extends BaseService {
                 throw new IOException("请求失败: " + response);
             }
             String responseBody = response.body().string();
-            Type resultType = new TypeToken<Result<List<String>>>(){}.getType();
-            Result<List<String>> result = apiUtil.getGson().fromJson(responseBody, resultType);
+            Type resultType = new TypeToken<Result<List<DataxTable>>>(){}.getType();
+            Result<List<DataxTable>> result = apiUtil.getGson().fromJson(responseBody, resultType);
             if (Result.isSuccess(result)) {
                 return result.getData();
             } else {
@@ -51,12 +52,15 @@ public class JobDataxService extends BaseService {
     /**
      * 获取表的字段列表
      */
-    public List<String> getColumns(Long datasourceId, String tableName, String querySql) throws IOException {
+    public List<String> getColumns(Long datasourceId, String tableName, String tableSchema, String querySql) throws IOException {
         String path = BASE_API + "/getColumns/" + datasourceId;
         
         Map<String, String> params = new HashMap<>();
         if (tableName != null && !tableName.isEmpty()) {
             params.put("tableName", tableName);
+        }
+        if (tableSchema != null && !tableSchema.isEmpty()) {
+            params.put("tableSchema", tableSchema);
         }
         if (querySql != null && !querySql.isEmpty()) {
             params.put("querySql", querySql);

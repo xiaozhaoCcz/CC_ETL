@@ -4,12 +4,16 @@ import com.cc.job.gui.service.JobDataxService;
 import com.cc.job.gui.service.JobJdbcDatasourceService;
 import com.cc.job.gui.util.StyleUtil;
 import com.cc.job.xo.model.entity.JobJdbcDatasource;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.*;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -386,8 +390,8 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
                     String writerTable = writerTables.get(i);
 
                     // 获取字段
-                    List<String> readerCols = dataxService.getColumns(readerDs.getId(), readerTable, null);
-                    List<String> writerCols = dataxService.getColumns(writerDs.getId(), writerTable, null);
+                    List<String> readerCols = dataxService.getColumns(readerDs.getId(), readerTable, null, null);
+                    List<String> writerCols = dataxService.getColumns(writerDs.getId(), writerTable, null, null);
 
                     // 构建Reader参数
                     JobDataxService.DataXParams readerParams = new JobDataxService.DataXParams();
@@ -439,7 +443,7 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
 
     private String formatJson(String json) {
         try {
-            com.google.gson.Gson gson = new com.google.gson.GsonBuilder().setPrettyPrinting().create();
+            Gson gson = new GsonBuilder().setPrettyPrinting().create();
             Object obj = gson.fromJson(json, Object.class);
             return gson.toJson(obj);
         } catch (Exception e) {
@@ -492,7 +496,8 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
         if (ds == null) return;
         new Thread(() -> {
             try {
-                List<String> tables = dataxService.getTables(ds.getId());
+//                List<String> tables = dataxService.getTables(ds.getId());
+                List<String> tables = List.of();
                 Platform.runLater(() -> readerTableList.setItems(FXCollections.observableArrayList(tables)));
             } catch (Exception e) {
                 Platform.runLater(() -> showError("加载表失败", e.getMessage()));
@@ -505,7 +510,8 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
         if (ds == null) return;
         new Thread(() -> {
             try {
-                List<String> tables = dataxService.getTables(ds.getId());
+//                List<String> tables = dataxService.getTables(ds.getId());
+                List<String> tables = List.of();
                 Platform.runLater(() -> writerTableList.setItems(FXCollections.observableArrayList(tables)));
             } catch (Exception e) {
                 Platform.runLater(() -> showError("加载表失败", e.getMessage()));
@@ -514,8 +520,8 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
     }
 
     private void copyToClipboard(String text) {
-        javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
-        javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
+        Clipboard clipboard = Clipboard.getSystemClipboard();
+        ClipboardContent content = new ClipboardContent();
         content.putString(text);
         clipboard.setContent(content);
     }
