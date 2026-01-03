@@ -160,10 +160,6 @@ public class JobInfo extends BaseEntity {
      */
     private Integer jobPartId;
     /**
-     * 任务定位
-     */
-    private Integer jobFlowPosition;
-    /**
      * 触发用户ID
      */
     private Integer triggerUserId;
@@ -464,13 +460,6 @@ public class JobInfo extends BaseEntity {
         this.triggerUserId = triggerUserId;
     }
 
-    public Integer getJobFlowPosition() {
-        return jobFlowPosition;
-    }
-
-    public void setJobFlowPosition(Integer jobFlowPosition) {
-        this.jobFlowPosition = jobFlowPosition;
-    }
 
     @Override
     public boolean equals(Object o) {
@@ -514,13 +503,12 @@ public class JobInfo extends BaseEntity {
                 Objects.equals(runTime, jobInfo.runTime) &&
                 Objects.equals(pauseStatus, jobInfo.pauseStatus) &&
                 Objects.equals(jobPartId, jobInfo.jobPartId) &&
-                Objects.equals(triggerUserId, jobInfo.triggerUserId)&&
-                Objects.equals(jobFlowPosition, jobInfo.jobFlowPosition);
+                Objects.equals(triggerUserId, jobInfo.triggerUserId);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), jobGroup, jobDesc, author, alarmEmail, scheduleType, scheduleConf, misfireStrategy, executorRouteStrategy, failStrategy, executorHandler, executorParam, executorBlockStrategy, executorTimeout, executorFailRetryCount, glueType, glueSource, glueRemark, glueUpdateTime, childJobId, triggerStatus, triggerOneStatus, triggerLastTime, triggerNextTime, jobType, parentId, reqType, reqHeader, reqBody, reqUrl, nodeFlag, jdbcDatasourceId, incrementType, incrementContent, runTime, pauseStatus, jobPartId, triggerUserId,jobFlowPosition);
+        return Objects.hash(super.hashCode(), jobGroup, jobDesc, author, alarmEmail, scheduleType, scheduleConf, misfireStrategy, executorRouteStrategy, failStrategy, executorHandler, executorParam, executorBlockStrategy, executorTimeout, executorFailRetryCount, glueType, glueSource, glueRemark, glueUpdateTime, childJobId, triggerStatus, triggerOneStatus, triggerLastTime, triggerNextTime, jobType, parentId, reqType, reqHeader, reqBody, reqUrl, nodeFlag, jdbcDatasourceId, incrementType, incrementContent, runTime, pauseStatus, jobPartId, triggerUserId);
     }
 
     @Override
@@ -562,7 +550,6 @@ public class JobInfo extends BaseEntity {
                 ", runTime=" + runTime +
                 ", pauseStatus=" + pauseStatus +
                 ", jobPartId=" + jobPartId +
-                ", jobFlowPosition="+ jobFlowPosition +
                 ", triggerUserId=" + triggerUserId +
                 '}';
     }
