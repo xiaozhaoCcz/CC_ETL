@@ -86,6 +86,41 @@ public class DialogManager {
     }
     
     /**
+     * 显示编辑分区对话框
+     * @param partitionId 分区ID
+     * @param partitionName 分区名称
+     * @param onSuccess 成功回调
+     */
+    public void showEditPartitionDialog(Long partitionId, String partitionName, Runnable onSuccess) {
+        try {
+            NewPartitionDialog dialog = new NewPartitionDialog(ownerStage, partitionId, partitionName);
+            Optional<String> result = dialog.showAndWait();
+            
+            result.ifPresent(newPartitionName -> {
+                logPanel.info("📝 编辑分区: " + partitionName + " -> " + newPartitionName);
+                
+                new Thread(() -> {
+                    try {
+                        boolean success = jobPartService.updateJobPart(partitionId, newPartitionName);
+                        Platform.runLater(() -> {
+                            if (success) {
+                                logPanel.success("✓ 分区更新成功: " + newPartitionName);
+                                if (onSuccess != null) onSuccess.run();
+                            } else {
+                                logPanel.error("✗ 分区更新失败");
+                            }
+                        });
+                    } catch (Exception e) {
+                        Platform.runLater(() -> logPanel.error("✗ 更新失败: " + e.getMessage()));
+                    }
+                }).start();
+            });
+        } catch (Exception e) {
+            logPanel.error("✗ 打开对话框失败: " + e.getMessage());
+        }
+    }
+    
+    /**
      * 显示新建/编辑任务组对话框
      */
     public void showJobGroupDialog(Long partitionId, String partitionName, JobInfoForm editData, Runnable onSuccess) {

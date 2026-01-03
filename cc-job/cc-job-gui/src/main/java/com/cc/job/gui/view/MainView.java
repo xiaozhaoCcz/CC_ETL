@@ -783,7 +783,13 @@ public class MainView extends BorderPane {
 
             @Override
             public void onPartitionAction(Long partitionId, String partitionName, TaskTreeView.TaskSelectionCallback.PartitionAction action) {
-                if (action == TaskTreeView.TaskSelectionCallback.PartitionAction.EXPORT) {
+                if (action == TaskTreeView.TaskSelectionCallback.PartitionAction.EDIT) {
+                    // 编辑分区：打开分区编辑对话框
+                    dialogManager.showEditPartitionDialog(partitionId, partitionName, () -> {
+                        // 编辑成功后刷新树视图
+                        dataManager.refreshTreeView();
+                    });
+                } else if (action == TaskTreeView.TaskSelectionCallback.PartitionAction.EXPORT) {
                     // 导出分区数据
                     exportPartitionData(partitionId, partitionName);
                 }

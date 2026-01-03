@@ -11,7 +11,6 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
-import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.*;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -39,17 +38,26 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     // Step 1 - Reader配置
     private ComboBox<String> readerDsTypeCombo;
     private ComboBox<JobJdbcDatasource> readerDatasourceCombo;
-    private TableView<DataxTable> readerTableView;
+    private HBox readerTableRadioBox;  // 数据表单选框容器（多列布局）
+    private ToggleGroup readerTableToggleGroup;  // 数据表单选组
     private TextArea readerSqlArea;
-    private ListView<String> readerColumnList;
-    private ComboBox<String> incrTypeCombo;
+    private HBox readerColumnCheckBox;  // 表字段多选框容器（多列布局）
+    private ScrollPane readerColumnScrollPane;  // 表字段滚动容器
+    private ComboBox<String> incrTypeCombo;  // 增量类型：全量/增量
+    private VBox incrConfigBox;  // 增量配置容器
+    private ComboBox<String> incrModeCombo;  // 增量模式：ID自增/时间自增
+    private TextField incrColumnField;  // 增量字段名
+    private TextField incrInitValueField;  // 增量初始值
+    private ComboBox<String> incrTimeFormatCombo;  // 时间格式（仅时间自增时显示）
 
     // Step 2 - Writer配置
     private ComboBox<String> writerDsTypeCombo;
     private ComboBox<JobJdbcDatasource> writerDatasourceCombo;
-    private TableView<DataxTable> writerTableView;
+    private HBox writerTableRadioBox;  // 数据表单选框容器（多列布局）
+    private ToggleGroup writerTableToggleGroup;  // 数据表单选组
     private TextArea writerSqlArea;
-    private ListView<String> writerColumnList;
+    private HBox writerColumnCheckBox;  // 表字段多选框容器（多列布局）
+    private ScrollPane writerColumnScrollPane;  // 表字段滚动容器
     private ComboBox<String> writeModeCombo;
 
     // Step 3 - 结果
@@ -60,6 +68,15 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
 
     private static final String[] DS_TYPES = {"MYSQL", "ORACLE", "POSTGRESQL"};
     private static final String[] WRITE_MODES = {"insert", "update", "replace"};
+    private static final String[] INCR_MODES = {"ID自增", "时间自增"};
+    private static final String[] TIME_FORMATS = {"YYYY-MM-DD HH:mm:ss", "YYYY-MM-DD", "YYYY/MM/DD HH:mm:ss", "YYYY/MM/DD"};
+    
+    // 存储表数据，用于单选
+    private List<DataxTable> readerTables = new ArrayList<>();
+    private List<DataxTable> writerTables = new ArrayList<>();
+    // 存储字段数据，用于多选
+    private List<String> readerColumns = new ArrayList<>();
+    private List<String> writerColumns = new ArrayList<>();
 
     public ShowDataxSyncDialog(Stage ownerStage) {
         setTitle("数据源同步");
@@ -93,6 +110,10 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
             Stage stage = (Stage) getDialogPane().getScene().getWindow();
             if (stage != null) {
                 stage.setResizable(true);
+                // 设置关闭事件处理
+                stage.setOnCloseRequest(event -> {
+                    close();
+                });
                 try {
                     String css = getClass().getResource("/styles.css").toExternalForm();
                     stage.getScene().getStylesheets().add(css);
@@ -188,23 +209,35 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     }
 
     private Node createReaderPane() {
-        VBox pane = new VBox(12);
-        pane.setPadding(new Insets(16));
+        VBox pane = new VBox(16);
+        pane.setPadding(new Insets(20));
+        pane.setStyle("-fx-background-color: " + StyleUtil.BG_PRIMARY + ";");
+        HBox.setHgrow(pane, Priority.ALWAYS);
 
-        String labelStyle = StyleUtil.body();
+        String labelStyle = StyleUtil.body() + " -fx-min-width: 100;";
 
-        // 数据源类型
+        // 使用GridPane创建两列布局，充分利用空间
+        GridPane grid = new GridPane();
+        grid.setHgap(16);
+        grid.setVgap(16);
+        grid.setPadding(new Insets(0));
+        HBox.setHgrow(grid, Priority.ALWAYS);
+
+        // 数据源类型和数据源并排显示
         Label dsTypeLabel = new Label("数据源类型");
         dsTypeLabel.setStyle(labelStyle);
         readerDsTypeCombo = new ComboBox<>(FXCollections.observableArrayList(DS_TYPES));
         readerDsTypeCombo.setPromptText("选择数据源类型");
+        HBox.setHgrow(readerDsTypeCombo, Priority.ALWAYS);
         readerDsTypeCombo.setOnAction(e -> filterReaderDatasources());
+        grid.add(dsTypeLabel, 0, 0);
+        grid.add(readerDsTypeCombo, 1, 0);
 
-        // 数据源
         Label dsLabel = new Label("数据源");
         dsLabel.setStyle(labelStyle);
         readerDatasourceCombo = new ComboBox<>();
         readerDatasourceCombo.setPromptText("选择数据源");
+        HBox.setHgrow(readerDatasourceCombo, Priority.ALWAYS);
         readerDatasourceCombo.setCellFactory(lv -> new ListCell<>() {
             @Override
             protected void updateItem(JobJdbcDatasource item, boolean empty) {
@@ -220,92 +253,236 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
             }
         });
         readerDatasourceCombo.setOnAction(e -> loadReaderTables());
+        grid.add(dsLabel, 0, 1);
+        grid.add(readerDatasourceCombo, 1, 1);
 
-        // 表列表
+        // 数据表 - 单选框（多列布局，每列8条）
         Label tableLabel = new Label("数据表");
         tableLabel.setStyle(labelStyle);
-        readerTableView = new TableView<>();
-        TableColumn<DataxTable, String> tableSchemaColumn = new TableColumn<>("TableSchema");
-        tableSchemaColumn.setCellValueFactory(new PropertyValueFactory<DataxTable,String>("TableSchema"));
-        tableSchemaColumn.setMinWidth(300);
-        TableColumn<DataxTable, String> tableNameColumn = new TableColumn<>("TableName");
-        tableNameColumn.setCellValueFactory(new PropertyValueFactory<DataxTable,String>("TableName"));
-        tableNameColumn.setMinWidth(300);
-        readerTableView.getColumns().addAll(tableSchemaColumn,tableNameColumn);
-        readerTableView.setPrefHeight(120);
-        readerTableView.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
-        readerTableView.getSelectionModel().selectedItemProperty().addListener((obs, old, val) -> {
-            if (val != null) loadReaderColumns();
-        });
+        readerTableToggleGroup = new ToggleGroup();
+        HBox tableColumnsContainer = new HBox(12);
+        tableColumnsContainer.setPadding(new Insets(12, 16, 12, 16));
+        // 默认状态：无边框，只显示提示文字
+        tableColumnsContainer.setStyle("-fx-background-color: transparent;");
+        tableColumnsContainer.setMinHeight(50);
+        // 默认显示提示信息
+        Label tablePlaceholder = new Label("请选择数据源");
+        tablePlaceholder.setStyle(StyleUtil.body() + " -fx-text-fill: " + StyleUtil.TEXT_SECONDARY + ";");
+        tablePlaceholder.setAlignment(Pos.CENTER);
+        tablePlaceholder.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(tablePlaceholder, Priority.ALWAYS);
+        tableColumnsContainer.getChildren().add(tablePlaceholder);
+        readerTableRadioBox = tableColumnsContainer; // 保持兼容性，实际使用tableColumnsContainer
+        ScrollPane tableScrollPane = new ScrollPane(tableColumnsContainer);
+        tableScrollPane.setFitToHeight(true);
+        tableScrollPane.setFitToWidth(false); // 允许横向滚动
+        tableScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        tableScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        tableScrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
+        tableScrollPane.setMinHeight(50); // 默认较小高度
+        VBox.setVgrow(tableScrollPane, Priority.ALWAYS);
+        grid.add(tableLabel, 0, 2);
+        grid.add(tableScrollPane, 1, 2);
 
         // SQL
         Label sqlLabel = new Label("SQL (可选)");
         sqlLabel.setStyle(labelStyle);
         readerSqlArea = new TextArea();
-        readerSqlArea.setPrefRowCount(3);
+        readerSqlArea.setMinHeight(120);
+        readerSqlArea.setPrefRowCount(5);
         readerSqlArea.setPromptText("使用多表查询时，columns可留空");
-
+        readerSqlArea.setWrapText(true);
+        VBox.setVgrow(readerSqlArea, Priority.ALWAYS);
+        HBox sqlBtnRow = new HBox(8);
+        sqlBtnRow.setAlignment(Pos.CENTER_RIGHT);
         Button parseSqlBtn = new Button("SQL解析");
         parseSqlBtn.setStyle(StyleUtil.successButton());
         parseSqlBtn.setOnAction(e -> loadReaderColumns());
+        sqlBtnRow.getChildren().add(parseSqlBtn);
+        VBox sqlContainer = new VBox(8, readerSqlArea, sqlBtnRow);
+        VBox.setVgrow(sqlContainer, Priority.ALWAYS);
+        grid.add(sqlLabel, 0, 3);
+        grid.add(sqlContainer, 1, 3);
 
-        // 字段列表
+        // 表字段 - 多选框
         Label columnLabel = new Label("表字段");
         columnLabel.setStyle(labelStyle);
-        readerColumnList = new ListView<>();
-        readerColumnList.setPrefHeight(120);
-        readerColumnList.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
-
+        HBox columnHeader = new HBox(8);
+        columnHeader.setAlignment(Pos.CENTER_LEFT);
         Button selectAllBtn = new Button("全选");
-        selectAllBtn.setOnAction(e -> readerColumnList.getSelectionModel().selectAll());
+        selectAllBtn.setStyle(StyleUtil.secondaryButton());
+        selectAllBtn.setPrefWidth(80);
+        selectAllBtn.setOnAction(e -> {
+            readerColumnCheckBox.getChildren().forEach(columnNode -> {
+                if (columnNode instanceof VBox) {
+                    ((VBox) columnNode).getChildren().forEach(node -> {
+                        if (node instanceof CheckBox) {
+                            ((CheckBox) node).setSelected(true);
+                        }
+                    });
+                }
+            });
+        });
+        Button clearAllBtn = new Button("清空");
+        clearAllBtn.setStyle(StyleUtil.secondaryButton());
+        clearAllBtn.setPrefWidth(80);
+        clearAllBtn.setOnAction(e -> {
+            readerColumnCheckBox.getChildren().forEach(columnNode -> {
+                if (columnNode instanceof VBox) {
+                    ((VBox) columnNode).getChildren().forEach(node -> {
+                        if (node instanceof CheckBox) {
+                            ((CheckBox) node).setSelected(false);
+                        }
+                    });
+                }
+            });
+        });
+        columnHeader.getChildren().addAll(selectAllBtn, clearAllBtn);
+        
+        // 表字段多列容器（每列8条）
+        HBox columnColumnsContainer = new HBox(12);
+        columnColumnsContainer.setPadding(new Insets(12, 16, 12, 16));
+        // 默认状态：无边框，只显示提示文字
+        columnColumnsContainer.setStyle("-fx-background-color: transparent;");
+        columnColumnsContainer.setMinHeight(50);
+        // 默认显示提示信息
+        Label columnPlaceholder = new Label("请选择数据表");
+        columnPlaceholder.setStyle(StyleUtil.body() + " -fx-text-fill: " + StyleUtil.TEXT_SECONDARY + ";");
+        columnPlaceholder.setAlignment(Pos.CENTER);
+        columnPlaceholder.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(columnPlaceholder, Priority.ALWAYS);
+        columnColumnsContainer.getChildren().add(columnPlaceholder);
+        readerColumnCheckBox = columnColumnsContainer; // 保持兼容性，实际使用columnColumnsContainer
+        readerColumnScrollPane = new ScrollPane(columnColumnsContainer);
+        readerColumnScrollPane.setFitToHeight(true);
+        readerColumnScrollPane.setFitToWidth(false); // 允许横向滚动
+        readerColumnScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        readerColumnScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        readerColumnScrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
+        readerColumnScrollPane.setMinHeight(50); // 默认较小高度
+        VBox.setVgrow(readerColumnScrollPane, Priority.ALWAYS);
+        VBox columnContainer = new VBox(8, columnHeader, readerColumnScrollPane);
+        VBox.setVgrow(columnContainer, Priority.ALWAYS);
+        grid.add(columnLabel, 0, 4);
+        grid.add(columnContainer, 1, 4);
 
-        // 增量类型
+        // 增量备份配置
         Label incrLabel = new Label("增量备份");
         incrLabel.setStyle(labelStyle);
         incrTypeCombo = new ComboBox<>(FXCollections.observableArrayList("全量", "增量"));
         incrTypeCombo.getSelectionModel().selectFirst();
-
-        GridPane grid = new GridPane();
-        grid.setHgap(16);
-        grid.setVgap(12);
-        grid.add(dsTypeLabel, 0, 0);
-        grid.add(readerDsTypeCombo, 1, 0);
-        grid.add(dsLabel, 0, 1);
-        grid.add(readerDatasourceCombo, 1, 1);
-        grid.add(tableLabel, 0, 2);
-        grid.add(readerTableView, 1, 2);
-        grid.add(sqlLabel, 0, 3);
-        HBox sqlBox = new HBox(8, readerSqlArea, parseSqlBtn);
-        HBox.setHgrow(readerSqlArea, Priority.ALWAYS);
-        grid.add(sqlBox, 1, 3);
-        grid.add(columnLabel, 0, 4);
-        VBox colBox = new VBox(4, readerColumnList, selectAllBtn);
-        grid.add(colBox, 1, 4);
+        HBox.setHgrow(incrTypeCombo, Priority.ALWAYS);
+        incrTypeCombo.setOnAction(e -> updateIncrConfigVisibility());
+        
+        // 增量配置容器
+        incrConfigBox = new VBox(8);
+        incrConfigBox.setPadding(new Insets(12));
+        incrConfigBox.setStyle("-fx-background-color: " + StyleUtil.BG_SECONDARY + "; " +
+                "-fx-background-radius: " + StyleUtil.RADIUS_MD + "; " +
+                "-fx-border-color: " + StyleUtil.GRAY_300 + "; " +
+                "-fx-border-width: 1; " +
+                "-fx-border-radius: " + StyleUtil.RADIUS_MD + ";");
+        incrConfigBox.setVisible(false);
+        
+        // 增量模式
+        HBox incrModeRow = new HBox(12);
+        incrModeRow.setAlignment(Pos.CENTER_LEFT);
+        Label incrModeLabel = new Label("增量模式");
+        incrModeLabel.setStyle(StyleUtil.body() + " -fx-min-width: 80;");
+        incrModeCombo = new ComboBox<>(FXCollections.observableArrayList(INCR_MODES));
+        incrModeCombo.getSelectionModel().selectFirst();
+        HBox.setHgrow(incrModeCombo, Priority.ALWAYS);
+        incrModeCombo.setOnAction(e -> updateIncrModeConfig());
+        incrModeRow.getChildren().addAll(incrModeLabel, incrModeCombo);
+        
+        // 增量字段
+        HBox incrColumnRow = new HBox(12);
+        incrColumnRow.setAlignment(Pos.CENTER_LEFT);
+        Label incrColumnLabel = new Label("增量字段");
+        incrColumnLabel.setStyle(StyleUtil.body() + " -fx-min-width: 80;");
+        incrColumnField = new TextField();
+        incrColumnField.setPromptText("请输入字段名，如：id 或 create_time");
+        HBox.setHgrow(incrColumnField, Priority.ALWAYS);
+        incrColumnRow.getChildren().addAll(incrColumnLabel, incrColumnField);
+        
+        // 初始值
+        HBox incrValueRow = new HBox(12);
+        incrValueRow.setAlignment(Pos.CENTER_LEFT);
+        Label incrValueLabel = new Label("初始值");
+        incrValueLabel.setStyle(StyleUtil.body() + " -fx-min-width: 80;");
+        incrInitValueField = new TextField();
+        incrInitValueField.setPromptText("ID自增请输入数字，时间自增请输入时间戳(毫秒)");
+        HBox.setHgrow(incrInitValueField, Priority.ALWAYS);
+        incrValueRow.getChildren().addAll(incrValueLabel, incrInitValueField);
+        
+        // 时间格式（仅时间自增时显示）
+        HBox incrTimeFormatRow = new HBox(12);
+        incrTimeFormatRow.setAlignment(Pos.CENTER_LEFT);
+        Label incrTimeFormatLabel = new Label("时间格式");
+        incrTimeFormatLabel.setStyle(StyleUtil.body() + " -fx-min-width: 80;");
+        incrTimeFormatCombo = new ComboBox<>(FXCollections.observableArrayList(TIME_FORMATS));
+        incrTimeFormatCombo.getSelectionModel().selectFirst();
+        HBox.setHgrow(incrTimeFormatCombo, Priority.ALWAYS);
+        incrTimeFormatRow.getChildren().addAll(incrTimeFormatLabel, incrTimeFormatCombo);
+        incrTimeFormatRow.setVisible(false);
+        
+        incrConfigBox.getChildren().addAll(incrModeRow, incrColumnRow, incrValueRow, incrTimeFormatRow);
+        
+        VBox incrContainer = new VBox(8, incrTypeCombo, incrConfigBox);
+        VBox.setVgrow(incrContainer, Priority.ALWAYS);
         grid.add(incrLabel, 0, 5);
-        grid.add(incrTypeCombo, 1, 5);
+        grid.add(incrContainer, 1, 5);
 
+        // 设置列宽约束
+        ColumnConstraints labelCol = new ColumnConstraints();
+        labelCol.setMinWidth(100);
+        labelCol.setPrefWidth(120);
+        labelCol.setHgrow(Priority.NEVER);
+        ColumnConstraints contentCol = new ColumnConstraints();
+        contentCol.setHgrow(Priority.ALWAYS);
+        grid.getColumnConstraints().addAll(labelCol, contentCol);
+
+        // 组装布局
         pane.getChildren().add(grid);
-        return new ScrollPane(pane);
+        VBox.setVgrow(pane, Priority.ALWAYS);
+        
+        ScrollPane scrollPane = new ScrollPane(pane);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setFitToHeight(true);
+        scrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
+        return scrollPane;
     }
 
     private Node createWriterPane() {
-        VBox pane = new VBox(12);
-        pane.setPadding(new Insets(16));
+        VBox pane = new VBox(16);
+        pane.setPadding(new Insets(20));
+        pane.setStyle("-fx-background-color: " + StyleUtil.BG_PRIMARY + ";");
+        HBox.setHgrow(pane, Priority.ALWAYS);
 
-        String labelStyle = StyleUtil.body();
+        String labelStyle = StyleUtil.body() + " -fx-min-width: 100;";
 
-        // 数据源类型
+        // 使用GridPane创建两列布局，充分利用空间
+        GridPane grid = new GridPane();
+        grid.setHgap(16);
+        grid.setVgap(16);
+        grid.setPadding(new Insets(0));
+        HBox.setHgrow(grid, Priority.ALWAYS);
+
+        // 数据源类型和数据源并排显示
         Label dsTypeLabel = new Label("数据源类型");
         dsTypeLabel.setStyle(labelStyle);
         writerDsTypeCombo = new ComboBox<>(FXCollections.observableArrayList(DS_TYPES));
         writerDsTypeCombo.setPromptText("选择数据源类型");
+        HBox.setHgrow(writerDsTypeCombo, Priority.ALWAYS);
         writerDsTypeCombo.setOnAction(e -> filterWriterDatasources());
+        grid.add(dsTypeLabel, 0, 0);
+        grid.add(writerDsTypeCombo, 1, 0);
 
-        // 数据源
         Label dsLabel = new Label("数据源");
         dsLabel.setStyle(labelStyle);
         writerDatasourceCombo = new ComboBox<>();
         writerDatasourceCombo.setPromptText("选择数据源");
+        HBox.setHgrow(writerDatasourceCombo, Priority.ALWAYS);
         writerDatasourceCombo.setCellFactory(lv -> new ListCell<>() {
             @Override
             protected void updateItem(JobJdbcDatasource item, boolean empty) {
@@ -321,72 +498,145 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
             }
         });
         writerDatasourceCombo.setOnAction(e -> loadWriterTables());
+        grid.add(dsLabel, 0, 1);
+        grid.add(writerDatasourceCombo, 1, 1);
 
-        // 表列表
+        // 数据表 - 单选框（多列布局，每列8条）
         Label tableLabel = new Label("数据表");
         tableLabel.setStyle(labelStyle);
-        writerTableView = new TableView<>();
-        TableColumn<DataxTable, String> tableSchemaColumn = new TableColumn<>("TableSchema");
-        tableSchemaColumn.setCellValueFactory(new PropertyValueFactory<DataxTable,String>("TableSchema"));
-        tableSchemaColumn.setMinWidth(300);
-        TableColumn<DataxTable, String> tableNameColumn = new TableColumn<>("TableName");
-        tableNameColumn.setCellValueFactory(new PropertyValueFactory<DataxTable,String>("TableName"));
-        tableNameColumn.setMinWidth(300);
-        writerTableView.getColumns().addAll(tableSchemaColumn,tableNameColumn);
-        writerTableView.setPrefHeight(120);
-        writerTableView.setPrefHeight(120);
-        writerTableView.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
-        writerTableView.getSelectionModel().selectedItemProperty().addListener((obs, old, val) -> {
-            if (val != null) loadWriterColumns();
-        });
+        writerTableToggleGroup = new ToggleGroup();
+        HBox tableColumnsContainer = new HBox(12);
+        tableColumnsContainer.setPadding(new Insets(12, 16, 12, 16));
+        // 默认状态：无边框，只显示提示文字
+        tableColumnsContainer.setStyle("-fx-background-color: transparent;");
+        tableColumnsContainer.setMinHeight(50);
+        // 默认显示提示信息
+        Label tablePlaceholder = new Label("请选择数据源");
+        tablePlaceholder.setStyle(StyleUtil.body() + " -fx-text-fill: " + StyleUtil.TEXT_SECONDARY + ";");
+        tablePlaceholder.setAlignment(Pos.CENTER);
+        tablePlaceholder.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(tablePlaceholder, Priority.ALWAYS);
+        tableColumnsContainer.getChildren().add(tablePlaceholder);
+        writerTableRadioBox = tableColumnsContainer; // 保持兼容性，实际使用tableColumnsContainer
+        ScrollPane tableScrollPane = new ScrollPane(tableColumnsContainer);
+        tableScrollPane.setFitToHeight(true);
+        tableScrollPane.setFitToWidth(false); // 允许横向滚动
+        tableScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        tableScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        tableScrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
+        tableScrollPane.setMinHeight(50); // 默认较小高度
+        VBox.setVgrow(tableScrollPane, Priority.ALWAYS);
+        grid.add(tableLabel, 0, 2);
+        grid.add(tableScrollPane, 1, 2);
 
         // SQL
         Label sqlLabel = new Label("SQL (可选)");
         sqlLabel.setStyle(labelStyle);
         writerSqlArea = new TextArea();
+        writerSqlArea.setMinHeight(120);
         writerSqlArea.setPrefRowCount(3);
-
+        writerSqlArea.setWrapText(true);
+        VBox.setVgrow(writerSqlArea, Priority.ALWAYS);
+        HBox sqlBtnRow = new HBox(8);
+        sqlBtnRow.setAlignment(Pos.CENTER_RIGHT);
         Button parseSqlBtn = new Button("SQL解析");
         parseSqlBtn.setStyle(StyleUtil.successButton());
         parseSqlBtn.setOnAction(e -> loadWriterColumns());
+        sqlBtnRow.getChildren().add(parseSqlBtn);
+        VBox sqlContainer = new VBox(8, writerSqlArea, sqlBtnRow);
+        VBox.setVgrow(sqlContainer, Priority.ALWAYS);
+        grid.add(sqlLabel, 0, 3);
+        grid.add(sqlContainer, 1, 3);
 
-        // 字段列表
+        // 表字段 - 多选框
         Label columnLabel = new Label("表字段");
         columnLabel.setStyle(labelStyle);
-        writerColumnList = new ListView<>();
-        writerColumnList.setPrefHeight(120);
-        writerColumnList.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
-
+        HBox columnHeader = new HBox(8);
+        columnHeader.setAlignment(Pos.CENTER_LEFT);
         Button selectAllBtn = new Button("全选");
-        selectAllBtn.setOnAction(e -> writerColumnList.getSelectionModel().selectAll());
+        selectAllBtn.setStyle(StyleUtil.secondaryButton());
+        selectAllBtn.setPrefWidth(80);
+        selectAllBtn.setOnAction(e -> {
+            writerColumnCheckBox.getChildren().forEach(columnNode -> {
+                if (columnNode instanceof VBox) {
+                    ((VBox) columnNode).getChildren().forEach(node -> {
+                        if (node instanceof CheckBox) {
+                            ((CheckBox) node).setSelected(true);
+                        }
+                    });
+                }
+            });
+        });
+        Button clearAllBtn = new Button("清空");
+        clearAllBtn.setStyle(StyleUtil.secondaryButton());
+        clearAllBtn.setPrefWidth(80);
+        clearAllBtn.setOnAction(e -> {
+            writerColumnCheckBox.getChildren().forEach(columnNode -> {
+                if (columnNode instanceof VBox) {
+                    ((VBox) columnNode).getChildren().forEach(node -> {
+                        if (node instanceof CheckBox) {
+                            ((CheckBox) node).setSelected(false);
+                        }
+                    });
+                }
+            });
+        });
+        columnHeader.getChildren().addAll(selectAllBtn, clearAllBtn);
+        
+        // 表字段多列容器（每列8条）
+        HBox columnColumnsContainer = new HBox(12);
+        columnColumnsContainer.setPadding(new Insets(12, 16, 12, 16));
+        // 默认状态：无边框，只显示提示文字
+        columnColumnsContainer.setStyle("-fx-background-color: transparent;");
+        columnColumnsContainer.setMinHeight(50);
+        // 默认显示提示信息
+        Label columnPlaceholder = new Label("请选择数据表");
+        columnPlaceholder.setStyle(StyleUtil.body() + " -fx-text-fill: " + StyleUtil.TEXT_SECONDARY + ";");
+        columnPlaceholder.setAlignment(Pos.CENTER);
+        columnPlaceholder.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(columnPlaceholder, Priority.ALWAYS);
+        columnColumnsContainer.getChildren().add(columnPlaceholder);
+        writerColumnCheckBox = columnColumnsContainer; // 保持兼容性，实际使用columnColumnsContainer
+        writerColumnScrollPane = new ScrollPane(columnColumnsContainer);
+        writerColumnScrollPane.setFitToHeight(true);
+        writerColumnScrollPane.setFitToWidth(false); // 允许横向滚动
+        writerColumnScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        writerColumnScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        writerColumnScrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
+        writerColumnScrollPane.setMinHeight(50); // 默认较小高度
+        VBox.setVgrow(writerColumnScrollPane, Priority.ALWAYS);
+        VBox columnContainer = new VBox(8, columnHeader, writerColumnScrollPane);
+        VBox.setVgrow(columnContainer, Priority.ALWAYS);
+        grid.add(columnLabel, 0, 4);
+        grid.add(columnContainer, 1, 4);
 
         // 写入模式
         Label modeLabel = new Label("写入模式");
         modeLabel.setStyle(labelStyle);
         writeModeCombo = new ComboBox<>(FXCollections.observableArrayList(WRITE_MODES));
         writeModeCombo.getSelectionModel().selectFirst();
-
-        GridPane grid = new GridPane();
-        grid.setHgap(16);
-        grid.setVgap(12);
-        grid.add(dsTypeLabel, 0, 0);
-        grid.add(writerDsTypeCombo, 1, 0);
-        grid.add(dsLabel, 0, 1);
-        grid.add(writerDatasourceCombo, 1, 1);
-        grid.add(tableLabel, 0, 2);
-        grid.add(writerTableView, 1, 2);
-        grid.add(sqlLabel, 0, 3);
-        HBox sqlBox = new HBox(8, writerSqlArea, parseSqlBtn);
-        HBox.setHgrow(writerSqlArea, Priority.ALWAYS);
-        grid.add(sqlBox, 1, 3);
-        grid.add(columnLabel, 0, 4);
-        VBox colBox = new VBox(4, writerColumnList, selectAllBtn);
-        grid.add(colBox, 1, 4);
+        HBox.setHgrow(writeModeCombo, Priority.ALWAYS);
         grid.add(modeLabel, 0, 5);
         grid.add(writeModeCombo, 1, 5);
 
+        // 设置列宽约束
+        ColumnConstraints labelCol = new ColumnConstraints();
+        labelCol.setMinWidth(100);
+        labelCol.setPrefWidth(120);
+        labelCol.setHgrow(Priority.NEVER);
+        ColumnConstraints contentCol = new ColumnConstraints();
+        contentCol.setHgrow(Priority.ALWAYS);
+        grid.getColumnConstraints().addAll(labelCol, contentCol);
+
+        // 组装布局
         pane.getChildren().add(grid);
-        return new ScrollPane(pane);
+        VBox.setVgrow(pane, Priority.ALWAYS);
+        
+        ScrollPane scrollPane = new ScrollPane(pane);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setFitToHeight(true);
+        scrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
+        return scrollPane;
     }
 
     private Node createResultPane() {
@@ -410,16 +660,27 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     private void handleNext() {
         if (currentStep == 0) {
             // 验证Reader配置
-            List<String> selectedCols = new ArrayList<>(readerColumnList.getSelectionModel().getSelectedItems());
+            List<String> selectedCols = getSelectedReaderColumns();
             if (selectedCols.isEmpty() && isBlank(readerSqlArea.getText())) {
                 showError("验证失败", "请选择要同步的数据列或输入SQL");
                 return;
+            }
+            // 验证增量配置
+            if ("增量".equals(incrTypeCombo.getValue())) {
+                if (isBlank(incrColumnField.getText())) {
+                    showError("验证失败", "增量同步需要填写增量字段");
+                    return;
+                }
+                if (isBlank(incrInitValueField.getText())) {
+                    showError("验证失败", "增量同步需要填写初始值");
+                    return;
+                }
             }
             currentStep++;
             updateStepView();
         } else if (currentStep == 1) {
             // 验证Writer配置
-            List<String> selectedCols = new ArrayList<>(writerColumnList.getSelectionModel().getSelectedItems());
+            List<String> selectedCols = getSelectedWriterColumns();
             if (selectedCols.isEmpty()) {
                 showError("验证失败", "请选择要写入的数据列");
                 return;
@@ -446,8 +707,16 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                     return;
                 }
 
-                List<String> readerCols = new ArrayList<>(readerColumnList.getSelectionModel().getSelectedItems());
-                List<String> writerCols = new ArrayList<>(writerColumnList.getSelectionModel().getSelectedItems());
+                List<String> readerCols = getSelectedReaderColumns();
+                List<String> writerCols = getSelectedWriterColumns();
+
+                // 获取选中的表
+                DataxTable selectedReaderTable = getSelectedReaderTable();
+                DataxTable selectedWriterTable = getSelectedWriterTable();
+                if (selectedReaderTable == null || selectedWriterTable == null) {
+                    Platform.runLater(() -> showError("错误", "请选择数据表"));
+                    return;
+                }
 
                 // 构建Reader参数
                 JobDataxService.DataXParams readerParams = new JobDataxService.DataXParams();
@@ -456,13 +725,22 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                 readerParams.setUsername(readerDs.getJdbcUsername());
                 readerParams.setPassword(readerDs.getJdbcPassword());
                 readerParams.setDbName(readerDs.getDatabaseName());
-                readerParams.setTableName(readerTableView.getSelectionModel().getSelectedItem().getTableName());
+                readerParams.setTableName(selectedReaderTable.getTableName());
+                readerParams.setSchemaName(selectedReaderTable.getTableSchema());
                 String[] readerIpPort = parseIpPort(readerDs.getJdbcUrl());
                 readerParams.setIp(readerIpPort[0]);
                 readerParams.setPort(readerIpPort[1]);
                 readerParams.setQuerySql(readerSqlArea.getText());
                 readerParams.setType(0);
-                readerParams.setIncrType("全量".equals(incrTypeCombo.getValue()) ? 0 : 1);
+                
+                // 设置增量类型和内容
+                int incrType = "全量".equals(incrTypeCombo.getValue()) ? 0 : 1;
+                readerParams.setIncrType(incrType);
+                if (incrType == 1) {
+                    // 构建增量内容
+                    String incrementContent = buildIncrementContent();
+                    readerParams.setIncrContent(incrementContent);
+                }
 
                 // 构建Writer参数
                 JobDataxService.DataXParams writerParams = new JobDataxService.DataXParams();
@@ -471,7 +749,8 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                 writerParams.setUsername(writerDs.getJdbcUsername());
                 writerParams.setPassword(writerDs.getJdbcPassword());
                 writerParams.setDbName(writerDs.getDatabaseName());
-                writerParams.setTableName(writerTableView.getSelectionModel().getSelectedItem().getTableName());
+                writerParams.setTableName(selectedWriterTable.getTableName());
+                writerParams.setSchemaName(selectedWriterTable.getTableSchema());
                 String[] writerIpPort = parseIpPort(writerDs.getJdbcUrl());
                 writerParams.setIp(writerIpPort[0]);
                 writerParams.setPort(writerIpPort[1]);
@@ -521,9 +800,17 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         updateStepView();
         if (readerDsTypeCombo != null) readerDsTypeCombo.getSelectionModel().clearSelection();
         if (readerDatasourceCombo != null) readerDatasourceCombo.getItems().clear();
-        if (readerTableView != null) readerTableView.getItems().clear();
-        if (readerColumnList != null) readerColumnList.getItems().clear();
+        if (readerTableRadioBox != null) readerTableRadioBox.getChildren().clear();
+        if (readerColumnCheckBox != null) readerColumnCheckBox.getChildren().clear();
         if (readerSqlArea != null) readerSqlArea.clear();
+        if (incrTypeCombo != null) {
+            incrTypeCombo.getSelectionModel().selectFirst();
+            updateIncrConfigVisibility();
+        }
+        if (incrColumnField != null) incrColumnField.clear();
+        if (incrInitValueField != null) incrInitValueField.clear();
+        readerTables.clear();
+        readerColumns.clear();
     }
 
     private void loadDatasources() {
@@ -556,60 +843,419 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
 
     private void loadReaderTables() {
         JobJdbcDatasource ds = readerDatasourceCombo.getValue();
-        if (ds == null) return;
+        if (ds == null) {
+            // 重置为默认状态
+            showTablePlaceholder(readerTableRadioBox, "请选择数据源");
+            return;
+        }
         new Thread(() -> {
             try {
                 List<DataxTable> tables = dataxService.getTables(ds.getId());
-                Platform.runLater(() -> readerTableView.setItems(FXCollections.observableArrayList(tables)));
+                readerTables = tables;
+                Platform.runLater(() -> {
+                    if (tables.isEmpty()) {
+                        // 显示无内容提示，但保持边框样式
+                        showTablePlaceholder(readerTableRadioBox, "表中无内容");
+                    } else {
+                        // 有数据时显示边框和多列布局
+                        showTableContent(readerTableRadioBox, tables, readerTableToggleGroup, 
+                                table -> loadReaderColumns());
+                    }
+                });
             } catch (Exception e) {
-                Platform.runLater(() -> showError("加载表失败", e.getMessage()));
+                Platform.runLater(() -> {
+                    showError("加载表失败", e.getMessage());
+                    showTablePlaceholder(readerTableRadioBox, "加载失败，请重试");
+                });
             }
         }).start();
     }
 
     private void loadWriterTables() {
         JobJdbcDatasource ds = writerDatasourceCombo.getValue();
-        if (ds == null) return;
+        if (ds == null) {
+            // 重置为默认状态
+            showTablePlaceholder(writerTableRadioBox, "请选择数据源");
+            return;
+        }
         new Thread(() -> {
             try {
                 List<DataxTable> tables = dataxService.getTables(ds.getId());
-                Platform.runLater(() -> writerTableView.setItems(FXCollections.observableArrayList(tables)));
+                writerTables = tables;
+                Platform.runLater(() -> {
+                    if (tables.isEmpty()) {
+                        // 显示无内容提示，但保持边框样式
+                        showTablePlaceholder(writerTableRadioBox, "表中无内容");
+                    } else {
+                        // 有数据时显示边框和多列布局
+                        showTableContent(writerTableRadioBox, tables, writerTableToggleGroup, 
+                                table -> loadWriterColumns());
+                    }
+                });
             } catch (Exception e) {
-                Platform.runLater(() -> showError("加载表失败", e.getMessage()));
+                Platform.runLater(() -> {
+                    showError("加载表失败", e.getMessage());
+                    showTablePlaceholder(writerTableRadioBox, "加载失败，请重试");
+                });
             }
         }).start();
     }
 
     private void loadReaderColumns() {
         JobJdbcDatasource ds = readerDatasourceCombo.getValue();
-        if (ds == null) return;
-        String table = readerTableView.getSelectionModel().getSelectedItem().getTableName();
-        String schema = readerTableView.getSelectionModel().getSelectedItem().getTableSchema();
+        if (ds == null) {
+            showColumnPlaceholder(readerColumnCheckBox, "请选择数据源");
+            return;
+        }
+        DataxTable selectedTable = getSelectedReaderTable();
+        if (selectedTable == null) {
+            showColumnPlaceholder(readerColumnCheckBox, "请选择数据表");
+            return;
+        }
+        String table = selectedTable.getTableName();
+        String schema = selectedTable.getTableSchema();
         String sql = readerSqlArea.getText();
         new Thread(() -> {
             try {
                 List<String> columns = dataxService.getColumns(ds.getId(), table, schema, sql);
-                Platform.runLater(() -> readerColumnList.setItems(FXCollections.observableArrayList(columns)));
+                readerColumns = columns;
+                Platform.runLater(() -> {
+                    if (columns.isEmpty()) {
+                        // 显示无内容提示，但保持边框样式
+                        showColumnPlaceholder(readerColumnCheckBox, "无可用字段");
+                    } else {
+                        // 有数据时显示边框和多列布局
+                        showColumnContent(readerColumnCheckBox, columns);
+                    }
+                });
             } catch (Exception e) {
-                Platform.runLater(() -> showError("加载字段失败", e.getMessage()));
+                Platform.runLater(() -> {
+                    showError("加载字段失败", e.getMessage());
+                    showColumnPlaceholder(readerColumnCheckBox, "加载失败，请重试");
+                });
             }
         }).start();
     }
 
     private void loadWriterColumns() {
         JobJdbcDatasource ds = writerDatasourceCombo.getValue();
-        if (ds == null) return;
-        String table = writerTableView.getSelectionModel().getSelectedItem().getTableName();
-        String schema = writerTableView.getSelectionModel().getSelectedItem().getTableSchema();
+        if (ds == null) {
+            showColumnPlaceholder(writerColumnCheckBox, "请选择数据源");
+            return;
+        }
+        DataxTable selectedTable = getSelectedWriterTable();
+        if (selectedTable == null) {
+            showColumnPlaceholder(writerColumnCheckBox, "请选择数据表");
+            return;
+        }
+        String table = selectedTable.getTableName();
+        String schema = selectedTable.getTableSchema();
         String sql = writerSqlArea.getText();
         new Thread(() -> {
             try {
                 List<String> columns = dataxService.getColumns(ds.getId(), table, schema, sql);
-                Platform.runLater(() -> writerColumnList.setItems(FXCollections.observableArrayList(columns)));
+                writerColumns = columns;
+                Platform.runLater(() -> {
+                    if (columns.isEmpty()) {
+                        // 显示无内容提示，但保持边框样式
+                        showColumnPlaceholder(writerColumnCheckBox, "无可用字段");
+                    } else {
+                        // 有数据时显示边框和多列布局
+                        showColumnContent(writerColumnCheckBox, columns);
+                    }
+                });
             } catch (Exception e) {
-                Platform.runLater(() -> showError("加载字段失败", e.getMessage()));
+                Platform.runLater(() -> {
+                    showError("加载字段失败", e.getMessage());
+                    showColumnPlaceholder(writerColumnCheckBox, "加载失败，请重试");
+                });
             }
         }).start();
+    }
+    
+    // 辅助方法：获取选中的Reader表
+    private DataxTable getSelectedReaderTable() {
+        if (readerTableToggleGroup.getSelectedToggle() != null) {
+            return (DataxTable) readerTableToggleGroup.getSelectedToggle().getUserData();
+        }
+        return null;
+    }
+    
+    // 辅助方法：获取选中的Writer表
+    private DataxTable getSelectedWriterTable() {
+        if (writerTableToggleGroup.getSelectedToggle() != null) {
+            return (DataxTable) writerTableToggleGroup.getSelectedToggle().getUserData();
+        }
+        return null;
+    }
+    
+    // 辅助方法：获取选中的Reader字段
+    private List<String> getSelectedReaderColumns() {
+        List<String> selected = new ArrayList<>();
+        if (readerColumnCheckBox != null) {
+            readerColumnCheckBox.getChildren().forEach(columnNode -> {
+                if (columnNode instanceof VBox) {
+                    ((VBox) columnNode).getChildren().forEach(node -> {
+                        if (node instanceof CheckBox) {
+                            CheckBox cb = (CheckBox) node;
+                            if (cb.isSelected()) {
+                                selected.add(cb.getText());
+                            }
+                        }
+                    });
+                }
+            });
+        }
+        return selected;
+    }
+    
+    // 辅助方法：获取选中的Writer字段
+    private List<String> getSelectedWriterColumns() {
+        List<String> selected = new ArrayList<>();
+        if (writerColumnCheckBox != null) {
+            writerColumnCheckBox.getChildren().forEach(columnNode -> {
+                if (columnNode instanceof VBox) {
+                    ((VBox) columnNode).getChildren().forEach(node -> {
+                        if (node instanceof CheckBox) {
+                            CheckBox cb = (CheckBox) node;
+                            if (cb.isSelected()) {
+                                selected.add(cb.getText());
+                            }
+                        }
+                    });
+                }
+            });
+        }
+        return selected;
+    }
+    
+    // 更新增量配置可见性
+    private void updateIncrConfigVisibility() {
+        boolean isIncremental = "增量".equals(incrTypeCombo.getValue());
+        if (incrConfigBox != null) {
+            incrConfigBox.setVisible(isIncremental);
+            incrConfigBox.setManaged(isIncremental);
+        }
+        if (isIncremental) {
+            updateIncrModeConfig();
+        }
+    }
+    
+    // 更新增量模式配置
+    private void updateIncrModeConfig() {
+        if (incrModeCombo == null || incrConfigBox == null) return;
+        boolean isTimeMode = "时间自增".equals(incrModeCombo.getValue());
+        // 找到时间格式行（incrConfigBox的最后一个子节点）
+        if (incrConfigBox.getChildren().size() > 3) {
+            Node timeFormatRow = incrConfigBox.getChildren().get(3);
+            timeFormatRow.setVisible(isTimeMode);
+            timeFormatRow.setManaged(isTimeMode);
+        }
+    }
+    
+    // 显示数据表占位符
+    private void showTablePlaceholder(HBox container, String message) {
+        container.getChildren().clear();
+        container.setPadding(new Insets(12, 16, 12, 16));
+        // 根据消息内容决定是否显示边框
+        boolean showBorder = !message.equals("请选择数据源");
+        if (showBorder) {
+            container.setStyle("-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
+                    "-fx-background-radius: " + StyleUtil.RADIUS_MD + "; " +
+                    "-fx-border-color: " + StyleUtil.GRAY_300 + "; " +
+                    "-fx-border-width: 1; " +
+                    "-fx-border-radius: " + StyleUtil.RADIUS_MD + ";");
+            container.setMinHeight(220);
+            container.setPrefHeight(220);
+            if (container.getParent() instanceof ScrollPane) {
+                ScrollPane scrollPane = (ScrollPane) container.getParent();
+                scrollPane.setMinHeight(220);
+                scrollPane.setPrefHeight(220);
+            }
+        } else {
+            container.setStyle("-fx-background-color: transparent;");
+            container.setMinHeight(50);
+            container.setPrefHeight(50);
+            if (container.getParent() instanceof ScrollPane) {
+                ScrollPane scrollPane = (ScrollPane) container.getParent();
+                scrollPane.setMinHeight(50);
+                scrollPane.setPrefHeight(50);
+            }
+        }
+        Label placeholder = new Label(message);
+        placeholder.setStyle(StyleUtil.body() + " -fx-text-fill: " + StyleUtil.TEXT_SECONDARY + ";");
+        placeholder.setAlignment(Pos.CENTER);
+        placeholder.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(placeholder, Priority.ALWAYS);
+        container.getChildren().add(placeholder);
+    }
+    
+    // 显示数据表内容（有边框）
+    private void showTableContent(HBox container, List<DataxTable> items, ToggleGroup toggleGroup,
+                                  java.util.function.Consumer<DataxTable> onSelect) {
+        container.getChildren().clear();
+        container.setPadding(new Insets(12, 16, 12, 16));
+        container.setStyle("-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
+                "-fx-background-radius: " + StyleUtil.RADIUS_MD + "; " +
+                "-fx-border-color: " + StyleUtil.GRAY_300 + "; " +
+                "-fx-border-width: 1; " +
+                "-fx-border-radius: " + StyleUtil.RADIUS_MD + ";");
+        container.setMinHeight(220);
+        container.setPrefHeight(220);
+        // 更新ScrollPane高度
+        if (container.getParent() instanceof ScrollPane) {
+            ScrollPane scrollPane = (ScrollPane) container.getParent();
+            scrollPane.setMinHeight(220);
+            scrollPane.setPrefHeight(220);
+        }
+        createMultiColumnRadioButtons(container, items, toggleGroup, onSelect);
+    }
+    
+    // 显示表字段占位符
+    private void showColumnPlaceholder(HBox container, String message) {
+        container.getChildren().clear();
+        container.setPadding(new Insets(12, 16, 12, 16));
+        // 根据消息内容决定是否显示边框
+        boolean showBorder = !message.equals("请选择数据源") && !message.equals("请选择数据表");
+        if (showBorder) {
+            container.setStyle("-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
+                    "-fx-background-radius: " + StyleUtil.RADIUS_MD + "; " +
+                    "-fx-border-color: " + StyleUtil.GRAY_300 + "; " +
+                    "-fx-border-width: 1; " +
+                    "-fx-border-radius: " + StyleUtil.RADIUS_MD + ";");
+            container.setMinHeight(220);
+            container.setPrefHeight(220);
+            if (container.getParent() instanceof ScrollPane) {
+                ScrollPane scrollPane = (ScrollPane) container.getParent();
+                scrollPane.setMinHeight(220);
+                scrollPane.setPrefHeight(220);
+            }
+        } else {
+            container.setStyle("-fx-background-color: transparent;");
+            container.setMinHeight(50);
+            container.setPrefHeight(50);
+            if (container.getParent() instanceof ScrollPane) {
+                ScrollPane scrollPane = (ScrollPane) container.getParent();
+                scrollPane.setMinHeight(50);
+                scrollPane.setPrefHeight(50);
+            }
+        }
+        Label placeholder = new Label(message);
+        placeholder.setStyle(StyleUtil.body() + " -fx-text-fill: " + StyleUtil.TEXT_SECONDARY + ";");
+        placeholder.setAlignment(Pos.CENTER);
+        placeholder.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(placeholder, Priority.ALWAYS);
+        container.getChildren().add(placeholder);
+    }
+    
+    // 显示表字段内容（有边框）
+    private void showColumnContent(HBox container, List<String> items) {
+        container.getChildren().clear();
+        container.setPadding(new Insets(12, 16, 12, 16));
+        container.setStyle("-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
+                "-fx-background-radius: " + StyleUtil.RADIUS_MD + "; " +
+                "-fx-border-color: " + StyleUtil.GRAY_300 + "; " +
+                "-fx-border-width: 1; " +
+                "-fx-border-radius: " + StyleUtil.RADIUS_MD + ";");
+        container.setMinHeight(220);
+        container.setPrefHeight(220);
+        // 更新ScrollPane高度
+        if (container.getParent() instanceof ScrollPane) {
+            ScrollPane scrollPane = (ScrollPane) container.getParent();
+            scrollPane.setMinHeight(220);
+            scrollPane.setPrefHeight(220);
+        }
+        createMultiColumnCheckBoxes(container, items);
+    }
+    
+    // 创建多列RadioButton布局（每列最多8条）
+    private void createMultiColumnRadioButtons(HBox container, List<DataxTable> items, 
+                                               ToggleGroup toggleGroup, 
+                                               java.util.function.Consumer<DataxTable> onSelect) {
+        container.getChildren().clear();
+        if (items == null || items.isEmpty()) return;
+        
+        final int ITEMS_PER_COLUMN = 8;
+        int totalColumns = (items.size() + ITEMS_PER_COLUMN - 1) / ITEMS_PER_COLUMN; // 向上取整
+        
+        for (int colIndex = 0; colIndex < totalColumns; colIndex++) {
+            VBox column = new VBox(6);
+            column.setMinWidth(180); // 每列最小宽度
+            column.setPrefWidth(180);
+            
+            int startIndex = colIndex * ITEMS_PER_COLUMN;
+            int endIndex = Math.min(startIndex + ITEMS_PER_COLUMN, items.size());
+            
+            for (int i = startIndex; i < endIndex; i++) {
+                DataxTable table = items.get(i);
+                RadioButton radio = new RadioButton(
+                        (table.getTableSchema() != null && !table.getTableSchema().isEmpty() 
+                                ? table.getTableSchema() + "." : "") + table.getTableName());
+                radio.setToggleGroup(toggleGroup);
+                radio.setUserData(table);
+                radio.setStyle(StyleUtil.body() + " -fx-background-color: transparent;"); // 移除背景颜色
+                radio.setOnAction(e -> {
+                    if (onSelect != null) {
+                        onSelect.accept(table);
+                    }
+                });
+                column.getChildren().add(radio);
+            }
+            
+            container.getChildren().add(column);
+        }
+    }
+    
+    // 创建多列CheckBox布局（每列最多8条）
+    private void createMultiColumnCheckBoxes(HBox container, List<String> items) {
+        container.getChildren().clear();
+        if (items == null || items.isEmpty()) return;
+        
+        final int ITEMS_PER_COLUMN = 8;
+        int totalColumns = (items.size() + ITEMS_PER_COLUMN - 1) / ITEMS_PER_COLUMN; // 向上取整
+        
+        for (int colIndex = 0; colIndex < totalColumns; colIndex++) {
+            VBox column = new VBox(6);
+            column.setMinWidth(180); // 每列最小宽度
+            column.setPrefWidth(180);
+            
+            int startIndex = colIndex * ITEMS_PER_COLUMN;
+            int endIndex = Math.min(startIndex + ITEMS_PER_COLUMN, items.size());
+            
+            for (int i = startIndex; i < endIndex; i++) {
+                String columnName = items.get(i);
+                CheckBox checkBox = new CheckBox(columnName);
+                checkBox.setStyle(StyleUtil.body() + " -fx-background-color: transparent;"); // 移除背景颜色
+                column.getChildren().add(checkBox);
+            }
+            
+            container.getChildren().add(column);
+        }
+    }
+    
+    // 构建增量内容JSON
+    private String buildIncrementContent() {
+        String columnKey = incrColumnField.getText().trim();
+        String columnValue = incrInitValueField.getText().trim();
+        String mode = incrModeCombo.getValue();
+        
+        // columnType: 0=ID自增, 1=时间自增
+        int columnType = "时间自增".equals(mode) ? 1 : 0;
+        String timeFormat = columnType == 1 && incrTimeFormatCombo.getValue() != null 
+                ? incrTimeFormatCombo.getValue() : "x";
+        
+        // 构建DataxColumn对象
+        com.google.gson.JsonObject columnObj = new com.google.gson.JsonObject();
+        columnObj.addProperty("columnKey", columnKey);
+        columnObj.addProperty("columnValue", columnValue);
+        columnObj.addProperty("columnParam", columnKey);  // 参数名通常与字段名相同
+        columnObj.addProperty("columnTimeFormat", timeFormat);
+        columnObj.addProperty("columnType", columnType);
+        
+        com.google.gson.JsonArray jsonArray = new com.google.gson.JsonArray();
+        jsonArray.add(columnObj);
+        
+        return new com.google.gson.Gson().toJson(jsonArray);
     }
 
     private void copyToClipboard(String text) {

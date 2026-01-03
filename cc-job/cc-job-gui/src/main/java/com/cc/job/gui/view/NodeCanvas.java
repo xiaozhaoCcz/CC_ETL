@@ -869,12 +869,18 @@ public class NodeCanvas extends Pane {
         MenuItem resetNodeStatesItem = new MenuItem("重置节点状态");
         resetNodeStatesItem.setOnAction(e -> resetAllNodeStates());
         
-        // 恢复所有节点运行状态
+        // 恢复所有节点运行状态（功能移除）
         MenuItem restoreAllNodesItem = new MenuItem("恢复节点运行");
         restoreAllNodesItem.setOnAction(e -> restoreAllNodesEnabled());
         
-        menu.getItems().addAll(addNodeItem, clearItem, runGroupItem, themeMenu, 
-                               separatorState, resetNodeStatesItem, restoreAllNodesItem);
+        menu.getItems().addAll(addNodeItem,
+                clearItem,
+                runGroupItem,
+                themeMenu,
+                separatorState,
+                resetNodeStatesItem
+                //restoreAllNodesItem
+        );
         
         this.setOnContextMenuRequested(e -> {
             if (!isClickOnNodeOrEdge((javafx.scene.Node) e.getTarget())) {

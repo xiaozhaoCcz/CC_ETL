@@ -9,26 +9,46 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 /**
- * 新建分区对话框
+ * 新建/编辑分区对话框
  */
 public class NewPartitionDialog extends Dialog<String> {
     
     private TextField partitionNameField;
     private ButtonType confirmButtonType;
     private ButtonType cancelButtonType;
+    private Long partitionId; // 编辑模式下的分区ID
     
+    /**
+     * 新建分区对话框构造函数
+     */
     public NewPartitionDialog(Stage owner) {
+        this(owner, null, null);
+    }
+    
+    /**
+     * 编辑分区对话框构造函数
+     * @param owner 父窗口
+     * @param partitionId 分区ID（编辑模式）
+     * @param partitionName 分区名称（编辑模式）
+     */
+    public NewPartitionDialog(Stage owner, Long partitionId, String partitionName) {
+        this.partitionId = partitionId;
         initOwner(owner);
         initModality(Modality.APPLICATION_MODAL);
-        setTitle("新建分区");
+        setTitle(partitionId == null ? "新建分区" : "编辑分区");
         setHeaderText(null);
         
         // 创建对话框内容
         VBox content = createContent();
         getDialogPane().setContent(content);
         
+        // 如果是编辑模式，填充现有名称
+        if (partitionId != null && partitionName != null) {
+            partitionNameField.setText(partitionName);
+        }
+        
         // 添加按钮
-        confirmButtonType = new ButtonType("确认", ButtonBar.ButtonData.OK_DONE);
+        confirmButtonType = new ButtonType(partitionId == null ? "确认" : "保存", ButtonBar.ButtonData.OK_DONE);
         cancelButtonType = new ButtonType("取消", ButtonBar.ButtonData.CANCEL_CLOSE);
         getDialogPane().getButtonTypes().addAll(confirmButtonType, cancelButtonType);
         
@@ -38,18 +58,19 @@ public class NewPartitionDialog extends Dialog<String> {
         // 设置结果转换器
         setResultConverter(buttonType -> {
             if (buttonType == confirmButtonType) {
-                String partitionName = partitionNameField.getText().trim();
-                if (partitionName.isEmpty()) {
+                String partitionNameResult = partitionNameField.getText().trim();
+                if (partitionNameResult.isEmpty()) {
                     return null;
                 }
-                return partitionName;
+                return partitionNameResult;
             }
             return null;
         });
         
         // 确认按钮验证
         Button confirmButton = (Button) getDialogPane().lookupButton(confirmButtonType);
-        confirmButton.setDisable(true);
+        // 编辑模式下，如果名称不为空，按钮应该可用
+        confirmButton.setDisable(partitionNameField.getText().trim().isEmpty());
         
         // 监听输入框变化
         partitionNameField.textProperty().addListener((observable, oldValue, newValue) -> {
@@ -165,6 +186,13 @@ public class NewPartitionDialog extends Dialog<String> {
      */
     public String getPartitionName() {
         return partitionNameField.getText().trim();
+    }
+    
+    /**
+     * 获取分区ID（编辑模式）
+     */
+    public Long getPartitionId() {
+        return partitionId;
     }
 }
 
