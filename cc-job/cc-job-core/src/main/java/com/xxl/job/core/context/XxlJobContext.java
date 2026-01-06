@@ -67,6 +67,8 @@ public class XxlJobContext {
 
     private List<Integer> jobFlowPositionIds;
 
+    private Object executeResult;
+
 
     public XxlJobContext(long jobId, String jobParam, String jobLogFileName, int shardIndex, int shardTotal) {
         this.jobId = jobId;
@@ -147,6 +149,13 @@ public class XxlJobContext {
     public void setJobFlowPositionIds(List<Integer> jobFlowPositionIds) {
         this.jobFlowPositionIds = jobFlowPositionIds;
     }
+    public void setExecuteResult(Object executeResult) {
+        this.executeResult = executeResult;
+    }
+
+    public Object getExecuteResult() {
+        return executeResult;
+    }
 
     // ---------------------- tool ----------------------
 
@@ -159,5 +168,4 @@ public class XxlJobContext {
     public static XxlJobContext getXxlJobContext(){
         return contextHolder.get();
     }
-
 }

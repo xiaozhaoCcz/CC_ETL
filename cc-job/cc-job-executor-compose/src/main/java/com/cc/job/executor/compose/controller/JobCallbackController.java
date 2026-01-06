@@ -55,13 +55,19 @@ public class JobCallbackController {
         
         String executeKey = data.getKey();
         Boolean success = data.getValue();
+        Object executeResult = data.getExecuteResult();
         
-        logger.info("[JobCallback] 收到子任务执行结果 - executeKey: {}, 成功: {}", executeKey, success);
+        logger.info("[JobCallback] 收到子任务执行结果 - executeKey: {}, 成功: {}, 执行结果: {}", 
+                executeKey, success, executeResult);
         
         Map<String, Object> result = new HashMap<>();
         
         try {
             TaskWrapperFactory.getJobResults().put(executeKey, success);
+            // 存储执行结果
+            if (executeResult != null) {
+                TaskWrapperFactory.setJobExecuteResult(executeKey, executeResult);
+            }
             
             TaskWrapperFactory.notifyTaskComplete(executeKey);
             

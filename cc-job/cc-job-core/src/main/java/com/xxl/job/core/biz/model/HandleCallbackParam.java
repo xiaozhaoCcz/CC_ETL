@@ -21,6 +21,8 @@ public class HandleCallbackParam implements Serializable {
 
     private String address;
 
+    private Object executeResult;
+
     public HandleCallbackParam(){}
     public HandleCallbackParam(long logId, long logDateTim, int handleCode, String handleMsg) {
         this.logId = logId;
@@ -97,6 +99,14 @@ public class HandleCallbackParam implements Serializable {
 
     public void setRandomId(String randomId) {
         this.randomId = randomId;
+    }
+
+    public Object getExecuteResult() {
+        return executeResult;
+    }
+
+    public void setExecuteResult(Object executeResult) {
+        this.executeResult = executeResult;
     }
 
     @Override

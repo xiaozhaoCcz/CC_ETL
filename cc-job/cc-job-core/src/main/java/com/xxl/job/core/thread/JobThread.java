@@ -147,17 +147,13 @@ public class JobThread extends Thread{
 						Thread futureThread = null;
 						try {
 							XxlJobContext finalXxlJobContext = xxlJobContext;
-							FutureTask<Boolean> futureTask = new FutureTask<Boolean>(new Callable<Boolean>() {
-								@Override
-								public Boolean call() throws Exception {
+							FutureTask<Boolean> futureTask = new FutureTask<>(() -> {
 
-									// init job context
-									XxlJobContext.setXxlJobContext(finalXxlJobContext);
-
-									handler.execute();
-									return true;
-								}
-							});
+                                // init job context
+                                XxlJobContext.setXxlJobContext(finalXxlJobContext);
+                                handler.execute();
+                                return true;
+                            });
 							futureThread = new Thread(futureTask);
 							futureThread.start();
 
@@ -218,26 +214,34 @@ public class JobThread extends Thread{
                     // callback handler info
                     if (!toStop) {
                         // commonm
-                        TriggerCallbackThread.pushCallBack(new HandleCallbackParam(
+                        HandleCallbackParam callbackParam = new HandleCallbackParam(
 								triggerParam.getJobId(),
 								triggerParam.getLogId(),
 								triggerParam.getLogDateTime(),
 								XxlJobContext.getXxlJobContext().getHandleCode(),
 								XxlJobContext.getXxlJobContext().getHandleMsg(),
 								triggerParam.getRandomId(),
-								triggerParam.getAddress())
-						);
+								triggerParam.getAddress());
+                        // 获取执行结果
+                        if (XxlJobContext.getXxlJobContext() != null) {
+                            callbackParam.setExecuteResult(XxlJobContext.getXxlJobContext().getExecuteResult());
+                        }
+                        TriggerCallbackThread.pushCallBack(callbackParam);
                     } else {
                         // is killed
-                        TriggerCallbackThread.pushCallBack(new HandleCallbackParam(
+                        HandleCallbackParam callbackParam = new HandleCallbackParam(
 								triggerParam.getJobId(),
 								triggerParam.getLogId(),
 								triggerParam.getLogDateTime(),
 								XxlJobContext.HANDLE_CODE_FAIL,
 								stopReason + " [job running, killed]",
 								triggerParam.getRandomId(),
-								triggerParam.getAddress())
-						);
+								triggerParam.getAddress());
+                        // 获取执行结果（即使被杀死也可能有结果）
+                        if (XxlJobContext.getXxlJobContext() != null) {
+                            callbackParam.setExecuteResult(XxlJobContext.getXxlJobContext().getExecuteResult());
+                        }
+                        TriggerCallbackThread.pushCallBack(callbackParam);
                     }
                 }
             }

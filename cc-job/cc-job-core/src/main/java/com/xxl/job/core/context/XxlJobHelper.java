@@ -289,6 +289,13 @@ public class XxlJobHelper {
         }
         return true;
     }
-
-
+    // ---------------------- tool for ExecuteResult ----------------------
+    public static boolean executeResult(Object result) {
+        XxlJobContext xxlJobContext = XxlJobContext.getXxlJobContext();
+        if(xxlJobContext == null){
+            return false;
+        }
+        xxlJobContext.setExecuteResult(result);
+        return true;
+    }
 }

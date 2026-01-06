@@ -22,6 +22,12 @@ public class JobGroupDataRequest {
     @JsonProperty("value")
     private Boolean value;
     
+    /**
+     * 执行结果
+     */
+    @JsonProperty("executeResult")
+    private Object executeResult;
+    
     public JobGroupDataRequest() {
         // 默认构造函数，Jackson需要
     }
@@ -45,6 +51,14 @@ public class JobGroupDataRequest {
     
     public void setValue(Boolean value) {
         this.value = value;
+    }
+    
+    public Object getExecuteResult() {
+        return executeResult;
+    }
+    
+    public void setExecuteResult(Object executeResult) {
+        this.executeResult = executeResult;
     }
     
     @Override

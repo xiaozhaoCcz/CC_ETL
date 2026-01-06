@@ -48,6 +48,7 @@ public class SampleXxlJob {
         }
          //default success
         XxlJobHelper.log(">>>>>>>> demoJobHandler1 end");
+        XxlJobHelper.executeResult(">>>>>>>> demoJobHandler1 result");
         System.out.println(">>>>>>>> demoJobHandler1 end");
     }
 

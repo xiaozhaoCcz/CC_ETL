@@ -61,7 +61,7 @@ cc-job:
       port: 15000
       ### job log path
       #logpath: ./data/applogs/executor/jobhandler
-      logpath: C:\Users\48423\OneDrive\Desktop\pp\ccJob\logs
+      logpath: /Users/xiaozhao/Desktop/xz/logs
       ### job log retention days
       logretentiondays: 30
     ### job, access token

@@ -57,4 +57,4 @@ xxl:
       slow:
         max: 200
     logretentiondays: 30
-    logpath: C:\Users\48423\OneDrive\Desktop\pp\ccJob\logs #日志文件地址
+    logpath: /Users/xiaozhao/Desktop/xz/logs #日志文件地址

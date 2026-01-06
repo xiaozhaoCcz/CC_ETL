@@ -1,6 +1,5 @@
 package com.cc.job.admin.task.thread;
 
-import cn.hutool.core.lang.Pair;
 import com.cc.job.admin.task.complete.XxlJobCompleter;
 import com.cc.job.admin.config.XxlJobAdminConfig;
 import com.cc.job.xo.model.entity.JobLog;
@@ -158,8 +157,15 @@ public class JobCompleteHelper {
 	private ReturnT<String> callback(HandleCallbackParam handleCallbackParam) {
 		// valid log item
 		if (handleCallbackParam.getLogId() == -1) {
-			Pair<String, Boolean> pair = new Pair<>(handleCallbackParam.getJobId() + ":" + handleCallbackParam.getRandomId(), handleCallbackParam.getHandleCode() == ReturnT.SUCCESS_CODE);
-			XxlJobRemotingUtil.postBody(handleCallbackParam.getAddress() + "api/addJobGroupData", "", 10, pair, String.class);
+			// 构建任务组数据请求，包含执行结果
+			Map<String, Object> requestData = new HashMap<>();
+			requestData.put("key", handleCallbackParam.getJobId() + ":" + handleCallbackParam.getRandomId());
+			requestData.put("value", handleCallbackParam.getHandleCode() == ReturnT.SUCCESS_CODE);
+			// 添加执行结果
+			if (handleCallbackParam.getExecuteResult() != null) {
+				requestData.put("executeResult", handleCallbackParam.getExecuteResult());
+			}
+			XxlJobRemotingUtil.postBody(handleCallbackParam.getAddress() + "api/addJobGroupData", "", 10, requestData, String.class);
 			return ReturnT.SUCCESS;
 		}
 		JobLog log = XxlJobAdminConfig.getAdminConfig().getJobLogMapper().selectById(handleCallbackParam.getLogId());
