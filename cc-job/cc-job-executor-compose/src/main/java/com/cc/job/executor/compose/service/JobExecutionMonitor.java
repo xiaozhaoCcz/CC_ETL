@@ -25,7 +25,7 @@ public class JobExecutionMonitor implements Callable<String> {
     
     private final JobInfo jobInfo;
     private final JobNode node;
-    ExecutionContext context;
+    private final ExecutionContext context;
     private final Map<String, Boolean> jobResultMap;
     private final int retryCount;
     private final String executeKey;

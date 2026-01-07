@@ -64,6 +64,7 @@ public class SampleXxlJob {
             TimeUnit.MILLISECONDS.sleep(500);
         }
         //default success
+        XxlJobHelper.executeResult(">>>>>>>> demoJobHandler2 result");
         XxlJobHelper.log(">>>>>>>> demoJobHandler2 end");
         System.out.println(">>>>>>>> demoJobHandler2 end");
     }
@@ -85,6 +86,7 @@ public class SampleXxlJob {
 //            retryCount++;
             //throw new RuntimeException();
        // }
+        XxlJobHelper.executeResult(">>>>>>>> demoJobHandler3 result");
         XxlJobHelper.log(">>>>>>>> demoJobHandler3 end");
         System.out.println(">>>>>>>> demoJobHandler3 end");
     }
@@ -101,6 +103,7 @@ public class SampleXxlJob {
             TimeUnit.MILLISECONDS.sleep(500);
         }
         //default success
+        XxlJobHelper.executeResult(">>>>>>>> demoJobHandler4 result");
         XxlJobHelper.log(">>>>>>>> demoJobHandler4 end");
         System.out.println(">>>>>>>> demoJobHandler4 end");
     }
@@ -118,6 +121,7 @@ public class SampleXxlJob {
             TimeUnit.MILLISECONDS.sleep(500);
         }
         //default success
+        XxlJobHelper.executeResult(">>>>>>>> demoJobHandler5 result");
         XxlJobHelper.log(">>>>>>>> demoJobHandler5 end");
     }
 
