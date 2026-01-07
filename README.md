@@ -18,8 +18,8 @@
 - 📖 [项目简介](#-项目简介)
 - 🔗 [项目地址](#-项目地址)
 - ✨ [核心特性](#-核心特性)
-- 📋 [使用场景](#-使用场景)
 - 🖼️ [项目展示](#-项目展示)
+- 📋 [使用场景](#-使用场景)
 - 💻 [PC端功能详细介绍](#-pc端功能详细介绍) ⭐
 - 🚀 [快速开始](#-快速开始)
 - 🧩 [模块说明](#-模块说明)
@@ -281,6 +281,52 @@ Cc-ETL 是一款基于 XXL-Job 深度改造的可视化定时任务调度平台�
 - **扩展性**：插件化架构，支持自定义扩展
 
 ---
+## 🖼️ 项目展示
+
+### 🎯 界面预览
+
+
+#### PC 端桌面应用
+<div align="center">
+  <img src="./doc/image/01mainIndex.png" width="80%" alt="PC端界面"/>
+</div>
+
+**PC端核心功能亮点：**
+
+- 🎨 **可视化任务编排**：拖拽式节点设计，直观易用
+- 📊 **多面板协同**：树形视图、画布、小地图、日志面板一体化
+- ⚡ **10种运行模式**：支持 BEAN、API、SQL 及 7 种 GLUE 模式
+- 🔧 **高级配置**：路由策略、阻塞处理、失败策略等完整配置
+- ⏪ **撤销重做**：完整的操作历史管理
+- ⌨️ **快捷键支持**：丰富的键盘快捷键提升效率
+- 🗺️ **小地图导航**：快速定位和导航大型任务组
+- 📝 **实时日志**：任务执行日志实时输出，支持搜索和过滤
+
+### ⚙️ 核心功能展示
+
+#### 1. 任务列表
+<div align="center">
+  <img src="./doc/image/02jobList.png" width="45%" alt="任务列表"/>
+  <img src="./doc/image/03jobEdit.png" width="45%" alt="任务编辑"/>
+</div>
+
+
+#### 2. 数据源配置
+<div align="center">
+ <img src="./doc/image/04dataSourceList.png" width="45%" alt="数据源列表"/>
+  <img src="./doc/image/05dataSourceEdit.png" width="45%" alt="数据源配置"/>
+</div>
+
+#### 3.任务列表
+
+<div align="center">
+ <img src="./doc/image/06jobSelect.png" width="45%" alt="任务列表"/>
+ <img src="./doc/image/07api.png" width="45%" alt="api任务"/>
+ <img src="./doc/image/08shell.png" width="45%" alt="shell任务"/>
+ <img src="./doc/image/09java.png" width="45%" alt="java任务"/>
+ <img src="./doc/image/10cSharp.png" width="45%" alt="c#任务"/>
+</div>
+
 ## 🚀 发展规划
 
 ### ✅ 已完成功能
@@ -339,52 +385,6 @@ Cc-ETL 是一款基于 XXL-Job 深度改造的可视化定时任务调度平台�
 - 📋 **开发者文档**：架构设计和开发指南
 
 ---
-
-## 🖼️ 项目展示
-
-### 🎯 界面预览
-
-
-#### PC 端桌面应用
-<div align="center">
-  <img src="./doc/image/01mainIndex.png" width="80%" alt="PC端界面"/>
-</div>
-
-**PC端核心功能亮点：**
-
-- 🎨 **可视化任务编排**：拖拽式节点设计，直观易用
-- 📊 **多面板协同**：树形视图、画布、小地图、日志面板一体化
-- ⚡ **10种运行模式**：支持 BEAN、API、SQL 及 7 种 GLUE 模式
-- 🔧 **高级配置**：路由策略、阻塞处理、失败策略等完整配置
-- ⏪ **撤销重做**：完整的操作历史管理
-- ⌨️ **快捷键支持**：丰富的键盘快捷键提升效率
-- 🗺️ **小地图导航**：快速定位和导航大型任务组
-- 📝 **实时日志**：任务执行日志实时输出，支持搜索和过滤
-
-### ⚙️ 核心功能展示
-
-#### 1. 任务列表
-<div align="center">
-  <img src="./doc/image/02jobList.png" width="45%" alt="任务列表"/>
-  <img src="./doc/image/03jobEdit.png" width="45%" alt="任务编辑"/>
-</div>
-
-
-#### 2. 数据源配置
-<div align="center">
- <img src="./doc/image/04dataSourceList.png" width="45%" alt="数据源列表"/>
-  <img src="./doc/image/05dataSourceEdit.png" width="45%" alt="数据源配置"/>
-</div>
-
-#### 3.任务列表
-
-<div align="center">
- <img src="./doc/image/06jobSelect.png" width="45%" alt="任务列表"/>
- <img src="./doc/image/07api.png" width="45%" alt="api任务"/>
- <img src="./doc/image/08shell.png" width="45%" alt="shell任务"/>
- <img src="./doc/image/09java.png" width="45%" alt="java任务"/>
- <img src="./doc/image/10cSharp.png" width="45%" alt="c#任务"/>
-</div>
 
 ### 📋 使用流程
 
