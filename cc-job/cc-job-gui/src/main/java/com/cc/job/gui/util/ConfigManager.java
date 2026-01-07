@@ -138,5 +138,27 @@ public class ConfigManager {
     public String getConfigFilePath() {
         return configFilePath.toString();
     }
+    
+    /**
+     * 获取配置属性
+     * 
+     * @param key 配置键
+     * @param defaultValue 默认值
+     * @return 配置值
+     */
+    public String getProperty(String key, String defaultValue) {
+        return properties.getProperty(key, defaultValue);
+    }
+    
+    /**
+     * 设置配置属性
+     * 
+     * @param key 配置键
+     * @param value 配置值
+     */
+    public void setProperty(String key, String value) {
+        properties.setProperty(key, value);
+        saveConfig();
+    }
 }
 

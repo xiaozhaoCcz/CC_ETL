@@ -58,3 +58,11 @@ xxl:
         max: 200
     logretentiondays: 30
     logpath: /Users/xiaozhao/Desktop/xz/logs #日志文件地址
+
+# CC-Job 节点执行结果存储配置
+cc-job:
+  result:
+    storage:
+      file:
+        # 文件存储基础路径（绝对路径），需要与executor-compose模块保持一致
+        basePath: /Users/xiaozhao/Desktop/xz/cc-job-results

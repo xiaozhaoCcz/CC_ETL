@@ -2,6 +2,7 @@ package com.cc.job.gui.view;
 
 import com.cc.job.gui.service.JobJdbcDatasourceService;
 import com.cc.job.gui.util.IconUtil;
+import com.cc.job.gui.view.component.SmartParameterInput;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.entity.JobJdbcDatasource;
 import com.cc.job.xo.model.form.JobInfoForm;
@@ -58,14 +59,14 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
     private TextField executorHandlerField;
     private ComboBox<JobJdbcDatasource> datasourceCombo;
     private Button glueIdeButton;
-    private TextArea executorParamArea;
+    private SmartParameterInput executorParamArea;
     private Label executorParamLabel;
     
     // API 配置相关字段
     private ComboBox<String> reqTypeCombo;
     private TextField reqUrlField;
     private Label reqBodyLabel;
-    private TextArea reqBodyArea;
+    private SmartParameterInput reqBodyArea;
     private ParameterTable bodyTable;
     
     private JobJdbcDatasourceService datasourceService;
@@ -402,10 +403,10 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
         
         // 任务参数
         executorParamLabel = createFormLabel("任务参数", false);
-        executorParamArea = new TextArea();
+        executorParamArea = new SmartParameterInput();
         executorParamArea.setPrefWidth(615);
         executorParamArea.setPrefRowCount(3);
-        executorParamArea.setPromptText("");
+        executorParamArea.setPromptText("输入参数，使用 #{任务描述}.属性 引用其他任务的结果，使用 `# 输入普通#号");
         executorParamArea.setWrapText(true);
         
         grid.add(glueTypeLabel, 0, 0);
@@ -552,10 +553,10 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
 
         // 请求体（POST/PUT时显示）
         reqBodyLabel = createFormLabel("请求体", false);
-        reqBodyArea = new TextArea();
+        reqBodyArea = new SmartParameterInput();
         reqBodyArea.setPrefWidth(615);
         reqBodyArea.setPrefRowCount(6);
-        reqBodyArea.setPromptText("请输入JSON格式的请求体");
+        reqBodyArea.setPromptText("请输入JSON格式的请求体，使用 #{任务描述}.属性 引用其他任务的结果，使用 `# 输入普通#号");
         reqBodyArea.setWrapText(true);
         reqBodyArea.setVisible(false);
         reqBodyArea.setManaged(false);
@@ -566,6 +567,9 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
         grid.add(reqUrlField, 1, 1, 3, 1);
         grid.add(reqBodyLabel, 0, 2);
         grid.add(reqBodyArea, 1, 2, 3, 1);
+        
+        // 注意：NewJobDialog是普通任务对话框，没有任务组ID，所以不需要设置taskGroupId
+        // 如果需要从任务组获取节点信息，可以在后续扩展中支持
 
         // 监听请求类型变化，显示/隐藏请求体
         reqTypeCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
@@ -912,7 +916,7 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
                 reqUrlField.setText(data.getReqUrl());
             }
             if (data.getReqBody() != null) {
-                reqBodyArea.setText(data.getReqBody());
+                reqBodyArea.setTextWithEscape(data.getReqBody());
             }
             // 只使用一个参数表格，优先使用executorParam，如果没有则使用reqHeader
             String paramData = data.getExecutorParam();
@@ -922,7 +926,7 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
             bodyTable.setData(paramData);
         } else {
             if (data.getExecutorParam() != null) {
-                executorParamArea.setText(data.getExecutorParam());
+                executorParamArea.setTextWithEscape(data.getExecutorParam());
             }
         }
         
@@ -1003,7 +1007,7 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
             form.setReqUrl(reqUrl);
             // 如果是POST或PUT，设置请求体
             if ("POST".equals(reqType) || "PUT".equals(reqType)) {
-                String reqBody = reqBodyArea.getText() != null ? reqBodyArea.getText().trim() : "";
+                String reqBody = reqBodyArea.getActualText() != null ? reqBodyArea.getActualText().trim() : "";
                 form.setReqBody(reqBody.isEmpty() ? null : reqBody);
             } else {
                 form.setReqBody(null);
@@ -1015,7 +1019,8 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
             form.setReqUrl(null);
             form.setReqBody(null);
             form.setReqHeader(null);
-            form.setExecutorParam(executorParamArea.getText().trim());
+            form.setExecutorParam(executorParamArea.getActualText() != null ? 
+                    executorParamArea.getActualText().trim() : "");
         }
         
         // 高级配置

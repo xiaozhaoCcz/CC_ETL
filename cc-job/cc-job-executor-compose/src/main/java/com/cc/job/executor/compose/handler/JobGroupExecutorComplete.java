@@ -69,8 +69,8 @@ public class JobGroupExecutorComplete {
         String executionBatchId = generateBatchId(taskGroupId, executeParam);
         logger.info("[JobGroupExecutor] 批次ID: {}", executionBatchId);
         
-        // 4. 委托给编排器执行
-        orchestrator.execute(taskGroupId, executionBatchId,jobFlowPositionIds,jobPauseStatusIds);
+        // 4. 委托给编排器执行（传递执行参数，用于解析历史批次ID）
+        orchestrator.execute(taskGroupId, executionBatchId, jobFlowPositionIds, jobPauseStatusIds, executeParam);
     }
     
     /**

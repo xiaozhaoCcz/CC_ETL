@@ -1,6 +1,7 @@
 package com.cc.job.executor.compose.service;
 
 import com.cc.job.executor.compose.core.model.ExecutionContext;
+import com.cc.job.executor.compose.core.service.ResultStorageService;
 import com.cc.job.executor.compose.core.service.TaskWrapperFactory;
 import com.cc.job.executor.compose.infrastructure.constant.ExecutorConstants;
 import com.cc.job.xo.model.entity.JobInfo;
@@ -30,11 +31,17 @@ public class JobExecutionMonitor implements Callable<String> {
     private final int retryCount;
     private final String executeKey;
     private final CountDownLatch latch;
+    private final ResultStorageService resultStorageService;
     
     private volatile boolean stop = false;
     
     public JobExecutionMonitor(JobInfo jobInfo, JobNode node, ExecutionContext context,
                               Map<String, Boolean> jobResultMap, int retryCount) {
+        this(jobInfo, node, context, jobResultMap, retryCount, null);
+    }
+    
+    public JobExecutionMonitor(JobInfo jobInfo, JobNode node, ExecutionContext context,
+                              Map<String, Boolean> jobResultMap, int retryCount, ResultStorageService resultStorageService) {
         this.jobInfo = jobInfo;
         this.node = node;
         this.context = context;
@@ -42,6 +49,7 @@ public class JobExecutionMonitor implements Callable<String> {
         this.retryCount = retryCount;
         this.executeKey = buildExecuteKey(jobInfo.getId(), context.getExecutionBatchId());
         this.latch = new CountDownLatch(1);
+        this.resultStorageService = resultStorageService;
     }
     
     public String getExecuteKey() {
@@ -80,13 +88,29 @@ public class JobExecutionMonitor implements Callable<String> {
                 // 获取任务执行结果
                 Object executeResult = TaskWrapperFactory.getJobExecuteResult(executeKey);
                 Object executeResult1 = context.getXxlJobContext().getExecuteResult();
-                if (executeResult != null) {
+                
+                // 优先使用 executeResult，如果没有则使用 executeResult1
+                Object finalResult = executeResult != null ? executeResult : executeResult1;
+                
+                if (finalResult != null) {
                     logger.info("[JobMonitor] 任务执行结果 - jobId: {}, 任务名称: {}, 执行结果: {}", 
-                            jobInfo.getId(), jobInfo.getJobDesc(), executeResult);
-                    System.out.println("任务："+jobInfo.getJobDesc()+"执行结果："+executeResult);
-                    System.out.println("任务："+jobInfo.getJobDesc()+"执行结果："+executeResult1);
+                            jobInfo.getId(), jobInfo.getJobDesc(), finalResult);
+                    
+                    // 存储结果到数据上下文（如果任务执行成功）
+                    if (success && resultStorageService != null && context.getDataContext() != null) {
+                        try {
+                            resultStorageService.storeResult(context, jobInfo, finalResult);
+                            logger.debug("[JobMonitor] 任务结果已存储到数据上下文 - jobId: {}", jobInfo.getId());
+                        } catch (Exception e) {
+                            logger.error("[JobMonitor] 存储任务结果到数据上下文失败 - jobId: {}", jobInfo.getId(), e);
+                            // 不抛出异常，避免影响任务完成流程
+                        }
+                    }
+                    
                     // 清理执行结果
-                    TaskWrapperFactory.removeJobExecuteResult(executeKey);
+                    if (executeResult != null) {
+                        TaskWrapperFactory.removeJobExecuteResult(executeKey);
+                    }
                 } else {
                     logger.debug("[JobMonitor] 任务执行结果为空 - jobId: {}, executeKey: {}", 
                             jobInfo.getId(), executeKey);

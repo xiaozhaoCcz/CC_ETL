@@ -31,6 +31,9 @@ public class DataContext {
     /** 元数据：记录每个数据项的创建时间 */
     private final Map<String, Long> dataTimestampMap = new ConcurrentHashMap<>();
 
+    /** 元数据：记录每个数据项的数据来源类型 */
+    private final Map<String, DataSourceType> dataSourceTypeMap = new ConcurrentHashMap<>();
+
     /**
      * 构造根上下文
      */
@@ -64,16 +67,50 @@ public class DataContext {
      * @param sourceNodeId 数据来源节点ID
      */
     public void put(String key, Object value, Long sourceNodeId) {
+        put(key, value, sourceNodeId, DataSourceType.CURRENT_RUNNING);
+    }
+
+    /**
+     * 存储数据（完整版，包含数据来源类型）
+     *
+     * @param key 数据键
+     * @param value 数据值
+     * @param sourceNodeId 数据来源节点ID
+     * @param sourceType 数据来源类型
+     */
+    public void put(String key, Object value, Long sourceNodeId, DataSourceType sourceType) {
         data.put(key, value);
         dataSourceMap.put(key, sourceNodeId);
         dataTimestampMap.put(key, System.currentTimeMillis());
+        dataSourceTypeMap.put(key, sourceType);
     }
 
     /**
      * 存储数据（简化版）
      */
     public void put(String key, Object value) {
-        put(key, value, null);
+        put(key, value, null, DataSourceType.CURRENT_RUNNING);
+    }
+
+    /**
+     * 从数据库加载数据并存储（自动标记为DATABASE来源）
+     *
+     * @param key 数据键
+     * @param value 数据值
+     * @param sourceNodeId 数据来源节点ID
+     */
+    public void putFromDatabase(String key, Object value, Long sourceNodeId) {
+        put(key, value, sourceNodeId, DataSourceType.DATABASE);
+    }
+
+    /**
+     * 从数据库加载数据并存储（简化版）
+     *
+     * @param key 数据键
+     * @param value 数据值
+     */
+    public void putFromDatabase(String key, Object value) {
+        putFromDatabase(key, value, null);
     }
 
     /**
@@ -181,6 +218,7 @@ public class DataContext {
         data.remove(key);
         dataSourceMap.remove(key);
         dataTimestampMap.remove(key);
+        dataSourceTypeMap.remove(key);
     }
 
     /**
@@ -190,6 +228,7 @@ public class DataContext {
         data.clear();
         dataSourceMap.clear();
         dataTimestampMap.clear();
+        dataSourceTypeMap.clear();
     }
 
     /**
@@ -229,6 +268,22 @@ public class DataContext {
         }
         if (parentContext != null) {
             return parentContext.getDataSource(key);
+        }
+        return null;
+    }
+
+    /**
+     * 获取数据来源类型
+     *
+     * @param key 数据键
+     * @return 数据来源类型，如果不存在则返回null
+     */
+    public DataSourceType getDataSourceType(String key) {
+        if (dataSourceTypeMap.containsKey(key)) {
+            return dataSourceTypeMap.get(key);
+        }
+        if (parentContext != null) {
+            return parentContext.getDataSourceType(key);
         }
         return null;
     }

@@ -1,8 +1,8 @@
 package com.cc.job.executor.compose.core.service;
 
 import com.cc.job.executor.compose.client.AdminApiClient;
-import com.cc.job.executor.compose.core.context.DataContextManager;
 import com.cc.job.executor.compose.core.model.ExecutionContext;
+import com.cc.job.executor.compose.core.service.ResultStorageService;
 import com.cc.job.executor.compose.service.JobExecutionMonitor;
 import com.cc.job.executor.compose.service.JobTriggerService;
 import com.cc.job.xo.model.entity.JobInfo;
@@ -33,12 +33,12 @@ public class TaskExecutor {
     
     private final AdminApiClient adminApiClient;
     private final JobTriggerService jobTriggerService;
-    private final DataContextManager dataContextManager;
+    private final ResultStorageService resultStorageService;
 
-    public TaskExecutor(AdminApiClient adminApiClient, JobTriggerService jobTriggerService, DataContextManager dataContextManager) {
+    public TaskExecutor(AdminApiClient adminApiClient, JobTriggerService jobTriggerService, ResultStorageService resultStorageService) {
         this.adminApiClient = adminApiClient;
         this.jobTriggerService = jobTriggerService;
-        this.dataContextManager = dataContextManager;
+        this.resultStorageService = resultStorageService;
     }
     
     /**
@@ -60,9 +60,9 @@ public class TaskExecutor {
             // 1. 检查并处理暂停状态（废弃）
             //handlePauseIfNeeded(node,context.getJobPauseStatusIds());
             
-            // 2. 触发任务执行
+            // 2. 触发任务执行（传入执行上下文，用于参数解析）
             boolean triggerSuccess = jobTriggerService.triggerJob(
-                    context.getXxlJobContext(), jobInfo, context.getExecutionBatchId());
+                    context.getXxlJobContext(), jobInfo, context.getExecutionBatchId(), context);
             
             if (!triggerSuccess) {
                 return handleTriggerFailure(jobInfo);
@@ -134,7 +134,7 @@ public class TaskExecutor {
         
         try {
             monitor = new JobExecutionMonitor(jobInfo, node, 
-                    context, jobResults, retryCount);
+                    context, jobResults, retryCount, resultStorageService);
             
             TaskWrapperFactory.registerMonitor(monitor.getExecuteKey(), monitor);
             

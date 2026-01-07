@@ -4,7 +4,11 @@ import cn.hutool.http.HttpRequest;
 import cn.hutool.http.HttpResponse;
 import cn.hutool.json.JSONUtil;
 import com.cc.job.executor.compose.client.AdminApiClient;
+import com.cc.job.executor.compose.core.context.DataContext;
+import com.cc.job.executor.compose.core.context.DataContextManager;
 import com.cc.job.executor.compose.core.model.ExecutionContext;
+import com.cc.job.executor.compose.core.service.HistoricalDataLoader;
+import com.cc.job.executor.compose.core.service.ResultStorageService;
 import com.cc.job.executor.compose.core.service.TaskDependencyBuilder;
 import com.cc.job.executor.compose.core.service.TaskGraphBuilder;
 import com.cc.job.executor.compose.core.service.TaskWrapperFactory;
@@ -20,7 +24,6 @@ import com.xxl.job.core.context.XxlJobContext;
 import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.executor.XxlJobExecutor;
 import com.xxl.job.core.util.IpUtil;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -49,13 +52,19 @@ public class TaskGroupOrchestrator {
     private final TaskWrapperFactory wrapperFactory;
     private final TaskDependencyBuilder dependencyBuilder;
     private final JobGroupUtils jobGroupUtils;
+    private final DataContextManager dataContextManager;
+    private final ResultStorageService resultStorageService;
+    private final HistoricalDataLoader historicalDataLoader;
 
-    public TaskGroupOrchestrator(AdminApiClient adminApiClient, TaskGraphBuilder graphBuilder, TaskWrapperFactory wrapperFactory, TaskDependencyBuilder dependencyBuilder, JobGroupUtils jobGroupUtils) {
+    public TaskGroupOrchestrator(AdminApiClient adminApiClient, TaskGraphBuilder graphBuilder, TaskWrapperFactory wrapperFactory, TaskDependencyBuilder dependencyBuilder, JobGroupUtils jobGroupUtils, DataContextManager dataContextManager, ResultStorageService resultStorageService, HistoricalDataLoader historicalDataLoader) {
         this.adminApiClient = adminApiClient;
         this.graphBuilder = graphBuilder;
         this.wrapperFactory = wrapperFactory;
         this.dependencyBuilder = dependencyBuilder;
         this.jobGroupUtils = jobGroupUtils;
+        this.dataContextManager = dataContextManager;
+        this.resultStorageService = resultStorageService;
+        this.historicalDataLoader = historicalDataLoader;
     }
     
     /** 存储正在执行的任务组 */
@@ -137,14 +146,26 @@ public class TaskGroupOrchestrator {
      * 
      * @param taskGroupId 任务组ID
      * @param executionBatchId 执行批次ID
+     * @param executeParam 执行参数（可能包含batchId参数）
      */
     public void execute(Long taskGroupId, String executionBatchId,List<Integer> jobFlowPositionIds,List<Integer> jobPauseStatusIds) {
+        execute(taskGroupId, executionBatchId, jobFlowPositionIds, jobPauseStatusIds, null);
+    }
+    
+    /**
+     * 执行任务组（带执行参数）
+     * 
+     * @param taskGroupId 任务组ID
+     * @param executionBatchId 执行批次ID
+     * @param executeParam 执行参数（可能包含batchId参数）
+     */
+    public void execute(Long taskGroupId, String executionBatchId,List<Integer> jobFlowPositionIds,List<Integer> jobPauseStatusIds, String executeParam) {
         logger.info("[Orchestrator] ========== 开始执行任务组 ==========");
-        logger.info("[Orchestrator] 任务组ID: {}, 批次ID: {}", taskGroupId, executionBatchId);
+        logger.info("[Orchestrator] 任务组ID: {}, 批次ID: {}, 执行参数: {}", taskGroupId, executionBatchId, executeParam);
         
         try {
             // 1. 准备执行上下文
-            ExecutionContext context = prepareExecution(taskGroupId, executionBatchId,jobFlowPositionIds,jobPauseStatusIds);
+            ExecutionContext context = prepareExecution(taskGroupId, executionBatchId, jobFlowPositionIds, jobPauseStatusIds, executeParam);
             
             // 2. 构建执行计划
             List<WorkerWrapper<Long, String>> workerWrappers = buildExecutionPlan(context);
@@ -167,7 +188,7 @@ public class TaskGroupOrchestrator {
     /**
      * 准备执行上下文
      */
-    private ExecutionContext prepareExecution(Long taskGroupId, String executionBatchId,List<Integer> jobFlowPositionIds,List<Integer> jobPauseStatusIds) {
+    private ExecutionContext prepareExecution(Long taskGroupId, String executionBatchId,List<Integer> jobFlowPositionIds,List<Integer> jobPauseStatusIds, String executeParam) {
         logger.debug("[Orchestrator] 准备执行上下文 - taskGroupId: {}", taskGroupId);
         
         // 获取任务组信息
@@ -201,6 +222,39 @@ public class TaskGroupOrchestrator {
         // 构建任务图
         graphBuilder.buildGraph(taskGroupId, nodes, edges);
         
+        // 创建或获取数据上下文
+        DataContext dataContext = dataContextManager.getContext(executionBatchId);
+        logger.debug("[Orchestrator] 获取数据上下文 - batchId: {}", executionBatchId);
+        
+        // 构建 jobName 映射（jobDesc -> jobId）
+        Map<String, Long> jobNameMap = buildJobNameMap(nodes);
+        logger.debug("[Orchestrator] 构建 jobName 映射 - 数量: {}", jobNameMap.size());
+        
+        // 解析执行参数，加载历史数据（如果指定了batchId）
+        String historicalBatchId = parseBatchIdFromParam(executeParam);
+        if (historicalBatchId != null && !historicalBatchId.isEmpty()) {
+            logger.info("[Orchestrator] 检测到历史批次ID参数，开始加载历史数据 - batchId: {}", historicalBatchId);
+            ExecutionContext tempContext = new ExecutionContext();
+            tempContext.setTaskGroupId(taskGroupId);
+            tempContext.setExecutionBatchId(executionBatchId);
+            tempContext.setDataContext(dataContext);
+            tempContext.setJobNameMap(jobNameMap);
+            int loadedCount = historicalDataLoader.loadFromDatabase(tempContext, taskGroupId, historicalBatchId);
+            logger.info("[Orchestrator] 历史数据加载完成 - batchId: {}, 加载数量: {}", historicalBatchId, loadedCount);
+        } else {
+            // 如果没有指定batchId，尝试加载最近一次执行的数据
+            logger.debug("[Orchestrator] 未指定历史批次ID，尝试加载最近一次执行的数据");
+            ExecutionContext tempContext = new ExecutionContext();
+            tempContext.setTaskGroupId(taskGroupId);
+            tempContext.setExecutionBatchId(executionBatchId);
+            tempContext.setDataContext(dataContext);
+            tempContext.setJobNameMap(jobNameMap);
+            int loadedCount = historicalDataLoader.loadLatestBatch(tempContext, taskGroupId);
+            if (loadedCount > 0) {
+                logger.info("[Orchestrator] 最近一次执行数据加载完成 - 加载数量: {}", loadedCount);
+            }
+        }
+        
         // 保存上下文
         XxlJobContext xxlJobContext = XxlJobContext.getXxlJobContext();
         CONTEXT_HOLDER.set(xxlJobContext);
@@ -214,7 +268,79 @@ public class TaskGroupOrchestrator {
                 .xxlJobContext(xxlJobContext)
                 .executeKey(buildExecuteKey(taskGroupId, executionBatchId))
                 .jobPauseStatusIds(jobPauseStatusIds)
+                .dataContext(dataContext)
+                .jobNameMap(jobNameMap)
                 .build();
+    }
+    
+    /**
+     * 构建 jobName 映射
+     * 
+     * <p>从节点列表中获取所有任务的 jobDesc，构建 jobDesc -> jobId 的映射
+     * 
+     * @param nodes 节点列表
+     * @return jobName 映射
+     */
+    private Map<String, Long> buildJobNameMap(List<JobNode> nodes) {
+        Map<String, Long> jobNameMap = new HashMap<>();
+        
+        // 获取所有节点的 jobId
+        List<Long> jobIds = nodes.stream()
+                .map(JobNode::getJobId)
+                .distinct()
+                .collect(Collectors.toList());
+        
+        if (jobIds.isEmpty()) {
+            return jobNameMap;
+        }
+        
+        // 批量获取任务信息
+        List<JobInfo> jobInfos = adminApiClient.getJobInfos(jobIds);
+        
+        // 构建映射：jobDesc -> jobId
+        for (JobInfo jobInfo : jobInfos) {
+            if (jobInfo != null && jobInfo.getJobDesc() != null) {
+                String jobDesc = jobInfo.getJobDesc().trim();
+                if (!jobDesc.isEmpty()) {
+                    // 规范化 jobName（与 ParameterResolver 保持一致）
+                    String normalizedJobName = normalizeJobName(jobDesc);
+                    jobNameMap.put(normalizedJobName, jobInfo.getId());
+                    // 同时保存原始 jobDesc（以防用户使用原始名称）
+                    jobNameMap.put(jobDesc, jobInfo.getId());
+                }
+            }
+        }
+        
+        logger.debug("[Orchestrator] jobName 映射构建完成 - 数量: {}", jobNameMap.size());
+        return jobNameMap;
+    }
+    
+    /**
+     * 规范化任务名称
+     * 
+     * <p>与 ParameterResolver 中的规范化逻辑保持一致
+     * 
+     * @param jobDesc 任务描述
+     * @return 规范化后的任务名称
+     */
+    private String normalizeJobName(String jobDesc) {
+        if (jobDesc == null || jobDesc.isEmpty()) {
+            return "";
+        }
+        
+        // 去除前后空格
+        String normalized = jobDesc.trim();
+        
+        // 将特殊字符替换为下划线（保留中文字符、字母、数字）
+        normalized = normalized.replaceAll("[^a-zA-Z0-9_\\u4e00-\\u9fa5]", "_");
+        
+        // 去除连续的下划线
+        normalized = normalized.replaceAll("_{2,}", "_");
+        
+        // 去除开头和结尾的下划线
+        normalized = normalized.replaceAll("^_+|_+$", "");
+        
+        return normalized;
     }
     
     /**
@@ -350,9 +476,26 @@ public class TaskGroupOrchestrator {
         // 更新任务组运行状态（包含收集和保存节点状态）
         updateTaskGroupStatus(taskGroupId, executionBatchId, context, workerWrappers);
         
+        // 持久化节点执行结果到数据库
+        if (context != null && resultStorageService != null) {
+            try {
+                int persistedCount = resultStorageService.persistResultToDatabase(context, taskGroupId, executionBatchId);
+                logger.info("[Orchestrator] 节点执行结果持久化完成 - taskGroupId: {}, batchId: {}, 数量: {}", 
+                        taskGroupId, executionBatchId, persistedCount);
+            } catch (Exception e) {
+                logger.error("[Orchestrator] 持久化节点执行结果失败 - taskGroupId: {}, batchId: {}", 
+                        taskGroupId, executionBatchId, e);
+                // 不抛出异常，避免影响清理流程
+            }
+        }
+        
         // 清理结果映射（在保存节点状态之后）
         Map<String, Boolean> jobResults = TaskWrapperFactory.getJobResults();
         jobResults.entrySet().removeIf(entry -> entry.getKey().startsWith(taskGroupId + ":"));
+        
+        // 销毁数据上下文
+        dataContextManager.destroyContext(executionBatchId);
+        logger.debug("[Orchestrator] 数据上下文已销毁 - batchId: {}", executionBatchId);
         
         // 清理线程本地变量
         CONTEXT_HOLDER.remove();
@@ -518,6 +661,60 @@ public class TaskGroupOrchestrator {
         } catch (Exception e) {
             logger.error("[Orchestrator] 收集或保存节点状态失败 - taskGroupId: {}", taskGroupId, e);
             // 不抛出异常，避免影响任务组完成流程
+        }
+    }
+    
+    /**
+     * 从执行参数中解析批次ID
+     * 
+     * <p>支持两种格式：
+     * <ul>
+     *   <li>JSON格式：{"batchId": "xxx"}</li>
+     *   <li>键值对格式：batchId=xxx</li>
+     * </ul>
+     * 
+     * @param executeParam 执行参数
+     * @return 批次ID，如果未找到则返回null
+     */
+    private String parseBatchIdFromParam(String executeParam) {
+        if (executeParam == null || executeParam.trim().isEmpty()) {
+            return null;
+        }
+        
+        try {
+            String trimmed = executeParam.trim();
+            
+            // 尝试解析为JSON格式
+            if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+                Map<String, Object> paramMap = JSONUtil.toBean(trimmed, Map.class);
+                Object batchId = paramMap.get("batchId");
+                if (batchId != null) {
+                    return batchId.toString();
+                }
+            }
+            
+            // 尝试解析为键值对格式：batchId=xxx
+            if (trimmed.contains("batchId=")) {
+                String[] parts = trimmed.split("batchId=");
+                if (parts.length > 1) {
+                    String batchIdPart = parts[1].trim();
+                    // 提取batchId（可能后面还有其他参数，用&或空格分隔）
+                    int endIndex = batchIdPart.indexOf('&');
+                    if (endIndex < 0) {
+                        endIndex = batchIdPart.indexOf(' ');
+                    }
+                    if (endIndex > 0) {
+                        return batchIdPart.substring(0, endIndex).trim();
+                    } else {
+                        return batchIdPart.trim();
+                    }
+                }
+            }
+            
+            return null;
+        } catch (Exception e) {
+            logger.warn("[Orchestrator] 解析执行参数中的batchId失败 - executeParam: {}", executeParam, e);
+            return null;
         }
     }
     

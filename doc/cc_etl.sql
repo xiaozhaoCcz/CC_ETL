@@ -476,6 +476,36 @@ INSERT INTO `job_node` (`id`, `job_id`, `node_position_x`, `node_position_y`, `n
 COMMIT;
 
 -- ----------------------------
+-- Table structure for job_node_result
+-- ----------------------------
+DROP TABLE IF EXISTS `job_node_result`;
+CREATE TABLE `job_node_result` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `task_group_id` bigint NOT NULL COMMENT '任务组ID',
+  `execution_batch_id` varchar(64) NOT NULL COMMENT '执行批次ID',
+  `job_id` bigint NOT NULL COMMENT '节点任务ID',
+  `job_name` varchar(255) DEFAULT NULL COMMENT '节点任务名称',
+  `result_data` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci COMMENT '执行结果数据（JSON格式，用于兼容小数据或作为后备）',
+  `file_path` varchar(500) DEFAULT NULL COMMENT '文件路径（相对路径，相对于basePath）',
+  `data_size` bigint DEFAULT NULL COMMENT '数据大小（字节）',
+  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
+  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
+  `is_deleted` int DEFAULT '0' COMMENT '是否删除：0-否，1-是',
+  PRIMARY KEY (`id`),
+  KEY `idx_task_group_batch` (`task_group_id`, `execution_batch_id`),
+  KEY `idx_job_id` (`job_id`),
+  KEY `idx_execution_batch_id` (`execution_batch_id`),
+  KEY `idx_create_time` (`create_time`),
+  KEY `idx_file_path` (`file_path`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='节点执行结果表';
+
+-- ----------------------------
+-- Records of job_node_result
+-- ----------------------------
+BEGIN;
+COMMIT;
+
+-- ----------------------------
 -- Table structure for job_part
 -- ----------------------------
 DROP TABLE IF EXISTS `job_part`;

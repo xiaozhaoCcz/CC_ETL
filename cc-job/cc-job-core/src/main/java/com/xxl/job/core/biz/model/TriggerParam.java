@@ -46,6 +46,12 @@ public class TriggerParam implements Serializable{
     private List<Integer> jobPauseStatusIds;
 
     private List<Integer> jobFlowPositionIds;
+    
+    /**
+     * 执行上下文数据（JSON格式）
+     * 用于GLUE脚本访问其他任务的结果数据
+     */
+    private String contextData;
 
     public String getAddress() {
         return address;
@@ -214,6 +220,14 @@ public class TriggerParam implements Serializable{
 
     public void setJobFlowPositionIds(List<Integer> jobFlowPositionIds) {
         this.jobFlowPositionIds = jobFlowPositionIds;
+    }
+    
+    public String getContextData() {
+        return contextData;
+    }
+    
+    public void setContextData(String contextData) {
+        this.contextData = contextData;
     }
 
     @Override
