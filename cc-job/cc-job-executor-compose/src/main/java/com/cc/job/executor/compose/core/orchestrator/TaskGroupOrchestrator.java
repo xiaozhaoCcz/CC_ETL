@@ -7,6 +7,7 @@ import com.cc.job.executor.compose.client.AdminApiClient;
 import com.cc.job.executor.compose.core.context.DataContext;
 import com.cc.job.executor.compose.core.context.DataContextManager;
 import com.cc.job.executor.compose.core.model.ExecutionContext;
+import com.cc.job.executor.compose.core.evaluator.ConditionEvaluator;
 import com.cc.job.executor.compose.core.service.HistoricalDataLoader;
 import com.cc.job.executor.compose.core.service.ResultStorageService;
 import com.cc.job.executor.compose.core.service.TaskDependencyBuilder;
@@ -47,6 +48,8 @@ public class TaskGroupOrchestrator {
     
     private static final Logger logger = LoggerFactory.getLogger(TaskGroupOrchestrator.class);
     
+    private static final String CONDITION_NODE = "ConditionNode";
+    
     private final AdminApiClient adminApiClient;
     private final TaskGraphBuilder graphBuilder;
     private final TaskWrapperFactory wrapperFactory;
@@ -55,8 +58,9 @@ public class TaskGroupOrchestrator {
     private final DataContextManager dataContextManager;
     private final ResultStorageService resultStorageService;
     private final HistoricalDataLoader historicalDataLoader;
+    private final ConditionEvaluator conditionEvaluator;
 
-    public TaskGroupOrchestrator(AdminApiClient adminApiClient, TaskGraphBuilder graphBuilder, TaskWrapperFactory wrapperFactory, TaskDependencyBuilder dependencyBuilder, JobGroupUtils jobGroupUtils, DataContextManager dataContextManager, ResultStorageService resultStorageService, HistoricalDataLoader historicalDataLoader) {
+    public TaskGroupOrchestrator(AdminApiClient adminApiClient, TaskGraphBuilder graphBuilder, TaskWrapperFactory wrapperFactory, TaskDependencyBuilder dependencyBuilder, JobGroupUtils jobGroupUtils, DataContextManager dataContextManager, ResultStorageService resultStorageService, HistoricalDataLoader historicalDataLoader, ConditionEvaluator conditionEvaluator) {
         this.adminApiClient = adminApiClient;
         this.graphBuilder = graphBuilder;
         this.wrapperFactory = wrapperFactory;
@@ -65,6 +69,7 @@ public class TaskGroupOrchestrator {
         this.dataContextManager = dataContextManager;
         this.resultStorageService = resultStorageService;
         this.historicalDataLoader = historicalDataLoader;
+        this.conditionEvaluator = conditionEvaluator;
     }
     
     /** 存储正在执行的任务组 */
@@ -219,16 +224,33 @@ public class TaskGroupOrchestrator {
         
         logger.info("[Orchestrator] 获取到 {} 个节点，{} 条边", nodes.size(), edges.size());
         
+        // ⭐ 新增：过滤条件不满足的条件节点内的任务
+        // 需要在构建任务图之前进行，因为条件节点内的任务不应该参与图构建
+        DataContext dataContext = dataContextManager.getContext(executionBatchId);
+        Map<String, Long> jobNameMap = buildJobNameMap(nodes);
+        nodes = filterNodesByCondition(nodes, dataContext, jobNameMap, taskGroupId);
+        // 重新过滤边，只保留过滤后节点之间的边
+        List<Long> filteredNodeIds = nodes.stream().map(BaseEntity::getId).collect(Collectors.toList());
+        edges = edges.stream()
+                .filter(e -> filteredNodeIds.contains(e.getFromNodeId()) && filteredNodeIds.contains(e.getEndNodeId()))
+                .collect(Collectors.toList());
+        
+        logger.info("[Orchestrator] 条件过滤后剩余 {} 个节点，{} 条边", nodes.size(), edges.size());
+        
         // 构建任务图
         graphBuilder.buildGraph(taskGroupId, nodes, edges);
         
-        // 创建或获取数据上下文
-        DataContext dataContext = dataContextManager.getContext(executionBatchId);
+        // 创建或获取数据上下文（如果之前没有创建）
+        if (dataContext == null) {
+            dataContext = dataContextManager.getContext(executionBatchId);
+        }
         logger.debug("[Orchestrator] 获取数据上下文 - batchId: {}", executionBatchId);
         
-        // 构建 jobName 映射（jobDesc -> jobId）
-        Map<String, Long> jobNameMap = buildJobNameMap(nodes);
-        logger.debug("[Orchestrator] 构建 jobName 映射 - 数量: {}", jobNameMap.size());
+        // 构建 jobName 映射（jobDesc -> jobId）（如果之前没有构建）
+        if (jobNameMap == null || jobNameMap.isEmpty()) {
+            jobNameMap = buildJobNameMap(nodes);
+            logger.debug("[Orchestrator] 构建 jobName 映射 - 数量: {}", jobNameMap.size());
+        }
         
         // 解析执行参数，加载历史数据（如果指定了batchId）
         String historicalBatchId = parseBatchIdFromParam(executeParam);
@@ -753,6 +775,101 @@ public class TaskGroupOrchestrator {
             result.put(executeKey, true);
         }
         return result;
+    }
+    
+    /**
+     * 根据条件表达式过滤节点
+     * 
+     * <p>过滤掉条件不满足的条件节点内的所有任务
+     * 
+     * @param nodes 原始节点列表
+     * @param dataContext 数据上下文
+     * @param jobNameMap jobName 映射
+     * @param taskGroupId 任务组ID
+     * @return 过滤后的节点列表
+     */
+    private List<JobNode> filterNodesByCondition(List<JobNode> nodes, DataContext dataContext, 
+                                                 Map<String, Long> jobNameMap, Long taskGroupId) {
+        if (nodes == null || nodes.isEmpty()) {
+            return nodes;
+        }
+        
+        // 构建父子关系：parentJobId -> List<JobNode>
+        Map<Long, List<JobNode>> nodesByParent = new HashMap<>();
+        for (JobNode node : nodes) {
+            Long parentId = node.getJobParentId();
+            if (parentId != null) {
+                nodesByParent.computeIfAbsent(parentId, k -> new ArrayList<>()).add(node);
+            }
+        }
+        
+        // 收集需要过滤的节点ID（条件不满足的条件节点内的所有任务）
+        Set<Long> nodesToFilter = new HashSet<>();
+        
+        // 找到所有条件节点
+        List<JobNode> conditionNodes = nodes.stream()
+                .filter(n -> CONDITION_NODE.equalsIgnoreCase(n.getNodeType()))
+                .collect(Collectors.toList());
+        
+        // 评估每个条件节点
+        for (JobNode conditionNode : conditionNodes) {
+            String conditionExpression = conditionNode.getConditionExpression();
+            String expressionType = conditionNode.getExpressionType();
+            
+            if (conditionExpression == null || conditionExpression.trim().isEmpty()) {
+                logger.warn("[Orchestrator] 条件节点 {} 的条件表达式为空，默认跳过", conditionNode.getId());
+                // 条件表达式为空，跳过条件节点内的所有任务
+                collectChildNodeIds(conditionNode.getJobId(), nodesByParent, nodesToFilter);
+                continue;
+            }
+            
+            // 评估条件表达式
+            boolean conditionMet = conditionEvaluator.evaluate(
+                    conditionExpression, 
+                    expressionType != null ? expressionType : "SIMPLE",
+                    dataContext, 
+                    jobNameMap
+            );
+            
+            logger.info("[Orchestrator] 条件节点 {} 评估结果: {} (表达式: {})", 
+                    conditionNode.getId(), conditionMet, conditionExpression);
+            
+            if (!conditionMet) {
+                // 条件不满足，收集条件节点内的所有任务ID
+                collectChildNodeIds(conditionNode.getJobId(), nodesByParent, nodesToFilter);
+                logger.info("[Orchestrator] 条件节点 {} 条件不满足，将跳过 {} 个任务", 
+                        conditionNode.getId(), nodesToFilter.size());
+            }
+        }
+        
+        // 过滤节点：排除条件不满足的条件节点内的任务，但保留条件节点本身（作为容器）
+        List<JobNode> filteredNodes = nodes.stream()
+                .filter(n -> !nodesToFilter.contains(n.getId()))
+                .collect(Collectors.toList());
+        
+        return filteredNodes;
+    }
+    
+    /**
+     * 递归收集条件节点内的所有子节点ID
+     * 
+     * @param parentJobId 父任务ID（条件节点的jobId）
+     * @param nodesByParent 按父ID分组的节点映射
+     * @param result 输出参数：收集到的节点ID集合
+     */
+    private void collectChildNodeIds(Long parentJobId, Map<Long, List<JobNode>> nodesByParent, 
+                                     Set<Long> result) {
+        List<JobNode> childNodes = nodesByParent.getOrDefault(parentJobId, Collections.emptyList());
+        for (JobNode childNode : childNodes) {
+            result.add(childNode.getId());
+            // 如果子节点也是条件节点或任务组节点，递归收集其子节点
+            String nodeType = childNode.getNodeType();
+            if (CONDITION_NODE.equalsIgnoreCase(nodeType) || 
+                "CustomGroup".equalsIgnoreCase(nodeType) || 
+                "DYNAMIC_GROUP".equalsIgnoreCase(nodeType)) {
+                collectChildNodeIds(childNode.getJobId(), nodesByParent, result);
+            }
+        }
     }
     
     /**

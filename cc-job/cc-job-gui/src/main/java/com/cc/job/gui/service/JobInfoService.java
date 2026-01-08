@@ -226,6 +226,35 @@ public class JobInfoService extends BaseService {
     }
     
     /**
+     * 创建条件节点
+     * @param parentTaskGroupId 父任务组ID
+     * @param conditionName 条件节点名称
+     * @param conditionExpression 条件表达式
+     * @param expressionType 表达式类型（SIMPLE/SCRIPT）
+     * @param conditionType 条件类型（IF/WHILE/FOREACH）
+     * @param x 节点X坐标
+     * @param y 节点Y坐标
+     * @return 创建的节点信息（包含jobId和nodeId）
+     * @throws IOException 网络异常
+     */
+    public Map<String, Object> createConditionNode(Long parentTaskGroupId, String conditionName, 
+                                                   String conditionExpression, String expressionType, 
+                                                   String conditionType, double x, double y) throws IOException {
+        Map<String, Object> requestMap = new HashMap<>();
+        requestMap.put("parentTaskGroupId", parentTaskGroupId);
+        requestMap.put("conditionName", conditionName);
+        requestMap.put("conditionExpression", conditionExpression);
+        requestMap.put("expressionType", expressionType);
+        requestMap.put("conditionType", conditionType);
+        requestMap.put("x", x);
+        requestMap.put("y", y);
+        
+        Result<Map<String, Object>> result = httpClient.post("/api/v1/jobInfos/createConditionNode", requestMap, 
+            new TypeToken<Map<String, Object>>(){});
+        return httpClient.extractData(result, "创建条件节点失败");
+    }
+    
+    /**
      * 获取任务表单数据（用于保存时获取现有数据）
      * @param id 任务ID
      * @return 任务表单数据

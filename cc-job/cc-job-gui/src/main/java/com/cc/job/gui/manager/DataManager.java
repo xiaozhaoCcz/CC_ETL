@@ -143,9 +143,10 @@ public class DataManager {
         List<ProcessNode> nodes = canvas.getNodes();
         List<NodeConnection> connections = canvas.getConnections();
         List<GroupContainer> groups = canvas.getGroupContainers();
+        List<com.cc.job.gui.model.ConditionNode> conditionNodes = canvas.getConditionNodes();
         
-        logPanel.info(String.format("节点: %d, 连接: %d, 任务组: %d", 
-            nodes.size(), connections.size(), groups.size()));
+        logPanel.info(String.format("节点: %d, 连接: %d, 任务组: %d, 条件节点: %d", 
+            nodes.size(), connections.size(), groups.size(), conditionNodes.size()));
         
         try {
             // 构建节点数据
@@ -199,6 +200,60 @@ public class DataManager {
                 
                 nodesData.add(nodeData);
                 addedNodeIds.add(group.getNodeId());
+            }
+            
+            // 添加条件节点
+            for (com.cc.job.gui.model.ConditionNode conditionNode : conditionNodes) {
+                if (conditionNode.getNodeId() == null || addedNodeIds.contains(conditionNode.getNodeId())) continue;
+                
+                Map<String, Object> nodeData = new HashMap<>();
+                nodeData.put("id", conditionNode.getNodeId());
+                nodeData.put("type", "ConditionNode");
+                nodeData.put("x", conditionNode.getLayoutX());
+                nodeData.put("y", conditionNode.getLayoutY());
+                
+                Map<String, Object> propertiesMap = new HashMap<>();
+                if (conditionNode.getConditionId() != null && conditionNode.getConditionId() > 0) {
+                    propertiesMap.put("jobId", conditionNode.getConditionId());
+                }
+                
+                // 保存条件节点属性
+                if (conditionNode.getConditionExpression() != null) {
+                    propertiesMap.put("conditionExpression", conditionNode.getConditionExpression());
+                }
+                if (conditionNode.getExpressionType() != null) {
+                    propertiesMap.put("expressionType", conditionNode.getExpressionType().toString());
+                }
+                // ⭐ 新增：保存conditionType
+                if (conditionNode.getConditionType() != null) {
+                    propertiesMap.put("conditionType", conditionNode.getConditionType().toString());
+                }
+                // ⭐ 新增：保存容器大小
+                propertiesMap.put("width", conditionNode.getContainerWidth());
+                propertiesMap.put("height", conditionNode.getContainerHeight());
+                
+                // 保存子节点ID列表
+                List<String> childNodeIds = new ArrayList<>();
+                if (conditionNode.getManagedCanvasNodes() != null) {
+                    for (ProcessNode child : conditionNode.getManagedCanvasNodes()) {
+                        if (child.getNodeId() != null) {
+                            childNodeIds.add(child.getNodeId());
+                        }
+                    }
+                }
+                // 也包含嵌套的条件节点
+                if (conditionNode.getManagedConditionNodes() != null) {
+                    for (com.cc.job.gui.model.ConditionNode childCondition : conditionNode.getManagedConditionNodes()) {
+                        if (childCondition.getNodeId() != null) {
+                            childNodeIds.add(childCondition.getNodeId());
+                        }
+                    }
+                }
+                propertiesMap.put("children", childNodeIds);
+                nodeData.put("properties", apiUtil.getGson().toJson(propertiesMap));
+                
+                nodesData.add(nodeData);
+                addedNodeIds.add(conditionNode.getNodeId());
             }
             
             // 构建连线数据
@@ -289,6 +344,8 @@ public class DataManager {
             return ((ProcessNode) owner).getNodeId();
         } else if (owner instanceof GroupContainer) {
             return ((GroupContainer) owner).getNodeId();
+        } else if (owner instanceof com.cc.job.gui.model.ConditionNode) {
+            return ((com.cc.job.gui.model.ConditionNode) owner).getNodeId();
         }
         return null;
     }

@@ -29,6 +29,16 @@ public class JobNode extends BaseEntity {
     private String nodeType;
 
     /**
+     * 条件表达式（条件节点专用）
+     */
+    private String conditionExpression;
+
+    /**
+     * 表达式类型：SIMPLE-简单表达式，SCRIPT-脚本表达式
+     */
+    private String expressionType;
+
+    /**
      * 节点运行状态：-1=未运行, 0=失败, 1=成功, 2=运行中
      */
     private Integer triggerStatus;
@@ -126,6 +136,22 @@ public class JobNode extends BaseEntity {
         this.nodeType = nodeType;
     }
 
+    public String getConditionExpression() {
+        return conditionExpression;
+    }
+
+    public void setConditionExpression(String conditionExpression) {
+        this.conditionExpression = conditionExpression;
+    }
+
+    public String getExpressionType() {
+        return expressionType;
+    }
+
+    public void setExpressionType(String expressionType) {
+        this.expressionType = expressionType;
+    }
+
     public Integer getTriggerStatus() {
         return triggerStatus;
     }
@@ -147,6 +173,8 @@ public class JobNode extends BaseEntity {
                 ", children='" + children + '\'' +
                 ", properties='" + properties + '\'' +
                 ", nodeType='" + nodeType + '\'' +
+                ", conditionExpression='" + conditionExpression + '\'' +
+                ", expressionType='" + expressionType + '\'' +
                 ", triggerStatus=" + triggerStatus +
                 '}';
     }

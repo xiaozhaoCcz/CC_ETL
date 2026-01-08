@@ -259,6 +259,22 @@ public class JobInfoController {
         return Result.success(jobEdge);
     }
 
+    @Operation(summary = "创建条件节点")
+    @PostMapping("createConditionNode")
+    public Result<Map<String, Object>> createConditionNode(@RequestBody Map<String, Object> formMap) {
+        Long parentTaskGroupId = Long.parseLong(String.valueOf(formMap.get("parentTaskGroupId")));
+        String conditionName = String.valueOf(formMap.get("conditionName"));
+        String conditionExpression = formMap.get("conditionExpression") != null ? String.valueOf(formMap.get("conditionExpression")) : null;
+        String expressionType = formMap.get("expressionType") != null ? String.valueOf(formMap.get("expressionType")) : null;
+        String conditionType = formMap.get("conditionType") != null ? String.valueOf(formMap.get("conditionType")) : "IF";
+        double x = formMap.get("x") != null ? Double.parseDouble(String.valueOf(formMap.get("x"))) : 0.0;
+        double y = formMap.get("y") != null ? Double.parseDouble(String.valueOf(formMap.get("y"))) : 0.0;
+        
+        Map<String, Object> result = jobComposeService.createConditionNode(
+            parentTaskGroupId, conditionName, conditionExpression, expressionType, conditionType, x, y);
+        return Result.success(result);
+    }
+
     @Operation(summary = "任务运行状态")
     @GetMapping("getJobStatus/{id}")
     public Result<Boolean> getJobStatus(@Parameter(description = "任务ID") @PathVariable("id") Long id){

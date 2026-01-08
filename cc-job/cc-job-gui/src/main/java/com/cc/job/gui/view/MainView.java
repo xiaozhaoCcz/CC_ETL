@@ -24,7 +24,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.util.*;
 import java.util.Set;
 
@@ -513,6 +512,100 @@ public class MainView extends BorderPane {
             Long jobId = pageStoreHelper.getCurrentTaskGroupId();
             String jobName = getJobNameById(jobId);
             taskExecutionManager.triggerJobExecution(jobId, jobName);
+        });
+        
+        // 设置创建条件节点回调
+        canvas.setOnRequestAddConditionNode(() -> {
+            Long taskGroupId = pageStoreHelper.getCurrentTaskGroupId();
+            if (taskGroupId == null || taskGroupId == 0) {
+                NotificationToast.showWarning("请先选择任务组");
+                return;
+            }
+            
+            Stage ownerStage = (Stage) canvas.getScene().getWindow();
+            ConditionNodeDialog dialog = new ConditionNodeDialog(ownerStage, null);
+            Optional<ConditionNodeDialog.ConditionData> result = dialog.showAndWait();
+            
+            result.ifPresent(data -> {
+                // 计算位置（在画布中心附近）
+                double[] position = calculateNewConditionNodePosition();
+                double x = position[0];
+                double y = position[1];
+                
+                // 在后台线程中调用API创建条件节点
+                new Thread(() -> {
+                    try {
+                        JobInfoService jobInfoService = new JobInfoService();
+                        Map<String, Object> createResult = jobInfoService.createConditionNode(
+                            taskGroupId,
+                            data.getConditionName(),
+                            data.getConditionExpression(),
+                            data.getExpressionType() != null ? data.getExpressionType().toString() : null,
+                            data.getConditionType() != null ? data.getConditionType().toString() : "IF",
+                            x,
+                            y
+                        );
+                        
+                        // 在主线程中更新UI
+                        Platform.runLater(() -> {
+                            Long jobId = Long.parseLong(String.valueOf(createResult.get("jobId")));
+                            Long nodeId = Long.parseLong(String.valueOf(createResult.get("nodeId")));
+                            
+                            // 创建条件节点，使用数据库返回的ID
+                            String frontendNodeId = "randomId-" + nodeId; // 前端显示用的ID
+                            ConditionNode conditionNode = new ConditionNode(frontendNodeId, jobId, data.getConditionName(), data.getConditionType());
+                            conditionNode.setConditionExpression(data.getConditionExpression());
+                            conditionNode.setExpressionType(data.getExpressionType());
+                            
+                            // 设置大小改变回调，标记需要保存
+                            conditionNode.setOnSizeChanged(() -> canvas.markAsUnsaved());
+                            
+                            // 设置位置
+                            conditionNode.setLayoutX(x);
+                            conditionNode.setLayoutY(y);
+                            
+                            // 添加到画布
+                            canvas.addConditionNode(conditionNode);
+                            canvas.markAsUnsaved();
+                            logPanel.success("✓ 条件节点创建成功");
+                        });
+                    } catch (Exception e) {
+                        Platform.runLater(() -> {
+                            logPanel.error("✗ 创建条件节点失败: " + e.getMessage());
+                            NotificationToast.showError("创建条件节点失败: " + e.getMessage());
+                        });
+                    }
+                }).start();
+            });
+        });
+        
+        // 设置条件节点编辑回调
+        canvas.setOnEditConditionNode(conditionNode -> {
+            Stage ownerStage = (Stage) canvas.getScene().getWindow();
+                ConditionNodeDialog.ConditionData editData = new ConditionNodeDialog.ConditionData();
+                editData.setConditionName(conditionNode.getConditionName());
+                editData.setConditionType(conditionNode.getConditionType());
+                editData.setConditionExpression(conditionNode.getConditionExpression());
+                editData.setExpressionType(conditionNode.getExpressionType());
+            
+            ConditionNodeDialog dialog = new ConditionNodeDialog(ownerStage, editData);
+            Optional<ConditionNodeDialog.ConditionData> result = dialog.showAndWait();
+            
+                result.ifPresent(data -> {
+                    conditionNode.setConditionName(data.getConditionName());
+                    conditionNode.setConditionType(data.getConditionType());
+                    conditionNode.setConditionExpression(data.getConditionExpression());
+                    conditionNode.setExpressionType(data.getExpressionType());
+                    canvas.markAsUnsaved();
+                    logPanel.success("✓ 条件节点已更新");
+                });
+        });
+        
+        // 设置条件节点删除回调
+        canvas.setOnDeleteConditionNode(conditionNode -> {
+            canvas.removeConditionNode(conditionNode);
+            canvas.markAsUnsaved();
+            logPanel.info("✓ 条件节点已删除");
         });
 
         // 树形视图回调
@@ -1261,6 +1354,25 @@ public class MainView extends BorderPane {
                 });
             }
         }, "import-partition").start();
+    }
+    
+    /**
+     * 计算新条件节点的位置
+     */
+    private double[] calculateNewConditionNodePosition() {
+        List<ConditionNode> existingConditionNodes = canvas.getConditionNodes();
+        if (existingConditionNodes == null || existingConditionNodes.isEmpty()) {
+            return new double[]{200, 200};
+        }
+        
+        int nodeCount = existingConditionNodes.size();
+        int row = nodeCount / 3;
+        int col = nodeCount % 3;
+        
+        double x = 200 + col * 360;
+        double y = 200 + row * 240;
+        
+        return new double[]{x, y};
     }
     
     /**

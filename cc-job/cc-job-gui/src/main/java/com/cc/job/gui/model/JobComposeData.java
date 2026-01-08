@@ -54,6 +54,9 @@ public class JobComposeData {
         private Map<String, Object> properties;
         private List<NodeData> childrenNodes;  // ⭐ 新增：子节点列表（用于任务组节点的嵌套展示）
         private Long jobParentId;  // ⭐ 新增：父任务组ID
+        // 条件节点相关字段
+        private String conditionExpression;  // 条件表达式
+        private String expressionType;  // 表达式类型：SIMPLE 或 SCRIPT
         
         public String getId() {
             return id;
@@ -133,6 +136,22 @@ public class JobComposeData {
         
         public void setJobParentId(Long jobParentId) {
             this.jobParentId = jobParentId;
+        }
+        
+        public String getConditionExpression() {
+            return conditionExpression;
+        }
+        
+        public void setConditionExpression(String conditionExpression) {
+            this.conditionExpression = conditionExpression;
+        }
+        
+        public String getExpressionType() {
+            return expressionType;
+        }
+        
+        public void setExpressionType(String expressionType) {
+            this.expressionType = expressionType;
         }
         
         @Override

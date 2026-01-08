@@ -212,6 +212,7 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
     }
 
     private final String DYNAMIC_GROUP = "CustomGroup";
+    private final String CONDITION_NODE = "ConditionNode"; // 条件节点类型
 
     private final String JOB_ID = "jobId";
     
@@ -228,9 +229,10 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
             return;
         }
         
-        // 找到所有任务组节点（当前层级）
+        // 找到所有任务组节点和条件节点（当前层级）
         List<LfNode> groupNodes = lfNodes.stream()
-            .filter(n -> DYNAMIC_GROUP.equalsIgnoreCase(n.getType()) || "custom-group".equalsIgnoreCase(n.getType()))
+            .filter(n -> DYNAMIC_GROUP.equalsIgnoreCase(n.getType()) || "custom-group".equalsIgnoreCase(n.getType()) ||
+                        CONDITION_NODE.equalsIgnoreCase(n.getType()) || "condition-node".equalsIgnoreCase(n.getType()))
             .toList();
         
         // 递归处理每个任务组节点
@@ -376,12 +378,26 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
                 String normalizedType = node.type;
                 if (DYNAMIC_GROUP.equalsIgnoreCase(node.type) || "custom-group".equalsIgnoreCase(node.type)) {
                     normalizedType = DYNAMIC_GROUP;  // 统一使用 "CustomGroup"
+                } else if (CONDITION_NODE.equalsIgnoreCase(node.type) || "condition-node".equalsIgnoreCase(node.type)) {
+                    normalizedType = CONDITION_NODE;  // 统一使用 "ConditionNode"
                 }
                 jobNode.setNodeType(normalizedType);
                 // 修复：新创建的节点，triggerStatus设置为-1表示未运行状态（白色背景）
                 jobNode.setTriggerStatus(-1);
                 Map<String, Object> propertiesMap = JSONUtil.toBean(node.properties, Map.class);
                 propertiesMap.put(JOB_ID, copyJobInfo.getId());
+                
+                // ⭐ 新增：处理条件节点，保存条件表达式
+                if (CONDITION_NODE.equalsIgnoreCase(normalizedType)) {
+                    Object conditionExpr = propertiesMap.get("conditionExpression");
+                    Object exprType = propertiesMap.get("expressionType");
+                    if (conditionExpr != null) {
+                        jobNode.setConditionExpression(String.valueOf(conditionExpr));
+                    }
+                    if (exprType != null) {
+                        jobNode.setExpressionType(String.valueOf(exprType));
+                    }
+                }
 
                 if (DYNAMIC_GROUP.equalsIgnoreCase(node.getType())) {
                     List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
@@ -397,6 +413,29 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
                     // ⭐ 修复：确保任务组节点有 width 和 height 属性
                     if (!propertiesMap.containsKey("width")) {
                         propertiesMap.put("width", 300.0);
+                    }
+                    if (!propertiesMap.containsKey("height")) {
+                        propertiesMap.put("height", 200.0);
+                    }
+                } else if (CONDITION_NODE.equalsIgnoreCase(node.getType())) {
+                    // ⭐ 新增：处理条件节点的子节点（包括普通节点和嵌套的条件节点）
+                    List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
+                    if (childIds != null && !childIds.isEmpty()) {
+                        // ⭐ 修复：childNodes包含所有子节点，包括嵌套的条件节点
+                        List<LfNode> childNodes = lfNodes.stream().filter(n -> childIds.contains(n.getId())).toList();
+                        List<LfEdge> childEdges = lfEdges.stream().filter(e -> childIds.contains(e.getSourceNodeId()) || childIds.contains(e.targetNodeId)).toList();
+                        // ⭐ 修复：递归保存子节点，嵌套的条件节点的jobParentId会被设置为当前条件节点的jobId
+                        List<Long> childJobIds = operateToSaveJobCompose(copyJobInfo, childNodes, childEdges, lfNodes, lfEdges);
+                        propertiesMap.put("children", JSONUtil.toJsonStr(childJobIds));
+                        jobNode.setChildren(JSONUtil.toJsonStr(childJobIds));
+                        copyJobInfo.setJobType(2);
+                        copyJobInfo.setExecutorParam(String.valueOf(copyJobInfo.getId()));
+                        jobInfoService.updateById(copyJobInfo);
+                    }
+                    
+                    // ⭐ 修复：确保条件节点有 width 和 height 属性
+                    if (!propertiesMap.containsKey("width")) {
+                        propertiesMap.put("width", 320.0);
                     }
                     if (!propertiesMap.containsKey("height")) {
                         propertiesMap.put("height", 200.0);
@@ -553,8 +592,30 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
         List<JobNode> updateNodes = new ArrayList<>();
 
 
-        List<LfNode> filterNodelList = nodeList.stream().filter(f -> nodeFromDb.stream().map(JobNode::getId).toList().contains(Long.parseLong(f.getId()))).toList();
-        for (LfNode node : filterNodelList) {
+        // ⭐ 修复：通过检查nodeFromDb中是否存在节点ID来判断是否为新节点
+        // 构建nodeFromDb的ID集合，用于快速查找
+        Set<Long> existingNodeIds = nodeFromDb.stream().map(JobNode::getId).collect(Collectors.toSet());
+        
+        // 分离已存在的节点和新节点
+        List<LfNode> existingNodes = new ArrayList<>();
+        List<LfNode> newNodes = new ArrayList<>();
+        
+        for (LfNode node : nodeList) {
+            try {
+                Long nodeIdLong = Long.parseLong(node.getId());
+                if (existingNodeIds.contains(nodeIdLong)) {
+                    existingNodes.add(node);
+                } else {
+                    newNodes.add(node);
+                }
+            } catch (NumberFormatException e) {
+                // 如果无法解析为Long，说明可能是新节点（前端生成的临时ID）
+                newNodes.add(node);
+            }
+        }
+        
+        // 处理已存在的节点（更新）
+        for (LfNode node : existingNodes) {
             Map<String, Object> properties = JSONUtil.toBean(node.getProperties(), Map.class);
             Object jobIdObj = properties.get(JOB_ID);
             if (jobIdObj == null) {
@@ -566,164 +627,251 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
             if (jobInfo1 == null) {
                 continue;  // 跳过关联任务不存在的节点，避免整个保存失败
             }
-            if (node.getId().contains("-")) {
-                JobInfo copyJobInfo = BeanUtil.copyProperties(jobInfo1, JobInfo.class, "id");
+            
+            // ⭐ 修复：通过nodeId查找已存在的节点
+            Long nodeIdLong = Long.parseLong(node.getId());
+            JobNode jobNode = nodeFromDb.stream().filter(n -> n.getId().equals(nodeIdLong)).findFirst().orElse(null);
+            
+            if (jobNode == null) {
+                // 如果找不到，尝试通过jobId查找
+                jobNode = nodeFromDb.stream().filter(n -> n.getJobId().equals(jobId)).findFirst().orElse(null);
+            }
+            
+            if (jobNode != null) {
+                // 更新已存在的节点
+                JobInfo copyJobInfo = BeanUtil.copyProperties(jobInfo1, JobInfo.class, "id","parentId","jobPartId");
                 // ⭐ 修复：检查 copyJobInfo 是否为 null
                 if (copyJobInfo == null) {
                     throw new BusinessException("复制任务信息失败，jobId: " + jobId);
                 }
-                copyJobInfo.setNodeFlag("Y");
-                copyJobInfo.setParentId(jobInfo.getId());
-                jobInfoService.save(copyJobInfo);
-
-                JobNode jobNode = new JobNode();
-                jobNode.setJobId(copyJobInfo.getId());
-                jobNode.setJobParentId(jobInfo.getId());
+                copyJobInfo.setId(jobNode.getJobId());
+                jobInfoService.updateById(copyJobInfo);
+                
+                Map<String, Object> propertiesMap = JSONUtil.toBean(node.properties, Map.class);
                 jobNode.setNodePositionX(node.x);
                 jobNode.setNodePositionY(node.y);
-                jobNode.setNodeType(node.type);
-                // 修复：新创建的节点，triggerStatus设置为-1表示未运行状态（白色背景）
-                jobNode.setTriggerStatus(-1);
-                Map<String, Object> propertiesMap = JSONUtil.toBean(node.properties, Map.class);
-                propertiesMap.put(JOB_ID, copyJobInfo.getId());
-
+                
+                // ⭐ 关键修复：不更新 trigger_status 字段，保留数据库中的值
+                // ⭐ 修复：统一规范化节点类型
+                String normalizedType = node.type;
+                if (DYNAMIC_GROUP.equalsIgnoreCase(node.type) || "custom-group".equalsIgnoreCase(node.type)) {
+                    normalizedType = DYNAMIC_GROUP;
+                } else if (CONDITION_NODE.equalsIgnoreCase(node.type) || "condition-node".equalsIgnoreCase(node.type)) {
+                    normalizedType = CONDITION_NODE;
+                }
+                jobNode.setNodeType(normalizedType);
+                
+                // ⭐ 新增：处理条件节点，保存条件表达式和类型
+                if (CONDITION_NODE.equalsIgnoreCase(normalizedType)) {
+                    Object conditionExpr = propertiesMap.get("conditionExpression");
+                    Object exprType = propertiesMap.get("expressionType");
+                    Object conditionType = propertiesMap.get("conditionType");
+                    if (conditionExpr != null) {
+                        jobNode.setConditionExpression(String.valueOf(conditionExpr));
+                    }
+                    if (exprType != null) {
+                        jobNode.setExpressionType(String.valueOf(exprType));
+                    }
+                    if (conditionType == null) {
+                        propertiesMap.put("conditionType", "IF"); // 默认值
+                    }
+                    // ⭐ 新增：确保width和height保存到properties
+                    Object width = propertiesMap.get("width");
+                    Object height = propertiesMap.get("height");
+                    if (width == null) {
+                        propertiesMap.put("width", 320.0);
+                    }
+                    if (height == null) {
+                        propertiesMap.put("height", 200.0);
+                    }
+                }
+                
                 if (DYNAMIC_GROUP.equalsIgnoreCase(node.getType())) {
-                    List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
+                    //得到孩子节点
+                    Object childrenObj = JSONUtil.toBean(node.getProperties(),Map.class).get("children");
+                    if (childrenObj != null) {
+                        List<String> childIds = JSONUtil.parseArray(childrenObj).toList(String.class);
+                        List<LfNode> childNodes = lfNodes.stream().filter(n -> childIds.contains(n.getId())).toList();
+                        List<LfEdge> childEdges = lfEdges.stream().filter(e -> childIds.contains(e.getSourceNodeId()) || childIds.contains(e.targetNodeId)).toList();
+                        operateToUpdateJobCompose(jobInfo1, childNodes, childEdges, lfNodes, lfEdges);
+                    }
+                    // ⭐ 修复：确保任务组节点有 width 和 height 属性
+                    if (!propertiesMap.containsKey("width")) {
+                        propertiesMap.put("width", 300.0);
+                    }
+                    if (!propertiesMap.containsKey("height")) {
+                        propertiesMap.put("height", 200.0);
+                    }
+                } else if (CONDITION_NODE.equalsIgnoreCase(node.getType())) {
+                    // ⭐ 新增：处理条件节点的子节点（包括普通节点和嵌套的条件节点）
+                    Object childrenObj = JSONUtil.toBean(node.getProperties(),Map.class).get("children");
+                    if (childrenObj != null) {
+                        List<String> childIds = JSONUtil.parseArray(childrenObj).toList(String.class);
+                        if (childIds != null && !childIds.isEmpty()) {
+                            List<LfNode> childNodes = lfNodes.stream().filter(n -> childIds.contains(n.getId())).toList();
+                            List<LfEdge> childEdges = lfEdges.stream().filter(e -> childIds.contains(e.getSourceNodeId()) || childIds.contains(e.targetNodeId)).toList();
+                            // ⭐ 修复：递归更新子节点，嵌套的条件节点也会被正确处理
+                            operateToUpdateJobCompose(jobInfo1, childNodes, childEdges, lfNodes, lfEdges);
+                            
+                            // ⭐ 修复：更新children字段，确保包含所有子节点的jobId
+                            List<JobNode> updatedChildNodes = jobNodeService.list(
+                                new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, jobInfo1.getId())
+                            );
+                            List<Long> childJobIds = updatedChildNodes.stream()
+                                .map(JobNode::getJobId)
+                                .collect(Collectors.toList());
+                            propertiesMap.put("children", JSONUtil.toJsonStr(childJobIds));
+                            jobNode.setChildren(JSONUtil.toJsonStr(childJobIds));
+                        }
+                    }
+                    // ⭐ 修复：确保条件节点有 width 和 height 属性
+                    if (!propertiesMap.containsKey("width")) {
+                        propertiesMap.put("width", 320.0);
+                    }
+                    if (!propertiesMap.containsKey("height")) {
+                        propertiesMap.put("height", 200.0);
+                    }
+                } else {
+                    // ⭐ 修复：确保普通节点也有 width 和 height 属性（如果缺失）
+                    if (!propertiesMap.containsKey("width")) {
+                        propertiesMap.put("width", 160.0);
+                    }
+                    if (!propertiesMap.containsKey("height")) {
+                        propertiesMap.put("height", 90.0);
+                    }
+                }
+                jobNode.setProperties(JSONUtil.toJsonStr(propertiesMap));
+                jobNodeService.updateById(jobNode);
+                updateNodes.add(jobNode);
+            }
+        }
+        
+        // 处理新节点（创建）
+        for (LfNode node : newNodes) {
+            Map<String, Object> properties = JSONUtil.toBean(node.getProperties(), Map.class);
+            Object jobIdObj = properties.get(JOB_ID);
+            if (jobIdObj == null) {
+                continue;  // 跳过没有 jobId 的节点
+            }
+            Long jobId = Long.parseLong(String.valueOf(jobIdObj));
+            JobInfo jobInfo1 = jobInfoService.getById(jobId);
+            // ⭐ 修复：如果 jobInfo1 为 null，跳过该节点并记录警告（而不是抛出异常）
+            if (jobInfo1 == null) {
+                continue;  // 跳过关联任务不存在的节点，避免整个保存失败
+            }
+            
+            // 创建新节点
+            JobInfo copyJobInfo = BeanUtil.copyProperties(jobInfo1, JobInfo.class, "id");
+            // ⭐ 修复：检查 copyJobInfo 是否为 null
+            if (copyJobInfo == null) {
+                throw new BusinessException("复制任务信息失败，jobId: " + jobId);
+            }
+            copyJobInfo.setNodeFlag("Y");
+            copyJobInfo.setParentId(jobInfo.getId());
+            jobInfoService.save(copyJobInfo);
+
+            JobNode newJobNode = new JobNode();
+            newJobNode.setJobId(copyJobInfo.getId());
+            newJobNode.setJobParentId(jobInfo.getId());
+            newJobNode.setNodePositionX(node.x);
+            newJobNode.setNodePositionY(node.y);
+            // ⭐ 修复：统一规范化节点类型
+            String normalizedType = node.type;
+            if (DYNAMIC_GROUP.equalsIgnoreCase(node.type) || "custom-group".equalsIgnoreCase(node.type)) {
+                normalizedType = DYNAMIC_GROUP;
+            } else if (CONDITION_NODE.equalsIgnoreCase(node.type) || "condition-node".equalsIgnoreCase(node.type)) {
+                normalizedType = CONDITION_NODE;
+            }
+            newJobNode.setNodeType(normalizedType);
+            // 修复：新创建的节点，triggerStatus设置为-1表示未运行状态（白色背景）
+            newJobNode.setTriggerStatus(-1);
+            Map<String, Object> propertiesMap = JSONUtil.toBean(node.properties, Map.class);
+            propertiesMap.put(JOB_ID, copyJobInfo.getId());
+            
+            // ⭐ 新增：处理条件节点，保存条件表达式
+            if (CONDITION_NODE.equalsIgnoreCase(normalizedType)) {
+                Object conditionExpr = propertiesMap.get("conditionExpression");
+                Object exprType = propertiesMap.get("expressionType");
+                if (conditionExpr != null) {
+                    newJobNode.setConditionExpression(String.valueOf(conditionExpr));
+                }
+                if (exprType != null) {
+                    newJobNode.setExpressionType(String.valueOf(exprType));
+                }
+            }
+
+            if (DYNAMIC_GROUP.equalsIgnoreCase(node.getType())) {
+                List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
+                List<LfNode> childNodes = lfNodes.stream().filter(n -> childIds.contains(n.getId())).toList();
+                List<LfEdge> childEdges = lfEdges.stream().filter(e -> childIds.contains(e.getSourceNodeId()) || childIds.contains(e.targetNodeId)).toList();
+                List<Long> childJobIds = operateToSaveJobCompose(copyJobInfo, childNodes, childEdges, lfNodes, lfEdges);
+                propertiesMap.put("children", JSONUtil.toJsonStr(childJobIds));
+                newJobNode.setChildren(JSONUtil.toJsonStr(childJobIds));
+                copyJobInfo.setJobType(2);
+                copyJobInfo.setExecutorParam(String.valueOf(copyJobInfo.getId()));
+                jobInfoService.updateById(copyJobInfo);
+                
+                // ⭐ 修复：确保任务组节点有 width 和 height 属性
+                if (!propertiesMap.containsKey("width")) {
+                    propertiesMap.put("width", 300.0);
+                }
+                if (!propertiesMap.containsKey("height")) {
+                    propertiesMap.put("height", 200.0);
+                }
+            } else if (CONDITION_NODE.equalsIgnoreCase(node.getType())) {
+                // ⭐ 新增：处理条件节点的子节点（包括普通节点和嵌套的条件节点）
+                List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
+                if (childIds != null && !childIds.isEmpty()) {
                     List<LfNode> childNodes = lfNodes.stream().filter(n -> childIds.contains(n.getId())).toList();
                     List<LfEdge> childEdges = lfEdges.stream().filter(e -> childIds.contains(e.getSourceNodeId()) || childIds.contains(e.targetNodeId)).toList();
+                    // ⭐ 修复：递归保存子节点，嵌套的条件节点的jobParentId会被设置为当前条件节点的jobId
                     List<Long> childJobIds = operateToSaveJobCompose(copyJobInfo, childNodes, childEdges, lfNodes, lfEdges);
                     propertiesMap.put("children", JSONUtil.toJsonStr(childJobIds));
-                    jobNode.setChildren(JSONUtil.toJsonStr(childJobIds));
+                    newJobNode.setChildren(JSONUtil.toJsonStr(childJobIds));
                     copyJobInfo.setJobType(2);
                     copyJobInfo.setExecutorParam(String.valueOf(copyJobInfo.getId()));
                     jobInfoService.updateById(copyJobInfo);
                 }
-                jobNode.setProperties(JSONUtil.toJsonStr(propertiesMap));
-                jobNodeService.save(jobNode);
-                nodeIdMap.put(node.getId(), jobNode.getId());
-            } else {
-                // ⭐ 修复：尝试通过nodeId查找节点，如果找不到，再尝试通过jobId查找（处理粘贴节点的情况）
-                Long nodeIdLong = Long.parseLong(node.getId());
-                JobNode jobNode = nodeFromDb.stream().filter(n -> n.getId().equals(nodeIdLong)).findFirst().orElse(null);
-
-                // 如果通过nodeId找不到，尝试通过jobId查找（粘贴的节点可能已经保存，但nodeId可能不匹配）！！！！废弃代码
-                if (jobNode == null) {                    Map<String, Object> nodeProperties = JSONUtil.toBean(node.getProperties(), Map.class);
-                    Object nodeJobIdObj = nodeProperties.get(JOB_ID);
-                    if (nodeJobIdObj != null) {
-                        Long nodeJobId = Long.parseLong(String.valueOf(nodeJobIdObj));
-                        // 通过jobId查找节点（粘贴的节点可能已经保存）
-                        jobNode = nodeFromDb.stream().filter(n -> n.getJobId().equals(nodeJobId)).findFirst().orElse(null);
-                    }
-                }
                 
-                // ⭐ 修复：如果找不到已存在的节点，可能是新粘贴的节点，需要创建新节点 ！！！！废弃代码
-                if (jobNode == null) {
-                    // 创建新节点（类似包含"-"的逻辑）
-                    JobInfo copyJobInfo = BeanUtil.copyProperties(jobInfo1, JobInfo.class, "id");
-                    // ⭐ 修复：检查 copyJobInfo 是否为 null
-                    if (copyJobInfo == null) {
-                        throw new BusinessException("复制任务信息失败，jobId: " + jobId);
-                    }
-                    copyJobInfo.setNodeFlag("Y");
-                    copyJobInfo.setParentId(jobInfo.getId());
-                    jobInfoService.save(copyJobInfo);
-
-                    JobNode newJobNode = new JobNode();
-                    newJobNode.setJobId(copyJobInfo.getId());
-                    newJobNode.setJobParentId(jobInfo.getId());
-                    newJobNode.setNodePositionX(node.x);
-                    newJobNode.setNodePositionY(node.y);
-                    // ⭐ 修复：统一规范化节点类型，确保任务组节点类型为 "CustomGroup"（大写）
-                    String normalizedType = node.type;
-                    if (DYNAMIC_GROUP.equalsIgnoreCase(node.type) || "custom-group".equalsIgnoreCase(node.type)) {
-                        normalizedType = DYNAMIC_GROUP;  // 统一使用 "CustomGroup"
-                    }
-                    newJobNode.setNodeType(normalizedType);
-                    // 修复：新创建的节点，triggerStatus设置为-1表示未运行状态（白色背景）
-                    newJobNode.setTriggerStatus(-1);
-                    Map<String, Object> propertiesMap = JSONUtil.toBean(node.properties, Map.class);
-                    propertiesMap.put(JOB_ID, copyJobInfo.getId());
-
-                    if (DYNAMIC_GROUP.equalsIgnoreCase(node.getType())) {
-                        List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
-                        List<LfNode> childNodes = lfNodes.stream().filter(n -> childIds.contains(n.getId())).toList();
-                        List<LfEdge> childEdges = lfEdges.stream().filter(e -> childIds.contains(e.getSourceNodeId()) || childIds.contains(e.targetNodeId)).toList();
-                        List<Long> childJobIds = operateToSaveJobCompose(copyJobInfo, childNodes, childEdges, lfNodes, lfEdges);
-                        propertiesMap.put("children", JSONUtil.toJsonStr(childJobIds));
-                        newJobNode.setChildren(JSONUtil.toJsonStr(childJobIds));
-                        copyJobInfo.setJobType(2);
-                        copyJobInfo.setExecutorParam(String.valueOf(copyJobInfo.getId()));
-                        jobInfoService.updateById(copyJobInfo);
-                        
-                        // ⭐ 修复：确保任务组节点有 width 和 height 属性
-                        if (!propertiesMap.containsKey("width")) {
-                            propertiesMap.put("width", 300.0);
-                        }
-                        if (!propertiesMap.containsKey("height")) {
-                            propertiesMap.put("height", 200.0);
-                        }
-                    } else {
-                        // ⭐ 修复：确保普通节点也有 width 和 height 属性（如果缺失）
-                        if (!propertiesMap.containsKey("width")) {
-                            propertiesMap.put("width", 160.0);
-                        }
-                        if (!propertiesMap.containsKey("height")) {
-                            propertiesMap.put("height", 90.0);
-                        }
-                    }
-                    newJobNode.setProperties(JSONUtil.toJsonStr(propertiesMap));
-                    jobNodeService.save(newJobNode);
-                    nodeIdMap.put(node.getId(), newJobNode.getId());
-                } else {
-                    // 更新已存在的节点
-                    JobInfo copyJobInfo = BeanUtil.copyProperties(jobInfo1, JobInfo.class, "id","parentId","jobPartId");
-                    // ⭐ 修复：检查 copyJobInfo 是否为 null
-                    if (copyJobInfo == null) {
-                        throw new BusinessException("复制任务信息失败，jobId: " + jobId);
-                    }
-                    copyJobInfo.setId(jobNode.getJobId());
-                    jobInfoService.updateById(copyJobInfo);
-                    Map<String, Object> propertiesMap = JSONUtil.toBean(node.properties, Map.class);
-                    jobNode.setNodePositionX(node.x);
-                    jobNode.setNodePositionY(node.y);
-                    
-                    // ⭐ 关键修复：不更新 trigger_status 字段，保留数据库中的值
-                    // 因为运行时会由执行器更新状态，这里只更新位置和配置
-                    // trigger_status 应该由任务执行流程控制，而不是由保存操作覆盖
-                    // ⭐ 修复：统一规范化节点类型，确保任务组节点类型为 "CustomGroup"（大写）
-                    String normalizedType = node.type;
-                    if (DYNAMIC_GROUP.equalsIgnoreCase(node.type) || "custom-group".equalsIgnoreCase(node.type)) {
-                        normalizedType = DYNAMIC_GROUP;  // 统一使用 "CustomGroup"
-                    }
-                    jobNode.setNodeType(normalizedType);
-                    if (DYNAMIC_GROUP.equalsIgnoreCase(node.getType())) {
-                        //得到孩子节点
-                        List<String> childIds = JSONUtil.parseArray(JSONUtil.toBean(node.getProperties(),Map.class).get("children")).toList(String.class);
-                        List<LfNode> childNodes = lfNodes.stream().filter(n -> childIds.contains(n.getId())).toList();
-                        List<LfEdge> childEdges = lfEdges.stream().filter(e -> childIds.contains(e.getSourceNodeId()) || childIds.contains(e.targetNodeId)).toList();
-                        operateToUpdateJobCompose(jobInfo1, childNodes, childEdges, lfNodes, lfEdges);
-
-                        // ⭐ 修复：确保任务组节点有 width 和 height 属性
-                        if (!propertiesMap.containsKey("width")) {
-                            propertiesMap.put("width", 300.0);
-                        }
-                        if (!propertiesMap.containsKey("height")) {
-                            propertiesMap.put("height", 200.0);
-                        }
-                    } else {
-                        // ⭐ 修复：确保普通节点也有 width 和 height 属性（如果缺失）
-                        if (!propertiesMap.containsKey("width")) {
-                            propertiesMap.put("width", 160.0);
-                        }
-                        if (!propertiesMap.containsKey("height")) {
-                            propertiesMap.put("height", 90.0);
-                        }
-                    }
-                    jobNode.setProperties(JSONUtil.toJsonStr(propertiesMap));
-                    updateNodes.add(jobNode);
-                    nodeIdMap.put(node.getId(), jobNode.getId());
+                // ⭐ 修复：确保条件节点有 width 和 height 属性
+                if (!propertiesMap.containsKey("width")) {
+                    propertiesMap.put("width", 320.0);
+                }
+                if (!propertiesMap.containsKey("height")) {
+                    propertiesMap.put("height", 200.0);
+                }
+            } else {
+                // ⭐ 修复：确保普通节点也有 width 和 height 属性（如果缺失）
+                if (!propertiesMap.containsKey("width")) {
+                    propertiesMap.put("width", 160.0);
+                }
+                if (!propertiesMap.containsKey("height")) {
+                    propertiesMap.put("height", 90.0);
                 }
             }
+            newJobNode.setProperties(JSONUtil.toJsonStr(propertiesMap));
+            jobNodeService.save(newJobNode);
+            nodeIdMap.put(node.getId(), newJobNode.getId());
+        }
+        
+        // 删除已存在的节点（如果不在nodeList中）
+        List<Long> nodeIdsFromRequest = nodeList.stream()
+            .map(n -> {
+                try {
+                    return Long.parseLong(n.getId());
+                } catch (NumberFormatException e) {
+                    return null;
+                }
+            })
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
+        
+        List<JobNode> nodesToDelete = nodeFromDb.stream()
+            .filter(n -> !nodeIdsFromRequest.contains(n.getId()))
+            .collect(Collectors.toList());
+        
+        for (JobNode nodeToDelete : nodesToDelete) {
+            jobNodeService.removeById(nodeToDelete.getId());
         }
 
         jobEdgeService.remove(new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getJobParentId, jobInfo.getId()));
@@ -925,6 +1073,9 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
             if (nodeType != null && (DYNAMIC_GROUP.equalsIgnoreCase(nodeType) ||
                     "custom-group".equalsIgnoreCase(nodeType))) {
                 nodeType = DYNAMIC_GROUP;
+            } else if (nodeType != null && (CONDITION_NODE.equalsIgnoreCase(nodeType) ||
+                    "condition-node".equalsIgnoreCase(nodeType))) {
+                nodeType = CONDITION_NODE;
             }
             nodeVo.setNodeType(nodeType);
 
@@ -938,15 +1089,34 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
                 propertiesMap = new HashMap<>();
             }
             propertiesMap.put(JOB_ID, node.getJobId());
+            
+            // ⭐ 新增：如果是条件节点，从数据库字段读取条件表达式并设置到properties中
+            if (CONDITION_NODE.equalsIgnoreCase(nodeType)) {
+                if (StringUtils.isNotBlank(node.getConditionExpression())) {
+                    propertiesMap.put("conditionExpression", node.getConditionExpression());
+                }
+                if (StringUtils.isNotBlank(node.getExpressionType())) {
+                    propertiesMap.put("expressionType", node.getExpressionType());
+                }
+            }
 
             if (!propertiesMap.containsKey("width")) {
-                propertiesMap.put("width", DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType()) ? 300.0 : 160.0);
+                propertiesMap.put("width", CONDITION_NODE.equalsIgnoreCase(node.getNodeType()) ? 320.0 : 
+                    (DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType()) ? 300.0 : 160.0));
             }
             if (!propertiesMap.containsKey("height")) {
-                propertiesMap.put("height", DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType()) ? 200.0 : 90.0);
+                propertiesMap.put("height", CONDITION_NODE.equalsIgnoreCase(node.getNodeType()) ? 200.0 : 
+                    (DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType()) ? 200.0 : 90.0));
+            }
+            
+            // ⭐ 新增：如果是条件节点，确保conditionType在properties中
+            if (CONDITION_NODE.equalsIgnoreCase(nodeType)) {
+                if (!propertiesMap.containsKey("conditionType")) {
+                    propertiesMap.put("conditionType", "IF");
+                }
             }
 
-            if (DYNAMIC_GROUP.equalsIgnoreCase(nodeType)) {
+            if (DYNAMIC_GROUP.equalsIgnoreCase(nodeType) || CONDITION_NODE.equalsIgnoreCase(nodeType)) {
                 // 递归获取所有子节点和边（包括嵌套的子节点）
                 // 使用新的Map来收集子节点，避免与父级节点Map冲突
                 Map<String, JobNodeVo> childNodeVoMap = new HashMap<>();
@@ -1115,6 +1285,67 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
         jobNode.setProperties(JSONUtil.toJsonStr(properties));
         jobNodeService.save(jobNode);
         return jobNode;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public Map<String, Object> createConditionNode(Long parentTaskGroupId, String conditionName, 
+                                                     String conditionExpression, String expressionType, 
+                                                     String conditionType, double x, double y) {
+        // 创建JobInfo记录
+        JobInfo jobInfo = new JobInfo();
+        jobInfo.setJobDesc(conditionName);
+        jobInfo.setJobType(2); // 任务组类型
+        jobInfo.setNodeFlag("Y");
+        jobInfo.setParentId(parentTaskGroupId);
+        jobInfo.setPauseStatus(0);
+        jobInfo.setGlueUpdateTime(LocalDateTime.now());
+        // 设置默认值
+        jobInfo.setJobGroup(1L); // 默认执行器组
+        jobInfo.setAuthor("system");
+        jobInfo.setScheduleType("NONE");
+        jobInfo.setGlueType("BEAN");
+        jobInfo.setExecutorParam(String.valueOf(parentTaskGroupId)); // 临时值，保存后会更新
+        jobInfoService.save(jobInfo);
+        
+        // 更新executorParam为jobId
+        jobInfo.setExecutorParam(String.valueOf(jobInfo.getId()));
+        jobInfoService.updateById(jobInfo);
+        
+        // 创建JobNode记录
+        JobNode jobNode = new JobNode();
+        jobNode.setJobId(jobInfo.getId());
+        jobNode.setJobParentId(parentTaskGroupId);
+        jobNode.setNodeType(CONDITION_NODE);
+        jobNode.setNodePositionX(x);
+        jobNode.setNodePositionY(y);
+        jobNode.setTriggerStatus(-1); // 未运行状态
+        
+        // 设置条件表达式
+        if (conditionExpression != null) {
+            jobNode.setConditionExpression(conditionExpression);
+        }
+        if (expressionType != null) {
+            jobNode.setExpressionType(expressionType);
+        }
+        
+        // 设置properties
+        Map<String, Object> properties = new HashMap<>();
+        properties.put(JOB_ID, jobInfo.getId());
+        properties.put("conditionExpression", conditionExpression);
+        properties.put("expressionType", expressionType);
+        properties.put("conditionType", conditionType != null ? conditionType : "IF");
+        properties.put("width", 320.0);
+        properties.put("height", 200.0);
+        jobNode.setProperties(JSONUtil.toJsonStr(properties));
+        
+        jobNodeService.save(jobNode);
+        
+        // 返回结果
+        Map<String, Object> result = new HashMap<>();
+        result.put("jobId", jobInfo.getId());
+        result.put("nodeId", jobNode.getId());
+        return result;
     }
 
     @Override
@@ -1522,10 +1753,10 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
         allJobIds.addAll(nodes.stream().map(JobNode::getJobId).toList());
         
         for (JobNode node : nodes) {
-            if (DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType())) {
+            if (DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType()) || CONDITION_NODE.equalsIgnoreCase(node.getNodeType())) {
                 Long childJobId = node.getJobId();
                 if (childJobId != null) {
-                    // 递归收集子任务组的ID
+                    // 递归收集子任务组和条件节点的ID
                     collectAllJobIds(childJobId, allJobIds);
                 }
             }
@@ -1585,7 +1816,7 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
         
         List<JobNode> nodes = nodesByParent.getOrDefault(jobId, Collections.emptyList());
         for (JobNode node : nodes) {
-            if (DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType())) {
+            if (DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType()) || CONDITION_NODE.equalsIgnoreCase(node.getNodeType())) {
                 Long childJobId = node.getJobId();
                 if (childJobId != null) {
                     collectJobIdsRecursive(childJobId, nodesByParent, allJobIds);
@@ -1634,16 +1865,41 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
             Integer triggerStatus = node.getTriggerStatus();
             jobNodeVo.setTriggerStatus(triggerStatus != null ? triggerStatus : -1);
             
-            if (DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType())) {
+            // ⭐ 新增：处理条件节点类型
+            String nodeType = node.getNodeType();
+            if (nodeType != null && (CONDITION_NODE.equalsIgnoreCase(nodeType) || "condition-node".equalsIgnoreCase(nodeType))) {
+                nodeType = CONDITION_NODE;
+            } else if (nodeType != null && (DYNAMIC_GROUP.equalsIgnoreCase(nodeType) || "custom-group".equalsIgnoreCase(nodeType))) {
+                nodeType = DYNAMIC_GROUP;
+            }
+            jobNodeVo.setNodeType(nodeType);
+            
+            if (DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType()) || CONDITION_NODE.equalsIgnoreCase(node.getNodeType())) {
                 String children = node.getChildren();
                 List<String> childIds = new ArrayList<>();
 
                 List<JobNode> childNodes = nodesByParent.getOrDefault(node.getJobId(), Collections.emptyList());
 
                 List<JobNodeVo> jobNodeVoList = new ArrayList<>();
+                // ⭐ 修复：允许条件节点包含嵌套的条件节点和普通节点
+                // 对于DYNAMIC_GROUP，只包含普通节点（排除嵌套的任务组和条件节点）
+                // 对于CONDITION_NODE，包含普通节点和嵌套的条件节点
                 for (JobNode childNode : childNodes) {
-                    if (!DYNAMIC_GROUP.equalsIgnoreCase(childNode.getNodeType())) {
-                        childIds.add(String.valueOf(childNode.getId()));
+                    boolean shouldInclude = false;
+                    if (DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType())) {
+                        // 任务组只包含普通节点
+                        if (!DYNAMIC_GROUP.equalsIgnoreCase(childNode.getNodeType()) && !CONDITION_NODE.equalsIgnoreCase(childNode.getNodeType())) {
+                            shouldInclude = true;
+                        }
+                    } else if (CONDITION_NODE.equalsIgnoreCase(node.getNodeType())) {
+                        // 条件节点包含普通节点和嵌套的条件节点
+                        if (!DYNAMIC_GROUP.equalsIgnoreCase(childNode.getNodeType())) {
+                            shouldInclude = true;
+                        }
+                    }
+                    
+                    if (shouldInclude) {
+                        // ⭐ 修复：移除重复的childIds.add
                         childIds.add(String.valueOf(childNode.getId()));
                         JobNodeVo childJobNodeVo = BeanUtil.copyProperties(childNode, JobNodeVo.class);
                         jobNodeVoList.add(childJobNodeVo);
@@ -1652,21 +1908,97 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
 
                 jobNodeVo.setChildrenNodes(jobNodeVoList);
 
-//                // 修复：即使childIds为空，也要设置children字段（为空数组），以便前端能够识别任务组节点
-//                List<String> newChildIds = new ArrayList<>();
-//                for (String childId : childIds) {
-//                    newChildIds.add(randomId + childId);
-//                }
-                 Map<String, Object> propertiesMap = JSONUtil.toBean(node.getProperties(), Map.class);
-//                if (propertiesMap == null) {
-//                    propertiesMap = new HashMap<>();
-//                }
-//                propertiesMap.put("children", JSONUtil.toJsonStr(newChildIds));
-                  jobNodeVo.setProperties(JSONUtil.toJsonStr(propertiesMap));
-//                jobNodeVo.setChildren(JSONUtil.toJsonStr(newChildIds));
+                // ⭐ 修复：构建children字段，包含所有子节点ID（包括嵌套的条件节点）
+                // 数据库中的children字段存储的是jobId列表，需要转换为nodeId列表
+                // 构建jobId到nodeId的映射
+                Map<Long, Long> jobIdToNodeIdMap = new HashMap<>();
+                for (JobNode childNode : childNodes) {
+                    jobIdToNodeIdMap.put(childNode.getJobId(), childNode.getId());
+                }
                 
-                // 递归处理子任务组（不再查询数据库）
-                if (!childIds.isEmpty()) {
+                List<String> finalChildIds = new ArrayList<>();
+                if (StringUtils.isNotBlank(children)) {
+                    try {
+                        // 数据库中的children字段存储的是jobId列表（Long类型）
+                        List<Long> childrenJobIdsFromDb = JSONUtil.parseArray(children).toList(Long.class);
+                        if (childrenJobIdsFromDb != null && !childrenJobIdsFromDb.isEmpty()) {
+                            // 将jobId转换为nodeId
+                            for (Long childJobId : childrenJobIdsFromDb) {
+                                Long nodeId = jobIdToNodeIdMap.get(childJobId);
+                                if (nodeId != null) {
+                                    finalChildIds.add(String.valueOf(nodeId));
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        // 如果解析失败（可能是旧格式的字符串ID），尝试解析为字符串列表
+                        try {
+                            List<String> childrenFromDb = JSONUtil.parseArray(children).toList(String.class);
+                            if (childrenFromDb != null && !childrenFromDb.isEmpty()) {
+                                finalChildIds.addAll(childrenFromDb);
+                            }
+                        } catch (Exception e2) {
+                            // 如果都解析失败，使用从childNodes中提取的ID
+                            finalChildIds.addAll(childIds);
+                        }
+                    }
+                }
+                
+                // 如果finalChildIds为空，使用从childNodes中提取的ID
+                if (finalChildIds.isEmpty()) {
+                    finalChildIds.addAll(childIds);
+                }
+                
+                // 为前端添加randomId前缀
+                List<String> newChildIds = new ArrayList<>();
+                for (String childId : finalChildIds) {
+                    // 如果childId是数字字符串（nodeId），添加randomId前缀
+                    if (childId.matches("\\d+")) {
+                        newChildIds.add(randomId + childId);
+                    } else {
+                        // 如果childId已经是带前缀的，直接使用
+                        newChildIds.add(childId);
+                    }
+                }
+                
+                Map<String, Object> propertiesMap;
+                if (StringUtils.isNotBlank(node.getProperties())) {
+                    propertiesMap = JSONUtil.toBean(node.getProperties(), Map.class);
+                } else {
+                    propertiesMap = new HashMap<>();
+                }
+                
+                // ⭐ 修复：确保children字段在properties中也被设置（用于前端识别）
+                propertiesMap.put("children", newChildIds);
+                
+                // ⭐ 新增：如果是条件节点，从数据库字段读取条件表达式并设置到properties中
+                if (CONDITION_NODE.equalsIgnoreCase(nodeType)) {
+                    if (StringUtils.isNotBlank(node.getConditionExpression())) {
+                        propertiesMap.put("conditionExpression", node.getConditionExpression());
+                    }
+                    if (StringUtils.isNotBlank(node.getExpressionType())) {
+                        propertiesMap.put("expressionType", node.getExpressionType());
+                    }
+                    // ⭐ 新增：确保条件节点有width和height属性（从properties读取，如果没有则使用默认值）
+                    if (!propertiesMap.containsKey("width")) {
+                        propertiesMap.put("width", 320.0);
+                    }
+                    if (!propertiesMap.containsKey("height")) {
+                        propertiesMap.put("height", 200.0);
+                    }
+                    // ⭐ 新增：如果没有conditionType，默认为IF（向后兼容）
+                    if (!propertiesMap.containsKey("conditionType")) {
+                        propertiesMap.put("conditionType", "IF");
+                    }
+                }
+                
+                jobNodeVo.setProperties(JSONUtil.toJsonStr(propertiesMap));
+                // ⭐ 修复：设置children字段到JobNodeVo（如果JobNodeVo有children字段）
+                // jobNodeVo.setChildren(JSONUtil.toJsonStr(newChildIds));
+                
+                // ⭐ 修复：递归处理子任务组和条件节点（不再查询数据库）
+                // 对于DYNAMIC_GROUP和CONDITION_NODE，都需要递归处理子节点
+                if (node.getJobId() != null) {
                     buildNodeVosRecursive(node.getJobId(), nodesByParent, edgesByParent, 
                                           jobInfoMap, nodeVos, edgeVos, randomId);
                 }

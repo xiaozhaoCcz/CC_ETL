@@ -1,5 +1,6 @@
 package com.cc.job.gui.manager;
 
+import com.cc.job.gui.model.ConditionNode;
 import com.cc.job.gui.model.GroupContainer;
 import com.cc.job.gui.model.NodeConnection;
 import com.cc.job.gui.model.ProcessNode;
@@ -20,15 +21,18 @@ public class CanvasConnectionManager {
     private final Pane canvas;
     private final List<NodeConnection> connections;
     private final List<GroupContainer> groupContainers;
+    private final List<ConditionNode> conditionNodes;
     private final Runnable notifyChanged;
     private final Consumer<String> logger;
     
     public CanvasConnectionManager(Pane canvas, List<NodeConnection> connections, 
                                    List<GroupContainer> groupContainers,
+                                   List<ConditionNode> conditionNodes,
                                    Runnable notifyChanged, Consumer<String> logger) {
         this.canvas = canvas;
         this.connections = connections;
         this.groupContainers = groupContainers;
+        this.conditionNodes = conditionNodes != null ? conditionNodes : new ArrayList<>();
         this.notifyChanged = notifyChanged;
         this.logger = logger;
     }
@@ -69,6 +73,16 @@ public class CanvasConnectionManager {
                 if (managedConnections != null && managedConnections.contains(connection)) {
                     isManagedByContainer = true;
                     break;
+                }
+            }
+            // 检查是否由条件节点管理
+            if (!isManagedByContainer) {
+                for (ConditionNode conditionNode : conditionNodes) {
+                    List<NodeConnection> managedConnections = conditionNode.getManagedConnections();
+                    if (managedConnections != null && managedConnections.contains(connection)) {
+                        isManagedByContainer = true;
+                        break;
+                    }
                 }
             }
             

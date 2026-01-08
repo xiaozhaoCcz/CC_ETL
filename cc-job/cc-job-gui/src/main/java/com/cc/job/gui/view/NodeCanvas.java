@@ -3,6 +3,7 @@ package com.cc.job.gui.view;
 import com.cc.job.gui.history.CanvasAction;
 import com.cc.job.gui.history.UndoRedoManager;
 import com.cc.job.gui.manager.*;
+import com.cc.job.gui.model.ConditionNode;
 import com.cc.job.gui.model.GroupContainer;
 import com.cc.job.gui.model.JobComposeData;
 import com.cc.job.gui.model.NodeConnection;
@@ -18,6 +19,7 @@ import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.Node;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
@@ -33,6 +35,7 @@ public class NodeCanvas extends Pane {
     
     private List<ProcessNode> nodes = new ArrayList<>();
     private List<GroupContainer> groupContainers = new ArrayList<>();
+    private List<ConditionNode> conditionNodes = new ArrayList<>();
     private List<NodeConnection> connections = new ArrayList<>();
     
     // 管理器
@@ -47,9 +50,12 @@ public class NodeCanvas extends Pane {
     
     // 回调
     private Runnable onRequestAddNode;
+    private Runnable onRequestAddConditionNode; // 创建条件节点回调
     private Runnable onRequestRunTaskGroup;
     private Runnable onRequestClearCanvas;
     private java.util.function.Consumer<GroupContainer> onDeleteGroupContainer;
+    private java.util.function.Consumer<ConditionNode> onDeleteConditionNode;
+    private java.util.function.Consumer<ConditionNode> onEditConditionNode; // 编辑条件节点回调
     private LogCallback logCallback;
     private Runnable onNodeMoved;
     private java.util.function.Consumer<Boolean> onSelectionModeChanged;
@@ -112,7 +118,7 @@ public class NodeCanvas extends Pane {
     
     private void initializeManagers() {
         nodeManager = new CanvasNodeManager(this, nodes, this::notifyNodeStructureChanged, this::log);
-        connectionManager = new CanvasConnectionManager(this, connections, groupContainers, this::notifyNodeStructureChanged, this::log);
+        connectionManager = new CanvasConnectionManager(this, connections, groupContainers, conditionNodes, this::notifyNodeStructureChanged, this::log);
         selectionManager = new CanvasSelectionManager(this, nodes, connections, this::log, this::notifyNodeStructureChanged);
         dataLoader = new CanvasDataLoader(this::log);
     }
@@ -143,6 +149,10 @@ public class NodeCanvas extends Pane {
         this.onRequestAddNode = runnable;
     }
     
+    public void setOnRequestAddConditionNode(Runnable runnable) {
+        this.onRequestAddConditionNode = runnable;
+    }
+    
     public void setOnRequestRunTaskGroup(Runnable runnable) {
         this.onRequestRunTaskGroup = runnable;
     }
@@ -153,6 +163,14 @@ public class NodeCanvas extends Pane {
     
     public void setOnDeleteGroupContainer(java.util.function.Consumer<GroupContainer> callback) {
         this.onDeleteGroupContainer = callback;
+    }
+    
+    public void setOnDeleteConditionNode(java.util.function.Consumer<ConditionNode> callback) {
+        this.onDeleteConditionNode = callback;
+    }
+    
+    public void setOnEditConditionNode(java.util.function.Consumer<ConditionNode> callback) {
+        this.onEditConditionNode = callback;
     }
     
     public void setUndoRedoManager(UndoRedoManager undoRedoManager) {
@@ -180,6 +198,10 @@ public class NodeCanvas extends Pane {
     
     public List<GroupContainer> getGroupContainers() {
         return new ArrayList<>(groupContainers);
+    }
+    
+    public List<ConditionNode> getConditionNodes() {
+        return new ArrayList<>(conditionNodes);
     }
     
     public ProcessNode getNodeByJobId(Long jobId) {
@@ -287,6 +309,9 @@ public class NodeCanvas extends Pane {
             // 拖拽结束后，检查是否需要左侧或上侧扩展
             checkAndExpandCanvas(node);
             
+            // 检测节点是否进入条件节点容器
+            checkNodeInConditionContainer(node);
+            
             if (selectionManager.isMovingSelection() && selectionManager.getDragStartNode() == node) {
                 selectionManager.setMovingSelection(false);
                 selectionManager.setDragStartNode(null);
@@ -318,6 +343,10 @@ public class NodeCanvas extends Pane {
         setupConnectorHandler(node, node.getBottomConnector());
         setupConnectorHandler(node, node.getLeftConnector());
         setupConnectorHandler(node, node.getRightConnector());
+        
+        // 设置移出容器回调
+        node.setOnRemoveFromContainer(() -> removeNodeFromContainer(node));
+        node.setIsInContainerChecker(() -> isNodeInAnyContainer(node));
     }
     
     /**
@@ -846,6 +875,9 @@ public class NodeCanvas extends Pane {
         MenuItem addNodeItem = new MenuItem("新增节点");
         addNodeItem.setOnAction(e -> { if (onRequestAddNode != null) onRequestAddNode.run(); });
         
+        MenuItem addConditionNodeItem = new MenuItem("创建条件节点");
+        addConditionNodeItem.setOnAction(e -> { if (onRequestAddConditionNode != null) onRequestAddConditionNode.run(); });
+        
         MenuItem clearItem = new MenuItem("清空页面");
         clearItem.setOnAction(e -> { if (onRequestClearCanvas != null) onRequestClearCanvas.run(); else clearViewOnly(); });
         
@@ -874,6 +906,8 @@ public class NodeCanvas extends Pane {
         restoreAllNodesItem.setOnAction(e -> restoreAllNodesEnabled());
         
         menu.getItems().addAll(addNodeItem,
+                addConditionNodeItem,
+                new SeparatorMenuItem(),
                 clearItem,
                 runGroupItem,
                 themeMenu,
@@ -1161,10 +1195,137 @@ public class NodeCanvas extends Pane {
                 log("✓ 加载了 " + successCount + " 条连接");
             }
             
+            // 加载条件节点
+            if (composeData.getNodes() != null) {
+                for (JobComposeData.NodeData nodeData : composeData.getNodes()) {
+                    if (nodeData.getType() != null && 
+                        ("ConditionNode".equals(nodeData.getType()) || "condition-node".equalsIgnoreCase(nodeData.getType()))) {
+                        loadConditionNode(nodeData, nodeMap);
+                    }
+                }
+            }
+            
             log("✓ 任务组数据加载完成");
         });
         
         notifyNodeStructureChanged();
+    }
+    
+    /**
+     * 加载条件节点
+     */
+    private void loadConditionNode(JobComposeData.NodeData nodeData, Map<String, ProcessNode> nodeMap) {
+        try {
+            String nodeId = nodeData.getId();
+            Long conditionId = nodeData.getJobId();
+            String conditionName = nodeData.getJobName() != null ? nodeData.getJobName() : "条件节点";
+            
+            // 从properties读取conditionType
+            ConditionNode.ConditionType conditionType = ConditionNode.ConditionType.IF;
+            if (nodeData.getProperties() != null) {
+                Object conditionTypeObj = nodeData.getProperties().get("conditionType");
+                if (conditionTypeObj != null) {
+                    try {
+                        conditionType = ConditionNode.ConditionType.valueOf(conditionTypeObj.toString().toUpperCase());
+                    } catch (Exception e) {
+                        // 如果解析失败，使用默认值IF
+                        conditionType = ConditionNode.ConditionType.IF;
+                    }
+                }
+            }
+            
+            ConditionNode conditionNode = new ConditionNode(nodeId, conditionId, conditionName, conditionType);
+            
+            // 设置位置
+            if (nodeData.getX() != null && nodeData.getY() != null) {
+                conditionNode.setLayoutX(nodeData.getX());
+                conditionNode.setLayoutY(nodeData.getY());
+            }
+            
+            // 设置条件表达式
+            if (nodeData.getProperties() != null) {
+                Object conditionExpr = nodeData.getProperties().get("conditionExpression");
+                Object exprType = nodeData.getProperties().get("expressionType");
+                if (conditionExpr != null) {
+                    conditionNode.setConditionExpression(conditionExpr.toString());
+                }
+                if (exprType != null) {
+                    try {
+                        conditionNode.setExpressionType(ConditionNode.ExpressionType.valueOf(exprType.toString().toUpperCase()));
+                    } catch (Exception e) {
+                        conditionNode.setExpressionType(ConditionNode.ExpressionType.SIMPLE);
+                    }
+                }
+                
+                // ⭐ 新增：从properties读取并设置容器大小
+                Object widthObj = nodeData.getProperties().get("width");
+                Object heightObj = nodeData.getProperties().get("height");
+                if (widthObj != null && heightObj != null) {
+                    try {
+                        double width = widthObj instanceof Number ? ((Number) widthObj).doubleValue() : Double.parseDouble(widthObj.toString());
+                        double height = heightObj instanceof Number ? ((Number) heightObj).doubleValue() : Double.parseDouble(heightObj.toString());
+                        conditionNode.setSize(width, height);
+                    } catch (Exception e) {
+                        // 如果解析失败，使用默认大小
+                        conditionNode.setSize(320, 200);
+                    }
+                }
+            }
+            
+            // ⭐ 新增：设置大小改变回调，标记需要保存
+            conditionNode.setOnSizeChanged(() -> markAsUnsaved());
+            
+            // 添加到画布
+            addConditionNode(conditionNode);
+            
+            // ⭐ 修复：绑定子节点（包括普通节点和嵌套的条件节点）
+            if (nodeData.getProperties() != null) {
+                Object childrenObj = nodeData.getProperties().get("children");
+                if (childrenObj instanceof List) {
+                    List<String> childIds = new ArrayList<>();
+                    for (Object childId : (List<?>) childrenObj) {
+                        if (childId != null) {
+                            childIds.add(childId.toString());
+                        }
+                    }
+                    
+                    // 分离普通节点和条件节点
+                    List<ProcessNode> childNodes = new ArrayList<>();
+                    List<ConditionNode> childConditionNodes = new ArrayList<>();
+                    
+                    for (String childId : childIds) {
+                        // 先尝试从nodeMap中查找（普通节点）
+                        ProcessNode childNode = nodeMap.get(childId);
+                        if (childNode != null) {
+                            childNodes.add(childNode);
+                        } else {
+                            // 如果不是普通节点，可能是嵌套的条件节点
+                            // 从conditionNodes中查找
+                            for (ConditionNode cn : conditionNodes) {
+                                if (cn.getNodeId() != null && cn.getNodeId().equals(childId)) {
+                                    childConditionNodes.add(cn);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 绑定普通节点
+                    if (!childNodes.isEmpty()) {
+                        conditionNode.bindCanvasNodes(childNodes);
+                    }
+                    
+                    // ⭐ 新增：绑定嵌套的条件节点
+                    if (!childConditionNodes.isEmpty()) {
+                        conditionNode.bindConditionNodes(childConditionNodes);
+                    }
+                }
+            }
+            
+            log("✓ 加载条件节点: " + conditionName);
+        } catch (Exception e) {
+            log("✗ 加载条件节点失败: " + e.getMessage());
+        }
     }
     
     private Circle getConnectorByAnchor(ProcessNode node, String anchor, boolean isSource) {
@@ -1186,6 +1347,9 @@ public class NodeCanvas extends Pane {
         groupContainers.forEach(this.getChildren()::remove);
         groupContainers.clear();
         
+        conditionNodes.forEach(this.getChildren()::remove);
+        conditionNodes.clear();
+        
         this.getChildren().clear();
         nodes.clear();
         connections.clear();
@@ -1205,6 +1369,8 @@ public class NodeCanvas extends Pane {
         new ArrayList<>(connections).forEach(connectionManager::removeConnection);
         nodes.forEach(this.getChildren()::remove);
         nodes.clear();
+        conditionNodes.forEach(this.getChildren()::remove);
+        conditionNodes.clear();
         groupContainers.forEach(this.getChildren()::remove);
         groupContainers.clear();
         selectionManager.clearSelection();
@@ -1382,6 +1548,782 @@ public class NodeCanvas extends Pane {
         
         log("✓ 删除任务组容器: " + container.getGroupName());
         notifyNodeStructureChanged();
+    }
+    
+    // ==================== 条件节点容器 ====================
+    
+    public void addConditionNode(ConditionNode conditionNode) {
+        if (conditionNode != null && !conditionNodes.contains(conditionNode)) {
+            conditionNodes.add(conditionNode);
+            if (!this.getChildren().contains(conditionNode)) {
+                this.getChildren().add(conditionNode);
+            }
+            
+            // 设置条件节点的回调函数
+            setupConditionNodeCallbacks(conditionNode);
+            
+            // ⭐ 新增：设置大小改变回调，标记需要保存
+            conditionNode.setOnSizeChanged(() -> markAsUnsaved());
+            
+            log("✓ 添加条件节点: " + conditionNode.getConditionName());
+            notifyNodeStructureChanged();
+        }
+    }
+    
+    /**
+     * 设置条件节点的回调函数
+     */
+    private void setupConditionNodeCallbacks(ConditionNode conditionNode) {
+        // 设置编辑条件回调
+        conditionNode.setOnEditCondition(() -> {
+            if (onEditConditionNode != null) {
+                onEditConditionNode.accept(conditionNode);
+            }
+        });
+        
+        // 设置删除回调
+        conditionNode.setOnDelete(() -> {
+            if (onDeleteConditionNode != null) {
+                onDeleteConditionNode.accept(conditionNode);
+            } else {
+                // 如果没有外部回调，直接删除
+                removeConditionNode(conditionNode);
+            }
+        });
+        
+        // ⭐ 新增：设置拖拽结束回调，检测条件节点是否进入其他容器
+        conditionNode.setOnDragFinished(() -> {
+            checkConditionNodeInConditionContainer(conditionNode);
+            markAsUnsaved();
+        });
+        
+        // ⭐ 新增：为条件节点设置连接点处理器，使其可以连接边
+        setupConditionNodeConnectorHandlers(conditionNode);
+    }
+    
+    /**
+     * ⭐ 新增：为条件节点设置连接点处理器
+     */
+    private void setupConditionNodeConnectorHandlers(ConditionNode conditionNode) {
+        // 为条件节点的四个连接点设置处理器
+        setupConditionNodeConnectorHandler(conditionNode, conditionNode.getTopConnector());
+        setupConditionNodeConnectorHandler(conditionNode, conditionNode.getBottomConnector());
+        setupConditionNodeConnectorHandler(conditionNode, conditionNode.getLeftConnector());
+        setupConditionNodeConnectorHandler(conditionNode, conditionNode.getRightConnector());
+    }
+    
+    /**
+     * ⭐ 新增：为条件节点的单个连接点设置处理器
+     */
+    private void setupConditionNodeConnectorHandler(ConditionNode conditionNode, Circle connector) {
+        connector.setOnMousePressed(e -> {
+            startOwner = conditionNode;
+            startTempLineForConditionNode(conditionNode, connector);
+            e.consume();
+        });
+        
+        connector.setOnMouseDragged(e -> {
+            if (tempLine != null) {
+                Point2D localPoint = sceneToLocal(e.getSceneX(), e.getSceneY());
+                tempLine.setEndX(localPoint.getX());
+                tempLine.setEndY(localPoint.getY());
+            }
+            e.consume();
+        });
+        
+        connector.setOnMouseReleased(e -> {
+            finishConnectionForConditionNode(connector, e.getSceneX(), e.getSceneY());
+            e.consume();
+        });
+    }
+    
+    /**
+     * ⭐ 新增：为条件节点启动临时连线
+     */
+    private void startTempLineForConditionNode(ConditionNode conditionNode, Circle connector) {
+        tempLine = new Line();
+        tempLine.setStroke(Color.web("#8B5CF6"));
+        tempLine.setStrokeWidth(2);
+        tempLine.getStrokeDashArray().addAll(5.0, 5.0);
+        
+        Point2D center = new Point2D(connector.getLayoutX() + connector.getRadius(), 
+                                     connector.getLayoutY() + connector.getRadius());
+        Point2D nodeLocal = conditionNode.getConnectorPane().localToParent(center);
+        Point2D canvasLocal = conditionNode.localToParent(nodeLocal);
+        
+        tempLine.setStartX(canvasLocal.getX());
+        tempLine.setStartY(canvasLocal.getY());
+        tempLine.setEndX(canvasLocal.getX());
+        tempLine.setEndY(canvasLocal.getY());
+        
+        this.getChildren().add(tempLine);
+    }
+    
+    /**
+     * ⭐ 新增：完成条件节点的连接
+     */
+    private void finishConnectionForConditionNode(Circle connector, double sceneX, double sceneY) {
+        if (tempLine == null || startOwner == null) {
+            return;
+        }
+        
+        Point2D localPoint = sceneToLocal(sceneX, sceneY);
+        Node targetNode = null;
+        Circle targetConnector = null;
+        
+        // 查找目标节点和连接点
+        for (Node child : this.getChildren()) {
+            if (child instanceof ProcessNode processNode && child != startOwner) {
+                Circle nearest = findNearestConnectorForNode(processNode, localPoint.getX(), localPoint.getY());
+                if (nearest != null) {
+                    targetNode = processNode;
+                    targetConnector = nearest;
+                    break;
+                }
+            } else if (child instanceof ConditionNode conditionNode && child != startOwner) {
+                Circle nearest = findNearestConnectorForConditionNode(conditionNode, localPoint.getX(), localPoint.getY());
+                if (nearest != null) {
+                    targetNode = conditionNode;
+                    targetConnector = nearest;
+                    break;
+                }
+            } else if (child instanceof GroupContainer groupContainer && child != startOwner) {
+                Circle nearest = findNearestConnectorForGroupContainer(groupContainer, localPoint.getX(), localPoint.getY());
+                if (nearest != null) {
+                    targetNode = groupContainer;
+                    targetConnector = nearest;
+                    break;
+                }
+            }
+        }
+        
+        // 移除临时连线
+        this.getChildren().remove(tempLine);
+        tempLine = null;
+        
+        // 如果找到目标，创建连接
+        if (targetNode != null && targetConnector != null && startOwner instanceof ConditionNode) {
+            ConditionNode sourceConditionNode = (ConditionNode) startOwner;
+            String sourceAnchor = getConnectorAnchor(sourceConditionNode, connector);
+            String targetAnchor = getConnectorAnchorForNode(targetNode, targetConnector);
+            
+            // 获取源连接点和目标连接点
+            Circle sourceConnectorCircle = getConnectorByAnchorForConditionNode(sourceConditionNode, sourceAnchor);
+            Circle targetConnectorCircle = getConnectorByAnchorForNode(targetNode, targetAnchor);
+            
+            if (sourceConnectorCircle != null && targetConnectorCircle != null) {
+                // ⭐ 修复：使用通用addConnection方法，支持ConditionNode、ProcessNode和GroupContainer
+                NodeConnection connection = connectionManager.addConnection(
+                    sourceConditionNode, sourceConditionNode.getConnectorPane(), sourceConnectorCircle,
+                    targetNode, getConnectorParentForNode(targetNode), targetConnectorCircle
+                );
+                connections.add(connection);
+                
+                markAsUnsaved();
+                notifyNodeStructureChanged();
+            }
+        }
+        
+        startOwner = null;
+    }
+    
+    /**
+     * ⭐ 新增：查找条件节点上距离指定位置最近的连接点
+     */
+    private Circle findNearestConnectorForConditionNode(ConditionNode conditionNode, double x, double y) {
+        Circle[] connectors = {
+            conditionNode.getTopConnector(),
+            conditionNode.getBottomConnector(),
+            conditionNode.getLeftConnector(),
+            conditionNode.getRightConnector()
+        };
+        
+        Circle nearest = null;
+        double minDistance = Double.MAX_VALUE;
+        
+        for (Circle connector : connectors) {
+            Point2D connectorCenter = new Point2D(
+                connector.getLayoutX() + connector.getRadius(),
+                connector.getLayoutY() + connector.getRadius()
+            );
+            Point2D nodeLocal = conditionNode.getConnectorPane().localToParent(connectorCenter);
+            Point2D canvasLocal = conditionNode.localToParent(nodeLocal);
+            
+            double dx = canvasLocal.getX() - x;
+            double dy = canvasLocal.getY() - y;
+            double distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance < minDistance && distance < 30) { // 30像素范围内
+                minDistance = distance;
+                nearest = connector;
+            }
+        }
+        
+        return nearest;
+    }
+    
+    /**
+     * ⭐ 新增：获取条件节点连接点的锚点名称
+     */
+    private String getConnectorAnchor(ConditionNode conditionNode, Circle connector) {
+        if (connector == conditionNode.getTopConnector()) return "top";
+        if (connector == conditionNode.getBottomConnector()) return "bottom";
+        if (connector == conditionNode.getLeftConnector()) return "left";
+        if (connector == conditionNode.getRightConnector()) return "right";
+        return "right";
+    }
+    
+    /**
+     * ⭐ 新增：根据锚点获取条件节点的连接点
+     */
+    private Circle getConnectorByAnchorForConditionNode(ConditionNode conditionNode, String anchor) {
+        if (anchor != null && !anchor.isEmpty()) {
+            return switch (anchor.toLowerCase()) {
+                case "top" -> conditionNode.getTopConnector();
+                case "bottom" -> conditionNode.getBottomConnector();
+                case "left" -> conditionNode.getLeftConnector();
+                case "right" -> conditionNode.getRightConnector();
+                default -> conditionNode.getRightConnector();
+            };
+        }
+        return conditionNode.getRightConnector();
+    }
+    
+    /**
+     * ⭐ 新增：根据锚点获取节点的连接点（通用方法）
+     */
+    private Circle getConnectorByAnchorForNode(Node node, String anchor) {
+        if (node instanceof ProcessNode processNode) {
+            return getConnectorByAnchor(processNode, anchor, false);
+        } else if (node instanceof ConditionNode conditionNode) {
+            return getConnectorByAnchorForConditionNode(conditionNode, anchor);
+        } else if (node instanceof GroupContainer groupContainer) {
+            return getConnectorByAnchorForGroupContainer(groupContainer, anchor);
+        }
+        return null;
+    }
+    
+    /**
+     * ⭐ 新增：根据锚点获取任务组的连接点
+     */
+    private Circle getConnectorByAnchorForGroupContainer(GroupContainer groupContainer, String anchor) {
+        if (anchor != null && !anchor.isEmpty()) {
+            return switch (anchor.toLowerCase()) {
+                case "top" -> groupContainer.getTopConnector();
+                case "bottom" -> groupContainer.getBottomConnector();
+                case "left" -> groupContainer.getLeftConnector();
+                case "right" -> groupContainer.getRightConnector();
+                default -> groupContainer.getRightConnector();
+            };
+        }
+        return groupContainer.getRightConnector();
+    }
+    
+    /**
+     * ⭐ 新增：获取节点的连接点父层
+     */
+    private Pane getConnectorParentForNode(Node node) {
+        if (node instanceof ProcessNode processNode) {
+            return processNode.getConnectorPane();
+        } else if (node instanceof ConditionNode conditionNode) {
+            return conditionNode.getConnectorPane();
+        } else if (node instanceof GroupContainer groupContainer) {
+            return groupContainer.getConnectorPane();
+        }
+        return null;
+    }
+    
+    /**
+     * ⭐ 新增：获取节点连接点的锚点名称（通用方法）
+     */
+    private String getConnectorAnchorForNode(Node node, Circle connector) {
+        if (node instanceof ProcessNode processNode) {
+            if (connector == processNode.getTopConnector()) return "top";
+            if (connector == processNode.getBottomConnector()) return "bottom";
+            if (connector == processNode.getLeftConnector()) return "left";
+            if (connector == processNode.getRightConnector()) return "right";
+        } else if (node instanceof ConditionNode conditionNode) {
+            return getConnectorAnchor(conditionNode, connector);
+        } else if (node instanceof GroupContainer groupContainer) {
+            if (connector == groupContainer.getTopConnector()) return "top";
+            if (connector == groupContainer.getBottomConnector()) return "bottom";
+            if (connector == groupContainer.getLeftConnector()) return "left";
+            if (connector == groupContainer.getRightConnector()) return "right";
+        }
+        return "right";
+    }
+    
+    /**
+     * ⭐ 新增：查找ProcessNode上距离指定位置最近的连接点
+     */
+    private Circle findNearestConnectorForNode(ProcessNode processNode, double x, double y) {
+        return nodeManager.findNearestConnector(processNode, x, y);
+    }
+    
+    /**
+     * ⭐ 新增：查找GroupContainer上距离指定位置最近的连接点
+     */
+    private Circle findNearestConnectorForGroupContainer(GroupContainer groupContainer, double x, double y) {
+        Circle[] connectors = {
+            groupContainer.getTopConnector(),
+            groupContainer.getBottomConnector(),
+            groupContainer.getLeftConnector(),
+            groupContainer.getRightConnector()
+        };
+        
+        Circle nearest = null;
+        double minDistance = Double.MAX_VALUE;
+        
+        for (Circle connector : connectors) {
+            Point2D connectorCenter = new Point2D(
+                connector.getLayoutX() + connector.getRadius(),
+                connector.getLayoutY() + connector.getRadius()
+            );
+            Point2D nodeLocal = groupContainer.getConnectorPane().localToParent(connectorCenter);
+            Point2D canvasLocal = groupContainer.localToParent(nodeLocal);
+            
+            double dx = canvasLocal.getX() - x;
+            double dy = canvasLocal.getY() - y;
+            double distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance < minDistance && distance < 30) { // 30像素范围内
+                minDistance = distance;
+                nearest = connector;
+            }
+        }
+        
+        return nearest;
+    }
+    
+    public void removeConditionNode(ConditionNode conditionNode) {
+        if (conditionNode == null) return;
+        
+        List<NodeConnection> attachedConnections = new ArrayList<>();
+        for (NodeConnection conn : new ArrayList<>(connections)) {
+            if (conn.getSourceOwner() == conditionNode || conn.getTargetOwner() == conditionNode) {
+                attachedConnections.add(conn);
+                connectionManager.removeConnection(conn);
+            }
+        }
+        
+        // 移除管理的节点
+        for (ProcessNode managedNode : conditionNode.getManagedCanvasNodes()) {
+            removeNode(managedNode, false);
+        }
+        
+        // 移除管理的条件节点
+        for (ConditionNode managedConditionNode : conditionNode.getManagedConditionNodes()) {
+            removeConditionNode(managedConditionNode);
+        }
+        
+        conditionNodes.remove(conditionNode);
+        this.getChildren().remove(conditionNode);
+        
+        log("✓ 删除条件节点: " + conditionNode.getConditionName());
+        notifyNodeStructureChanged();
+    }
+    
+    /**
+     * 检测节点是否进入条件节点容器，如果是则自动加入容器
+     * 支持递归检查嵌套的条件节点
+     */
+    private void checkNodeInConditionContainer(ProcessNode node) {
+        if (node == null) return;
+        
+        // 递归检查所有条件节点（包括嵌套的）
+        ConditionNode foundContainer = findConditionNodeContaining(node, conditionNodes);
+        if (foundContainer != null) {
+            // 节点已经在某个容器中，检查是否还在容器内
+            if (!isNodeInContainer(node, foundContainer)) {
+                // 节点移出了容器，从容器中移除
+                removeNodeFromConditionContainer(node, foundContainer);
+            }
+            return;
+        }
+        
+        // 检查节点是否进入任何条件节点容器（包括嵌套的）
+        ConditionNode targetContainer = findConditionNodeForNode(node, conditionNodes);
+        if (targetContainer != null && targetContainer.isExpanded()) {
+            // 节点进入容器，添加到容器中
+            addNodeToConditionContainer(node, targetContainer);
+        }
+    }
+    
+    /**
+     * 递归查找包含指定节点的条件节点
+     */
+    private ConditionNode findConditionNodeContaining(ProcessNode node, List<ConditionNode> conditionNodes) {
+        for (ConditionNode conditionNode : conditionNodes) {
+            // 检查当前条件节点是否包含该节点
+            if (conditionNode.getManagedCanvasNodes().contains(node)) {
+                return conditionNode;
+            }
+            // 递归检查嵌套的条件节点
+            ConditionNode nested = findConditionNodeContaining(node, conditionNode.getManagedConditionNodes());
+            if (nested != null) {
+                return nested;
+            }
+        }
+        return null;
+    }
+    
+    /**
+     * 递归查找节点应该加入的条件节点容器 - ⭐ 优化：返回最内层容器
+     */
+    private ConditionNode findConditionNodeForNode(ProcessNode node, List<ConditionNode> conditionNodes) {
+        // ⭐ 修复：优先检查嵌套的条件节点（最内层），如果找到就直接返回
+        for (ConditionNode conditionNode : conditionNodes) {
+            if (conditionNode.isExpanded()) {
+                // 先递归检查嵌套的条件节点
+                ConditionNode nested = findConditionNodeForNode(node, conditionNode.getManagedConditionNodes());
+                if (nested != null) {
+                    return nested; // 返回最内层的容器
+                }
+                // 如果嵌套容器中没有找到，再检查当前容器
+                if (isNodeInContainer(node, conditionNode)) {
+                    return conditionNode;
+                }
+            }
+        }
+        return null;
+    }
+    
+    /**
+     * 判断节点是否在条件节点容器内
+     */
+    private boolean isNodeInContainer(ProcessNode node, ConditionNode conditionNode) {
+        if (node == null || conditionNode == null || !conditionNode.isExpanded()) {
+            return false;
+        }
+        
+        double nodeX = node.getLayoutX();
+        double nodeY = node.getLayoutY();
+        double nodeWidth = node.getPrefWidth();
+        double nodeHeight = node.getPrefHeight();
+        
+        double containerX = conditionNode.getLayoutX();
+        double containerY = conditionNode.getLayoutY();
+        double containerWidth = conditionNode.getFrame().getWidth();
+        double containerHeight = conditionNode.getFrame().getHeight();
+        
+        // 计算节点中心点
+        double nodeCenterX = nodeX + nodeWidth / 2;
+        double nodeCenterY = nodeY + nodeHeight / 2;
+        
+        // 检查节点中心点是否在容器内（考虑header高度）
+        double headerHeight = 36; // 估算header高度
+        double contentY = containerY + headerHeight;
+        double contentHeight = containerHeight - headerHeight;
+        
+        return nodeCenterX >= containerX && 
+               nodeCenterX <= containerX + containerWidth &&
+               nodeCenterY >= contentY && 
+               nodeCenterY <= contentY + contentHeight;
+    }
+    
+    /**
+     * ⭐ 新增：判断条件节点是否在指定容器内（重载方法）
+     */
+    private boolean isConditionNodeInContainer(ConditionNode conditionNode, ConditionNode container) {
+        if (conditionNode == null || container == null || !container.isExpanded()) {
+            return false;
+        }
+        
+        // ⭐ 避免循环嵌套：不能将条件节点拖入自身或其子容器中
+        if (conditionNode == container) {
+            return false;
+        }
+        
+        // 检查是否是其子容器
+        if (isDescendantOf(conditionNode, container)) {
+            return false;
+        }
+        
+        double nodeX = conditionNode.getLayoutX();
+        double nodeY = conditionNode.getLayoutY();
+        double nodeWidth = conditionNode.getFrame().getWidth();
+        double nodeHeight = conditionNode.getFrame().getHeight();
+        
+        double containerX = container.getLayoutX();
+        double containerY = container.getLayoutY();
+        double containerWidth = container.getFrame().getWidth();
+        double containerHeight = container.getFrame().getHeight();
+        
+        // 计算条件节点中心点
+        double nodeCenterX = nodeX + nodeWidth / 2;
+        double nodeCenterY = nodeY + nodeHeight / 2;
+        
+        // 检查节点中心点是否在容器内（考虑header高度）
+        double headerHeight = 36; // 估算header高度
+        double contentY = containerY + headerHeight;
+        double contentHeight = containerHeight - headerHeight;
+        
+        return nodeCenterX >= containerX && 
+               nodeCenterX <= containerX + containerWidth &&
+               nodeCenterY >= contentY && 
+               nodeCenterY <= contentY + contentHeight;
+    }
+    
+    /**
+     * ⭐ 新增：检查conditionNode是否是container的子孙节点（避免循环嵌套）
+     */
+    private boolean isDescendantOf(ConditionNode conditionNode, ConditionNode container) {
+        if (conditionNode == null || container == null) {
+            return false;
+        }
+        
+        // 递归检查container的所有嵌套条件节点
+        for (ConditionNode nested : container.getManagedConditionNodes()) {
+            if (nested == conditionNode) {
+                return true;
+            }
+            // 递归检查嵌套的条件节点
+            if (isDescendantOf(conditionNode, nested)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * 将节点添加到条件节点容器
+     */
+    private void addNodeToConditionContainer(ProcessNode node, ConditionNode conditionNode) {
+        if (node == null || conditionNode == null) return;
+        
+        // 检查节点是否已经在容器中
+        if (conditionNode.getManagedCanvasNodes().contains(node)) {
+            return;
+        }
+        
+        // 将节点添加到容器的管理列表
+        List<ProcessNode> managedNodes = new ArrayList<>(conditionNode.getManagedCanvasNodes());
+        managedNodes.add(node);
+        conditionNode.bindCanvasNodes(managedNodes);
+        
+        log("✓ 节点 " + node.getJobHandlerName() + " 已加入条件节点: " + conditionNode.getConditionName());
+        markAsUnsaved();
+        notifyNodeStructureChanged();
+    }
+    
+    /**
+     * 从条件节点容器中移除节点
+     */
+    private void removeNodeFromConditionContainer(ProcessNode node, ConditionNode conditionNode) {
+        if (node == null || conditionNode == null) return;
+        
+        List<ProcessNode> managedNodes = new ArrayList<>(conditionNode.getManagedCanvasNodes());
+        managedNodes.remove(node);
+        conditionNode.bindCanvasNodes(managedNodes);
+        
+        log("✓ 节点 " + node.getJobHandlerName() + " 已从条件节点移除: " + conditionNode.getConditionName());
+        markAsUnsaved();
+        notifyNodeStructureChanged();
+    }
+    
+    /**
+     * ⭐ 新增：将条件节点添加到条件节点容器
+     */
+    private void addConditionNodeToConditionContainer(ConditionNode conditionNode, ConditionNode container) {
+        if (conditionNode == null || container == null) return;
+        
+        // 检查条件节点是否已经在容器中
+        if (container.getManagedConditionNodes().contains(conditionNode)) {
+            return;
+        }
+        
+        // ⭐ 避免循环嵌套：不能将条件节点拖入自身或其子容器中
+        if (conditionNode == container) {
+            return;
+        }
+        
+        if (isDescendantOf(conditionNode, container)) {
+            return;
+        }
+        
+        // 如果条件节点已经在其他容器中，先从原容器中移除
+        ConditionNode oldContainer = findConditionNodeContainingConditionNode(conditionNode, conditionNodes);
+        if (oldContainer != null && oldContainer != container) {
+            removeConditionNodeFromConditionContainer(conditionNode, oldContainer);
+        }
+        
+        // 将条件节点添加到容器的管理列表
+        List<ConditionNode> managedConditionNodes = new ArrayList<>(container.getManagedConditionNodes());
+        managedConditionNodes.add(conditionNode);
+        container.bindConditionNodes(managedConditionNodes);
+        
+        log("✓ 条件节点 " + conditionNode.getConditionName() + " 已加入条件节点: " + container.getConditionName());
+        markAsUnsaved();
+        notifyNodeStructureChanged();
+    }
+    
+    /**
+     * ⭐ 新增：从条件节点容器中移除条件节点
+     */
+    private void removeConditionNodeFromConditionContainer(ConditionNode conditionNode, ConditionNode container) {
+        if (conditionNode == null || container == null) return;
+        
+        List<ConditionNode> managedConditionNodes = new ArrayList<>(container.getManagedConditionNodes());
+        managedConditionNodes.remove(conditionNode);
+        container.bindConditionNodes(managedConditionNodes);
+        
+        log("✓ 条件节点 " + conditionNode.getConditionName() + " 已从条件节点移除: " + container.getConditionName());
+        markAsUnsaved();
+        notifyNodeStructureChanged();
+    }
+    
+    /**
+     * ⭐ 新增：检测条件节点是否进入条件节点容器，如果是则自动加入容器
+     * 支持递归检查嵌套的条件节点
+     */
+    private void checkConditionNodeInConditionContainer(ConditionNode conditionNode) {
+        if (conditionNode == null) return;
+        
+        // 递归检查所有条件节点（包括嵌套的），查找包含该条件节点的容器
+        ConditionNode foundContainer = findConditionNodeContainingConditionNode(conditionNode, conditionNodes);
+        if (foundContainer != null) {
+            // 条件节点已经在某个容器中，检查是否还在容器内
+            if (!isConditionNodeInContainer(conditionNode, foundContainer)) {
+                // 条件节点移出了容器，从容器中移除
+                removeConditionNodeFromConditionContainer(conditionNode, foundContainer);
+            } else {
+                // 仍在容器内，不需要处理
+                return;
+            }
+        }
+        
+        // 检查条件节点是否进入任何条件节点容器（包括嵌套的）
+        ConditionNode targetContainer = findConditionNodeForConditionNode(conditionNode, conditionNodes);
+        if (targetContainer != null && targetContainer.isExpanded()) {
+            // 条件节点进入容器，添加到容器中
+            addConditionNodeToConditionContainer(conditionNode, targetContainer);
+        }
+    }
+    
+    /**
+     * ⭐ 新增：递归查找包含指定条件节点的条件节点容器
+     */
+    private ConditionNode findConditionNodeContainingConditionNode(ConditionNode conditionNode, List<ConditionNode> conditionNodes) {
+        for (ConditionNode container : conditionNodes) {
+            // 检查当前条件节点是否包含该条件节点
+            if (container.getManagedConditionNodes().contains(conditionNode)) {
+                return container;
+            }
+            // 递归检查嵌套的条件节点
+            ConditionNode nested = findConditionNodeContainingConditionNode(conditionNode, container.getManagedConditionNodes());
+            if (nested != null) {
+                return nested;
+            }
+        }
+        return null;
+    }
+    
+    /**
+     * ⭐ 新增：递归查找条件节点应该加入的条件节点容器 - 返回最内层容器
+     */
+    private ConditionNode findConditionNodeForConditionNode(ConditionNode conditionNode, List<ConditionNode> conditionNodes) {
+        // 优先检查嵌套的条件节点（最内层），如果找到就直接返回
+        for (ConditionNode container : conditionNodes) {
+            if (container.isExpanded() && container != conditionNode) {
+                // 先递归检查嵌套的条件节点
+                ConditionNode nested = findConditionNodeForConditionNode(conditionNode, container.getManagedConditionNodes());
+                if (nested != null) {
+                    return nested; // 返回最内层的容器
+                }
+                // 如果嵌套容器中没有找到，再检查当前容器
+                if (isConditionNodeInContainer(conditionNode, container)) {
+                    return container;
+                }
+            }
+        }
+        return null;
+    }
+    
+    /**
+     * ⭐ 新增：递归查找所有包含指定节点的条件节点容器（从内到外）
+     */
+    private List<ConditionNode> findAllContainersContaining(ProcessNode node, List<ConditionNode> conditionNodes) {
+        List<ConditionNode> containers = new ArrayList<>();
+        for (ConditionNode conditionNode : conditionNodes) {
+            // 先递归检查嵌套的条件节点（最内层）
+            List<ConditionNode> nestedContainers = findAllContainersContaining(node, conditionNode.getManagedConditionNodes());
+            if (!nestedContainers.isEmpty()) {
+                // 如果找到嵌套容器，先添加嵌套容器（最内层）
+                containers.addAll(nestedContainers);
+            }
+            // 检查当前条件节点是否包含该节点
+            if (conditionNode.getManagedCanvasNodes().contains(node)) {
+                containers.add(conditionNode);
+            }
+        }
+        return containers;
+    }
+    
+    /**
+     * 从容器中移除节点（公共方法）- ⭐ 修复：支持递归移出到最外层
+     */
+    public void removeNodeFromContainer(ProcessNode node) {
+        if (node == null) return;
+        
+        // ⭐ 修复：递归查找所有包含该节点的条件节点容器（从内到外）
+        List<ConditionNode> allContainers = findAllContainersContaining(node, conditionNodes);
+        if (!allContainers.isEmpty()) {
+            // 从最内层到最外层依次移出
+            for (ConditionNode container : allContainers) {
+                removeNodeFromConditionContainer(node, container);
+            }
+            return;
+        }
+        
+        // 检查是否在任务组容器中
+        for (GroupContainer container : groupContainers) {
+            if (container.getManagedCanvasNodes().contains(node)) {
+                List<ProcessNode> managedNodes = new ArrayList<>(container.getManagedCanvasNodes());
+                managedNodes.remove(node);
+                container.bindCanvasNodes(managedNodes);
+                log("✓ 节点 " + node.getJobHandlerName() + " 已从任务组移除");
+                markAsUnsaved();
+                notifyNodeStructureChanged();
+                return;
+            }
+        }
+    }
+    
+    /**
+     * 检查节点是否在容器内
+     */
+    public boolean isNodeInAnyContainer(ProcessNode node) {
+        if (node == null) return false;
+        
+        // 检查条件节点容器
+        ConditionNode conditionContainer = findConditionNodeContaining(node, conditionNodes);
+        if (conditionContainer != null) {
+            return true;
+        }
+        
+        // 检查任务组容器
+        for (GroupContainer container : groupContainers) {
+            if (container.getManagedCanvasNodes().contains(node)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * ⭐ 新增：检查条件节点是否在容器内
+     */
+    public boolean isConditionNodeInAnyContainer(ConditionNode conditionNode) {
+        if (conditionNode == null) return false;
+        
+        // 检查条件节点容器
+        ConditionNode conditionContainer = findConditionNodeContainingConditionNode(conditionNode, conditionNodes);
+        if (conditionContainer != null) {
+            return true;
+        }
+        
+        return false;
     }
     
     // ==================== 节点状态管理 ====================

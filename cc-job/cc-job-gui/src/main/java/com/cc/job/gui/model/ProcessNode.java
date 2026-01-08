@@ -77,6 +77,10 @@ public class ProcessNode extends StackPane {
     // 节点状态设置回调
     private NodeStateChangeCallback onStateChange;
     
+    // 移出容器回调
+    private Runnable onRemoveFromContainer;
+    private java.util.function.Supplier<Boolean> isInContainerChecker; // 检查节点是否在容器内
+    
     public interface DisableNodeCallback {
         void onDisableNode(Long jobId, boolean isDisabled);
     }
@@ -518,6 +522,14 @@ public class ProcessNode extends StackPane {
         // 分隔符
         SeparatorMenuItem separator2 = new SeparatorMenuItem();
         
+        // 移出容器（动态添加，如果节点在容器内才显示）
+        MenuItem removeFromContainerItem = new MenuItem("移出容器");
+        removeFromContainerItem.setOnAction(e -> {
+            if (onRemoveFromContainer != null) {
+                onRemoveFromContainer.run();
+            }
+        });
+        
         // 删除节点
         MenuItem deleteItem = new MenuItem("删除节点");
         deleteItem.setStyle("-fx-text-fill: #EF4444;"); // 红色文字
@@ -543,6 +555,24 @@ public class ProcessNode extends StackPane {
         
         // 右键显示菜单
         this.setOnContextMenuRequested(e -> {
+            // 动态更新"移出容器"菜单项的可见性
+            boolean isInContainer = isInContainerChecker != null && isInContainerChecker.get();
+            if (isInContainer) {
+                // 如果节点在容器内，且菜单项还未添加，则添加
+                if (!contextMenu.getItems().contains(removeFromContainerItem)) {
+                    // 在separator2之前插入
+                    int separatorIndex = contextMenu.getItems().indexOf(separator2);
+                    if (separatorIndex >= 0) {
+                        contextMenu.getItems().add(separatorIndex, removeFromContainerItem);
+                    } else {
+                        contextMenu.getItems().add(contextMenu.getItems().size() - 1, removeFromContainerItem);
+                    }
+                }
+                removeFromContainerItem.setVisible(true);
+            } else {
+                // 如果节点不在容器内，隐藏菜单项
+                removeFromContainerItem.setVisible(false);
+            }
             contextMenu.show(this, e.getScreenX(), e.getScreenY());
             e.consume();
         });
@@ -674,6 +704,14 @@ public class ProcessNode extends StackPane {
     
     public void setOnStateChange(NodeStateChangeCallback callback) {
         this.onStateChange = callback;
+    }
+    
+    public void setOnRemoveFromContainer(Runnable onRemoveFromContainer) {
+        this.onRemoveFromContainer = onRemoveFromContainer;
+    }
+    
+    public void setIsInContainerChecker(java.util.function.Supplier<Boolean> isInContainerChecker) {
+        this.isInContainerChecker = isInContainerChecker;
     }
     
     /**
