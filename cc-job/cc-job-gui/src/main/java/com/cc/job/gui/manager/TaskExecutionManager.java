@@ -160,6 +160,8 @@ public class TaskExecutionManager {
                     
                     runningJob.cleanup();
                     runningJobs.remove(currentJobId);
+                    // ⭐ 隐藏标签页上的运行状态绿点
+                    navigationBar.updateTaskGroupRunningStatus(currentJobId, false);
                     updateToolBarRunningJobs();
                     canvas.setAllConnectionsRunning(false);
                     toolBar.setRunButtonLoading(false);
@@ -222,6 +224,27 @@ public class TaskExecutionManager {
     private void handleSSEMessage(SSEService.SSEMessage message, String expectedRandomId) {
         if (message.getStatus() != null && message.getStatus() == -1) {
             logPanel.error("❌ SSE连接错误: " + message.getResult());
+            
+            // ⭐ SSE连接错误时，清理运行状态并隐藏绿点
+            String errorRandomId = message.getRandomId();
+            Long errorJobId = message.getParentJobId() != null ? message.getParentJobId() : message.getJobId();
+            
+            if (errorJobId != null && errorRandomId != null && errorRandomId.equals(expectedRandomId)) {
+                RunningJobGroup runningJob = runningJobs.get(errorJobId);
+                if (runningJob != null && errorRandomId.equals(runningJob.getRandomId())) {
+                    Platform.runLater(() -> {
+                        logger.warn("SSE连接错误，清理任务组运行状态 - jobId: {}, randomId: {}", errorJobId, errorRandomId);
+                        runningJob.cleanup();
+                        runningJobs.remove(errorJobId);
+                        navigationBar.updateTaskGroupRunningStatus(errorJobId, false);
+                        updateToolBarRunningJobs();
+                        canvas.setAllConnectionsRunning(false);
+                        
+                        // 断开SSE连接
+                        SSEService.getInstance().disconnect(errorJobId, errorRandomId);
+                    });
+                }
+            }
             return;
         }
         

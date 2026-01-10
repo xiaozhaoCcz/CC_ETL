@@ -1320,7 +1320,10 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
             actionColumn.setCellFactory(col -> new TableCell<>() {
                 private final Button deleteButton = new Button("删除");
                 {
-                    deleteButton.setStyle("-fx-background-color: rgba(255,255,255,0.15); -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 4 10; -fx-background-radius: 4; -fx-border-color: rgba(255,255,255,0.3); -fx-border-radius: 4; -fx-cursor: hand;");
+                    // 使用红色背景，使按钮更明显
+                    deleteButton.setStyle("-fx-background-color: #FF4444; -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 4 10; -fx-background-radius: 4; -fx-border-color: #CC0000; -fx-border-radius: 4; -fx-cursor: hand;");
+                    deleteButton.setOnMouseEntered(e -> deleteButton.setStyle("-fx-background-color: #FF6666; -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 4 10; -fx-background-radius: 4; -fx-border-color: #CC0000; -fx-border-radius: 4; -fx-cursor: hand;"));
+                    deleteButton.setOnMouseExited(e -> deleteButton.setStyle("-fx-background-color: #FF4444; -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 4 10; -fx-background-radius: 4; -fx-border-color: #CC0000; -fx-border-radius: 4; -fx-cursor: hand;"));
                     deleteButton.setOnAction(e -> {
                         ParamItem item = getTableView().getItems().get(getIndex());
                         items.remove(item);
@@ -1340,7 +1343,10 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
             tableView.getColumns().add(actionColumn);
 
             Button addButton = new Button("+ 新增参数");
-            addButton.setStyle("-fx-background-color: rgba(255,255,255,0.2); -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 6 14; -fx-background-radius: 4; -fx-border-color: rgba(255,255,255,0.4); -fx-border-radius: 4; -fx-cursor: hand;");
+            // 使用蓝色背景，使按钮更明显
+            addButton.setStyle("-fx-background-color: #4A90E2; -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 6 14; -fx-background-radius: 4; -fx-border-color: #357ABD; -fx-border-radius: 4; -fx-cursor: hand;");
+            addButton.setOnMouseEntered(e -> addButton.setStyle("-fx-background-color: #5BA0F2; -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 6 14; -fx-background-radius: 4; -fx-border-color: #357ABD; -fx-border-radius: 4; -fx-cursor: hand;"));
+            addButton.setOnMouseExited(e -> addButton.setStyle("-fx-background-color: #4A90E2; -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 6 14; -fx-background-radius: 4; -fx-border-color: #357ABD; -fx-border-radius: 4; -fx-cursor: hand;"));
             addButton.setOnAction(e -> addRow("", ""));
 
             // 将新增按钮放在表格上方
