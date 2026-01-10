@@ -126,6 +126,7 @@ public class JobThread extends Thread{
 						xxlJobContext = triggerParam.getXxlJobContext();
 						int childJobId = triggerParam.getJobId();
 						xxlJobContext.setJobId(childJobId);
+						xxlJobContext.setJobParam(triggerParam.getExecutorParams());
 					}else{
 						xxlJobContext = new XxlJobContext(
 								triggerParam.getJobId(),

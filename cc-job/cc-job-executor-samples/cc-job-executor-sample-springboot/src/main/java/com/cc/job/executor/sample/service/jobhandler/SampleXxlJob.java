@@ -38,8 +38,9 @@ public class SampleXxlJob {
     @XxlJob("demoJobHandler1")
     public void demoJobHandler() throws Exception {
 
-        XxlJobHelper.log(">>>>>>>> demoJobHandler1 start");
-        System.out.println(">>>>>>>> demoJobHandler1 start");
+        String jobParam = XxlJobHelper.getJobParam();
+
+        XxlJobHelper.log(">>>>>>>> demoJobHandler1 start,params:"+jobParam);
 
         for (int i = 0; i < 10; i++) {
             XxlJobHelper.log("demoJobHandler1 beat at:" + i);
@@ -55,9 +56,9 @@ public class SampleXxlJob {
 
     @XxlJob("demoJobHandler2")
     public void demoJobHandler2() throws Exception {
-        XxlJobHelper.log(">>>>>>>> demoJobHandler2 start");
-        System.out.println(">>>>>>>> demoJobHandler2 start");
+        String jobParam = XxlJobHelper.getJobParam();
 
+        XxlJobHelper.log(">>>>>>>> demoJobHandler2 start,params:"+jobParam);
         for (int i = 0; i < 10; i++) {
             XxlJobHelper.log("demoJobHandler2 beat at:" + i);
             System.out.println("demoJobHandler2 beat at:" + i);
@@ -74,7 +75,9 @@ public class SampleXxlJob {
     @XxlJob("demoJobHandler3")
     public void demoJobHandler3() throws Exception {
 
-        XxlJobHelper.log(">>>>>>>> demoJobHandler3 start");
+        String jobParam = XxlJobHelper.getJobParam();
+
+        XxlJobHelper.log(">>>>>>>> demoJobHandler3 start,params:"+jobParam);
         System.out.println(">>>>>>>> demoJobHandler3 start");
 
         for (int i = 0; i < 10; i++) {
@@ -93,9 +96,9 @@ public class SampleXxlJob {
 
     @XxlJob("demoJobHandler4")
     public void demoJobHandler4() throws Exception {
+        String jobParam = XxlJobHelper.getJobParam();
 
-        XxlJobHelper.log(">>>>>>>> demoJobHandler4 start");
-        System.out.println(">>>>>>>> demoJobHandler1 start");
+        XxlJobHelper.log(">>>>>>>> demoJobHandler4 start,params:"+jobParam);
 
         for (int i = 0; i < 10; i++) {
             XxlJobHelper.log("demoJobHandler4 beat at:" + i);
@@ -113,7 +116,9 @@ public class SampleXxlJob {
     @XxlJob("demoJobHandler5")
     public void demoJobHandler5() throws Exception {
 
-        XxlJobHelper.log(">>>>>>>> demoJobHandler5 start");
+        String jobParam = XxlJobHelper.getJobParam();
+
+        XxlJobHelper.log(">>>>>>>> demoJobHandler5 start,params:"+jobParam);
 
         for (int i = 0; i < 10; i++) {
             XxlJobHelper.log("demoJobHandler5 beat at:" + i);

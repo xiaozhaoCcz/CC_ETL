@@ -15,14 +15,14 @@ import java.util.regex.Pattern;
 /**
  * 参数解析器
  * 
- * <p>负责解析和替换参数中的变量引用，支持 #jobName.attr 语法
+ * <p>负责解析和替换参数中的变量引用，支持 #{jobName}.attr 语法
  * 
  * <p>支持的语法：
  * <ul>
- *   <li>#jobName.attr - 获取 jobName 任务的 attr 属性</li>
- *   <li>#jobName.data.userId - 支持嵌套属性访问</li>
- *   <li>#jobName.list[0] - 支持数组/列表索引访问</li>
- *   <li>#jobName.result - 获取整个结果（如果结果是简单类型）</li>
+ *   <li>#{jobName}.attr - 获取 jobName 任务的 attr 属性</li>
+ *   <li>#{jobName}.data.userId - 支持嵌套属性访问</li>
+ *   <li>#{jobName}.list[0] - 支持数组/列表索引访问</li>
+ *   <li>#{jobName}.result - 获取整个结果（如果结果是简单类型）</li>
  * </ul>
  * 
  * @author cc-job-team
@@ -32,13 +32,13 @@ public class ParameterResolver {
     
     private static final Logger logger = LoggerFactory.getLogger(ParameterResolver.class);
     
-    /** 变量匹配模式：匹配 #jobName.attr 或 #jobName.attr.subAttr 等，支持方法调用 */
-    private static final Pattern VARIABLE_PATTERN = Pattern.compile("#([a-zA-Z0-9_\\u4e00-\\u9fa5]+)(\\.[a-zA-Z0-9_\\[\\]\\u4e00-\\u9fa5()]+)*");
+    /** 变量匹配模式：匹配 #{jobName}.attr 或 #{jobName}.attr.subAttr 等，支持方法调用 */
+    private static final Pattern VARIABLE_PATTERN = Pattern.compile("#\\{([^}]+)\\}(\\.[^\\s}()]+(?:\\([^)]*\\))?)+");
     
     /**
      * 解析并替换模板字符串中的所有变量
      * 
-     * @param template 模板字符串，可能包含 #jobName.attr 变量
+     * @param template 模板字符串，可能包含 #{jobName}.attr 变量
      * @param context 数据上下文
      * @param jobNameMap jobName 到 jobId 的映射（用于查找任务）
      * @return 替换后的字符串
@@ -64,10 +64,17 @@ public class ParameterResolver {
         for (String variable : variables) {
             String value = getValueFromContext(variable, context, jobNameMap);
             if (value != null) {
-                result = result.replace("#" + variable, value);
-                logger.debug("[ParameterResolver] 替换变量: #{} = {}", variable, value);
+                // variable 格式：jobName.attr，需要替换 #{jobName}.attr
+                String[] parts = variable.split("\\.", 2);
+                if (parts.length >= 2) {
+                    String jobName = parts[0];
+                    String attrPath = parts[1];
+                    String fullExpression = "#{" + jobName + "}." + attrPath;
+                    result = result.replace(fullExpression, value);
+                    logger.debug("[ParameterResolver] 替换变量: #{{{}}} = {}", variable, value);
+                }
             } else {
-                logger.warn("[ParameterResolver] 变量 #{} 未找到值，保持原值", variable);
+                logger.warn("[ParameterResolver] 变量 #{{{}}} 未找到值，保持原值", variable);
             }
         }
         
@@ -89,9 +96,12 @@ public class ParameterResolver {
         
         Matcher matcher = VARIABLE_PATTERN.matcher(template);
         while (matcher.find()) {
-            String fullMatch = matcher.group(0);
-            // 移除开头的 # 符号
-            String variable = fullMatch.substring(1);
+            // 移除开头的 #{ 和结尾的 }，保留 jobName.attr 部分
+            // fullMatch 格式：#{jobName}.attr
+            // 需要提取：jobName.attr
+            String jobName = matcher.group(1);  // 任务名称
+            String attrPath = matcher.group(2); // 属性路径（包含开头的 .）
+            String variable = jobName + attrPath;  // 组合为 jobName.attr
             variables.add(variable);
         }
         

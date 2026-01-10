@@ -490,7 +490,8 @@ public class AdminApiClient {
                 Map<String, Object> resultMap = JSONUtil.toBean(response.body(), Map.class);
                 Object data = resultMap.get("data");
                 if (data != null) {
-                    List<Map<String, Object>> results = JSONUtil.toList(JSONUtil.toJsonStr(data), Map.class);
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) JSONUtil.toList(JSONUtil.toJsonStr(data), Map.class);
                     logger.debug("[AdminApiClient] 获取节点结果成功 - taskGroupId: {}, batchId: {}, 数量: {}", 
                             taskGroupId, executionBatchId, results != null ? results.size() : 0);
                     return results != null ? results : new ArrayList<>();

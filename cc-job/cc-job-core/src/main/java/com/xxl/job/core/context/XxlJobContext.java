@@ -24,7 +24,7 @@ public class XxlJobContext {
     /**
      * job param
      */
-    private final String jobParam;
+    private String jobParam;
 
     // ---------------------- for log ----------------------
 
@@ -104,6 +104,10 @@ public class XxlJobContext {
 
     public String getJobParam() {
         return jobParam;
+    }
+
+    public void setJobParam(String jobParam){
+        this.jobParam = jobParam;
     }
 
     public String getJobLogFileName() {
