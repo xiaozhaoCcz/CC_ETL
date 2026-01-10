@@ -81,6 +81,9 @@ public class ProcessNode extends StackPane {
     private Runnable onRemoveFromContainer;
     private java.util.function.Supplier<Boolean> isInContainerChecker; // 检查节点是否在容器内
     
+    // 颜色变更回调
+    private Runnable onColorChanged; // 颜色变更时的回调,用于保存到数据库
+    
     public interface DisableNodeCallback {
         void onDisableNode(Long jobId, boolean isDisabled);
     }
@@ -1110,6 +1113,14 @@ public class ProcessNode extends StackPane {
     }
     
     /**
+     * 设置颜色变更回调
+     * @param callback 颜色变更时的回调函数,用于保存颜色到数据库
+     */
+    public void setOnColorChanged(Runnable callback) {
+        this.onColorChanged = callback;
+    }
+    
+    /**
      * 更改节点颜色（用于手动更改，如右键菜单）
      */
     private void changeNodeColor(String color) {
@@ -1134,6 +1145,20 @@ public class ProcessNode extends StackPane {
         leftConnector.setFill(Color.web(color));
         rightConnector.setFill(Color.web(color));
         
+        // 触发颜色变更回调,用于保存到数据库
+        if (onColorChanged != null) {
+            onColorChanged.run();
+        }
+    }
+    
+    /**
+     * 公共方法: 设置节点颜色(供外部调用,如从数据库加载时)
+     * @param color 颜色值(如 "#8B5CF6")
+     */
+    public void setNodeColor(String color) {
+        if (color != null && !color.isEmpty()) {
+            changeNodeColor(color);
+        }
     }
     
     /**

@@ -3,6 +3,7 @@ package com.cc.job.executor.compose.core.resolver;
 import cn.hutool.json.JSONUtil;
 import com.cc.job.executor.compose.core.context.DataContext;
 import com.cc.job.executor.compose.core.context.DataSourceType;
+import com.cc.job.xo.model.result.NodeResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -31,8 +32,8 @@ public class ParameterResolver {
     
     private static final Logger logger = LoggerFactory.getLogger(ParameterResolver.class);
     
-    /** 变量匹配模式：匹配 #jobName.attr 或 #jobName.attr.subAttr 等 */
-    private static final Pattern VARIABLE_PATTERN = Pattern.compile("#([a-zA-Z0-9_\\u4e00-\\u9fa5]+)(\\.[a-zA-Z0-9_\\[\\]\\u4e00-\\u9fa5]+)*");
+    /** 变量匹配模式：匹配 #jobName.attr 或 #jobName.attr.subAttr 等，支持方法调用 */
+    private static final Pattern VARIABLE_PATTERN = Pattern.compile("#([a-zA-Z0-9_\\u4e00-\\u9fa5]+)(\\.[a-zA-Z0-9_\\[\\]\\u4e00-\\u9fa5()]+)*");
     
     /**
      * 解析并替换模板字符串中的所有变量
@@ -123,50 +124,161 @@ public class ParameterResolver {
         // 规范化 jobName（去除特殊字符，转换为小写）
         String normalizedJobName = normalizeJobName(jobName);
         
-        // 构建数据键：jobName.attrPath
-        String dataKey = normalizedJobName + "." + attrPath;
+        // 检查是否包含方法调用
+        boolean hasMethodCall = attrPath.contains("(");
         
-        // 从上下文获取值
-        Object value = context.get(dataKey);
-        
-        // 如果直接获取失败，尝试其他可能的键名
-        if (value == null) {
-            // 尝试 jobName.result（如果 attrPath 是 result）
-            if ("result".equals(attrPath)) {
-                value = context.get(normalizedJobName + ".result");
-            }
-            // 尝试 jobName.value（如果 attrPath 是 value）
-            if (value == null && "value".equals(attrPath)) {
-                value = context.get(normalizedJobName + ".value");
-            }
-        }
-        
-        // 如果值存在，可能需要进一步解析嵌套属性
-        if (value != null && attrPath.contains(".")) {
-            value = resolveNestedAttribute(value, attrPath);
-        }
-        
-        // 如果值存在，可能需要解析数组索引
-        if (value != null && attrPath.contains("[")) {
-            value = resolveArrayIndex(value, attrPath);
-        }
-        
-        // 转换为字符串
-        if (value != null) {
-            // 记录数据来源类型（用于调试和追踪）
-            DataSourceType sourceType = context.getDataSourceType(dataKey);
-            if (sourceType != null) {
-                if (sourceType == DataSourceType.DATABASE) {
-                    logger.debug("[ParameterResolver] 从数据库获取变量值: {} (来源: 历史数据)", variable);
-                } else {
-                    logger.debug("[ParameterResolver] 从当前执行上下文获取变量值: {} (来源: 当前运行)", variable);
+        // 如果包含方法调用，需要先解析到方法调用的位置
+        if (hasMethodCall) {
+            // 找到第一个方法调用的位置
+            int methodIndex = attrPath.indexOf('(');
+            String beforeMethod = attrPath.substring(0, methodIndex);
+            String methodPart = attrPath.substring(methodIndex);
+            
+            // 先解析方法调用之前的部分
+            String baseKey = normalizedJobName + "." + beforeMethod;
+            Object baseValue = context.get(baseKey);
+            
+            // 如果直接获取失败，尝试其他可能的键名
+            if (baseValue == null) {
+                // 尝试 jobName.result（如果 beforeMethod 是 result）
+                if ("result".equals(beforeMethod)) {
+                    baseValue = context.get(normalizedJobName + ".result");
+                }
+                // 尝试 jobName.value（如果 beforeMethod 是 value）
+                if (baseValue == null && "value".equals(beforeMethod)) {
+                    baseValue = context.get(normalizedJobName + ".value");
+                }
+                // 尝试 jobName.data（如果 beforeMethod 是 data）
+                if (baseValue == null && "data".equals(beforeMethod)) {
+                    baseValue = context.get(normalizedJobName + ".data");
                 }
             }
-            return convertToString(value);
+            
+            // 如果baseValue是NodeResult，需要进一步解析
+            if (baseValue != null) {
+                baseValue = resolveNodeResultAttribute(baseValue, beforeMethod);
+            }
+            
+            // 如果值存在，可能需要进一步解析嵌套属性（在方法调用之前）
+            if (baseValue != null && beforeMethod.contains(".")) {
+                baseValue = resolveNestedAttribute(baseValue, beforeMethod);
+            }
+            
+            // 执行方法调用
+            if (baseValue != null) {
+                return convertToString(executeMethod(baseValue, methodPart));
+            }
+        } else {
+            // 没有方法调用，使用原有逻辑
+            // 构建数据键：jobName.attrPath
+            String dataKey = normalizedJobName + "." + attrPath;
+            
+            // 从上下文获取值
+            Object value = context.get(dataKey);
+            
+            // 如果直接获取失败，尝试其他可能的键名
+            if (value == null) {
+                // 尝试 jobName.result（如果 attrPath 是 result）
+                if ("result".equals(attrPath)) {
+                    value = context.get(normalizedJobName + ".result");
+                }
+                // 尝试 jobName.value（如果 attrPath 是 value）
+                if (value == null && "value".equals(attrPath)) {
+                    value = context.get(normalizedJobName + ".value");
+                }
+                // 尝试直接获取jobName（可能是NodeResult对象）
+                if (value == null) {
+                    value = context.get(normalizedJobName);
+                    if (value != null) {
+                        value = resolveNodeResultAttribute(value, attrPath);
+                    }
+                }
+            }
+            
+            // 如果值存在，可能需要进一步解析嵌套属性
+            if (value != null && attrPath.contains(".")) {
+                value = resolveNestedAttribute(value, attrPath);
+            }
+            
+            // 如果值存在，可能需要解析数组索引
+            if (value != null && attrPath.contains("[")) {
+                value = resolveArrayIndex(value, attrPath);
+            }
+            
+            // 转换为字符串
+            if (value != null) {
+                // 记录数据来源类型（用于调试和追踪）
+                DataSourceType sourceType = context.getDataSourceType(dataKey);
+                if (sourceType != null) {
+                    if (sourceType == DataSourceType.DATABASE) {
+                        logger.debug("[ParameterResolver] 从数据库获取变量值: {} (来源: 历史数据)", variable);
+                    } else {
+                        logger.debug("[ParameterResolver] 从当前执行上下文获取变量值: {} (来源: 当前运行)", variable);
+                    }
+                }
+                return convertToString(value);
+            }
         }
         
         logger.debug("[ParameterResolver] 未找到变量值: {}", variable);
         return null;
+    }
+    
+    /**
+     * 从NodeResult对象中解析属性
+     */
+    private Object resolveNodeResultAttribute(Object value, String attrPath) {
+        if (value == null || attrPath == null) {
+            return value;
+        }
+        
+        // 检查是否是NodeResult类型
+        if (value instanceof NodeResult) {
+            NodeResult nodeResult = (NodeResult) value;
+            
+            // 根据属性路径返回相应的值
+            switch (attrPath) {
+                case "code":
+                    return nodeResult.getCode();
+                case "message":
+                    return nodeResult.getMessage();
+                case "success":
+                    return nodeResult.getSuccess();
+                case "duration":
+                    return nodeResult.getDuration();
+                case "timestamp":
+                    return nodeResult.getTimestamp();
+                case "data":
+                    return nodeResult.getData();
+                case "sqlResult":
+                    return nodeResult.getSqlResult();
+                case "apiResult":
+                    return nodeResult.getApiResult();
+                case "beanResult":
+                    return nodeResult.getBeanResult();
+                case "glueResult":
+                    return nodeResult.getGlueResult();
+                default:
+                    // 尝试从data中获取
+                    if (nodeResult.getData() != null && nodeResult.getData() instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> dataMap = (Map<String, Object>) nodeResult.getData();
+                        return dataMap.get(attrPath);
+                    }
+            }
+        }
+        
+        return value;
+    }
+    
+    /**
+     * 首字母大写
+     */
+    private String capitalize(String str) {
+        if (str == null || str.isEmpty()) {
+            return str;
+        }
+        return str.substring(0, 1).toUpperCase() + str.substring(1);
     }
     
     /**
@@ -358,6 +470,129 @@ public class ParameterResolver {
         }
         
         return str;
+    }
+    
+    /**
+     * 执行方法调用
+     * 
+     * @param value 目标对象
+     * @param methodCall 方法调用字符串（如 get(0), range(0, 10), size()）
+     * @return 方法返回值
+     */
+    private Object executeMethod(Object value, String methodCall) {
+        if (value == null || methodCall == null || methodCall.isEmpty()) {
+            return value;
+        }
+        
+        // 解析方法名和参数
+        int openParen = methodCall.indexOf('(');
+        int closeParen = methodCall.lastIndexOf(')');
+        
+        if (openParen < 0 || closeParen < 0 || closeParen <= openParen) {
+            return value;
+        }
+        
+        String methodName = methodCall.substring(0, openParen);
+        String paramsStr = methodCall.substring(openParen + 1, closeParen).trim();
+        
+        // 解析参数
+        List<Object> params = parseMethodParams(paramsStr);
+        
+        // 根据方法名执行相应的操作
+        return executeMethodByName(value, methodName, params);
+    }
+    
+    /**
+     * 解析方法参数
+     */
+    private List<Object> parseMethodParams(String paramsStr) {
+        List<Object> params = new ArrayList<>();
+        if (paramsStr == null || paramsStr.isEmpty()) {
+            return params;
+        }
+        
+        // 简单解析：按逗号分割，支持整数和字符串
+        String[] parts = paramsStr.split(",");
+        for (String part : parts) {
+            part = part.trim();
+            if (part.isEmpty()) {
+                continue;
+            }
+            
+            // 尝试解析为整数
+            try {
+                params.add(Integer.parseInt(part));
+            } catch (NumberFormatException e) {
+                // 如果不是整数，作为字符串处理（去除引号）
+                if (part.startsWith("\"") && part.endsWith("\"")) {
+                    params.add(part.substring(1, part.length() - 1));
+                } else if (part.startsWith("'") && part.endsWith("'")) {
+                    params.add(part.substring(1, part.length() - 1));
+                } else {
+                    params.add(part);
+                }
+            }
+        }
+        
+        return params;
+    }
+    
+    /**
+     * 根据方法名执行相应的操作
+     */
+    private Object executeMethodByName(Object value, String methodName, List<Object> params) {
+        if (!(value instanceof List)) {
+            logger.warn("[ParameterResolver] 方法调用 {} 只能在List类型上执行，当前类型: {}", 
+                    methodName, value.getClass().getSimpleName());
+            return value;
+        }
+        
+        @SuppressWarnings("unchecked")
+        List<Object> list = (List<Object>) value;
+        
+        switch (methodName) {
+            case "get":
+                if (params.size() == 1 && params.get(0) instanceof Integer) {
+                    int index = (Integer) params.get(0);
+                    if (index >= 0 && index < list.size()) {
+                        return list.get(index);
+                    }
+                }
+                break;
+                
+            case "range":
+                if (params.size() == 2 && params.get(0) instanceof Integer && params.get(1) instanceof Integer) {
+                    int start = (Integer) params.get(0);
+                    int end = (Integer) params.get(1);
+                    if (start >= 0 && end <= list.size() && start <= end) {
+                        return new ArrayList<>(list.subList(start, end));
+                    }
+                }
+                break;
+                
+            case "size":
+                return list.size();
+                
+            case "first":
+                if (!list.isEmpty()) {
+                    return list.get(0);
+                }
+                break;
+                
+            case "last":
+                if (!list.isEmpty()) {
+                    return list.get(list.size() - 1);
+                }
+                break;
+                
+            case "isEmpty":
+                return list.isEmpty();
+                
+            default:
+                logger.warn("[ParameterResolver] 不支持的方法: {}", methodName);
+        }
+        
+        return value;
     }
     
     /**

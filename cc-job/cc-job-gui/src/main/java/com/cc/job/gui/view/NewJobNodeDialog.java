@@ -2,6 +2,7 @@ package com.cc.job.gui.view;
 
 import com.cc.job.gui.service.JobJdbcDatasourceService;
 import com.cc.job.gui.util.IconUtil;
+import com.cc.job.gui.view.component.SmartParameterInput;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.entity.JobJdbcDatasource;
 import com.cc.job.xo.model.form.JobInfoForm;
@@ -54,11 +55,11 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
     private ComboBox<JobJdbcDatasource> datasourceCombo; // SQL模式下的数据库下拉框
     private Button glueIdeButton; // GLUE模式下的按钮
     private Label executorParamLabel;
-    private com.cc.job.gui.view.component.SmartParameterInput executorParamArea;
+    private SmartParameterInput executorParamArea;
     private ComboBox<String> reqTypeCombo;
     private TextField reqUrlField;
     private Label reqBodyLabel;
-    private com.cc.job.gui.view.component.SmartParameterInput reqBodyArea;
+    private SmartParameterInput reqBodyArea;
     private ParameterTable bodyTable;
     
     private JobJdbcDatasourceService datasourceService;
@@ -356,7 +357,7 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         
         // 任务参数
         executorParamLabel = createFormLabel("任务参数", false);
-        executorParamArea = new com.cc.job.gui.view.component.SmartParameterInput();
+        executorParamArea = new SmartParameterInput();
         executorParamArea.setPrefWidth(615);
         executorParamArea.setPrefRowCount(4);
         executorParamArea.setPromptText("输入参数，使用 #{任务描述}.属性 引用其他任务的结果，使用 `# 输入普通#号");
@@ -1276,7 +1277,12 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
             addButton.setStyle("-fx-background-color: rgba(255,255,255,0.2); -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 6 14; -fx-background-radius: 4; -fx-border-color: rgba(255,255,255,0.4); -fx-border-radius: 4; -fx-cursor: hand;");
             addButton.setOnAction(e -> addRow("", ""));
 
-            getChildren().addAll(titleLabel, tableView, addButton);
+            // 将新增按钮放在表格上方
+            HBox buttonContainer = new HBox();
+            buttonContainer.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+            buttonContainer.getChildren().add(addButton);
+
+            getChildren().addAll(titleLabel, buttonContainer, tableView);
             ensureAtLeastOneRow();
         }
 

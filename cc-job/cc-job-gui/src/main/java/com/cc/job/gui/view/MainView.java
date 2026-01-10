@@ -10,6 +10,7 @@ import com.cc.job.xo.model.form.JobInfoForm;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -73,6 +74,9 @@ public class MainView extends BorderPane {
     
     // 任务组名称到ID的映射
     private Map<String, Long> taskGroupNameToIdMap = new HashMap<>();
+    
+    // 任务组ID -> 滚动位置映射（用于保存和恢复每个任务组的画布位置）
+    private Map<Long, ScrollPosition> taskGroupScrollPositions = new HashMap<>();
     
     public MainView() {
         this.jobGroupService = new JobGroupService();
@@ -171,6 +175,15 @@ public class MainView extends BorderPane {
         // 重要：设置对话框管理器（用于显示节点详情对话框）
         nodeCallbackConfigurator.setDialogManager(dialogManager);
         
+        // 设置颜色变更回调(用于保存颜色到数据库)
+        nodeCallbackConfigurator.setOnColorChangedCallback(() -> {
+            Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
+            if (currentTaskGroupId != null && currentTaskGroupId != 0) {
+                // 异步保存,不阻塞UI
+                dataManager.saveOrUpdateJob(currentTaskGroupId);
+            }
+        });
+        
         // 设置数据加载完成后的回调，配置所有节点的操作回调
         dataManager.setOnDataLoaded(() -> {
             Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
@@ -181,6 +194,9 @@ public class MainView extends BorderPane {
                 if (taskExecutionManager != null && taskExecutionManager.isTaskGroupRunning(currentTaskGroupId)) {
                     canvas.setAllConnectionsRunning(true);
                 }
+                
+                // ⭐ 修复：数据加载完成后恢复滚动位置
+                restoreScrollPosition(currentTaskGroupId);
             }
         });
         
@@ -322,7 +338,9 @@ public class MainView extends BorderPane {
 
             @Override
             public void onSettings() {
-                logPanel.info("系统设置功能开发中...");
+                Stage ownerStage = (Stage) MainView.this.getScene().getWindow();
+                SettingsDialog settingsDialog = new SettingsDialog(ownerStage);
+                settingsDialog.showAndWait();
             }
 
             @Override
@@ -389,11 +407,15 @@ public class MainView extends BorderPane {
                     return;
                 }
                 
-                // 切换任务组前，先保存当前任务组的数据
+                // 切换任务组前，先保存当前任务组的数据和滚动位置
                 Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
-                if (currentTaskGroupId != null && currentTaskGroupId != 0 && !currentTaskGroupId.equals(taskGroupId) && canvas.hasUnsavedChanges()) {
-                    dataManager.saveOrUpdateJob(currentTaskGroupId);
-                    canvas.markAsSaved();
+                if (currentTaskGroupId != null && currentTaskGroupId != 0 && !currentTaskGroupId.equals(taskGroupId)) {
+                    if (canvas.hasUnsavedChanges()) {
+                        dataManager.saveOrUpdateJob(currentTaskGroupId);
+                        canvas.markAsSaved();
+                    }
+                    // 保存当前任务组的滚动位置
+                    saveCurrentScrollPosition();
                 }
                 
                 String displayName = (taskGroupName != null && !taskGroupName.isBlank())
@@ -404,19 +426,481 @@ public class MainView extends BorderPane {
                 pageStoreHelper.setCurrentPage(taskGroupId);
                 navigationBar.addOrSelectTask(displayName, taskGroupId);
                 toolBar.setCurrentTaskGroupId(taskGroupId);
-                // 数据加载后会自动配置节点回调
+                // 数据加载后会自动配置节点回调，并恢复滚动位置
                 dataManager.loadTaskGroupData(taskGroupId, displayName);
+                
+                // 添加到最近打开的文件列表
+                com.cc.job.gui.util.RecentFilesManager.getInstance().addRecentFile(taskGroupId, displayName);
+                toolBar.refreshRecentFilesMenu();
+            }
+            
+            // 文件菜单扩展
+            @Override
+            public void onSaveAs() {
+                Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
+                if (currentTaskGroupId == null) {
+                    logPanel.warn("⚠ 请先选择一个任务组");
+                    return;
+                }
+                exportTaskGroup(currentTaskGroupId);
+            }
+            
+            @Override
+            public void onExit() {
+                Stage stage = (Stage) MainView.this.getScene().getWindow();
+                stage.fireEvent(new javafx.stage.WindowEvent(stage, javafx.stage.WindowEvent.WINDOW_CLOSE_REQUEST));
+            }
+            
+            @Override
+            public void onRecentFile(Long taskGroupId, String taskGroupName) {
+                onTaskSelected(taskGroupId, taskGroupName);
+            }
+            
+            @Override
+            public List<TopToolBar.RecentFile> getRecentFiles() {
+                return com.cc.job.gui.util.RecentFilesManager.getInstance().getRecentFiles();
+            }
+            
+            // 编辑菜单扩展
+            @Override
+            public void onCut() {
+                handleCopyShortcut();
+                // 复制后删除选中的节点
+                Set<ProcessNode> selectedNodes = canvas.getSelectedNodes();
+                if (!selectedNodes.isEmpty()) {
+                    for (ProcessNode node : selectedNodes) {
+                        canvas.removeNode(node, true);
+                    }
+                    canvas.markAsUnsaved();
+                    logPanel.info("✓ 已剪切节点");
+                }
+            }
+            
+            @Override
+            public void onCopy() {
+                handleCopyShortcut();
+            }
+            
+            @Override
+            public void onPaste() {
+                handlePasteShortcut();
+            }
+            
+            @Override
+            public void onDelete() {
+                Set<ProcessNode> selectedNodes = canvas.getSelectedNodes();
+                if (selectedNodes.isEmpty()) {
+                    logPanel.warn("⚠ 请先选中要删除的节点");
+                    return;
+                }
+                for (ProcessNode node : selectedNodes) {
+                    canvas.removeNode(node, true);
+                }
+                canvas.markAsUnsaved();
+                logPanel.info("✓ 已删除节点");
+            }
+            
+            @Override
+            public void onSelectAll() {
+                canvas.selectAllNodes();
+                logPanel.info("✓ 已全选所有节点");
+            }
+            
+            @Override
+            public void onFindNode() {
+                // 显示查找节点对话框
+                showFindNodeDialog();
+            }
+            
+            @Override
+            public void onFindNext() {
+                // TODO: 实现查找下一个
+                logPanel.info("查找下一个功能开发中...");
+            }
+            
+            @Override
+            public void onFindPrevious() {
+                // TODO: 实现查找上一个
+                logPanel.info("查找上一个功能开发中...");
+            }
+            
+            @Override
+            public void onAutoLayout() {
+                canvas.autoLayout();
+                logPanel.info("✓ 已自动布局");
+            }
+            
+            // 选择菜单
+            @Override
+            public void onInvertSelection() {
+                canvas.invertSelection();
+                logPanel.info("✓ 已反选");
+            }
+            
+            @Override
+            public void onSelectByType(String type) {
+                canvas.selectByType(type);
+                logPanel.info("✓ 已按类型选择: " + type);
+            }
+            
+            @Override
+            public void onClearSelection() {
+                canvas.clearSelection();
+            }
+            
+            @Override
+            public void onSelectUpstream() {
+                canvas.selectUpstreamNodes();
+                logPanel.info("✓ 已选择上游节点");
+            }
+            
+            @Override
+            public void onSelectDownstream() {
+                canvas.selectDownstreamNodes();
+                logPanel.info("✓ 已选择下游节点");
+            }
+            
+            // 查看菜单
+            @Override
+            public void onZoomActualSize() {
+                zoomCanvas(1.0);
+            }
+            
+            @Override
+            public void onToggleTreeView() {
+                treeViewVisible = !treeViewVisible;
+                updateLeftSidebar();
+            }
+            
+            @Override
+            public void onToggleMiniMap() {
+                miniMapVisible = !miniMapVisible;
+                updateLeftSidebar();
+            }
+            
+            @Override
+            public void onToggleLogPanel() {
+                logPanelVisible = !logPanelVisible;
+                updateLeftSidebar();
+            }
+            
+            @Override
+            public void onResetLayout() {
+                treeViewVisible = true;
+                miniMapVisible = true;
+                logPanelVisible = true;
+                updateLeftSidebar();
+                logPanel.info("✓ 已重置布局");
+            }
+            
+            @Override
+            public void onToggleGrid() {
+                canvas.toggleGrid();
+                logPanel.info("✓ 已切换网格显示");
+            }
+            
+            @Override
+            public void onToggleNodeLabels() {
+                canvas.toggleNodeLabels();
+                logPanel.info("✓ 已切换节点标签显示");
+            }
+            
+            @Override
+            public void onToggleEdgeLabels() {
+                canvas.toggleEdgeLabels();
+                logPanel.info("✓ 已切换连线标签显示");
+            }
+            
+            @Override
+            public void onSetTheme(String theme) {
+                // TODO: 实现主题切换
+                logPanel.info("主题切换功能开发中: " + theme);
+            }
+            
+            @Override
+            public void onToggleFullScreen() {
+                Stage stage = (Stage) MainView.this.getScene().getWindow();
+                stage.setFullScreen(!stage.isFullScreen());
+            }
+            
+            // 转到菜单
+            @Override
+            public void onGoToNode() {
+                showGoToNodeDialog();
+            }
+            
+            @Override
+            public void onGoToTaskGroup() {
+                showGoToTaskGroupDialog();
+            }
+            
+            @Override
+            public void onGoToPartition() {
+                showGoToPartitionDialog();
+            }
+            
+            @Override
+            public void onPreviousNode() {
+                canvas.navigateToPreviousNode();
+            }
+            
+            @Override
+            public void onNextNode() {
+                canvas.navigateToNextNode();
+            }
+            
+            @Override
+            public void onLocateSelectedNode() {
+                Set<ProcessNode> selectedNodes = canvas.getSelectedNodes();
+                if (!selectedNodes.isEmpty()) {
+                    ProcessNode node = selectedNodes.iterator().next();
+                    canvas.locateNode(node);
+                    logPanel.info("✓ 已定位到选中节点");
+                } else {
+                    logPanel.warn("⚠ 请先选中一个节点");
+                }
+            }
+            
+            @Override
+            public void onLocateRunningNode() {
+                canvas.locateRunningNode();
+                logPanel.info("✓ 已定位到运行中的节点");
+            }
+            
+            // 运行菜单扩展
+            @Override
+            public void onRerun() {
+                Long jobId = pageStoreHelper.getCurrentTaskGroupId();
+                if (jobId != null) {
+                    onStop(jobId);
+                    // 等待停止后重新运行
+                    Platform.runLater(() -> {
+                        try {
+                            Thread.sleep(500);
+                            onRun();
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    });
+                }
+            }
+            
+            @Override
+            public void onRunSelectedNodes() {
+                // TODO: 实现运行选中的节点
+                logPanel.info("运行选中节点功能开发中...");
+            }
+            
+            @Override
+            public void onRunToHere() {
+                // TODO: 实现运行到此处
+                logPanel.info("运行到此处功能开发中...");
+            }
+            
+            // 任务菜单扩展
+            @Override
+            public void onNewJobGroup() {
+                dialogManager.showJobGroupDialog(null, null, null, () -> {
+                    dataManager.refreshTreeView();
+                });
+            }
+            
+            @Override
+            public void onEditJobGroup() {
+                Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
+                if (currentTaskGroupId == null) {
+                    logPanel.warn("⚠ 请先选择一个任务组");
+                    return;
+                }
+                String taskGroupName = getJobNameById(currentTaskGroupId);
+                new Thread(() -> {
+                    try {
+                        JobInfoForm formData = new JobInfoService().getJobNodeFormData(currentTaskGroupId);
+                        Platform.runLater(() -> {
+                            Long partitionId = formData.getJobPartId() != null ? formData.getJobPartId().longValue() : null;
+                            dialogManager.showJobGroupDialog(partitionId, taskGroupName, formData, () -> {
+                                dataManager.refreshTreeView();
+                            });
+                        });
+                    } catch (Exception e) {
+                        Platform.runLater(() -> logPanel.error("✗ 加载任务组数据失败: " + e.getMessage()));
+                    }
+                }).start();
+            }
+            
+            @Override
+            public void onDeleteJobGroup() {
+                Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
+                if (currentTaskGroupId == null) {
+                    logPanel.warn("⚠ 请先选择一个任务组");
+                    return;
+                }
+                // 显示确认对话框
+                Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
+                confirmAlert.setTitle("确认删除");
+                confirmAlert.setHeaderText(null);
+                confirmAlert.setContentText("确定要删除当前任务组吗？此操作不可撤销。");
+                confirmAlert.showAndWait().ifPresent(response -> {
+                    if (response == ButtonType.OK) {
+                        try {
+                            new JobGroupService().deleteJobGroups(String.valueOf(currentTaskGroupId));
+                            logPanel.success("✓ 任务组已删除");
+                            dataManager.refreshTreeView();
+                            canvas.clear();
+                            pageStoreHelper.setCurrentPage(null);
+                        } catch (Exception e) {
+                            logPanel.error("✗ 删除任务组失败: " + e.getMessage());
+                        }
+                    }
+                });
+            }
+            
+            @Override
+            public void onCopyJobGroup() {
+                // TODO: 实现复制任务组
+                logPanel.info("复制任务组功能开发中...");
+            }
+            
+            // 窗口菜单
+            @Override
+            public void onNewWindow() {
+                // TODO: 实现新建窗口
+                logPanel.info("新建窗口功能开发中...");
+            }
+            
+            @Override
+            public void onCloseWindow() {
+                Stage stage = (Stage) MainView.this.getScene().getWindow();
+                stage.fireEvent(new javafx.stage.WindowEvent(stage, javafx.stage.WindowEvent.WINDOW_CLOSE_REQUEST));
+            }
+            
+            @Override
+            public void onCloseAllWindows() {
+                onCloseWindow();
+            }
+            
+            @Override
+            public void onMinimize() {
+                Stage stage = (Stage) MainView.this.getScene().getWindow();
+                stage.setIconified(true);
+            }
+            
+            @Override
+            public void onZoomWindow() {
+                Stage stage = (Stage) MainView.this.getScene().getWindow();
+                if (stage.isMaximized()) {
+                    stage.setMaximized(false);
+                } else {
+                    stage.setMaximized(true);
+                }
+            }
+            
+            @Override
+            public void onDetachTreeView() {
+                detachPanel("任务组", treeView, () -> {
+                    treeViewVisible = true;
+                    updateLeftSidebar();
+                });
+            }
+            
+            @Override
+            public void onDetachMiniMap() {
+                detachPanel("小地图", miniMap, () -> {
+                    miniMapVisible = true;
+                    updateLeftSidebar();
+                });
+            }
+            
+            @Override
+            public void onDetachLogPanel() {
+                detachLogPanel();
+            }
+            
+            @Override
+            public void onRestoreAllPanels() {
+                treeViewVisible = true;
+                miniMapVisible = true;
+                logPanelVisible = true;
+                updateLeftSidebar();
+                logPanel.info("✓ 已恢复所有面板");
+            }
+            
+            @Override
+            public void onSaveLayout() {
+                // TODO: 实现保存布局
+                logPanel.info("保存布局功能开发中...");
+            }
+            
+            @Override
+            public void onRestoreDefaultLayout() {
+                onResetLayout();
+            }
+            
+            // 帮助菜单
+            @Override
+            public void onUserManual() {
+                // 打开用户手册（可以是本地文件或在线链接）
+                logPanel.info("用户手册功能开发中...");
+            }
+            
+            @Override
+            public void onShortcutsList() {
+                showShortcutsDialog();
+            }
+            
+            @Override
+            public void onApiDocumentation() {
+                // 打开API文档
+                logPanel.info("API文档功能开发中...");
+            }
+            
+            @Override
+            public void onChangelog() {
+                // 显示更新日志
+                showChangelogDialog();
+            }
+            
+            @Override
+            public void onAbout() {
+                showAboutDialog();
+            }
+            
+            @Override
+            public void onCheckUpdate() {
+                logPanel.info("检查更新功能开发中...");
+            }
+            
+            @Override
+            public void onReportIssue() {
+                // 打开报告问题的链接或对话框
+                logPanel.info("报告问题功能开发中...");
+            }
+            
+            @Override
+            public void onFeedback() {
+                // 打开反馈建议的链接或对话框
+                logPanel.info("反馈建议功能开发中...");
+            }
+            
+            @Override
+            public void onOnlineHelp() {
+                // 打开在线帮助
+                logPanel.info("在线帮助功能开发中...");
             }
         });
 
         // 导航栏回调
         navigationBar.setOnTaskSwitch((taskGroupName, taskGroupId) -> {
-            // 切换任务组前，先保存当前任务组的数据（只在有未保存更改时）
+            // 切换任务组前，先保存当前任务组的数据（只在有未保存更改时）和滚动位置
             Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
-            if (currentTaskGroupId != null && currentTaskGroupId != 0 && canvas.hasUnsavedChanges()) {
-                dataManager.saveOrUpdateJob(currentTaskGroupId);
+            if (currentTaskGroupId != null && currentTaskGroupId != 0) {
+                if (canvas.hasUnsavedChanges()) {
+                    dataManager.saveOrUpdateJob(currentTaskGroupId);
+                }
+                canvas.markAsSaved();
+                // 保存当前任务组的滚动位置
+                saveCurrentScrollPosition();
             }
-            canvas.markAsSaved();
             
             Long resolvedTaskId = taskGroupId != null ? taskGroupId : findTaskGroupIdByName(taskGroupName);
             
@@ -425,6 +909,7 @@ public class MainView extends BorderPane {
                 navigationBar.setCurrentTaskGroupId(resolvedTaskId);
                 toolBar.setCurrentTaskGroupId(resolvedTaskId);
                 pageStoreHelper.setCurrentPage(resolvedTaskId);
+                // 数据加载后会自动恢复滚动位置
                 dataManager.loadTaskGroupData(resolvedTaskId, taskGroupName);
                 
                 Platform.runLater(() -> {
@@ -548,8 +1033,9 @@ public class MainView extends BorderPane {
                         
                         // 在主线程中更新UI
                         Platform.runLater(() -> {
-                            Long jobId = Long.parseLong(String.valueOf(createResult.get("jobId")));
-                            Long nodeId = Long.parseLong(String.valueOf(createResult.get("nodeId")));
+                            // 安全地解析可能包含小数点的数字（如 25850.0）
+                            Long jobId = parseToLong(createResult.get("jobId"));
+                            Long nodeId = parseToLong(createResult.get("nodeId"));
                             
                             // 创建条件节点，使用数据库返回的ID
                             String frontendNodeId = "randomId-" + nodeId; // 前端显示用的ID
@@ -671,17 +1157,22 @@ public class MainView extends BorderPane {
             @Override
             public void onTaskSelected(Long taskId, String taskName, Integer type) {
                 if (type != null && type == 1 && taskId != null) {
-                    // 切换任务组前，先保存当前任务组的数据
+                    // 切换任务组前，先保存当前任务组的数据和滚动位置
                     Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
-                    if (currentTaskGroupId != null && currentTaskGroupId != 0 && !currentTaskGroupId.equals(taskId) && canvas.hasUnsavedChanges()) {
-                        dataManager.saveOrUpdateJob(currentTaskGroupId);
-                        canvas.markAsSaved();
+                    if (currentTaskGroupId != null && currentTaskGroupId != 0 && !currentTaskGroupId.equals(taskId)) {
+                        if (canvas.hasUnsavedChanges()) {
+                            dataManager.saveOrUpdateJob(currentTaskGroupId);
+                            canvas.markAsSaved();
+                        }
+                        // 保存当前任务组的滚动位置
+                        saveCurrentScrollPosition();
                     }
                     
                     taskGroupNameToIdMap.put(taskName, taskId);
                     pageStoreHelper.setCurrentPage(taskId);
                     navigationBar.addOrSelectTask(taskName, taskId);
                     toolBar.setCurrentTaskGroupId(taskId);
+                    // 数据加载后会自动恢复滚动位置
                     dataManager.loadTaskGroupData(taskId, taskName);
                 }
             }
@@ -754,6 +1245,11 @@ public class MainView extends BorderPane {
                     // 需要切换任务组
                     logPanel.info("🔄 切换到任务组: " + targetTaskGroupId);
                     
+                    // 保存当前任务组的滚动位置
+                    if (currentTaskGroupId != null && currentTaskGroupId != 0) {
+                        saveCurrentScrollPosition();
+                    }
+                    
                     // 获取任务组名称
                     String taskGroupName = getJobNameById(targetTaskGroupId);
                     if (taskGroupName == null) {
@@ -766,7 +1262,7 @@ public class MainView extends BorderPane {
                     navigationBar.addOrSelectTask(taskGroupName, targetTaskGroupId);
                     toolBar.setCurrentTaskGroupId(targetTaskGroupId);
                     
-                    // 加载任务组数据，加载完成后定位节点
+                    // 加载任务组数据，加载完成后定位节点（滚动位置会在数据加载完成后自动恢复）
                     dataManager.loadTaskGroupData(targetTaskGroupId, taskGroupName);
                     
                     // 延迟定位节点（等待数据加载完成）
@@ -837,6 +1333,11 @@ public class MainView extends BorderPane {
                     // 需要切换任务组
                     logPanel.info("🔄 切换到任务组: " + targetTaskGroupId);
                     
+                    // 保存当前任务组的滚动位置
+                    if (currentTaskGroupId != null && currentTaskGroupId != 0) {
+                        saveCurrentScrollPosition();
+                    }
+                    
                     // 获取任务组名称
                     String taskGroupName = getJobNameById(targetTaskGroupId);
                     if (taskGroupName == null) {
@@ -849,7 +1350,7 @@ public class MainView extends BorderPane {
                     navigationBar.addOrSelectTask(taskGroupName, targetTaskGroupId);
                     toolBar.setCurrentTaskGroupId(targetTaskGroupId);
                     
-                    // 加载任务组数据，加载完成后定位连接线
+                    // 加载任务组数据，加载完成后定位连接线（滚动位置会在数据加载完成后自动恢复）
                     dataManager.loadTaskGroupData(targetTaskGroupId, taskGroupName);
                     
                     // 延迟定位连接线（等待数据加载完成）
@@ -1376,6 +1877,28 @@ public class MainView extends BorderPane {
     }
     
     /**
+     * 安全地将对象转换为 Long 类型
+     * 处理可能包含小数点的数字字符串（如 "25850.0"）
+     */
+    private Long parseToLong(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Long) {
+            return (Long) value;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).longValue();
+        }
+        String str = String.valueOf(value);
+        // 如果包含小数点，先转换为 Double 再转换为 Long
+        if (str.contains(".")) {
+            return (long) Double.parseDouble(str);
+        }
+        return Long.parseLong(str);
+    }
+    
+    /**
      * 显示节点历史对话框
      */
     private void showNodeHistoryDialog(Long taskGroupId, String taskGroupName) {
@@ -1407,5 +1930,323 @@ public class MainView extends BorderPane {
         public Long getCurrentTaskGroupId() {
             return this.currentPage;
         }
+    }
+    
+    // 滚动位置存储类
+    private static class ScrollPosition {
+        double hvalue;
+        double vvalue;
+        
+        ScrollPosition(double hvalue, double vvalue) {
+            this.hvalue = hvalue;
+            this.vvalue = vvalue;
+        }
+    }
+    
+    /**
+     * 保存当前任务组的滚动位置
+     */
+    private void saveCurrentScrollPosition() {
+        if (scrollPane == null) return;
+        
+        Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
+        if (currentTaskGroupId != null && currentTaskGroupId != 0) {
+            double hvalue = scrollPane.getHvalue();
+            double vvalue = scrollPane.getVvalue();
+            taskGroupScrollPositions.put(currentTaskGroupId, new ScrollPosition(hvalue, vvalue));
+            logger.debug("保存任务组 {} 的滚动位置: hvalue={}, vvalue={}", currentTaskGroupId, hvalue, vvalue);
+        }
+    }
+    
+    /**
+     * 恢复指定任务组的滚动位置
+     * 如果任务组没有保存的位置，则设置为居中（0.5, 0.5）
+     */
+    private void restoreScrollPosition(Long taskGroupId) {
+        if (scrollPane == null || taskGroupId == null || taskGroupId == 0) return;
+        
+        // 使用Platform.runLater确保在UI更新后执行
+        Platform.runLater(() -> {
+            ScrollPosition savedPosition = taskGroupScrollPositions.get(taskGroupId);
+            
+            if (savedPosition != null) {
+                // 恢复保存的位置
+                scrollPane.setHvalue(savedPosition.hvalue);
+                scrollPane.setVvalue(savedPosition.vvalue);
+                logger.debug("恢复任务组 {} 的滚动位置: hvalue={}, vvalue={}", taskGroupId, savedPosition.hvalue, savedPosition.vvalue);
+            } else {
+                // 首次加载，设置为居中
+                scrollPane.setHvalue(0.5);
+                scrollPane.setVvalue(0.5);
+                // 保存居中位置，以便后续切换时保持一致
+                taskGroupScrollPositions.put(taskGroupId, new ScrollPosition(0.5, 0.5));
+                logger.debug("任务组 {} 首次加载，设置滚动位置为居中", taskGroupId);
+            }
+        });
+    }
+    
+    /**
+     * 导出任务组
+     */
+    private void exportTaskGroup(Long taskGroupId) {
+        if (taskGroupId == null) {
+            logPanel.warn("⚠ 任务组ID无效");
+            return;
+        }
+        
+        Stage ownerStage = (Stage) this.getScene().getWindow();
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("导出任务组");
+        String taskGroupName = getJobNameById(taskGroupId);
+        fileChooser.setInitialFileName(taskGroupName != null ? taskGroupName + ".json" : "taskgroup_" + taskGroupId + ".json");
+        
+        FileChooser.ExtensionFilter extFilter = new FileChooser.ExtensionFilter("JSON文件 (*.json)", "*.json");
+        fileChooser.getExtensionFilters().add(extFilter);
+        
+        File file = fileChooser.showSaveDialog(ownerStage);
+        if (file == null) {
+            return;
+        }
+        
+        logPanel.info("📤 开始导出任务组: " + taskGroupName);
+        // TODO: 实现任务组导出逻辑
+        logPanel.info("任务组导出功能开发中...");
+    }
+    
+    /**
+     * 显示查找节点对话框
+     */
+    private void showFindNodeDialog() {
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("查找节点");
+        dialog.setHeaderText(null);
+        dialog.setContentText("请输入节点名称:");
+        
+        Optional<String> result = dialog.showAndWait();
+        result.ifPresent(nodeName -> {
+            ProcessNode foundNode = canvas.findNodeByName(nodeName);
+            if (foundNode != null) {
+                canvas.locateNode(foundNode);
+                canvas.selectNode(foundNode);
+                logPanel.info("✓ 已找到并定位到节点: " + nodeName);
+            } else {
+                logPanel.warn("⚠ 未找到节点: " + nodeName);
+            }
+        });
+    }
+    
+    /**
+     * 显示转到节点对话框
+     */
+    private void showGoToNodeDialog() {
+        showFindNodeDialog();
+    }
+    
+    /**
+     * 切换到指定任务组
+     */
+    private void switchToTaskGroup(Long taskGroupId, String taskGroupName) {
+        if (taskGroupId == null) {
+            logPanel.warn("⚠ 任务组ID无效");
+            return;
+        }
+        
+        // 切换任务组前，先保存当前任务组的数据和滚动位置
+        Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
+        if (currentTaskGroupId != null && currentTaskGroupId != 0 && !currentTaskGroupId.equals(taskGroupId)) {
+            if (canvas.hasUnsavedChanges()) {
+                dataManager.saveOrUpdateJob(currentTaskGroupId);
+                canvas.markAsSaved();
+            }
+            // 保存当前任务组的滚动位置
+            saveCurrentScrollPosition();
+        }
+        
+        String displayName = (taskGroupName != null && !taskGroupName.isBlank())
+            ? taskGroupName
+            : ("任务组 " + taskGroupId);
+        
+        taskGroupNameToIdMap.put(displayName, taskGroupId);
+        pageStoreHelper.setCurrentPage(taskGroupId);
+        navigationBar.addOrSelectTask(displayName, taskGroupId);
+        toolBar.setCurrentTaskGroupId(taskGroupId);
+        // 数据加载后会自动配置节点回调，并恢复滚动位置
+        dataManager.loadTaskGroupData(taskGroupId, displayName);
+        
+        // 添加到最近打开的文件列表
+        com.cc.job.gui.util.RecentFilesManager.getInstance().addRecentFile(taskGroupId, displayName);
+        toolBar.refreshRecentFilesMenu();
+    }
+    
+    /**
+     * 显示转到任务组对话框
+     */
+    private void showGoToTaskGroupDialog() {
+        // 显示任务组选择对话框
+        ChoiceDialog<String> dialog = new ChoiceDialog<>();
+        dialog.setTitle("转到任务组");
+        dialog.setHeaderText(null);
+        dialog.setContentText("请选择任务组:");
+        
+        // 获取所有任务组
+        try {
+            List<JobGroup> jobGroups = jobGroupService.getAllJobGroupList();
+            List<String> taskGroupNames = new ArrayList<>();
+            for (JobGroup group : jobGroups) {
+                taskGroupNames.add(group.getTitle() != null ? group.getTitle() : "任务组 " + group.getId());
+            }
+            dialog.getItems().addAll(taskGroupNames);
+            
+            Optional<String> result = dialog.showAndWait();
+            result.ifPresent(taskGroupName -> {
+                // 查找任务组ID
+                for (JobGroup group : jobGroups) {
+                    String groupName = group.getTitle() != null ? group.getTitle() : "任务组 " + group.getId();
+                    if (groupName.equals(taskGroupName)) {
+                        // 直接调用切换任务组的逻辑
+                        switchToTaskGroup(group.getId(), groupName);
+                        break;
+                    }
+                }
+            });
+        } catch (Exception e) {
+            logPanel.error("✗ 加载任务组列表失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 显示转到分区对话框
+     */
+    private void showGoToPartitionDialog() {
+        // TODO: 实现转到分区
+        logPanel.info("转到分区功能开发中...");
+    }
+    
+    /**
+     * 显示快捷键列表对话框
+     */
+    private void showShortcutsDialog() {
+        Stage dialog = new Stage();
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        dialog.setTitle("快捷键列表");
+        
+        VBox content = new VBox(10);
+        content.setPadding(new Insets(20));
+        
+        Label title = new Label("快捷键列表");
+        title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
+        
+        VBox shortcutsBox = new VBox(5);
+        
+        // 编辑快捷键
+        Label editLabel = new Label("编辑操作:");
+        editLabel.setStyle("-fx-font-weight: bold;");
+        shortcutsBox.getChildren().add(editLabel);
+        shortcutsBox.getChildren().add(new Label("Ctrl+Z - 撤销"));
+        shortcutsBox.getChildren().add(new Label("Ctrl+Y - 重做"));
+        shortcutsBox.getChildren().add(new Label("Ctrl+X - 剪切"));
+        shortcutsBox.getChildren().add(new Label("Ctrl+C - 复制"));
+        shortcutsBox.getChildren().add(new Label("Ctrl+V - 粘贴"));
+        shortcutsBox.getChildren().add(new Label("Delete - 删除"));
+        shortcutsBox.getChildren().add(new Label("Ctrl+A - 全选"));
+        shortcutsBox.getChildren().add(new Label("Ctrl+F - 查找节点"));
+        shortcutsBox.getChildren().add(new Label("F3 - 查找下一个"));
+        shortcutsBox.getChildren().add(new Label("Shift+F3 - 查找上一个"));
+        
+        shortcutsBox.getChildren().add(new Separator());
+        
+        // 视图快捷键
+        Label viewLabel = new Label("视图操作:");
+        viewLabel.setStyle("-fx-font-weight: bold;");
+        shortcutsBox.getChildren().add(viewLabel);
+        shortcutsBox.getChildren().add(new Label("Ctrl+= - 放大"));
+        shortcutsBox.getChildren().add(new Label("Ctrl+- - 缩小"));
+        shortcutsBox.getChildren().add(new Label("Ctrl+0 - 适应窗口"));
+        shortcutsBox.getChildren().add(new Label("F11 - 全屏"));
+        
+        shortcutsBox.getChildren().add(new Separator());
+        
+        // 功能快捷键
+        Label funcLabel = new Label("功能操作:");
+        funcLabel.setStyle("-fx-font-weight: bold;");
+        shortcutsBox.getChildren().add(funcLabel);
+        shortcutsBox.getChildren().add(new Label("Ctrl+N - 新建任务"));
+        shortcutsBox.getChildren().add(new Label("Ctrl+O - 打开"));
+        shortcutsBox.getChildren().add(new Label("Ctrl+S - 保存"));
+        shortcutsBox.getChildren().add(new Label("Ctrl+Shift+S - 另存为"));
+        shortcutsBox.getChildren().add(new Label("F5 - 运行任务组"));
+        shortcutsBox.getChildren().add(new Label("Shift+F5 - 停止任务"));
+        shortcutsBox.getChildren().add(new Label("Ctrl+G - 转到节点"));
+        shortcutsBox.getChildren().add(new Label("Ctrl+W - 关闭窗口"));
+        shortcutsBox.getChildren().add(new Label("Ctrl+Shift+? - 快捷键列表"));
+        
+        ScrollPane scrollPane = new ScrollPane(shortcutsBox);
+        scrollPane.setFitToWidth(true);
+        
+        Button closeButton = new Button("关闭");
+        closeButton.setOnAction(e -> dialog.close());
+        HBox buttonBox = new HBox();
+        buttonBox.setAlignment(Pos.CENTER_RIGHT);
+        buttonBox.getChildren().add(closeButton);
+        
+        content.getChildren().addAll(title, scrollPane, buttonBox);
+        
+        Scene scene = new Scene(content, 400, 500);
+        dialog.setScene(scene);
+        dialog.show();
+    }
+    
+    /**
+     * 显示更新日志对话框
+     */
+    private void showChangelogDialog() {
+        Stage dialog = new Stage();
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        dialog.setTitle("更新日志");
+        
+        VBox content = new VBox(10);
+        content.setPadding(new Insets(20));
+        
+        Label title = new Label("更新日志");
+        title.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
+        
+        TextArea changelogArea = new TextArea();
+        changelogArea.setEditable(false);
+        changelogArea.setText("版本 2.0.0\n" +
+            "- 新增完整的导航栏菜单系统\n" +
+            "- 新增最近打开文件功能\n" +
+            "- 新增系统设置对话框\n" +
+            "- 优化用户体验\n" +
+            "\n更多更新信息请查看项目文档。");
+        changelogArea.setPrefRowCount(15);
+        
+        Button closeButton = new Button("关闭");
+        closeButton.setOnAction(e -> dialog.close());
+        HBox buttonBox = new HBox();
+        buttonBox.setAlignment(javafx.geometry.Pos.CENTER_RIGHT);
+        buttonBox.getChildren().add(closeButton);
+        
+        content.getChildren().addAll(title, changelogArea, buttonBox);
+        
+        Scene scene = new Scene(content, 500, 400);
+        dialog.setScene(scene);
+        dialog.show();
+    }
+    
+    /**
+     * 显示关于对话框
+     */
+    private void showAboutDialog() {
+        Alert aboutAlert = new Alert(Alert.AlertType.INFORMATION);
+        aboutAlert.setTitle("关于 CcETL");
+        aboutAlert.setHeaderText("CcETL - 可视化任务调度平台");
+        aboutAlert.setContentText("版本: 2.0.0\n\n" +
+            "基于 XXL-Job 深度改造的可视化任务调度平台\n" +
+            "支持拖拽式任务编排、DataX 数据同步、多端管理界面\n\n" +
+            "许可证: MIT License\n\n" +
+            "项目地址:\n" +
+            "GitHub: https://github.com/xiaozhaoCcz/CC_ETL\n" +
+            "Gitee: https://gitee.com/xzjsccz/Cc_ETL");
+        aboutAlert.showAndWait();
     }
 }

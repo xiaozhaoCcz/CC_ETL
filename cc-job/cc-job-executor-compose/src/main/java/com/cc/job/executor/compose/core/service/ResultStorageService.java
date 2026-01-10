@@ -7,6 +7,12 @@ import com.cc.job.executor.compose.core.context.DataSourceType;
 import com.cc.job.executor.compose.core.model.ExecutionContext;
 import com.cc.job.executor.compose.core.service.FileStorageService;
 import com.cc.job.xo.model.entity.JobInfo;
+import com.cc.job.xo.model.result.NodeResult;
+import com.cc.job.xo.model.result.SqlResult;
+import com.cc.job.xo.model.result.ApiResult;
+import com.cc.job.xo.model.result.BeanResult;
+import com.cc.job.xo.model.result.GlueResult;
+import com.xxl.job.core.glue.GlueTypeEnum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -72,20 +78,225 @@ public class ResultStorageService {
         logger.info("[ResultStorage] 开始存储任务结果 - jobId: {}, jobName: {}, resultType: {}", 
                 jobInfo.getId(), jobName, executeResult.getClass().getSimpleName());
         
-        // 根据结果类型存储
-        if (executeResult instanceof Map) {
-            storeMapResult(dataContext, jobName, (Map<String, Object>) executeResult, jobInfo.getId());
-        } else if (executeResult instanceof List) {
-            storeListResult(dataContext, jobName, (List<Object>) executeResult, jobInfo.getId());
-        } else if (executeResult instanceof String) {
-            storeStringResult(dataContext, jobName, (String) executeResult, jobInfo.getId());
+        // 如果已经是NodeResult，直接存储
+        if (executeResult instanceof NodeResult) {
+            storeNodeResult(dataContext, jobName, (NodeResult) executeResult, jobInfo.getId());
         } else {
-            // 简单类型或其他类型
-            storeSimpleResult(dataContext, jobName, executeResult, jobInfo.getId());
+            // 尝试转换为NodeResult（向后兼容）
+            NodeResult nodeResult = convertToNodeResult(executeResult, jobInfo);
+            if (nodeResult != null) {
+                storeNodeResult(dataContext, jobName, nodeResult, jobInfo.getId());
+            } else {
+                // 无法转换，使用旧方式存储
+                if (executeResult instanceof Map) {
+                    storeMapResult(dataContext, jobName, (Map<String, Object>) executeResult, jobInfo.getId());
+                } else if (executeResult instanceof List) {
+                    storeListResult(dataContext, jobName, (List<Object>) executeResult, jobInfo.getId());
+                } else if (executeResult instanceof String) {
+                    storeStringResult(dataContext, jobName, (String) executeResult, jobInfo.getId());
+                } else {
+                    // 简单类型或其他类型
+                    storeSimpleResult(dataContext, jobName, executeResult, jobInfo.getId());
+                }
+            }
         }
         
         logger.debug("[ResultStorage] 任务结果存储完成 - jobId: {}, jobName: {}", 
                 jobInfo.getId(), jobName);
+    }
+    
+    /**
+     * 存储NodeResult结果
+     */
+    private void storeNodeResult(DataContext context, String jobName, NodeResult nodeResult, Long jobId) {
+        // 存储整个NodeResult对象
+        context.put(jobName, nodeResult, jobId);
+        
+        // 存储通用属性，方便直接访问
+        if (nodeResult.getCode() != null) {
+            context.put(jobName + ".code", nodeResult.getCode(), jobId);
+        }
+        if (nodeResult.getMessage() != null) {
+            context.put(jobName + ".message", nodeResult.getMessage(), jobId);
+        }
+        if (nodeResult.getSuccess() != null) {
+            context.put(jobName + ".success", nodeResult.getSuccess(), jobId);
+        }
+        if (nodeResult.getDuration() != null) {
+            context.put(jobName + ".duration", nodeResult.getDuration(), jobId);
+        }
+        if (nodeResult.getTimestamp() != null) {
+            context.put(jobName + ".timestamp", nodeResult.getTimestamp(), jobId);
+        }
+        if (nodeResult.getData() != null) {
+            context.put(jobName + ".data", nodeResult.getData(), jobId);
+        }
+        
+        // 根据节点类型存储特定属性
+        if (nodeResult.getSqlResult() != null) {
+            storeSqlResult(context, jobName, nodeResult.getSqlResult(), jobId);
+        }
+        if (nodeResult.getApiResult() != null) {
+            storeApiResult(context, jobName, nodeResult.getApiResult(), jobId);
+        }
+        if (nodeResult.getBeanResult() != null) {
+            storeBeanResult(context, jobName, nodeResult.getBeanResult(), jobId);
+        }
+        if (nodeResult.getGlueResult() != null) {
+            storeGlueResult(context, jobName, nodeResult.getGlueResult(), jobId);
+        }
+        
+        logger.debug("[ResultStorage] 存储NodeResult - jobName: {}", jobName);
+    }
+    
+    /**
+     * 存储SQL结果特定属性
+     */
+    private void storeSqlResult(DataContext context, String jobName, SqlResult sqlResult, Long jobId) {
+        context.put(jobName + ".sqlResult", sqlResult, jobId);
+        if (sqlResult.getData() != null) {
+            context.put(jobName + ".data", sqlResult.getData(), jobId);
+        }
+        if (sqlResult.getCount() != null) {
+            context.put(jobName + ".count", sqlResult.getCount(), jobId);
+        }
+        if (sqlResult.getAffectedRows() != null) {
+            context.put(jobName + ".affectedRows", sqlResult.getAffectedRows(), jobId);
+        }
+        if (sqlResult.getColumns() != null) {
+            context.put(jobName + ".columns", sqlResult.getColumns(), jobId);
+        }
+        if (sqlResult.getColumnTypes() != null) {
+            context.put(jobName + ".columnTypes", sqlResult.getColumnTypes(), jobId);
+        }
+        if (sqlResult.getSqlType() != null) {
+            context.put(jobName + ".sqlType", sqlResult.getSqlType(), jobId);
+        }
+        if (sqlResult.getExecutedSql() != null) {
+            context.put(jobName + ".executedSql", sqlResult.getExecutedSql(), jobId);
+        }
+    }
+    
+    /**
+     * 存储API结果特定属性
+     */
+    private void storeApiResult(DataContext context, String jobName, ApiResult apiResult, Long jobId) {
+        context.put(jobName + ".apiResult", apiResult, jobId);
+        context.put(jobName + ".response", apiResult, jobId); // 别名
+        if (apiResult.getStatusCode() != null) {
+            context.put(jobName + ".response.statusCode", apiResult.getStatusCode(), jobId);
+        }
+        if (apiResult.getBody() != null) {
+            context.put(jobName + ".response.body", apiResult.getBody(), jobId);
+        }
+        if (apiResult.getRawBody() != null) {
+            context.put(jobName + ".response.rawBody", apiResult.getRawBody(), jobId);
+        }
+        if (apiResult.getHeaders() != null) {
+            context.put(jobName + ".response.headers", apiResult.getHeaders(), jobId);
+        }
+        if (apiResult.getRequestUrl() != null) {
+            context.put(jobName + ".request.url", apiResult.getRequestUrl(), jobId);
+        }
+        if (apiResult.getRequestMethod() != null) {
+            context.put(jobName + ".request.method", apiResult.getRequestMethod(), jobId);
+        }
+        if (apiResult.getResponseTime() != null) {
+            context.put(jobName + ".responseTime", apiResult.getResponseTime(), jobId);
+        }
+    }
+    
+    /**
+     * 存储Bean结果特定属性
+     */
+    private void storeBeanResult(DataContext context, String jobName, BeanResult beanResult, Long jobId) {
+        context.put(jobName + ".beanResult", beanResult, jobId);
+        if (beanResult.getValue() != null) {
+            context.put(jobName + ".value", beanResult.getValue(), jobId);
+        }
+        if (beanResult.getMethodName() != null) {
+            context.put(jobName + ".methodName", beanResult.getMethodName(), jobId);
+        }
+        if (beanResult.getClassName() != null) {
+            context.put(jobName + ".className", beanResult.getClassName(), jobId);
+        }
+        if (beanResult.getReturnType() != null) {
+            context.put(jobName + ".returnType", beanResult.getReturnType(), jobId);
+        }
+    }
+    
+    /**
+     * 存储Glue结果特定属性
+     */
+    private void storeGlueResult(DataContext context, String jobName, GlueResult glueResult, Long jobId) {
+        context.put(jobName + ".glueResult", glueResult, jobId);
+        if (glueResult.getOutput() != null) {
+            context.put(jobName + ".output", glueResult.getOutput(), jobId);
+        }
+        if (glueResult.getError() != null) {
+            context.put(jobName + ".error", glueResult.getError(), jobId);
+        }
+        if (glueResult.getExitCode() != null) {
+            context.put(jobName + ".exitCode", glueResult.getExitCode(), jobId);
+        }
+        if (glueResult.getResult() != null) {
+            context.put(jobName + ".result", glueResult.getResult(), jobId);
+        }
+        if (glueResult.getScriptType() != null) {
+            context.put(jobName + ".scriptType", glueResult.getScriptType(), jobId);
+        }
+        if (glueResult.getLogOutput() != null) {
+            context.put(jobName + ".logOutput", glueResult.getLogOutput(), jobId);
+        }
+    }
+    
+    /**
+     * 尝试将旧格式结果转换为NodeResult（向后兼容）
+     */
+    private NodeResult convertToNodeResult(Object executeResult, JobInfo jobInfo) {
+        if (jobInfo == null || jobInfo.getGlueType() == null) {
+            return null;
+        }
+        
+        GlueTypeEnum glueType = GlueTypeEnum.match(jobInfo.getGlueType());
+        if (glueType == null) {
+            return null;
+        }
+        
+        long duration = 0; // 无法获取实际执行时间，使用0
+        NodeResult nodeResult = NodeResult.success("执行成功", duration);
+        nodeResult.setData(executeResult);
+        
+        // 根据节点类型创建特定的结果对象
+        switch (glueType) {
+            case SQL:
+                // SQL结果已经在JdbcTaskExecutor中转换为NodeResult
+                break;
+            case API:
+                // API结果已经在HttpTaskExecutor中转换为NodeResult
+                break;
+            case BEAN:
+                BeanResult beanResult = new BeanResult(executeResult);
+                beanResult.setMethodName(jobInfo.getExecutorHandler());
+                nodeResult.setBeanResult(beanResult);
+                break;
+            case GLUE_GROOVY:
+            case GLUE_SHELL:
+            case GLUE_PYTHON:
+            case GLUE_PHP:
+            case GLUE_NODEJS:
+            case GLUE_POWERSHELL:
+            case GLUE_CSHARP:
+                GlueResult glueResult = new GlueResult();
+                glueResult.setResult(executeResult);
+                glueResult.setScriptType(glueType.getDesc());
+                nodeResult.setGlueResult(glueResult);
+                break;
+            default:
+                return null;
+        }
+        
+        return nodeResult;
     }
     
     /**

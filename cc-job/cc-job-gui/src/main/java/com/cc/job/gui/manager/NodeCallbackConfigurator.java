@@ -15,6 +15,7 @@ public class NodeCallbackConfigurator {
     private final NodeCanvas canvas;
     private final LogPanel logPanel;
     private DialogManager dialogManager;
+    private Runnable onColorChangedCallback; // 颜色变更时的保存回调
     
     public NodeCallbackConfigurator(NodeOperationManager nodeOperationManager, 
                                     NodeCanvas canvas, 
@@ -29,6 +30,13 @@ public class NodeCallbackConfigurator {
      */
     public void setDialogManager(DialogManager dialogManager) {
         this.dialogManager = dialogManager;
+    }
+    
+    /**
+     * 设置颜色变更回调(用于保存颜色到数据库)
+     */
+    public void setOnColorChangedCallback(Runnable callback) {
+        this.onColorChangedCallback = callback;
     }
     
     /**
@@ -115,6 +123,13 @@ public class NodeCallbackConfigurator {
                         });
                     }
                 }).start();
+            }
+        });
+        
+        // 颜色变更回调 - 保存颜色到数据库
+        node.setOnColorChanged(() -> {
+            if (onColorChangedCallback != null) {
+                onColorChangedCallback.run();
             }
         });
     }

@@ -708,6 +708,191 @@ public class NodeCanvas extends Pane {
         }
     }
     
+    public void selectAllNodes() {
+        selectionManager.selectNodes(new HashSet<>(nodes));
+    }
+    
+    public void invertSelection() {
+        Set<ProcessNode> currentSelected = new HashSet<>(selectionManager.getSelectedNodes());
+        Set<ProcessNode> allNodes = new HashSet<>(nodes);
+        Set<ProcessNode> inverted = new HashSet<>();
+        for (ProcessNode node : allNodes) {
+            if (!currentSelected.contains(node)) {
+                inverted.add(node);
+            }
+        }
+        selectionManager.selectNodes(inverted);
+    }
+    
+    public void selectByType(String type) {
+        Set<ProcessNode> selected = new HashSet<>();
+        if ("TASK".equals(type)) {
+            // 选择所有任务节点（ProcessNode类型）
+            // 注意：条件节点(ConditionNode)不在nodes列表中，所以直接选择所有nodes即可
+            selected.addAll(nodes);
+        } else if ("CONDITION".equals(type)) {
+            // 选择所有条件节点 - 条件节点不是ProcessNode类型，需要特殊处理
+            // ConditionNode和ProcessNode是不同的类型，无法直接添加到selected集合
+            // 暂时跳过，因为条件节点选择需要单独实现
+            log("条件节点选择功能开发中...");
+            return;
+        } else if ("EDGE".equals(type)) {
+            // 选择所有连线（这个需要特殊处理）
+            // 暂时只选择节点，连线的选择需要单独实现
+            log("连线选择功能开发中...");
+            return;
+        }
+        selectionManager.selectNodes(selected);
+    }
+    
+    public void selectUpstreamNodes() {
+        Set<ProcessNode> selected = selectionManager.getSelectedNodes();
+        if (selected.isEmpty()) {
+            log("⚠ 请先选中一个节点");
+            return;
+        }
+        Set<ProcessNode> upstream = new HashSet<>();
+        for (ProcessNode node : selected) {
+            findUpstreamNodes(node, upstream);
+        }
+        selectionManager.selectNodes(upstream);
+    }
+    
+    public void selectDownstreamNodes() {
+        Set<ProcessNode> selected = selectionManager.getSelectedNodes();
+        if (selected.isEmpty()) {
+            log("⚠ 请先选中一个节点");
+            return;
+        }
+        Set<ProcessNode> downstream = new HashSet<>();
+        for (ProcessNode node : selected) {
+            findDownstreamNodes(node, downstream);
+        }
+        selectionManager.selectNodes(downstream);
+    }
+    
+    private void findUpstreamNodes(ProcessNode node, Set<ProcessNode> result) {
+        for (NodeConnection conn : connections) {
+            if (conn.getTargetNode() == node) {
+                ProcessNode source = conn.getSourceNode();
+                if (source != null && !result.contains(source)) {
+                    result.add(source);
+                    findUpstreamNodes(source, result);
+                }
+            }
+        }
+    }
+    
+    private void findDownstreamNodes(ProcessNode node, Set<ProcessNode> result) {
+        for (NodeConnection conn : connections) {
+            if (conn.getSourceNode() == node) {
+                ProcessNode target = conn.getTargetNode();
+                if (target != null && !result.contains(target)) {
+                    result.add(target);
+                    findDownstreamNodes(target, result);
+                }
+            }
+        }
+    }
+    
+    public void toggleGrid() {
+        // TODO: 实现网格显示/隐藏
+        log("网格显示功能开发中...");
+    }
+    
+    public void toggleNodeLabels() {
+        // TODO: 实现节点标签显示/隐藏
+        log("节点标签显示功能开发中...");
+    }
+    
+    public void toggleEdgeLabels() {
+        // TODO: 实现连线标签显示/隐藏
+        log("连线标签显示功能开发中...");
+    }
+    
+    public void autoLayout() {
+        // 简单的自动布局：将所有节点按网格排列
+        if (nodes.isEmpty()) {
+            log("⚠ 画布中没有节点");
+            return;
+        }
+        
+        int cols = (int) Math.ceil(Math.sqrt(nodes.size()));
+        int spacing = 200;
+        int startX = 100;
+        int startY = 100;
+        
+        int col = 0;
+        int row = 0;
+        for (ProcessNode node : nodes) {
+            node.setLayoutX(startX + col * spacing);
+            node.setLayoutY(startY + row * spacing);
+            col++;
+            if (col >= cols) {
+                col = 0;
+                row++;
+            }
+        }
+        
+        markAsUnsaved();
+        log("✓ 自动布局完成");
+    }
+    
+    public ProcessNode findNodeByName(String name) {
+        if (name == null || name.isEmpty()) {
+            return null;
+        }
+        for (ProcessNode node : nodes) {
+            // 使用节点的jobHandlerName来匹配
+            String nodeName = node.getJobHandlerName();
+            if (name.equals(nodeName)) {
+                return node;
+            }
+        }
+        return null;
+    }
+    
+    private int currentNodeIndex = -1;
+    
+    public void navigateToPreviousNode() {
+        if (nodes.isEmpty()) {
+            return;
+        }
+        if (currentNodeIndex <= 0) {
+            currentNodeIndex = nodes.size() - 1;
+        } else {
+            currentNodeIndex--;
+        }
+        ProcessNode node = nodes.get(currentNodeIndex);
+        locateNode(node);
+        selectNode(node);
+    }
+    
+    public void navigateToNextNode() {
+        if (nodes.isEmpty()) {
+            return;
+        }
+        if (currentNodeIndex >= nodes.size() - 1) {
+            currentNodeIndex = 0;
+        } else {
+            currentNodeIndex++;
+        }
+        ProcessNode node = nodes.get(currentNodeIndex);
+        locateNode(node);
+        selectNode(node);
+    }
+    
+    public void locateRunningNode() {
+        for (ProcessNode node : nodes) {
+            if (node.getStatus() == ProcessNode.NodeStatus.RUNNING) {
+                locateNode(node);
+                selectNode(node);
+                return;
+            }
+        }
+        log("⚠ 未找到运行中的节点");
+    }
+    
     private void setupSelectionHandlers() {
         this.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> {
             if (e.isPrimaryButtonDown()) {
@@ -1138,30 +1323,90 @@ public class NodeCanvas extends Pane {
         runWithoutHistory(() -> {
             clear();
             
-            Map<String, ProcessNode> nodeMap = dataLoader.loadNodes(composeData.getNodes(), node -> {
-                nodeManager.addNode(node);
-                setupNodeCallbacks(node);
-                
-                // 从全局管理器恢复节点状态（开始/终止/阻塞）
-                if (node.getJobId() != null) {
-                    com.cc.job.gui.util.NodeGraphStateManager stateManager = 
-                        com.cc.job.gui.util.NodeGraphStateManager.getInstance();
-                    
-                    // 恢复图节点状态（开始/终止/阻塞）
-                    ProcessNode.GraphNodeState savedState = stateManager.getNodeState(node.getJobId());
-                    if (savedState != ProcessNode.GraphNodeState.NORMAL) {
-                        // 使用内部方法设置状态，不触发回调（避免在加载时触发状态传播）
-                        node.setGraphStateInternal(savedState);
+            // ⭐ 修复：先创建所有普通节点，但不添加到画布（只创建节点对象和nodeMap）
+            Map<String, ProcessNode> nodeMap = new HashMap<>();
+            if (composeData.getNodes() != null) {
+                for (JobComposeData.NodeData nodeData : composeData.getNodes()) {
+                    // 跳过条件节点和任务组节点
+                    if (nodeData.getType() != null && 
+                        ("ConditionNode".equals(nodeData.getType()) || "condition-node".equalsIgnoreCase(nodeData.getType()))) {
+                        continue;
+                    }
+                    if (nodeData.getType() != null && 
+                        ("CustomGroup".equals(nodeData.getType()) || "custom-group".equalsIgnoreCase(nodeData.getType()))) {
+                        continue;
                     }
                     
-                    // 恢复启用/禁用状态
-                    boolean savedEnabled = stateManager.getNodeEnabled(node.getJobId());
-                    if (!savedEnabled) {
-                        // 如果节点是禁用状态，恢复禁用状态
-                        node.restoreEnabledState(false);
+                    ProcessNode node = dataLoader.createNodeFromData(nodeData);
+                    if (node != null) {
+                        setupNodeCallbacks(node);
+                        
+                        // 从全局管理器恢复节点状态（开始/终止/阻塞）
+                        if (node.getJobId() != null) {
+                            com.cc.job.gui.util.NodeGraphStateManager stateManager = 
+                                com.cc.job.gui.util.NodeGraphStateManager.getInstance();
+                            
+                            // 恢复图节点状态（开始/终止/阻塞）
+                            ProcessNode.GraphNodeState savedState = stateManager.getNodeState(node.getJobId());
+                            if (savedState != ProcessNode.GraphNodeState.NORMAL) {
+                                // 使用内部方法设置状态，不触发回调（避免在加载时触发状态传播）
+                                node.setGraphStateInternal(savedState);
+                            }
+                            
+                            // 恢复启用/禁用状态
+                            boolean savedEnabled = stateManager.getNodeEnabled(node.getJobId());
+                            if (!savedEnabled) {
+                                // 如果节点是禁用状态，恢复禁用状态
+                                node.restoreEnabledState(false);
+                            }
+                        }
+                        
+                        nodeMap.put(nodeData.getId(), node);
                     }
                 }
-            });
+            }
+            
+            // ⭐ 修复：先加载所有条件节点（不绑定子节点），建立条件节点Map
+            Map<String, ConditionNode> conditionNodeMap = new HashMap<>();
+            if (composeData.getNodes() != null) {
+                for (JobComposeData.NodeData nodeData : composeData.getNodes()) {
+                    if (nodeData.getType() != null && 
+                        ("ConditionNode".equals(nodeData.getType()) || "condition-node".equalsIgnoreCase(nodeData.getType()))) {
+                        ConditionNode conditionNode = createConditionNodeFromData(nodeData);
+                        if (conditionNode != null) {
+                            conditionNodeMap.put(nodeData.getId(), conditionNode);
+                            addConditionNode(conditionNode);
+                        }
+                    }
+                }
+            }
+            
+            // ⭐ 修复：现在绑定所有条件节点的子节点（此时所有条件节点都已加载）
+            for (JobComposeData.NodeData nodeData : composeData.getNodes()) {
+                if (nodeData.getType() != null && 
+                    ("ConditionNode".equals(nodeData.getType()) || "condition-node".equalsIgnoreCase(nodeData.getType()))) {
+                    ConditionNode conditionNode = conditionNodeMap.get(nodeData.getId());
+                    if (conditionNode != null) {
+                        bindConditionNodeChildren(conditionNode, nodeData, nodeMap, conditionNodeMap);
+                    }
+                }
+            }
+            
+            // ⭐ 修复：只将不在任何条件节点内的普通节点添加到画布
+            Set<String> nodesInContainers = new HashSet<>();
+            for (ConditionNode conditionNode : conditionNodes) {
+                for (ProcessNode managedNode : conditionNode.getManagedCanvasNodes()) {
+                    if (managedNode.getNodeId() != null) {
+                        nodesInContainers.add(managedNode.getNodeId());
+                    }
+                }
+            }
+            
+            for (ProcessNode node : nodeMap.values()) {
+                if (node.getNodeId() != null && !nodesInContainers.contains(node.getNodeId())) {
+                    nodeManager.addNode(node);
+                }
+            }
             
             // 加载连接后，需要重新应用状态传播逻辑（因为状态可能影响其他节点）
             // 延迟执行状态传播，确保所有节点和连接都已加载完成
@@ -1175,6 +1420,24 @@ public class NodeCanvas extends Pane {
                 for (JobComposeData.EdgeData edgeData : composeData.getEdges()) {
                     ProcessNode sourceNode = nodeMap.get(edgeData.getSourceNodeId());
                     ProcessNode targetNode = nodeMap.get(edgeData.getTargetNodeId());
+                    
+                    // ⭐ 修复：如果节点不在nodeMap中，可能是条件节点
+                    if (sourceNode == null) {
+                        for (ConditionNode cn : conditionNodes) {
+                            if (cn.getNodeId() != null && cn.getNodeId().equals(edgeData.getSourceNodeId())) {
+                                sourceNode = null; // 条件节点作为连接源，需要特殊处理
+                                break;
+                            }
+                        }
+                    }
+                    if (targetNode == null) {
+                        for (ConditionNode cn : conditionNodes) {
+                            if (cn.getNodeId() != null && cn.getNodeId().equals(edgeData.getTargetNodeId())) {
+                                targetNode = null; // 条件节点作为连接目标，需要特殊处理
+                                break;
+                            }
+                        }
+                    }
                     
                     if (sourceNode != null && targetNode != null) {
                         Circle sourceConnector = getConnectorByAnchor(sourceNode, edgeData.getSourceAnchor(), true);
@@ -1195,16 +1458,6 @@ public class NodeCanvas extends Pane {
                 log("✓ 加载了 " + successCount + " 条连接");
             }
             
-            // 加载条件节点
-            if (composeData.getNodes() != null) {
-                for (JobComposeData.NodeData nodeData : composeData.getNodes()) {
-                    if (nodeData.getType() != null && 
-                        ("ConditionNode".equals(nodeData.getType()) || "condition-node".equalsIgnoreCase(nodeData.getType()))) {
-                        loadConditionNode(nodeData, nodeMap);
-                    }
-                }
-            }
-            
             log("✓ 任务组数据加载完成");
         });
         
@@ -1212,9 +1465,9 @@ public class NodeCanvas extends Pane {
     }
     
     /**
-     * 加载条件节点
+     * ⭐ 新增：从NodeData创建ConditionNode（不绑定子节点）
      */
-    private void loadConditionNode(JobComposeData.NodeData nodeData, Map<String, ProcessNode> nodeMap) {
+    private ConditionNode createConditionNodeFromData(JobComposeData.NodeData nodeData) {
         try {
             String nodeId = nodeData.getId();
             Long conditionId = nodeData.getJobId();
@@ -1257,7 +1510,7 @@ public class NodeCanvas extends Pane {
                     }
                 }
                 
-                // ⭐ 新增：从properties读取并设置容器大小
+                // ⭐ 修复：从properties读取并设置容器大小
                 Object widthObj = nodeData.getProperties().get("width");
                 Object heightObj = nodeData.getProperties().get("height");
                 if (widthObj != null && heightObj != null) {
@@ -1272,59 +1525,68 @@ public class NodeCanvas extends Pane {
                 }
             }
             
-            // ⭐ 新增：设置大小改变回调，标记需要保存
+            // ⭐ 修复：设置大小改变回调，标记需要保存
             conditionNode.setOnSizeChanged(() -> markAsUnsaved());
             
-            // 添加到画布
-            addConditionNode(conditionNode);
-            
-            // ⭐ 修复：绑定子节点（包括普通节点和嵌套的条件节点）
-            if (nodeData.getProperties() != null) {
-                Object childrenObj = nodeData.getProperties().get("children");
-                if (childrenObj instanceof List) {
-                    List<String> childIds = new ArrayList<>();
-                    for (Object childId : (List<?>) childrenObj) {
-                        if (childId != null) {
-                            childIds.add(childId.toString());
-                        }
-                    }
-                    
-                    // 分离普通节点和条件节点
-                    List<ProcessNode> childNodes = new ArrayList<>();
-                    List<ConditionNode> childConditionNodes = new ArrayList<>();
-                    
-                    for (String childId : childIds) {
-                        // 先尝试从nodeMap中查找（普通节点）
-                        ProcessNode childNode = nodeMap.get(childId);
-                        if (childNode != null) {
-                            childNodes.add(childNode);
-                        } else {
-                            // 如果不是普通节点，可能是嵌套的条件节点
-                            // 从conditionNodes中查找
-                            for (ConditionNode cn : conditionNodes) {
-                                if (cn.getNodeId() != null && cn.getNodeId().equals(childId)) {
-                                    childConditionNodes.add(cn);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    
-                    // 绑定普通节点
-                    if (!childNodes.isEmpty()) {
-                        conditionNode.bindCanvasNodes(childNodes);
-                    }
-                    
-                    // ⭐ 新增：绑定嵌套的条件节点
-                    if (!childConditionNodes.isEmpty()) {
-                        conditionNode.bindConditionNodes(childConditionNodes);
-                    }
+            log("✓ 创建条件节点: " + conditionName);
+            return conditionNode;
+        } catch (Exception e) {
+            log("✗ 创建条件节点失败: " + e.getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * ⭐ 新增：绑定条件节点的子节点（包括普通节点和嵌套的条件节点）
+     */
+    private void bindConditionNodeChildren(ConditionNode conditionNode, JobComposeData.NodeData nodeData, 
+                                            Map<String, ProcessNode> nodeMap, Map<String, ConditionNode> conditionNodeMap) {
+        if (nodeData.getProperties() == null) return;
+        
+        Object childrenObj = nodeData.getProperties().get("children");
+        if (!(childrenObj instanceof List)) return;
+        
+        List<String> childIds = new ArrayList<>();
+        for (Object childId : (List<?>) childrenObj) {
+            if (childId != null) {
+                childIds.add(childId.toString());
+            }
+        }
+        
+        // 分离普通节点和条件节点
+        List<ProcessNode> childNodes = new ArrayList<>();
+        List<ConditionNode> childConditionNodes = new ArrayList<>();
+        
+        for (String childId : childIds) {
+            // 先尝试从nodeMap中查找（普通节点）
+            ProcessNode childNode = nodeMap.get(childId);
+            if (childNode != null) {
+                childNodes.add(childNode);
+            } else {
+                // 如果不是普通节点，可能是嵌套的条件节点
+                // 从conditionNodeMap中查找
+                ConditionNode childConditionNode = conditionNodeMap.get(childId);
+                if (childConditionNode != null) {
+                    childConditionNodes.add(childConditionNode);
                 }
             }
-            
-            log("✓ 加载条件节点: " + conditionName);
-        } catch (Exception e) {
-            log("✗ 加载条件节点失败: " + e.getMessage());
+        }
+        
+        // ⭐ 修复：绑定普通节点（绑定后，这些节点会从画布的nodes列表中移除）
+        if (!childNodes.isEmpty()) {
+            conditionNode.bindCanvasNodes(childNodes);
+            // 从画布的nodes列表中移除这些节点（因为它们现在由条件节点管理）
+            for (ProcessNode childNode : childNodes) {
+                if (nodes.contains(childNode)) {
+                    nodes.remove(childNode);
+                    this.getChildren().remove(childNode);
+                }
+            }
+        }
+        
+        // ⭐ 修复：绑定嵌套的条件节点
+        if (!childConditionNodes.isEmpty()) {
+            conditionNode.bindConditionNodes(childConditionNodes);
         }
     }
     

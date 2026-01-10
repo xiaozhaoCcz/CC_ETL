@@ -67,6 +67,77 @@ public class ParameterInputStyleUtil {
             "-fx-font-size: 12; " +
             "-fx-font-style: italic;";
     
+    /**
+     * 输入框基础样式
+     */
+    public static final String INPUT_FIELD_STYLE = 
+            "-fx-background-color: #FFFFFF; " +
+            "-fx-border-color: #D1D5DB; " +
+            "-fx-border-radius: 6; " +
+            "-fx-background-radius: 6; " +
+            "-fx-border-width: 1; " +
+            "-fx-padding: 8 12 8 12; " +
+            "-fx-font-size: 14; " +
+            "-fx-text-fill: #111827;";
+    
+    /**
+     * 输入框焦点状态样式
+     */
+    public static final String INPUT_FIELD_FOCUSED_STYLE = 
+            "-fx-border-color: #3B82F6; " +
+            "-fx-border-width: 2;";
+    
+    /**
+     * 选中文本背景样式（浅蓝色）
+     */
+    public static final String SELECTION_BACKGROUND_STYLE = 
+            "-fx-selection-bar: #BFDBFE; " +
+            "-fx-selection-bar-non-focused: #E0E7FF;";
+    
+    /**
+     * 节点类型标签样式 - SQL
+     */
+    public static final String NODE_TYPE_SQL_STYLE = 
+            "-fx-background-color: #DBEAFE; " +
+            "-fx-text-fill: #1E40AF; " +
+            "-fx-padding: 2 6 2 6; " +
+            "-fx-background-radius: 4; " +
+            "-fx-font-size: 11; " +
+            "-fx-font-weight: bold;";
+    
+    /**
+     * 节点类型标签样式 - API
+     */
+    public static final String NODE_TYPE_API_STYLE = 
+            "-fx-background-color: #D1FAE5; " +
+            "-fx-text-fill: #065F46; " +
+            "-fx-padding: 2 6 2 6; " +
+            "-fx-background-radius: 4; " +
+            "-fx-font-size: 11; " +
+            "-fx-font-weight: bold;";
+    
+    /**
+     * 节点类型标签样式 - Bean
+     */
+    public static final String NODE_TYPE_BEAN_STYLE = 
+            "-fx-background-color: #FED7AA; " +
+            "-fx-text-fill: #9A3412; " +
+            "-fx-padding: 2 6 2 6; " +
+            "-fx-background-radius: 4; " +
+            "-fx-font-size: 11; " +
+            "-fx-font-weight: bold;";
+    
+    /**
+     * 节点类型标签样式 - 其他类型
+     */
+    public static final String NODE_TYPE_OTHER_STYLE = 
+            "-fx-background-color: #F3F4F6; " +
+            "-fx-text-fill: #4B5563; " +
+            "-fx-padding: 2 6 2 6; " +
+            "-fx-background-radius: 4; " +
+            "-fx-font-size: 11; " +
+            "-fx-font-weight: bold;";
+    
     private ParameterInputStyleUtil() {
         // 工具类，不允许实例化
     }

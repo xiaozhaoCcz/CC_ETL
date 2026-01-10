@@ -166,6 +166,10 @@ public class DataManager {
                 if (node.getJobId() != null) {
                     propertiesMap.put("jobId", node.getJobId());
                 }
+                // 添加节点颜色到properties
+                if (node.getCurrentColor() != null) {
+                    propertiesMap.put("color", node.getCurrentColor());
+                }
                 nodeData.put("properties", apiUtil.getGson().toJson(propertiesMap));
                 
                 nodesData.add(nodeData);

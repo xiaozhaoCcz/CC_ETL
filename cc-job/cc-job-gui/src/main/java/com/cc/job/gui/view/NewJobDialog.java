@@ -1343,7 +1343,12 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
             addButton.setStyle("-fx-background-color: rgba(255,255,255,0.2); -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 6 14; -fx-background-radius: 4; -fx-border-color: rgba(255,255,255,0.4); -fx-border-radius: 4; -fx-cursor: hand;");
             addButton.setOnAction(e -> addRow("", ""));
 
-            getChildren().addAll(titleLabel, tableView, addButton);
+            // 将新增按钮放在表格上方
+            HBox buttonContainer = new HBox();
+            buttonContainer.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+            buttonContainer.getChildren().add(addButton);
+
+            getChildren().addAll(titleLabel, buttonContainer, tableView);
             ensureAtLeastOneRow();
         }
 

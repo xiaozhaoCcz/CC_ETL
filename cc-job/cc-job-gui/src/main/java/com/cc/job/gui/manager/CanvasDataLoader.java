@@ -38,6 +38,13 @@ public class CanvasDataLoader {
     }
     
     private ProcessNode createNode(JobComposeData.NodeData nodeData) {
+        return createNodeFromData(nodeData);
+    }
+    
+    /**
+     * ⭐ 新增：从NodeData创建ProcessNode（公共方法，供外部调用）
+     */
+    public ProcessNode createNodeFromData(JobComposeData.NodeData nodeData) {
         String text = nodeData.getJobName() != null ? nodeData.getJobName() : "Node";
         ProcessNode node = new ProcessNode(nodeData.getId(), text);
         
@@ -60,6 +67,18 @@ public class CanvasDataLoader {
         }
         
         node.setType(mapNodeType(nodeData.getType(), nodeData.getProperties()));
+        
+        // 从properties读取颜色并应用
+        if (nodeData.getProperties() != null) {
+            Object colorObj = nodeData.getProperties().get("color");
+            if (colorObj != null) {
+                String color = colorObj.toString();
+                if (color != null && !color.isEmpty()) {
+                    node.setNodeColor(color);
+                }
+            }
+        }
+        
         return node;
     }
     

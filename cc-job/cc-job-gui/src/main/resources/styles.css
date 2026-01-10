@@ -721,3 +721,18 @@
     -fx-border-radius: 6;
     -fx-background-radius: 6;
 }
+
+/* ============ 参数输入语法高亮样式 ============ */
+
+/* 参数表达式高亮样式（#{nodeName}.code 等） */
+.parameter-expression {
+    -rtfx-background-color: #BFDBFE !important;
+    -fx-fill: #0369A1 !important;
+    -fx-font-weight: 500;
+}
+
+/* 确保参数表达式背景色正确显示（针对 CodeArea） */
+.parameter-input .parameter-expression {
+    -rtfx-background-color: #BFDBFE !important;
+    -fx-fill: #0369A1 !important;
+}
