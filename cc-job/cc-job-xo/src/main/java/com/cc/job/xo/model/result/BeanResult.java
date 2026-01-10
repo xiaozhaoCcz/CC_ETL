@@ -1,5 +1,6 @@
 package com.cc.job.xo.model.result;
 
+import java.io.Serializable;
 import java.util.Objects;
 
 /**
@@ -9,7 +10,9 @@ import java.util.Objects;
  *
  * @author cc-job-team
  */
-public class BeanResult {
+public class BeanResult implements Serializable {
+    
+    private static final long serialVersionUID = 1L;
     
     /** Bean执行返回的值 */
     private Object value;

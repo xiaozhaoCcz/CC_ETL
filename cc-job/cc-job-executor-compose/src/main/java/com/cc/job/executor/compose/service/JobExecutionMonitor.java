@@ -74,11 +74,33 @@ public class JobExecutionMonitor implements Callable<String> {
                 jobInfo.getId(), context.getExecutionBatchId(), executeKey);
         
         try {
-            latch.await();
+            // 计算超时时间：任务超时时间 + 缓冲时间（30秒用于回调）
+            long timeoutSeconds = jobInfo.getExecutorTimeout() > 0 
+                    ? jobInfo.getExecutorTimeout() + 30 
+                    : 300; // 默认5分钟
+            
+            boolean awaitResult = latch.await(timeoutSeconds, java.util.concurrent.TimeUnit.SECONDS);
             
             if (stop) {
                 logger.debug("[JobMonitor] 监听被停止 - jobId: {}", jobInfo.getId());
                 return ExecutorConstants.ExecutionResult.SUCCESS;
+            }
+            
+            // 如果等待超时，检查任务是否真的还在执行
+            if (!awaitResult) {
+                logger.warn("[JobMonitor] 等待任务回调超时 - jobId: {}, executeKey: {}, 超时时间: {}秒", 
+                        jobInfo.getId(), executeKey, timeoutSeconds);
+                
+                // 检查任务是否已经完成但回调失败
+                Boolean success = jobResultMap.get(executeKey);
+                if (success == null) {
+                    // 任务结果不存在，可能是回调失败，标记为失败
+                    logger.error("[JobMonitor] 任务回调超时且结果不存在，可能回调失败 - jobId: {}, executeKey: {}", 
+                            jobInfo.getId(), executeKey);
+                    // 标记为失败，避免任务组一直运行
+                    jobResultMap.put(executeKey, false);
+                    return handleJobCompletion(false, retryCount);
+                }
             }
             
             Boolean success = jobResultMap.get(executeKey);
@@ -118,7 +140,10 @@ public class JobExecutionMonitor implements Callable<String> {
                 return handleJobCompletion(success, retryCount);
             } else {
                 logger.warn("[JobMonitor] 任务结果不存在 - jobId: {}, executeKey: {}", jobInfo.getId(), executeKey);
-                return ExecutorConstants.ExecutionResult.SUCCESS;
+                // 如果结果不存在，可能是回调失败，标记为失败
+                logger.error("[JobMonitor] 任务结果不存在，可能回调失败，标记为失败 - jobId: {}, executeKey: {}", 
+                        jobInfo.getId(), executeKey);
+                return handleJobCompletion(false, retryCount);
             }
             
         } catch (InterruptedException e) {

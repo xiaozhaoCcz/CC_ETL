@@ -1,5 +1,6 @@
 package com.cc.job.xo.model.result;
 
+import java.io.Serializable;
 import java.util.Objects;
 
 /**
@@ -9,7 +10,9 @@ import java.util.Objects;
  *
  * @author cc-job-team
  */
-public class NodeResult {
+public class NodeResult implements Serializable {
+    
+    private static final long serialVersionUID = 1L;
     
     /** 状态码：200=成功，其他=失败 */
     private Integer code;

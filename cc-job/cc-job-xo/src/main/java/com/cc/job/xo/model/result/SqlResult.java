@@ -1,5 +1,6 @@
 package com.cc.job.xo.model.result;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -11,7 +12,9 @@ import java.util.Objects;
  *
  * @author cc-job-team
  */
-public class SqlResult {
+public class SqlResult implements Serializable {
+    
+    private static final long serialVersionUID = 1L;
     
     /** 查询结果数据（SELECT） */
     private List<Map<String, Object>> data;

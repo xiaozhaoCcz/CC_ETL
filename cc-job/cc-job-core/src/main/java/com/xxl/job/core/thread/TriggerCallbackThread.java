@@ -9,6 +9,7 @@ import com.xxl.job.core.enums.RegistryConfig;
 import com.xxl.job.core.executor.XxlJobExecutor;
 import com.xxl.job.core.log.XxlJobFileAppender;
 import com.xxl.job.core.util.FileUtil;
+import com.xxl.job.core.util.GsonTool;
 import com.xxl.job.core.util.JdkSerializeTool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,7 +18,6 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.Vector;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -213,7 +213,40 @@ public class TriggerCallbackThread {
         }
 
         // append file
-        byte[] callbackParamList_bytes = JdkSerializeTool.serialize(callbackParamList);
+        byte[] callbackParamList_bytes = null;
+        try {
+            callbackParamList_bytes = JdkSerializeTool.serialize(callbackParamList);
+        } catch (Exception e) {
+            logger.error("[TriggerCallbackThread] JDK序列化失败，尝试使用JSON序列化作为备用方案", e);
+        }
+        
+        // 如果JDK序列化失败，使用JSON序列化作为备用方案
+        if (callbackParamList_bytes == null || callbackParamList_bytes.length == 0) {
+            try {
+                // 使用Gson进行JSON序列化
+                String json = GsonTool.toJson(callbackParamList);
+                callbackParamList_bytes = json.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                logger.info("[TriggerCallbackThread] 使用JSON序列化作为备用方案，数据大小: {} 字节", callbackParamList_bytes.length);
+            } catch (Exception e) {
+                logger.error("[TriggerCallbackThread] JSON序列化也失败，无法保存回调参数", e);
+                // 即使序列化失败，也记录错误信息到日志文件
+                try {
+                    String errorInfo = "回调参数序列化失败: " + e.getMessage() + "\n" +
+                            "回调参数数量: " + callbackParamList.size() + "\n" +
+                            "时间: " + new java.util.Date();
+                    callbackParamList_bytes = errorInfo.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                } catch (Exception ex) {
+                    logger.error("[TriggerCallbackThread] 无法创建错误信息", ex);
+                    return; // 完全失败，无法保存
+                }
+            }
+        }
+
+        // 确保目录存在
+        File callbackLogDir = new File(failCallbackFilePath);
+        if (!callbackLogDir.exists()) {
+            callbackLogDir.mkdirs();
+        }
 
         File callbackLogFile = new File(failCallbackFileName.replace("{x}", String.valueOf(System.currentTimeMillis())));
         if (callbackLogFile.exists()) {
@@ -224,7 +257,13 @@ public class TriggerCallbackThread {
                 }
             }
         }
-        FileUtil.writeFileContent(callbackLogFile, callbackParamList_bytes);
+        
+        // 只有在有数据时才写入文件
+        if (callbackParamList_bytes != null && callbackParamList_bytes.length > 0) {
+            FileUtil.writeFileContent(callbackLogFile, callbackParamList_bytes);
+        } else {
+            logger.error("[TriggerCallbackThread] 回调参数序列化后为空，无法保存到文件");
+        }
     }
 
     private void retryFailCallbackFile(){
@@ -251,10 +290,31 @@ public class TriggerCallbackThread {
                 continue;
             }
 
-            List<HandleCallbackParam> callbackParamList = (List<HandleCallbackParam>) JdkSerializeTool.deserialize(callbackParamList_bytes, List.class);
-
-            callbaclLogFile.delete();
-            doCallback(callbackParamList);
+            List<HandleCallbackParam> callbackParamList = null;
+            
+            // 尝试JDK反序列化
+            try {
+                callbackParamList = (List<HandleCallbackParam>) JdkSerializeTool.deserialize(callbackParamList_bytes, List.class);
+            } catch (Exception e) {
+                logger.warn("[TriggerCallbackThread] JDK反序列化失败，尝试JSON反序列化", e);
+                // 如果JDK反序列化失败，尝试JSON反序列化（备用方案）
+                try {
+                    String json = new String(callbackParamList_bytes, java.nio.charset.StandardCharsets.UTF_8);
+                    callbackParamList = GsonTool.fromJsonList(json, HandleCallbackParam.class);
+                } catch (Exception ex) {
+                    logger.error("[TriggerCallbackThread] JSON反序列化也失败，跳过此文件", ex);
+                    callbaclLogFile.delete();
+                    continue;
+                }
+            }
+            
+            if (callbackParamList != null && !callbackParamList.isEmpty()) {
+                callbaclLogFile.delete();
+                doCallback(callbackParamList);
+            } else {
+                logger.warn("[TriggerCallbackThread] 反序列化后的回调参数列表为空，删除文件");
+                callbaclLogFile.delete();
+            }
         }
 
     }

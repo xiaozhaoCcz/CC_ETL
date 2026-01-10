@@ -1,5 +1,6 @@
 package com.cc.job.xo.model.result;
 
+import java.io.Serializable;
 import java.util.Map;
 import java.util.Objects;
 
@@ -10,7 +11,9 @@ import java.util.Objects;
  *
  * @author cc-job-team
  */
-public class ApiResult {
+public class ApiResult implements Serializable {
+    
+    private static final long serialVersionUID = 1L;
     
     /** HTTP状态码 */
     private Integer statusCode;
