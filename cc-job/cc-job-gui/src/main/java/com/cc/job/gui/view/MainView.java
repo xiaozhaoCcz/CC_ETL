@@ -25,6 +25,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.*;
 import java.util.Set;
 
@@ -893,7 +895,11 @@ public class MainView extends BorderPane {
         navigationBar.setOnTaskSwitch((taskGroupName, taskGroupId) -> {
             // 切换任务组前，先保存当前任务组的数据（只在有未保存更改时）和滚动位置
             Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
-            if (currentTaskGroupId != null && currentTaskGroupId != 0) {
+            Long resolvedTaskId = taskGroupId != null ? taskGroupId : findTaskGroupIdByName(taskGroupName);
+            
+            // 只有在真正切换到不同任务组时才保存当前任务组的滚动位置
+            if (currentTaskGroupId != null && currentTaskGroupId != 0 
+                    && resolvedTaskId != null && !currentTaskGroupId.equals(resolvedTaskId)) {
                 if (canvas.hasUnsavedChanges()) {
                     dataManager.saveOrUpdateJob(currentTaskGroupId);
                 }
@@ -901,8 +907,6 @@ public class MainView extends BorderPane {
                 // 保存当前任务组的滚动位置
                 saveCurrentScrollPosition();
             }
-            
-            Long resolvedTaskId = taskGroupId != null ? taskGroupId : findTaskGroupIdByName(taskGroupName);
             
             if (resolvedTaskId != null) {
                 taskGroupNameToIdMap.put(taskGroupName, resolvedTaskId);
@@ -1953,6 +1957,11 @@ public class MainView extends BorderPane {
         if (currentTaskGroupId != null && currentTaskGroupId != 0) {
             double hvalue = scrollPane.getHvalue();
             double vvalue = scrollPane.getVvalue();
+            double canvasWidth = canvas.getPrefWidth();
+            double canvasHeight = canvas.getPrefHeight();
+            double viewportWidth = scrollPane.getViewportBounds().getWidth();
+            double viewportHeight = scrollPane.getViewportBounds().getHeight();
+            
             taskGroupScrollPositions.put(currentTaskGroupId, new ScrollPosition(hvalue, vvalue));
             logger.debug("保存任务组 {} 的滚动位置: hvalue={}, vvalue={}", currentTaskGroupId, hvalue, vvalue);
         }
@@ -1965,23 +1974,56 @@ public class MainView extends BorderPane {
     private void restoreScrollPosition(Long taskGroupId) {
         if (scrollPane == null || taskGroupId == null || taskGroupId == 0) return;
         
-        // 使用Platform.runLater确保在UI更新后执行
+        ScrollPosition savedPosition = taskGroupScrollPositions.get(taskGroupId);
+        
+        // 立即设置滚动位置（如果已保存），避免延迟导致的视觉跳转
+        if (savedPosition != null) {
+            double targetH = savedPosition.hvalue;
+            double targetV = savedPosition.vvalue;
+            scrollPane.setHvalue(targetH);
+            scrollPane.setVvalue(targetV);
+            logger.debug("立即恢复任务组 {} 的滚动位置: hvalue={}, vvalue={}", taskGroupId, targetH, targetV);
+        } else {
+            // 首次加载，立即设置为居中
+            scrollPane.setHvalue(0.5);
+            scrollPane.setVvalue(0.5);
+            taskGroupScrollPositions.put(taskGroupId, new ScrollPosition(0.5, 0.5));
+            logger.debug("任务组 {} 首次加载，立即设置滚动位置为居中", taskGroupId);
+        }
+        
+        // 使用Platform.runLater确保在UI更新后验证和修正滚动位置
         Platform.runLater(() -> {
-            ScrollPosition savedPosition = taskGroupScrollPositions.get(taskGroupId);
-            
-            if (savedPosition != null) {
-                // 恢复保存的位置
-                scrollPane.setHvalue(savedPosition.hvalue);
-                scrollPane.setVvalue(savedPosition.vvalue);
-                logger.debug("恢复任务组 {} 的滚动位置: hvalue={}, vvalue={}", taskGroupId, savedPosition.hvalue, savedPosition.vvalue);
-            } else {
-                // 首次加载，设置为居中
-                scrollPane.setHvalue(0.5);
-                scrollPane.setVvalue(0.5);
-                // 保存居中位置，以便后续切换时保持一致
-                taskGroupScrollPositions.put(taskGroupId, new ScrollPosition(0.5, 0.5));
-                logger.debug("任务组 {} 首次加载，设置滚动位置为居中", taskGroupId);
-            }
+            // 使用较短的延迟验证滚动位置（减少到50ms，减少视觉延迟）
+            javafx.animation.PauseTransition delay = new javafx.animation.PauseTransition(javafx.util.Duration.millis(50));
+            delay.setOnFinished(e -> {
+                ScrollPosition position = taskGroupScrollPositions.get(taskGroupId);
+                
+                double canvasWidth = canvas.getPrefWidth();
+                double canvasHeight = canvas.getPrefHeight();
+                double viewportWidth = scrollPane.getViewportBounds().getWidth();
+                double viewportHeight = scrollPane.getViewportBounds().getHeight();
+                
+                if (position != null) {
+                    double targetH = position.hvalue;
+                    double targetV = position.vvalue;
+                    double actualH = scrollPane.getHvalue();
+                    double actualV = scrollPane.getVvalue();
+                    
+                    // 如果滚动位置被改变了，再次恢复（只在差异较大时修正，避免微小抖动）
+                    if (Math.abs(targetH - actualH) > 0.01 || Math.abs(targetV - actualV) > 0.01) {
+                        scrollPane.setHvalue(targetH);
+                        scrollPane.setVvalue(targetV);
+                        logger.debug("检测到滚动位置被改变，重新恢复任务组 {} 的滚动位置: hvalue={}, vvalue={}", taskGroupId, targetH, targetV);
+                    }
+                } else {
+                    // 首次加载，设置为居中
+                    scrollPane.setHvalue(0.5);
+                    scrollPane.setVvalue(0.5);
+                    taskGroupScrollPositions.put(taskGroupId, new ScrollPosition(0.5, 0.5));
+                    logger.debug("任务组 {} 首次加载，设置滚动位置为居中", taskGroupId);
+                }
+            });
+            delay.play();
         });
     }
     

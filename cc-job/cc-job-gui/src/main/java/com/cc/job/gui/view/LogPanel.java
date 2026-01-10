@@ -50,6 +50,22 @@ public class LogPanel extends VBox {
     private javafx.animation.Timeline searchDebounceTimeline;
     private javafx.animation.Timeline batchUpdateTimeline;
     
+    // 新增UI控件
+    private ComboBox<String> levelFilterCombo;
+    private CheckBox regexCheckBox;
+    private CheckBox caseSensitiveCheckBox;
+    private ToggleButton pauseButton;
+    private ToggleButton autoScrollButton;
+    private Label errorCountLabel;
+    private Label warnCountLabel;
+    private Label infoCountLabel;
+    private Label lastUpdateLabel;
+    private javafx.animation.Timeline updateTimeTimeline;
+    
+    // 搜索历史
+    private final List<String> searchHistory = new ArrayList<>();
+    private static final int MAX_SEARCH_HISTORY = 10;
+    
     public LogPanel() {
         tabManager = new LogTabManager();
         initializeUI();
@@ -131,11 +147,12 @@ public class LogPanel extends VBox {
     }
     
     private HBox createTitleBar() {
-        HBox titleBar = new HBox(12);
+        HBox titleBar = new HBox(8);
         titleBar.setAlignment(Pos.CENTER_LEFT);
         titleBar.setStyle("-fx-border-width: 0; -fx-padding: 14 20;");
         titleBar.setPrefHeight(56);
         
+        // 搜索框
         searchField = new TextField();
         searchField.setPromptText("搜索日志...");
         searchField.setPrefWidth(200);
@@ -163,6 +180,34 @@ public class LogPanel extends VBox {
             searchDebounceTimeline.play();
         });
         
+        // 级别过滤下拉菜单
+        levelFilterCombo = new ComboBox<>();
+        levelFilterCombo.getItems().addAll("全部", "INFO", "WARN", "ERROR", "DEBUG", "SUCCESS");
+        levelFilterCombo.setValue("全部");
+        levelFilterCombo.setPrefWidth(100);
+        levelFilterCombo.setStyle(
+            "-fx-background-color: #F1F5F9; " +
+            "-fx-text-fill: " + StyleUtil.GRAY_700 + "; " +
+            "-fx-font-size: 12px; " +
+            "-fx-border-color: rgba(148,163,184,0.55); " +
+            "-fx-border-width: 1; " +
+            "-fx-border-radius: 8; " +
+            "-fx-background-radius: 8;"
+        );
+        levelFilterCombo.setOnAction(e -> applyFilters());
+        
+        // 正则表达式复选框
+        regexCheckBox = new CheckBox("正则");
+        regexCheckBox.setStyle("-fx-font-size: 11px; -fx-text-fill: " + StyleUtil.GRAY_600 + ";");
+        regexCheckBox.setTooltip(new Tooltip("启用正则表达式搜索"));
+        regexCheckBox.setOnAction(e -> applyFilters());
+        
+        // 大小写敏感复选框
+        caseSensitiveCheckBox = new CheckBox("大小写");
+        caseSensitiveCheckBox.setStyle("-fx-font-size: 11px; -fx-text-fill: " + StyleUtil.GRAY_600 + ";");
+        caseSensitiveCheckBox.setTooltip(new Tooltip("大小写敏感搜索"));
+        caseSensitiveCheckBox.setOnAction(e -> applyFilters());
+        
         HBox spacer = new HBox();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         
@@ -171,6 +216,52 @@ public class LogPanel extends VBox {
         countLabel.setTextFill(Color.web(StyleUtil.GRAY_500));
         
         Region separator = createSeparator();
+        
+        // 暂停/恢复按钮
+        pauseButton = new ToggleButton("暂停");
+        pauseButton.setStyle(
+            "-fx-background-color: linear-gradient(to bottom, #F1F5F9, rgba(241,245,249,0.98)); " +
+            "-fx-text-fill: " + StyleUtil.GRAY_600 + "; " +
+            "-fx-font-size: 12px; " +
+            "-fx-font-weight: 600; " +
+            "-fx-padding: 6 12; " +
+            "-fx-border-radius: 8; " +
+            "-fx-background-radius: 8; " +
+            "-fx-border-color: rgba(148,163,184,0.6); " +
+            "-fx-border-width: 1; " +
+            "-fx-cursor: hand;"
+        );
+        pauseButton.setTooltip(new Tooltip("暂停/恢复实时日志更新"));
+        pauseButton.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            LogContentManager data = tabManager.getCurrentTabData();
+            if (data != null) {
+                data.setPauseUpdates(newVal);
+                pauseButton.setText(newVal ? "恢复" : "暂停");
+            }
+        });
+        
+        // 自动滚动开关
+        autoScrollButton = new ToggleButton("自动滚动");
+        autoScrollButton.setSelected(true);
+        autoScrollButton.setStyle(
+            "-fx-background-color: linear-gradient(to bottom, #F1F5F9, rgba(241,245,249,0.98)); " +
+            "-fx-text-fill: " + StyleUtil.GRAY_600 + "; " +
+            "-fx-font-size: 12px; " +
+            "-fx-font-weight: 600; " +
+            "-fx-padding: 6 12; " +
+            "-fx-border-radius: 8; " +
+            "-fx-background-radius: 8; " +
+            "-fx-border-color: rgba(148,163,184,0.6); " +
+            "-fx-border-width: 1; " +
+            "-fx-cursor: hand;"
+        );
+        autoScrollButton.setTooltip(new Tooltip("自动滚动到底部"));
+        autoScrollButton.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            LogContentManager data = tabManager.getCurrentTabData();
+            if (data != null) {
+                data.autoScrollToBottom = newVal;
+            }
+        });
         
         Button scrollToTopBtn = createButton("↑", () -> {
             LogContentManager data = tabManager.getCurrentTabData();
@@ -181,7 +272,11 @@ public class LogPanel extends VBox {
         Button clearBtn = createButton("清空", this::clearLogs);
         Button exportBtn = createButton("导出", this::exportLogs);
         
-        titleBar.getChildren().addAll(searchField, spacer, countLabel, separator, scrollToTopBtn, clearBtn, exportBtn);
+        titleBar.getChildren().addAll(
+            searchField, levelFilterCombo,
+            regexCheckBox, caseSensitiveCheckBox, spacer, countLabel, separator,
+            pauseButton, autoScrollButton, scrollToTopBtn, clearBtn, exportBtn
+        );
         return titleBar;
     }
     
@@ -205,15 +300,96 @@ public class LogPanel extends VBox {
         infoLabel.setFont(Font.font("System", FontWeight.NORMAL, 11));
         infoLabel.setTextFill(Color.web(StyleUtil.GRAY_500));
         
+        Region separator1 = createSeparator();
+        
+        // 日志统计标签
+        errorCountLabel = new Label("错误: 0");
+        errorCountLabel.setFont(Font.font("System", FontWeight.MEDIUM, 11));
+        errorCountLabel.setTextFill(Color.web(StyleUtil.ERROR));
+        errorCountLabel.setStyle("-fx-cursor: hand;");
+        errorCountLabel.setOnMouseClicked(e -> filterByLevel("ERROR"));
+        errorCountLabel.setTooltip(new Tooltip("点击过滤错误日志"));
+        
+        warnCountLabel = new Label("警告: 0");
+        warnCountLabel.setFont(Font.font("System", FontWeight.MEDIUM, 11));
+        warnCountLabel.setTextFill(Color.web(StyleUtil.WARNING));
+        warnCountLabel.setStyle("-fx-cursor: hand;");
+        warnCountLabel.setOnMouseClicked(e -> filterByLevel("WARN"));
+        warnCountLabel.setTooltip(new Tooltip("点击过滤警告日志"));
+        
+        infoCountLabel = new Label("信息: 0");
+        infoCountLabel.setFont(Font.font("System", FontWeight.MEDIUM, 11));
+        infoCountLabel.setTextFill(Color.web(StyleUtil.GRAY_600));
+        infoCountLabel.setStyle("-fx-cursor: hand;");
+        infoCountLabel.setOnMouseClicked(e -> filterByLevel("INFO"));
+        infoCountLabel.setTooltip(new Tooltip("点击过滤信息日志"));
+        
         HBox spacer = new HBox();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         
-        Label timeLabel = new Label("最后更新: 从未");
-        timeLabel.setFont(Font.font("System", FontWeight.NORMAL, 11));
-        timeLabel.setTextFill(Color.web(StyleUtil.GRAY_400));
+        lastUpdateLabel = new Label("最后更新: 从未");
+        lastUpdateLabel.setFont(Font.font("System", FontWeight.NORMAL, 11));
+        lastUpdateLabel.setTextFill(Color.web(StyleUtil.GRAY_400));
         
-        statusBar.getChildren().addAll(infoLabel, spacer, timeLabel);
+        statusBar.getChildren().addAll(
+            infoLabel, separator1, errorCountLabel, warnCountLabel, infoCountLabel,
+            spacer, lastUpdateLabel
+        );
+        
+        // 启动更新时间标签的定时器
+        startUpdateTimeTimer();
+        
         return statusBar;
+    }
+    
+    private void startUpdateTimeTimer() {
+        updateTimeTimeline = new javafx.animation.Timeline(
+            new javafx.animation.KeyFrame(
+                javafx.util.Duration.seconds(1),
+                e -> updateLastUpdateTime()
+            )
+        );
+        updateTimeTimeline.setCycleCount(javafx.animation.Timeline.INDEFINITE);
+        updateTimeTimeline.play();
+    }
+    
+    private void updateLastUpdateTime() {
+        LogContentManager data = tabManager.getCurrentTabData();
+        if (data != null && data.getEntries() != null && !data.getEntries().isEmpty()) {
+            // 获取最后一条日志的时间
+            List<LogContentManager.LogEntry> entries = data.getEntries();
+            if (!entries.isEmpty()) {
+                LogContentManager.LogEntry lastEntry = entries.get(entries.size() - 1);
+                if (lastEntry.timestamp != null) {
+                    try {
+                        LocalDateTime lastTime = LocalDateTime.parse(
+                            lastEntry.timestamp,
+                            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
+                        );
+                        LocalDateTime now = LocalDateTime.now();
+                        long seconds = java.time.Duration.between(lastTime, now).getSeconds();
+                        String timeStr;
+                        if (seconds < 60) {
+                            timeStr = seconds + "秒前";
+                        } else if (seconds < 3600) {
+                            timeStr = (seconds / 60) + "分钟前";
+                        } else {
+                            timeStr = lastTime.format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+                        }
+                        lastUpdateLabel.setText("最后更新: " + timeStr);
+                    } catch (Exception e) {
+                        lastUpdateLabel.setText("最后更新: " + lastEntry.timestamp);
+                    }
+                }
+            }
+        }
+    }
+    
+    private void filterByLevel(String level) {
+        if (levelFilterCombo != null) {
+            levelFilterCombo.setValue(level);
+            applyFilters();
+        }
     }
     
     private Button createButton(String text, Runnable action) {
@@ -260,14 +436,17 @@ public class LogPanel extends VBox {
         Platform.runLater(() -> {
             updatesByGroup.forEach((taskGroupId, newEntries) -> {
                 LogContentManager tabData = tabManager.getTabData(taskGroupId);
-                if (tabData != null) {
+                if (tabData != null && !tabData.isPauseUpdates()) {
                     for (LogContentManager.LogEntry entry : newEntries) {
                         tabData.addEntry(entry);
                     }
                     
                     if (tabManager.isCurrentTab(taskGroupId)) {
-                        tabData.renderIncremental(currentSearchKeyword);
-                        updateStatusBar(tabData);
+                        // 如果暂停更新，不渲染
+                        if (!tabData.isPauseUpdates()) {
+                            tabData.renderIncremental(currentSearchKeyword);
+                            updateStatusBar(tabData);
+                        }
                     }
                 }
             });
@@ -276,11 +455,50 @@ public class LogPanel extends VBox {
     
     private void applySearchFilter(String keyword) {
         currentSearchKeyword = keyword == null ? "" : keyword.trim();
-        LogContentManager tabData = tabManager.getCurrentTabData();
-        if (tabData != null) {
-            tabData.render(currentSearchKeyword);
-            updateStatusBar(tabData);
+        if (!currentSearchKeyword.isEmpty() && !searchHistory.contains(currentSearchKeyword)) {
+            searchHistory.add(0, currentSearchKeyword);
+            if (searchHistory.size() > MAX_SEARCH_HISTORY) {
+                searchHistory.remove(searchHistory.size() - 1);
+            }
         }
+        applyFilters();
+    }
+    
+    private void applyFilters() {
+        LogContentManager tabData = tabManager.getCurrentTabData();
+        if (tabData == null) return;
+        
+        // 显示加载指示器
+        countLabel.setText("搜索中...");
+        
+        // 获取级别过滤
+        Set<String> enabledLevels = new HashSet<>();
+        String selectedLevel = levelFilterCombo != null ? levelFilterCombo.getValue() : "全部";
+        if ("全部".equals(selectedLevel)) {
+            enabledLevels.add("ALL");
+        } else {
+            enabledLevels.add(selectedLevel);
+        }
+        tabData.setEnabledLevels(enabledLevels);
+        
+        // 获取搜索选项
+        boolean useRegex = regexCheckBox != null && regexCheckBox.isSelected();
+        boolean caseSensitive = caseSensitiveCheckBox != null && caseSensitiveCheckBox.isSelected();
+        tabData.setRegexEnabled(useRegex);
+        tabData.setCaseSensitive(caseSensitive);
+        
+        // 应用过滤并渲染（异步，已在render方法中实现）
+        tabData.render(currentSearchKeyword, enabledLevels, useRegex, caseSensitive);
+        
+        // 延迟更新状态栏（等待渲染完成）
+        Platform.runLater(() -> {
+            try {
+                Thread.sleep(100); // 给渲染线程一些时间
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            updateStatusBar(tabData);
+        });
     }
     
     private void updateStatusBar(LogContentManager tabData) {
@@ -289,6 +507,18 @@ public class LogPanel extends VBox {
                 countLabel.setText("匹配 " + tabData.filteredCount + " / 共 " + tabData.logCount + " 条");
             } else {
                 countLabel.setText(tabData.logCount + " 条日志");
+            }
+            
+            // 更新统计信息
+            LogContentManager.LogStatistics stats = tabData.getLogStatistics();
+            if (errorCountLabel != null) {
+                errorCountLabel.setText("错误: " + stats.errorCount);
+            }
+            if (warnCountLabel != null) {
+                warnCountLabel.setText("警告: " + stats.warnCount);
+            }
+            if (infoCountLabel != null) {
+                infoCountLabel.setText("信息: " + stats.infoCount);
             }
         }
     }
@@ -500,21 +730,250 @@ public class LogPanel extends VBox {
     }
     
     private void clearLogs() {
-        Platform.runLater(() -> {
-            LogContentManager tabData = tabManager.getCurrentTabData();
-            if (tabData != null) {
-                tabData.clearEntries();
-                tabData.status = "就绪";
-                tabData.statusColor = "#10B981";
-                tabData.render(currentSearchKeyword);
-                updateStatusBar(tabData);
-                info("日志已清空");
+        LogContentManager tabData = tabManager.getCurrentTabData();
+        if (tabData == null) return;
+        
+        // 显示确认对话框
+        Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
+        confirmAlert.setTitle("确认清空");
+        confirmAlert.setHeaderText(null);
+        confirmAlert.setContentText("确定要清空当前标签页的日志吗？此操作不可撤销。");
+        
+        // 添加"清空所有标签"选项
+        ButtonType clearAllButton = new ButtonType("清空所有标签");
+        ButtonType clearCurrentButton = new ButtonType("清空当前标签");
+        ButtonType cancelButton = new ButtonType("取消", ButtonBar.ButtonData.CANCEL_CLOSE);
+        confirmAlert.getButtonTypes().setAll(clearAllButton, clearCurrentButton, cancelButton);
+        
+        confirmAlert.showAndWait().ifPresent(buttonType -> {
+            if (buttonType == clearAllButton) {
+                // 清空所有标签
+                Platform.runLater(() -> {
+                    for (LogContentManager data : tabManager.tabDataMap.values()) {
+                        if (data != null) {
+                            data.clearEntries();
+                            data.status = "就绪";
+                            data.statusColor = "#10B981";
+                        }
+                    }
+                    tabData.render(currentSearchKeyword);
+                    updateStatusBar(tabData);
+                    info("所有标签页的日志已清空");
+                });
+            } else if (buttonType == clearCurrentButton) {
+                // 清空当前标签
+                Platform.runLater(() -> {
+                    tabData.clearEntries();
+                    tabData.status = "就绪";
+                    tabData.statusColor = "#10B981";
+                    tabData.render(currentSearchKeyword);
+                    updateStatusBar(tabData);
+                    info("日志已清空");
+                });
             }
         });
     }
     
     private void exportLogs() {
-        warn("导出功能开发中...");
+        LogContentManager tabData = tabManager.getCurrentTabData();
+        if (tabData == null || tabData.getEntries().isEmpty()) {
+            warn("没有可导出的日志");
+            return;
+        }
+        
+        // 创建导出对话框
+        Dialog<ExportOptions> dialog = new Dialog<>();
+        dialog.setTitle("导出日志");
+        dialog.setHeaderText("选择导出选项");
+        
+        // 创建选项
+        ComboBox<String> formatCombo = new ComboBox<>();
+        formatCombo.getItems().addAll("TXT", "CSV", "JSON");
+        formatCombo.setValue("TXT");
+        
+        RadioButton exportAll = new RadioButton("导出全部日志");
+        RadioButton exportFiltered = new RadioButton("导出当前过滤结果");
+        exportFiltered.setSelected(true);
+        ToggleGroup exportGroup = new ToggleGroup();
+        exportAll.setToggleGroup(exportGroup);
+        exportFiltered.setToggleGroup(exportGroup);
+        
+        VBox content = new VBox(10);
+        content.setPadding(new Insets(20));
+        content.getChildren().addAll(
+            new Label("导出格式:"),
+            formatCombo,
+            new Label("导出范围:"),
+            exportAll,
+            exportFiltered
+        );
+        
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        
+        dialog.setResultConverter(buttonType -> {
+            if (buttonType == ButtonType.OK) {
+                return new ExportOptions(
+                    formatCombo.getValue(),
+                    exportAll.isSelected()
+                );
+            }
+            return null;
+        });
+        
+        Optional<ExportOptions> result = dialog.showAndWait();
+        result.ifPresent(options -> {
+            // 显示文件选择对话框
+            javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
+            fileChooser.setTitle("导出日志");
+            
+            String extension = options.format.toLowerCase();
+            fileChooser.getExtensionFilters().add(
+                new javafx.stage.FileChooser.ExtensionFilter(
+                    options.format + "文件 (*." + extension + ")",
+                    "*." + extension
+                )
+            );
+            
+            java.io.File file = fileChooser.showSaveDialog(
+                searchField.getScene().getWindow()
+            );
+            
+            if (file != null) {
+                exportLogsToFile(file, options, tabData);
+            }
+        });
+    }
+    
+    private void exportLogsToFile(java.io.File file, ExportOptions options, LogContentManager tabData) {
+        // 显示进度对话框
+        Dialog<Void> progressDialog = new Dialog<>();
+        progressDialog.setTitle("导出中...");
+        progressDialog.setHeaderText("正在导出日志，请稍候...");
+        
+        ProgressBar progressBar = new ProgressBar();
+        progressBar.setPrefWidth(300);
+        progressBar.setProgress(-1); // 不确定进度
+        
+        Label statusLabel = new Label("准备导出...");
+        VBox content = new VBox(10);
+        content.setPadding(new Insets(20));
+        content.getChildren().addAll(progressBar, statusLabel);
+        progressDialog.getDialogPane().setContent(content);
+        progressDialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
+        
+        // 在后台线程中执行导出
+        new Thread(() -> {
+            try {
+                Platform.runLater(() -> statusLabel.setText("正在收集日志数据..."));
+                
+                List<LogContentManager.LogEntry> entriesToExport;
+                if (options.exportAll) {
+                    entriesToExport = new ArrayList<>(tabData.getEntries());
+                } else {
+                    // 获取过滤后的日志
+                    entriesToExport = new ArrayList<>();
+                    Set<String> enabledLevels = tabData.getEnabledLevels();
+                    
+                    for (LogContentManager.LogEntry entry : tabData.getEntries()) {
+                        // 应用相同的过滤条件
+                        if (enabledLevels != null && !enabledLevels.isEmpty() && !enabledLevels.contains("ALL")) {
+                            String entryLevel = entry.level != null ? entry.level : "TEXT";
+                            if (!enabledLevels.contains(entryLevel)) {
+                                continue;
+                            }
+                        }
+                        
+                        if (currentSearchKeyword == null || currentSearchKeyword.isEmpty() || 
+                            entry.matches(currentSearchKeyword.toLowerCase())) {
+                            entriesToExport.add(entry);
+                        }
+                    }
+                }
+                
+                Platform.runLater(() -> statusLabel.setText("正在写入文件..."));
+                
+                // 根据格式导出
+                try (java.io.FileWriter writer = new java.io.FileWriter(file, java.nio.charset.StandardCharsets.UTF_8)) {
+                    switch (options.format) {
+                        case "TXT":
+                            exportAsTxt(writer, entriesToExport);
+                            break;
+                        case "CSV":
+                            exportAsCsv(writer, entriesToExport);
+                            break;
+                        case "JSON":
+                            exportAsJson(writer, entriesToExport);
+                            break;
+                    }
+                }
+                
+                Platform.runLater(() -> {
+                    progressDialog.close();
+                    NotificationToast.showSuccess("日志已成功导出到: " + file.getAbsolutePath());
+                });
+                
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    progressDialog.close();
+                    error("导出失败: " + e.getMessage());
+                    NotificationToast.showError("导出失败: " + e.getMessage());
+                });
+            }
+        }, "log-export").start();
+        
+        progressDialog.show();
+    }
+    
+    private void exportAsTxt(java.io.FileWriter writer, List<LogContentManager.LogEntry> entries) throws Exception {
+        for (LogContentManager.LogEntry entry : entries) {
+            if (entry.raw) {
+                writer.write(entry.message);
+            } else {
+                writer.write("[" + (entry.timestamp != null ? entry.timestamp : "") + "] ");
+                writer.write((entry.icon != null ? entry.icon : "") + " ");
+                writer.write(String.format("%-7s", entry.level != null ? entry.level : ""));
+                writer.write(" │ " + entry.message);
+            }
+            writer.write("\n");
+        }
+    }
+    
+    private void exportAsCsv(java.io.FileWriter writer, List<LogContentManager.LogEntry> entries) throws Exception {
+        writer.write("时间戳,级别,消息\n");
+        for (LogContentManager.LogEntry entry : entries) {
+            writer.write("\"" + (entry.timestamp != null ? entry.timestamp : "") + "\",");
+            writer.write("\"" + (entry.level != null ? entry.level : "TEXT") + "\",");
+            writer.write("\"" + entry.message.replace("\"", "\"\"") + "\"\n");
+        }
+    }
+    
+    private void exportAsJson(java.io.FileWriter writer, List<LogContentManager.LogEntry> entries) throws Exception {
+        writer.write("[\n");
+        for (int i = 0; i < entries.size(); i++) {
+            LogContentManager.LogEntry entry = entries.get(i);
+            writer.write("  {\n");
+            writer.write("    \"timestamp\": \"" + (entry.timestamp != null ? entry.timestamp : "") + "\",\n");
+            writer.write("    \"level\": \"" + (entry.level != null ? entry.level : "TEXT") + "\",\n");
+            writer.write("    \"message\": \"" + entry.message.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n") + "\",\n");
+            writer.write("    \"raw\": " + entry.raw + "\n");
+            writer.write("  }");
+            if (i < entries.size() - 1) {
+                writer.write(",");
+            }
+            writer.write("\n");
+        }
+        writer.write("]\n");
+    }
+    
+    private static class ExportOptions {
+        final String format;
+        final boolean exportAll;
+        
+        ExportOptions(String format, boolean exportAll) {
+            this.format = format;
+            this.exportAll = exportAll;
+        }
     }
     
     public void updateStatus(String status, String colorHex) {

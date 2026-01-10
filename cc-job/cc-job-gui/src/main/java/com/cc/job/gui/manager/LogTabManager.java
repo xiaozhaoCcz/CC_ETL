@@ -18,7 +18,7 @@ import java.util.Map;
 public class LogTabManager {
     
     public final Map<Long, LogTab> logTabs = new HashMap<>();
-    private final Map<Long, LogContentManager> tabDataMap = new HashMap<>();
+    public final Map<Long, LogContentManager> tabDataMap = new HashMap<>();
     private Long currentTaskGroupId;
     
     public LogTabManager() {

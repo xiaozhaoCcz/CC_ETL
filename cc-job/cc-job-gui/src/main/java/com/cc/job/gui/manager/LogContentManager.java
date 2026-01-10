@@ -11,8 +11,10 @@ import javafx.util.Duration;
 import org.fxmisc.flowless.VirtualizedScrollPane;
 import org.fxmisc.richtext.CodeArea;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.time.LocalDateTime;
+import java.util.*;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 /**
  * 日志内容管理器 - 负责日志的存储、渲染和显示
@@ -30,7 +32,17 @@ public class LogContentManager {
     
     private int appendedCount = 0;
     private String lastSearchKeyword = "";
-    private boolean autoScrollToBottom = true;
+    public boolean autoScrollToBottom = true;
+    
+    // 过滤相关字段
+    private Set<String> enabledLevels = new HashSet<>(Arrays.asList("ALL", "INFO", "WARN", "ERROR", "DEBUG", "SUCCESS", "TEXT"));
+    private boolean regexEnabled = false;
+    private boolean caseSensitive = false;
+    private boolean pauseUpdates = false;
+    
+    // 性能优化：最大显示日志条数
+    private static final int MAX_DISPLAY_ENTRIES = 50000;
+    private static final int MAX_KEEP_ENTRIES = 100000;
     
     public LogContentManager() {
         initializeCodeArea();
@@ -152,6 +164,13 @@ public class LogContentManager {
                     message, entry.messageColor, entry.raw, entry.isExecutionLog
                 ));
                 logCount = entries.size();
+                
+                // 性能优化：当日志量过大时，自动清理旧日志（保留最新的）
+                if (entries.size() > MAX_KEEP_ENTRIES) {
+                    int removeCount = entries.size() - MAX_KEEP_ENTRIES;
+                    entries.subList(0, removeCount).clear();
+                    logCount = entries.size();
+                }
             }
         }
     }
@@ -202,40 +221,97 @@ public class LogContentManager {
     }
     
     public void render(String keyword) {
-        String normalized = keyword == null ? "" : keyword.trim().toLowerCase();
-        lastSearchKeyword = normalized;
-        
-        List<LogEntry> executionLogs = getExecutionLogs();
-        
-        if (executionLogs.isEmpty()) {
-            filteredCount = 0;
-            appendedCount = 0;
-            codeArea.replaceText(normalized.isEmpty() ? 
-                "日志暂未产生\n启动任务组或执行操作后，这里会实时展示运行信息。" :
-                "暂无日志可供搜索\n调整关键字或过滤条件后重试。");
-            return;
-        }
-        
-        StringBuilder content = new StringBuilder();
-        int matches = 0;
-        
-        for (LogEntry entry : executionLogs) {
-            if (normalized.isEmpty() || entry.matches(normalized)) {
-                if (content.length() > 0) {
-                    content.append("\n");
-                }
-                content.append(entry.message);
-                matches++;
+        render(keyword, enabledLevels, regexEnabled, caseSensitive);
+    }
+    
+    public void render(String keyword, Set<String> levels, boolean useRegex, boolean caseSensitive) {
+        // 异步渲染，避免UI卡顿
+        new Thread(() -> {
+            String normalized = keyword == null ? "" : keyword.trim();
+            lastSearchKeyword = normalized;
+            
+            List<LogEntry> executionLogs = getExecutionLogs();
+            
+            if (executionLogs.isEmpty()) {
+                Platform.runLater(() -> {
+                    filteredCount = 0;
+                    appendedCount = 0;
+                    codeArea.replaceText(normalized.isEmpty() ? 
+                        "日志暂未产生\n启动任务组或执行操作后，这里会实时展示运行信息。" :
+                        "暂无日志可供搜索\n调整关键字或过滤条件后重试。");
+                });
+                return;
             }
-        }
-        
-        codeArea.replaceText(content.toString().trim());
-        appendedCount = executionLogs.size();
-        filteredCount = normalized.isEmpty() ? executionLogs.size() : matches;
-        
-        if (!normalized.isEmpty() && matches == 0) {
-            codeArea.replaceText("未找到匹配的日志记录\n尝试缩短搜索词或更改日志级别筛选条件。");
-        }
+            
+            StringBuilder content = new StringBuilder();
+            int matches = 0;
+            Pattern pattern = null;
+            
+            // 编译正则表达式（如果启用）
+            if (useRegex && !normalized.isEmpty()) {
+                try {
+                    int flags = caseSensitive ? 0 : Pattern.CASE_INSENSITIVE;
+                    pattern = Pattern.compile(normalized, flags);
+                } catch (PatternSyntaxException e) {
+                    // 正则表达式无效，回退到普通搜索
+                    pattern = null;
+                }
+            }
+            
+            // 性能优化：对于大量日志，只处理最新的部分
+            int startIndex = Math.max(0, executionLogs.size() - MAX_DISPLAY_ENTRIES);
+            List<LogEntry> logsToProcess = executionLogs.subList(startIndex, executionLogs.size());
+            
+            for (LogEntry entry : logsToProcess) {
+                // 级别过滤
+                if (levels != null && !levels.isEmpty() && !levels.contains("ALL")) {
+                    String entryLevel = entry.level != null ? entry.level : "TEXT";
+                    if (!levels.contains(entryLevel)) {
+                        continue;
+                    }
+                }
+                
+                // 关键词匹配
+                boolean matchesKeyword = normalized.isEmpty();
+                if (!matchesKeyword) {
+                    if (pattern != null) {
+                        matchesKeyword = pattern.matcher(entry.getSearchableText()).find();
+                    } else {
+                        String searchText = caseSensitive ? entry.getSearchableText() : entry.getSearchableText().toLowerCase();
+                        String searchKeyword = caseSensitive ? normalized : normalized.toLowerCase();
+                        matchesKeyword = searchText.contains(searchKeyword);
+                    }
+                }
+                
+                if (matchesKeyword) {
+                    if (content.length() > 0) {
+                        content.append("\n");
+                    }
+                    content.append(entry.message);
+                    matches++;
+                }
+            }
+            
+            final String finalContent = content.toString().trim();
+            final int finalMatches = matches;
+            final boolean hasMore = startIndex > 0;
+            
+            Platform.runLater(() -> {
+                if (hasMore && !normalized.isEmpty()) {
+                    codeArea.replaceText("(仅显示最新 " + MAX_DISPLAY_ENTRIES + " 条日志的搜索结果，共找到 " + finalMatches + " 条匹配)\n\n" + finalContent);
+                } else if (hasMore) {
+                    codeArea.replaceText("(仅显示最新 " + MAX_DISPLAY_ENTRIES + " 条日志，共 " + executionLogs.size() + " 条)\n\n" + finalContent);
+                } else {
+                    codeArea.replaceText(finalContent);
+                }
+                appendedCount = executionLogs.size();
+                filteredCount = finalMatches;
+                
+                if (!normalized.isEmpty() && finalMatches == 0) {
+                    codeArea.replaceText("未找到匹配的日志记录\n尝试缩短搜索词或更改日志级别筛选条件。");
+                }
+            });
+        }, "log-render-thread").start();
     }
     
     private List<LogEntry> getExecutionLogs() {
@@ -284,6 +360,89 @@ public class LogContentManager {
         return entries;
     }
     
+    // 过滤相关方法
+    public void setEnabledLevels(Set<String> levels) {
+        this.enabledLevels = levels != null ? new HashSet<>(levels) : new HashSet<>(Arrays.asList("ALL"));
+    }
+    
+    public Set<String> getEnabledLevels() {
+        return enabledLevels;
+    }
+    
+    public void setRegexEnabled(boolean enabled) {
+        this.regexEnabled = enabled;
+    }
+    
+    public void setCaseSensitive(boolean sensitive) {
+        this.caseSensitive = sensitive;
+    }
+    
+    public void setPauseUpdates(boolean pause) {
+        this.pauseUpdates = pause;
+    }
+    
+    public boolean isPauseUpdates() {
+        return pauseUpdates;
+    }
+    
+    /**
+     * 获取日志统计信息
+     */
+    public LogStatistics getLogStatistics() {
+        LogStatistics stats = new LogStatistics();
+        List<LogEntry> executionLogs = getExecutionLogs();
+        
+        for (LogEntry entry : executionLogs) {
+            String level = entry.level != null ? entry.level : "TEXT";
+            stats.totalCount++;
+            
+            switch (level) {
+                case "ERROR":
+                    stats.errorCount++;
+                    break;
+                case "WARN":
+                    stats.warnCount++;
+                    break;
+                case "INFO":
+                    stats.infoCount++;
+                    break;
+                case "DEBUG":
+                    stats.debugCount++;
+                    break;
+                case "SUCCESS":
+                    stats.successCount++;
+                    break;
+            }
+            
+            // 更新时间范围
+            LocalDateTime entryTime = entry.getTimestamp();
+            if (entryTime != null) {
+                if (stats.earliestTime == null || entryTime.isBefore(stats.earliestTime)) {
+                    stats.earliestTime = entryTime;
+                }
+                if (stats.latestTime == null || entryTime.isAfter(stats.latestTime)) {
+                    stats.latestTime = entryTime;
+                }
+            }
+        }
+        
+        return stats;
+    }
+    
+    /**
+     * 日志统计信息
+     */
+    public static class LogStatistics {
+        public int totalCount = 0;
+        public int errorCount = 0;
+        public int warnCount = 0;
+        public int infoCount = 0;
+        public int debugCount = 0;
+        public int successCount = 0;
+        public LocalDateTime earliestTime;
+        public LocalDateTime latestTime;
+    }
+    
     /**
      * 日志条目
      */
@@ -313,11 +472,26 @@ public class LogContentManager {
             if (keywordLower == null || keywordLower.isEmpty()) {
                 return true;
             }
+            return getSearchableText().toLowerCase().contains(keywordLower);
+        }
+        
+        public String getSearchableText() {
             String baseMessage = message == null ? "" : message;
-            String target = raw ? baseMessage :
+            return raw ? baseMessage :
                 ((timestamp != null ? timestamp : "") + " " + 
                  (level != null ? level : "") + " " + baseMessage);
-            return target != null && target.toLowerCase().contains(keywordLower);
+        }
+        
+        public LocalDateTime getTimestamp() {
+            if (timestamp == null || timestamp.isEmpty()) {
+                return null;
+            }
+            try {
+                // 解析时间戳格式: yyyy-MM-dd HH:mm:ss.SSS
+                return LocalDateTime.parse(timestamp, java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"));
+            } catch (Exception e) {
+                return null;
+            }
         }
     }
 }
