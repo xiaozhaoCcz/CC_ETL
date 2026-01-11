@@ -219,19 +219,22 @@ public class LogPanel extends VBox {
         // 自动滚动开关
         autoScrollButton = new ToggleButton("自动滚动");
         autoScrollButton.setSelected(true);
-        autoScrollButton.setStyle(
-            "-fx-background-color: linear-gradient(to bottom, #F1F5F9, rgba(241,245,249,0.98)); " +
-            "-fx-text-fill: " + StyleUtil.GRAY_600 + "; " +
-            "-fx-font-size: 12px; " +
-            "-fx-font-weight: 600; " +
-            "-fx-padding: 6 12; " +
-            "-fx-border-radius: 8; " +
-            "-fx-background-radius: 8; " +
-            "-fx-border-color: rgba(148,163,184,0.6); " +
-            "-fx-border-width: 1; " +
-            "-fx-cursor: hand;"
-        );
+        String normal =   "-fx-background-color: linear-gradient(to bottom, #F1F5F9, rgba(241,245,249,0.98)); " +
+                "-fx-text-fill: " + StyleUtil.GRAY_600 + "; " +
+                "-fx-font-size: 12px; " +
+                "-fx-font-weight: 600; " +
+                "-fx-padding: 6 12; " +
+                "-fx-border-radius: 8; " +
+                "-fx-background-radius: 8; " +
+                "-fx-border-color: rgba(148,163,184,0.6); " +
+                "-fx-border-width: 1; " +
+                "-fx-cursor: hand;";
         autoScrollButton.setTooltip(new Tooltip("自动滚动到底部"));
+        String hover = normal.replace("#F1F5F9", "rgba(226,232,240,0.99)").replace("rgba(148,163,184,0.6)", StyleUtil.PRIMARY_LIGHT);
+        autoScrollButton.setStyle(normal);
+        autoScrollButton.setOnMouseEntered(e -> autoScrollButton.setStyle(hover));
+        autoScrollButton.setOnMouseExited(e -> autoScrollButton.setStyle(normal));
+
         autoScrollButton.selectedProperty().addListener((obs, oldVal, newVal) -> {
             LogContentManager data = tabManager.getCurrentTabData();
             if (data != null) {

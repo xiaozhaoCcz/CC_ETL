@@ -43,6 +43,16 @@ public class JobNode extends BaseEntity {
      */
     private Integer triggerStatus;
 
+    /**
+     * 节点备注
+     */
+    private String remark;
+
+    /**
+     * 节点标签（JSON格式存储标签列表）
+     */
+    private String tags;
+
     @Override
     public boolean equals(Object o) {
         if (o == null || getClass() != o.getClass()) return false;
@@ -160,6 +170,22 @@ public class JobNode extends BaseEntity {
         this.triggerStatus = triggerStatus;
     }
 
+    public String getRemark() {
+        return remark;
+    }
+
+    public void setRemark(String remark) {
+        this.remark = remark;
+    }
+
+    public String getTags() {
+        return tags;
+    }
+
+    public void setTags(String tags) {
+        this.tags = tags;
+    }
+
     @Override
     public String toString() {
         return "JobNode{" +
@@ -176,6 +202,8 @@ public class JobNode extends BaseEntity {
                 ", conditionExpression='" + conditionExpression + '\'' +
                 ", expressionType='" + expressionType + '\'' +
                 ", triggerStatus=" + triggerStatus +
+                ", remark='" + remark + '\'' +
+                ", tags='" + tags + '\'' +
                 '}';
     }
 }

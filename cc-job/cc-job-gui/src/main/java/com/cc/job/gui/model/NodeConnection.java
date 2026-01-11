@@ -47,6 +47,19 @@ public class NodeConnection extends Group {
     private String labelText = ""; // 标签文本
     private boolean labelVisible = false; // 标签是否可见
     
+    // 连线样式相关
+    public enum EdgeStyle {
+        SOLID,      // 实线
+        DASHED,     // 虚线
+        DOTTED      // 点线
+    }
+    
+    private EdgeStyle edgeStyle = EdgeStyle.SOLID; // 连线样式
+    private String edgeColor = "#374151"; // 连线颜色（默认灰色）
+    
+    // 编辑样式回调（右键菜单由CanvasConnectionManager统一管理）
+    private Runnable onEditStyle;
+    
     /**
      * 创建连接（指定具体的连接点）
      */
@@ -136,8 +149,20 @@ public class NodeConnection extends Group {
         
         this.getChildren().addAll(curve, arrowHead, edgeLabel);
         
+        // 确保连线可以接收鼠标事件
+        // 注意：curve的fill是TRANSPARENT，所以需要确保stroke足够宽以接收鼠标事件
+        // 或者使用pickOnBounds=false来使用精确的边界检测
+        this.setPickOnBounds(false); // 使用精确的边界检测（基于子元素的形状）
+        this.setMouseTransparent(false); // 确保可以接收鼠标事件
+        
+        // 确保curve和arrowHead可以接收鼠标事件
+        curve.setMouseTransparent(false);
+        arrowHead.setMouseTransparent(false);
+        
         // 鼠标悬停效果
         setupHoverEffect();
+        
+        // 右键菜单由CanvasConnectionManager统一管理，不在这里设置
         
         // 绑定标签位置到连线中点
         bindLabelPosition();
@@ -263,22 +288,19 @@ public class NodeConnection extends Group {
         
         this.setOnMouseExited(e -> {
             if (!isRunning && !isSelected()) {
-                // 根据当前状态恢复颜色
-                if (isBlocked) {
-                    // 阻塞状态：保持灰色
-                    curve.setStroke(Color.web("#9CA3AF"));
-                    curve.setStrokeWidth(2.5);
-                    arrowHead.setFill(Color.web("#9CA3AF"));
-                    arrowHead.setStroke(Color.web("#9CA3AF"));
-                } else {
-                    // 普通状态：恢复为深灰色
-                    curve.setStroke(Color.web("#374151"));
-                    curve.setStrokeWidth(2.5);
-                    arrowHead.setFill(Color.web("#374151"));
-                    arrowHead.setStroke(Color.web("#374151"));
-                }
+                // 调用 updateStyle() 方法，它会根据当前状态和自定义颜色正确恢复
+                // 这样可以保持用户设置的自定义颜色，而不是硬编码的默认颜色
+                updateStyle();
             }
         });
+    }
+    
+    /**
+     * 设置编辑样式回调
+     * 注意：右键菜单由CanvasConnectionManager统一管理
+     */
+    public void setOnEditStyle(Runnable callback) {
+        this.onEditStyle = callback;
     }
     
     /**
@@ -337,6 +359,7 @@ public class NodeConnection extends Group {
 
     private boolean selected = false;
     private boolean isBlocked = false; // 是否处于阻塞状态（被开始/终止/阻塞节点影响）
+    private boolean isInCycle = false; // 是否在循环依赖中
 
     public void setSelected(boolean selected) {
         this.selected = selected;
@@ -359,11 +382,33 @@ public class NodeConnection extends Group {
     public boolean isBlocked() {
         return isBlocked;
     }
+    
+    /**
+     * 设置循环依赖状态（显示红色加粗，表示连接在循环中）
+     * @param inCycle 是否在循环中
+     */
+    public void setInCycle(boolean inCycle) {
+        this.isInCycle = inCycle;
+        updateStyle();
+    }
+    
+    public boolean isInCycle() {
+        return isInCycle;
+    }
 
     private void updateStyle() {
-        if (selected) {
+        if (isInCycle) {
+            // 循环依赖状态：红色加粗实线（优先级最高）
             stopDashAnimation();
             curve.getStrokeDashArray().clear();
+            curve.setStroke(Color.web("#EF4444")); // 红色
+            curve.setStrokeWidth(4.0); // 加粗
+            arrowHead.setFill(Color.web("#EF4444"));
+            arrowHead.setStroke(Color.web("#EF4444"));
+            arrowHead.setStrokeWidth(2);
+        } else if (selected) {
+            stopDashAnimation();
+            applyEdgeStyle(edgeStyle);
             curve.setStroke(Color.web("#2563EB"));
             curve.setStrokeWidth(3.5);
             arrowHead.setFill(Color.web("#2563EB"));
@@ -392,13 +437,65 @@ public class NodeConnection extends Group {
             startDashAnimation();
         } else {
             stopDashAnimation();
-            curve.getStrokeDashArray().clear();
-            curve.setStroke(Color.web("#374151"));
+            applyEdgeStyle(edgeStyle);
+            // 使用自定义颜色，如果没有设置则使用默认颜色
+            String colorToUse = (edgeColor != null && !edgeColor.isEmpty()) ? edgeColor : "#374151";
+            curve.setStroke(Color.web(colorToUse));
             curve.setStrokeWidth(2.5);
-            arrowHead.setFill(Color.web("#374151"));
-            arrowHead.setStroke(Color.web("#374151"));
+            arrowHead.setFill(Color.web(colorToUse));
+            arrowHead.setStroke(Color.web(colorToUse));
             arrowHead.setStrokeWidth(1); // 恢复正常箭头粗细
         }
+    }
+    
+    /**
+     * 应用连线样式
+     */
+    private void applyEdgeStyle(EdgeStyle style) {
+        curve.getStrokeDashArray().clear();
+        switch (style) {
+            case SOLID:
+                // 实线：不设置虚线数组
+                break;
+            case DASHED:
+                // 虚线
+                curve.getStrokeDashArray().addAll(10.0, 5.0);
+                break;
+            case DOTTED:
+                // 点线
+                curve.getStrokeDashArray().addAll(3.0, 3.0);
+                break;
+        }
+    }
+    
+    /**
+     * 设置连线样式
+     */
+    public void setEdgeStyle(EdgeStyle style) {
+        this.edgeStyle = style;
+        updateStyle();
+    }
+    
+    /**
+     * 获取连线样式
+     */
+    public EdgeStyle getEdgeStyle() {
+        return edgeStyle;
+    }
+    
+    /**
+     * 设置连线颜色
+     */
+    public void setEdgeColor(String color) {
+        this.edgeColor = color;
+        updateStyle();
+    }
+    
+    /**
+     * 获取连线颜色
+     */
+    public String getEdgeColor() {
+        return edgeColor;
     }
 
     public void playLocateAnimation() {
@@ -512,7 +609,14 @@ public class NodeConnection extends Group {
         labelText = text != null ? text : "";
         if (edgeLabel != null) {
             edgeLabel.setText(labelText);
-            updateLabelVisibility();
+            // 如果设置了标签文本，自动显示标签（如果标签可见性已开启）
+            if (!labelText.isEmpty() && labelVisible) {
+                edgeLabel.setVisible(true);
+            } else if (labelText.isEmpty()) {
+                edgeLabel.setVisible(false);
+            } else {
+                updateLabelVisibility();
+            }
         }
     }
     
@@ -529,6 +633,10 @@ public class NodeConnection extends Group {
     public void setLabelVisible(boolean visible) {
         labelVisible = visible;
         updateLabelVisibility();
+        // 确保标签文本已设置时，根据可见性显示/隐藏
+        if (edgeLabel != null && !labelText.isEmpty()) {
+            edgeLabel.setVisible(visible);
+        }
     }
     
     /**

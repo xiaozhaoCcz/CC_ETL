@@ -12,13 +12,9 @@ import com.cc.job.gui.util.NodeStatusSyncManager;
 import javafx.animation.AnimationTimer;
 import javafx.animation.PauseTransition;
 import javafx.geometry.Point2D;
-import javafx.scene.control.ContextMenu;
-import javafx.scene.control.Menu;
-import javafx.scene.control.MenuItem;
-import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.*;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.control.ScrollPane;
 import javafx.scene.Node;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
@@ -43,6 +39,7 @@ public class NodeCanvas extends Pane {
     private CanvasConnectionManager connectionManager;
     private CanvasSelectionManager selectionManager;
     private CanvasDataLoader dataLoader;
+    private CanvasLayoutManager layoutManager;
     
     private UndoRedoManager undoRedoManager;
     private boolean historyEnabled = true;
@@ -59,6 +56,7 @@ public class NodeCanvas extends Pane {
     private LogCallback logCallback;
     private Runnable onNodeMoved;
     private java.util.function.Consumer<Boolean> onSelectionModeChanged;
+    private java.util.function.Consumer<Boolean> onSnapToGridChanged;
     private Runnable onRequestSave; // 保存数据回调
     
     // 临时连线相关
@@ -102,6 +100,9 @@ public class NodeCanvas extends Pane {
     private boolean gridVisible = false; // 网格是否可见（独立于主题）
     private boolean nodeLabelsVisible = false; // 节点标签是否可见
     private boolean edgeLabelsVisible = false; // 连线标签是否可见
+    private boolean rulerVisible = true; // 标尺是否可见（默认显示）
+    private CanvasRuler ruler; // 标尺组件
+    private Label coordinateLabel; // 坐标显示标签
     
     // 智能对齐相关
     private boolean smartAlignmentEnabled = true; // 智能对齐是否启用
@@ -127,6 +128,10 @@ public class NodeCanvas extends Pane {
         setupCanvasContextMenu();
         setupSelectionHandlers();
         setupAutoSave();
+        setupCoordinateDisplay();
+        
+        // 初始化标尺（默认显示）
+        initializeRuler();
     }
     
     private void initializeManagers() {
@@ -134,6 +139,7 @@ public class NodeCanvas extends Pane {
         connectionManager = new CanvasConnectionManager(this, connections, groupContainers, conditionNodes, this::notifyNodeStructureChanged, this::log);
         selectionManager = new CanvasSelectionManager(this, nodes, connections, this::log, this::notifyNodeStructureChanged);
         dataLoader = new CanvasDataLoader(this::log);
+        layoutManager = new CanvasLayoutManager(this::log);
     }
     
     // ==================== Setters ====================
@@ -154,8 +160,21 @@ public class NodeCanvas extends Pane {
         this.onSelectionModeChanged = callback;
     }
     
+    public void setOnSnapToGridChanged(java.util.function.Consumer<Boolean> callback) {
+        this.onSnapToGridChanged = callback;
+    }
+    
     public void setScrollPane(ScrollPane scrollPane) {
         this.hostingScrollPane = scrollPane;
+    }
+    
+    /**
+     * 设置主窗口Stage（用于打开对话框）
+     */
+    public void setOwnerStage(javafx.stage.Stage ownerStage) {
+        if (connectionManager != null) {
+            connectionManager.setOwnerStage(ownerStage);
+        }
     }
     
     public void setOnRequestAddNode(Runnable runnable) {
@@ -294,6 +313,16 @@ public class NodeCanvas extends Pane {
             if (selectionManager.getSelectedNodes().contains(node)) {
                 selectionManager.updateSelectionBoundingBox();
             }
+            
+            // 更新坐标显示（节点移动时）
+            if (coordinateLabel != null) {
+                double nodeX = node.getLayoutX();
+                double nodeY = node.getLayoutY();
+                coordinateLabel.setText(String.format("坐标: (%.0f, %.0f)", nodeX, nodeY));
+                coordinateLabel.setLayoutX(nodeX + 10);
+                coordinateLabel.setLayoutY(nodeY - 30);
+                coordinateLabel.setVisible(true);
+            }
         });
         
         node.setOnDragStarted(() -> {
@@ -302,6 +331,16 @@ public class NodeCanvas extends Pane {
             // 记录拖拽前节点是否被选中
             boolean wasSelected = selectionManager.getSelectedNodes().contains(node);
             nodeSelectedBeforeDrag.put(node, wasSelected);
+            
+            // 开始拖拽时显示节点坐标
+            if (coordinateLabel != null) {
+                double nodeX = node.getLayoutX();
+                double nodeY = node.getLayoutY();
+                coordinateLabel.setText(String.format("坐标: (%.0f, %.0f)", nodeX, nodeY));
+                coordinateLabel.setLayoutX(nodeX + 10);
+                coordinateLabel.setLayoutY(nodeY - 30);
+                coordinateLabel.setVisible(true);
+            }
             
             startDragScrollAnimation(); // 启动平滑滚动动画
             if (!selectionManager.getSelectedNodes().isEmpty() && 
@@ -322,9 +361,13 @@ public class NodeCanvas extends Pane {
         
         node.setOnDragFinished((oldX, oldY, newX, newY) -> {
             isDragging = false; // 标记拖拽结束
+            currentDragNode = null; // 清除当前拖拽节点
             stopDragScrollAnimation(); // 停止滚动动画
             // 隐藏对齐参考线
             hideAlignmentGuides();
+            
+            // 拖拽结束后，如果鼠标不在画布上，隐藏坐标标签
+            // 否则继续显示鼠标坐标
             
             // 检查拖拽前节点是否被选中
             boolean wasSelectedBeforeDrag = nodeSelectedBeforeDrag.getOrDefault(node, false);
@@ -643,6 +686,43 @@ public class NodeCanvas extends Pane {
         connectionManager.setAllConnectionsRunning(running);
     }
     
+    /**
+     * 检测并高亮循环依赖
+     * @return 是否存在循环依赖
+     */
+    public boolean detectAndHighlightCycles() {
+        // 清除之前的循环标记
+        clearCycleHighlight();
+        
+        // 执行循环检测
+        CycleDetectionManager.CycleDetectionResult result = 
+            CycleDetectionManager.detectCycles(connections);
+        
+        // 标记所有参与循环的连接线
+        for (NodeConnection conn : result.getCycleConnections()) {
+            conn.setInCycle(true);
+        }
+        
+        return result.hasCycle();
+    }
+    
+    /**
+     * 获取循环依赖检测结果（包含详细信息）
+     * @return 检测结果
+     */
+    public CycleDetectionManager.CycleDetectionResult getCycleDetectionResult() {
+        return CycleDetectionManager.detectCycles(connections);
+    }
+    
+    /**
+     * 清除所有连接线的循环依赖标记
+     */
+    public void clearCycleHighlight() {
+        for (NodeConnection conn : connections) {
+            conn.setInCycle(false);
+        }
+    }
+    
     // ==================== 连接点处理 ====================
     
     private void setupConnectorHandler(ProcessNode node, Circle connector) {
@@ -853,6 +933,125 @@ public class NodeCanvas extends Pane {
     }
     
     /**
+     * 初始化标尺（默认显示）
+     */
+    private void initializeRuler() {
+        ruler = new CanvasRuler();
+        ruler.updateCanvasSize(getPrefWidth(), getPrefHeight());
+        this.getChildren().add(0, ruler);
+        ruler.toBack();
+        // 确保标尺不拦截鼠标事件
+        ruler.setMouseTransparent(true);
+        
+        // 监听画布大小变化
+        widthProperty().addListener((obs, oldVal, newVal) -> {
+            if (ruler != null && rulerVisible) {
+                ruler.updateCanvasSize(newVal.doubleValue(), getPrefHeight());
+            }
+        });
+        heightProperty().addListener((obs, oldVal, newVal) -> {
+            if (ruler != null && rulerVisible) {
+                ruler.updateCanvasSize(getPrefWidth(), newVal.doubleValue());
+            }
+        });
+        
+        ruler.setVisible(true);
+        ruler.setManaged(true);
+    }
+    
+    /**
+     * 切换标尺显示
+     */
+    public void toggleRuler() {
+        rulerVisible = !rulerVisible;
+        if (ruler == null) {
+            ruler = new CanvasRuler();
+            ruler.updateCanvasSize(getPrefWidth(), getPrefHeight());
+            // 将标尺放在最底层
+            if (!this.getChildren().contains(ruler)) {
+                this.getChildren().add(0, ruler);
+            }
+            ruler.toBack(); // 确保在最底层
+            
+            // 监听画布大小变化
+            widthProperty().addListener((obs, oldVal, newVal) -> {
+                if (ruler != null && rulerVisible) {
+                    ruler.updateCanvasSize(newVal.doubleValue(), getPrefHeight());
+                }
+            });
+            heightProperty().addListener((obs, oldVal, newVal) -> {
+                if (ruler != null && rulerVisible) {
+                    ruler.updateCanvasSize(getPrefWidth(), newVal.doubleValue());
+                }
+            });
+        }
+        
+        // 确保ruler在画布中
+        if (!this.getChildren().contains(ruler)) {
+            this.getChildren().add(0, ruler);
+            ruler.toBack();
+        }
+        
+        // 确保标尺不拦截鼠标事件
+        ruler.setMouseTransparent(true);
+        
+        ruler.setVisible(rulerVisible);
+        ruler.setManaged(rulerVisible); // 控制是否占用布局空间
+        
+        if (rulerVisible) {
+            // 更新标尺大小
+            ruler.updateCanvasSize(getPrefWidth(), getPrefHeight());
+            log("✓ 标尺已显示");
+        } else {
+            log("✓ 标尺已隐藏");
+        }
+    }
+    
+    /**
+     * 设置坐标显示
+     */
+    private void setupCoordinateDisplay() {
+        coordinateLabel = new Label();
+        coordinateLabel.setStyle(
+            "-fx-font-size: 11; " +
+            "-fx-text-fill: #6B7280; " +
+            "-fx-background-color: rgba(255, 255, 255, 0.9); " +
+            "-fx-background-radius: 4; " +
+            "-fx-padding: 4 8 4 8;"
+        );
+        coordinateLabel.setVisible(false);
+        coordinateLabel.setMouseTransparent(true);
+        this.getChildren().add(coordinateLabel);
+        
+        // 鼠标移动时显示坐标（仅在未拖拽节点时）
+        this.setOnMouseMoved(e -> {
+            // 如果正在拖拽节点，不更新鼠标坐标（让节点坐标显示）
+            if (isDragging && currentDragNode != null) {
+                return;
+            }
+            
+            double x = e.getX();
+            double y = e.getY();
+            coordinateLabel.setText(String.format("坐标: (%.0f, %.0f)", x, y));
+            
+            // 计算坐标标签位置（相对于画布）
+            if (this.getScene() != null) {
+                coordinateLabel.setLayoutX(e.getSceneX() - this.getScene().getX() + 10);
+                coordinateLabel.setLayoutY(e.getSceneY() - this.getScene().getY() - 30);
+            } else {
+                // 如果scene还未初始化，使用相对坐标
+                coordinateLabel.setLayoutX(e.getX() + 10);
+                coordinateLabel.setLayoutY(e.getY() - 30);
+            }
+            coordinateLabel.setVisible(true);
+        });
+        
+        this.setOnMouseExited(e -> {
+            coordinateLabel.setVisible(false);
+        });
+    }
+    
+    /**
      * 更新网格可见性
      */
     private void updateGridVisibility() {
@@ -957,34 +1156,41 @@ public class NodeCanvas extends Pane {
         }
     }
     
+    /**
+     * 自动布局（使用默认的网格布局）
+     */
     public void autoLayout() {
-        // 简单的自动布局：将所有节点按网格排列
+        autoLayout(CanvasLayoutManager.LayoutAlgorithm.GRID);
+    }
+    
+    /**
+     * 自动布局（指定布局算法）
+     * @param algorithm 布局算法类型
+     */
+    public void autoLayout(CanvasLayoutManager.LayoutAlgorithm algorithm) {
         if (nodes.isEmpty()) {
             log("⚠ 画布中没有节点");
             return;
         }
         
-        int cols = (int) Math.ceil(Math.sqrt(nodes.size()));
-        int spacing = 200;
-        int startX = 100;
-        int startY = 100;
-        
-        int col = 0;
-        int row = 0;
-        for (ProcessNode node : nodes) {
-            node.setLayoutX(startX + col * spacing);
-            node.setLayoutY(startY + row * spacing);
-            col++;
-            if (col >= cols) {
-                col = 0;
-                row++;
-            }
+        if (layoutManager == null) {
+            layoutManager = new CanvasLayoutManager(this::log);
         }
         
+        layoutManager.layout(nodes, connections, algorithm);
         markAsUnsaved();
-        log("✓ 自动布局完成");
     }
     
+    /**
+     * 获取布局管理器
+     */
+    public CanvasLayoutManager getLayoutManager() {
+        return layoutManager;
+    }
+    
+    /**
+     * 按名称查找节点（精确匹配）
+     */
     public ProcessNode findNodeByName(String name) {
         if (name == null || name.isEmpty()) {
             return null;
@@ -998,6 +1204,37 @@ public class NodeCanvas extends Pane {
         }
         return null;
     }
+    
+    /**
+     * 模糊搜索节点（按名称）
+     */
+    public List<ProcessNode> findNodesByName(String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return new ArrayList<>();
+        }
+        
+        String lowerKeyword = keyword.toLowerCase();
+        List<ProcessNode> results = new ArrayList<>();
+        for (ProcessNode node : nodes) {
+            String nodeName = node.getJobHandlerName();
+            if (nodeName != null && nodeName.toLowerCase().contains(lowerKeyword)) {
+                results.add(node);
+            }
+        }
+        return results;
+    }
+    
+    /**
+     * 获取搜索管理器
+     */
+    public NodeSearchManager getSearchManager() {
+        if (searchManager == null) {
+            searchManager = new NodeSearchManager(this::log);
+        }
+        return searchManager;
+    }
+    
+    private NodeSearchManager searchManager; // 搜索管理器
     
     private int currentNodeIndex = -1;
     
@@ -1597,6 +1834,57 @@ public class NodeCanvas extends Pane {
                             );
                             if (edge != null) {
                                 edge.setEdgeId(edgeData.getId());
+                                
+                                // ⭐ 修复：从properties恢复连线样式、颜色和标签信息
+                                Map<String, Object> properties = edgeData.getProperties();
+                                if (properties != null && !properties.isEmpty()) {
+                                    // 恢复样式（默认 SOLID）
+                                    if (properties.containsKey("edgeStyle")) {
+                                        try {
+                                            String styleName = properties.get("edgeStyle").toString();
+                                            NodeConnection.EdgeStyle style = NodeConnection.EdgeStyle.valueOf(styleName);
+                                            edge.setEdgeStyle(style);
+                                        } catch (Exception e) {
+                                            log("⚠ 无法解析连线样式: " + properties.get("edgeStyle") + "，使用默认样式 SOLID");
+                                            edge.setEdgeStyle(NodeConnection.EdgeStyle.SOLID);
+                                        }
+                                    } else {
+                                        // 如果样式缺失，使用默认样式
+                                        edge.setEdgeStyle(NodeConnection.EdgeStyle.SOLID);
+                                    }
+                                    
+                                    // 恢复颜色（默认 #374151）
+                                    if (properties.containsKey("edgeColor")) {
+                                        String edgeColor = properties.get("edgeColor").toString();
+                                        if (edgeColor != null && !edgeColor.isEmpty()) {
+                                            edge.setEdgeColor(edgeColor);
+                                        } else {
+                                            edge.setEdgeColor("#374151");
+                                        }
+                                    } else {
+                                        // 如果颜色缺失，使用默认颜色
+                                        edge.setEdgeColor("#374151");
+                                    }
+                                    
+                                    // 恢复标签（默认空字符串）
+                                    if (properties.containsKey("labelText")) {
+                                        String labelText = properties.get("labelText").toString();
+                                        if (labelText != null) {
+                                            edge.setLabelText(labelText);
+                                        } else {
+                                            edge.setLabelText("");
+                                        }
+                                    } else {
+                                        // 如果标签缺失，使用默认值（空字符串）
+                                        edge.setLabelText("");
+                                    }
+                                } else {
+                                    // 如果 properties 为空，使用所有默认值
+                                    edge.setEdgeStyle(NodeConnection.EdgeStyle.SOLID);
+                                    edge.setEdgeColor("#374151");
+                                    edge.setLabelText("");
+                                }
+                                
                                 successCount++;
                             }
                         }
@@ -1753,6 +2041,12 @@ public class NodeCanvas extends Pane {
     // ==================== 清空操作 ====================
     
     public void clear() {
+        // 保存需要保留的基础UI元素
+        CanvasRuler savedRuler = ruler;
+        Label savedCoordinateLabel = coordinateLabel;
+        Canvas savedDotsBackground = dotsBackgroundCanvas;
+        Canvas savedGridBackground = gridBackgroundCanvas;
+        
         groupContainers.forEach(this.getChildren()::remove);
         groupContainers.clear();
         
@@ -1760,8 +2054,26 @@ public class NodeCanvas extends Pane {
         conditionNodes.clear();
         
         this.getChildren().clear();
+        
         nodes.clear();
         connections.clear();
+        
+        // 重新添加需要保留的基础UI元素
+        if (savedRuler != null && rulerVisible) {
+            this.getChildren().add(0, savedRuler);
+            savedRuler.toBack();
+        }
+        if (savedCoordinateLabel != null) {
+            this.getChildren().add(savedCoordinateLabel);
+        }
+        if (savedDotsBackground != null) {
+            this.getChildren().add(0, savedDotsBackground);
+            savedDotsBackground.toBack();
+        }
+        if (savedGridBackground != null) {
+            this.getChildren().add(0, savedGridBackground);
+            savedGridBackground.toBack();
+        }
         
         // 重新添加选择矩形到画布
         if (selectionManager != null) {
@@ -3657,6 +3969,14 @@ public class NodeCanvas extends Pane {
      */
     public void setSnapToGridEnabled(boolean enabled) {
         snapToGridEnabled = enabled;
+        if (onSnapToGridChanged != null) onSnapToGridChanged.accept(enabled);
+    }
+    
+    /**
+     * 获取网格吸附是否启用
+     */
+    public boolean isSnapToGridEnabled() {
+        return snapToGridEnabled;
     }
     
     /**

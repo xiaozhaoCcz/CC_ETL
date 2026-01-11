@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * 顶部工具栏组件
@@ -57,12 +58,18 @@ public class TopToolBar extends VBox {
         void onSelect(); // 框选功能
         void onLayoutHorizontal(); // 横向布局
         void onLayoutVertical(); // 纵向布局
+        void onDistributeHorizontally(); // 水平等距分布
+        void onDistributeVertically(); // 垂直等距分布
+        void onAlignToCenter(); // 对齐到画布中心
+        void onToggleSnapToGrid(); // 切换网格吸附
+        void onDetectCycles(); // 检测循环依赖
         void onJobList();
         void onJobGroupList();
         void onJobLogList();
         void onDatasourceList();
         void onDataxSync();
         void onDataxGroupSync();
+        void onExportCanvas(); // 导出画布
 
         /**
          * 任务菜单需要的任务列表（供“任务”下拉菜单展示）
@@ -90,10 +97,12 @@ public class TopToolBar extends VBox {
         default void onPaste() {} // 粘贴
         default void onDelete() {} // 删除
         default void onSelectAll() {} // 全选
+        default void onBatchEdit() {} // 批量编辑
         default void onFindNode() {} // 查找节点
         default void onFindNext() {} // 查找下一个
         default void onFindPrevious() {} // 查找上一个
-        default void onAutoLayout() {} // 自动布局
+        default void onAutoLayout() {} // 自动布局（默认网格布局）
+        default void onAutoLayout(com.cc.job.gui.manager.CanvasLayoutManager.LayoutAlgorithm algorithm) {} // 自动布局（指定算法）
         
         // 选择菜单
         default void onInvertSelection() {} // 反选
@@ -109,6 +118,7 @@ public class TopToolBar extends VBox {
         default void onToggleLogPanel() {} // 显示/隐藏日志面板
         default void onResetLayout() {} // 重置布局
         default void onToggleGrid() {} // 显示/隐藏网格
+        default void onToggleRuler() {} // 显示/隐藏标尺
         default void onToggleNodeLabels() {} // 显示/隐藏节点标签
         default void onToggleEdgeLabels() {} // 显示/隐藏连线标签
         default void onSetTheme(String theme) {} // 设置主题
@@ -135,9 +145,6 @@ public class TopToolBar extends VBox {
         default void onCopyJobGroup() {} // 复制任务组
         
         // 窗口菜单
-        default void onNewWindow() {} // 新建窗口
-        default void onCloseWindow() {} // 关闭窗口
-        default void onCloseAllWindows() {} // 关闭所有窗口
         default void onMinimize() {} // 最小化
         default void onZoomWindow() {} // 缩放窗口
         default void onDetachTreeView() {} // 弹出树形视图
@@ -199,6 +206,7 @@ public class TopToolBar extends VBox {
     private Button undoButton;
     private Button redoButton;
     private Button selectButton; // 框选按钮
+    private Button snapToGridButton; // 网格吸附按钮
     
     // 当前任务组ID（用于判断是否正在运行）
     private Long currentTaskGroupId;
@@ -410,10 +418,22 @@ public class TopToolBar extends VBox {
         MenuItem layoutVerticalItem = new MenuItem("纵向布局");
         layoutVerticalItem.setOnAction(e -> safeCall(ToolBarCallback::onLayoutVertical));
         
-        MenuItem autoLayoutItem = new MenuItem("自动布局");
-        autoLayoutItem.setOnAction(e -> safeCall(ToolBarCallback::onAutoLayout));
+        // 批量编辑
+        MenuItem batchEditItem = new MenuItem("批量编辑");
+        batchEditItem.setOnAction(e -> safeCall(ToolBarCallback::onBatchEdit));
         
-        editMenu.getItems().addAll(selectItem, layoutHorizontalItem, layoutVerticalItem, autoLayoutItem);
+        Menu autoLayoutMenu = new Menu("自动布局");
+        MenuItem gridLayoutMenuItem = new MenuItem("网格布局");
+        gridLayoutMenuItem.setOnAction(e -> safeCall(cb -> cb.onAutoLayout(com.cc.job.gui.manager.CanvasLayoutManager.LayoutAlgorithm.GRID)));
+        MenuItem hierarchicalLayoutMenuItem = new MenuItem("层次化布局");
+        hierarchicalLayoutMenuItem.setOnAction(e -> safeCall(cb -> cb.onAutoLayout(com.cc.job.gui.manager.CanvasLayoutManager.LayoutAlgorithm.HIERARCHICAL)));
+        MenuItem forceDirectedLayoutMenuItem = new MenuItem("力导向布局");
+        forceDirectedLayoutMenuItem.setOnAction(e -> safeCall(cb -> cb.onAutoLayout(com.cc.job.gui.manager.CanvasLayoutManager.LayoutAlgorithm.FORCE_DIRECTED)));
+        MenuItem treeLayoutMenuItem = new MenuItem("树形布局");
+        treeLayoutMenuItem.setOnAction(e -> safeCall(cb -> cb.onAutoLayout(com.cc.job.gui.manager.CanvasLayoutManager.LayoutAlgorithm.TREE)));
+        autoLayoutMenu.getItems().addAll(gridLayoutMenuItem, hierarchicalLayoutMenuItem, forceDirectedLayoutMenuItem, treeLayoutMenuItem);
+        
+        editMenu.getItems().addAll(selectItem, layoutHorizontalItem, layoutVerticalItem, batchEditItem, autoLayoutMenu);
         
         return editMenu;
     }
@@ -638,18 +658,6 @@ public class TopToolBar extends VBox {
     private Menu createWindowMenu() {
         Menu windowMenu = new Menu("窗口");
         
-        MenuItem newWindowItem = new MenuItem("新建窗口");
-        newWindowItem.setOnAction(e -> safeCall(ToolBarCallback::onNewWindow));
-        
-        MenuItem closeWindowItem = new MenuItem("关闭窗口");
-        closeWindowItem.setAccelerator(new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.W, javafx.scene.input.KeyCombination.CONTROL_DOWN));
-        closeWindowItem.setOnAction(e -> safeCall(ToolBarCallback::onCloseWindow));
-        
-        MenuItem closeAllItem = new MenuItem("关闭所有窗口");
-        closeAllItem.setOnAction(e -> safeCall(ToolBarCallback::onCloseAllWindows));
-        
-        windowMenu.getItems().addAll(newWindowItem, closeWindowItem, closeAllItem, new SeparatorMenuItem());
-        
         MenuItem minimizeItem = new MenuItem("最小化");
         minimizeItem.setOnAction(e -> safeCall(ToolBarCallback::onMinimize));
         
@@ -746,11 +754,81 @@ public class TopToolBar extends VBox {
         undoButton = createIconButton(IconUtil.undoIcon(), "撤销", "撤销上一步操作", () -> safeCall(ToolBarCallback::onUndo));
         redoButton = createIconButton(IconUtil.redoIcon(), "重做", "重做上一步操作", () -> safeCall(ToolBarCallback::onRedo));
         selectButton = createIconButton(IconUtil.selectIcon(), "框选", "框选节点和边", () -> safeCall(ToolBarCallback::onSelect));
-        Button layoutHorizontalButton = createIconButton(IconUtil.layoutHorizontalIcon(), "横向布局", "横向对齐选中的节点", () -> safeCall(ToolBarCallback::onLayoutHorizontal));
-        Button layoutVerticalButton = createIconButton(IconUtil.layoutVerticalIcon(), "纵向布局", "纵向对齐选中的节点", () -> safeCall(ToolBarCallback::onLayoutVertical));
+        snapToGridButton = createIconButton(IconUtil.gridIcon(), "网格吸附", "切换网格吸附功能", () -> safeCall(ToolBarCallback::onToggleSnapToGrid));
+        
+        // 布局下拉菜单
+        javafx.scene.control.MenuButton layoutMenuButton = new javafx.scene.control.MenuButton("布局");
+        layoutMenuButton.setGraphic(IconUtil.layoutHorizontalIcon());
+        layoutMenuButton.setGraphicTextGap(6);
+        
+        // 横向布局
+        javafx.scene.control.MenuItem layoutHorizontalItem = new javafx.scene.control.MenuItem("横向布局");
+        layoutHorizontalItem.setGraphic(IconUtil.layoutHorizontalIcon());
+        layoutHorizontalItem.setOnAction(e -> safeCall(ToolBarCallback::onLayoutHorizontal));
+        
+        // 纵向布局
+        javafx.scene.control.MenuItem layoutVerticalItem = new javafx.scene.control.MenuItem("纵向布局");
+        layoutVerticalItem.setGraphic(IconUtil.layoutVerticalIcon());
+        layoutVerticalItem.setOnAction(e -> safeCall(ToolBarCallback::onLayoutVertical));
+        
+        // 水平等距
+        javafx.scene.control.MenuItem distributeHorizontalItem = new javafx.scene.control.MenuItem("水平等距");
+        distributeHorizontalItem.setGraphic(IconUtil.layoutHorizontalIcon());
+        distributeHorizontalItem.setOnAction(e -> safeCall(ToolBarCallback::onDistributeHorizontally));
+        
+        // 垂直等距
+        javafx.scene.control.MenuItem distributeVerticalItem = new javafx.scene.control.MenuItem("垂直等距");
+        distributeVerticalItem.setGraphic(IconUtil.layoutVerticalIcon());
+        distributeVerticalItem.setOnAction(e -> safeCall(ToolBarCallback::onDistributeVertically));
+        
+        // 居中对齐
+        javafx.scene.control.MenuItem alignToCenterItem = new javafx.scene.control.MenuItem("居中对齐");
+        alignToCenterItem.setGraphic(IconUtil.expandIcon());
+        alignToCenterItem.setOnAction(e -> safeCall(ToolBarCallback::onAlignToCenter));
+        
+        layoutMenuButton.getItems().addAll(
+            layoutHorizontalItem, 
+            layoutVerticalItem, 
+            new SeparatorMenuItem(),
+            distributeHorizontalItem, 
+            distributeVerticalItem,
+            new SeparatorMenuItem(),
+            alignToCenterItem
+        );
+        
+        javafx.scene.control.Tooltip layoutTip = new javafx.scene.control.Tooltip("节点布局功能");
+        layoutTip.setStyle("-fx-font-size: 12px;");
+        layoutMenuButton.setTooltip(layoutTip);
+        
+        // 布局算法选择下拉菜单
+        javafx.scene.control.MenuButton autoLayoutMenuButton = new javafx.scene.control.MenuButton("自动布局");
+        autoLayoutMenuButton.setGraphicTextGap(6);
+        // MenuButton不是Button类型，不能使用applyIconButtonHover
+        
+        javafx.scene.control.MenuItem gridLayoutItem = new javafx.scene.control.MenuItem("网格布局");
+        gridLayoutItem.setOnAction(e -> safeCall(cb -> cb.onAutoLayout(com.cc.job.gui.manager.CanvasLayoutManager.LayoutAlgorithm.GRID)));
+        
+        javafx.scene.control.MenuItem hierarchicalLayoutItem = new javafx.scene.control.MenuItem("层次化布局");
+        hierarchicalLayoutItem.setOnAction(e -> safeCall(cb -> cb.onAutoLayout(com.cc.job.gui.manager.CanvasLayoutManager.LayoutAlgorithm.HIERARCHICAL)));
+        
+        javafx.scene.control.MenuItem forceDirectedLayoutItem = new javafx.scene.control.MenuItem("力导向布局");
+        forceDirectedLayoutItem.setOnAction(e -> safeCall(cb -> cb.onAutoLayout(com.cc.job.gui.manager.CanvasLayoutManager.LayoutAlgorithm.FORCE_DIRECTED)));
+        
+        javafx.scene.control.MenuItem treeLayoutItem = new javafx.scene.control.MenuItem("树形布局");
+        treeLayoutItem.setOnAction(e -> safeCall(cb -> cb.onAutoLayout(com.cc.job.gui.manager.CanvasLayoutManager.LayoutAlgorithm.TREE)));
+        
+        autoLayoutMenuButton.getItems().addAll(gridLayoutItem, hierarchicalLayoutItem, forceDirectedLayoutItem, treeLayoutItem);
+        
+        javafx.scene.control.Tooltip autoLayoutTip = new javafx.scene.control.Tooltip("选择自动布局算法");
+        autoLayoutTip.setStyle("-fx-font-size: 12px;");
+        autoLayoutMenuButton.setTooltip(autoLayoutTip);
+        
+        // 检测循环依赖按钮
+        Button detectCyclesButton = createIconButton(IconUtil.warnIcon(), "检测循环", "检测画布中的循环依赖", () -> safeCall(ToolBarCallback::onDetectCycles));
+        
         undoButton.setDisable(true);
         redoButton.setDisable(true);
-        HBox editGroup = createToolGroup(undoButton, redoButton, selectButton, layoutHorizontalButton, layoutVerticalButton);
+        HBox editGroup = createToolGroup(undoButton, redoButton, selectButton, layoutMenuButton, snapToGridButton, autoLayoutMenuButton, detectCyclesButton);
         
         Region sep2 = createSeparator();
         
@@ -763,7 +841,8 @@ public class TopToolBar extends VBox {
             createIconButton(IconUtil.zoomOutIcon(), "缩小", "缩小画布", () -> safeCall(ToolBarCallback::onZoomOut)),
             zoomLabel,
             createIconButton(IconUtil.expandIcon(), "适应", "适应窗口大小", () -> safeCall(ToolBarCallback::onZoomFit)),
-            createIconButton(IconUtil.historyIcon(), "节点历史", "查看节点历史执行记录", () -> safeCall(ToolBarCallback::onNodeHistory))
+            createIconButton(IconUtil.historyIcon(), "节点历史", "查看节点历史执行记录", () -> safeCall(ToolBarCallback::onNodeHistory)),
+            createIconButton(IconUtil.exportIcon(), "画布", "导出画布为图片", () -> safeCall(ToolBarCallback::onExportCanvas))
         );
         
         // 右侧空白区域
@@ -1064,7 +1143,7 @@ public class TopToolBar extends VBox {
         return btn;
     }
     
-    private void safeCall(java.util.function.Consumer<ToolBarCallback> method) {
+    private void safeCall(Consumer<ToolBarCallback> method) {
         if (callback != null) {
             method.accept(callback);
         }
@@ -1143,6 +1222,62 @@ public class TopToolBar extends VBox {
                     // 框选模式未激活：恢复默认样式
                     StyleUtil.applyIconButtonHover(selectButton);
                     selectButton.setTooltip(new Tooltip("框选节点和边"));
+                }
+            }
+        });
+    }
+    
+    /**
+     * 更新网格吸附按钮的状态
+     * @param isActive 是否启用网格吸附
+     */
+    public void updateSnapToGridButtonState(boolean isActive) {
+        Platform.runLater(() -> {
+            if (snapToGridButton != null) {
+                if (isActive) {
+                    // 网格吸附启用：显示高亮效果（蓝色背景）
+                    snapToGridButton.setStyle(
+                        "-fx-background-color: #2563EB; " +
+                        "-fx-text-fill: white; " +
+                        "-fx-font-size: 12; " +
+                        "-fx-font-weight: bold; " +
+                        "-fx-padding: 6 12 6 12; " +
+                        "-fx-border-radius: 4; " +
+                        "-fx-background-radius: 4; " +
+                        "-fx-cursor: hand;"
+                    );
+                    snapToGridButton.setTooltip(new Tooltip("网格吸附已启用，点击可关闭"));
+                    
+                    // 添加悬停效果
+                    snapToGridButton.setOnMouseEntered(e -> {
+                        snapToGridButton.setStyle(
+                            "-fx-background-color: #1D4ED8; " +
+                            "-fx-text-fill: white; " +
+                            "-fx-font-size: 12; " +
+                            "-fx-font-weight: bold; " +
+                            "-fx-padding: 6 12 6 12; " +
+                            "-fx-border-radius: 4; " +
+                            "-fx-background-radius: 4; " +
+                            "-fx-cursor: hand; " +
+                            "-fx-effect: dropshadow(gaussian, rgba(37,99,235,0.3), 4, 0, 0, 2);"
+                        );
+                    });
+                    snapToGridButton.setOnMouseExited(e -> {
+                        snapToGridButton.setStyle(
+                            "-fx-background-color: #2563EB; " +
+                            "-fx-text-fill: white; " +
+                            "-fx-font-size: 12; " +
+                            "-fx-font-weight: bold; " +
+                            "-fx-padding: 6 12 6 12; " +
+                            "-fx-border-radius: 4; " +
+                            "-fx-background-radius: 4; " +
+                            "-fx-cursor: hand;"
+                        );
+                    });
+                } else {
+                    // 网格吸附未启用：恢复默认样式
+                    StyleUtil.applyIconButtonHover(snapToGridButton);
+                    snapToGridButton.setTooltip(new Tooltip("切换网格吸附功能"));
                 }
             }
         });

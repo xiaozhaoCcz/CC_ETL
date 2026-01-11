@@ -84,6 +84,10 @@ public final class IconUtil {
     public static FontIcon layoutVerticalIcon() {
         return createFeatherIcon(Feather.ALIGN_CENTER, SECONDARY_COLOR, 16);
     }
+    
+    public static FontIcon gridIcon() {
+        return createFeatherIcon(Feather.GRID, SECONDARY_COLOR, 16);
+    }
 
     public static FontIcon playIcon() {
         return createFeatherIcon(Feather.PLAY, WHITE_COLOR, 18);

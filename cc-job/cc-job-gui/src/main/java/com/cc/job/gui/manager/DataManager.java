@@ -170,6 +170,14 @@ public class DataManager {
                 if (node.getCurrentColor() != null) {
                     propertiesMap.put("color", node.getCurrentColor());
                 }
+                // 添加节点备注到properties
+                if (node.getRemark() != null && !node.getRemark().trim().isEmpty()) {
+                    propertiesMap.put("remark", node.getRemark());
+                }
+                // 添加节点标签到properties
+                if (node.getTags() != null && !node.getTags().isEmpty()) {
+                    propertiesMap.put("tags", node.getTags());
+                }
                 nodeData.put("properties", apiUtil.getGson().toJson(propertiesMap));
                 
                 nodesData.add(nodeData);
@@ -279,6 +287,38 @@ public class DataManager {
                 edgeData.put("targetNodeId", targetId);
                 edgeData.put("startPoint", "right");
                 edgeData.put("endPoint", "left");
+                
+                // ⭐ 修复：保存连线样式、颜色和标签信息
+                Map<String, Object> properties = new HashMap<>();
+                // 总是保存样式（默认 SOLID）
+                NodeConnection.EdgeStyle edgeStyle = conn.getEdgeStyle();
+                if (edgeStyle != null) {
+                    properties.put("edgeStyle", edgeStyle.name());
+                } else {
+                    properties.put("edgeStyle", NodeConnection.EdgeStyle.SOLID.name());
+                }
+                // 总是保存颜色（默认 #374151）
+                String edgeColor = conn.getEdgeColor();
+                if (edgeColor != null && !edgeColor.isEmpty()) {
+                    properties.put("edgeColor", edgeColor);
+                } else {
+                    properties.put("edgeColor", "#374151");
+                }
+                // 总是保存标签（默认空字符串，以支持清除标签）
+                String labelText = conn.getLabelText();
+                if (labelText != null) {
+                    properties.put("labelText", labelText);
+                } else {
+                    properties.put("labelText", "");
+                }
+                // 总是保存properties（确保所有属性都有值）
+                String propertiesJson = apiUtil.getGson().toJson(properties);
+                edgeData.put("properties", propertiesJson);
+                
+                // 调试日志：记录保存的properties
+                logger.debug("保存连线properties: source={}, target={}, properties={}", 
+                    sourceId, targetId, propertiesJson);
+                
                 edgesData.add(edgeData);
             }
             

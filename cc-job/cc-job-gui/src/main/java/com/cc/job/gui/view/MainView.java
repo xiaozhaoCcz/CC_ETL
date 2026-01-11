@@ -25,8 +25,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.util.*;
 import java.util.Set;
 
@@ -176,6 +174,11 @@ public class MainView extends BorderPane {
         
         // 重要：设置对话框管理器（用于显示节点详情对话框）
         nodeCallbackConfigurator.setDialogManager(dialogManager);
+        // 重要：设置主窗口Stage（用于显示依赖关系面板）
+        nodeCallbackConfigurator.setOwnerStage(ownerStage);
+        
+        // 设置canvas的ownerStage（用于连线样式对话框等）
+        canvas.setOwnerStage(ownerStage);
         
         // 设置颜色变更回调(用于保存颜色到数据库)
         nodeCallbackConfigurator.setOnColorChangedCallback(() -> {
@@ -266,6 +269,26 @@ public class MainView extends BorderPane {
             }
 
             @Override
+            public void onExportCanvas() {
+                Stage ownerStage = (Stage) MainView.this.getScene().getWindow();
+                CanvasExportDialog exportDialog = new CanvasExportDialog(ownerStage);
+                
+                exportDialog.showAndWait().ifPresent(file -> {
+                    if (file != null) {
+                        com.cc.job.gui.manager.CanvasExportManager exportManager = 
+                            new com.cc.job.gui.manager.CanvasExportManager(logPanel::info);
+                        com.cc.job.gui.manager.CanvasExportManager.ExportConfig config = exportDialog.getConfig();
+                        boolean success = exportManager.exportCanvas(canvas, file, config);
+                        if (success) {
+                            logPanel.success("✓ 画布已导出到: " + file.getAbsolutePath());
+                        } else {
+                            logPanel.error("✗ 导出失败");
+                        }
+                    }
+                });
+            }
+            
+            @Override
             public void onNodeHistory() {
                 Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
                 if (currentTaskGroupId == null) {
@@ -280,6 +303,45 @@ public class MainView extends BorderPane {
             public void onRun() {
                 Long jobId = pageStoreHelper.getCurrentTaskGroupId();
                 String jobName = getJobNameById(jobId);
+                
+                // ⭐ 运行前检测循环依赖
+                boolean hasCycle = canvas.detectAndHighlightCycles();
+                if (hasCycle) {
+                    // 获取详细的循环信息
+                    com.cc.job.gui.manager.CycleDetectionManager.CycleDetectionResult result = 
+                        canvas.getCycleDetectionResult();
+                    
+                    // 构建循环路径信息
+                    StringBuilder message = new StringBuilder();
+                    message.append("检测到循环依赖，无法运行任务！\n\n");
+                    message.append("参与循环的连接线已标记为红色并加粗显示。\n\n");
+                    
+                    if (!result.getCyclePaths().isEmpty()) {
+                        message.append("循环路径：\n");
+                        for (int i = 0; i < result.getCyclePaths().size(); i++) {
+                            List<String> path = result.getCyclePaths().get(i);
+                            if (path.size() > 1) {
+                                message.append("循环 ").append(i + 1).append(": ");
+                                message.append(String.join(" → ", path));
+                                message.append("\n");
+                            }
+                        }
+                    }
+                    message.append("\n请修复循环依赖后再运行任务。");
+                    
+                    // 显示错误对话框阻止运行
+                    Alert alert = new Alert(Alert.AlertType.ERROR);
+                    alert.setTitle("循环依赖错误");
+                    alert.setHeaderText("存在循环依赖，无法运行");
+                    alert.setContentText(message.toString());
+                    alert.showAndWait();
+                    
+                    logPanel.error("✗ 存在循环依赖，运行已取消");
+                    return;
+                }
+                
+                // 清除循环标记（如果没有循环）
+                canvas.clearCycleHighlight();
                 
                 // ⭐ 清除节点状态缓存（避免旧状态影响）
                 NodeStatusSyncManager.getInstance().clearCacheForTaskGroupSwitch();
@@ -360,6 +422,82 @@ public class MainView extends BorderPane {
             @Override
             public void onLayoutVertical() {
                 canvas.alignVertical();
+            }
+            
+            @Override
+            public void onDistributeHorizontally() {
+                canvas.distributeNodesHorizontally();
+                logPanel.info("✓ 水平等距分布完成");
+            }
+            
+            @Override
+            public void onDistributeVertically() {
+                canvas.distributeNodesVertically();
+                logPanel.info("✓ 垂直等距分布完成");
+            }
+            
+            @Override
+            public void onAlignToCenter() {
+                canvas.alignToCanvasCenter();
+                logPanel.info("✓ 已对齐到画布中心");
+            }
+            
+            @Override
+            public void onToggleSnapToGrid() {
+                boolean currentState = canvas.isSnapToGridEnabled();
+                canvas.setSnapToGridEnabled(!currentState);
+                logPanel.info("✓ 网格吸附已" + (!currentState ? "启用" : "禁用"));
+                // 按钮状态会通过监听器自动更新
+            }
+            
+            @Override
+            public void onDetectCycles() {
+                // 执行循环依赖检测
+                boolean hasCycle = canvas.detectAndHighlightCycles();
+                
+                if (hasCycle) {
+                    // 获取详细的循环信息
+                    com.cc.job.gui.manager.CycleDetectionManager.CycleDetectionResult result = 
+                        canvas.getCycleDetectionResult();
+                    
+                    // 构建循环路径信息
+                    StringBuilder message = new StringBuilder();
+                    message.append("检测到循环依赖！\n\n");
+                    message.append("参与循环的连接线已标记为红色并加粗显示。\n\n");
+                    
+                    if (!result.getCyclePaths().isEmpty()) {
+                        message.append("循环路径：\n");
+                        for (int i = 0; i < result.getCyclePaths().size(); i++) {
+                            List<String> path = result.getCyclePaths().get(i);
+                            if (path.size() > 1) {
+                                message.append("循环 ").append(i + 1).append(": ");
+                                message.append(String.join(" → ", path));
+                                message.append("\n");
+                            }
+                        }
+                    }
+                    
+                    // 显示警告对话框
+                    Alert alert = new Alert(Alert.AlertType.WARNING);
+                    alert.setTitle("循环依赖检测");
+                    alert.setHeaderText("检测到循环依赖");
+                    alert.setContentText(message.toString());
+                    alert.showAndWait();
+                    
+                    logPanel.warn("⚠ 检测到循环依赖，请修复后再运行任务");
+                } else {
+                    // 清除之前的标记
+                    canvas.clearCycleHighlight();
+                    
+                    // 显示成功提示
+                    Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                    alert.setTitle("循环依赖检测");
+                    alert.setHeaderText("检测完成");
+                    alert.setContentText("未检测到循环依赖，画布结构正常。");
+                    alert.showAndWait();
+                    
+                    logPanel.success("✓ 未检测到循环依赖");
+                }
             }
 
             @Override
@@ -509,9 +647,55 @@ public class MainView extends BorderPane {
             }
             
             @Override
+            public void onBatchEdit() {
+                Set<ProcessNode> selectedNodes = canvas.getSelectedNodes();
+                if (selectedNodes.isEmpty()) {
+                    logPanel.warn("⚠ 请先选中要编辑的节点");
+                    return;
+                }
+                
+                Stage ownerStage = (Stage) MainView.this.getScene().getWindow();
+                com.cc.job.gui.view.BatchEditDialog batchDialog = new com.cc.job.gui.view.BatchEditDialog(
+                    ownerStage,
+                    selectedNodes
+                );
+                
+                batchDialog.showAndWait().ifPresent(result -> {
+                    if (result != null) {
+                        // 如果是删除操作，需要确认
+                        if (result.getOperation() == com.cc.job.gui.view.BatchEditDialog.BatchEditOperation.DELETE) {
+                            Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+                            confirm.setTitle("确认删除");
+                            confirm.setHeaderText("确定要删除选中的 " + selectedNodes.size() + " 个节点吗？");
+                            confirm.setContentText("此操作不可撤销！");
+                            confirm.initOwner(ownerStage);
+                            
+                            confirm.showAndWait().ifPresent(buttonType -> {
+                                if (buttonType == ButtonType.OK) {
+                                    nodeOperationManager.batchEditNodes(selectedNodes, result);
+                                }
+                            });
+                        } else {
+                            nodeOperationManager.batchEditNodes(selectedNodes, result);
+                        }
+                    }
+                });
+            }
+            
+            @Override
             public void onFindNode() {
-                // 显示查找节点对话框
-                showFindNodeDialog();
+                // 显示高级搜索对话框
+                Stage ownerStage = (Stage) MainView.this.getScene().getWindow();
+                NodeSearchDialog searchDialog = new NodeSearchDialog(
+                    ownerStage,
+                    canvas.getNodes(),
+                    node -> {
+                        // 定位到节点
+                        canvas.locateNode(node);
+                        logPanel.info("✓ 已定位到节点: " + node.getJobHandlerName());
+                    }
+                );
+                searchDialog.showAndWait();
             }
             
             @Override
@@ -529,7 +713,17 @@ public class MainView extends BorderPane {
             @Override
             public void onAutoLayout() {
                 canvas.autoLayout();
-                logPanel.info("✓ 已自动布局");
+                logPanel.info("✓ 已自动布局（网格布局）");
+            }
+            
+            @Override
+            public void onAutoLayout(com.cc.job.gui.manager.CanvasLayoutManager.LayoutAlgorithm algorithm) {
+                canvas.autoLayout(algorithm);
+                String algorithmName = algorithm == com.cc.job.gui.manager.CanvasLayoutManager.LayoutAlgorithm.GRID ? "网格布局" :
+                                      algorithm == com.cc.job.gui.manager.CanvasLayoutManager.LayoutAlgorithm.HIERARCHICAL ? "层次化布局" :
+                                      algorithm == com.cc.job.gui.manager.CanvasLayoutManager.LayoutAlgorithm.FORCE_DIRECTED ? "力导向布局" :
+                                      algorithm == com.cc.job.gui.manager.CanvasLayoutManager.LayoutAlgorithm.TREE ? "树形布局" : "未知布局";
+                logPanel.info("✓ 已自动布局（" + algorithmName + "）");
             }
             
             // 选择菜单
@@ -599,6 +793,12 @@ public class MainView extends BorderPane {
             public void onToggleGrid() {
                 canvas.toggleGrid();
                 logPanel.info("✓ 已切换网格显示");
+            }
+            
+            @Override
+            public void onToggleRuler() {
+                canvas.toggleRuler();
+                logPanel.info("✓ 已切换标尺显示");
             }
             
             @Override
@@ -764,23 +964,6 @@ public class MainView extends BorderPane {
             }
             
             // 窗口菜单
-            @Override
-            public void onNewWindow() {
-                // TODO: 实现新建窗口
-                logPanel.info("新建窗口功能开发中...");
-            }
-            
-            @Override
-            public void onCloseWindow() {
-                Stage stage = (Stage) MainView.this.getScene().getWindow();
-                stage.fireEvent(new javafx.stage.WindowEvent(stage, javafx.stage.WindowEvent.WINDOW_CLOSE_REQUEST));
-            }
-            
-            @Override
-            public void onCloseAllWindows() {
-                onCloseWindow();
-            }
-            
             @Override
             public void onMinimize() {
                 Stage stage = (Stage) MainView.this.getScene().getWindow();
@@ -971,6 +1154,13 @@ public class MainView extends BorderPane {
         canvas.setOnSelectionModeChanged(isActive -> {
             if (toolBar != null) {
                 toolBar.updateSelectionButtonState(isActive);
+            }
+        });
+        
+        // 设置网格吸附状态改变回调
+        canvas.setOnSnapToGridChanged(isActive -> {
+            if (toolBar != null) {
+                toolBar.updateSnapToGridButtonState(isActive);
             }
         });
         
@@ -1429,6 +1619,19 @@ public class MainView extends BorderPane {
                     } else if (event.isControlDown() && event.getCode() == javafx.scene.input.KeyCode.V) {
                         handlePasteShortcut();
                         event.consume();
+                    } else if (event.isControlDown() && event.getCode() == javafx.scene.input.KeyCode.F) {
+                        // Ctrl+F: 查找节点
+                        Stage ownerStage = (Stage) MainView.this.getScene().getWindow();
+                        NodeSearchDialog searchDialog = new NodeSearchDialog(
+                            ownerStage,
+                            canvas.getNodes(),
+                            node -> {
+                                canvas.locateNode(node);
+                                logPanel.info("✓ 已定位到节点: " + node.getJobHandlerName());
+                            }
+                        );
+                        searchDialog.showAndWait();
+                        event.consume();
                     }
                 });
             }
@@ -1779,7 +1982,7 @@ public class MainView extends BorderPane {
         Stage ownerStage = (Stage) this.getScene().getWindow();
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("导出分区数据");
-        fileChooser.setInitialFileName(partitionName != null ? partitionName + ".ce" : "partition_" + partitionId + ".ce");
+        fileChooser.setInitialFileName(partitionName != null ? partitionName: "partition_" + partitionId);
         
         // 设置文件过滤器
         FileChooser.ExtensionFilter extFilter = new FileChooser.ExtensionFilter("CE文件 (*.ce)", "*.ce");
@@ -2219,7 +2422,6 @@ public class MainView extends BorderPane {
         shortcutsBox.getChildren().add(new Label("F5 - 运行任务组"));
         shortcutsBox.getChildren().add(new Label("Shift+F5 - 停止任务"));
         shortcutsBox.getChildren().add(new Label("Ctrl+G - 转到节点"));
-        shortcutsBox.getChildren().add(new Label("Ctrl+W - 关闭窗口"));
         shortcutsBox.getChildren().add(new Label("Ctrl+Shift+? - 快捷键列表"));
         
         ScrollPane scrollPane = new ScrollPane(shortcutsBox);

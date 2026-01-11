@@ -398,6 +398,24 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
                         jobNode.setExpressionType(String.valueOf(exprType));
                     }
                 }
+                
+                // ⭐ 新增：从properties中读取remark和tags，保存到JobNode的对应字段
+                Object remarkObj = propertiesMap.get("remark");
+                if (remarkObj != null) {
+                    String remark = String.valueOf(remarkObj);
+                    if (StringUtils.isNotBlank(remark) && !"null".equals(remark)) {
+                        jobNode.setRemark(remark);
+                    }
+                }
+                Object tagsObj = propertiesMap.get("tags");
+                if (tagsObj != null) {
+                    // tags可能是List或JSON字符串
+                    if (tagsObj instanceof List) {
+                        jobNode.setTags(JSONUtil.toJsonStr(tagsObj));
+                    } else if (tagsObj instanceof String) {
+                        jobNode.setTags((String) tagsObj);
+                    }
+                }
 
                 if (DYNAMIC_GROUP.equalsIgnoreCase(node.getType())) {
                     List<String> childIds = JSONUtil.parseArray(node.getChildren()).toList(String.class);
@@ -473,7 +491,9 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
                 jobEdge.setFromNodeId(sourceJobId);
                 jobEdge.setEndNodeId(targetJobId);
                 jobEdge.setJobParentId(jobInfo.getId());
-                jobEdge.setProperties(edge.properties);
+                // ⭐ 保存连线样式、颜色和标签信息（properties是JSON字符串）
+                // 前端已确保properties总是有值，即使只有默认值
+                jobEdge.setProperties(StringUtils.isNotBlank(edge.properties) ? edge.properties : "{}");
                 jobEdge.setPointsList(edge.pointsList);
                 jobEdge.setStartPoint(edge.startPoint);
                 jobEdge.setEndPoint(edge.endPoint);
@@ -759,7 +779,9 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
                 jobEdge.setFromNodeId(sourceJobId);
                 jobEdge.setEndNodeId(targetJobId);
                 jobEdge.setJobParentId(jobInfo.getId());
-                jobEdge.setProperties(edge.properties);
+                // ⭐ 保存连线样式、颜色和标签信息（properties是JSON字符串）
+                // 前端已确保properties总是有值，即使只有默认值
+                jobEdge.setProperties(StringUtils.isNotBlank(edge.properties) ? edge.properties : "{}");
                 jobEdge.setPointsList(edge.pointsList);
                 jobEdge.setStartPoint(edge.startPoint);
                 jobEdge.setEndPoint(edge.endPoint);
@@ -938,6 +960,14 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
                 }
             }
 
+            // ⭐ 新增：从JobNode的remark和tags字段读取并放入properties中
+            if (StringUtils.isNotBlank(node.getRemark())) {
+                propertiesMap.put("remark", node.getRemark());
+            }
+            if (StringUtils.isNotBlank(node.getTags())) {
+                propertiesMap.put("tags", node.getTags());
+            }
+            
             if (!propertiesMap.containsKey("width")) {
                 propertiesMap.put("width", CONDITION_NODE.equalsIgnoreCase(node.getNodeType()) ? 320.0 : 
                     (DYNAMIC_GROUP.equalsIgnoreCase(node.getNodeType()) ? 300.0 : 160.0));

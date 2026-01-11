@@ -7,11 +7,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
-import javafx.scene.control.ContextMenu;
-import javafx.scene.control.Label;
-import javafx.scene.control.Menu;
-import javafx.scene.control.MenuItem;
-import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.*;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
@@ -58,6 +54,12 @@ public class ProcessNode extends StackPane {
     // 删除回调
     private Runnable onDelete;
     
+    // 编辑标签回调
+    private Runnable onEditTags;
+    
+    // 编辑备注回调
+    private Runnable onEditRemark;
+    
     // 拖动回调
     private Runnable onDragged;
     private DragFinishedListener dragFinishedListener;
@@ -70,6 +72,7 @@ public class ProcessNode extends StackPane {
     private Runnable onEdit;
     private Runnable onCopy;
     private Runnable onShowDetails;
+    private Runnable onShowDependencies; // 查看依赖回调
     
     // 禁用/启用节点回调
     private DisableNodeCallback onDisable;
@@ -117,7 +120,7 @@ public class ProcessNode extends StackPane {
     // 备注相关
     private String remark = ""; // 节点备注
     private javafx.scene.control.Tooltip remarkTooltip; // 备注提示框
-    private FontIcon remarkIcon; // 备注图标（显示在节点右上角）
+    private FontIcon remarkIcon; // 备注图标（显示在节点右下角）
     
     private static final double NODE_WIDTH = 180;
     private static final double NODE_HEIGHT = 80;
@@ -235,23 +238,21 @@ public class ProcessNode extends StackPane {
         tagsContainer.setVisible(false);
         updateTagsDisplay();
         
-        // 创建备注图标容器（右上角）
+        // 创建备注图标容器（右下角）
         Pane remarkIconContainer = new Pane();
-        remarkIconContainer.setPrefSize(20, 20);
-        remarkIconContainer.setLayoutX(NODE_WIDTH - 24);
-        remarkIconContainer.setLayoutY(6);
+        remarkIconContainer.setPrefSize(18, 18);
         remarkIconContainer.setMouseTransparent(true);
         
-        remarkIcon = new FontIcon(org.kordamp.ikonli.feather.Feather.INFO);
-        remarkIcon.setIconSize(14);
-        remarkIcon.setIconColor(javafx.scene.paint.Color.web("#6366F1"));
-        remarkIcon.setLayoutX(3);
-        remarkIcon.setLayoutY(3);
+        remarkIcon = new FontIcon(org.kordamp.ikonli.feather.Feather.FILE_TEXT);
+        remarkIcon.setIconSize(12);
+        remarkIcon.setIconColor(Color.web("#8B5CF6"));
+        remarkIcon.setLayoutX(NODE_WIDTH-20);
+        remarkIcon.setLayoutY(NODE_HEIGHT-10);
         remarkIconContainer.setVisible(false);
         remarkIconContainer.getChildren().add(remarkIcon);
         
         // 创建备注提示框
-        remarkTooltip = new javafx.scene.control.Tooltip();
+        remarkTooltip = new Tooltip();
         remarkTooltip.setWrapText(true);
         remarkTooltip.setMaxWidth(300);
         
@@ -511,6 +512,30 @@ public class ProcessNode extends StackPane {
             }
         });
         
+        // 查看依赖
+        MenuItem dependenciesItem = new MenuItem("查看依赖");
+        dependenciesItem.setOnAction(e -> {
+            if (onShowDependencies != null) {
+                onShowDependencies.run();
+            }
+        });
+        
+        // 编辑标签
+        MenuItem editTagsItem = new MenuItem("编辑标签");
+        editTagsItem.setOnAction(e -> {
+            if (onEditTags != null) {
+                onEditTags.run();
+            }
+        });
+        
+        // 编辑备注
+        MenuItem editRemarkItem = new MenuItem("编辑备注");
+        editRemarkItem.setOnAction(e -> {
+            if (onEditRemark != null) {
+                onEditRemark.run();
+            }
+        });
+        
         // 分隔符
         SeparatorMenuItem separator1 = new SeparatorMenuItem();
         
@@ -598,6 +623,9 @@ public class ProcessNode extends StackPane {
             editItem,
             copyItem,
             detailsItem,
+            dependenciesItem,
+            editTagsItem,
+            editRemarkItem,
             separator1,
             colorMenu,
             //toggleItem,
@@ -748,8 +776,20 @@ public class ProcessNode extends StackPane {
         this.onCopy = onCopy;
     }
     
+    public void setOnEditTags(Runnable onEditTags) {
+        this.onEditTags = onEditTags;
+    }
+    
+    public void setOnEditRemark(Runnable onEditRemark) {
+        this.onEditRemark = onEditRemark;
+    }
+    
     public void setOnShowDetails(Runnable onShowDetails) {
         this.onShowDetails = onShowDetails;
+    }
+    
+    public void setOnShowDependencies(Runnable onShowDependencies) {
+        this.onShowDependencies = onShowDependencies;
     }
     
     public void setOnDisable(DisableNodeCallback callback) {
