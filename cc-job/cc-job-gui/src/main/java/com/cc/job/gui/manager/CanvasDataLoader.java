@@ -78,6 +78,63 @@ public class CanvasDataLoader {
                 }
             }
             
+            // 从properties读取节点大小
+            double width = 180.0; // 默认宽度
+            double height = 80.0; // 默认高度
+            Object widthObj = nodeData.getProperties().get("width");
+            if (widthObj != null) {
+                try {
+                    if (widthObj instanceof Number) {
+                        width = ((Number) widthObj).doubleValue();
+                    } else {
+                        width = Double.parseDouble(widthObj.toString());
+                    }
+                } catch (NumberFormatException e) {
+                    // 使用默认值
+                }
+            }
+            Object heightObj = nodeData.getProperties().get("height");
+            if (heightObj != null) {
+                try {
+                    if (heightObj instanceof Number) {
+                        height = ((Number) heightObj).doubleValue();
+                    } else {
+                        height = Double.parseDouble(heightObj.toString());
+                    }
+                } catch (NumberFormatException e) {
+                    // 使用默认值
+                }
+            }
+            node.setNodeSize(width, height);
+            
+            // 从properties读取边框样式
+            Object borderStyleObj = nodeData.getProperties().get("borderStyle");
+            if (borderStyleObj != null) {
+                try {
+                    String borderStyleStr = borderStyleObj.toString();
+                    ProcessNode.BorderStyle borderStyle = ProcessNode.BorderStyle.valueOf(borderStyleStr);
+                    node.setBorderStyle(borderStyle);
+                } catch (IllegalArgumentException e) {
+                    // 使用默认值 SOLID
+                }
+            }
+            
+            // 从properties读取边框粗细
+            Object borderWidthObj = nodeData.getProperties().get("borderWidth");
+            if (borderWidthObj != null) {
+                try {
+                    double borderWidth;
+                    if (borderWidthObj instanceof Number) {
+                        borderWidth = ((Number) borderWidthObj).doubleValue();
+                    } else {
+                        borderWidth = Double.parseDouble(borderWidthObj.toString());
+                    }
+                    node.setBorderWidth(borderWidth);
+                } catch (NumberFormatException e) {
+                    // 使用默认值
+                }
+            }
+            
             // 从properties读取标签
             Object tagsObj = nodeData.getProperties().get("tags");
             if (tagsObj != null) {

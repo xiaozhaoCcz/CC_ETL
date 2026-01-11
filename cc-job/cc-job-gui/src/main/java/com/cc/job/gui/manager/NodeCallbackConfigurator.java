@@ -167,6 +167,28 @@ public class NodeCallbackConfigurator {
             }
         });
         
+        // 样式设置回调
+        node.setOnChangeStyle(() -> {
+            Platform.runLater(() -> {
+                javafx.stage.Stage stage = ownerStage;
+                if (stage == null && canvas.getScene() != null) {
+                    stage = (javafx.stage.Stage) canvas.getScene().getWindow();
+                }
+                if (stage == null) {
+                    logPanel.warn("⚠ 无法获取主窗口，无法显示样式设置对话框");
+                    return;
+                }
+                com.cc.job.gui.view.NodeStyleDialog dialog = new com.cc.job.gui.view.NodeStyleDialog(stage, node);
+                dialog.showAndWait().ifPresent(result -> {
+                    // 对话框已经应用了样式，这里只需要触发保存回调
+                    if (onColorChangedCallback != null) {
+                        onColorChangedCallback.run();
+                    }
+                    logPanel.info("✓ 节点样式已更新");
+                });
+            });
+        });
+        
         // 编辑标签回调
         node.setOnEditTags(() -> {
             Platform.runLater(() -> {

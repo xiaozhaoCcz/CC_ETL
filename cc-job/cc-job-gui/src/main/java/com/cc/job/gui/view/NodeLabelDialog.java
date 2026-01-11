@@ -91,16 +91,32 @@ public class NodeLabelDialog extends Dialog<List<String>> {
                 if (empty || item == null) {
                     setText(null);
                     setGraphic(null);
+                    setStyle(""); // 清空样式
                 } else {
                     setText(item);
-                    // 设置标签样式
-                    setStyle(
-                        "-fx-font-size: 12; " +
-                        "-fx-padding: 4 8 4 8; " +
-                        "-fx-background-color: #EEF2FF; " +
-                        "-fx-background-radius: 4; " +
-                        "-fx-text-fill: #6366F1;"
-                    );
+                    // 根据选中状态设置不同的样式
+                    if (isSelected()) {
+                        // 选中状态：深蓝色背景，白色文字，带边框
+                        setStyle(
+                            "-fx-font-size: 12; " +
+                            "-fx-padding: 4 8 4 8; " +
+                            "-fx-background-color: #6366F1; " +
+                            "-fx-background-radius: 4; " +
+                            "-fx-text-fill: #FFFFFF; " +
+                            "-fx-border-color: #4F46E5; " +
+                            "-fx-border-radius: 4; " +
+                            "-fx-border-width: 2;"
+                        );
+                    } else {
+                        // 未选中状态：浅蓝色背景，蓝色文字
+                        setStyle(
+                            "-fx-font-size: 12; " +
+                            "-fx-padding: 4 8 4 8; " +
+                            "-fx-background-color: #EEF2FF; " +
+                            "-fx-background-radius: 4; " +
+                            "-fx-text-fill: #6366F1;"
+                        );
+                    }
                 }
             }
         });

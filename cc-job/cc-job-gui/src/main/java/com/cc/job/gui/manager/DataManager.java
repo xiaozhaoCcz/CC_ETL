@@ -170,6 +170,13 @@ public class DataManager {
                 if (node.getCurrentColor() != null) {
                     propertiesMap.put("color", node.getCurrentColor());
                 }
+                // 添加节点大小到properties
+                propertiesMap.put("width", node.getNodeWidth());
+                propertiesMap.put("height", node.getNodeHeight());
+                // 添加边框样式到properties
+                propertiesMap.put("borderStyle", node.getBorderStyle().name());
+                // 添加边框粗细到properties
+                propertiesMap.put("borderWidth", node.getBorderWidth());
                 // 添加节点备注到properties
                 if (node.getRemark() != null && !node.getRemark().trim().isEmpty()) {
                     propertiesMap.put("remark", node.getRemark());

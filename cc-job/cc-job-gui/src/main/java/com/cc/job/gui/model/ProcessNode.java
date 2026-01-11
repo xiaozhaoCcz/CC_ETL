@@ -87,6 +87,9 @@ public class ProcessNode extends StackPane {
     // 颜色变更回调
     private Runnable onColorChanged; // 颜色变更时的回调,用于保存到数据库
     
+    // 样式设置回调
+    private Runnable onChangeStyle; // 样式设置回调
+    
     public interface DisableNodeCallback {
         void onDisableNode(Long jobId, boolean isDisabled);
     }
@@ -95,12 +98,35 @@ public class ProcessNode extends StackPane {
         void onNodeStateChange(ProcessNode node, GraphNodeState oldState, GraphNodeState newState);
     }
     
+    /**
+     * 边框样式枚举
+     */
+    public enum BorderStyle {
+        SOLID,   // 实线
+        DASHED,  // 虚线
+        DOTTED   // 点线
+    }
+    
     // 节点状态
     private boolean enabled = true;
     private String currentColor = "#8B5CF6"; // 默认紫色
     private String type = "Bean"; // 节点类型：Bean, API, SQL等
     private NodeStatus status = NodeStatus.IDLE; // 节点运行状态
     private GraphNodeState graphState = GraphNodeState.NORMAL; // 图节点状态（开始/终止/阻塞）
+    
+    // 节点样式属性
+    private double nodeWidth = NODE_WIDTH; // 节点宽度
+    private double nodeHeight = NODE_HEIGHT; // 节点高度
+    private BorderStyle borderStyle = BorderStyle.SOLID; // 边框样式
+    private double borderWidth = 2.0; // 边框粗细
+    
+    // 拖拽调整大小相关
+    private Circle resizeHandle; // 调整大小的控制点
+    private boolean isResizing = false; // 是否正在调整大小
+    private double resizeStartX; // 调整大小开始时的鼠标X坐标
+    private double resizeStartY; // 调整大小开始时的鼠标Y坐标
+    private double resizeStartWidth; // 调整大小开始时的节点宽度
+    private double resizeStartHeight; // 调整大小开始时的节点高度
     
     // UI元素引用
     private javafx.scene.shape.Rectangle background;
@@ -141,22 +167,25 @@ public class ProcessNode extends StackPane {
     }
     
     private void initializeUI() {
-        // 设置节点大小
-        this.setPrefSize(NODE_WIDTH, NODE_HEIGHT);
-        this.setMaxSize(NODE_WIDTH, NODE_HEIGHT);
-        this.setMinSize(NODE_WIDTH, NODE_HEIGHT);
+        // 设置节点大小（使用动态大小）
+        this.setPrefSize(nodeWidth, nodeHeight);
+        this.setMinSize(80, 40); // 最小尺寸限制
+        this.setMaxSize(800, 400); // 最大尺寸限制
         
         // 根据节点类型设置边框颜色
         updateBorderColorByType();
         
         // 创建背景
-        background = new javafx.scene.shape.Rectangle(NODE_WIDTH, NODE_HEIGHT);
+        background = new javafx.scene.shape.Rectangle(nodeWidth, nodeHeight);
         background.setFill(Color.WHITE);
         background.setStroke(Color.web(currentColor));
-        background.setStrokeWidth(2);
+        background.setStrokeWidth(borderWidth);
         background.setArcWidth(10);
         background.setArcHeight(10);
         background.setMouseTransparent(true); // 背景不拦截鼠标事件
+        
+        // 应用边框样式
+        applyBorderStyle();
         
         // 创建内容容器
         VBox contentBox = new VBox(5);
@@ -184,16 +213,16 @@ public class ProcessNode extends StackPane {
         // 任务处理器名称
         handlerLabel = new Label(jobHandlerName);
         handlerLabel.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #1F2937;");
-        handlerLabel.setMaxWidth(NODE_WIDTH - 20);
+        handlerLabel.setMaxWidth(nodeWidth - 20);
         
         contentBox.getChildren().addAll(typeContainer, handlerLabel);
         
         // 创建独立的连接点容器
         // 容器与节点大小相同，连接点将定位在边缘外部
         connectorPane = new Pane();
-        connectorPane.setPrefSize(NODE_WIDTH, NODE_HEIGHT);
-        connectorPane.setMaxSize(NODE_WIDTH, NODE_HEIGHT);
-        connectorPane.setMinSize(NODE_WIDTH, NODE_HEIGHT);
+        connectorPane.setPrefSize(nodeWidth, nodeHeight);
+        connectorPane.setMaxSize(nodeWidth, nodeHeight);
+        connectorPane.setMinSize(nodeWidth, nodeHeight);
         connectorPane.setMouseTransparent(false); // 连接点容器接收鼠标事件
         // 允许子元素超出容器边界显示
         connectorPane.setClip(null);
@@ -232,8 +261,8 @@ public class ProcessNode extends StackPane {
         tagsContainer = new HBox(4);
         tagsContainer.setAlignment(Pos.CENTER);
         tagsContainer.setLayoutX(0);
-        tagsContainer.setLayoutY(NODE_HEIGHT - 20);
-        tagsContainer.setPrefWidth(NODE_WIDTH);
+        tagsContainer.setLayoutY(nodeHeight - 20);
+        tagsContainer.setPrefWidth(nodeWidth);
         tagsContainer.setMouseTransparent(true);
         tagsContainer.setVisible(false);
         updateTagsDisplay();
@@ -246,10 +275,23 @@ public class ProcessNode extends StackPane {
         remarkIcon = new FontIcon(org.kordamp.ikonli.feather.Feather.FILE_TEXT);
         remarkIcon.setIconSize(12);
         remarkIcon.setIconColor(Color.web("#8B5CF6"));
-        remarkIcon.setLayoutX(NODE_WIDTH-20);
-        remarkIcon.setLayoutY(NODE_HEIGHT-10);
+        remarkIcon.setLayoutX(nodeWidth-20);
+        remarkIcon.setLayoutY(nodeHeight-10);
         remarkIconContainer.setVisible(false);
         remarkIconContainer.getChildren().add(remarkIcon);
+        
+        // 创建调整大小的控制点（右下角）
+        resizeHandle = new Circle(6);
+        resizeHandle.setFill(Color.web("#3B82F6"));
+        resizeHandle.setStroke(Color.WHITE);
+        resizeHandle.setStrokeWidth(1.5);
+        resizeHandle.setLayoutX(nodeWidth - 6);
+        resizeHandle.setLayoutY(nodeHeight - 6);
+        resizeHandle.setCursor(Cursor.SE_RESIZE);
+        resizeHandle.setVisible(false); // 默认隐藏，只在鼠标移动到中心区域时显示
+        
+        // 设置调整大小的鼠标事件
+        setupResizeHandlers();
         
         // 创建备注提示框
         remarkTooltip = new Tooltip();
@@ -267,14 +309,87 @@ public class ProcessNode extends StackPane {
             remarkTooltip.hide();
         });
         
-        // 按顺序添加：背景 -> 内容 -> 连接点容器 -> 状态图标容器 -> 标签容器 -> 备注图标容器
-        this.getChildren().addAll(background, contentBox, connectorPane, stateIconContainer, tagsContainer, remarkIconContainer);
+        // 按顺序添加：背景 -> 内容 -> 连接点容器 -> 状态图标容器 -> 标签容器 -> 备注图标容器 -> 调整大小控制点
+        this.getChildren().addAll(background, contentBox, connectorPane, stateIconContainer, tagsContainer, remarkIconContainer, resizeHandle);
         
         // 最后创建连接点并添加到独立容器中
         createConnectors();
         
         // 初始化状态图标
         updateStateIcon();
+    }
+    
+    /**
+     * 判断鼠标位置是否在节点中心区域附近
+     * @param mouseX 鼠标在节点内的X坐标（相对于节点）
+     * @param mouseY 鼠标在节点内的Y坐标（相对于节点）
+     * @return 是否在中心区域
+     */
+    private boolean isMouseInCenterArea(double mouseX, double mouseY) {
+        // 定义中心区域为节点中心50%的区域
+        double centerX = nodeWidth / 2;
+        double centerY = nodeHeight / 2;
+        double centerAreaWidth = nodeWidth * 0.5;
+        double centerAreaHeight = nodeHeight * 0.5;
+        
+        double leftBound = centerX - centerAreaWidth / 2;
+        double rightBound = centerX + centerAreaWidth / 2;
+        double topBound = centerY - centerAreaHeight / 2;
+        double bottomBound = centerY + centerAreaHeight / 2;
+        
+        return mouseX >= leftBound && mouseX <= rightBound &&
+               mouseY >= topBound && mouseY <= bottomBound;
+    }
+    
+    /**
+     * 设置调整大小的鼠标事件处理器
+     */
+    private void setupResizeHandlers() {
+        resizeHandle.setOnMousePressed(e -> {
+            if (e.isPrimaryButtonDown()) {
+                isResizing = true;
+                resizeStartX = e.getSceneX();
+                resizeStartY = e.getSceneY();
+                resizeStartWidth = nodeWidth;
+                resizeStartHeight = nodeHeight;
+                // 开始调整大小时，确保控制点可见
+                if (resizeHandle != null) {
+                    resizeHandle.setVisible(true);
+                }
+                e.consume();
+            }
+        });
+        
+        resizeHandle.setOnMouseDragged(e -> {
+            if (isResizing) {
+                double deltaX = e.getSceneX() - resizeStartX;
+                double deltaY = e.getSceneY() - resizeStartY;
+                
+                double newWidth = Math.max(80, Math.min(800, resizeStartWidth + deltaX));
+                double newHeight = Math.max(40, Math.min(400, resizeStartHeight + deltaY));
+                
+                setNodeSize(newWidth, newHeight);
+                // 调整大小过程中，保持控制点可见
+                if (resizeHandle != null) {
+                    resizeHandle.setVisible(true);
+                }
+                e.consume();
+            }
+        });
+        
+        resizeHandle.setOnMouseReleased(e -> {
+            if (isResizing) {
+                isResizing = false;
+                // 触发样式变更回调，用于保存到数据库
+                if (onColorChanged != null) {
+                    onColorChanged.run();
+                }
+                // 调整大小结束后，根据鼠标位置决定是否隐藏控制点
+                // 注意：此时鼠标可能已经不在节点内，所以不在这里处理显示/隐藏
+                // 由鼠标移动事件处理器来处理
+                e.consume();
+            }
+        });
     }
     
     private void createConnectors() {
@@ -288,20 +403,20 @@ public class ProcessNode extends StackPane {
         // 圆心放在节点边界上，这样连接线会紧贴节点，没有间隙
         
         // 顶部：水平居中，圆心在节点顶边
-        topConnector.setLayoutX(NODE_WIDTH / 2);
+        topConnector.setLayoutX(nodeWidth / 2);
         topConnector.setLayoutY(0);
         
         // 底部：水平居中，圆心在节点底边
-        bottomConnector.setLayoutX(NODE_WIDTH / 2);
-        bottomConnector.setLayoutY(NODE_HEIGHT);
+        bottomConnector.setLayoutX(nodeWidth / 2);
+        bottomConnector.setLayoutY(nodeHeight);
         
         // 左侧：圆心在节点左边，垂直居中
         leftConnector.setLayoutX(0);
-        leftConnector.setLayoutY(NODE_HEIGHT / 2);
+        leftConnector.setLayoutY(nodeHeight / 2);
         
         // 右侧：圆心在节点右边，垂直居中
-        rightConnector.setLayoutX(NODE_WIDTH);
-        rightConnector.setLayoutY(NODE_HEIGHT / 2);
+        rightConnector.setLayoutX(nodeWidth);
+        rightConnector.setLayoutY(nodeHeight / 2);
         
         // 添加到独立的连接点容器中
         connectorPane.getChildren().addAll(topConnector, bottomConnector, leftConnector, rightConnector);
@@ -369,6 +484,27 @@ public class ProcessNode extends StackPane {
             if (!e.isPrimaryButtonDown()) {
                 this.setCursor(Cursor.MOVE);
                 showConnectors(true);
+                
+                // 检查鼠标是否在中心区域，如果是则显示调整大小控制点
+                double mouseX = e.getX();
+                double mouseY = e.getY();
+                if (isMouseInCenterArea(mouseX, mouseY) && resizeHandle != null) {
+                    resizeHandle.setVisible(true);
+                }
+            }
+            e.consume();
+        });
+        
+        // 鼠标在节点内移动
+        this.setOnMouseMoved(e -> {
+            // 只有当鼠标不在按下状态时才更新控制点显示
+            if (!e.isPrimaryButtonDown() && !isResizing) {
+                double mouseX = e.getX();
+                double mouseY = e.getY();
+                if (resizeHandle != null) {
+                    // 根据鼠标位置动态显示/隐藏控制点
+                    resizeHandle.setVisible(isMouseInCenterArea(mouseX, mouseY));
+                }
             }
             e.consume();
         });
@@ -379,6 +515,11 @@ public class ProcessNode extends StackPane {
             if (!e.isPrimaryButtonDown()) {
                 this.setCursor(Cursor.DEFAULT);
                 showConnectors(false);
+                
+                // 隐藏调整大小控制点
+                if (resizeHandle != null && !isResizing) {
+                    resizeHandle.setVisible(false);
+                }
             }
             e.consume();
         });
@@ -539,25 +680,13 @@ public class ProcessNode extends StackPane {
         // 分隔符
         SeparatorMenuItem separator1 = new SeparatorMenuItem();
         
-        // 更改颜色
-        Menu colorMenu = new Menu("更改颜色");
-        
-        MenuItem purpleItem = new MenuItem("紫色 (默认)");
-        purpleItem.setOnAction(e -> changeNodeColor("#8B5CF6"));
-        
-        MenuItem blueItem = new MenuItem("蓝色");
-        blueItem.setOnAction(e -> changeNodeColor("#3B82F6"));
-        
-        MenuItem greenItem = new MenuItem("绿色");
-        greenItem.setOnAction(e -> changeNodeColor("#10B981"));
-        
-        MenuItem orangeItem = new MenuItem("橙色");
-        orangeItem.setOnAction(e -> changeNodeColor("#F59E0B"));
-        
-        MenuItem redItem = new MenuItem("红色");
-        redItem.setOnAction(e -> changeNodeColor("#EF4444"));
-        
-        colorMenu.getItems().addAll(purpleItem, blueItem, greenItem, orangeItem, redItem);
+        // 设置样式
+        MenuItem styleItem = new MenuItem("设置样式");
+        styleItem.setOnAction(e -> {
+            if (onChangeStyle != null) {
+                onChangeStyle.run();
+            }
+        });
         
         // 禁用/启用节点
         MenuItem toggleItem = new MenuItem("禁用节点");
@@ -627,7 +756,7 @@ public class ProcessNode extends StackPane {
             editTagsItem,
             editRemarkItem,
             separator1,
-            colorMenu,
+            styleItem,
             //toggleItem,
             separatorState,
             stateMenu,
@@ -946,6 +1075,8 @@ public class ProcessNode extends StackPane {
                 // 只改变边框颜色为绿色，表示开始节点
                 background.setStroke(Color.web("#10B981")); // 绿色边框
                 background.setStrokeWidth(3); // 加粗边框
+                // 特殊状态使用实线边框
+                background.getStrokeDashArray().clear();
                 // 更新连接点颜色为绿色
                 if (topConnector != null) {
                     topConnector.setFill(Color.web("#10B981"));
@@ -966,6 +1097,8 @@ public class ProcessNode extends StackPane {
                 // 只改变边框颜色为红色，表示终止节点
                 background.setStroke(Color.web("#EF4444")); // 红色边框
                 background.setStrokeWidth(3); // 加粗边框
+                // 特殊状态使用实线边框
+                background.getStrokeDashArray().clear();
                 // 更新连接点颜色为红色
                 if (topConnector != null) {
                     topConnector.setFill(Color.web("#EF4444"));
@@ -979,6 +1112,8 @@ public class ProcessNode extends StackPane {
                 background.setFill(Color.web("#D1D5DB")); // 更深的灰色背景，与画布背景 #F3F4F6 区分明显
                 background.setStroke(Color.web("#9CA3AF")); // 灰色边框，增强视觉效果
                 background.setStrokeWidth(2.5); // 稍微加粗边框
+                // 特殊状态使用实线边框
+                background.getStrokeDashArray().clear();
                 // 更新连接点颜色为灰色，表示阻塞状态
                 if (topConnector != null) {
                     topConnector.setFill(Color.web("#9CA3AF"));
@@ -998,7 +1133,9 @@ public class ProcessNode extends StackPane {
                     // 否则使用类型颜色
                     background.setStroke(Color.web(currentColor));
                     background.setFill(Color.WHITE);
-                    background.setStrokeWidth(2);
+                    background.setStrokeWidth(borderWidth);
+                    // 应用边框样式
+                    applyBorderStyle();
                     // 更新连接点颜色
                     if (topConnector != null) {
                         topConnector.setFill(Color.web(currentColor));
@@ -1253,6 +1390,159 @@ public class ProcessNode extends StackPane {
     }
     
     /**
+     * 设置节点大小
+     * @param width 宽度
+     * @param height 高度
+     */
+    public void setNodeSize(double width, double height) {
+        // 限制范围
+        width = Math.max(80, Math.min(800, width));
+        height = Math.max(40, Math.min(400, height));
+        
+        this.nodeWidth = width;
+        this.nodeHeight = height;
+        
+        // 更新节点大小
+        this.setPrefSize(width, height);
+        
+        // 更新背景矩形大小
+        if (background != null) {
+            background.setWidth(width);
+            background.setHeight(height);
+        }
+        
+        // 更新连接点容器大小
+        if (connectorPane != null) {
+            connectorPane.setPrefSize(width, height);
+            connectorPane.setMaxSize(width, height);
+            connectorPane.setMinSize(width, height);
+        }
+        
+        // 更新连接点位置
+        if (topConnector != null) {
+            topConnector.setLayoutX(width / 2);
+            topConnector.setLayoutY(0);
+            bottomConnector.setLayoutX(width / 2);
+            bottomConnector.setLayoutY(height);
+            leftConnector.setLayoutX(0);
+            leftConnector.setLayoutY(height / 2);
+            rightConnector.setLayoutX(width);
+            rightConnector.setLayoutY(height / 2);
+        }
+        
+        // 更新标签容器位置和大小
+        if (tagsContainer != null) {
+            tagsContainer.setLayoutY(height - 20);
+            tagsContainer.setPrefWidth(width);
+        }
+        
+        // 更新备注图标位置
+        if (remarkIcon != null) {
+            remarkIcon.setLayoutX(width - 20);
+            remarkIcon.setLayoutY(height - 10);
+        }
+        
+        // 更新调整大小控制点位置
+        if (resizeHandle != null) {
+            resizeHandle.setLayoutX(width - 6);
+            resizeHandle.setLayoutY(height - 6);
+        }
+        
+        // 更新处理器名称标签最大宽度
+        if (handlerLabel != null) {
+            handlerLabel.setMaxWidth(width - 20);
+        }
+    }
+    
+    /**
+     * 获取节点宽度
+     */
+    public double getNodeWidth() {
+        return nodeWidth;
+    }
+    
+    /**
+     * 获取节点高度
+     */
+    public double getNodeHeight() {
+        return nodeHeight;
+    }
+    
+    /**
+     * 设置边框样式
+     * @param style 边框样式
+     */
+    public void setBorderStyle(BorderStyle style) {
+        this.borderStyle = style;
+        applyBorderStyle();
+        
+        // 触发样式变更回调
+        if (onColorChanged != null) {
+            onColorChanged.run();
+        }
+    }
+    
+    /**
+     * 获取边框样式
+     */
+    public BorderStyle getBorderStyle() {
+        return borderStyle;
+    }
+    
+    /**
+     * 设置边框粗细
+     * @param width 边框粗细
+     */
+    public void setBorderWidth(double width) {
+        this.borderWidth = Math.max(1, Math.min(10, width));
+        if (background != null) {
+            background.setStrokeWidth(this.borderWidth);
+        }
+        
+        // 触发样式变更回调
+        if (onColorChanged != null) {
+            onColorChanged.run();
+        }
+    }
+    
+    /**
+     * 获取边框粗细
+     */
+    public double getBorderWidth() {
+        return borderWidth;
+    }
+    
+    /**
+     * 应用边框样式
+     */
+    private void applyBorderStyle() {
+        if (background == null) return;
+        
+        background.getStrokeDashArray().clear();
+        switch (borderStyle) {
+            case SOLID:
+                // 实线：不设置虚线数组
+                break;
+            case DASHED:
+                // 虚线
+                background.getStrokeDashArray().addAll(10.0, 5.0);
+                break;
+            case DOTTED:
+                // 点线
+                background.getStrokeDashArray().addAll(3.0, 3.0);
+                break;
+        }
+    }
+    
+    /**
+     * 设置样式变更回调
+     * @param callback 回调函数
+     */
+    public void setOnChangeStyle(Runnable callback) {
+        this.onChangeStyle = callback;
+    }
+    
+    /**
      * 根据状态更新背景填充颜色
      * @param newStatus 新的状态
      */
@@ -1412,7 +1702,9 @@ public class ProcessNode extends StackPane {
             // 这样可以在运行状态下也能区分节点类型（Bean、Java、API等）
             if (background != null) {
                 background.setStroke(Color.web(currentColor));
-                background.setStrokeWidth(2);
+                background.setStrokeWidth(borderWidth);
+                // 重新应用边框样式
+                applyBorderStyle();
             }
             
             // 连接点颜色也保持节点类型颜色
