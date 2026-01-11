@@ -66,13 +66,14 @@ public class NodeCallbackConfigurator {
         });
         
         // 复制回调 - 动态获取 jobId
+        // 右键菜单复制：直接创建新节点（复制+粘贴一步完成）
         node.setOnCopy(() -> {
             Long jobId = node.getJobId();
             if (jobId == null) {
                 Platform.runLater(() -> logPanel.warn("⚠ 该节点未绑定后端任务，无法复制"));
                 return;
             }
-            nodeOperationManager.copyNodeToClipboard(node, currentTaskGroupId);
+            nodeOperationManager.duplicateNode(node, currentTaskGroupId);
         });
         
         // 查看详情回调 - 动态获取 jobId

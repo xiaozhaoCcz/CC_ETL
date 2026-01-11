@@ -33,6 +33,10 @@ public class NodeOperationManager {
     private JobInfoForm copiedNodeForm = null;
     private CopiedNodesData copiedNodesData = null;
     
+    // 保存复制时的原节点位置（用于计算粘贴位置）
+    private Double copiedNodeX = null;
+    private Double copiedNodeY = null;
+    
     // 节点回调配置器（用于配置编辑、复制等业务逻辑回调）
     private NodeCallbackConfigurator nodeCallbackConfigurator;
     
@@ -50,6 +54,65 @@ public class NodeOperationManager {
      */
     public void setNodeCallbackConfigurator(NodeCallbackConfigurator configurator) {
         this.nodeCallbackConfigurator = configurator;
+    }
+    
+    /**
+     * 直接复制并创建新节点（右键菜单使用）- 复制+粘贴一步完成
+     */
+    public void duplicateNode(ProcessNode sourceNode, Long currentTaskGroupId) {
+        if (sourceNode == null || sourceNode.getJobId() == null) {
+            Platform.runLater(() -> logPanel.warn("⚠ 节点无效或未绑定任务，无法复制"));
+            return;
+        }
+        
+        if (currentTaskGroupId == null) {
+            Platform.runLater(() -> logPanel.warn("⚠ 当前任务组ID无效，无法复制节点"));
+            return;
+        }
+        
+        Platform.runLater(() -> logPanel.info("📋 正在复制节点: " + sourceNode.getJobHandlerName()));
+        
+        new Thread(() -> {
+            try {
+                JobInfoForm originalForm = jobInfoService.getJobNodeFormData(sourceNode.getJobId());
+                if (originalForm == null) {
+                    Platform.runLater(() -> logPanel.error("✗ 获取节点数据失败"));
+                    return;
+                }
+                
+                // 创建新节点表单
+                JobInfoForm duplicateForm = deepCopyJobInfoForm(originalForm);
+                duplicateForm.setId(null);
+                duplicateForm.setParentId(currentTaskGroupId);
+                duplicateForm.setJobDesc(generateCopyName(originalForm.getJobDesc()));
+                
+                // 基于原节点位置计算新位置（偏移80像素）
+                double originalX = sourceNode.getLayoutX();
+                double originalY = sourceNode.getLayoutY();
+                double[] newPosition = calculateDuplicatePosition(originalX, originalY);
+                duplicateForm.setNodePositionX(newPosition[0]);
+                duplicateForm.setNodePositionY(newPosition[1]);
+                duplicateForm.setGlueUpdateTime(null);
+                
+                // 保存新节点
+                JobNode newJobNode = jobInfoService.saveJobNode(duplicateForm);
+                if (newJobNode != null) {
+                    Platform.runLater(() -> {
+                        ProcessNode newNode = addNodeToCanvas(newJobNode, duplicateForm);
+                        if (newNode != null) {
+                            // 选中新创建的节点
+                            canvas.selectNodes(Collections.singleton(newNode));
+                            // 定位到新节点
+                            canvas.locateNode(newNode);
+                            logPanel.success("✓ 节点复制成功");
+                        }
+                    });
+                }
+            } catch (Exception e) {
+                Platform.runLater(() -> logPanel.error("✗ 复制失败: " + e.getMessage()));
+                logger.error("复制节点失败", e);
+            }
+        }).start();
     }
     
     /**
@@ -79,6 +142,10 @@ public class NodeOperationManager {
                 // 只保存到剪贴板，不创建节点
                 copiedNodeForm = deepCopyJobInfoForm(originalForm);
                 copiedNodesData = null; // 清空多个节点的数据
+                
+                // 保存原节点位置，用于计算粘贴位置
+                copiedNodeX = sourceNode.getLayoutX();
+                copiedNodeY = sourceNode.getLayoutY();
                 
                 Platform.runLater(() -> {
                     logPanel.success("✓ 节点已复制到剪贴板，按 Ctrl+V 粘贴");
@@ -344,8 +411,88 @@ public class NodeOperationManager {
         return node;
     }
     
+    /**
+     * 计算粘贴位置 - 基于原节点位置计算偏移量
+     */
     private double[] calculatePastePosition() {
+        // 如果有保存的原节点位置，基于该位置计算偏移
+        if (copiedNodeX != null && copiedNodeY != null) {
+            return calculateDuplicatePosition(copiedNodeX, copiedNodeY);
+        }
+        
+        // 如果没有原节点位置信息，使用默认位置
         return new double[]{300, 200};
+    }
+    
+    /**
+     * 计算复制节点的新位置 - 基于原节点位置偏移
+     * @param originalX 原节点X坐标
+     * @param originalY 原节点Y坐标
+     * @return 新节点的位置 [x, y]
+     */
+    private double[] calculateDuplicatePosition(double originalX, double originalY) {
+        // 偏移量：向右下角偏移80像素
+        double offsetX = 80.0;
+        double offsetY = 80.0;
+        
+        double newX = originalX + offsetX;
+        double newY = originalY + offsetY;
+        
+        // 确保新节点位置在画布可视区域内
+        // 获取画布的可视区域（如果有ScrollPane）
+        if (canvas.getScene() != null && canvas.getScene().getWindow() != null) {
+            javafx.scene.control.ScrollPane scrollPane = findScrollPane(canvas);
+            if (scrollPane != null) {
+                javafx.geometry.Bounds viewportBounds = scrollPane.getViewportBounds();
+                double viewportWidth = viewportBounds.getWidth();
+                double viewportHeight = viewportBounds.getHeight();
+                
+                // 获取当前可视区域的左上角坐标
+                double canvasWidth = canvas.getPrefWidth();
+                double canvasHeight = canvas.getPrefHeight();
+                double scrollableWidth = Math.max(0, canvasWidth - viewportWidth);
+                double scrollableHeight = Math.max(0, canvasHeight - viewportHeight);
+                
+                double viewportLeft = scrollableWidth > 0 ? scrollPane.getHvalue() * scrollableWidth : 0;
+                double viewportTop = scrollableHeight > 0 ? scrollPane.getVvalue() * scrollableHeight : 0;
+                double viewportRight = viewportLeft + viewportWidth;
+                double viewportBottom = viewportTop + viewportHeight;
+                
+                // 估算节点大小（假设节点宽度约200，高度约100）
+                double estimatedNodeWidth = 200.0;
+                double estimatedNodeHeight = 100.0;
+                
+                // 如果新节点会超出可视区域右边界，调整到可视区域内
+                if (newX + estimatedNodeWidth > viewportRight) {
+                    newX = Math.max(viewportLeft + 20, viewportRight - estimatedNodeWidth - 20);
+                }
+                
+                // 如果新节点会超出可视区域下边界，调整到可视区域内
+                if (newY + estimatedNodeHeight > viewportBottom) {
+                    newY = Math.max(viewportTop + 20, viewportBottom - estimatedNodeHeight - 20);
+                }
+                
+                // 确保新节点位置在画布范围内
+                newX = Math.max(20, Math.min(newX, canvasWidth - estimatedNodeWidth - 20));
+                newY = Math.max(20, Math.min(newY, canvasHeight - estimatedNodeHeight - 20));
+            }
+        }
+        
+        return new double[]{newX, newY};
+    }
+    
+    /**
+     * 查找包含画布的ScrollPane
+     */
+    private javafx.scene.control.ScrollPane findScrollPane(javafx.scene.Node node) {
+        javafx.scene.Node parent = node.getParent();
+        while (parent != null) {
+            if (parent instanceof javafx.scene.control.ScrollPane) {
+                return (javafx.scene.control.ScrollPane) parent;
+            }
+            parent = parent.getParent();
+        }
+        return null;
     }
     
     private double[] calculateNewNodePosition() {

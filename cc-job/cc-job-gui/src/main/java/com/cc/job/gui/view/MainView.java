@@ -47,7 +47,7 @@ public class MainView extends BorderPane {
     private ScrollPane scrollPane;
     
     // 布局容器
-    private VBox leftArea;
+    private SplitPane leftArea;
     private HBox leftContainer;
     private SplitPane horizontalSplit;
     private SplitPane verticalSplit;
@@ -102,14 +102,14 @@ public class MainView extends BorderPane {
         collapsedSidebar = new CollapsedSidebar();
 
         // 左侧区域：树形导航 + 小地图
-        leftArea = new VBox(8);
+        leftArea = new SplitPane();
+        leftArea.setOrientation(Orientation.VERTICAL);
         leftArea.setStyle("-fx-background-color: transparent;");
         
         treeView = new TaskTreeView();
-        VBox.setVgrow(treeView, Priority.ALWAYS);
-        
         miniMap = new MiniMapView();
-        leftArea.getChildren().addAll(treeView, miniMap);
+        leftArea.getItems().addAll(treeView, miniMap);
+        leftArea.setDividerPositions(0.7); // 树形菜单占70%，小地图占30%
 
         // 左侧容器
         leftContainer = new HBox(0);
@@ -1711,6 +1711,21 @@ public class MainView extends BorderPane {
                 }
             }
             
+            // 处理左侧区域的分隔线位置
+            if (treeViewVisible && miniMapVisible) {
+                // 两个都可见，恢复默认位置
+                double[] currentPositions = leftArea.getDividerPositions();
+                if (currentPositions.length == 0 || currentPositions[0] <= 0.0 || currentPositions[0] >= 1.0) {
+                    leftArea.setDividerPositions(0.7);
+                }
+            } else if (!treeViewVisible && miniMapVisible) {
+                // 只有小地图可见，分隔线移到顶部（小地图占满）
+                leftArea.setDividerPositions(0.0);
+            } else if (treeViewVisible && !miniMapVisible) {
+                // 只有树形菜单可见，分隔线移到底部（树形菜单占满）
+                leftArea.setDividerPositions(1.0);
+            }
+            
             if (!logPanelVisible) {
                 verticalSplit.setDividerPositions(1.0);
             } else {
@@ -1800,17 +1815,26 @@ public class MainView extends BorderPane {
             }
             
             // 将面板添加回原容器
-            if (panel instanceof TaskTreeView) {
-                if (!leftArea.getChildren().contains(panel)) {
-                    leftArea.getChildren().add(0, panel);
-                }
-            } else if (panel instanceof MiniMapView) {
-                if (!leftArea.getChildren().contains(panel)) {
-                    leftArea.getChildren().add(panel);
-                }
+            // 注意：即使面板已经在 leftArea 中，我们也需要先移除再添加
+            // 因为面板的父节点可能还是弹出窗口的容器，而不是 leftArea
+            boolean wasInContainer = leftArea.getItems().contains(panel);
+            if (wasInContainer) {
+                leftArea.getItems().remove(panel);
             }
             
-            // 执行回调
+            // 先恢复状态标志，避免面板的 onClose 回调干扰
+            if (panel instanceof TaskTreeView) {
+                treeViewVisible = true;
+                leftArea.getItems().add(0, treeView);
+            } else if (panel instanceof MiniMapView) {
+                miniMapVisible = true;
+                leftArea.getItems().add(miniMap);
+            }
+            
+            // 立即更新侧边栏，确保状态正确恢复
+            updateLeftSidebar();
+            
+            // 执行回调（回调中也会调用 updateLeftSidebar，但这是安全的，因为状态已经正确）
             if (onWindowClosed != null) {
                 onWindowClosed.run();
             }
@@ -1921,6 +1945,22 @@ public class MainView extends BorderPane {
                 if (currentPositions.length > 0 && currentPositions[0] == 0.0) {
                     horizontalSplit.setDividerPositions(0.2);
                 }
+            }
+            
+            // 调整左侧区域的分隔线位置，使剩余面板占据全部空间
+            if (treeViewVisible && miniMapVisible) {
+                // 两个都可见，保持当前分隔线位置（不强制改变）
+                // 如果分隔线位置异常，才恢复默认位置
+                double[] currentPositions = leftArea.getDividerPositions();
+                if (currentPositions.length == 0 || currentPositions[0] <= 0.0 || currentPositions[0] >= 1.0) {
+                    leftArea.setDividerPositions(0.7);
+                }
+            } else if (!treeViewVisible && miniMapVisible) {
+                // 只有小地图可见，分隔线移到顶部（小地图占满）
+                leftArea.setDividerPositions(0.0);
+            } else if (treeViewVisible && !miniMapVisible) {
+                // 只有树形菜单可见，分隔线移到底部（树形菜单占满）
+                leftArea.setDividerPositions(1.0);
             }
             
             // 调整垂直分割面板

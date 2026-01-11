@@ -64,11 +64,9 @@ public class MiniMapView extends VBox {
     }
     
     private void initializeUI() {
-        // 设置样式：顶部边框作为分割线，左边距为0确保分割线从最左边开始
+        // 设置样式：SplitPane 会提供分隔线，移除顶部边框
         setStyle(
             "-fx-background-color: transparent; " +
-            "-fx-border-color: rgba(148,163,184,0.3) transparent transparent transparent; " +
-            "-fx-border-width: 1 0 0 0; " +
             "-fx-padding: 12 12 0 8;"
         );
         setSpacing(12);
