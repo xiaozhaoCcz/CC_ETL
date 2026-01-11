@@ -34,11 +34,14 @@ public class LogContentManager {
     private String lastSearchKeyword = "";
     public boolean autoScrollToBottom = true;
     
+    // 用户滚动标志，用于防止滚动时自动跳到底部
+    private boolean isUserScrolling = false;
+    private Timeline scrollEndTimeline;
+    
     // 过滤相关字段
     private Set<String> enabledLevels = new HashSet<>(Arrays.asList("ALL", "INFO", "WARN", "ERROR", "DEBUG", "SUCCESS", "TEXT"));
     private boolean regexEnabled = false;
     private boolean caseSensitive = false;
-    private boolean pauseUpdates = false;
     
     // 性能优化：最大显示日志条数
     private static final int MAX_DISPLAY_ENTRIES = 50000;
@@ -95,22 +98,29 @@ public class LogContentManager {
     
     private void setupScrollListeners() {
         Runnable checkScrollPosition = () -> {
-            Platform.runLater(() -> {
-                try {
-                    ScrollBar vScrollBar = findVerticalScrollBar();
-                    if (vScrollBar != null) {
-                        double max = vScrollBar.getMax();
-                        double value = vScrollBar.getValue();
-                        double visibleAmount = vScrollBar.getVisibleAmount();
-                        
-                        if (value >= max - visibleAmount - 1.0) {
-                            autoScrollToBottom = true;
-                        } else {
-                            autoScrollToBottom = false;
-                        }
-                    }
-                } catch (Exception ignored) {}
-            });
+            // 立即标记用户正在滚动
+            isUserScrolling = true;
+            
+            // 取消之前的延迟重置时间线
+            if (scrollEndTimeline != null) {
+                scrollEndTimeline.stop();
+            }
+            
+            // 同步检查滚动位置（滚动事件应该在 JavaFX 应用线程上）
+            if (Platform.isFxApplicationThread()) {
+                checkScrollPositionSync();
+            } else {
+                Platform.runLater(this::checkScrollPositionSync);
+            }
+            
+            // 延迟重置用户滚动标志，避免滚动动画期间的误判
+            scrollEndTimeline = new Timeline(
+                new KeyFrame(
+                    Duration.millis(150),
+                    e -> isUserScrolling = false
+                )
+            );
+            scrollEndTimeline.play();
         };
         
         codeArea.setOnScroll(event -> checkScrollPosition.run());
@@ -122,6 +132,16 @@ public class LogContentManager {
                 checkScrollPosition.run();
             }
         });
+    }
+    
+    /**
+     * 同步检查滚动位置（不修改 autoScrollToBottom 标志）
+     * autoScrollToBottom 标志应该只由用户通过按钮控制
+     */
+    private void checkScrollPositionSync() {
+        // 此方法保留用于将来可能的扩展，但目前不需要修改 autoScrollToBottom
+        // autoScrollToBottom 标志应该完全由用户通过按钮控制
+        // 滚动位置检查只用于判断用户是否在底部，但不应该修改自动滚动标志
     }
     
     private ScrollBar findVerticalScrollBar() {
@@ -138,7 +158,8 @@ public class LogContentManager {
     
     private void setupTextChangeListener() {
         codeArea.textProperty().addListener((obs, oldText, newText) -> {
-            if (autoScrollToBottom && newText != null && !newText.equals(oldText)) {
+            // 只有当自动滚动启用且用户不在滚动时才自动滚动到底部
+            if (autoScrollToBottom && !isUserScrolling && newText != null && !newText.equals(oldText)) {
                 Platform.runLater(() -> {
                     Timeline scrollTimeline = new Timeline(
                         new KeyFrame(
@@ -182,6 +203,11 @@ public class LogContentManager {
         lastSearchKeyword = "";
         codeArea.clear();
         autoScrollToBottom = true;
+        isUserScrolling = false;
+        if (scrollEndTimeline != null) {
+            scrollEndTimeline.stop();
+            scrollEndTimeline = null;
+        }
     }
     
     public void renderIncremental(String keyword) {
@@ -375,14 +401,6 @@ public class LogContentManager {
     
     public void setCaseSensitive(boolean sensitive) {
         this.caseSensitive = sensitive;
-    }
-    
-    public void setPauseUpdates(boolean pause) {
-        this.pauseUpdates = pause;
-    }
-    
-    public boolean isPauseUpdates() {
-        return pauseUpdates;
     }
     
     /**

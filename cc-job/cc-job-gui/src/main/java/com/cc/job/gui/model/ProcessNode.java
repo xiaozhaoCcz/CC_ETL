@@ -109,6 +109,16 @@ public class ProcessNode extends StackPane {
     private javafx.scene.shape.Circle iconBackground; // 状态图标背景圆圈
     private Timeline locateAnimation;
     
+    // 标签相关
+    private HBox tagsContainer; // 标签容器（显示在节点底部）
+    private boolean tagsVisible = false; // 标签是否可见
+    private java.util.List<String> tags = new java.util.ArrayList<>(); // 节点标签列表
+    
+    // 备注相关
+    private String remark = ""; // 节点备注
+    private javafx.scene.control.Tooltip remarkTooltip; // 备注提示框
+    private FontIcon remarkIcon; // 备注图标（显示在节点右上角）
+    
     private static final double NODE_WIDTH = 180;
     private static final double NODE_HEIGHT = 80;
     
@@ -215,8 +225,49 @@ public class ProcessNode extends StackPane {
         
         stateIconContainer.getChildren().addAll(iconBackground, stateIcon);
         
-        // 按顺序添加：背景 -> 内容 -> 连接点容器 -> 状态图标容器
-        this.getChildren().addAll(background, contentBox, connectorPane, stateIconContainer);
+        // 创建标签容器（显示在节点底部）
+        tagsContainer = new HBox(4);
+        tagsContainer.setAlignment(Pos.CENTER);
+        tagsContainer.setLayoutX(0);
+        tagsContainer.setLayoutY(NODE_HEIGHT - 20);
+        tagsContainer.setPrefWidth(NODE_WIDTH);
+        tagsContainer.setMouseTransparent(true);
+        tagsContainer.setVisible(false);
+        updateTagsDisplay();
+        
+        // 创建备注图标容器（右上角）
+        Pane remarkIconContainer = new Pane();
+        remarkIconContainer.setPrefSize(20, 20);
+        remarkIconContainer.setLayoutX(NODE_WIDTH - 24);
+        remarkIconContainer.setLayoutY(6);
+        remarkIconContainer.setMouseTransparent(true);
+        
+        remarkIcon = new FontIcon(org.kordamp.ikonli.feather.Feather.INFO);
+        remarkIcon.setIconSize(14);
+        remarkIcon.setIconColor(javafx.scene.paint.Color.web("#6366F1"));
+        remarkIcon.setLayoutX(3);
+        remarkIcon.setLayoutY(3);
+        remarkIconContainer.setVisible(false);
+        remarkIconContainer.getChildren().add(remarkIcon);
+        
+        // 创建备注提示框
+        remarkTooltip = new javafx.scene.control.Tooltip();
+        remarkTooltip.setWrapText(true);
+        remarkTooltip.setMaxWidth(300);
+        
+        // 设置鼠标悬停时显示备注
+        this.setOnMouseEntered(e -> {
+            if (remark != null && !remark.trim().isEmpty()) {
+                remarkTooltip.setText(remark);
+                remarkTooltip.show(this, e.getScreenX(), e.getScreenY() + 10);
+            }
+        });
+        this.setOnMouseExited(e -> {
+            remarkTooltip.hide();
+        });
+        
+        // 按顺序添加：背景 -> 内容 -> 连接点容器 -> 状态图标容器 -> 标签容器 -> 备注图标容器
+        this.getChildren().addAll(background, contentBox, connectorPane, stateIconContainer, tagsContainer, remarkIconContainer);
         
         // 最后创建连接点并添加到独立容器中
         createConnectors();
@@ -1392,6 +1443,134 @@ public class ProcessNode extends StackPane {
             default:
                 updateStatus(NodeStatus.IDLE);
                 break;
+        }
+    }
+    
+    // ==================== 标签相关方法 ====================
+    
+    /**
+     * 设置节点标签
+     */
+    public void setTags(java.util.List<String> newTags) {
+        if (newTags == null) {
+            tags.clear();
+        } else {
+            tags = new java.util.ArrayList<>(newTags);
+        }
+        updateTagsDisplay();
+    }
+    
+    /**
+     * 获取节点标签
+     */
+    public java.util.List<String> getTags() {
+        return new java.util.ArrayList<>(tags);
+    }
+    
+    /**
+     * 添加标签
+     */
+    public void addTag(String tag) {
+        if (tag != null && !tag.trim().isEmpty() && !tags.contains(tag)) {
+            tags.add(tag);
+            updateTagsDisplay();
+        }
+    }
+    
+    /**
+     * 移除标签
+     */
+    public void removeTag(String tag) {
+        tags.remove(tag);
+        updateTagsDisplay();
+    }
+    
+    /**
+     * 更新标签显示
+     */
+    private void updateTagsDisplay() {
+        if (tagsContainer == null) return;
+        
+        tagsContainer.getChildren().clear();
+        
+        if (tags.isEmpty()) {
+            tagsContainer.setVisible(false);
+            return;
+        }
+        
+        // 只显示前3个标签，避免节点过于拥挤
+        int maxTags = 3;
+        for (int i = 0; i < Math.min(tags.size(), maxTags); i++) {
+            String tag = tags.get(i);
+            Label tagLabel = new Label(tag);
+            tagLabel.setStyle(
+                "-fx-font-size: 10; " +
+                "-fx-font-weight: 500; " +
+                "-fx-text-fill: #6366F1; " +
+                "-fx-background-color: #EEF2FF; " +
+                "-fx-background-radius: 8; " +
+                "-fx-padding: 2 6 2 6;"
+            );
+            tagsContainer.getChildren().add(tagLabel);
+        }
+        
+        // 如果有更多标签，显示省略号
+        if (tags.size() > maxTags) {
+            Label moreLabel = new Label("...");
+            moreLabel.setStyle(
+                "-fx-font-size: 10; " +
+                "-fx-text-fill: #9CA3AF;"
+            );
+            tagsContainer.getChildren().add(moreLabel);
+        }
+        
+        tagsContainer.setVisible(tagsVisible && !tags.isEmpty());
+    }
+    
+    /**
+     * 设置标签可见性
+     */
+    public void setTagsVisible(boolean visible) {
+        tagsVisible = visible;
+        if (tagsContainer != null) {
+            tagsContainer.setVisible(visible && !tags.isEmpty());
+        }
+    }
+    
+    /**
+     * 获取标签可见性
+     */
+    public boolean isTagsVisible() {
+        return tagsVisible;
+    }
+    
+    // ==================== 备注相关方法 ====================
+    
+    /**
+     * 设置节点备注
+     */
+    public void setRemark(String newRemark) {
+        remark = newRemark != null ? newRemark : "";
+        updateRemarkDisplay();
+    }
+    
+    /**
+     * 获取节点备注
+     */
+    public String getRemark() {
+        return remark;
+    }
+    
+    /**
+     * 更新备注显示
+     */
+    private void updateRemarkDisplay() {
+        if (remarkIcon != null) {
+            // 如果有备注，显示备注图标
+            Pane remarkContainer = (Pane) remarkIcon.getParent();
+            if (remarkContainer != null) {
+                remarkContainer.setVisible(remark != null && !remark.trim().isEmpty());
+            }
         }
     }
 }

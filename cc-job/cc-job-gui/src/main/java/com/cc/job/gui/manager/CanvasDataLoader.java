@@ -77,6 +77,42 @@ public class CanvasDataLoader {
                     node.setNodeColor(color);
                 }
             }
+            
+            // 从properties读取标签
+            Object tagsObj = nodeData.getProperties().get("tags");
+            if (tagsObj != null) {
+                java.util.List<String> tags = new java.util.ArrayList<>();
+                if (tagsObj instanceof java.util.List) {
+                    for (Object tag : (java.util.List<?>) tagsObj) {
+                        if (tag != null) {
+                            tags.add(tag.toString());
+                        }
+                    }
+                } else if (tagsObj instanceof String) {
+                    // 尝试解析JSON数组字符串
+                    try {
+                        com.google.gson.Gson gson = new com.google.gson.Gson();
+                        java.util.List<?> tagList = gson.fromJson((String) tagsObj, java.util.List.class);
+                        for (Object tag : tagList) {
+                            if (tag != null) {
+                                tags.add(tag.toString());
+                            }
+                        }
+                    } catch (Exception e) {
+                        // 解析失败，忽略
+                    }
+                }
+                node.setTags(tags);
+            }
+            
+            // 从properties读取备注
+            Object remarkObj = nodeData.getProperties().get("remark");
+            if (remarkObj != null) {
+                String remark = remarkObj.toString();
+                if (remark != null && !remark.trim().isEmpty()) {
+                    node.setRemark(remark);
+                }
+            }
         }
         
         return node;

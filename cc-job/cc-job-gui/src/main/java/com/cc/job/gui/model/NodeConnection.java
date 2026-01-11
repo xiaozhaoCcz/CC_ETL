@@ -42,6 +42,11 @@ public class NodeConnection extends Group {
     private boolean isRunning = false; // 是否处于运行状态
     private Timeline locateAnimation;
     
+    // 连线标签相关
+    private javafx.scene.control.Label edgeLabel; // 连线标签
+    private String labelText = ""; // 标签文本
+    private boolean labelVisible = false; // 标签是否可见
+    
     /**
      * 创建连接（指定具体的连接点）
      */
@@ -116,10 +121,26 @@ public class NodeConnection extends Group {
         arrowHead.setStroke(Color.web("#374151"));
         arrowHead.setStrokeWidth(1);
         
-        this.getChildren().addAll(curve, arrowHead);
+        // 创建连线标签（默认隐藏）
+        edgeLabel = new javafx.scene.control.Label();
+        edgeLabel.setStyle(
+            "-fx-font-size: 11; " +
+            "-fx-font-weight: 500; " +
+            "-fx-text-fill: #6366F1; " +
+            "-fx-background-color: rgba(255, 255, 255, 0.9); " +
+            "-fx-background-radius: 4; " +
+            "-fx-padding: 2 6 2 6;"
+        );
+        edgeLabel.setVisible(false);
+        edgeLabel.setMouseTransparent(true);
+        
+        this.getChildren().addAll(curve, arrowHead, edgeLabel);
         
         // 鼠标悬停效果
         setupHoverEffect();
+        
+        // 绑定标签位置到连线中点
+        bindLabelPosition();
     }
     
     private void bindConnection() {
@@ -435,4 +456,94 @@ public class NodeConnection extends Group {
     // 新增：通用拥有者与父层访问器（用于前端保存时识别连接两端）
     public Node getSourceOwner() { return sourceOwner; }
     public Node getTargetOwner() { return targetOwner; }
+    
+    // ==================== 连线标签相关方法 ====================
+    
+    /**
+     * 绑定标签位置到连线中点
+     */
+    private void bindLabelPosition() {
+        if (edgeLabel == null) return;
+        
+        // 计算连线中点位置
+        javafx.beans.binding.DoubleBinding midX = new javafx.beans.binding.DoubleBinding() {
+            {
+                super.bind(curve.startXProperty(), curve.endXProperty(), 
+                          curve.controlX1Property(), curve.controlY1Property(),
+                          curve.controlX2Property(), curve.controlY2Property());
+            }
+            @Override
+            protected double computeValue() {
+                // 计算贝塞尔曲线中点（使用t=0.5）
+                double t = 0.5;
+                double x = Math.pow(1-t, 3) * curve.getStartX() +
+                          3 * Math.pow(1-t, 2) * t * curve.getControlX1() +
+                          3 * (1-t) * Math.pow(t, 2) * curve.getControlX2() +
+                          Math.pow(t, 3) * curve.getEndX();
+                return x;
+            }
+        };
+        
+        javafx.beans.binding.DoubleBinding midY = new javafx.beans.binding.DoubleBinding() {
+            {
+                super.bind(curve.startYProperty(), curve.endYProperty(),
+                          curve.controlX1Property(), curve.controlY1Property(),
+                          curve.controlX2Property(), curve.controlY2Property());
+            }
+            @Override
+            protected double computeValue() {
+                double t = 0.5;
+                double y = Math.pow(1-t, 3) * curve.getStartY() +
+                          3 * Math.pow(1-t, 2) * t * curve.getControlY1() +
+                          3 * (1-t) * Math.pow(t, 2) * curve.getControlY2() +
+                          Math.pow(t, 3) * curve.getEndY();
+                return y;
+            }
+        };
+        
+        edgeLabel.layoutXProperty().bind(midX.subtract(edgeLabel.widthProperty().divide(2)));
+        edgeLabel.layoutYProperty().bind(midY.subtract(edgeLabel.heightProperty().divide(2)));
+    }
+    
+    /**
+     * 设置连线标签文本
+     */
+    public void setLabelText(String text) {
+        labelText = text != null ? text : "";
+        if (edgeLabel != null) {
+            edgeLabel.setText(labelText);
+            updateLabelVisibility();
+        }
+    }
+    
+    /**
+     * 获取连线标签文本
+     */
+    public String getLabelText() {
+        return labelText;
+    }
+    
+    /**
+     * 设置标签可见性
+     */
+    public void setLabelVisible(boolean visible) {
+        labelVisible = visible;
+        updateLabelVisibility();
+    }
+    
+    /**
+     * 获取标签可见性
+     */
+    public boolean isLabelVisible() {
+        return labelVisible;
+    }
+    
+    /**
+     * 更新标签可见性
+     */
+    private void updateLabelVisibility() {
+        if (edgeLabel != null) {
+            edgeLabel.setVisible(labelVisible && !labelText.isEmpty());
+        }
+    }
 }

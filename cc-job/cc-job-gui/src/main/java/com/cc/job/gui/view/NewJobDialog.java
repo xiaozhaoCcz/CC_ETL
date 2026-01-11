@@ -189,6 +189,11 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
         scrollPane.setStyle("-fx-background-color: transparent;");
         
         VBox formContent = new VBox(20);
+        // 添加文字说明
+        Label descLabel = new Label("此页面添加的任务是普通任务，请前往任务列表中查看");
+        descLabel.setStyle("-fx-text-fill: #6B7280; -fx-font-size: 13;");
+        formContent.getChildren().add(descLabel);
+
         formContent.setPadding(new Insets(10));
         
         // 基础配置

@@ -54,7 +54,6 @@ public class LogPanel extends VBox {
     private ComboBox<String> levelFilterCombo;
     private CheckBox regexCheckBox;
     private CheckBox caseSensitiveCheckBox;
-    private ToggleButton pauseButton;
     private ToggleButton autoScrollButton;
     private Label errorCountLabel;
     private Label warnCountLabel;
@@ -217,29 +216,6 @@ public class LogPanel extends VBox {
         
         Region separator = createSeparator();
         
-        // 暂停/恢复按钮
-        pauseButton = new ToggleButton("暂停");
-        pauseButton.setStyle(
-            "-fx-background-color: linear-gradient(to bottom, #F1F5F9, rgba(241,245,249,0.98)); " +
-            "-fx-text-fill: " + StyleUtil.GRAY_600 + "; " +
-            "-fx-font-size: 12px; " +
-            "-fx-font-weight: 600; " +
-            "-fx-padding: 6 12; " +
-            "-fx-border-radius: 8; " +
-            "-fx-background-radius: 8; " +
-            "-fx-border-color: rgba(148,163,184,0.6); " +
-            "-fx-border-width: 1; " +
-            "-fx-cursor: hand;"
-        );
-        pauseButton.setTooltip(new Tooltip("暂停/恢复实时日志更新"));
-        pauseButton.selectedProperty().addListener((obs, oldVal, newVal) -> {
-            LogContentManager data = tabManager.getCurrentTabData();
-            if (data != null) {
-                data.setPauseUpdates(newVal);
-                pauseButton.setText(newVal ? "恢复" : "暂停");
-            }
-        });
-        
         // 自动滚动开关
         autoScrollButton = new ToggleButton("自动滚动");
         autoScrollButton.setSelected(true);
@@ -261,6 +237,12 @@ public class LogPanel extends VBox {
             if (data != null) {
                 data.autoScrollToBottom = newVal;
             }
+            // 根据选中状态更新按钮文本
+            if (newVal) {
+                autoScrollButton.setText("自动滚动");
+            } else {
+                autoScrollButton.setText("关闭滚动");
+            }
         });
         
         Button scrollToTopBtn = createButton("↑", () -> {
@@ -275,7 +257,7 @@ public class LogPanel extends VBox {
         titleBar.getChildren().addAll(
             searchField, levelFilterCombo,
             regexCheckBox, caseSensitiveCheckBox, spacer, countLabel, separator,
-            pauseButton, autoScrollButton, scrollToTopBtn, clearBtn, exportBtn
+            autoScrollButton, scrollToTopBtn, clearBtn, exportBtn
         );
         return titleBar;
     }
@@ -436,17 +418,14 @@ public class LogPanel extends VBox {
         Platform.runLater(() -> {
             updatesByGroup.forEach((taskGroupId, newEntries) -> {
                 LogContentManager tabData = tabManager.getTabData(taskGroupId);
-                if (tabData != null && !tabData.isPauseUpdates()) {
+                if (tabData != null) {
                     for (LogContentManager.LogEntry entry : newEntries) {
                         tabData.addEntry(entry);
                     }
                     
                     if (tabManager.isCurrentTab(taskGroupId)) {
-                        // 如果暂停更新，不渲染
-                        if (!tabData.isPauseUpdates()) {
-                            tabData.renderIncremental(currentSearchKeyword);
-                            updateStatusBar(tabData);
-                        }
+                        tabData.renderIncremental(currentSearchKeyword);
+                        updateStatusBar(tabData);
                     }
                 }
             });

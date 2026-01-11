@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
 
 /**
  * 节点操作管理器 - 负责节点的复制、粘贴、编辑等操作
@@ -52,7 +53,7 @@ public class NodeOperationManager {
     }
     
     /**
-     * 复制节点 - 直接创建新节点并添加到画布
+     * 复制节点到剪贴板 - 只保存到剪贴板，不创建节点
      */
     public void copyNodeToClipboard(ProcessNode sourceNode, Long currentTaskGroupId) {
         if (sourceNode == null || sourceNode.getJobId() == null) {
@@ -75,47 +76,17 @@ public class NodeOperationManager {
                     return;
                 }
                 
-                // 创建新节点的表单数据
-                JobInfoForm copyForm = deepCopyJobInfoForm(originalForm);
-                copyForm.setId(null);
-                copyForm.setParentId(currentTaskGroupId);
-                copyForm.setJobDesc(generateCopyName(originalForm.getJobDesc()));
+                // 只保存到剪贴板，不创建节点
+                copiedNodeForm = deepCopyJobInfoForm(originalForm);
+                copiedNodesData = null; // 清空多个节点的数据
                 
-                // 计算新节点的位置（在源节点右侧）
-                double[] position = calculateCopyPosition(sourceNode);
-                copyForm.setNodePositionX(position[0]);
-                copyForm.setNodePositionY(position[1]);
-                copyForm.setGlueUpdateTime(null);
-                
-                // 保存新节点到后端
-                JobNode newJobNode = jobInfoService.saveJobNode(copyForm);
-                if (newJobNode != null) {
-                    Platform.runLater(() -> {
-                        addNodeToCanvas(newJobNode, copyForm);
-                        logPanel.success("✓ 节点复制成功: " + copyForm.getJobDesc());
-                    });
-                } else {
-                    Platform.runLater(() -> logPanel.error("✗ 节点复制失败：后端返回空"));
-                }
+                Platform.runLater(() -> {
+                    logPanel.success("✓ 节点已复制到剪贴板，按 Ctrl+V 粘贴");
+                });
             } catch (Exception e) {
                 Platform.runLater(() -> logPanel.error("✗ 复制失败: " + e.getMessage()));
             }
         }).start();
-    }
-    
-    /**
-     * 计算复制节点的位置（在源节点右侧）
-     */
-    private double[] calculateCopyPosition(ProcessNode sourceNode) {
-        double sourceX = sourceNode.getLayoutX();
-        double sourceY = sourceNode.getLayoutY();
-        double nodeWidth = sourceNode.getWidth() > 0 ? sourceNode.getWidth() : sourceNode.getPrefWidth();
-        
-        // 在源节点右侧，间隔50像素
-        double newX = sourceX + nodeWidth + 50;
-        double newY = sourceY;
-        
-        return new double[]{newX, newY};
     }
     
     /**
@@ -145,10 +116,14 @@ public class NodeOperationManager {
                     nodeData.form = copyForm;
                     nodeData.originalJobId = node.getJobId();
                     nodeData.originalNodeId = node.getNodeId();
-                    data.nodeForms.add(nodeData);
                     
+                    // 保存节点的实际布局位置
                     double nodeX = node.getLayoutX();
                     double nodeY = node.getLayoutY();
+                    nodeData.originalX = nodeX;
+                    nodeData.originalY = nodeY;
+                    
+                    data.nodeForms.add(nodeData);
                     data.minX = Math.min(data.minX, nodeX);
                     data.minY = Math.min(data.minY, nodeY);
                 }
@@ -232,6 +207,10 @@ public class NodeOperationManager {
                 List<ProcessNode> newNodes = new ArrayList<>();
                 Map<Long, ProcessNode> oldJobIdToNewNode = new HashMap<>();
                 
+                // 使用 CountDownLatch 等待所有节点创建完成
+                CountDownLatch latch = new CountDownLatch(copiedNodesData.nodeForms.size());
+                List<Exception> errors = Collections.synchronizedList(new ArrayList<>());
+                
                 // 创建节点
                 for (CopiedNodesData.NodeFormData nodeData : copiedNodesData.nodeForms) {
                     JobInfoForm pasteForm = deepCopyJobInfoForm(nodeData.form);
@@ -239,25 +218,50 @@ public class NodeOperationManager {
                     pasteForm.setParentId(currentTaskGroupId);
                     pasteForm.setJobDesc(generateCopyName(nodeData.form.getJobDesc()));
                     
-                    double originalX = nodeData.form.getNodePositionX() != null ? nodeData.form.getNodePositionX() : 0;
-                    double originalY = nodeData.form.getNodePositionY() != null ? nodeData.form.getNodePositionY() : 0;
+                    // 使用保存的实际布局位置，而不是表单中的位置
+                    double originalX = nodeData.originalX;
+                    double originalY = nodeData.originalY;
                     pasteForm.setNodePositionX(originalX + offsetX);
                     pasteForm.setNodePositionY(originalY + offsetY);
+                    pasteForm.setGlueUpdateTime(null);
                     
                     JobNode newJobNode = jobInfoService.saveJobNode(pasteForm);
                     if (newJobNode != null) {
                         Long originalJobId = nodeData.originalJobId;
                         Platform.runLater(() -> {
-                            ProcessNode newNode = addNodeToCanvas(newJobNode, pasteForm);
-                            if (newNode != null) {
-                                newNodes.add(newNode);
-                                oldJobIdToNewNode.put(originalJobId, newNode);
+                            try {
+                                ProcessNode newNode = addNodeToCanvas(newJobNode, pasteForm);
+                                if (newNode != null) {
+                                    synchronized (newNodes) {
+                                        newNodes.add(newNode);
+                                        oldJobIdToNewNode.put(originalJobId, newNode);
+                                    }
+                                }
+                            } catch (Exception e) {
+                                errors.add(e);
+                                logger.error("创建节点失败", e);
+                            } finally {
+                                latch.countDown();
                             }
                         });
+                    } else {
+                        latch.countDown();
                     }
                 }
                 
-                Thread.sleep(500);
+                // 等待所有节点创建完成
+                try {
+                    latch.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    Platform.runLater(() -> logPanel.error("✗ 粘贴被中断: " + e.getMessage()));
+                    return;
+                }
+                
+                // 检查是否有错误
+                if (!errors.isEmpty()) {
+                    Platform.runLater(() -> logPanel.error("✗ 部分节点创建失败"));
+                }
                 
                 // 恢复连接
                 Platform.runLater(() -> {
@@ -273,6 +277,7 @@ public class NodeOperationManager {
                 });
             } catch (Exception e) {
                 Platform.runLater(() -> logPanel.error("✗ 粘贴失败: " + e.getMessage()));
+                logger.error("粘贴多个节点失败", e);
             }
         }).start();
     }
@@ -409,6 +414,8 @@ public class NodeOperationManager {
             JobInfoForm form;
             Long originalJobId;
             String originalNodeId;
+            double originalX;  // 节点的实际布局X坐标
+            double originalY;  // 节点的实际布局Y坐标
         }
         
         static class ConnectionInfo {

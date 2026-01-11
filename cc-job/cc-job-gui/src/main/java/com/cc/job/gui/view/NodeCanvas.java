@@ -79,6 +79,9 @@ public class NodeCanvas extends Pane {
     private boolean isExpanding = false; // 标记是否正在执行扩展操作
     private boolean isDragging = false;  // 标记是否有节点正在被拖拽
     
+    // 拖拽选择状态管理
+    private Map<ProcessNode, Boolean> nodeSelectedBeforeDrag = new HashMap<>(); // 记录拖拽前节点是否被选中
+    
     // 拖拽优化：节流控制
     private long lastExpandCheckTime = 0;
     private long lastScrollCheckTime = 0;
@@ -96,6 +99,16 @@ public class NodeCanvas extends Pane {
     private Canvas gridBackgroundCanvas; // 用于绘制网格背景的Canvas
     private boolean dotsBackgroundListenersAdded = false; // 标记是否已添加监听器
     private boolean gridBackgroundListenersAdded = false; // 标记是否已添加监听器
+    private boolean gridVisible = false; // 网格是否可见（独立于主题）
+    private boolean nodeLabelsVisible = false; // 节点标签是否可见
+    private boolean edgeLabelsVisible = false; // 连线标签是否可见
+    
+    // 智能对齐相关
+    private boolean smartAlignmentEnabled = true; // 智能对齐是否启用
+    private boolean snapToGridEnabled = false; // 网格吸附是否启用
+    private double gridSnapSize = 20.0; // 网格吸附大小
+    private List<Line> alignmentGuideLines = new ArrayList<>(); // 对齐参考线
+    private static final double ALIGNMENT_THRESHOLD = 5.0; // 对齐阈值（像素）
     
     // 自动保存相关
     private PauseTransition autoSaveTransition; // 自动保存延迟触发器
@@ -286,6 +299,10 @@ public class NodeCanvas extends Pane {
         node.setOnDragStarted(() -> {
             isDragging = true; // 标记开始拖拽
             currentDragNode = node; // 记录当前拖拽节点
+            // 记录拖拽前节点是否被选中
+            boolean wasSelected = selectionManager.getSelectedNodes().contains(node);
+            nodeSelectedBeforeDrag.put(node, wasSelected);
+            
             startDragScrollAnimation(); // 启动平滑滚动动画
             if (!selectionManager.getSelectedNodes().isEmpty() && 
                 selectionManager.getSelectedNodes().contains(node) && 
@@ -296,7 +313,9 @@ public class NodeCanvas extends Pane {
         });
         
         node.setOnClicked(() -> {
-            if (!selectionManager.isMovingSelection()) {
+            // 只有在没有发生拖拽的情况下才选中节点
+            // 如果节点正在被拖拽或刚刚完成拖拽，不选中节点
+            if (!selectionManager.isMovingSelection() && !isDragging) {
                 selectionManager.selectNode(node);
             }
         });
@@ -304,6 +323,13 @@ public class NodeCanvas extends Pane {
         node.setOnDragFinished((oldX, oldY, newX, newY) -> {
             isDragging = false; // 标记拖拽结束
             stopDragScrollAnimation(); // 停止滚动动画
+            // 隐藏对齐参考线
+            hideAlignmentGuides();
+            
+            // 检查拖拽前节点是否被选中
+            boolean wasSelectedBeforeDrag = nodeSelectedBeforeDrag.getOrDefault(node, false);
+            nodeSelectedBeforeDrag.remove(node); // 清除记录
+            
             currentDragNode = null;
             
             // 拖拽结束后，检查是否需要左侧或上侧扩展
@@ -330,9 +356,20 @@ public class NodeCanvas extends Pane {
                 markAsUnsaved();
             }
             
-            // 如果节点被选中，确保选择框位置正确
-            if (selectionManager.getSelectedNodes().contains(node)) {
-                selectionManager.updateSelectionBoundingBox();
+            // 只有在拖拽前节点就已经被选中的情况下，才更新选择框
+            // 如果节点在拖拽前没有被选中，拖拽后也不应该显示选择框
+            if (wasSelectedBeforeDrag) {
+                // 确保节点仍在选中列表中（可能被其他操作清除）
+                if (selectionManager.getSelectedNodes().contains(node)) {
+                    selectionManager.updateSelectionBoundingBox();
+                }
+            } else {
+                // 如果节点在拖拽前没有被选中，拖拽后应该清除选择状态
+                // 这样可以避免移动节点后意外显示红色框
+                if (selectionManager.getSelectedNodes().contains(node)) {
+                    // 如果节点被选中了（可能是拖拽过程中触发的），清除选择
+                    selectionManager.clearSelection();
+                }
             }
             
             notifyNodeStructureChanged();
@@ -403,6 +440,16 @@ public class NodeCanvas extends Pane {
     
     private void handleNodeDrag(ProcessNode node) {
         // 优化：画布扩展检查已在 onDragged 中通过节流处理
+        
+        // 智能对齐：显示对齐参考线
+        if (smartAlignmentEnabled && !selectionManager.isMovingSelection()) {
+            showAlignmentGuides(node);
+        }
+        
+        // 网格吸附
+        if (snapToGridEnabled) {
+            snapNodeToGrid(node);
+        }
         
         if (selectionManager.isMovingSelection() && selectionManager.getDragStartNode() == node && 
             selectionManager.getSelectedNodes().size() > 1) {
@@ -796,18 +843,118 @@ public class NodeCanvas extends Pane {
     }
     
     public void toggleGrid() {
-        // TODO: 实现网格显示/隐藏
-        log("网格显示功能开发中...");
+        gridVisible = !gridVisible;
+        updateGridVisibility();
+        if (gridVisible) {
+            log("✓ 网格已显示");
+        } else {
+            log("✓ 网格已隐藏");
+        }
+    }
+    
+    /**
+     * 更新网格可见性
+     */
+    private void updateGridVisibility() {
+        if (gridVisible) {
+            // 如果网格Canvas不存在，创建它
+            if (gridBackgroundCanvas == null) {
+                createGridBackground();
+            } else {
+                // 如果已存在，确保它可见
+                if (!this.getChildren().contains(gridBackgroundCanvas)) {
+                    this.getChildren().add(0, gridBackgroundCanvas);
+                }
+                gridBackgroundCanvas.setVisible(true);
+            }
+        } else {
+            // 隐藏网格（但不删除，以便快速切换）
+            if (gridBackgroundCanvas != null) {
+                gridBackgroundCanvas.setVisible(false);
+            }
+        }
     }
     
     public void toggleNodeLabels() {
-        // TODO: 实现节点标签显示/隐藏
-        log("节点标签显示功能开发中...");
+        nodeLabelsVisible = !nodeLabelsVisible;
+        updateAllNodeLabelsVisibility();
+        if (nodeLabelsVisible) {
+            log("✓ 节点标签已显示");
+        } else {
+            log("✓ 节点标签已隐藏");
+        }
+    }
+    
+    /**
+     * 更新所有节点的标签可见性
+     */
+    private void updateAllNodeLabelsVisibility() {
+        for (ProcessNode node : nodes) {
+            node.setTagsVisible(nodeLabelsVisible);
+        }
+    }
+    
+    /**
+     * 设置节点标签（从properties中读取）
+     */
+    public void setNodeTagsFromProperties(ProcessNode node, Map<String, Object> properties) {
+        if (properties == null || node == null) return;
+        
+        Object tagsObj = properties.get("tags");
+        if (tagsObj != null) {
+            java.util.List<String> tags = new java.util.ArrayList<>();
+            if (tagsObj instanceof java.util.List) {
+                for (Object tag : (java.util.List<?>) tagsObj) {
+                    if (tag != null) {
+                        tags.add(tag.toString());
+                    }
+                }
+            } else if (tagsObj instanceof String) {
+                // 尝试解析JSON数组字符串
+                try {
+                    com.google.gson.Gson gson = new com.google.gson.Gson();
+                    java.util.List<?> tagList = gson.fromJson((String) tagsObj, java.util.List.class);
+                    for (Object tag : tagList) {
+                        if (tag != null) {
+                            tags.add(tag.toString());
+                        }
+                    }
+                } catch (Exception e) {
+                    // 解析失败，忽略
+                }
+            }
+            node.setTags(tags);
+            node.setTagsVisible(nodeLabelsVisible);
+        }
     }
     
     public void toggleEdgeLabels() {
-        // TODO: 实现连线标签显示/隐藏
-        log("连线标签显示功能开发中...");
+        edgeLabelsVisible = !edgeLabelsVisible;
+        updateAllEdgeLabelsVisibility();
+        if (edgeLabelsVisible) {
+            log("✓ 连线标签已显示");
+        } else {
+            log("✓ 连线标签已隐藏");
+        }
+    }
+    
+    /**
+     * 更新所有连线的标签可见性
+     */
+    private void updateAllEdgeLabelsVisibility() {
+        for (NodeConnection conn : connections) {
+            conn.setLabelVisible(edgeLabelsVisible);
+        }
+    }
+    
+    /**
+     * 为连线设置标签（从edge数据中读取）
+     */
+    public void setEdgeLabelFromData(NodeConnection conn, String labelText) {
+        if (conn != null && labelText != null && !labelText.trim().isEmpty()) {
+            conn.setLabelText(labelText);
+            conn.setLabelVisible(edgeLabelsVisible);
+        }
     }
     
     public void autoLayout() {
@@ -3287,6 +3434,236 @@ public class NodeCanvas extends Pane {
             connectionManager.removeConnection(connection);
             notifyNodeStructureChanged();
         }
+    }
+    
+    // ==================== 智能对齐相关方法 ====================
+    
+    /**
+     * 显示对齐参考线
+     */
+    private void showAlignmentGuides(ProcessNode draggedNode) {
+        hideAlignmentGuides(); // 先清除旧的参考线
+        
+        if (draggedNode == null) return;
+        
+        double nodeX = draggedNode.getLayoutX();
+        double nodeY = draggedNode.getLayoutY();
+        double nodeWidth = draggedNode.getPrefWidth();
+        double nodeHeight = draggedNode.getPrefHeight();
+        
+        double nodeCenterX = nodeX + nodeWidth / 2;
+        double nodeCenterY = nodeY + nodeHeight / 2;
+        double nodeLeft = nodeX;
+        double nodeRight = nodeX + nodeWidth;
+        double nodeTop = nodeY;
+        double nodeBottom = nodeY + nodeHeight;
+        
+        // 检查与其他节点的对齐
+        for (ProcessNode otherNode : nodes) {
+            if (otherNode == draggedNode) continue;
+            
+            double otherX = otherNode.getLayoutX();
+            double otherY = otherNode.getLayoutY();
+            double otherWidth = otherNode.getPrefWidth();
+            double otherHeight = otherNode.getPrefHeight();
+            
+            double otherCenterX = otherX + otherWidth / 2;
+            double otherCenterY = otherY + otherHeight / 2;
+            double otherLeft = otherX;
+            double otherRight = otherX + otherWidth;
+            double otherTop = otherY;
+            double otherBottom = otherY + otherHeight;
+            
+            // 检查水平对齐（中心、顶部、底部）
+            if (Math.abs(nodeCenterY - otherCenterY) < ALIGNMENT_THRESHOLD) {
+                createHorizontalGuideLine(otherCenterY);
+                draggedNode.setLayoutY(otherCenterY - nodeHeight / 2);
+            } else if (Math.abs(nodeTop - otherTop) < ALIGNMENT_THRESHOLD) {
+                createHorizontalGuideLine(otherTop);
+                draggedNode.setLayoutY(otherTop);
+            } else if (Math.abs(nodeBottom - otherBottom) < ALIGNMENT_THRESHOLD) {
+                createHorizontalGuideLine(otherBottom);
+                draggedNode.setLayoutY(otherBottom - nodeHeight);
+            }
+            
+            // 检查垂直对齐（中心、左侧、右侧）
+            if (Math.abs(nodeCenterX - otherCenterX) < ALIGNMENT_THRESHOLD) {
+                createVerticalGuideLine(otherCenterX);
+                draggedNode.setLayoutX(otherCenterX - nodeWidth / 2);
+            } else if (Math.abs(nodeLeft - otherLeft) < ALIGNMENT_THRESHOLD) {
+                createVerticalGuideLine(otherLeft);
+                draggedNode.setLayoutX(otherLeft);
+            } else if (Math.abs(nodeRight - otherRight) < ALIGNMENT_THRESHOLD) {
+                createVerticalGuideLine(otherRight);
+                draggedNode.setLayoutX(otherRight - nodeWidth);
+            }
+        }
+    }
+    
+    /**
+     * 创建水平对齐参考线
+     */
+    private void createHorizontalGuideLine(double y) {
+        Line guideLine = new Line(0, y, getPrefWidth(), y);
+        guideLine.setStroke(Color.web("#3B82F6"));
+        guideLine.setStrokeWidth(1);
+        guideLine.getStrokeDashArray().addAll(5.0, 5.0);
+        guideLine.setMouseTransparent(true);
+        guideLine.toBack();
+        alignmentGuideLines.add(guideLine);
+        this.getChildren().add(guideLine);
+    }
+    
+    /**
+     * 创建垂直对齐参考线
+     */
+    private void createVerticalGuideLine(double x) {
+        Line guideLine = new Line(x, 0, x, getPrefHeight());
+        guideLine.setStroke(Color.web("#3B82F6"));
+        guideLine.setStrokeWidth(1);
+        guideLine.getStrokeDashArray().addAll(5.0, 5.0);
+        guideLine.setMouseTransparent(true);
+        guideLine.toBack();
+        alignmentGuideLines.add(guideLine);
+        this.getChildren().add(guideLine);
+    }
+    
+    /**
+     * 隐藏对齐参考线
+     */
+    private void hideAlignmentGuides() {
+        for (Line guideLine : alignmentGuideLines) {
+            this.getChildren().remove(guideLine);
+        }
+        alignmentGuideLines.clear();
+    }
+    
+    /**
+     * 网格吸附：将节点对齐到网格点
+     */
+    private void snapNodeToGrid(ProcessNode node) {
+        if (node == null) return;
+        
+        double x = node.getLayoutX();
+        double y = node.getLayoutY();
+        
+        // 对齐到最近的网格点
+        double snappedX = Math.round(x / gridSnapSize) * gridSnapSize;
+        double snappedY = Math.round(y / gridSnapSize) * gridSnapSize;
+        
+        node.setLayoutX(Math.max(0, snappedX));
+        node.setLayoutY(Math.max(0, snappedY));
+    }
+    
+    /**
+     * 等距分布（水平）
+     */
+    public void distributeNodesHorizontally() {
+        Set<ProcessNode> selectedNodes = selectionManager.getSelectedNodes();
+        if (selectedNodes.size() < 3) {
+            log("⚠ 需要至少选中 3 个节点才能等距分布");
+            return;
+        }
+        
+        List<ProcessNode> sortedNodes = new ArrayList<>(selectedNodes);
+        sortedNodes.sort((a, b) -> Double.compare(a.getLayoutX(), b.getLayoutX()));
+        
+        double minX = sortedNodes.get(0).getLayoutX();
+        double maxX = sortedNodes.get(sortedNodes.size() - 1).getLayoutX();
+        double spacing = (maxX - minX) / (sortedNodes.size() - 1);
+        
+        for (int i = 0; i < sortedNodes.size(); i++) {
+            sortedNodes.get(i).setLayoutX(minX + i * spacing);
+        }
+        
+        markAsUnsaved();
+        log("✓ 水平等距分布完成: " + sortedNodes.size() + " 个节点");
+    }
+    
+    /**
+     * 等距分布（垂直）
+     */
+    public void distributeNodesVertically() {
+        Set<ProcessNode> selectedNodes = selectionManager.getSelectedNodes();
+        if (selectedNodes.size() < 3) {
+            log("⚠ 需要至少选中 3 个节点才能等距分布");
+            return;
+        }
+        
+        List<ProcessNode> sortedNodes = new ArrayList<>(selectedNodes);
+        sortedNodes.sort((a, b) -> Double.compare(a.getLayoutY(), b.getLayoutY()));
+        
+        double minY = sortedNodes.get(0).getLayoutY();
+        double maxY = sortedNodes.get(sortedNodes.size() - 1).getLayoutY();
+        double spacing = (maxY - minY) / (sortedNodes.size() - 1);
+        
+        for (int i = 0; i < sortedNodes.size(); i++) {
+            sortedNodes.get(i).setLayoutY(minY + i * spacing);
+        }
+        
+        markAsUnsaved();
+        log("✓ 垂直等距分布完成: " + sortedNodes.size() + " 个节点");
+    }
+    
+    /**
+     * 对齐到画布中心
+     */
+    public void alignToCanvasCenter() {
+        Set<ProcessNode> selectedNodes = selectionManager.getSelectedNodes();
+        if (selectedNodes.isEmpty()) {
+            log("⚠ 请先选中节点");
+            return;
+        }
+        
+        double canvasCenterX = getPrefWidth() / 2;
+        double canvasCenterY = getPrefHeight() / 2;
+        
+        // 计算选中节点的中心
+        double nodesCenterX = 0;
+        double nodesCenterY = 0;
+        for (ProcessNode node : selectedNodes) {
+            nodesCenterX += node.getLayoutX() + node.getPrefWidth() / 2;
+            nodesCenterY += node.getLayoutY() + node.getPrefHeight() / 2;
+        }
+        nodesCenterX /= selectedNodes.size();
+        nodesCenterY /= selectedNodes.size();
+        
+        // 计算偏移量
+        double deltaX = canvasCenterX - nodesCenterX;
+        double deltaY = canvasCenterY - nodesCenterY;
+        
+        // 移动所有选中节点
+        for (ProcessNode node : selectedNodes) {
+            node.setLayoutX(Math.max(0, node.getLayoutX() + deltaX));
+            node.setLayoutY(Math.max(0, node.getLayoutY() + deltaY));
+        }
+        
+        markAsUnsaved();
+        log("✓ 已对齐到画布中心: " + selectedNodes.size() + " 个节点");
+    }
+    
+    /**
+     * 启用/禁用智能对齐
+     */
+    public void setSmartAlignmentEnabled(boolean enabled) {
+        smartAlignmentEnabled = enabled;
+        if (!enabled) {
+            hideAlignmentGuides();
+        }
+    }
+    
+    /**
+     * 启用/禁用网格吸附
+     */
+    public void setSnapToGridEnabled(boolean enabled) {
+        snapToGridEnabled = enabled;
+    }
+    
+    /**
+     * 设置网格吸附大小
+     */
+    public void setGridSnapSize(double size) {
+        gridSnapSize = Math.max(5, size);
     }
 }
 
