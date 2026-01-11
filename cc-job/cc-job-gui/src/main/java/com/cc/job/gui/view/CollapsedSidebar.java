@@ -133,27 +133,11 @@ public class CollapsedSidebar extends VBox {
     }
     
     public void showTreeViewButton(boolean show) {
-        // #region agent log
-        try {
-            java.io.FileWriter fw = new java.io.FileWriter("/Users/xiaozhao/Desktop/xz/IdeaProject/Cc_ETL/.cursor/debug.log", true);
-            fw.write(String.format("{\"timestamp\":%d,\"location\":\"CollapsedSidebar.java:135\",\"message\":\"showTreeViewButton called\",\"data\":{\"show\":%s},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"K\"}\n", 
-                System.currentTimeMillis(), show));
-            fw.close();
-        } catch (java.io.IOException e) {}
-        // #endregion
         treeViewButton.setVisible(show);
         treeViewButton.setManaged(show);
     }
     
     public void showMiniMapButton(boolean show) {
-        // #region agent log
-        try {
-            java.io.FileWriter fw = new java.io.FileWriter("/Users/xiaozhao/Desktop/xz/IdeaProject/Cc_ETL/.cursor/debug.log", true);
-            fw.write(String.format("{\"timestamp\":%d,\"location\":\"CollapsedSidebar.java:140\",\"message\":\"showMiniMapButton called\",\"data\":{\"show\":%s},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"K\"}\n", 
-                System.currentTimeMillis(), show));
-            fw.close();
-        } catch (java.io.IOException e) {}
-        // #endregion
         miniMapButton.setVisible(show);
         miniMapButton.setManaged(show);
     }
