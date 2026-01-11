@@ -201,15 +201,7 @@ public class JobTriggerService {
         // 触发任务
         return doTrigger(xxlJobContext, jobInfo, randomId, triggerParam, address);
     }
-    
-    /**
-     * 创建触发参数
-     */
-    private TriggerParam createTriggerParam(JobInfo jobInfo, String randomId, XxlJobContext xxlJobContext,
-                                           String composeAddress, int broadcastIndex, int broadcastTotal) {
-        return createTriggerParam(jobInfo, randomId, xxlJobContext, composeAddress, broadcastIndex, broadcastTotal, null);
-    }
-    
+
     /**
      * 创建触发参数（带执行上下文，用于参数解析）
      */
@@ -219,6 +211,7 @@ public class JobTriggerService {
         String executorParam = jobInfo.getExecutorParam();
         String reqUrl = jobInfo.getReqUrl();
         String reqBody = jobInfo.getReqBody();
+        String reqHeader = jobInfo.getReqHeader();
         String glueSource = jobInfo.getGlueSource();
         
         // 如果提供了执行上下文，解析并替换参数中的变量
@@ -245,6 +238,13 @@ public class JobTriggerService {
                 reqBody = parameterResolver.resolve(reqBody, dataContext, jobNameMap);
                 logger.debug("[JobTrigger] 解析 reqBody - jobId: {}, 原始: {}, 解析后: {}", 
                         jobInfo.getId(), jobInfo.getReqBody(), reqBody);
+            }
+            
+            // 解析 reqHeader
+            if (reqHeader != null && !reqHeader.isEmpty()) {
+                reqHeader = parameterResolver.resolve(reqHeader, dataContext, jobNameMap);
+                logger.debug("[JobTrigger] 解析 reqHeader - jobId: {}, 原始: {}, 解析后: {}", 
+                        jobInfo.getId(), jobInfo.getReqHeader(), reqHeader);
             }
             
             // 解析 glueSource（对于 GLUE 任务）
@@ -278,7 +278,7 @@ public class JobTriggerService {
         
         // 设置 HTTP 任务参数（使用解析后的值）
         triggerParam.setReqBody(reqBody);
-        triggerParam.setReqHeader(jobInfo.getReqHeader());
+        triggerParam.setReqHeader(reqHeader);
         triggerParam.setReqType(jobInfo.getReqType());
         triggerParam.setReqUrl(reqUrl);
         

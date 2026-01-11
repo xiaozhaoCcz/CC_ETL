@@ -80,15 +80,6 @@ public class XxlJobHelper {
         return xxlJobContext.getShardIndex();
     }
 
-    public static List<Integer> getJobPauseStatusIds() {
-        XxlJobContext xxlJobContext = XxlJobContext.getXxlJobContext();
-        if (xxlJobContext == null) {
-            return null;
-        }
-        return xxlJobContext.getJobPauseStatusIds();
-    }
-
-
     public static List<Integer> getJobFlowPositionIds() {
         XxlJobContext xxlJobContext = XxlJobContext.getXxlJobContext();
         if (xxlJobContext == null) {

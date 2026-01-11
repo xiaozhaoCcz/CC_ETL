@@ -1,5 +1,7 @@
 package com.xxl.job.core.context;
 
+import com.xxl.job.core.biz.model.TriggerParam;
+
 import java.util.List;
 
 /**
@@ -63,11 +65,11 @@ public class XxlJobContext {
     private String handleMsg;
 
 
-    private List<Integer>  jobPauseStatusIds;
-
     private List<Integer> jobFlowPositionIds;
 
     private Object executeResult;
+
+    private TriggerParam triggerParam;
 
 
     public XxlJobContext(long jobId, String jobParam, String jobLogFileName, int shardIndex, int shardTotal) {
@@ -80,7 +82,7 @@ public class XxlJobContext {
         this.handleCode = HANDLE_CODE_SUCCESS;  // default success
     }
 
-    public XxlJobContext(long jobId, String jobParam, String jobLogFileName, int shardIndex, int shardTotal,List<Integer> jobFlowPositionIds,List<Integer>  jobPauseStatusIds) {
+    public XxlJobContext(long jobId, String jobParam, String jobLogFileName, int shardIndex, int shardTotal,List<Integer> jobFlowPositionIds) {
         this.jobId = jobId;
         this.jobParam = jobParam;
         this.jobLogFileName = jobLogFileName;
@@ -90,8 +92,6 @@ public class XxlJobContext {
         this.handleCode = HANDLE_CODE_SUCCESS;  // default success
 
         this.jobFlowPositionIds = jobFlowPositionIds;
-
-        this.jobPauseStatusIds = jobPauseStatusIds;
     }
 
     public long getJobId() {
@@ -138,13 +138,6 @@ public class XxlJobContext {
         return handleMsg;
     }
 
-    public List<Integer> getJobPauseStatusIds() {
-        return jobPauseStatusIds;
-    }
-
-    public void setJobPauseStatusIds(List<Integer> jobPauseStatusIds) {
-        this.jobPauseStatusIds = jobPauseStatusIds;
-    }
 
     public List<Integer> getJobFlowPositionIds() {
         return jobFlowPositionIds;
@@ -159,6 +152,14 @@ public class XxlJobContext {
 
     public Object getExecuteResult() {
         return executeResult;
+    }
+
+    public TriggerParam getTriggerParam() {
+        return triggerParam;
+    }
+
+    public void setTriggerParam(TriggerParam triggerParam) {
+        this.triggerParam = triggerParam;
     }
 
     // ---------------------- tool ----------------------

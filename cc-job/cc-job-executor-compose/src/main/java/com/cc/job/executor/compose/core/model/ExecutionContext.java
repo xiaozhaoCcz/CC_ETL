@@ -39,7 +39,6 @@ public class ExecutionContext {
     /** 执行键 */
     private String executeKey;
 
-    private List<Integer> jobPauseStatusIds;
     
     /** 数据上下文 */
     private DataContext dataContext;
@@ -58,10 +57,9 @@ public class ExecutionContext {
         this.edges = edges;
         this.xxlJobContext = xxlJobContext;
         this.executeKey = executeKey;
-        this.jobPauseStatusIds = jobPauseStatusIds;
     }
     
-    public ExecutionContext(Long taskGroupId, String executionBatchId, JobInfo taskGroupInfo, List<JobNode> nodes, List<JobEdge> edges, XxlJobContext xxlJobContext, String executeKey, List<Integer> jobPauseStatusIds, DataContext dataContext, Map<String, Long> jobNameMap) {
+    public ExecutionContext(Long taskGroupId, String executionBatchId, JobInfo taskGroupInfo, List<JobNode> nodes, List<JobEdge> edges, XxlJobContext xxlJobContext, String executeKey, DataContext dataContext, Map<String, Long> jobNameMap) {
         this.taskGroupId = taskGroupId;
         this.executionBatchId = executionBatchId;
         this.taskGroupInfo = taskGroupInfo;
@@ -69,7 +67,6 @@ public class ExecutionContext {
         this.edges = edges;
         this.xxlJobContext = xxlJobContext;
         this.executeKey = executeKey;
-        this.jobPauseStatusIds = jobPauseStatusIds;
         this.dataContext = dataContext;
         this.jobNameMap = jobNameMap;
     }
@@ -134,14 +131,6 @@ public class ExecutionContext {
         this.executeKey = executeKey;
     }
 
-    public List<Integer> getJobPauseStatusIds() {
-        return jobPauseStatusIds;
-    }
-
-    public void setJobPauseStatusIds(List<Integer> jobPauseStatusIds) {
-        this.jobPauseStatusIds = jobPauseStatusIds;
-    }
-    
     public DataContext getDataContext() {
         return dataContext;
     }
@@ -225,7 +214,7 @@ public class ExecutionContext {
         }
 
         public ExecutionContext build() {
-            return new ExecutionContext(taskGroupId, executionBatchId, taskGroupInfo, nodes, edges, xxlJobContext, executeKey, jobPauseStatusIds, dataContext, jobNameMap);
+            return new ExecutionContext(taskGroupId, executionBatchId, taskGroupInfo, nodes, edges, xxlJobContext, executeKey, dataContext, jobNameMap);
         }
     }
 }

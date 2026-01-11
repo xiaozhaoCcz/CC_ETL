@@ -146,31 +146,20 @@ public class TaskGroupOrchestrator {
         }
     }
 
-    /**
-     * 执行任务组
-     * 
-     * @param taskGroupId 任务组ID
-     * @param executionBatchId 执行批次ID
-     * @param executeParam 执行参数（可能包含batchId参数）
-     */
-    public void execute(Long taskGroupId, String executionBatchId,List<Integer> jobFlowPositionIds,List<Integer> jobPauseStatusIds) {
-        execute(taskGroupId, executionBatchId, jobFlowPositionIds, jobPauseStatusIds, null);
-    }
-    
-    /**
+    /*
      * 执行任务组（带执行参数）
      * 
      * @param taskGroupId 任务组ID
      * @param executionBatchId 执行批次ID
      * @param executeParam 执行参数（可能包含batchId参数）
      */
-    public void execute(Long taskGroupId, String executionBatchId,List<Integer> jobFlowPositionIds,List<Integer> jobPauseStatusIds, String executeParam) {
+    public void execute(Long taskGroupId, String executionBatchId,List<Integer> jobFlowPositionIds, String executeParam) {
         logger.info("[Orchestrator] ========== 开始执行任务组 ==========");
         logger.info("[Orchestrator] 任务组ID: {}, 批次ID: {}, 执行参数: {}", taskGroupId, executionBatchId, executeParam);
         
         try {
             // 1. 准备执行上下文
-            ExecutionContext context = prepareExecution(taskGroupId, executionBatchId, jobFlowPositionIds, jobPauseStatusIds, executeParam);
+            ExecutionContext context = prepareExecution(taskGroupId, executionBatchId, jobFlowPositionIds, executeParam);
             
             // 2. 构建执行计划
             List<WorkerWrapper<Long, String>> workerWrappers = buildExecutionPlan(context);
@@ -193,7 +182,7 @@ public class TaskGroupOrchestrator {
     /**
      * 准备执行上下文
      */
-    private ExecutionContext prepareExecution(Long taskGroupId, String executionBatchId,List<Integer> jobFlowPositionIds,List<Integer> jobPauseStatusIds, String executeParam) {
+    private ExecutionContext prepareExecution(Long taskGroupId, String executionBatchId,List<Integer> jobFlowPositionIds, String executeParam) {
         logger.debug("[Orchestrator] 准备执行上下文 - taskGroupId: {}", taskGroupId);
         
         // 获取任务组信息
@@ -289,7 +278,6 @@ public class TaskGroupOrchestrator {
                 .edges(edges)
                 .xxlJobContext(xxlJobContext)
                 .executeKey(buildExecuteKey(taskGroupId, executionBatchId))
-                .jobPauseStatusIds(jobPauseStatusIds)
                 .dataContext(dataContext)
                 .jobNameMap(jobNameMap)
                 .build();

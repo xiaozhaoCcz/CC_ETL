@@ -7,6 +7,8 @@ import com.cc.job.xo.mapper.JobInfoMapper;
 import com.cc.job.xo.mapper.JobJdbcDatasourceMapper;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobJdbcDatasource;
+import com.xxl.job.core.biz.model.TriggerParam;
+import com.xxl.job.core.context.XxlJobContext;
 import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.handler.annotation.XxlJob;
 import org.slf4j.Logger;
@@ -65,12 +67,38 @@ public class JobJdbcHandler {
     
     /**
      * 获取任务信息
+     * 
+     * <p>优先从 TriggerParam 中获取已解析的参数，如果没有则从数据库获取（保持向后兼容）
      */
     private JobInfo getJobInfo(long jobId) {
+        // 1. 尝试从 XxlJobContext 的 TriggerParam 中获取已解析的参数
+        XxlJobContext context = XxlJobContext.getXxlJobContext();
+        if (context != null) {
+            TriggerParam triggerParam = context.getTriggerParam();
+            if (triggerParam != null) {
+                // 如果 TriggerParam 中有已解析的参数，使用它们
+                JobInfo jobInfo = jobInfoMapper.selectById(jobId);
+                if (jobInfo == null) {
+                    throw new BusinessException(ExecutorConstants.ErrorMessage.JOB_NOT_FOUND + ": " + jobId);
+                }
+                
+                // 使用 TriggerParam 中已解析的参数覆盖数据库中的参数
+                // 优先级：TriggerParam 中的参数 > 数据库中的参数
+                if (triggerParam.getExecutorParams() != null) {
+                    jobInfo.setExecutorParam(triggerParam.getExecutorParams());
+                    logger.debug("[JobJdbcHandler] 使用 TriggerParam 中的 executorParam: {}", triggerParam.getExecutorParams());
+                }
+                
+                return jobInfo;
+            }
+        }
+        
+        // 2. 如果没有 TriggerParam，从数据库获取（向后兼容）
         JobInfo jobInfo = jobInfoMapper.selectById(jobId);
         if (jobInfo == null) {
             throw new BusinessException(ExecutorConstants.ErrorMessage.JOB_NOT_FOUND + ": " + jobId);
         }
+        logger.debug("[JobJdbcHandler] 从数据库获取任务信息 - jobId: {}", jobId);
         return jobInfo;
     }
     

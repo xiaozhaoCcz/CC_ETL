@@ -53,7 +53,6 @@ public class JobGroupExecutorComplete {
         long taskGroupId = XxlJobHelper.getJobId();
         String executeParam = XxlJobHelper.getJobParam();
         List<Integer> jobFlowPositionIds = XxlJobHelper.getJobFlowPositionIds();
-        List<Integer> jobPauseStatusIds = XxlJobHelper.getJobPauseStatusIds();
 
         logger.info("[JobGroupExecutor] ========== 开始执行任务组 ==========");
         logger.info("[JobGroupExecutor] 任务组ID: {}, 执行参数: {}", taskGroupId, executeParam);
@@ -70,7 +69,7 @@ public class JobGroupExecutorComplete {
         logger.info("[JobGroupExecutor] 批次ID: {}", executionBatchId);
         
         // 4. 委托给编排器执行（传递执行参数，用于解析历史批次ID）
-        orchestrator.execute(taskGroupId, executionBatchId, jobFlowPositionIds, jobPauseStatusIds, executeParam);
+        orchestrator.execute(taskGroupId, executionBatchId, jobFlowPositionIds, executeParam);
     }
     
     /**

@@ -134,9 +134,11 @@ public class JobThread extends Thread{
 								logFileName,
 								triggerParam.getBroadcastIndex(),
 								triggerParam.getBroadcastTotal(),
-								triggerParam.getJobFlowPositionIds(),
-								triggerParam.getJobPauseStatusIds());
+								triggerParam.getJobFlowPositionIds()
+						);
 					}
+					// 设置 triggerParam 到 context 中，以便 handler 可以访问已解析的参数
+					xxlJobContext.setTriggerParam(triggerParam);
 					// init job context
 					XxlJobContext.setXxlJobContext(xxlJobContext);
 
