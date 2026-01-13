@@ -27,7 +27,6 @@ import java.util.function.Consumer;
 public class ConditionNode extends StackPane {
 
     private final String nodeId;
-    private final Long conditionId;
     private String conditionName;
     
     // 条件表达式相关
@@ -104,13 +103,8 @@ public class ConditionNode extends StackPane {
     // ⭐ 新增：父容器引用（用于嵌套条件节点向上通知）
     private ConditionNode parentContainer = null;
 
-    public ConditionNode(String nodeId, Long conditionId, String conditionName) {
-        this(nodeId, conditionId, conditionName, ConditionType.IF);
-    }
-    
-    public ConditionNode(String nodeId, Long conditionId, String conditionName, ConditionType conditionType) {
+    public ConditionNode(String nodeId, String conditionName, ConditionType conditionType) {
         this.nodeId = nodeId;
-        this.conditionId = conditionId;
         this.conditionName = conditionName != null ? conditionName : "条件节点";
         this.conditionType = conditionType != null ? conditionType : ConditionType.IF;
 
@@ -221,15 +215,15 @@ public class ConditionNode extends StackPane {
         enableDrag();
 
         // ⭐ 添加单击事件：单击条件节点时打开编辑对话框（作为备用，frame会优先拦截）
-        this.setOnMouseClicked(e -> {
-            if (e.getButton() == MouseButton.PRIMARY && e.getClickCount() == 1) {
-                // 单击时触发编辑条件
-                if (onEditCondition != null) {
-                    onEditCondition.run();
-                    e.consume();
-                }
-            }
-        });
+//        this.setOnMouseClicked(e -> {
+//            if (e.getButton() == MouseButton.PRIMARY && e.getClickCount() == 1) {
+//                // 单击时触发编辑条件
+//                if (onEditCondition != null) {
+//                    onEditCondition.run();
+//                    e.consume();
+//                }
+//            }
+//        });
 
         header.setOnMouseClicked(e -> {
             if (e.getButton() == MouseButton.PRIMARY && e.getClickCount() == 2) {
@@ -598,15 +592,18 @@ public class ConditionNode extends StackPane {
                     double dy = ny - getLayoutY();
                     setLayoutX(nx);
                     setLayoutY(ny);
+                    
+                    // ⭐ 修复：节点在contentLayer中时，会自动跟随条件节点移动
+                    // 因为contentLayer是条件节点的子节点，所以不需要手动更新节点坐标
+                    // 但是需要更新originX和originY，以及嵌套的条件节点
+                    
+                    // 更新originX和originY（用于计算相对位置）
                     if (!managedCanvasNodes.isEmpty()) {
-                        for (ProcessNode n : managedCanvasNodes) {
-                            n.setLayoutX(n.getLayoutX() + dx);
-                            n.setLayoutY(n.getLayoutY() + dy);
-                        }
                         originX += dx;
                         originY += dy;
                     }
-                    // 移动管理的条件节点
+                    
+                    // ⭐ 修复：移动嵌套的条件节点（它们不在contentLayer中，需要手动更新）
                     if (!managedConditionNodes.isEmpty()) {
                         for (ConditionNode cn : managedConditionNodes) {
                             cn.setLayoutX(cn.getLayoutX() + dx);
@@ -657,6 +654,7 @@ public class ConditionNode extends StackPane {
     }
 
     public void bindCanvasNodes(List<ProcessNode> nodesOnCanvas) {
+        // ⭐ 修复：先移除旧的节点从contentLayer
         for (ProcessNode oldNode : managedCanvasNodes) {
             if (oldNode != null) {
                 Consumer<ProcessNode> originalCallback = originalPositionCallbacks.get(oldNode);
@@ -665,6 +663,8 @@ public class ConditionNode extends StackPane {
                 } else {
                     oldNode.setOnPositionChanged(null);
                 }
+                // 从contentLayer中移除
+                contentLayer.getChildren().remove(oldNode);
             }
         }
         originalPositionCallbacks.clear();
@@ -674,10 +674,99 @@ public class ConditionNode extends StackPane {
             managedCanvasNodes.addAll(nodesOnCanvas);
         }
 
+        // ⭐ 修复：将新节点添加到contentLayer，并正确转换坐标
+        // 节点在contentLayer中时，坐标应该是相对于contentLayer的（即相对于条件节点内容区域的）
         for (ProcessNode node : managedCanvasNodes) {
             if (node != null) {
+                // ⭐ 修复：如果节点还没有添加到contentLayer，需要转换坐标
+                // 节点当前的坐标是绝对坐标（相对于画布的），需要转换为相对于contentLayer的坐标
+                boolean wasInContentLayer = contentLayer.getChildren().contains(node);
+                
+                if (!wasInContentLayer) {
+                    // 获取节点的绝对坐标（相对于画布的）
+                    double absoluteX = node.getLayoutX();
+                    double absoluteY = node.getLayoutY();
+                    
+                    // 获取条件节点的绝对坐标
+                    double containerX = this.getLayoutX();
+                    double containerY = this.getLayoutY();
+                    
+                    // 获取header的高度（contentLayer在header下方）
+                    double headerHeight = header.getHeight();
+                    
+                    // 计算相对于contentLayer的坐标
+                    // contentLayer位于条件节点的(0, headerHeight)位置
+                    double relativeX = absoluteX - containerX;
+                    double relativeY = absoluteY - containerY - headerHeight;
+                    
+                    // 将节点添加到contentLayer
+                    contentLayer.getChildren().add(node);
+                    
+                    // 设置相对位置（相对于contentLayer）
+                    node.setLayoutX(relativeX);
+                    node.setLayoutY(relativeY);
+                    
+                    // 确保节点可见
+                    node.setVisible(true);
+                    node.setManaged(true);
+                } else {
+                    // 节点已经在contentLayer中，确保它被包含
+                    if (!contentLayer.getChildren().contains(node)) {
+                        contentLayer.getChildren().add(node);
+                    }
+                    // 确保节点可见
+                    node.setVisible(true);
+                    node.setManaged(true);
+                }
+                
+                // 设置位置改变回调
                 node.setOnPositionChanged(n -> {
-                    checkAndExpandContainer();
+                    // ⭐ 修复：限制节点在条件节点内的移动范围
+                    // 节点在contentLayer中，坐标是相对坐标，应该限制在条件节点范围内
+                    double containerWidth = frame.getWidth();
+                    double containerHeight = frame.getHeight();
+                    double headerHeight = header.getHeight();
+                    double padding = 24;
+                    
+                    // 限制节点位置在条件节点范围内（考虑padding）
+                    double maxX = containerWidth - padding - n.getPrefWidth();
+                    double maxY = containerHeight - headerHeight - padding - n.getPrefHeight();
+                    
+                    double nodeX = n.getLayoutX();
+                    double nodeY = n.getLayoutY();
+                    boolean positionAdjusted = false;
+                    
+                    // 如果节点超出范围，调整位置
+                    if (nodeX < padding) {
+                        n.setLayoutX(padding);
+                        positionAdjusted = true;
+                    } else if (nodeX > maxX) {
+                        n.setLayoutX(maxX);
+                        positionAdjusted = true;
+                    }
+                    
+                    if (nodeY < padding) {
+                        n.setLayoutY(padding);
+                        positionAdjusted = true;
+                    } else if (nodeY > maxY) {
+                        n.setLayoutY(maxY);
+                        positionAdjusted = true;
+                    }
+                    
+                    // ⭐ 修复：只有在位置被调整时才延迟调用checkAndExpandContainer
+                    // 如果节点位置没有超出范围，不需要检查扩展
+                    if (positionAdjusted) {
+                        // 延迟调用checkAndExpandContainer，避免在节点移动过程中频繁更新
+                        javafx.application.Platform.runLater(() -> {
+                            // 检查是否需要扩展容器（只扩展右下角）
+                            checkAndExpandContainer();
+                        });
+                    } else {
+                        // 节点位置正常，只检查是否需要扩展容器（不限制位置时）
+                        javafx.application.Platform.runLater(() -> {
+                            checkAndExpandContainer();
+                        });
+                    }
                 });
             }
         }
@@ -685,11 +774,14 @@ public class ConditionNode extends StackPane {
         if (!managedCanvasNodes.isEmpty()) {
             double minX = Double.MAX_VALUE, minY = Double.MAX_VALUE;
             for (ProcessNode n : managedCanvasNodes) {
+                // ⭐ 修复：节点在contentLayer中，坐标已经是相对坐标
                 minX = Math.min(minX, n.getLayoutX());
                 minY = Math.min(minY, n.getLayoutY());
             }
-            originX = minX;
-            originY = minY;
+            // ⭐ 修复：如果minX或minY为负数，说明节点在条件节点左上角之外
+            // 应该将originX和originY设置为0，而不是负数，避免后续计算错误
+            originX = Math.max(0, minX);
+            originY = Math.max(0, minY);
             baseRelativePos.clear();
             for (ProcessNode n : managedCanvasNodes) {
                 baseRelativePos.put(n, new double[]{n.getLayoutX() - originX, n.getLayoutY() - originY});
@@ -750,10 +842,13 @@ public class ConditionNode extends StackPane {
             return;
         }
 
-        double minX = Double.MAX_VALUE, minY = Double.MAX_VALUE, maxX = 0, maxY = 0;
+        double minX = Double.MAX_VALUE, minY = Double.MAX_VALUE, maxX = Double.MIN_VALUE, maxY = Double.MIN_VALUE;
+        boolean hasNodes = false;
         
-        // 计算普通节点的边界
+        // 计算普通节点的边界（节点在contentLayer中，坐标是相对坐标）
         for (ProcessNode n : managedCanvasNodes) {
+            if (n == null) continue;
+            hasNodes = true;
             double nodeX = n.getLayoutX();
             double nodeY = n.getLayoutY();
             double nodeWidth = n.getPrefWidth();
@@ -765,76 +860,86 @@ public class ConditionNode extends StackPane {
             maxY = Math.max(maxY, nodeY + nodeHeight);
         }
         
-        // ⭐ 新增：计算嵌套条件节点的边界
+        // ⭐ 修复：计算嵌套条件节点的边界
+        // 嵌套的条件节点不在contentLayer中，它们的坐标是绝对坐标（相对于画布的）
+        // 需要转换为相对于contentLayer的坐标
         for (ConditionNode cn : managedConditionNodes) {
             if (cn != null && cn.isExpanded()) {
-                double cnX = cn.getLayoutX();
-                double cnY = cn.getLayoutY();
+                hasNodes = true;
+                // 嵌套条件节点的绝对坐标
+                double cnAbsoluteX = cn.getLayoutX();
+                double cnAbsoluteY = cn.getLayoutY();
                 double cnWidth = cn.getFrame().getWidth();
                 double cnHeight = cn.getFrame().getHeight();
+                
+                // 转换为相对于contentLayer的坐标
+                double containerX = getLayoutX();
+                double containerY = getLayoutY();
+                double headerHeight = header.getHeight();
+                double cnRelativeX = cnAbsoluteX - containerX;
+                double cnRelativeY = cnAbsoluteY - containerY - headerHeight;
 
-                minX = Math.min(minX, cnX);
-                minY = Math.min(minY, cnY);
-                maxX = Math.max(maxX, cnX + cnWidth);
-                maxY = Math.max(maxY, cnY + cnHeight);
+                minX = Math.min(minX, cnRelativeX);
+                minY = Math.min(minY, cnRelativeY);
+                maxX = Math.max(maxX, cnRelativeX + cnWidth);
+                maxY = Math.max(maxY, cnRelativeY + cnHeight);
             }
         }
 
-        double containerX = getLayoutX();
-        double containerY = getLayoutY();
+        // ⭐ 修复：如果没有节点，不调整
+        if (!hasNodes || minX == Double.MAX_VALUE || maxX == Double.MIN_VALUE) {
+            return;
+        }
+
+        // ⭐ 修复：minX和minY是相对于contentLayer的坐标
+        // 如果为负数，说明节点在条件节点左上角之外，应该限制节点移动而不是扩大条件节点
+        // 这里只处理节点超出右下角的情况，不处理左上角的情况
         double containerWidth = frame.getWidth();
         double containerHeight = frame.getHeight();
 
         double padding = 24;
-        double requiredMinX = minX - padding;
-        double requiredMinY = minY - padding - header.getHeight();
+        // 只计算右下角的扩展需求
+        double requiredMaxX = maxX + padding;
+        double requiredMaxY = maxY + padding;
 
         boolean needUpdate = false;
-        double newX = containerX;
-        double newY = containerY;
         double newWidth = containerWidth;
         double newHeight = containerHeight;
 
-        if (requiredMinX < containerX) {
-            newX = Math.max(0, requiredMinX);
-            newWidth = containerWidth + (containerX - newX);
+        // ⭐ 修复：只扩展右下角，不移动条件节点位置
+        // 如果节点在左上角之外（minX < 0 或 minY < 0），应该限制节点移动，而不是扩大条件节点
+        if (requiredMaxX > containerWidth) {
+            newWidth = Math.max(newWidth, requiredMaxX);
             needUpdate = true;
         }
 
-        if (requiredMinY < containerY) {
-            newY = Math.max(0, requiredMinY);
-            newHeight = containerHeight + (containerY - newY);
-            needUpdate = true;
-        }
-
-        if (maxX + padding > containerX + containerWidth) {
-            newWidth = Math.max(newWidth, maxX + padding - newX);
-            needUpdate = true;
-        }
-
-        if (maxY + padding > containerY + containerHeight) {
-            newHeight = Math.max(newHeight, maxY + padding - newY);
+        if (requiredMaxY > containerHeight - header.getHeight()) {
+            newHeight = Math.max(newHeight, requiredMaxY + header.getHeight());
             needUpdate = true;
         }
 
         if (needUpdate) {
-            newWidth = Math.max(320, newWidth);
-            newHeight = Math.max(160, newHeight);
+            // ⭐ 修复：限制条件节点的最大尺寸，避免异常扩大
+            double maxWidth = 2000; // 最大宽度
+            double maxHeight = 2000; // 最大高度
+            newWidth = Math.max(320, Math.min(newWidth, maxWidth));
+            newHeight = Math.max(160, Math.min(newHeight, maxHeight));
 
-            setLayoutX(newX);
-            setLayoutY(newY);
+            // ⭐ 修复：不移动条件节点位置，只调整大小
             frame.setWidth(newWidth);
             frame.setHeight(newHeight);
 
             layoutConnectors();
             updateResizeHandlesPosition();
 
-            originX = minX;
-            originY = minY;
-            baseRelativePos.clear();
-            for (ProcessNode n : managedCanvasNodes) {
-                baseRelativePos.put(n, new double[]{n.getLayoutX() - originX, n.getLayoutY() - originY});
-            }
+            // ⭐ 修复：不应该在checkAndExpandContainer中更新originX、originY和baseRelativePos
+            // 这些值应该只在bindCanvasNodes时设置一次，避免移动一个节点时影响其他节点的位置
+            // originX = Math.max(0, minX); // 移除：不应该在这里更新
+            // originY = Math.max(0, minY); // 移除：不应该在这里更新
+            // baseRelativePos.clear(); // 移除：不应该在这里更新
+            // for (ProcessNode n : managedCanvasNodes) {
+            //     baseRelativePos.put(n, new double[]{n.getLayoutX() - originX, n.getLayoutY() - originY});
+            // }
             
             // ⭐ 新增：如果存在父容器，通知父容器也调整大小
             if (parentContainer != null) {
@@ -877,13 +982,26 @@ public class ConditionNode extends StackPane {
             expanded = true;
             contentLayer.setVisible(true);
             contentLayer.setManaged(true);
+            // ⭐ 修复：确保所有管理的节点都可见，并且已添加到contentLayer
             for (ProcessNode n : managedCanvasNodes) {
-                n.setVisible(true);
-                n.setManaged(true);
+                if (n != null) {
+                    // 确保节点在contentLayer中
+                    if (!contentLayer.getChildren().contains(n)) {
+                        contentLayer.getChildren().add(n);
+                    }
+                    n.setVisible(true);
+                    n.setManaged(true);
+                }
             }
             for (ConditionNode cn : managedConditionNodes) {
-                cn.setVisible(true);
-                cn.setManaged(true);
+                if (cn != null) {
+                    // 确保嵌套的条件节点也在contentLayer中
+                    if (!contentLayer.getChildren().contains(cn)) {
+                        contentLayer.getChildren().add(cn);
+                    }
+                    cn.setVisible(true);
+                    cn.setManaged(true);
+                }
             }
             for (NodeConnection c : managedConnections) {
                 c.setVisible(true);
@@ -1005,15 +1123,25 @@ public class ConditionNode extends StackPane {
             maxY = Math.max(maxY, n.getLayoutY() + n.getPrefHeight());
         }
 
+        // ⭐ 修复：嵌套条件节点的坐标需要转换为相对于contentLayer的坐标
         for (ConditionNode cn : managedConditionNodes) {
-            double cnX = cn.getLayoutX();
-            double cnY = cn.getLayoutY();
+            // 嵌套条件节点的绝对坐标
+            double cnAbsoluteX = cn.getLayoutX();
+            double cnAbsoluteY = cn.getLayoutY();
             double cnWidth = cn.getFrame().getWidth();
             double cnHeight = cn.getFrame().getHeight();
-            minX = Math.min(minX, cnX);
-            minY = Math.min(minY, cnY);
-            maxX = Math.max(maxX, cnX + cnWidth);
-            maxY = Math.max(maxY, cnY + cnHeight);
+            
+            // 转换为相对于contentLayer的坐标
+            double containerX = getLayoutX();
+            double containerY = getLayoutY();
+            double headerHeight = header.getHeight();
+            double cnRelativeX = cnAbsoluteX - containerX;
+            double cnRelativeY = cnAbsoluteY - containerY - headerHeight;
+            
+            minX = Math.min(minX, cnRelativeX);
+            minY = Math.min(minY, cnRelativeY);
+            maxX = Math.max(maxX, cnRelativeX + cnWidth);
+            maxY = Math.max(maxY, cnRelativeY + cnHeight);
         }
 
         javafx.scene.Parent parent = getParent();
@@ -1050,10 +1178,25 @@ public class ConditionNode extends StackPane {
         }
 
         double padding = 24;
-        frame.setWidth(Math.max(320, (maxX - minX) + padding * 2));
-        frame.setHeight(Math.max(160, (maxY - minY) + padding * 2 + header.getHeight()));
-        setLayoutX(Math.max(0, minX - padding));
-        setLayoutY(Math.max(0, minY - (padding + header.getHeight())));
+        // ⭐ 修复：只调整frame的大小，不移动条件节点的位置
+        // minX和minY是相对于contentLayer的坐标，不应该用来移动条件节点的绝对位置
+        // 如果minX或minY为负数，说明节点在条件节点左上角之外，应该限制节点移动，而不是移动条件节点
+        double newWidth = Math.max(320, (maxX - minX) + padding * 2);
+        double newHeight = Math.max(160, (maxY - minY) + padding * 2 + header.getHeight());
+        
+        // ⭐ 修复：限制条件节点的最大尺寸，避免异常扩大
+        double maxWidth = 2000;
+        double maxHeight = 2000;
+        newWidth = Math.min(newWidth, maxWidth);
+        newHeight = Math.min(newHeight, maxHeight);
+        
+        frame.setWidth(newWidth);
+        frame.setHeight(newHeight);
+        
+        // ⭐ 修复：不移动条件节点位置，保持原有位置
+        // setLayoutX(Math.max(0, minX - padding)); // 移除：不应该移动条件节点位置
+        // setLayoutY(Math.max(0, minY - (padding + header.getHeight()))); // 移除：不应该移动条件节点位置
+        
         return true;
     }
 
@@ -1087,10 +1230,6 @@ public class ConditionNode extends StackPane {
 
     public double getZoom() {
         return zoom;
-    }
-
-    public Long getConditionId() {
-        return conditionId;
     }
 
     public String getConditionName() {

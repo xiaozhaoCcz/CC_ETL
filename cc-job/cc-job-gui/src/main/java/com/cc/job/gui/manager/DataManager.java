@@ -222,7 +222,7 @@ public class DataManager {
             }
             
             // 添加条件节点
-            for (com.cc.job.gui.model.ConditionNode conditionNode : conditionNodes) {
+            for (ConditionNode conditionNode : conditionNodes) {
                 if (conditionNode.getNodeId() == null || addedNodeIds.contains(conditionNode.getNodeId())) continue;
                 
                 Map<String, Object> nodeData = new HashMap<>();
@@ -232,10 +232,6 @@ public class DataManager {
                 nodeData.put("y", conditionNode.getLayoutY());
                 
                 Map<String, Object> propertiesMap = new HashMap<>();
-                if (conditionNode.getConditionId() != null && conditionNode.getConditionId() > 0) {
-                    propertiesMap.put("jobId", conditionNode.getConditionId());
-                }
-                
                 // 保存条件节点属性
                 if (conditionNode.getConditionExpression() != null) {
                     propertiesMap.put("conditionExpression", conditionNode.getConditionExpression());

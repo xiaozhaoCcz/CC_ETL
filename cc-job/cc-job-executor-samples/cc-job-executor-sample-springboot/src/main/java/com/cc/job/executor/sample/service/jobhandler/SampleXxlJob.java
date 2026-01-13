@@ -49,7 +49,7 @@ public class SampleXxlJob {
         }
          //default success
         XxlJobHelper.log(">>>>>>>> demoJobHandler1 end");
-        XxlJobHelper.executeResult(">>>>>>>> demoJobHandler1 result");
+        XxlJobHelper.executeResult("demoJobHandler1 result,测试添加分区");
         System.out.println(">>>>>>>> demoJobHandler1 end");
     }
 

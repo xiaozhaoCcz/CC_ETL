@@ -8,6 +8,7 @@ import com.cc.job.gui.model.GroupContainer;
 import com.cc.job.gui.model.JobComposeData;
 import com.cc.job.gui.model.NodeConnection;
 import com.cc.job.gui.model.ProcessNode;
+import com.cc.job.gui.util.NodeGraphStateManager;
 import com.cc.job.gui.util.NodeStatusSyncManager;
 import javafx.animation.AnimationTimer;
 import javafx.animation.PauseTransition;
@@ -1727,8 +1728,7 @@ public class NodeCanvas extends Pane {
                         
                         // 从全局管理器恢复节点状态（开始/终止/阻塞）
                         if (node.getJobId() != null) {
-                            com.cc.job.gui.util.NodeGraphStateManager stateManager = 
-                                com.cc.job.gui.util.NodeGraphStateManager.getInstance();
+                            NodeGraphStateManager stateManager = NodeGraphStateManager.getInstance();
                             
                             // 恢复图节点状态（开始/终止/阻塞）
                             ProcessNode.GraphNodeState savedState = stateManager.getNodeState(node.getJobId());
@@ -1905,8 +1905,21 @@ public class NodeCanvas extends Pane {
     private ConditionNode createConditionNodeFromData(JobComposeData.NodeData nodeData) {
         try {
             String nodeId = nodeData.getId();
-            Long conditionId = nodeData.getJobId();
-            String conditionName = nodeData.getJobName() != null ? nodeData.getJobName() : "条件节点";
+            // ⭐ 修复：条件节点的jobId应该为null，移除对jobId的依赖
+            // Long conditionId = nodeData.getJobId(); // 不再需要
+            
+            // ⭐ 修复：优化jobName获取逻辑，优先从conditionExpression获取
+            String conditionName = "条件节点";
+            if (nodeData.getProperties() != null) {
+                Object conditionExpr = nodeData.getProperties().get("conditionExpression");
+                if (conditionExpr != null && !conditionExpr.toString().trim().isEmpty()) {
+                    conditionName = conditionExpr.toString();
+                } else if (nodeData.getJobName() != null && !nodeData.getJobName().trim().isEmpty()) {
+                    conditionName = nodeData.getJobName();
+                }
+            } else if (nodeData.getJobName() != null && !nodeData.getJobName().trim().isEmpty()) {
+                conditionName = nodeData.getJobName();
+            }
             
             // 从properties读取conditionType
             ConditionNode.ConditionType conditionType = ConditionNode.ConditionType.IF;
@@ -1922,7 +1935,7 @@ public class NodeCanvas extends Pane {
                 }
             }
             
-            ConditionNode conditionNode = new ConditionNode(nodeId, conditionId, conditionName, conditionType);
+            ConditionNode conditionNode = new ConditionNode(nodeId,  conditionName, conditionType);
             
             // 设置位置
             if (nodeData.getX() != null && nodeData.getY() != null) {
@@ -1979,10 +1992,29 @@ public class NodeCanvas extends Pane {
         if (nodeData.getProperties() == null) return;
         
         Object childrenObj = nodeData.getProperties().get("children");
-        if (!(childrenObj instanceof List)) return;
+        
+        // ⭐ 修复：处理children字段可能是String（JSON字符串）或List的情况
+        List<?> childrenList = null;
+        if (childrenObj instanceof List) {
+            childrenList = (List<?>) childrenObj;
+        } else if (childrenObj instanceof String) {
+            // 如果是JSON字符串，尝试解析
+            try {
+                com.google.gson.Gson gson = com.cc.job.gui.util.ApiUtil.getInstance().getGson();
+                childrenList = gson.fromJson((String) childrenObj, new com.google.gson.reflect.TypeToken<List<Object>>(){}.getType());
+            } catch (Exception e) {
+                return;
+            }
+        } else if (childrenObj != null) {
+            return;
+        } else {
+            return;
+        }
+        
+        if (childrenList == null || childrenList.isEmpty()) return;
         
         List<String> childIds = new ArrayList<>();
-        for (Object childId : (List<?>) childrenObj) {
+        for (Object childId : childrenList) {
             if (childId != null) {
                 childIds.add(childId.toString());
             }
@@ -2009,7 +2041,6 @@ public class NodeCanvas extends Pane {
         
         // ⭐ 修复：绑定普通节点（绑定后，这些节点会从画布的nodes列表中移除）
         if (!childNodes.isEmpty()) {
-            conditionNode.bindCanvasNodes(childNodes);
             // 从画布的nodes列表中移除这些节点（因为它们现在由条件节点管理）
             for (ProcessNode childNode : childNodes) {
                 if (nodes.contains(childNode)) {
@@ -2017,6 +2048,9 @@ public class NodeCanvas extends Pane {
                     this.getChildren().remove(childNode);
                 }
             }
+            
+            // ⭐ 修复：绑定节点到条件节点（这会添加节点到contentLayer）
+            conditionNode.bindCanvasNodes(childNodes);
         }
         
         // ⭐ 修复：绑定嵌套的条件节点
@@ -2651,14 +2685,12 @@ public class NodeCanvas extends Pane {
     private void checkNodeInConditionContainer(ProcessNode node) {
         if (node == null) return;
         
-        // 递归检查所有条件节点（包括嵌套的）
+        // ⭐ 修复：递归检查所有条件节点（包括嵌套的）
         ConditionNode foundContainer = findConditionNodeContaining(node, conditionNodes);
         if (foundContainer != null) {
-            // 节点已经在某个容器中，检查是否还在容器内
-            if (!isNodeInContainer(node, foundContainer)) {
-                // 节点移出了容器，从容器中移除
-                removeNodeFromConditionContainer(node, foundContainer);
-            }
+            // ⭐ 修复：节点已经在容器的managedCanvasNodes中，说明它已经被正确管理
+            // 不需要检查位置，因为节点在contentLayer中时，坐标是相对坐标，位置检查会出错
+            // 节点在contentLayer中会自动跟随条件节点移动，所以只要在managedCanvasNodes中就认为在容器内
             return;
         }
         
@@ -2711,14 +2743,41 @@ public class NodeCanvas extends Pane {
     
     /**
      * 判断节点是否在条件节点容器内
+     * ⭐ 修复：如果节点已经在容器的managedCanvasNodes中，直接返回true
+     * 因为节点在contentLayer中时，坐标是相对坐标，不能直接用绝对坐标比较
      */
     private boolean isNodeInContainer(ProcessNode node, ConditionNode conditionNode) {
         if (node == null || conditionNode == null || !conditionNode.isExpanded()) {
             return false;
         }
         
+        // ⭐ 修复：如果节点已经在容器的managedCanvasNodes中，说明它已经被正确管理
+        // 节点在contentLayer中时，坐标是相对坐标，不需要检查位置
+        if (conditionNode.getManagedCanvasNodes().contains(node)) {
+            return true;
+        }
+        
+        // 如果节点不在managedCanvasNodes中，使用绝对坐标检查（节点可能在画布上）
+        // 获取节点的绝对坐标（如果节点在contentLayer中，需要转换）
         double nodeX = node.getLayoutX();
         double nodeY = node.getLayoutY();
+        
+        // ⭐ 修复：如果节点的父节点是contentLayer，需要将相对坐标转换为绝对坐标
+        javafx.scene.Node parent = node.getParent();
+        if (parent != null) {
+            // 检查父节点是否是contentLayer（通过检查父节点的父节点是否是条件节点）
+            javafx.scene.Node grandParent = parent.getParent();
+            if (grandParent != null && grandParent == conditionNode) {
+                // 节点在contentLayer中，需要转换为绝对坐标
+                double containerX = conditionNode.getLayoutX();
+                double containerY = conditionNode.getLayoutY();
+                // header高度估算为36（与下面的headerHeight一致）
+                double headerHeight = 36;
+                nodeX = containerX + nodeX;
+                nodeY = containerY + headerHeight + nodeY;
+            }
+        }
+        
         double nodeWidth = node.getPrefWidth();
         double nodeHeight = node.getPrefHeight();
         

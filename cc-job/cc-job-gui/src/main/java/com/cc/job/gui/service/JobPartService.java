@@ -75,46 +75,46 @@ public class JobPartService extends  BaseService {
     private JobComposeData parseJobComposeData(Map<String, Object> data) {
         JobComposeData composeData = new JobComposeData();
 
-        Object jobNodeObj = data.get("jobNode");
-        if (jobNodeObj instanceof Map) {
-            Map<?, ?> jnMap = (Map<?, ?>) jobNodeObj;
-            JobComposeData.NodeData jobNode = new JobComposeData.NodeData();
-            jobNode.setId(String.valueOf(jnMap.get("id")));
-            jobNode.setType(String.valueOf(jnMap.get("nodeType")));
-            jobNode.setJobName(String.valueOf(jnMap.get("jobName")));
-            if (jnMap.get("jobId") != null) {
-                try {
-                    jobNode.setJobId(((Number) jnMap.get("jobId")).longValue());
-                } catch (Exception ignored) {}
-            }
-            if (jnMap.get("nodePositionX") != null) {
-                jobNode.setX(((Number) jnMap.get("nodePositionX")).doubleValue());
-            }
-            if (jnMap.get("nodePositionY") != null) {
-                jobNode.setY(((Number) jnMap.get("nodePositionY")).doubleValue());
-            }
-            Map<String, Object> jnProps = new HashMap<>();
-            Object jnPropsObj = jnMap.get("properties");
-            if (jnPropsObj instanceof String) {
-                try {
-                    jnProps = apiUtil.getGson().fromJson(
-                            (String) jnPropsObj,
-                            new TypeToken<Map<String, Object>>(){}.getType()
-                    );
-                } catch (Exception e) {
-                    logger.error("解析 jobNode.properties 失败: {}", e.getMessage(), e);
-                }
-            } else if (jnPropsObj instanceof Map) {
-                //noinspection unchecked
-                jnProps = (Map<String, Object>) jnPropsObj;
-            }
-            Object jnChildren = jnMap.get("children");
-            if (jnChildren != null) {
-                jnProps.put("children", jnChildren);
-            }
-            jobNode.setProperties(jnProps);
-            composeData.setJobNode(jobNode);
-        }
+//        Object jobNodeObj = data.get("jobNode");
+//        if (jobNodeObj instanceof Map) {
+//            Map<?, ?> jnMap = (Map<?, ?>) jobNodeObj;
+//            JobComposeData.NodeData jobNode = new JobComposeData.NodeData();
+//            jobNode.setId(String.valueOf(jnMap.get("id")));
+//            jobNode.setType(String.valueOf(jnMap.get("nodeType")));
+//            jobNode.setJobName(String.valueOf(jnMap.get("jobName")));
+//            if (jnMap.get("jobId") != null) {
+//                try {
+//                    jobNode.setJobId(((Number) jnMap.get("jobId")).longValue());
+//                } catch (Exception ignored) {}
+//            }
+//            if (jnMap.get("nodePositionX") != null) {
+//                jobNode.setX(((Number) jnMap.get("nodePositionX")).doubleValue());
+//            }
+//            if (jnMap.get("nodePositionY") != null) {
+//                jobNode.setY(((Number) jnMap.get("nodePositionY")).doubleValue());
+//            }
+//            Map<String, Object> jnProps = new HashMap<>();
+//            Object jnPropsObj = jnMap.get("properties");
+//            if (jnPropsObj instanceof String) {
+//                try {
+//                    jnProps = apiUtil.getGson().fromJson(
+//                            (String) jnPropsObj,
+//                            new TypeToken<Map<String, Object>>(){}.getType()
+//                    );
+//                } catch (Exception e) {
+//                    logger.error("解析 jobNode.properties 失败: {}", e.getMessage(), e);
+//                }
+//            } else if (jnPropsObj instanceof Map) {
+//                //noinspection unchecked
+//                jnProps = (Map<String, Object>) jnPropsObj;
+//            }
+//            Object jnChildren = jnMap.get("children");
+//            if (jnChildren != null) {
+//                jnProps.put("children", jnChildren);
+//            }
+//            jobNode.setProperties(jnProps);
+//            composeData.setJobNode(jobNode);
+//        }
 
         Object nodesObj = data.get("nodes");
         if (nodesObj instanceof List) {

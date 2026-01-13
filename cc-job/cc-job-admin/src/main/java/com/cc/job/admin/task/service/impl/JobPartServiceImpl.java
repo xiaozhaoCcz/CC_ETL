@@ -69,16 +69,36 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
         if(!jobInfoIds.isEmpty()){
             jobNodeList = jobNodeService.list(new LambdaQueryWrapper<JobNode>().in(JobNode::getJobParentId, jobInfoIds));
             jobEdgeList = jobEdgeService.list(new LambdaQueryWrapper<JobEdge>().in(JobEdge::getJobParentId, jobInfoIds));
-            Map<Long, Long> jobIdToJobNodeIdMap = jobNodeList.stream().collect(Collectors.toMap(JobNode::getJobId, JobNode::getId));
+            // ⭐ 修复：只处理有jobId的节点（普通节点和任务组节点）
+            Map<Long, Long> jobIdToJobNodeIdMap = jobNodeList.stream()
+                .filter(node -> node.getJobId() != null) // 过滤掉条件节点（jobId为null）
+                .collect(Collectors.toMap(JobNode::getJobId, JobNode::getId));
             if(!jobIdToJobNodeIdMap.isEmpty()){
                 List<JobInfo> jobInfoList2 = jobInfoService.listByIds(jobIdToJobNodeIdMap.keySet());
                 Map<Long, String> jobInfoDescMap = jobInfoList2.stream().collect(Collectors.toMap(JobInfo::getId, JobInfo::getJobDesc));
                 jobInfoDescMap.forEach((k, v) -> jobNodeDescMap.put(jobIdToJobNodeIdMap.get(k), v));
             }
+            // ⭐ 修复：处理条件节点，从conditionExpression获取名称
+            for (JobNode jobNode : jobNodeList) {
+                // 判断是否为条件节点：nodeType为ConditionNode且jobId为null
+                if (jobNode.getJobId() == null && 
+                    (jobNode.getNodeType() != null && 
+                     ("ConditionNode".equalsIgnoreCase(jobNode.getNodeType()) || 
+                      "condition-node".equalsIgnoreCase(jobNode.getNodeType())))) {
+                    String conditionName = "条件节点"; // 默认值
+                    if (jobNode.getConditionExpression() != null && !jobNode.getConditionExpression().trim().isEmpty()) {
+                        conditionName = jobNode.getConditionExpression().trim();
+                    }
+                    jobNodeDescMap.put(jobNode.getId(), conditionName);
+                }
+            }
         }
 
         Map<Long, List<JobNode>> jobNodeMap = jobNodeList.stream().collect(Collectors.groupingBy(JobNode::getJobParentId));
         Map<Long, List<JobEdge>> jobEdgeMap = jobEdgeList.stream().collect(Collectors.groupingBy(JobEdge::getJobParentId));
+        // ⭐ 修复：创建nodeId到JobNode的映射，用于边标签构建时查找节点
+        Map<Long, JobNode> nodeIdToJobNodeMap = jobNodeList.stream()
+            .collect(Collectors.toMap(JobNode::getId, node -> node, (existing, replacement) -> existing));
 
         for (JobPart jobPart : jobPartList) {
             JobPartVo jobPartVo = new JobPartVo();
@@ -108,7 +128,8 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
                         for (JobNode jobNode : jobNodes) {
                             JobPartVo jobPartVoNode1 = new JobPartVo();
                             jobPartVoNode1.setId(jobNode.getId());
-                            jobPartVoNode1.setLabel(jobNodeDescMap.get(jobNode.getId()).trim());
+                            // ⭐ 修复：使用辅助方法获取节点描述，统一处理条件节点和普通节点
+                            jobPartVoNode1.setLabel(getNodeDescription(jobNode, jobNodeDescMap));
                             jobPartVoNode1.setType(4);
                             jobPartVoNode1.setExt1(String.valueOf(jobNode.getJobId()));
                             childrenJobPartVo2.add(jobPartVoNode1);
@@ -128,7 +149,12 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
                         for (JobEdge jobEdge : jobEdges) {
                             JobPartVo jobPartVoEdge1 = new JobPartVo();
                             jobPartVoEdge1.setId(jobEdge.getId());
-                            jobPartVoEdge1.setLabel((jobNodeDescMap.get(jobEdge.getFromNodeId()) + "➡" + jobNodeDescMap.get(jobEdge.getEndNodeId())).trim());
+                            // ⭐ 修复：使用辅助方法获取源节点和目标节点的描述，统一处理条件节点和普通节点
+                            JobNode fromNode = nodeIdToJobNodeMap.get(jobEdge.getFromNodeId());
+                            JobNode endNode = nodeIdToJobNodeMap.get(jobEdge.getEndNodeId());
+                            String fromNodeDesc = fromNode != null ? getNodeDescription(fromNode, jobNodeDescMap) : "未知节点";
+                            String endNodeDesc = endNode != null ? getNodeDescription(endNode, jobNodeDescMap) : "未知节点";
+                            jobPartVoEdge1.setLabel(fromNodeDesc + "➡" + endNodeDesc);
                             jobPartVoEdge1.setType(5);
                             childrenJobPartVo3.add(jobPartVoEdge1);
                         }
@@ -146,6 +172,38 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
             jobPartVos.add(jobPartVo);
         }
         return jobPartVos;
+    }
+
+    /**
+     * 获取节点描述（统一处理普通节点和条件节点）
+     * @param jobNode 节点对象
+     * @param jobNodeDescMap 节点描述Map（包含普通节点的描述）
+     * @return 节点描述
+     */
+    private String getNodeDescription(JobNode jobNode, Map<Long, String> jobNodeDescMap) {
+        if (jobNode == null) {
+            return "未知节点";
+        }
+        
+        // 先从Map中查找（普通节点和任务组节点）
+        String description = jobNodeDescMap.get(jobNode.getId());
+        if (description != null && !description.trim().isEmpty()) {
+            return description.trim();
+        }
+        
+        // 如果是条件节点，从conditionExpression获取
+        if (jobNode.getJobId() == null && 
+            (jobNode.getNodeType() != null && 
+             ("ConditionNode".equalsIgnoreCase(jobNode.getNodeType()) || 
+              "condition-node".equalsIgnoreCase(jobNode.getNodeType())))) {
+            if (jobNode.getConditionExpression() != null && !jobNode.getConditionExpression().trim().isEmpty()) {
+                return jobNode.getConditionExpression().trim();
+            }
+            return "条件节点";
+        }
+        
+        // 默认值
+        return "未知节点";
     }
 
     @Override

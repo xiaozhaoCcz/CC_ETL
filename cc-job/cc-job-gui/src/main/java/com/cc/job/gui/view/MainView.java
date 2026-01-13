@@ -1227,13 +1227,8 @@ public class MainView extends BorderPane {
                         
                         // 在主线程中更新UI
                         Platform.runLater(() -> {
-                            // 安全地解析可能包含小数点的数字（如 25850.0）
-                            Long jobId = parseToLong(createResult.get("jobId"));
                             Long nodeId = parseToLong(createResult.get("nodeId"));
-                            
-                            // 创建条件节点，使用数据库返回的ID
-                            String frontendNodeId = "randomId-" + nodeId; // 前端显示用的ID
-                            ConditionNode conditionNode = new ConditionNode(frontendNodeId, jobId, data.getConditionName(), data.getConditionType());
+                            ConditionNode conditionNode = new ConditionNode(String.valueOf(nodeId), data.getConditionName(), data.getConditionType());
                             conditionNode.setConditionExpression(data.getConditionExpression());
                             conditionNode.setExpressionType(data.getExpressionType());
                             

@@ -28,6 +28,8 @@ public class JobNode extends BaseEntity {
 
     private String nodeType;
 
+    private String nodeParentId;
+
     /**
      * 条件表达式（条件节点专用）
      */
@@ -53,18 +55,6 @@ public class JobNode extends BaseEntity {
      */
     private String tags;
 
-    @Override
-    public boolean equals(Object o) {
-        if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
-        JobNode taskNode = (JobNode) o;
-        return Objects.equals(jobId, taskNode.jobId) && Objects.equals(jobParentId, taskNode.jobParentId) && Objects.equals(nodePositionX, taskNode.nodePositionX) && Objects.equals(nodePositionY, taskNode.nodePositionY) && Objects.equals(nodeInDegree, taskNode.nodeInDegree) && Objects.equals(nodeOutDegree, taskNode.nodeOutDegree) && Objects.equals(sort, taskNode.sort);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(super.hashCode(), jobId, jobParentId, nodePositionX, nodePositionY, nodeInDegree, nodeOutDegree, sort);
-    }
 
     public Long getJobId() {
         return jobId;
@@ -186,24 +176,12 @@ public class JobNode extends BaseEntity {
         this.tags = tags;
     }
 
-    @Override
-    public String toString() {
-        return "JobNode{" +
-                "jobId=" + jobId +
-                ", jobParentId=" + jobParentId +
-                ", nodePositionX=" + nodePositionX +
-                ", nodePositionY=" + nodePositionY +
-                ", nodeInDegree=" + nodeInDegree +
-                ", nodeOutDegree=" + nodeOutDegree +
-                ", sort=" + sort +
-                ", children='" + children + '\'' +
-                ", properties='" + properties + '\'' +
-                ", nodeType='" + nodeType + '\'' +
-                ", conditionExpression='" + conditionExpression + '\'' +
-                ", expressionType='" + expressionType + '\'' +
-                ", triggerStatus=" + triggerStatus +
-                ", remark='" + remark + '\'' +
-                ", tags='" + tags + '\'' +
-                '}';
+    public String getNodeParentId() {
+        return nodeParentId;
     }
+
+    public void setNodeParentId(String nodeParentId) {
+        this.nodeParentId = nodeParentId;
+    }
+
 }
