@@ -1,6 +1,7 @@
 package com.cc.job.gui.manager;
 
 import com.cc.job.gui.service.*;
+import com.cc.job.gui.util.NotificationToast;
 import com.cc.job.gui.view.*;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.entity.JobNode;
@@ -62,26 +63,33 @@ public class DialogManager {
             Optional<String> result = dialog.showAndWait();
             
             result.ifPresent(partitionName -> {
-                logPanel.info("📝 创建新分区: " + partitionName);
+                logger.info("📝 创建新分区: " + partitionName);
                 
                 new Thread(() -> {
                     try {
                         boolean success = jobPartService.saveJobPart(partitionName);
                         Platform.runLater(() -> {
                             if (success) {
-                                logPanel.success("✓ 分区创建成功: " + partitionName);
+                                logger.info("✓ 分区创建成功: " + partitionName);
                                 if (onSuccess != null) onSuccess.run();
                             } else {
-                                logPanel.error("✗ 分区创建失败");
+                                NotificationToast.showError("✗ 分区创建失败");
+                                logger.error("✗ 分区创建失败");
                             }
                         });
                     } catch (Exception e) {
-                        Platform.runLater(() -> logPanel.error("✗ 创建失败: " + e.getMessage()));
+                        Platform.runLater(() -> {
+                            NotificationToast.showError("✗ 创建失败: " + e.getMessage());
+                        });
+                        logger.error("✗ 创建失败: {}", e.getMessage());
                     }
                 }).start();
             });
         } catch (Exception e) {
-            logPanel.error("✗ 打开对话框失败: " + e.getMessage());
+            Platform.runLater(() -> {
+                NotificationToast.showError("✗ 打开对话框失败: " + e.getMessage());
+            });
+            logger.error("✗ 打开对话框失败: {}", e.getMessage());
         }
     }
     
@@ -97,26 +105,33 @@ public class DialogManager {
             Optional<String> result = dialog.showAndWait();
             
             result.ifPresent(newPartitionName -> {
-                logPanel.info("📝 编辑分区: " + partitionName + " -> " + newPartitionName);
+                logger.info("📝 编辑分区: " + partitionName + " -> " + newPartitionName);
                 
                 new Thread(() -> {
                     try {
                         boolean success = jobPartService.updateJobPart(partitionId, newPartitionName);
                         Platform.runLater(() -> {
                             if (success) {
-                                logPanel.success("✓ 分区更新成功: " + newPartitionName);
+                                logger.info("✓ 分区更新成功: " + newPartitionName);
                                 if (onSuccess != null) onSuccess.run();
                             } else {
-                                logPanel.error("✗ 分区更新失败");
+                                NotificationToast.showError("✗ 分区更新失败");
+                                logger.error("✗ 分区更新失败");
                             }
                         });
                     } catch (Exception e) {
-                        Platform.runLater(() -> logPanel.error("✗ 更新失败: " + e.getMessage()));
+                        Platform.runLater(() -> {
+                            NotificationToast.showError("✗ 更新失败: " + e.getMessage());
+                        });
+                        logger.error("✗ 更新失败: {}", e.getMessage());
                     }
                 }).start();
             });
         } catch (Exception e) {
-            logPanel.error("✗ 打开对话框失败: " + e.getMessage());
+            Platform.runLater(() -> {
+                NotificationToast.showError("✗ 打开对话框失败: " + e.getMessage());
+            });
+            logger.error("✗ 打开对话框失败: {}", e.getMessage());
         }
     }
     
@@ -142,23 +157,33 @@ public class DialogManager {
                                     
                                     Platform.runLater(() -> {
                                         if (success) {
-                                            logPanel.success(editData == null ? "✓ 任务组创建成功" : "✓ 任务组更新成功");
+                                            logger.info(editData == null ? "✓ 任务组创建成功" : "✓ 任务组更新成功");
                                             if (onSuccess != null) onSuccess.run();
                                         } else {
-                                            logPanel.error("✗ 操作失败");
+                                            NotificationToast.showError("✗ 操作失败");
+                                            logger.error("✗ 操作失败");
                                         }
                                     });
                                 } catch (Exception e) {
-                                    Platform.runLater(() -> logPanel.error("✗ 保存失败: " + e.getMessage()));
+                                    Platform.runLater(() -> {
+                                        NotificationToast.showError("✗ 保存失败: " + e.getMessage());
+                                    });
+                                    logger.error("✗ 保存失败: {}", e.getMessage());
                                 }
                             }).start();
                         });
                     } catch (Exception e) {
-                        logPanel.error("✗ 打开对话框失败: " + e.getMessage());
+                        Platform.runLater(() -> {
+                            NotificationToast.showError("✗ 打开对话框失败: " + e.getMessage());
+                        });
+                        logger.error("✗ 打开对话框失败: {}", e.getMessage());
                     }
                 });
             } catch (Exception e) {
-                Platform.runLater(() -> logPanel.error("✗ 加载执行器列表失败: " + e.getMessage()));
+                Platform.runLater(() -> {
+                    NotificationToast.showError("✗ 加载执行器列表失败: " + e.getMessage());
+                });
+                logger.error("✗ 加载执行器列表失败: {}", e.getMessage());
             }
         }).start();
     }
@@ -182,23 +207,33 @@ public class DialogManager {
                                     JobNode jobNode = jobInfoService.saveJobNode(formData);
                                     Platform.runLater(() -> {
                                         if (jobNode != null) {
-                                            logPanel.success(editData == null ? "✓ 节点创建成功" : "✓ 节点更新成功");
+                                            logger.info(editData == null ? "✓ 节点创建成功" : "✓ 节点更新成功");
                                             if (onSuccess != null) onSuccess.run();
                                         } else {
-                                            logPanel.error("✗ 操作失败");
+                                            NotificationToast.showError("✗ 操作失败");
+                                            logger.error("✗ 操作失败");
                                         }
                                     });
                                 } catch (Exception e) {
-                                    Platform.runLater(() -> logPanel.error("✗ 保存失败: " + e.getMessage()));
+                                    Platform.runLater(() -> {
+                                        NotificationToast.showError("✗ 保存失败: " + e.getMessage());
+                                    });
+                                    logger.error("✗ 保存失败: {}", e.getMessage());
                                 }
                             }).start();
                         });
                     } catch (Exception e) {
-                        logPanel.error("✗ 打开对话框失败: " + e.getMessage());
+                        Platform.runLater(() -> {
+                            NotificationToast.showError("✗ 打开对话框失败: " + e.getMessage());
+                        });
+                        logger.error("✗ 打开对话框失败: {}", e.getMessage());
                     }
                 });
             } catch (Exception e) {
-                Platform.runLater(() -> logPanel.error("✗ 加载执行器列表失败: " + e.getMessage()));
+                Platform.runLater(() -> {
+                    NotificationToast.showError("✗ 加载执行器列表失败: " + e.getMessage());
+                });
+                logger.error("✗ 加载执行器列表失败: {}", e.getMessage());
             }
         }).start();
     }
@@ -222,24 +257,32 @@ public class DialogManager {
                                 try {
                                     long jobId = jobInfoService.saveJobInfo(formData);
                                     Platform.runLater(() -> {
-                                        if (jobId > 0) {
-                                            logPanel.success(editData == null ? "✓ 任务创建成功" : "✓ 任务更新成功");
-                                            if (onSuccess != null) onSuccess.run();
+                                        if (jobId > 0 && onSuccess != null) {
+                                            onSuccess.run();
                                         } else {
-                                            logPanel.error("✗ 操作失败");
+                                            NotificationToast.showError("✗ 操作失败");
                                         }
                                     });
                                 } catch (Exception e) {
-                                    Platform.runLater(() -> logPanel.error("✗ 保存失败: " + e.getMessage()));
+                                    Platform.runLater(() -> {
+                                        NotificationToast.showError("✗ 保存失败: " + e.getMessage());
+                                    });
+                                    logger.error("✗ 保存失败: {}", e.getMessage());
                                 }
                             }).start();
                         });
                     } catch (Exception e) {
-                        logPanel.error("✗ 打开对话框失败: " + e.getMessage());
+                        Platform.runLater(() -> {
+                            NotificationToast.showError("✗ 打开对话框失败: " + e.getMessage());
+                        });
+                        logger.error("✗ 打开对话框失败: {}", e.getMessage());
                     }
                 });
             } catch (Exception e) {
-                Platform.runLater(() -> logPanel.error("✗ 加载执行器列表失败: " + e.getMessage()));
+                Platform.runLater(() -> {
+                    NotificationToast.showError("✗ 加载执行器列表失败: " + e.getMessage());
+                });
+                logger.error("✗ 加载执行器列表失败: {}", e.getMessage());
             }
         }).start();
     }

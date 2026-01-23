@@ -13,6 +13,9 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -282,7 +285,7 @@ public class TopToolBar extends VBox {
         // 新建子菜单
         Menu newItem = new Menu("新建");
         MenuItem newJobItem = new MenuItem("新建任务");
-        newJobItem.setAccelerator(new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.N, javafx.scene.input.KeyCombination.CONTROL_DOWN));
+        newJobItem.setAccelerator(new KeyCodeCombination(KeyCode.N, KeyCombination.CONTROL_DOWN));
         newJobItem.setOnAction(e -> safeCall(ToolBarCallback::onNew));
         MenuItem newJobPartItem = new MenuItem("新建分区");
         newJobPartItem.setOnAction(e -> safeCall(ToolBarCallback::onNewPart));
@@ -290,7 +293,7 @@ public class TopToolBar extends VBox {
         
         // 打开
         MenuItem openItem = new MenuItem("打开");
-        openItem.setAccelerator(new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.O, javafx.scene.input.KeyCombination.CONTROL_DOWN));
+        openItem.setAccelerator(new KeyCodeCombination(KeyCode.O, KeyCombination.CONTROL_DOWN));
         openItem.setOnAction(e -> safeCall(ToolBarCallback::onOpen));
         
         // 保存
@@ -455,7 +458,10 @@ public class TopToolBar extends VBox {
         selectConditionNodesItem.setOnAction(e -> safeCall(cb -> cb.onSelectByType("CONDITION")));
         MenuItem selectEdgesItem = new MenuItem("选择所有连线");
         selectEdgesItem.setOnAction(e -> safeCall(cb -> cb.onSelectByType("EDGE")));
-        selectByTypeMenu.getItems().addAll(selectTaskNodesItem, selectConditionNodesItem, selectEdgesItem);
+        selectByTypeMenu.getItems().addAll(
+                selectTaskNodesItem,
+                //selectConditionNodesItem,
+                selectEdgesItem);
         
         MenuItem clearSelectionItem = new MenuItem("清除选择");
         clearSelectionItem.setOnAction(e -> safeCall(ToolBarCallback::onClearSelection));

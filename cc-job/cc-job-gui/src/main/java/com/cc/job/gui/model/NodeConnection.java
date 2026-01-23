@@ -205,11 +205,27 @@ public class NodeConnection extends Group {
     
     /**
      * 创建连接点中心X坐标的绑定
+     * ⭐ 修复：正确处理节点在条件容器contentLayer中的情况
      */
     private DoubleBinding createConnectorCenterXBinding(Node owner, Pane connectorParent, Circle connector) {
         return new DoubleBinding() {
             {
-                super.bind(owner.layoutXProperty(), connector.layoutXProperty());
+                // 绑定所有可能影响坐标的属性
+                super.bind(owner.layoutXProperty(), owner.layoutYProperty(), 
+                          connector.layoutXProperty(), connector.layoutYProperty());
+                // 绑定connectorParent的位置属性（如果它在场景图中移动）
+                if (connectorParent != null) {
+                    super.bind(connectorParent.layoutXProperty(), connectorParent.layoutYProperty());
+                }
+                // 绑定NodeConnection的父节点属性（如果存在）
+                if (NodeConnection.this.getParent() != null) {
+                    super.bind(NodeConnection.this.getParent().layoutXProperty(), 
+                              NodeConnection.this.getParent().layoutYProperty());
+                }
+                // 监听父节点变化，当NodeConnection被添加到场景图时重新计算
+                NodeConnection.this.parentProperty().addListener((obs, oldParent, newParent) -> {
+                    invalidate();
+                });
             }
             @Override
             protected double computeValue() {
@@ -218,20 +234,49 @@ public class NodeConnection extends Group {
                     connector.getLayoutX(),
                     connector.getLayoutY()
                 );
-                Point2D nodeLocal = connectorParent.localToParent(connectorCenter);
-                Point2D parentLocal = owner.localToParent(nodeLocal);
-                return parentLocal.getX();
+                
+                // ⭐ 修复：使用localToScene和sceneToLocal来正确转换坐标
+                // 这样可以正确处理节点在contentLayer中的情况
+                Point2D scenePoint = connectorParent.localToScene(connectorCenter);
+                
+                // NodeConnection的父节点应该是NodeCanvas
+                javafx.scene.Node connectionParent = NodeConnection.this.getParent();
+                if (connectionParent != null) {
+                    Point2D canvasLocal = connectionParent.sceneToLocal(scenePoint);
+                    return canvasLocal.getX();
+                } else {
+                    // 如果NodeConnection还没有父节点，使用原来的方法作为后备
+                    Point2D nodeLocal = connectorParent.localToParent(connectorCenter);
+                    Point2D parentLocal = owner.localToParent(nodeLocal);
+                    return parentLocal.getX();
+                }
             }
         };
     }
     
     /**
      * 创建连接点中心Y坐标的绑定
+     * ⭐ 修复：正确处理节点在条件容器contentLayer中的情况
      */
     private DoubleBinding createConnectorCenterYBinding(Node owner, Pane connectorParent, Circle connector) {
         return new DoubleBinding() {
             {
-                super.bind(owner.layoutYProperty(), connector.layoutYProperty());
+                // 绑定所有可能影响坐标的属性
+                super.bind(owner.layoutXProperty(), owner.layoutYProperty(), 
+                          connector.layoutXProperty(), connector.layoutYProperty());
+                // 绑定connectorParent的位置属性（如果它在场景图中移动）
+                if (connectorParent != null) {
+                    super.bind(connectorParent.layoutXProperty(), connectorParent.layoutYProperty());
+                }
+                // 绑定NodeConnection的父节点属性（如果存在）
+                if (NodeConnection.this.getParent() != null) {
+                    super.bind(NodeConnection.this.getParent().layoutXProperty(), 
+                              NodeConnection.this.getParent().layoutYProperty());
+                }
+                // 监听父节点变化，当NodeConnection被添加到场景图时重新计算
+                NodeConnection.this.parentProperty().addListener((obs, oldParent, newParent) -> {
+                    invalidate();
+                });
             }
             @Override
             protected double computeValue() {
@@ -240,9 +285,22 @@ public class NodeConnection extends Group {
                     connector.getLayoutX(),
                     connector.getLayoutY()
                 );
-                Point2D nodeLocal = connectorParent.localToParent(connectorCenter);
-                Point2D parentLocal = owner.localToParent(nodeLocal);
-                return parentLocal.getY();
+                
+                // ⭐ 修复：使用localToScene和sceneToLocal来正确转换坐标
+                // 这样可以正确处理节点在contentLayer中的情况
+                Point2D scenePoint = connectorParent.localToScene(connectorCenter);
+                
+                // NodeConnection的父节点应该是NodeCanvas
+                javafx.scene.Node connectionParent = NodeConnection.this.getParent();
+                if (connectionParent != null) {
+                    Point2D canvasLocal = connectionParent.sceneToLocal(scenePoint);
+                    return canvasLocal.getY();
+                } else {
+                    // 如果NodeConnection还没有父节点，使用原来的方法作为后备
+                    Point2D nodeLocal = connectorParent.localToParent(connectorCenter);
+                    Point2D parentLocal = owner.localToParent(nodeLocal);
+                    return parentLocal.getY();
+                }
             }
         };
     }

@@ -17,8 +17,10 @@ import org.kordamp.ikonli.javafx.FontIcon;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 
 /**
@@ -595,7 +597,8 @@ public class ConditionNode extends StackPane {
                     
                     // ⭐ 修复：节点在contentLayer中时，会自动跟随条件节点移动
                     // 因为contentLayer是条件节点的子节点，所以不需要手动更新节点坐标
-                    // 但是需要更新originX和originY，以及嵌套的条件节点
+                    // 嵌套的条件节点也在contentLayer中，也会自动跟随
+                    // 但是需要更新originX和originY（用于计算相对位置）
                     
                     // 更新originX和originY（用于计算相对位置）
                     if (!managedCanvasNodes.isEmpty()) {
@@ -603,13 +606,7 @@ public class ConditionNode extends StackPane {
                         originY += dy;
                     }
                     
-                    // ⭐ 修复：移动嵌套的条件节点（它们不在contentLayer中，需要手动更新）
-                    if (!managedConditionNodes.isEmpty()) {
-                        for (ConditionNode cn : managedConditionNodes) {
-                            cn.setLayoutX(cn.getLayoutX() + dx);
-                            cn.setLayoutY(cn.getLayoutY() + dy);
-                        }
-                    }
+                    // ⭐ 修复：嵌套的条件节点也在contentLayer中，会自动跟随，不需要手动更新
                 } finally {
                     isContainerDragging = false;
                 }
@@ -654,20 +651,86 @@ public class ConditionNode extends StackPane {
     }
 
     public void bindCanvasNodes(List<ProcessNode> nodesOnCanvas) {
-        // ⭐ 修复：先移除旧的节点从contentLayer
-        for (ProcessNode oldNode : managedCanvasNodes) {
-            if (oldNode != null) {
-                Consumer<ProcessNode> originalCallback = originalPositionCallbacks.get(oldNode);
-                if (originalCallback != null) {
-                    oldNode.setOnPositionChanged(originalCallback);
-                } else {
-                    oldNode.setOnPositionChanged(null);
+        // #region agent log
+        try {
+            java.io.FileWriter fw = new java.io.FileWriter("/Users/xiaozhao/Desktop/xz/IdeaProject/Cc_ETL/.cursor/debug.log", true);
+            java.util.Map<String, Object> logData = new java.util.HashMap<>();
+            logData.put("sessionId", "debug-session");
+            logData.put("runId", "run2");
+            logData.put("hypothesisId", "G");
+            logData.put("location", "ConditionNode.java:651");
+            logData.put("message", "bindCanvasNodes: entry");
+            java.util.Map<String, Object> data = new java.util.HashMap<>();
+            data.put("oldManagedNodesCount", managedCanvasNodes.size());
+            data.put("newNodesCount", nodesOnCanvas != null ? nodesOnCanvas.size() : 0);
+            java.util.List<String> oldNodeIds = new java.util.ArrayList<>();
+            for (ProcessNode n : managedCanvasNodes) {
+                if (n != null) {
+                    oldNodeIds.add(n.getNodeId() != null ? n.getNodeId() : "null");
                 }
-                // 从contentLayer中移除
-                contentLayer.getChildren().remove(oldNode);
+            }
+            data.put("oldNodeIds", oldNodeIds);
+            java.util.List<String> newNodeIds = new java.util.ArrayList<>();
+            if (nodesOnCanvas != null) {
+                for (ProcessNode n : nodesOnCanvas) {
+                    if (n != null) {
+                        newNodeIds.add(n.getNodeId() != null ? n.getNodeId() : "null");
+                    }
+                }
+            }
+            data.put("newNodeIds", newNodeIds);
+            logData.put("data", data);
+            logData.put("timestamp", System.currentTimeMillis());
+            fw.write(new com.google.gson.Gson().toJson(logData) + "\n");
+            fw.close();
+        } catch (Exception e) {}
+        // #endregion
+        
+        // ⭐ 修复：先移除旧的节点从contentLayer（只移除不在新列表中的节点）
+        // 这样可以避免移除所有节点，然后重新添加
+        Set<ProcessNode> newNodesSet = nodesOnCanvas != null ? new HashSet<>(nodesOnCanvas) : new HashSet<>();
+        
+        for (ProcessNode oldNode : new java.util.ArrayList<>(managedCanvasNodes)) {
+            if (oldNode != null) {
+                // 如果旧节点不在新列表中，才移除它
+                if (!newNodesSet.contains(oldNode)) {
+                    Consumer<ProcessNode> originalCallback = originalPositionCallbacks.get(oldNode);
+                    if (originalCallback != null) {
+                        oldNode.setOnPositionChanged(originalCallback);
+                    } else {
+                        oldNode.setOnPositionChanged(null);
+                    }
+                    // 从contentLayer中移除
+                    contentLayer.getChildren().remove(oldNode);
+                    
+                    // #region agent log
+                    try {
+                        java.io.FileWriter fw = new java.io.FileWriter("/Users/xiaozhao/Desktop/xz/IdeaProject/Cc_ETL/.cursor/debug.log", true);
+                        java.util.Map<String, Object> logData = new java.util.HashMap<>();
+                        logData.put("sessionId", "debug-session");
+                        logData.put("runId", "run2");
+                        logData.put("hypothesisId", "G");
+                        logData.put("location", "ConditionNode.java:662");
+                        logData.put("message", "bindCanvasNodes: removing old node");
+                        java.util.Map<String, Object> data = new java.util.HashMap<>();
+                        data.put("nodeId", oldNode.getNodeId() != null ? oldNode.getNodeId() : "null");
+                        data.put("nodeName", oldNode.getJobHandlerName() != null ? oldNode.getJobHandlerName() : "null");
+                        logData.put("data", data);
+                        logData.put("timestamp", System.currentTimeMillis());
+                        fw.write(new com.google.gson.Gson().toJson(logData) + "\n");
+                        fw.close();
+                    } catch (Exception e) {}
+                    // #endregion
+                }
             }
         }
-        originalPositionCallbacks.clear();
+        
+        // 清除不在新列表中的节点的回调
+        for (ProcessNode oldNode : new java.util.ArrayList<>(managedCanvasNodes)) {
+            if (oldNode != null && !newNodesSet.contains(oldNode)) {
+                originalPositionCallbacks.remove(oldNode);
+            }
+        }
 
         managedCanvasNodes.clear();
         if (nodesOnCanvas != null) {
@@ -678,9 +741,50 @@ public class ConditionNode extends StackPane {
         // 节点在contentLayer中时，坐标应该是相对于contentLayer的（即相对于条件节点内容区域的）
         for (ProcessNode node : managedCanvasNodes) {
             if (node != null) {
+                // #region agent log
+                try {
+                    java.io.FileWriter fw = new java.io.FileWriter("/Users/xiaozhao/Desktop/xz/IdeaProject/Cc_ETL/.cursor/debug.log", true);
+                    java.util.Map<String, Object> logData = new java.util.HashMap<>();
+                    logData.put("sessionId", "debug-session");
+                    logData.put("runId", "run1");
+                    logData.put("hypothesisId", "A");
+                    logData.put("location", "ConditionNode.java:674");
+                    logData.put("message", "bindCanvasNodes: processing node");
+                    java.util.Map<String, Object> data = new java.util.HashMap<>();
+                    data.put("nodeId", node.getNodeId() != null ? node.getNodeId() : "null");
+                    data.put("nodeName", node.getJobHandlerName() != null ? node.getJobHandlerName() : "null");
+                    data.put("parentBefore", node.getParent() != null ? node.getParent().getClass().getSimpleName() : "null");
+                    data.put("absoluteX", node.getLayoutX());
+                    data.put("absoluteY", node.getLayoutY());
+                    logData.put("data", data);
+                    logData.put("timestamp", System.currentTimeMillis());
+                    fw.write(new com.google.gson.Gson().toJson(logData) + "\n");
+                    fw.close();
+                } catch (Exception e) {}
+                // #endregion
+                
                 // ⭐ 修复：如果节点还没有添加到contentLayer，需要转换坐标
                 // 节点当前的坐标是绝对坐标（相对于画布的），需要转换为相对于contentLayer的坐标
                 boolean wasInContentLayer = contentLayer.getChildren().contains(node);
+                
+                // #region agent log
+                try {
+                    java.io.FileWriter fw = new java.io.FileWriter("/Users/xiaozhao/Desktop/xz/IdeaProject/Cc_ETL/.cursor/debug.log", true);
+                    java.util.Map<String, Object> logData = new java.util.HashMap<>();
+                    logData.put("sessionId", "debug-session");
+                    logData.put("runId", "run1");
+                    logData.put("hypothesisId", "B");
+                    logData.put("location", "ConditionNode.java:678");
+                    logData.put("message", "bindCanvasNodes: wasInContentLayer check");
+                    java.util.Map<String, Object> data = new java.util.HashMap<>();
+                    data.put("wasInContentLayer", wasInContentLayer);
+                    data.put("contentLayerChildrenCount", contentLayer.getChildren().size());
+                    logData.put("data", data);
+                    logData.put("timestamp", System.currentTimeMillis());
+                    fw.write(new com.google.gson.Gson().toJson(logData) + "\n");
+                    fw.close();
+                } catch (Exception e) {}
+                // #endregion
                 
                 if (!wasInContentLayer) {
                     // 获取节点的绝对坐标（相对于画布的）
@@ -699,74 +803,325 @@ public class ConditionNode extends StackPane {
                     double relativeX = absoluteX - containerX;
                     double relativeY = absoluteY - containerY - headerHeight;
                     
+                    // #region agent log
+                    try {
+                        java.io.FileWriter fw = new java.io.FileWriter("/Users/xiaozhao/Desktop/xz/IdeaProject/Cc_ETL/.cursor/debug.log", true);
+                        java.util.Map<String, Object> logData = new java.util.HashMap<>();
+                        logData.put("sessionId", "debug-session");
+                        logData.put("runId", "run1");
+                        logData.put("hypothesisId", "A");
+                        logData.put("location", "ConditionNode.java:694");
+                        logData.put("message", "bindCanvasNodes: coordinate conversion");
+                        java.util.Map<String, Object> data = new java.util.HashMap<>();
+                        data.put("absoluteX", absoluteX);
+                        data.put("absoluteY", absoluteY);
+                        data.put("containerX", containerX);
+                        data.put("containerY", containerY);
+                        data.put("headerHeight", headerHeight);
+                        data.put("relativeX", relativeX);
+                        data.put("relativeY", relativeY);
+                        logData.put("data", data);
+                        logData.put("timestamp", System.currentTimeMillis());
+                        fw.write(new com.google.gson.Gson().toJson(logData) + "\n");
+                        fw.close();
+                    } catch (Exception e) {}
+                    // #endregion
+                    
                     // 将节点添加到contentLayer
                     contentLayer.getChildren().add(node);
+                    
+                    // #region agent log
+                    try {
+                        java.io.FileWriter fw = new java.io.FileWriter("/Users/xiaozhao/Desktop/xz/IdeaProject/Cc_ETL/.cursor/debug.log", true);
+                        java.util.Map<String, Object> logData = new java.util.HashMap<>();
+                        logData.put("sessionId", "debug-session");
+                        logData.put("runId", "run1");
+                        logData.put("hypothesisId", "C");
+                        logData.put("location", "ConditionNode.java:698");
+                        logData.put("message", "bindCanvasNodes: after adding to contentLayer");
+                        java.util.Map<String, Object> data = new java.util.HashMap<>();
+                        data.put("parentAfter", node.getParent() != null ? node.getParent().getClass().getSimpleName() : "null");
+                        data.put("isInContentLayer", contentLayer.getChildren().contains(node));
+                        logData.put("data", data);
+                        logData.put("timestamp", System.currentTimeMillis());
+                        fw.write(new com.google.gson.Gson().toJson(logData) + "\n");
+                        fw.close();
+                    } catch (Exception e) {}
+                    // #endregion
                     
                     // 设置相对位置（相对于contentLayer）
                     node.setLayoutX(relativeX);
                     node.setLayoutY(relativeY);
                     
+                    // #region agent log
+                    try {
+                        java.io.FileWriter fw = new java.io.FileWriter("/Users/xiaozhao/Desktop/xz/IdeaProject/Cc_ETL/.cursor/debug.log", true);
+                        java.util.Map<String, Object> logData = new java.util.HashMap<>();
+                        logData.put("sessionId", "debug-session");
+                        logData.put("runId", "run1");
+                        logData.put("hypothesisId", "A");
+                        logData.put("location", "ConditionNode.java:702");
+                        logData.put("message", "bindCanvasNodes: after setting relative position");
+                        java.util.Map<String, Object> data = new java.util.HashMap<>();
+                        data.put("relativeX", node.getLayoutX());
+                        data.put("relativeY", node.getLayoutY());
+                        logData.put("data", data);
+                        logData.put("timestamp", System.currentTimeMillis());
+                        fw.write(new com.google.gson.Gson().toJson(logData) + "\n");
+                        fw.close();
+                    } catch (Exception e) {}
+                    // #endregion
+                    
                     // 确保节点可见
                     node.setVisible(true);
                     node.setManaged(true);
                 } else {
-                    // 节点已经在contentLayer中，确保它被包含
+                    // ⭐ 修复：节点已经在contentLayer中，确保它被包含，但不要修改坐标
+                    // 节点在contentLayer中时，坐标已经是相对坐标，不应该被修改
                     if (!contentLayer.getChildren().contains(node)) {
                         contentLayer.getChildren().add(node);
                     }
                     // 确保节点可见
                     node.setVisible(true);
                     node.setManaged(true);
+                    
+                    // ⭐ 重要：不要修改节点的坐标，因为它已经是相对坐标了
+                    // 如果修改坐标，会导致节点位置错误
+                    
+                    // #region agent log
+                    try {
+                        java.io.FileWriter fw = new java.io.FileWriter("/Users/xiaozhao/Desktop/xz/IdeaProject/Cc_ETL/.cursor/debug.log", true);
+                        java.util.Map<String, Object> logData = new java.util.HashMap<>();
+                        logData.put("sessionId", "debug-session");
+                        logData.put("runId", "run4");
+                        logData.put("hypothesisId", "K");
+                        logData.put("location", "ConditionNode.java:878");
+                        logData.put("message", "bindCanvasNodes: node already in contentLayer, preserving coordinates");
+                        java.util.Map<String, Object> data = new java.util.HashMap<>();
+                        data.put("relativeX", node.getLayoutX());
+                        data.put("relativeY", node.getLayoutY());
+                        data.put("parent", node.getParent() != null ? node.getParent().getClass().getSimpleName() : "null");
+                        data.put("isInContentLayer", contentLayer.getChildren().contains(node));
+                        logData.put("data", data);
+                        logData.put("timestamp", System.currentTimeMillis());
+                        fw.write(new com.google.gson.Gson().toJson(logData) + "\n");
+                        fw.close();
+                    } catch (Exception e) {}
+                    // #endregion
                 }
                 
                 // 设置位置改变回调
                 node.setOnPositionChanged(n -> {
-                    // ⭐ 修复：限制节点在条件节点内的移动范围
-                    // 节点在contentLayer中，坐标是相对坐标，应该限制在条件节点范围内
+                    // ⭐ 修复：如果条件节点正在被拖拽或调整大小，不处理子节点移动
+                    if (isContainerDragging || isResizing) {
+                        return;
+                    }
+                    
+                    // #region agent log
+                    try {
+                        java.io.FileWriter fw = new java.io.FileWriter("/Users/xiaozhao/Desktop/xz/IdeaProject/Cc_ETL/.cursor/debug.log", true);
+                        java.util.Map<String, Object> logData = new java.util.HashMap<>();
+                        logData.put("sessionId", "debug-session");
+                        logData.put("runId", "run3");
+                        logData.put("hypothesisId", "I");
+                        logData.put("location", "ConditionNode.java:841");
+                        logData.put("message", "onPositionChanged: node moved");
+                        java.util.Map<String, Object> data = new java.util.HashMap<>();
+                        data.put("nodeX", n.getLayoutX());
+                        data.put("nodeY", n.getLayoutY());
+                        data.put("containerX", getLayoutX());
+                        data.put("containerY", getLayoutY());
+                        data.put("nodeParent", n.getParent() != null ? n.getParent().getClass().getSimpleName() : "null");
+                        logData.put("data", data);
+                        logData.put("timestamp", System.currentTimeMillis());
+                        fw.write(new com.google.gson.Gson().toJson(logData) + "\n");
+                        fw.close();
+                    } catch (Exception e) {}
+                    // #endregion
+                    
+                    // ⭐ 修复：确保节点在contentLayer中，如果不在则说明有问题
+                    if (n.getParent() != contentLayer) {
+                        // #region agent log
+                        try {
+                            java.io.FileWriter fw = new java.io.FileWriter("/Users/xiaozhao/Desktop/xz/IdeaProject/Cc_ETL/.cursor/debug.log", true);
+                            java.util.Map<String, Object> logData = new java.util.HashMap<>();
+                            logData.put("sessionId", "debug-session");
+                            logData.put("runId", "run3");
+                            logData.put("hypothesisId", "J");
+                            logData.put("location", "ConditionNode.java:857");
+                            logData.put("message", "onPositionChanged: node not in contentLayer! Fixing...");
+                            java.util.Map<String, Object> data = new java.util.HashMap<>();
+                            data.put("nodeParent", n.getParent() != null ? n.getParent().getClass().getSimpleName() : "null");
+                            data.put("isInContentLayer", contentLayer.getChildren().contains(n));
+                            data.put("nodeX", n.getLayoutX());
+                            data.put("nodeY", n.getLayoutY());
+                            logData.put("data", data);
+                            logData.put("timestamp", System.currentTimeMillis());
+                            fw.write(new com.google.gson.Gson().toJson(logData) + "\n");
+                            fw.close();
+                        } catch (Exception e) {}
+                        // #endregion
+                        
+                        // ⭐ 修复：如果节点不在contentLayer中，需要重新添加并转换坐标
+                        // 获取节点的当前绝对坐标（如果节点在画布上）
+                        double absoluteX = n.getLayoutX();
+                        double absoluteY = n.getLayoutY();
+                        
+                        // 如果节点已经在画布上（父节点是NodeCanvas），需要转换为相对坐标
+                        if (n.getParent() != null && n.getParent() != contentLayer) {
+                            // 获取条件节点的绝对坐标
+                            double containerX = this.getLayoutX();
+                            double containerY = this.getLayoutY();
+                            double headerHeight = header.getHeight();
+                            
+                            // 计算相对于contentLayer的坐标
+                            double relativeX = absoluteX - containerX;
+                            double relativeY = absoluteY - containerY - headerHeight;
+                            
+                            // 从原父节点移除
+                            if (n.getParent() instanceof javafx.scene.layout.Pane) {
+                                ((javafx.scene.layout.Pane) n.getParent()).getChildren().remove(n);
+                            }
+                            
+                            // 添加到contentLayer
+                            contentLayer.getChildren().add(n);
+                            
+                            // 设置相对位置
+                            n.setLayoutX(relativeX);
+                            n.setLayoutY(relativeY);
+                            
+                            // #region agent log
+                            try {
+                                java.io.FileWriter fw = new java.io.FileWriter("/Users/xiaozhao/Desktop/xz/IdeaProject/Cc_ETL/.cursor/debug.log", true);
+                                java.util.Map<String, Object> logData = new java.util.HashMap<>();
+                                logData.put("sessionId", "debug-session");
+                                logData.put("runId", "run3");
+                                logData.put("hypothesisId", "J");
+                                logData.put("location", "ConditionNode.java:890");
+                                logData.put("message", "onPositionChanged: node re-added to contentLayer");
+                                java.util.Map<String, Object> data = new java.util.HashMap<>();
+                                data.put("absoluteX", absoluteX);
+                                data.put("absoluteY", absoluteY);
+                                data.put("relativeX", relativeX);
+                                data.put("relativeY", relativeY);
+                                data.put("nodeParentAfter", n.getParent() != null ? n.getParent().getClass().getSimpleName() : "null");
+                                logData.put("data", data);
+                                logData.put("timestamp", System.currentTimeMillis());
+                                fw.write(new com.google.gson.Gson().toJson(logData) + "\n");
+                                fw.close();
+                            } catch (Exception e) {}
+                            // #endregion
+                        } else {
+                            // 如果节点不在任何父节点中，直接添加到contentLayer
+                            if (!contentLayer.getChildren().contains(n)) {
+                                contentLayer.getChildren().add(n);
+                            }
+                        }
+                        return;
+                    }
+                    
+                    // ⭐ 修复：实现条件节点跟随子节点移动的逻辑
+                    // 注意：只在子节点真正超出容器边界（0,0）时才移动容器，而不是在padding内移动时也移动
                     double containerWidth = frame.getWidth();
                     double containerHeight = frame.getHeight();
                     double headerHeight = header.getHeight();
                     double padding = 24;
                     
-                    // 限制节点位置在条件节点范围内（考虑padding）
-                    double maxX = containerWidth - padding - n.getPrefWidth();
-                    double maxY = containerHeight - headerHeight - padding - n.getPrefHeight();
-                    
                     double nodeX = n.getLayoutX();
                     double nodeY = n.getLayoutY();
-                    boolean positionAdjusted = false;
+                    double nodeWidth = n.getPrefWidth();
+                    double nodeHeight = n.getPrefHeight();
                     
-                    // 如果节点超出范围，调整位置
-                    if (nodeX < padding) {
-                        n.setLayoutX(padding);
-                        positionAdjusted = true;
-                    } else if (nodeX > maxX) {
+                    // ⭐ 修复：检查子节点是否真正超出条件节点左上角边界（0,0），而不是padding边界
+                    // 只有当节点坐标小于0时，才需要移动条件节点
+                    if (nodeX < 0 || nodeY < 0) {
+                        // 计算需要移动的距离（使节点回到边界内）
+                        double dx = nodeX < 0 ? nodeX : 0;  // 如果nodeX < 0，需要移动-nodeX距离
+                        double dy = nodeY < 0 ? nodeY : 0;  // 如果nodeY < 0，需要移动-nodeY距离
+                        
+                        // #region agent log
+                        try {
+                            java.io.FileWriter fw = new java.io.FileWriter("/Users/xiaozhao/Desktop/xz/IdeaProject/Cc_ETL/.cursor/debug.log", true);
+                            java.util.Map<String, Object> logData = new java.util.HashMap<>();
+                            logData.put("sessionId", "debug-session");
+                            logData.put("runId", "run3");
+                            logData.put("hypothesisId", "I");
+                            logData.put("location", "ConditionNode.java:883");
+                            logData.put("message", "onPositionChanged: moving container");
+                            java.util.Map<String, Object> data = new java.util.HashMap<>();
+                            data.put("nodeX", nodeX);
+                            data.put("nodeY", nodeY);
+                            data.put("dx", dx);
+                            data.put("dy", dy);
+                            data.put("oldContainerX", getLayoutX());
+                            data.put("oldContainerY", getLayoutY());
+                            logData.put("data", data);
+                            logData.put("timestamp", System.currentTimeMillis());
+                            fw.write(new com.google.gson.Gson().toJson(logData) + "\n");
+                            fw.close();
+                        } catch (Exception e) {}
+                        // #endregion
+                        
+                        // 移动条件节点（使节点回到边界内）
+                        double newContainerX = Math.max(0, getLayoutX() - dx);  // 注意：dx是负数，所以用减法
+                        double newContainerY = Math.max(0, getLayoutY() - dy);
+                        
+                        // 更新条件节点的位置
+                        setLayoutX(newContainerX);
+                        setLayoutY(newContainerY);
+                        
+                        // ⭐ 重要：更新所有其他子节点的相对位置，保持相对距离
+                        // 由于条件节点移动了，需要调整所有子节点的相对坐标
+                        // 但是，由于子节点在contentLayer中，它们的绝对位置会自动跟随
+                        // 所以需要调整其他子节点的相对坐标
+                        
+                        // 更新originX和originY（用于计算相对位置）
+                        if (!managedCanvasNodes.isEmpty()) {
+                            originX += dx;  // 注意：dx是负数，所以用加法
+                            originY += dy;
+                        }
+                        
+                        // 更新所有其他普通节点的相对位置（保持相对距离）
+                        for (ProcessNode otherNode : managedCanvasNodes) {
+                            if (otherNode != null && otherNode != n) {
+                                otherNode.setLayoutX(otherNode.getLayoutX() - dx);
+                                otherNode.setLayoutY(otherNode.getLayoutY() - dy);
+                            }
+                        }
+                        
+                        // 更新所有嵌套条件节点的相对位置（保持相对距离）
+                        for (ConditionNode cn : managedConditionNodes) {
+                            if (cn != null) {
+                                cn.setLayoutX(cn.getLayoutX() - dx);
+                                cn.setLayoutY(cn.getLayoutY() - dy);
+                            }
+                        }
+                        
+                        // 通知父容器（如果有）也调整大小
+                        if (parentContainer != null) {
+                            parentContainer.checkAndExpandContainer();
+                        }
+                    }
+                    
+                    // ⭐ 修复：限制节点在条件节点内的移动范围（右下角边界）
+                    // 限制节点位置在条件节点范围内（考虑padding）
+                    double maxX = containerWidth - padding - nodeWidth;
+                    double maxY = containerHeight - headerHeight - padding - nodeHeight;
+                    
+                    // 如果节点超出右下角范围，调整位置
+                    if (nodeX > maxX) {
                         n.setLayoutX(maxX);
-                        positionAdjusted = true;
                     }
                     
-                    if (nodeY < padding) {
-                        n.setLayoutY(padding);
-                        positionAdjusted = true;
-                    } else if (nodeY > maxY) {
+                    if (nodeY > maxY) {
                         n.setLayoutY(maxY);
-                        positionAdjusted = true;
                     }
                     
-                    // ⭐ 修复：只有在位置被调整时才延迟调用checkAndExpandContainer
-                    // 如果节点位置没有超出范围，不需要检查扩展
-                    if (positionAdjusted) {
-                        // 延迟调用checkAndExpandContainer，避免在节点移动过程中频繁更新
-                        javafx.application.Platform.runLater(() -> {
-                            // 检查是否需要扩展容器（只扩展右下角）
-                            checkAndExpandContainer();
-                        });
-                    } else {
-                        // 节点位置正常，只检查是否需要扩展容器（不限制位置时）
-                        javafx.application.Platform.runLater(() -> {
-                            checkAndExpandContainer();
-                        });
-                    }
+                    // ⭐ 修复：延迟调用checkAndExpandContainer，避免在节点移动过程中频繁更新
+                    javafx.application.Platform.runLater(() -> {
+                        // 检查是否需要扩展容器（只扩展右下角）
+                        checkAndExpandContainer();
+                    });
                 });
             }
         }
@@ -793,11 +1148,13 @@ public class ConditionNode extends StackPane {
     }
 
     public void bindConditionNodes(List<ConditionNode> conditionNodes) {
-        // ⭐ 修复：先清除旧嵌套条件节点的父容器引用
+        // ⭐ 修复：先清除旧嵌套条件节点的父容器引用和位置监听
         for (ConditionNode oldCn : managedConditionNodes) {
             if (oldCn != null) {
                 oldCn.parentContainer = null;
                 oldCn.setOnSizeChanged(null);
+                // 从contentLayer中移除
+                contentLayer.getChildren().remove(oldCn);
             }
         }
         
@@ -805,20 +1162,143 @@ public class ConditionNode extends StackPane {
         if (conditionNodes != null) {
             managedConditionNodes.addAll(conditionNodes);
             
-            // ⭐ 新增：为每个嵌套的条件节点设置父容器引用和大小改变回调
+            // ⭐ 新增：为每个嵌套的条件节点设置父容器引用、添加到contentLayer并设置回调
             for (ConditionNode cn : managedConditionNodes) {
                 if (cn != null) {
                     cn.parentContainer = this;
+                    
+                    // ⭐ 修复：将嵌套条件节点添加到contentLayer，并正确转换坐标
+                    boolean wasInContentLayer = contentLayer.getChildren().contains(cn);
+                    
+                    if (!wasInContentLayer) {
+                        // 获取嵌套条件节点的绝对坐标（相对于画布的）
+                        double absoluteX = cn.getLayoutX();
+                        double absoluteY = cn.getLayoutY();
+                        
+                        // 获取父条件节点的绝对坐标
+                        double containerX = this.getLayoutX();
+                        double containerY = this.getLayoutY();
+                        
+                        // 获取header的高度（contentLayer在header下方）
+                        double headerHeight = header.getHeight();
+                        
+                        // 计算相对于contentLayer的坐标
+                        double relativeX = absoluteX - containerX;
+                        double relativeY = absoluteY - containerY - headerHeight;
+                        
+                        // 将嵌套条件节点添加到contentLayer
+                        contentLayer.getChildren().add(cn);
+                        
+                        // 设置相对位置（相对于contentLayer）
+                        cn.setLayoutX(relativeX);
+                        cn.setLayoutY(relativeY);
+                    } else {
+                        // 嵌套条件节点已经在contentLayer中，确保它被包含
+                        if (!contentLayer.getChildren().contains(cn)) {
+                            contentLayer.getChildren().add(cn);
+                        }
+                    }
+                    
+                    // 确保嵌套条件节点可见
+                    cn.setVisible(expanded);
+                    cn.setManaged(expanded);
+                    
                     // 当嵌套容器大小改变时，触发父容器的checkAndExpandContainer
                     cn.setOnSizeChanged(() -> {
                         if (!isContainerDragging && !isResizing && expanded) {
                             checkAndExpandContainer();
                         }
                     });
+                    
+                    // ⭐ 新增：为嵌套条件节点添加位置改变监听，实现父条件节点跟随移动
+                    // 监听嵌套条件节点的layoutX和layoutY属性变化
+                    cn.layoutXProperty().addListener((obs, oldVal, newVal) -> {
+                        if (!isContainerDragging && !isResizing && expanded && newVal != null && oldVal != null) {
+                            // 检查嵌套条件节点是否超出父条件节点边界
+                            checkAndMoveContainerForNestedConditionNode(cn);
+                        }
+                    });
+                    
+                    cn.layoutYProperty().addListener((obs, oldVal, newVal) -> {
+                        if (!isContainerDragging && !isResizing && expanded && newVal != null && oldVal != null) {
+                            // 检查嵌套条件节点是否超出父条件节点边界
+                            checkAndMoveContainerForNestedConditionNode(cn);
+                        }
+                    });
+                    
+                    // 拖拽结束时也检查
+                    cn.setOnDragFinished(() -> {
+                        if (!isContainerDragging && !isResizing && expanded) {
+                            checkAndMoveContainerForNestedConditionNode(cn);
+                        }
+                    });
                 }
             }
         }
         updateFrameSize();
+    }
+    
+    /**
+     * ⭐ 新增：检查嵌套条件节点是否超出父条件节点边界，如果超出则移动父条件节点
+     */
+    private void checkAndMoveContainerForNestedConditionNode(ConditionNode nestedCn) {
+        if (nestedCn == null || !expanded) return;
+        
+        // 嵌套条件节点在contentLayer中，坐标是相对坐标
+        double nestedX = nestedCn.getLayoutX();
+        double nestedY = nestedCn.getLayoutY();
+        
+        // ⭐ 修复：检查嵌套条件节点是否真正超出父条件节点左上角边界（0,0），而不是padding边界
+        // 只有当嵌套条件节点坐标小于0时，才需要移动父条件节点
+        if (nestedX < 0 || nestedY < 0) {
+            // 计算需要移动的距离（使嵌套条件节点回到边界内）
+            double dx = nestedX < 0 ? nestedX : 0;  // 如果nestedX < 0，需要移动-nestedX距离
+            double dy = nestedY < 0 ? nestedY : 0;  // 如果nestedY < 0，需要移动-nestedY距离
+            
+            // 移动父条件节点（使嵌套条件节点回到边界内）
+            double newContainerX = Math.max(0, getLayoutX() - dx);  // 注意：dx是负数，所以用减法
+            double newContainerY = Math.max(0, getLayoutY() - dy);
+            
+            // 更新父条件节点的位置
+            setLayoutX(newContainerX);
+            setLayoutY(newContainerY);
+            
+            // ⭐ 重要：更新所有子节点的相对位置，保持相对距离
+            // 由于父条件节点移动了，需要调整所有子节点的相对坐标
+            // 但是，由于子节点在contentLayer中，它们的绝对位置会自动跟随
+            // 所以需要更新所有子节点的相对坐标，保持相对距离
+            
+            // 更新originX和originY（用于计算相对位置）
+            if (!managedCanvasNodes.isEmpty()) {
+                originX += dx;  // 注意：dx是负数，所以用加法
+                originY += dy;
+            }
+            
+            // 更新所有普通节点的相对位置（保持相对距离）
+            for (ProcessNode otherNode : managedCanvasNodes) {
+                if (otherNode != null) {
+                    otherNode.setLayoutX(otherNode.getLayoutX() - dx);
+                    otherNode.setLayoutY(otherNode.getLayoutY() - dy);
+                }
+            }
+            
+            // 更新所有嵌套条件节点的相对位置（保持相对距离）
+            for (ConditionNode cn : managedConditionNodes) {
+                if (cn != null && cn != nestedCn) {
+                    // 嵌套条件节点的相对坐标需要调整
+                    cn.setLayoutX(cn.getLayoutX() - dx);
+                    cn.setLayoutY(cn.getLayoutY() - dy);
+                }
+            }
+            
+            // 通知父容器（如果有）也调整大小
+            if (parentContainer != null) {
+                parentContainer.checkAndExpandContainer();
+            }
+        }
+        
+        // 检查是否需要扩展容器
+        checkAndExpandContainer();
     }
     
     /**
@@ -861,23 +1341,15 @@ public class ConditionNode extends StackPane {
         }
         
         // ⭐ 修复：计算嵌套条件节点的边界
-        // 嵌套的条件节点不在contentLayer中，它们的坐标是绝对坐标（相对于画布的）
-        // 需要转换为相对于contentLayer的坐标
+        // 嵌套的条件节点在contentLayer中，它们的坐标是相对坐标（相对于contentLayer的）
         for (ConditionNode cn : managedConditionNodes) {
             if (cn != null && cn.isExpanded()) {
                 hasNodes = true;
-                // 嵌套条件节点的绝对坐标
-                double cnAbsoluteX = cn.getLayoutX();
-                double cnAbsoluteY = cn.getLayoutY();
+                // 嵌套条件节点的相对坐标（已经在contentLayer中）
+                double cnRelativeX = cn.getLayoutX();
+                double cnRelativeY = cn.getLayoutY();
                 double cnWidth = cn.getFrame().getWidth();
                 double cnHeight = cn.getFrame().getHeight();
-                
-                // 转换为相对于contentLayer的坐标
-                double containerX = getLayoutX();
-                double containerY = getLayoutY();
-                double headerHeight = header.getHeight();
-                double cnRelativeX = cnAbsoluteX - containerX;
-                double cnRelativeY = cnAbsoluteY - containerY - headerHeight;
 
                 minX = Math.min(minX, cnRelativeX);
                 minY = Math.min(minY, cnRelativeY);
@@ -1123,20 +1595,13 @@ public class ConditionNode extends StackPane {
             maxY = Math.max(maxY, n.getLayoutY() + n.getPrefHeight());
         }
 
-        // ⭐ 修复：嵌套条件节点的坐标需要转换为相对于contentLayer的坐标
+        // ⭐ 修复：嵌套条件节点在contentLayer中，坐标已经是相对坐标
         for (ConditionNode cn : managedConditionNodes) {
-            // 嵌套条件节点的绝对坐标
-            double cnAbsoluteX = cn.getLayoutX();
-            double cnAbsoluteY = cn.getLayoutY();
+            // 嵌套条件节点的相对坐标（已经在contentLayer中）
+            double cnRelativeX = cn.getLayoutX();
+            double cnRelativeY = cn.getLayoutY();
             double cnWidth = cn.getFrame().getWidth();
             double cnHeight = cn.getFrame().getHeight();
-            
-            // 转换为相对于contentLayer的坐标
-            double containerX = getLayoutX();
-            double containerY = getLayoutY();
-            double headerHeight = header.getHeight();
-            double cnRelativeX = cnAbsoluteX - containerX;
-            double cnRelativeY = cnAbsoluteY - containerY - headerHeight;
             
             minX = Math.min(minX, cnRelativeX);
             minY = Math.min(minY, cnRelativeY);

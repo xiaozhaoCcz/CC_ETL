@@ -241,7 +241,7 @@ public class MainView extends BorderPane {
             public void onUndo() {
                 if (undoRedoManager.canUndo()) {
                     undoRedoManager.undo();
-                    logPanel.info("↩ 已撤销");
+                    logger.info("↩ 已撤销");
                 }
             }
 
@@ -249,7 +249,7 @@ public class MainView extends BorderPane {
             public void onRedo() {
                 if (undoRedoManager.canRedo()) {
                     undoRedoManager.redo();
-                    logPanel.info("↪ 已重做");
+                    logger.info("↪ 已重做");
                 }
             }
 
@@ -276,13 +276,14 @@ public class MainView extends BorderPane {
                 exportDialog.showAndWait().ifPresent(file -> {
                     if (file != null) {
                         com.cc.job.gui.manager.CanvasExportManager exportManager = 
-                            new com.cc.job.gui.manager.CanvasExportManager(logPanel::info);
+                            new com.cc.job.gui.manager.CanvasExportManager(logger::info);
                         com.cc.job.gui.manager.CanvasExportManager.ExportConfig config = exportDialog.getConfig();
                         boolean success = exportManager.exportCanvas(canvas, file, config);
                         if (success) {
-                            logPanel.success("✓ 画布已导出到: " + file.getAbsolutePath());
+                            logger.info("✓ 画布已导出到: " + file.getAbsolutePath());
                         } else {
-                            logPanel.error("✗ 导出失败");
+                            NotificationToast.showError("✗ 导出失败");
+                            logger.error("✗ 导出失败");
                         }
                     }
                 });
@@ -292,7 +293,8 @@ public class MainView extends BorderPane {
             public void onNodeHistory() {
                 Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
                 if (currentTaskGroupId == null) {
-                    logPanel.warn("⚠ 请先选择一个任务组");
+                    NotificationToast.showWarning("⚠ 请先选择一个任务组");
+                    logger.warn("⚠ 请先选择一个任务组");
                     return;
                 }
                 String taskGroupName = getJobNameById(currentTaskGroupId);
@@ -397,7 +399,8 @@ public class MainView extends BorderPane {
                 canvas.disableAutoSave();
                 canvas.clear();
                 canvas.enableAutoSave();
-                logPanel.warn("画布已清空");
+                NotificationToast.showWarning("画布已清空");
+                logger.warn("画布已清空");
             }
 
             @Override
@@ -411,7 +414,7 @@ public class MainView extends BorderPane {
             public void onSelect() {
                 boolean currentMode = canvas.isSelectionMode();
                 canvas.setSelectionMode(!currentMode);
-                logPanel.info(currentMode ? "✓ 框选模式已禁用" : "✓ 框选模式已启用");
+                logger.info(currentMode ? "✓ 框选模式已禁用" : "✓ 框选模式已启用");
             }
 
             @Override
@@ -427,26 +430,26 @@ public class MainView extends BorderPane {
             @Override
             public void onDistributeHorizontally() {
                 canvas.distributeNodesHorizontally();
-                logPanel.info("✓ 水平等距分布完成");
+                logger.info("✓ 水平等距分布完成");
             }
             
             @Override
             public void onDistributeVertically() {
                 canvas.distributeNodesVertically();
-                logPanel.info("✓ 垂直等距分布完成");
+                logger.info("✓ 垂直等距分布完成");
             }
             
             @Override
             public void onAlignToCenter() {
                 canvas.alignToCanvasCenter();
-                logPanel.info("✓ 已对齐到画布中心");
+                logger.info("✓ 已对齐到画布中心");
             }
             
             @Override
             public void onToggleSnapToGrid() {
                 boolean currentState = canvas.isSnapToGridEnabled();
                 canvas.setSnapToGridEnabled(!currentState);
-                logPanel.info("✓ 网格吸附已" + (!currentState ? "启用" : "禁用"));
+                logger.info("✓ 网格吸附已" + (!currentState ? "启用" : "禁用"));
                 // 按钮状态会通过监听器自动更新
             }
             
@@ -484,7 +487,8 @@ public class MainView extends BorderPane {
                     alert.setContentText(message.toString());
                     alert.showAndWait();
                     
-                    logPanel.warn("⚠ 检测到循环依赖，请修复后再运行任务");
+                    NotificationToast.showWarning("⚠ 检测到循环依赖，请修复后再运行任务");
+                    logger.warn("⚠ 检测到循环依赖，请修复后再运行任务");
                 } else {
                     // 清除之前的标记
                     canvas.clearCycleHighlight();
@@ -496,7 +500,7 @@ public class MainView extends BorderPane {
                     alert.setContentText("未检测到循环依赖，画布结构正常。");
                     alert.showAndWait();
                     
-                    logPanel.success("✓ 未检测到循环依赖");
+                    logger.info("✓ 未检测到循环依赖");
                 }
             }
 
@@ -543,7 +547,8 @@ public class MainView extends BorderPane {
             @Override
             public void onTaskSelected(Long taskGroupId, String taskGroupName) {
                 if (taskGroupId == null) {
-                    logPanel.warn("⚠ 任务ID无效");
+                    NotificationToast.showWarning("⚠ 任务ID无效");
+                    logger.warn("⚠ 任务ID无效");
                     return;
                 }
                 
@@ -579,7 +584,8 @@ public class MainView extends BorderPane {
             public void onSaveAs() {
                 Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
                 if (currentTaskGroupId == null) {
-                    logPanel.warn("⚠ 请先选择一个任务组");
+                    NotificationToast.showWarning("⚠ 请先选择一个任务组");
+                    logger.warn("⚠ 请先选择一个任务组");
                     return;
                 }
                 exportTaskGroup(currentTaskGroupId);
@@ -612,7 +618,7 @@ public class MainView extends BorderPane {
                         canvas.removeNode(node, true);
                     }
                     canvas.markAsUnsaved();
-                    logPanel.info("✓ 已剪切节点");
+                    logger.info("✓ 已剪切节点");
                 }
             }
             
@@ -630,27 +636,29 @@ public class MainView extends BorderPane {
             public void onDelete() {
                 Set<ProcessNode> selectedNodes = canvas.getSelectedNodes();
                 if (selectedNodes.isEmpty()) {
-                    logPanel.warn("⚠ 请先选中要删除的节点");
+                    NotificationToast.showWarning("⚠ 请先选中要删除的节点");
+                    logger.warn("⚠ 请先选中要删除的节点");
                     return;
                 }
                 for (ProcessNode node : selectedNodes) {
                     canvas.removeNode(node, true);
                 }
                 canvas.markAsUnsaved();
-                logPanel.info("✓ 已删除节点");
+                logger.info("✓ 已删除节点");
             }
             
             @Override
             public void onSelectAll() {
                 canvas.selectAllNodes();
-                logPanel.info("✓ 已全选所有节点");
+                logger.info("✓ 已全选所有节点");
             }
             
             @Override
             public void onBatchEdit() {
                 Set<ProcessNode> selectedNodes = canvas.getSelectedNodes();
                 if (selectedNodes.isEmpty()) {
-                    logPanel.warn("⚠ 请先选中要编辑的节点");
+                    NotificationToast.showWarning("⚠ 请先选中要编辑的节点");
+                    logger.warn("⚠ 请先选中要编辑的节点");
                     return;
                 }
                 
@@ -692,7 +700,7 @@ public class MainView extends BorderPane {
                     node -> {
                         // 定位到节点
                         canvas.locateNode(node);
-                        logPanel.info("✓ 已定位到节点: " + node.getJobHandlerName());
+                        logger.info("✓ 已定位到节点: " + node.getJobHandlerName());
                     }
                 );
                 searchDialog.showAndWait();
@@ -701,19 +709,19 @@ public class MainView extends BorderPane {
             @Override
             public void onFindNext() {
                 // TODO: 实现查找下一个
-                logPanel.info("查找下一个功能开发中...");
+                logger.info("查找下一个功能开发中...");
             }
             
             @Override
             public void onFindPrevious() {
                 // TODO: 实现查找上一个
-                logPanel.info("查找上一个功能开发中...");
+                logger.info("查找上一个功能开发中...");
             }
             
             @Override
             public void onAutoLayout() {
                 canvas.autoLayout();
-                logPanel.info("✓ 已自动布局（网格布局）");
+                logger.info("✓ 已自动布局（网格布局）");
             }
             
             @Override
@@ -723,20 +731,20 @@ public class MainView extends BorderPane {
                                       algorithm == com.cc.job.gui.manager.CanvasLayoutManager.LayoutAlgorithm.HIERARCHICAL ? "层次化布局" :
                                       algorithm == com.cc.job.gui.manager.CanvasLayoutManager.LayoutAlgorithm.FORCE_DIRECTED ? "力导向布局" :
                                       algorithm == com.cc.job.gui.manager.CanvasLayoutManager.LayoutAlgorithm.TREE ? "树形布局" : "未知布局";
-                logPanel.info("✓ 已自动布局（" + algorithmName + "）");
+                logger.info("✓ 已自动布局（" + algorithmName + "）");
             }
             
             // 选择菜单
             @Override
             public void onInvertSelection() {
                 canvas.invertSelection();
-                logPanel.info("✓ 已反选");
+                logger.info("✓ 已反选");
             }
             
             @Override
             public void onSelectByType(String type) {
                 canvas.selectByType(type);
-                logPanel.info("✓ 已按类型选择: " + type);
+                logger.info("✓ 已按类型选择: " + type);
             }
             
             @Override
@@ -747,13 +755,13 @@ public class MainView extends BorderPane {
             @Override
             public void onSelectUpstream() {
                 canvas.selectUpstreamNodes();
-                logPanel.info("✓ 已选择上游节点");
+                logger.info("✓ 已选择上游节点");
             }
             
             @Override
             public void onSelectDownstream() {
                 canvas.selectDownstreamNodes();
-                logPanel.info("✓ 已选择下游节点");
+                logger.info("✓ 已选择下游节点");
             }
             
             // 查看菜单
@@ -786,37 +794,37 @@ public class MainView extends BorderPane {
                 miniMapVisible = true;
                 logPanelVisible = true;
                 updateLeftSidebar();
-                logPanel.info("✓ 已重置布局");
+                logger.info("✓ 已重置布局");
             }
             
             @Override
             public void onToggleGrid() {
                 canvas.toggleGrid();
-                logPanel.info("✓ 已切换网格显示");
+                logger.info("✓ 已切换网格显示");
             }
             
             @Override
             public void onToggleRuler() {
                 canvas.toggleRuler();
-                logPanel.info("✓ 已切换标尺显示");
+                logger.info("✓ 已切换标尺显示");
             }
             
             @Override
             public void onToggleNodeLabels() {
                 canvas.toggleNodeLabels();
-                logPanel.info("✓ 已切换节点标签显示");
+                logger.info("✓ 已切换节点标签显示");
             }
             
             @Override
             public void onToggleEdgeLabels() {
                 canvas.toggleEdgeLabels();
-                logPanel.info("✓ 已切换连线标签显示");
+                logger.info("✓ 已切换连线标签显示");
             }
             
             @Override
             public void onSetTheme(String theme) {
                 // TODO: 实现主题切换
-                logPanel.info("主题切换功能开发中: " + theme);
+                logger.info("主题切换功能开发中: " + theme);
             }
             
             @Override
@@ -857,16 +865,17 @@ public class MainView extends BorderPane {
                 if (!selectedNodes.isEmpty()) {
                     ProcessNode node = selectedNodes.iterator().next();
                     canvas.locateNode(node);
-                    logPanel.info("✓ 已定位到选中节点");
+                    logger.info("✓ 已定位到选中节点");
                 } else {
-                    logPanel.warn("⚠ 请先选中一个节点");
+                    NotificationToast.showWarning("⚠ 请先选中一个节点");
+                    logger.warn("⚠ 请先选中一个节点");
                 }
             }
             
             @Override
             public void onLocateRunningNode() {
                 canvas.locateRunningNode();
-                logPanel.info("✓ 已定位到运行中的节点");
+                logger.info("✓ 已定位到运行中的节点");
             }
             
             // 运行菜单扩展
@@ -890,13 +899,13 @@ public class MainView extends BorderPane {
             @Override
             public void onRunSelectedNodes() {
                 // TODO: 实现运行选中的节点
-                logPanel.info("运行选中节点功能开发中...");
+                logger.info("运行选中节点功能开发中...");
             }
             
             @Override
             public void onRunToHere() {
                 // TODO: 实现运行到此处
-                logPanel.info("运行到此处功能开发中...");
+                logger.info("运行到此处功能开发中...");
             }
             
             // 任务菜单扩展
@@ -911,7 +920,8 @@ public class MainView extends BorderPane {
             public void onEditJobGroup() {
                 Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
                 if (currentTaskGroupId == null) {
-                    logPanel.warn("⚠ 请先选择一个任务组");
+                    NotificationToast.showWarning("⚠ 请先选择一个任务组");
+                    logger.warn("⚠ 请先选择一个任务组");
                     return;
                 }
                 String taskGroupName = getJobNameById(currentTaskGroupId);
@@ -925,7 +935,10 @@ public class MainView extends BorderPane {
                             });
                         });
                     } catch (Exception e) {
-                        Platform.runLater(() -> logPanel.error("✗ 加载任务组数据失败: " + e.getMessage()));
+                        Platform.runLater(() -> {
+                            NotificationToast.showError("✗ 加载任务组数据失败: " + e.getMessage());
+                        });
+                        logger.error("✗ 加载任务组数据失败: {}", e.getMessage());
                     }
                 }).start();
             }
@@ -934,7 +947,8 @@ public class MainView extends BorderPane {
             public void onDeleteJobGroup() {
                 Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
                 if (currentTaskGroupId == null) {
-                    logPanel.warn("⚠ 请先选择一个任务组");
+                    NotificationToast.showWarning("⚠ 请先选择一个任务组");
+                    logger.warn("⚠ 请先选择一个任务组");
                     return;
                 }
                 // 显示确认对话框
@@ -946,12 +960,15 @@ public class MainView extends BorderPane {
                     if (response == ButtonType.OK) {
                         try {
                             new JobGroupService().deleteJobGroups(String.valueOf(currentTaskGroupId));
-                            logPanel.success("✓ 任务组已删除");
+                            logger.info("✓ 任务组已删除");
                             dataManager.refreshTreeView();
                             canvas.clear();
                             pageStoreHelper.setCurrentPage(null);
                         } catch (Exception e) {
-                            logPanel.error("✗ 删除任务组失败: " + e.getMessage());
+                            Platform.runLater(() -> {
+                                NotificationToast.showError("✗ 删除任务组失败: " + e.getMessage());
+                            });
+                            logger.error("✗ 删除任务组失败: {}", e.getMessage());
                         }
                     }
                 });
@@ -960,7 +977,7 @@ public class MainView extends BorderPane {
             @Override
             public void onCopyJobGroup() {
                 // TODO: 实现复制任务组
-                logPanel.info("复制任务组功能开发中...");
+                logger.info("复制任务组功能开发中...");
             }
             
             // 窗口菜单
@@ -1007,13 +1024,13 @@ public class MainView extends BorderPane {
                 miniMapVisible = true;
                 logPanelVisible = true;
                 updateLeftSidebar();
-                logPanel.info("✓ 已恢复所有面板");
+                logger.info("✓ 已恢复所有面板");
             }
             
             @Override
             public void onSaveLayout() {
                 // TODO: 实现保存布局
-                logPanel.info("保存布局功能开发中...");
+                logger.info("保存布局功能开发中...");
             }
             
             @Override
@@ -1025,7 +1042,7 @@ public class MainView extends BorderPane {
             @Override
             public void onUserManual() {
                 // 打开用户手册（可以是本地文件或在线链接）
-                logPanel.info("用户手册功能开发中...");
+                logger.info("用户手册功能开发中...");
             }
             
             @Override
@@ -1036,7 +1053,7 @@ public class MainView extends BorderPane {
             @Override
             public void onApiDocumentation() {
                 // 打开API文档
-                logPanel.info("API文档功能开发中...");
+                logger.info("API文档功能开发中...");
             }
             
             @Override
@@ -1052,25 +1069,25 @@ public class MainView extends BorderPane {
             
             @Override
             public void onCheckUpdate() {
-                logPanel.info("检查更新功能开发中...");
+                logger.info("检查更新功能开发中...");
             }
             
             @Override
             public void onReportIssue() {
                 // 打开报告问题的链接或对话框
-                logPanel.info("报告问题功能开发中...");
+                logger.info("报告问题功能开发中...");
             }
             
             @Override
             public void onFeedback() {
                 // 打开反馈建议的链接或对话框
-                logPanel.info("反馈建议功能开发中...");
+                logger.info("反馈建议功能开发中...");
             }
             
             @Override
             public void onOnlineHelp() {
                 // 打开在线帮助
-                logPanel.info("在线帮助功能开发中...");
+                logger.info("在线帮助功能开发中...");
             }
         });
 
@@ -1103,7 +1120,8 @@ public class MainView extends BorderPane {
                     treeView.selectTaskGroupById(resolvedTaskId);
                 });
             } else {
-                logPanel.warn("⚠ 未找到任务组ID: " + taskGroupName);
+                NotificationToast.showWarning("⚠ 未找到任务组ID: " + taskGroupName);
+                logger.warn("⚠ 未找到任务组ID: " + taskGroupName);
             }
         });
 
@@ -1126,7 +1144,7 @@ public class MainView extends BorderPane {
                 // 清空当前页面状态
                 pageStoreHelper.setCurrentPage(null);
                 toolBar.setCurrentTaskGroupId(null);
-                logPanel.info("📋 已关闭任务组: " + taskGroupName);
+                logger.info("📋 已关闭任务组: " + taskGroupName);
             }
             
             // 检查是否所有标签页都已关闭
@@ -1138,7 +1156,7 @@ public class MainView extends BorderPane {
                 canvas.enableAutoSave();
                 pageStoreHelper.setCurrentPage(null);
                 toolBar.setCurrentTaskGroupId(null);
-                logPanel.info("📋 所有任务组已关闭");
+                logger.info("📋 所有任务组已关闭");
             }
             
             taskGroupNameToIdMap.remove(taskGroupName);
@@ -1242,13 +1260,13 @@ public class MainView extends BorderPane {
                             // 添加到画布
                             canvas.addConditionNode(conditionNode);
                             canvas.markAsUnsaved();
-                            logPanel.success("✓ 条件节点创建成功");
+                            logger.info("✓ 条件节点创建成功");
                         });
                     } catch (Exception e) {
                         Platform.runLater(() -> {
-                            logPanel.error("✗ 创建条件节点失败: " + e.getMessage());
-                            NotificationToast.showError("创建条件节点失败: " + e.getMessage());
+                            NotificationToast.showError("✗ 创建条件节点失败: " + e.getMessage());
                         });
+                        logger.error("✗ 创建条件节点失败: {}", e.getMessage());
                     }
                 }).start();
             });
@@ -1272,7 +1290,7 @@ public class MainView extends BorderPane {
                     conditionNode.setConditionExpression(data.getConditionExpression());
                     conditionNode.setExpressionType(data.getExpressionType());
                     canvas.markAsUnsaved();
-                    logPanel.success("✓ 条件节点已更新");
+                    logger.info("✓ 条件节点已更新");
                 });
         });
         
@@ -1280,7 +1298,7 @@ public class MainView extends BorderPane {
         canvas.setOnDeleteConditionNode(conditionNode -> {
             canvas.removeConditionNode(conditionNode);
             canvas.markAsUnsaved();
-            logPanel.info("✓ 条件节点已删除");
+            logger.info("✓ 条件节点已删除");
         });
 
         // 树形视图回调
@@ -1403,7 +1421,10 @@ public class MainView extends BorderPane {
                             dialogManager.showNodeDetailsDialog(jobId, taskGroupId, nodeName, nodeId);
                         });
                     } else {
-                        logPanel.warn("⚠ 对话框管理器未设置，无法显示详情");
+                        Platform.runLater(() -> {
+                            NotificationToast.showWarning("⚠ 对话框管理器未设置，无法显示详情");
+                        });
+                        logger.warn("⚠ 对话框管理器未设置，无法显示详情");
                     }
                 }
             }
@@ -1420,11 +1441,12 @@ public class MainView extends BorderPane {
                     if (targetNode != null) {
                         // 节点在当前画布中，直接定位
                         canvas.locateNode(targetNode);
-                        logPanel.info("📍 已定位到节点: " + nodeName);
+                        logger.info("📍 已定位到节点: " + nodeName);
                         return;
                     } else {
                         // 节点不在当前画布中，无法定位
-                        logPanel.warn("⚠ 未找到节点: " + nodeName + "，请先打开对应的任务组");
+                        NotificationToast.showWarning("⚠ 未找到节点: " + nodeName + "，请先打开对应的任务组");
+                        logger.warn("⚠ 未找到节点: " + nodeName + "，请先打开对应的任务组");
                         return;
                     }
                 }
@@ -1432,7 +1454,7 @@ public class MainView extends BorderPane {
                 // 检查是否需要切换任务组
                 if (currentTaskGroupId == null || !currentTaskGroupId.equals(targetTaskGroupId)) {
                     // 需要切换任务组
-                    logPanel.info("🔄 切换到任务组: " + targetTaskGroupId);
+                    logger.info("🔄 切换到任务组: " + targetTaskGroupId);
                     
                     // 保存当前任务组的滚动位置
                     if (currentTaskGroupId != null && currentTaskGroupId != 0) {
@@ -1461,9 +1483,10 @@ public class MainView extends BorderPane {
                             ProcessNode targetNode = canvas.getNodeByJobId(jobId);
                             if (targetNode != null) {
                                 canvas.locateNode(targetNode);
-                                logPanel.info("📍 已定位到节点: " + nodeName);
+                                logger.info("📍 已定位到节点: " + nodeName);
                             } else {
-                                logPanel.warn("⚠ 节点加载后仍未找到: " + nodeName);
+                                NotificationToast.showWarning("⚠ 节点加载后仍未找到: " + nodeName);
+                                logger.warn("⚠ 节点加载后仍未找到: " + nodeName);
                             }
                         });
                         delay.play();
@@ -1473,9 +1496,10 @@ public class MainView extends BorderPane {
                     ProcessNode targetNode = canvas.getNodeByJobId(jobId);
                     if (targetNode != null) {
                         canvas.locateNode(targetNode);
-                        logPanel.info("📍 已定位到节点: " + nodeName);
+                        logger.info("📍 已定位到节点: " + nodeName);
                     } else {
-                        logPanel.warn("⚠ 未找到节点: " + nodeName);
+                        NotificationToast.showWarning("⚠ 未找到节点: " + nodeName);
+                        logger.warn("⚠ 未找到节点: " + nodeName);
                     }
                 }
             }
@@ -1485,9 +1509,10 @@ public class MainView extends BorderPane {
                 if (action == TaskTreeView.TaskSelectionCallback.EdgeAction.LOCATE) {
                     // 定位连接线
                     if (canvas.locateConnectionByEdgeId(edgeId != null ? edgeId.toString() : null)) {
-                        logPanel.info("📍 已定位到连接线");
+                        logger.info("📍 已定位到连接线");
                     } else {
-                        logPanel.warn("⚠ 未找到连接线");
+                        NotificationToast.showWarning("⚠ 未找到连接线");
+                        logger.warn("⚠ 未找到连接线");
                     }
                 }
             }
@@ -1509,10 +1534,11 @@ public class MainView extends BorderPane {
                 // 如果目标任务组ID为空，尝试在当前画布中查找连接线
                 if (targetTaskGroupId == null) {
                     if (canvas.locateConnectionByEdgeId(edgeId != null ? edgeId.toString() : null)) {
-                        logPanel.info("📍 已定位到连接线");
+                        logger.info("📍 已定位到连接线");
                         return;
                     } else {
-                        logPanel.warn("⚠ 未找到连接线，请先打开对应的任务组");
+                        NotificationToast.showWarning("⚠ 未找到连接线，请先打开对应的任务组");
+                        logger.warn("⚠ 未找到连接线，请先打开对应的任务组");
                         return;
                     }
                 }
@@ -1520,7 +1546,7 @@ public class MainView extends BorderPane {
                 // 检查是否需要切换任务组
                 if (currentTaskGroupId == null || !currentTaskGroupId.equals(targetTaskGroupId)) {
                     // 需要切换任务组
-                    logPanel.info("🔄 切换到任务组: " + targetTaskGroupId);
+                    logger.info("🔄 切换到任务组: " + targetTaskGroupId);
                     
                     // 保存当前任务组的滚动位置
                     if (currentTaskGroupId != null && currentTaskGroupId != 0) {
@@ -1547,9 +1573,10 @@ public class MainView extends BorderPane {
                         javafx.animation.PauseTransition delay = new javafx.animation.PauseTransition(javafx.util.Duration.millis(500));
                         delay.setOnFinished(e -> {
                             if (canvas.locateConnectionByEdgeId(edgeId != null ? edgeId.toString() : null)) {
-                                logPanel.info("📍 已定位到连接线");
+                                logger.info("📍 已定位到连接线");
                             } else {
-                                logPanel.warn("⚠ 连接线加载后仍未找到");
+                                NotificationToast.showWarning("⚠ 连接线加载后仍未找到");
+                                logger.warn("⚠ 连接线加载后仍未找到");
                             }
                         });
                         delay.play();
@@ -1557,9 +1584,10 @@ public class MainView extends BorderPane {
                 } else {
                     // 当前任务组已匹配，直接定位
                     if (canvas.locateConnectionByEdgeId(edgeId != null ? edgeId.toString() : null)) {
-                        logPanel.info("📍 已定位到连接线");
+                        logger.info("📍 已定位到连接线");
                     } else {
-                        logPanel.warn("⚠ 未找到连接线");
+                        NotificationToast.showWarning("⚠ 未找到连接线");
+                        logger.warn("⚠ 未找到连接线");
                     }
                 }
             }
@@ -1596,7 +1624,10 @@ public class MainView extends BorderPane {
                                 });
                             });
                         } catch (Exception e) {
-                            Platform.runLater(() -> logPanel.error("✗ 加载任务组数据失败: " + e.getMessage()));
+                            Platform.runLater(() -> {
+                                NotificationToast.showError("✗ 加载任务组数据失败: " + e.getMessage());
+                            });
+                            logger.error("✗ 加载任务组数据失败: {}", e.getMessage());
                         }
                     }).start();
                 }
@@ -1622,7 +1653,7 @@ public class MainView extends BorderPane {
                             canvas.getNodes(),
                             node -> {
                                 canvas.locateNode(node);
-                                logPanel.info("✓ 已定位到节点: " + node.getJobHandlerName());
+                                logger.info("✓ 已定位到节点: " + node.getJobHandlerName());
                             }
                         );
                         searchDialog.showAndWait();
@@ -1638,7 +1669,8 @@ public class MainView extends BorderPane {
         Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
         
         if (selectedNodes.isEmpty()) {
-            logPanel.warn("⚠ 请先选中要复制的节点");
+            NotificationToast.showWarning("⚠ 请先选中要复制的节点");
+            logger.warn("⚠ 请先选中要复制的节点");
             return;
         }
         
@@ -2010,7 +2042,8 @@ public class MainView extends BorderPane {
      */
     private void exportPartitionData(Long partitionId, String partitionName) {
         if (partitionId == null) {
-            logPanel.warn("⚠ 分区ID无效");
+            NotificationToast.showWarning("⚠ 分区ID无效");
+            logger.warn("⚠ 分区ID无效");
             return;
         }
         
@@ -2028,7 +2061,7 @@ public class MainView extends BorderPane {
             return; // 用户取消了保存
         }
         
-        logPanel.info("📤 开始导出分区数据: " + partitionName);
+        logger.info("📤 开始导出分区数据: " + partitionName);
         
         new Thread(() -> {
             try {
@@ -2074,7 +2107,7 @@ public class MainView extends BorderPane {
             return;
         }
         
-        logPanel.info("📥 开始导入分区数据: " + file.getName());
+        logger.info("📥 开始导入分区数据: " + file.getName());
         
         new Thread(() -> {
             try {
@@ -2154,7 +2187,7 @@ public class MainView extends BorderPane {
         dialog.setScene(scene);
         dialog.show();
         
-        logPanel.info("✓ 打开节点历史页面: " + taskGroupName);
+        logger.info("✓ 打开节点历史页面: " + taskGroupName);
     }
 
     // 页面状态管理辅助类
@@ -2270,7 +2303,8 @@ public class MainView extends BorderPane {
      */
     private void exportTaskGroup(Long taskGroupId) {
         if (taskGroupId == null) {
-            logPanel.warn("⚠ 任务组ID无效");
+            NotificationToast.showWarning("⚠ 任务组ID无效");
+            logger.warn("⚠ 任务组ID无效");
             return;
         }
         
@@ -2288,9 +2322,9 @@ public class MainView extends BorderPane {
             return;
         }
         
-        logPanel.info("📤 开始导出任务组: " + taskGroupName);
+        logger.info("📤 开始导出任务组: " + taskGroupName);
         // TODO: 实现任务组导出逻辑
-        logPanel.info("任务组导出功能开发中...");
+        logger.info("任务组导出功能开发中...");
     }
     
     /**
@@ -2308,9 +2342,10 @@ public class MainView extends BorderPane {
             if (foundNode != null) {
                 canvas.locateNode(foundNode);
                 canvas.selectNode(foundNode);
-                logPanel.info("✓ 已找到并定位到节点: " + nodeName);
+                logger.info("✓ 已找到并定位到节点: " + nodeName);
             } else {
-                logPanel.warn("⚠ 未找到节点: " + nodeName);
+                NotificationToast.showWarning("⚠ 未找到节点: " + nodeName);
+                logger.warn("⚠ 未找到节点: " + nodeName);
             }
         });
     }
@@ -2327,7 +2362,8 @@ public class MainView extends BorderPane {
      */
     private void switchToTaskGroup(Long taskGroupId, String taskGroupName) {
         if (taskGroupId == null) {
-            logPanel.warn("⚠ 任务组ID无效");
+            NotificationToast.showWarning("⚠ 任务组ID无效");
+            logger.warn("⚠ 任务组ID无效");
             return;
         }
         
@@ -2390,7 +2426,10 @@ public class MainView extends BorderPane {
                 }
             });
         } catch (Exception e) {
-            logPanel.error("✗ 加载任务组列表失败: " + e.getMessage());
+            Platform.runLater(() -> {
+                NotificationToast.showError("✗ 加载任务组列表失败: " + e.getMessage());
+            });
+            logger.error("✗ 加载任务组列表失败: {}", e.getMessage());
         }
     }
     
@@ -2399,7 +2438,7 @@ public class MainView extends BorderPane {
      */
     private void showGoToPartitionDialog() {
         // TODO: 实现转到分区
-        logPanel.info("转到分区功能开发中...");
+        logger.info("转到分区功能开发中...");
     }
     
     /**

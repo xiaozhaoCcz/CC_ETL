@@ -382,7 +382,7 @@ public class DataManager {
     public void refreshTreeView() {
         if (treeView != null) {
             treeView.refreshTreeData();
-            logPanel.success("✓ 任务树刷新成功");
+            logger.info("✓ 任务树刷新成功");
         }
     }
     

@@ -2,14 +2,19 @@ package com.cc.job.gui.manager;
 
 import com.cc.job.gui.model.ProcessNode;
 import com.cc.job.gui.service.JobInfoService;
+import com.cc.job.gui.util.NotificationToast;
 import com.cc.job.gui.view.LogPanel;
 import com.cc.job.gui.view.NodeCanvas;
 import javafx.application.Platform;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 节点回调配置器 - 为节点配置编辑、复制、查看详情等回调
  */
 public class NodeCallbackConfigurator {
+    
+    private static final Logger logger = LoggerFactory.getLogger(NodeCallbackConfigurator.class);
     
     private final NodeOperationManager nodeOperationManager;
     private final NodeCanvas canvas;
@@ -59,7 +64,10 @@ public class NodeCallbackConfigurator {
         node.setOnEdit(() -> {
             Long jobId = node.getJobId();
             if (jobId == null) {
-                Platform.runLater(() -> logPanel.warn("⚠ 该节点未绑定后端任务，无法编辑"));
+                Platform.runLater(() -> {
+                    NotificationToast.showWarning("⚠ 该节点未绑定后端任务，无法编辑");
+                });
+                logger.warn("⚠ 该节点未绑定后端任务，无法编辑");
                 return;
             }
             nodeOperationManager.editNode(jobId, node, currentTaskGroupId);
@@ -70,7 +78,10 @@ public class NodeCallbackConfigurator {
         node.setOnCopy(() -> {
             Long jobId = node.getJobId();
             if (jobId == null) {
-                Platform.runLater(() -> logPanel.warn("⚠ 该节点未绑定后端任务，无法复制"));
+                Platform.runLater(() -> {
+                    NotificationToast.showWarning("⚠ 该节点未绑定后端任务，无法复制");
+                });
+                logger.warn("⚠ 该节点未绑定后端任务，无法复制");
                 return;
             }
             nodeOperationManager.duplicateNode(node, currentTaskGroupId);
@@ -80,7 +91,10 @@ public class NodeCallbackConfigurator {
         node.setOnShowDetails(() -> {
             Long jobId = node.getJobId();
             if (jobId == null) {
-                Platform.runLater(() -> logPanel.warn("⚠ 该节点未绑定后端任务，无法查看详情"));
+                Platform.runLater(() -> {
+                    NotificationToast.showWarning("⚠ 该节点未绑定后端任务，无法查看详情");
+                });
+                logger.warn("⚠ 该节点未绑定后端任务，无法查看详情");
                 return;
             }
             // 显示节点详情对话框
@@ -94,7 +108,10 @@ public class NodeCallbackConfigurator {
                     );
                 });
             } else {
-                Platform.runLater(() -> logPanel.warn("⚠ 对话框管理器未设置，无法显示详情"));
+                Platform.runLater(() -> {
+                    NotificationToast.showWarning("⚠ 对话框管理器未设置，无法显示详情");
+                });
+                logger.warn("⚠ 对话框管理器未设置，无法显示详情");
             }
         });
         
@@ -106,7 +123,8 @@ public class NodeCallbackConfigurator {
                     stage = (javafx.stage.Stage) canvas.getScene().getWindow();
                 }
                 if (stage == null) {
-                    logPanel.warn("⚠ 无法获取主窗口，无法显示依赖关系面板");
+                    NotificationToast.showWarning("⚠ 无法获取主窗口，无法显示依赖关系面板");
+                    logger.warn("⚠ 无法获取主窗口，无法显示依赖关系面板");
                     return;
                 }
                 com.cc.job.gui.view.DependencyViewPanel dependencyPanel = new com.cc.job.gui.view.DependencyViewPanel(
@@ -117,7 +135,7 @@ public class NodeCallbackConfigurator {
                     selectedNode -> {
                         // 定位到选中的节点
                         canvas.locateNode(selectedNode);
-                        logPanel.info("✓ 已定位到节点: " + selectedNode.getJobHandlerName());
+                        logger.info("✓ 已定位到节点: " + selectedNode.getJobHandlerName());
                     }
                 );
                 dependencyPanel.showAndWait();
@@ -129,13 +147,16 @@ public class NodeCallbackConfigurator {
             @Override
             public void onDisableNode(Long nodeJobId, boolean isDisabled) {
                 if (nodeJobId == null) {
-                    logPanel.warn("⚠ 该节点未绑定后端任务，无法禁用/启用");
+                    Platform.runLater(() -> {
+                        NotificationToast.showWarning("⚠ 该节点未绑定后端任务，无法禁用/启用");
+                    });
+                    logger.warn("⚠ 该节点未绑定后端任务，无法禁用/启用");
                     Platform.runLater(() -> node.restoreEnabledState(!isDisabled));
                     return;
                 }
                 
                 String action = isDisabled ? "禁用" : "启用";
-                logPanel.info("正在" + action + "节点: " + node.getJobHandlerName());
+                logger.info("正在" + action + "节点: " + node.getJobHandlerName());
                 
                 new Thread(() -> {
                     try {
@@ -145,17 +166,19 @@ public class NodeCallbackConfigurator {
                         
                         Platform.runLater(() -> {
                             if (success) {
-                                logPanel.success("✓ 节点已" + action);
+                                logger.info("✓ 节点已" + action);
                             } else {
-                                logPanel.error("✗ 节点" + action + "失败");
+                                NotificationToast.showError("✗ 节点" + action + "失败");
+                                logger.error("✗ 节点" + action + "失败");
                                 node.restoreEnabledState(!isDisabled);
                             }
                         });
                     } catch (Exception e) {
                         Platform.runLater(() -> {
-                            logPanel.error("✗ 节点" + action + "失败: " + e.getMessage());
-                            node.restoreEnabledState(!isDisabled);
+                            NotificationToast.showError("✗ 节点" + action + "失败: " + e.getMessage());
                         });
+                        logger.error("✗ 节点" + action + "失败: {}", e.getMessage());
+                        Platform.runLater(() -> node.restoreEnabledState(!isDisabled));
                     }
                 }).start();
             }
@@ -176,7 +199,8 @@ public class NodeCallbackConfigurator {
                     stage = (javafx.stage.Stage) canvas.getScene().getWindow();
                 }
                 if (stage == null) {
-                    logPanel.warn("⚠ 无法获取主窗口，无法显示样式设置对话框");
+                    NotificationToast.showWarning("⚠ 无法获取主窗口，无法显示样式设置对话框");
+                    logger.warn("⚠ 无法获取主窗口，无法显示样式设置对话框");
                     return;
                 }
                 com.cc.job.gui.view.NodeStyleDialog dialog = new com.cc.job.gui.view.NodeStyleDialog(stage, node);
@@ -185,7 +209,7 @@ public class NodeCallbackConfigurator {
                     if (onColorChangedCallback != null) {
                         onColorChangedCallback.run();
                     }
-                    logPanel.info("✓ 节点样式已更新");
+                    logger.info("✓ 节点样式已更新");
                 });
             });
         });
@@ -198,7 +222,8 @@ public class NodeCallbackConfigurator {
                     stage = (javafx.stage.Stage) canvas.getScene().getWindow();
                 }
                 if (stage == null) {
-                    logPanel.warn("⚠ 无法获取主窗口，无法显示标签编辑对话框");
+                    NotificationToast.showWarning("⚠ 无法获取主窗口，无法显示标签编辑对话框");
+                    logger.warn("⚠ 无法获取主窗口，无法显示标签编辑对话框");
                     return;
                 }
                 com.cc.job.gui.view.NodeLabelDialog dialog = new com.cc.job.gui.view.NodeLabelDialog(stage, node);
@@ -209,7 +234,7 @@ public class NodeCallbackConfigurator {
                         if (onColorChangedCallback != null) {
                             onColorChangedCallback.run();
                         }
-                        logPanel.info("✓ 节点标签已更新");
+                        logger.info("✓ 节点标签已更新");
                     }
                 });
             });
@@ -223,7 +248,8 @@ public class NodeCallbackConfigurator {
                     stage = (javafx.stage.Stage) canvas.getScene().getWindow();
                 }
                 if (stage == null) {
-                    logPanel.warn("⚠ 无法获取主窗口，无法显示备注编辑对话框");
+                    NotificationToast.showWarning("⚠ 无法获取主窗口，无法显示备注编辑对话框");
+                    logger.warn("⚠ 无法获取主窗口，无法显示备注编辑对话框");
                     return;
                 }
                 com.cc.job.gui.view.NodeRemarkDialog dialog = new com.cc.job.gui.view.NodeRemarkDialog(stage, node);
@@ -234,7 +260,7 @@ public class NodeCallbackConfigurator {
                         if (onColorChangedCallback != null) {
                             onColorChangedCallback.run();
                         }
-                        logPanel.info("✓ 节点备注已更新");
+                        logger.info("✓ 节点备注已更新");
                     }
                 });
             });

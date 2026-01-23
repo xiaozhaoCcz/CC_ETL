@@ -379,8 +379,13 @@ public class NodeCanvas extends Pane {
             // 拖拽结束后，检查是否需要左侧或上侧扩展
             checkAndExpandCanvas(node);
             
-            // 检测节点是否进入条件节点容器
-            checkNodeInConditionContainer(node);
+            // ⭐ 修复：如果节点已经在条件节点容器中，不要调用checkNodeInConditionContainer
+            // 因为节点在contentLayer中时，坐标是相对坐标，checkNodeInConditionContainer可能会误判
+            ConditionNode existingContainer = findConditionNodeContaining(node, conditionNodes);
+            if (existingContainer == null) {
+                // 只有节点不在任何容器中时，才检查是否进入容器
+                checkNodeInConditionContainer(node);
+            }
             
             if (selectionManager.isMovingSelection() && selectionManager.getDragStartNode() == node) {
                 selectionManager.setMovingSelection(false);
@@ -1476,7 +1481,7 @@ public class NodeCanvas extends Pane {
         restoreAllNodesItem.setOnAction(e -> restoreAllNodesEnabled());
         
         menu.getItems().addAll(addNodeItem,
-                addConditionNodeItem,
+                //addConditionNodeItem,
                 new SeparatorMenuItem(),
                 clearItem,
                 runGroupItem,
@@ -2694,11 +2699,25 @@ public class NodeCanvas extends Pane {
             return;
         }
         
-        // 检查节点是否进入任何条件节点容器（包括嵌套的）
-        ConditionNode targetContainer = findConditionNodeForNode(node, conditionNodes);
-        if (targetContainer != null && targetContainer.isExpanded()) {
-            // 节点进入容器，添加到容器中
-            addNodeToConditionContainer(node, targetContainer);
+        // ⭐ 修复：检查节点是否进入任何条件节点容器（包括嵌套的）
+        // 但是，如果节点已经在contentLayer中（父节点是Pane且父节点的父节点是条件节点），
+        // 说明节点已经在某个容器中，不应该再次检查
+        javafx.scene.Node parent = node.getParent();
+        boolean nodeInContentLayer = false;
+        if (parent != null) {
+            javafx.scene.Node grandParent = parent.getParent();
+            if (grandParent instanceof ConditionNode) {
+                nodeInContentLayer = true;
+            }
+        }
+        
+        // 只有节点不在contentLayer中时，才检查是否进入容器
+        if (!nodeInContentLayer) {
+            ConditionNode targetContainer = findConditionNodeForNode(node, conditionNodes);
+            if (targetContainer != null && targetContainer.isExpanded()) {
+                // 节点进入容器，添加到容器中
+                addNodeToConditionContainer(node, targetContainer);
+            }
         }
     }
     
@@ -2724,6 +2743,19 @@ public class NodeCanvas extends Pane {
      * 递归查找节点应该加入的条件节点容器 - ⭐ 优化：返回最内层容器
      */
     private ConditionNode findConditionNodeForNode(ProcessNode node, List<ConditionNode> conditionNodes) {
+        // ⭐ 修复：如果节点已经在某个容器的managedCanvasNodes中，不应该再查找
+        // 因为节点在contentLayer中时，坐标是相对坐标，不能用于位置检查
+        for (ConditionNode conditionNode : conditionNodes) {
+            if (conditionNode.getManagedCanvasNodes().contains(node)) {
+                return null; // 节点已经在容器中，不需要再查找
+            }
+            // 递归检查嵌套的条件节点
+            ConditionNode nested = findConditionNodeForNode(node, conditionNode.getManagedConditionNodes());
+            if (nested != null) {
+                return null; // 节点已经在嵌套容器中，不需要再查找
+            }
+        }
+        
         // ⭐ 修复：优先检查嵌套的条件节点（最内层），如果找到就直接返回
         for (ConditionNode conditionNode : conditionNodes) {
             if (conditionNode.isExpanded()) {
@@ -2757,26 +2789,21 @@ public class NodeCanvas extends Pane {
             return true;
         }
         
-        // 如果节点不在managedCanvasNodes中，使用绝对坐标检查（节点可能在画布上）
-        // 获取节点的绝对坐标（如果节点在contentLayer中，需要转换）
-        double nodeX = node.getLayoutX();
-        double nodeY = node.getLayoutY();
-        
-        // ⭐ 修复：如果节点的父节点是contentLayer，需要将相对坐标转换为绝对坐标
+        // ⭐ 修复：如果节点不在managedCanvasNodes中，使用绝对坐标检查（节点可能在画布上）
+        // 但是，如果节点的父节点是contentLayer，说明节点已经在容器中，不应该再检查位置
         javafx.scene.Node parent = node.getParent();
         if (parent != null) {
             // 检查父节点是否是contentLayer（通过检查父节点的父节点是否是条件节点）
             javafx.scene.Node grandParent = parent.getParent();
             if (grandParent != null && grandParent == conditionNode) {
-                // 节点在contentLayer中，需要转换为绝对坐标
-                double containerX = conditionNode.getLayoutX();
-                double containerY = conditionNode.getLayoutY();
-                // header高度估算为36（与下面的headerHeight一致）
-                double headerHeight = 36;
-                nodeX = containerX + nodeX;
-                nodeY = containerY + headerHeight + nodeY;
+                // 节点在contentLayer中，说明它已经在容器中，直接返回true
+                return true;
             }
         }
+        
+        // 如果节点不在contentLayer中，使用绝对坐标检查（节点可能在画布上）
+        double nodeX = node.getLayoutX();
+        double nodeY = node.getLayoutY();
         
         double nodeWidth = node.getPrefWidth();
         double nodeHeight = node.getPrefHeight();
@@ -3511,6 +3538,14 @@ public class NodeCanvas extends Pane {
      */
     private void checkAndExpandCanvas(ProcessNode node) {
         if (node == null) return;
+        
+        // ⭐ 修复：如果节点在条件节点容器中，不需要检查画布扩展
+        // 因为节点在contentLayer中时，坐标是相对坐标，不能用于画布扩展检查
+        ConditionNode container = findConditionNodeContaining(node, conditionNodes);
+        if (container != null) {
+            // 节点在容器中，不需要检查画布扩展
+            return;
+        }
         
         // 如果正在执行扩展操作，跳过本次检查，防止重复扩展
         if (isExpanding) return;
