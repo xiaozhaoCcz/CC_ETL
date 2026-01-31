@@ -590,6 +590,34 @@ public class MainView extends BorderPane {
                 }
                 exportTaskGroup(currentTaskGroupId);
             }
+
+            @Override
+            public void onExportPartition() {
+                TreeNodeData selected = treeView.getSelectedTreeNodeData();
+                if (selected != null && selected.getType() != null && selected.getType() == 0) {
+                    exportPartitionData(selected.getId(), selected.getLabel());
+                } else {
+                    NotificationToast.showWarning("⚠ 请先在左侧树中选择一个分区");
+                    logger.warn("⚠ 请先在左侧树中选择一个分区");
+                }
+            }
+
+            @Override
+            public void onImportTaskGroup() {
+                Long partitionId = null;
+                TreeNodeData selected = treeView.getSelectedTreeNodeData();
+                if (selected != null && selected.getType() != null && selected.getType() == 0) {
+                    partitionId = selected.getId();
+                }
+                if (partitionId == null) {
+                    Optional<Long> chosen = showSelectPartitionDialog();
+                    if (chosen.isEmpty()) {
+                        return;
+                    }
+                    partitionId = chosen.get();
+                }
+                importTaskGroupFile(partitionId);
+            }
             
             @Override
             public void onExit() {
@@ -2131,6 +2159,107 @@ public class MainView extends BorderPane {
             }
         }, "import-partition").start();
     }
+
+    /**
+     * 显示选择分区对话框（用于导入任务组时未选中分区）
+     */
+    private Optional<Long> showSelectPartitionDialog() {
+        Stage ownerStage = (Stage) getScene().getWindow();
+        Dialog<Long> dialog = new Dialog<>();
+        dialog.initOwner(ownerStage);
+        dialog.initModality(Modality.APPLICATION_MODAL);
+        dialog.setTitle("选择分区");
+        dialog.setHeaderText("请选择要导入任务组的目标分区");
+
+        ButtonType okButtonType = new ButtonType("确定", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, okButtonType);
+
+        ComboBox<com.cc.job.xo.model.vo.JobPartVo> partCombo = new ComboBox<>();
+        partCombo.setPromptText("请选择分区");
+        partCombo.setPrefWidth(320);
+        partCombo.setCellFactory(cb -> new javafx.scene.control.ListCell<>() {
+            @Override
+            protected void updateItem(com.cc.job.xo.model.vo.JobPartVo item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item.getLabel());
+            }
+        });
+        partCombo.setButtonCell(new javafx.scene.control.ListCell<>() {
+            @Override
+            protected void updateItem(com.cc.job.xo.model.vo.JobPartVo item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item.getLabel());
+            }
+        });
+
+        VBox content = new VBox(12);
+        content.setPadding(new Insets(16));
+        content.getChildren().addAll(new Label("分区"), partCombo);
+        dialog.getDialogPane().setContent(content);
+
+        try {
+            List<com.cc.job.xo.model.vo.JobPartVo> tree = new JobPartService().getTree();
+            partCombo.getItems().setAll(tree != null ? tree : Collections.emptyList());
+            if (partCombo.getItems().isEmpty()) {
+                partCombo.setDisable(true);
+            } else {
+                partCombo.getSelectionModel().selectFirst();
+            }
+        } catch (Exception e) {
+            logger.error("加载分区列表失败", e);
+            NotificationToast.showError("加载分区列表失败: " + e.getMessage());
+            return Optional.empty();
+        }
+
+        dialog.setResultConverter(bt -> {
+            if (bt == okButtonType) {
+                com.cc.job.xo.model.vo.JobPartVo selected = partCombo.getValue();
+                return selected != null ? selected.getId() : null;
+            }
+            return null;
+        });
+        return dialog.showAndWait().filter(Objects::nonNull);
+    }
+
+    /**
+     * 导入任务组文件到指定分区
+     */
+    private void importTaskGroupFile(Long partitionId) {
+        Stage ownerStage = (Stage) getScene().getWindow();
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("导入任务组");
+        FileChooser.ExtensionFilter extFilter = new FileChooser.ExtensionFilter("CEL文件 (*.cel)", "*.cel");
+        fileChooser.getExtensionFilters().add(extFilter);
+
+        File file = fileChooser.showOpenDialog(ownerStage);
+        if (file == null) {
+            return;
+        }
+        if (!file.exists() || !file.isFile()) {
+            NotificationToast.showError("选择的文件不存在或无效");
+            return;
+        }
+
+        logger.info("📥 开始导入任务组到分区: " + partitionId);
+        new Thread(() -> {
+            try {
+                JobPartService jobPartService = new JobPartService();
+                boolean success = jobPartService.importTaskGroup(partitionId, file);
+                Platform.runLater(() -> {
+                    if (success) {
+                        NotificationToast.showSuccess("任务组已成功导入");
+                        dataManager.refreshTreeView();
+                    } else {
+                        NotificationToast.showError("导入任务组失败，请检查文件格式是否正确");
+                    }
+                });
+            } catch (Exception e) {
+                logger.error("导入任务组失败", e);
+                Platform.runLater(() ->
+                    NotificationToast.showError("导入任务组时发生错误: " + e.getMessage()));
+            }
+        }, "import-taskgroup").start();
+    }
     
     /**
      * 计算新条件节点的位置
@@ -2307,24 +2436,38 @@ public class MainView extends BorderPane {
             logger.warn("⚠ 任务组ID无效");
             return;
         }
-        
+
         Stage ownerStage = (Stage) this.getScene().getWindow();
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("导出任务组");
         String taskGroupName = getJobNameById(taskGroupId);
-        fileChooser.setInitialFileName(taskGroupName != null ? taskGroupName + ".json" : "taskgroup_" + taskGroupId + ".json");
-        
-        FileChooser.ExtensionFilter extFilter = new FileChooser.ExtensionFilter("JSON文件 (*.json)", "*.json");
+        fileChooser.setInitialFileName(taskGroupName != null ? taskGroupName + ".cel" : "taskgroup_" + taskGroupId + ".cel");
+        FileChooser.ExtensionFilter extFilter = new FileChooser.ExtensionFilter("CEL文件 (*.cel)", "*.cel");
         fileChooser.getExtensionFilters().add(extFilter);
-        
+
         File file = fileChooser.showSaveDialog(ownerStage);
         if (file == null) {
             return;
         }
-        
+
         logger.info("📤 开始导出任务组: " + taskGroupName);
-        // TODO: 实现任务组导出逻辑
-        logger.info("任务组导出功能开发中...");
+        new Thread(() -> {
+            try {
+                JobPartService jobPartService = new JobPartService();
+                byte[] data = jobPartService.exportTaskGroupData(taskGroupId);
+                try (FileOutputStream fos = new FileOutputStream(file)) {
+                    fos.write(data);
+                    fos.flush();
+                }
+                Platform.runLater(() -> {
+                    NotificationToast.showSuccess("任务组已导出到: " + file.getAbsolutePath());
+                });
+            } catch (Exception e) {
+                logger.error("导出任务组失败", e);
+                Platform.runLater(() ->
+                    NotificationToast.showError("导出任务组时发生错误: " + e.getMessage()));
+            }
+        }, "export-taskgroup").start();
     }
     
     /**

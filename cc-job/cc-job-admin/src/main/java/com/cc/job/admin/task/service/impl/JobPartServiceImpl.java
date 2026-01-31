@@ -408,6 +408,83 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
     }
 
     /**
+     * 导出单个任务组数据（.cel 格式）
+     * 复用 PartitionExportData，partition 为 null，taskGroups 仅含一个任务组
+     */
+    @Override
+    public byte[] exportTaskGroupData(Long jobId) {
+        JobInfo taskGroup = jobInfoService.getById(jobId);
+        if (taskGroup == null) {
+            throw new RuntimeException("任务组不存在: " + jobId);
+        }
+        if (taskGroup.getJobType() == null || taskGroup.getJobType() != 2
+                || !"N".equals(taskGroup.getNodeFlag())) {
+            throw new RuntimeException("ID 不是任务组: " + jobId);
+        }
+
+        PartitionExportData.TaskGroupInfo taskGroupInfo = new PartitionExportData.TaskGroupInfo();
+        taskGroupInfo.setTaskGroupData(convertToTaskInfoData(taskGroup));
+
+        List<JobNode> jobNodeList = jobNodeService.list(
+            new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, taskGroup.getId()));
+        List<PartitionExportData.NodeInfo> nodeInfoList = new ArrayList<>();
+        for (JobNode jobNode : jobNodeList) {
+            PartitionExportData.NodeInfo nodeInfo = new PartitionExportData.NodeInfo();
+            nodeInfo.setNodeId(jobNode.getId());
+            nodeInfo.setJobId(jobNode.getJobId());
+            nodeInfo.setJobParentId(jobNode.getJobParentId());
+            nodeInfo.setNodePositionX(jobNode.getNodePositionX());
+            nodeInfo.setNodePositionY(jobNode.getNodePositionY());
+            nodeInfo.setNodeInDegree(jobNode.getNodeInDegree());
+            nodeInfo.setNodeOutDegree(jobNode.getNodeOutDegree());
+            nodeInfo.setSort(jobNode.getSort());
+            nodeInfo.setChildren(jobNode.getChildren());
+            nodeInfo.setProperties(jobNode.getProperties());
+            nodeInfo.setNodeType(jobNode.getNodeType());
+            nodeInfo.setTriggerStatus(jobNode.getTriggerStatus());
+            JobInfo nodeJobInfo = jobInfoService.getById(jobNode.getJobId());
+            if (nodeJobInfo != null) {
+                nodeInfo.setTaskInfo(convertToTaskInfoData(nodeJobInfo));
+            }
+            nodeInfoList.add(nodeInfo);
+        }
+        taskGroupInfo.setNodes(nodeInfoList);
+
+        List<JobEdge> jobEdgeList = jobEdgeService.list(
+            new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getJobParentId, taskGroup.getId()));
+        List<PartitionExportData.EdgeInfo> edgeInfoList = new ArrayList<>();
+        for (JobEdge jobEdge : jobEdgeList) {
+            PartitionExportData.EdgeInfo edgeInfo = new PartitionExportData.EdgeInfo();
+            edgeInfo.setId(jobEdge.getId());
+            edgeInfo.setJobParentId(jobEdge.getJobParentId());
+            edgeInfo.setFromNodeId(jobEdge.getFromNodeId());
+            edgeInfo.setEndNodeId(jobEdge.getEndNodeId());
+            edgeInfo.setPointsList(jobEdge.getPointsList());
+            edgeInfo.setProperties(jobEdge.getProperties());
+            edgeInfo.setStartPoint(jobEdge.getStartPoint());
+            edgeInfo.setEndPoint(jobEdge.getEndPoint());
+            edgeInfoList.add(edgeInfo);
+        }
+        taskGroupInfo.setEdges(edgeInfoList);
+
+        PartitionExportData exportData = new PartitionExportData();
+        exportData.setPartition(null);
+        exportData.setTaskGroups(Collections.singletonList(taskGroupInfo));
+
+        Gson gson = new Gson();
+        String json = gson.toJson(exportData);
+        SecretKeySpec keySpec = new SecretKeySpec(SECRET_KEY.getBytes(), ALGORITHM);
+        try {
+            Cipher cipher = Cipher.getInstance(ALGORITHM);
+            cipher.init(Cipher.ENCRYPT_MODE, keySpec);
+            return cipher.doFinal(json.getBytes());
+        } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException
+                | IllegalBlockSizeException | BadPaddingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
      * 将JobInfo转换为TaskInfoData
      */
     private PartitionExportData.TaskInfoData convertToTaskInfoData(JobInfo jobInfo) {
@@ -581,6 +658,115 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
 
                 // 5.4 更新任务组节点的children字段（如果有嵌套任务组）
                 // 这里需要处理嵌套任务组的情况，暂时先跳过
+            }
+        }
+    }
+
+    /**
+     * 导入任务组到指定分区（.cel 格式：单任务组，partition 可为 null）
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void importTaskGroup(Long partitionId, MultipartFile file) {
+        if (partitionId == null) {
+            throw new RuntimeException("分区ID不能为空");
+        }
+        JobPart partition = this.getById(partitionId);
+        if (partition == null) {
+            throw new RuntimeException("分区不存在: " + partitionId);
+        }
+
+        Cipher cipher;
+        SecretKeySpec keySpec = new SecretKeySpec(SECRET_KEY.getBytes(), "AES");
+        byte[] decryptedBytes;
+        String json;
+        try {
+            cipher = Cipher.getInstance(ALGORITHM);
+            cipher.init(Cipher.DECRYPT_MODE, keySpec);
+            decryptedBytes = cipher.doFinal(file.getBytes());
+            json = new String(decryptedBytes, "UTF-8");
+        } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | IllegalBlockSizeException |
+                 BadPaddingException | IOException e) {
+            throw new RuntimeException("解密文件失败", e);
+        }
+
+        Gson gson = new Gson();
+        PartitionExportData exportData = gson.fromJson(json, PartitionExportData.class);
+        if (exportData == null || exportData.getTaskGroups() == null || exportData.getTaskGroups().isEmpty()) {
+            throw new RuntimeException("导入数据格式错误：需要至少一个任务组");
+        }
+
+        Map<Long, Long> oldToNewJobInfoIdMap = new HashMap<>();
+        Map<Long, Long> oldToNewNodeIdMap = new HashMap<>();
+        Map<Long, Long> oldToNewEdgeIdMap = new HashMap<>();
+        Long newPartitionId = partitionId;
+
+        for (PartitionExportData.TaskGroupInfo taskGroupInfo : exportData.getTaskGroups()) {
+            JobInfo newTaskGroup = convertToJobInfo(taskGroupInfo.getTaskGroupData());
+            newTaskGroup.setId(null);
+            newTaskGroup.setJobPartId(newPartitionId.intValue());
+            newTaskGroup.setJobType(2);
+            newTaskGroup.setNodeFlag("N");
+            newTaskGroup.setTriggerStatus(0);
+            jobInfoService.save(newTaskGroup);
+
+            Long newTaskGroupId = newTaskGroup.getId();
+            if (newTaskGroupId == null) {
+                throw new RuntimeException("创建任务组失败：未生成ID");
+            }
+            newTaskGroup.setExecutorParam(String.valueOf(newTaskGroupId));
+            jobInfoService.updateById(newTaskGroup);
+
+            Long oldTaskGroupId = taskGroupInfo.getTaskGroupData().getId();
+            oldToNewJobInfoIdMap.put(oldTaskGroupId, newTaskGroupId);
+
+            if (taskGroupInfo.getNodes() != null) {
+                for (PartitionExportData.NodeInfo nodeInfo : taskGroupInfo.getNodes()) {
+                    JobInfo newNodeJobInfo = convertToJobInfo(nodeInfo.getTaskInfo());
+                    newNodeJobInfo.setId(null);
+                    newNodeJobInfo.setParentId(newTaskGroupId);
+                    newNodeJobInfo.setTriggerStatus(0);
+                    jobInfoService.save(newNodeJobInfo);
+
+                    Long newJobInfoId = newNodeJobInfo.getId();
+                    Long oldJobInfoId = nodeInfo.getTaskInfo().getId();
+                    oldToNewJobInfoIdMap.put(oldJobInfoId, newJobInfoId);
+
+                    JobNode newJobNode = new JobNode();
+                    newJobNode.setJobId(newJobInfoId);
+                    newJobNode.setJobParentId(newTaskGroupId);
+                    newJobNode.setNodePositionX(nodeInfo.getNodePositionX());
+                    newJobNode.setNodePositionY(nodeInfo.getNodePositionY());
+                    newJobNode.setNodeInDegree(nodeInfo.getNodeInDegree());
+                    newJobNode.setNodeOutDegree(nodeInfo.getNodeOutDegree());
+                    newJobNode.setSort(nodeInfo.getSort());
+                    newJobNode.setChildren(nodeInfo.getChildren());
+                    newJobNode.setProperties(nodeInfo.getProperties());
+                    newJobNode.setNodeType(nodeInfo.getNodeType());
+                    newJobNode.setTriggerStatus(nodeInfo.getTriggerStatus());
+                    jobNodeService.save(newJobNode);
+
+                    oldToNewNodeIdMap.put(nodeInfo.getNodeId(), newJobNode.getId());
+                }
+            }
+
+            if (taskGroupInfo.getEdges() != null) {
+                for (PartitionExportData.EdgeInfo edgeInfo : taskGroupInfo.getEdges()) {
+                    Long newFromNodeId = oldToNewNodeIdMap.get(edgeInfo.getFromNodeId());
+                    Long newEndNodeId = oldToNewNodeIdMap.get(edgeInfo.getEndNodeId());
+                    if (newFromNodeId != null && newEndNodeId != null) {
+                        JobEdge newJobEdge = new JobEdge();
+                        newJobEdge.setJobParentId(newTaskGroupId);
+                        newJobEdge.setFromNodeId(newFromNodeId);
+                        newJobEdge.setEndNodeId(newEndNodeId);
+                        newJobEdge.setPointsList(edgeInfo.getPointsList());
+                        newJobEdge.setProperties(edgeInfo.getProperties());
+                        newJobEdge.setStartPoint(edgeInfo.getStartPoint());
+                        newJobEdge.setEndPoint(edgeInfo.getEndPoint());
+                        jobEdgeService.save(newJobEdge);
+                        oldToNewEdgeIdMap.put(edgeInfo.getId(), newJobEdge.getId());
+                    }
+                }
             }
         }
     }

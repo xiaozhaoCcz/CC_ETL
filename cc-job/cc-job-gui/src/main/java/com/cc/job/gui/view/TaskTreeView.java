@@ -586,4 +586,12 @@ public class TaskTreeView extends VBox {
         TreeItem<TreeNodeData> selected = treeView.getSelectionModel().getSelectedItem();
         return selected != null && selected.getValue() != null ? selected.getValue().getLabel() : null;
     }
+
+    /**
+     * 获取当前树选中的节点数据（分区 type=0，任务组 type=1 等）
+     */
+    public TreeNodeData getSelectedTreeNodeData() {
+        TreeItem<TreeNodeData> selected = treeView.getSelectionModel().getSelectedItem();
+        return selected != null ? selected.getValue() : null;
+    }
 }

@@ -17,5 +17,9 @@ public interface JobPartService extends IService<JobPart> {
 
     byte[] exportData(Long id);
 
+    byte[] exportTaskGroupData(Long jobId);
+
     void importData(MultipartFile file);
+
+    void importTaskGroup(Long partitionId, MultipartFile file);
 }

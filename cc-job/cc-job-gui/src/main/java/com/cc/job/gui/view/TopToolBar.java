@@ -91,6 +91,8 @@ public class TopToolBar extends VBox {
         
         // 文件菜单扩展
         default void onSaveAs() {} // 另存为
+        default void onExportPartition() {} // 导出分区
+        default void onImportTaskGroup() {} // 导入任务组
         default void onExit() {} // 退出
         default void onRecentFile(Long taskGroupId, String taskGroupName) {} // 最近打开的文件
         
@@ -318,13 +320,17 @@ public class TopToolBar extends VBox {
         Menu importMenu = new Menu("导入");
         MenuItem importPartitionItem = new MenuItem("导入分区文件");
         importPartitionItem.setOnAction(e -> safeCall(ToolBarCallback::onOpen));
-        importMenu.getItems().add(importPartitionItem);
+        MenuItem importTaskGroupItem = new MenuItem("导入任务组");
+        importTaskGroupItem.setOnAction(e -> safeCall(ToolBarCallback::onImportTaskGroup));
+        importMenu.getItems().addAll(importPartitionItem, importTaskGroupItem);
         
         // 导出子菜单
         Menu exportMenu = new Menu("导出");
         MenuItem exportTaskGroupItem = new MenuItem("导出当前任务组");
         exportTaskGroupItem.setOnAction(e -> safeCall(ToolBarCallback::onSaveAs));
-        exportMenu.getItems().add(exportTaskGroupItem);
+        MenuItem exportPartitionItem = new MenuItem("导出分区");
+        exportPartitionItem.setOnAction(e -> safeCall(ToolBarCallback::onExportPartition));
+        exportMenu.getItems().addAll(exportTaskGroupItem, exportPartitionItem);
         
         fileMenu.getItems().addAll(new SeparatorMenuItem(), importMenu, exportMenu, new SeparatorMenuItem());
         
