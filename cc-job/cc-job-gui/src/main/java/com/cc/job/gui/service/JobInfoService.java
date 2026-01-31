@@ -199,8 +199,7 @@ public class JobInfoService extends BaseService {
      */
     public long saveJobInfo(JobInfoForm formData) throws IOException {
         Result<Long> result = httpClient.post("/api/v1/jobInfos", formData, Long.class);
-        Long data = httpClient.extractData(result, "保存任务节点失败");
-        return data;
+        return httpClient.extractData(result, "保存任务节点失败");
     }
 
     /**

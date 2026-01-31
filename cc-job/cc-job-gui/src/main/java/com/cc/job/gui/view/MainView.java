@@ -31,6 +31,7 @@ import java.util.Set;
 /**
  * 主界面视图 - 作为协调器，委托具体逻辑给各个管理器
  * 重构版本：将原5009行代码拆分为多个管理器，主类仅保留650行
+ * @author xiaozhao
  */
 public class MainView extends BorderPane {
 
@@ -48,7 +49,6 @@ public class MainView extends BorderPane {
     
     // 布局容器
     private SplitPane leftArea;
-    private HBox leftContainer;
     private SplitPane horizontalSplit;
     private SplitPane verticalSplit;
     
@@ -73,10 +73,10 @@ public class MainView extends BorderPane {
     private final PageStoreHelper pageStoreHelper = new PageStoreHelper();
     
     // 任务组名称到ID的映射
-    private Map<String, Long> taskGroupNameToIdMap = new HashMap<>();
+    private final Map<String, Long> taskGroupNameToIdMap = new HashMap<>();
     
     // 任务组ID -> 滚动位置映射（用于保存和恢复每个任务组的画布位置）
-    private Map<Long, ScrollPosition> taskGroupScrollPositions = new HashMap<>();
+    private final Map<Long, ScrollPosition> taskGroupScrollPositions = new HashMap<>();
     
     public MainView() {
         this.jobGroupService = new JobGroupService();
@@ -112,7 +112,7 @@ public class MainView extends BorderPane {
         leftArea.setDividerPositions(0.7); // 树形菜单占70%，小地图占30%
 
         // 左侧容器
-        leftContainer = new HBox(0);
+        HBox leftContainer = new HBox(0);
         leftContainer.getChildren().addAll(collapsedSidebar, leftArea);
         HBox.setHgrow(leftArea, Priority.ALWAYS);
 

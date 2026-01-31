@@ -288,6 +288,7 @@ public class TopToolBar extends VBox {
         newJobItem.setAccelerator(new KeyCodeCombination(KeyCode.N, KeyCombination.CONTROL_DOWN));
         newJobItem.setOnAction(e -> safeCall(ToolBarCallback::onNew));
         MenuItem newJobPartItem = new MenuItem("新建分区");
+        newJobPartItem.setAccelerator(new KeyCodeCombination(KeyCode.P,KeyCombination.CONTROL_DOWN));
         newJobPartItem.setOnAction(e -> safeCall(ToolBarCallback::onNewPart));
         newItem.getItems().addAll(newJobItem, newJobPartItem);
         

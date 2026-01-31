@@ -180,19 +180,5 @@ public class NewPartitionDialog extends Dialog<String> {
             }
         });
     }
-    
-    /**
-     * 获取输入的分区名称
-     */
-    public String getPartitionName() {
-        return partitionNameField.getText().trim();
-    }
-    
-    /**
-     * 获取分区ID（编辑模式）
-     */
-    public Long getPartitionId() {
-        return partitionId;
-    }
 }
 

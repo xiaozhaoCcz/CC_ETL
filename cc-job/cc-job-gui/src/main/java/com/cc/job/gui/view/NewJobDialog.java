@@ -69,9 +69,9 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
     private SmartParameterInput reqBodyArea;
     private ParameterTable bodyTable;
     
-    private JobJdbcDatasourceService datasourceService;
+    private final JobJdbcDatasourceService datasourceService;
     private Long pendingDatasourceId;
-    private TextArea glueEditorArea;
+    private final TextArea glueEditorArea;
     private String glueRemark;
     private GlueType lastGlueType = null;
     
@@ -83,8 +83,8 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
     private TextField executorTimeoutField;
     private TextField executorFailRetryCountField;
     
-    private ButtonType saveButtonType;
-    private ButtonType cancelButtonType;
+    private final ButtonType saveButtonType;
+    private final ButtonType cancelButtonType;
     
     // 高级配置容器
     private VBox advancedSection;
@@ -872,9 +872,15 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
                 .findFirst()
                 .ifPresent(jobGroupCombo::setValue);
         }
-        if (data.getJobDesc() != null) jobDescField.setText(data.getJobDesc());
-        if (data.getAuthor() != null) authorField.setText(data.getAuthor());
-        if (data.getAlarmEmail() != null) alarmEmailField.setText(data.getAlarmEmail());
+        if (data.getJobDesc() != null) {
+            jobDescField.setText(data.getJobDesc());
+        }
+        if (data.getAuthor() != null) {
+            authorField.setText(data.getAuthor());
+        }
+        if (data.getAlarmEmail() != null) {
+            alarmEmailField.setText(data.getAlarmEmail());
+        }
         
         // 调度配置
         if (data.getScheduleType() != null) {
@@ -884,7 +890,9 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
                 scheduleTypeCombo.setValue(ScheduleType.CRON);
             }
         }
-        if (data.getScheduleConf() != null) scheduleConfField.setText(data.getScheduleConf());
+        if (data.getScheduleConf() != null) {
+            scheduleConfField.setText(data.getScheduleConf());
+        }
         
         // 任务配置
         GlueType glueType = GlueType.fromType(data.getGlueType());
