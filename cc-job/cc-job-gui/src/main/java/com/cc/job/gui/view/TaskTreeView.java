@@ -58,10 +58,11 @@ public class TaskTreeView extends VBox {
         }
         default void onPartitionAction(Long partitionId, String partitionName, PartitionAction action) {}
         default void onJobGroupEdit(Long taskGroupId, String taskGroupName) {}
+        default void onExportTaskGroup(Long taskGroupId, String taskGroupName) {}
         
         enum JobNodeAction { EDIT, LOCATE, PROPERTIES }
         enum EdgeAction { LOCATE, DELETE }
-        enum PartitionAction { EDIT, EXPORT }
+        enum PartitionAction { EDIT, EXPORT, IMPORT }
     }
     
     public TaskTreeView() {

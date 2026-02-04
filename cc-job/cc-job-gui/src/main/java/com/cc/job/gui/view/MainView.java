@@ -1711,7 +1711,15 @@ public class MainView extends BorderPane {
                 } else if (action == TaskTreeView.TaskSelectionCallback.PartitionAction.EXPORT) {
                     // 导出分区数据
                     exportPartitionData(partitionId, partitionName);
+                } else if (action == TaskTreeView.TaskSelectionCallback.PartitionAction.IMPORT) {
+                    // 导入任务组到该分区（与顶部导入任务组一致）
+                    importTaskGroupFile(partitionId);
                 }
+            }
+
+            @Override
+            public void onExportTaskGroup(Long taskGroupId, String taskGroupName) {
+                exportTaskGroup(taskGroupId);
             }
 
             @Override

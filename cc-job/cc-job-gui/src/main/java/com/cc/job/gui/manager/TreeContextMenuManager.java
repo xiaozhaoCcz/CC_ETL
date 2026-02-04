@@ -47,6 +47,14 @@ public class TreeContextMenuManager {
                 selectionCallback.onNewJobGroup(nodeData.getId(), nodeData.getLabel());
             }
         });
+        MenuItem importTaskGroupItem = new MenuItem("导入任务组");
+        importTaskGroupItem.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: #2563EB;");
+        importTaskGroupItem.setOnAction(e -> {
+            if (selectionCallback != null) {
+                selectionCallback.onPartitionAction(nodeData.getId(), nodeData.getLabel(),
+                    TaskTreeView.TaskSelectionCallback.PartitionAction.IMPORT);
+            }
+        });
         
         MenuItem refreshItem = createMenuItem("刷新", onRefresh);
         MenuItem editItem = createMenuItem("编辑", () -> {
@@ -62,7 +70,7 @@ public class TreeContextMenuManager {
             }
         });
         
-        menu.getItems().addAll(newTaskItem, refreshItem, editItem, exportItem);
+        menu.getItems().addAll(newTaskItem, importTaskGroupItem, refreshItem, editItem, exportItem);
         
         if (supportsDeletion(nodeData)) {
             menu.getItems().addAll(new SeparatorMenuItem(), createDeleteMenuItem(onDelete));
@@ -84,8 +92,13 @@ public class TreeContextMenuManager {
                 selectionCallback.onJobGroupEdit(nodeData.getId(), nodeData.getLabel());
             }
         });
+        MenuItem exportItem = createMenuItem("导出", () -> {
+            if (selectionCallback != null) {
+                selectionCallback.onExportTaskGroup(nodeData.getId(), nodeData.getLabel());
+            }
+        });
         
-        menu.getItems().addAll(addNodeItem, refreshItem, editItem);
+        menu.getItems().addAll(addNodeItem, refreshItem, editItem, exportItem);
         
         if (supportsDeletion(nodeData)) {
             menu.getItems().addAll(new SeparatorMenuItem(), createDeleteMenuItem(onDelete));
