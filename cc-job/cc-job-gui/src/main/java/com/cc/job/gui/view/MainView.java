@@ -1409,6 +1409,9 @@ public class MainView extends BorderPane {
                     toolBar.setCurrentTaskGroupId(taskId);
                     // 数据加载后会自动恢复滚动位置
                     dataManager.loadTaskGroupData(taskId, taskName);
+                    // 添加到最近打开的文件列表
+                    com.cc.job.gui.util.RecentFilesManager.getInstance().addRecentFile(taskId, taskName);
+                    toolBar.refreshRecentFilesMenu();
                 }
             }
 

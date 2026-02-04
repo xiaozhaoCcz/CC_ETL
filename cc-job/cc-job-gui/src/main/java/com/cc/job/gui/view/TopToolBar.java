@@ -313,6 +313,7 @@ public class TopToolBar extends VBox {
         // 最近打开的文件
         recentFilesMenu = new Menu("最近打开的文件");
         updateRecentFilesMenu(recentFilesMenu);
+        recentFilesMenu.setOnShowing(e -> updateRecentFilesMenu(recentFilesMenu));
         
         fileMenu.getItems().addAll(newItem, openItem, saveItem, saveAsItem, new SeparatorMenuItem(), recentFilesMenu);
         
@@ -1164,6 +1165,7 @@ public class TopToolBar extends VBox {
     
     public void setCallback(ToolBarCallback callback) {
         this.callback = callback;
+        refreshRecentFilesMenu();
     }
     
     public void updateZoomLevel(double zoom) {

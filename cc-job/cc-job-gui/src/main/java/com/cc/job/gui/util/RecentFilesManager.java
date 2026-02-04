@@ -14,6 +14,10 @@ public class RecentFilesManager {
     
     private static final Logger logger = LoggerFactory.getLogger(RecentFilesManager.class);
     private static final int MAX_RECENT_FILES = 10;
+    /** 不加入、不展示在最近文件列表中的保留名称（如示例/系统任务组），比较时忽略大小写与首尾空格 */
+    private static final Set<String> RESERVED_NAMES = new HashSet<>(Arrays.asList(
+            "示例执行器"
+    ));
     private static volatile RecentFilesManager instance;
     
     private final ConfigManager configManager;
@@ -88,6 +92,10 @@ public class RecentFilesManager {
         if (taskGroupId == null || taskGroupName == null || taskGroupName.isEmpty()) {
             return;
         }
+        String nameKey = taskGroupName.trim().toLowerCase();
+        if (RESERVED_NAMES.contains(nameKey)) {
+            return;
+        }
         
         // 移除已存在的相同文件
         recentFiles.removeIf(f -> f.getTaskGroupId().equals(taskGroupId));
@@ -105,10 +113,12 @@ public class RecentFilesManager {
     }
     
     /**
-     * 获取最近打开的文件列表
+     * 获取最近打开的文件列表（已过滤保留名称）
      */
     public List<RecentFile> getRecentFiles() {
-        return new ArrayList<>(recentFiles);
+        return recentFiles.stream()
+                .filter(f -> f.getTaskGroupName() != null && !RESERVED_NAMES.contains(f.getTaskGroupName().trim().toLowerCase()))
+                .collect(Collectors.toCollection(ArrayList::new));
     }
     
     /**
