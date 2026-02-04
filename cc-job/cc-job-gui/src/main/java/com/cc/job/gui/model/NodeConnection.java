@@ -139,7 +139,7 @@ public class NodeConnection extends Group {
         edgeLabel.setStyle(
             "-fx-font-size: 11; " +
             "-fx-font-weight: 500; " +
-            "-fx-text-fill: #6366F1; " +
+            "-fx-text-fill: #2563EB; " +
             "-fx-background-color: rgba(255, 255, 255, 0.9); " +
             "-fx-background-radius: 4; " +
             "-fx-padding: 2 6 2 6;"
@@ -336,10 +336,10 @@ public class NodeConnection extends Group {
         this.setOnMouseEntered(e -> {
             if (!isRunning && !isSelected() && !isBlocked) {
                 // 只有在非阻塞状态下才显示紫色悬停效果
-                curve.setStroke(Color.web("#8B5CF6"));
+                curve.setStroke(Color.web("#2563EB"));
                 curve.setStrokeWidth(3.0);
-                arrowHead.setFill(Color.web("#8B5CF6"));
-                arrowHead.setStroke(Color.web("#8B5CF6"));
+                arrowHead.setFill(Color.web("#2563EB"));
+                arrowHead.setStroke(Color.web("#2563EB"));
             }
             // 阻塞状态下保持灰色，不改变颜色
         });

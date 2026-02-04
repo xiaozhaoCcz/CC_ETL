@@ -100,10 +100,10 @@ public class NodeLabelDialog extends Dialog<List<String>> {
                         setStyle(
                             "-fx-font-size: 12; " +
                             "-fx-padding: 4 8 4 8; " +
-                            "-fx-background-color: #6366F1; " +
+                            "-fx-background-color: #2563EB; " +
                             "-fx-background-radius: 4; " +
                             "-fx-text-fill: #FFFFFF; " +
-                            "-fx-border-color: #4F46E5; " +
+                            "-fx-border-color: #1D4ED8; " +
                             "-fx-border-radius: 4; " +
                             "-fx-border-width: 2;"
                         );
@@ -114,7 +114,7 @@ public class NodeLabelDialog extends Dialog<List<String>> {
                             "-fx-padding: 4 8 4 8; " +
                             "-fx-background-color: #EEF2FF; " +
                             "-fx-background-radius: 4; " +
-                            "-fx-text-fill: #6366F1;"
+                            "-fx-text-fill: #2563EB;"
                         );
                     }
                 }

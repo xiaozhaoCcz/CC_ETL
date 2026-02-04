@@ -116,8 +116,7 @@ public class ShowExecutorListDialog extends Dialog<Void> {
         container.setPadding(new Insets(16, 16, 16, 16));
         container.setStyle(
                 "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                "-fx-background-radius: " + StyleUtil.RADIUS_LG + "; " +
-                "-fx-effect: " + StyleUtil.SHADOW_SM + ";"
+                "-fx-background-radius: " + StyleUtil.RADIUS_LG + ";"
         );
 
         // 过滤输入区域
@@ -392,8 +391,7 @@ public class ShowExecutorListDialog extends Dialog<Void> {
         pager.setPadding(new Insets(16, 16, 16, 16));
         pager.setStyle(
                 "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                "-fx-background-radius: " + StyleUtil.RADIUS_LG + "; " +
-                "-fx-effect: " + StyleUtil.SHADOW_SM + ";"
+                "-fx-background-radius: " + StyleUtil.RADIUS_LG + ";"
         );
         return pager;
     }

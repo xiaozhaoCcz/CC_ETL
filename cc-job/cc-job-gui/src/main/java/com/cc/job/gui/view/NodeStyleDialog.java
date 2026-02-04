@@ -81,11 +81,11 @@ public class NodeStyleDialog extends Dialog<Void> {
                 colorPicker.setValue(color);
             } catch (Exception e) {
                 // 如果颜色格式无效，使用默认颜色
-                colorPicker.setValue(Color.web("#8B5CF6"));
+                colorPicker.setValue(Color.web("#2563EB"));
             }
         } else {
             // 默认颜色
-            colorPicker.setValue(Color.web("#8B5CF6"));
+            colorPicker.setValue(Color.web("#2563EB"));
         }
         
         // 大小设置
@@ -271,7 +271,7 @@ public class NodeStyleDialog extends Dialog<Void> {
                 (int) (color.getGreen() * 255),
                 (int) (color.getBlue() * 255));
         }
-        return "#8B5CF6"; // 默认颜色
+        return "#2563EB"; // 默认颜色
     }
     
     /**

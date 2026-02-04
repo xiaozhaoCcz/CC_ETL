@@ -72,7 +72,8 @@ public class TaskTreeView extends VBox {
     }
     
     private void initializeUI() {
-        setStyle("-fx-background-color: transparent; -fx-padding: 0 0 0 8;");
+        getStyleClass().add("tree-view-panel");
+        setStyle("-fx-padding: 0 0 0 8;");
         setMinWidth(240);
         setSpacing(10);
         
@@ -122,18 +123,7 @@ public class TaskTreeView extends VBox {
         searchField.setPrefHeight(28);
         searchField.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(searchField, Priority.ALWAYS);
-        
-        String normalStyle = "-fx-background-color: #FFFFFF; -fx-text-fill: #111827; -fx-font-size: 12px; " +
-            "-fx-padding: 4 8; -fx-border-color: #D1D5DB; -fx-border-width: 1; -fx-border-radius: 4; " +
-            "-fx-background-radius: 4; -fx-prompt-text-fill: #9CA3AF;";
-        
-        String focusedStyle = normalStyle.replace("#D1D5DB", "#6366F1") +
-            "-fx-effect: dropshadow(gaussian, rgba(99, 102, 241, 0.2), 3, 0, 0, 0);";
-        
-        searchField.setStyle(normalStyle);
-        searchField.focusedProperty().addListener((obs, was, is) -> {
-            searchField.setStyle(is ? focusedStyle : normalStyle);
-        });
+        searchField.getStyleClass().add("tree-search-field");
         
         searchField.textProperty().addListener((obs, oldVal, newVal) -> searchManager.filterTree(newVal));
         

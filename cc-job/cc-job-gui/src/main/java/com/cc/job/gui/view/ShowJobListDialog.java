@@ -175,8 +175,7 @@ public class ShowJobListDialog extends Dialog<Void> {
         pane.setPadding(new Insets(16, 16, 16, 16));
         pane.setStyle(
                 "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                "-fx-background-radius: " + StyleUtil.RADIUS_LG + "; " +
-                "-fx-effect: " + StyleUtil.SHADOW_SM + ";"
+                "-fx-background-radius: " + StyleUtil.RADIUS_LG + ";"
         );
 
         // 创建标签样式
@@ -543,12 +542,12 @@ public class ShowJobListDialog extends Dialog<Void> {
                         "-fx-padding: 2 8; -fx-background-radius: 4; -fx-font-size: 11px;");
             } else {
                 tag.setText("任务");
-                tag.setStyle("-fx-background-color: #6366F1; -fx-text-fill: white; " +
+                tag.setStyle("-fx-background-color: #2563EB; -fx-text-fill: white; " +
                         "-fx-padding: 2 8; -fx-background-radius: 4; -fx-font-size: 11px;");
             }
         } else {
             tag.setText("任务");
-            tag.setStyle("-fx-background-color: #6366F1; -fx-text-fill: white; " +
+            tag.setStyle("-fx-background-color: #2563EB; -fx-text-fill: white; " +
                     "-fx-padding: 2 8; -fx-background-radius: 4; -fx-font-size: 11px;");
         }
         return tag;
@@ -717,8 +716,7 @@ public class ShowJobListDialog extends Dialog<Void> {
         pager.setPadding(new Insets(16, 16, 16, 16));
         pager.setStyle(
                 "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                "-fx-background-radius: " + StyleUtil.RADIUS_LG + "; " +
-                "-fx-effect: " + StyleUtil.SHADOW_SM + ";"
+                "-fx-background-radius: " + StyleUtil.RADIUS_LG + ";"
         );
         return pager;
     }

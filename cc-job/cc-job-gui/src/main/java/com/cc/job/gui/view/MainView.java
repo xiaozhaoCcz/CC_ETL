@@ -47,6 +47,7 @@ public class MainView extends BorderPane {
     private CollapsedSidebar collapsedSidebar;
     private TaskNavigationBar navigationBar;
     private ScrollPane scrollPane;
+    private StatusBar statusBar;
     
     // 布局容器
     private SplitPane leftArea;
@@ -96,7 +97,7 @@ public class MainView extends BorderPane {
     }
 
     private void initializeUI() {
-        this.setStyle("-fx-background-color: #F1F5F9;");
+        this.setStyle("-fx-background-color: #FFFFFF;");
 
         // 顶部工具栏
         toolBar = new TopToolBar();
@@ -115,8 +116,9 @@ public class MainView extends BorderPane {
         leftArea.getItems().addAll(treeView, miniMap);
         leftArea.setDividerPositions(0.7); // 树形菜单占70%，小地图占30%
 
-        // 左侧容器
+        // 左侧容器（企业级深色边栏）
         HBox leftContainer = new HBox(0);
+        leftContainer.getStyleClass().add("sidebar-left");
         leftContainer.getChildren().addAll(collapsedSidebar, leftArea);
         HBox.setHgrow(leftArea, Priority.ALWAYS);
 
@@ -135,8 +137,9 @@ public class MainView extends BorderPane {
         scrollPane.setFitToHeight(false);
         scrollPane.setPannable(true);
 
-        // 画布区域容器
+        // 画布区域容器（中央白底）
         VBox canvasArea = new VBox(0);
+        canvasArea.getStyleClass().add("content-area");
         canvasArea.getChildren().addAll(navigationBar, scrollPane);
         VBox.setVgrow(scrollPane, Priority.ALWAYS);
 
@@ -146,19 +149,24 @@ public class MainView extends BorderPane {
         // 垂直分割面板
         verticalSplit = new SplitPane();
         verticalSplit.setOrientation(Orientation.VERTICAL);
+        verticalSplit.getStyleClass().add("content-area");
         verticalSplit.getItems().addAll(canvasArea, logPanel);
         verticalSplit.setDividerPositions(0.7);
-        verticalSplit.setPadding(new Insets(0, 12, 12, 4));
+        verticalSplit.setPadding(new Insets(0, 0, 12, 0));
 
         // 水平分割面板
         horizontalSplit = new SplitPane();
         horizontalSplit.setOrientation(Orientation.HORIZONTAL);
         horizontalSplit.getItems().addAll(leftContainer, verticalSplit);
         horizontalSplit.setDividerPositions(0.2);
-        horizontalSplit.setPadding(new Insets(0, 12, 12, 0));
+        horizontalSplit.setPadding(new Insets(0, 0, 12, 0));
 
         miniMap.bindTo(canvas, scrollPane);
         this.setCenter(horizontalSplit);
+
+        // 底部状态栏（企业级 IDE 风格）
+        statusBar = new StatusBar();
+        this.setBottom(statusBar);
     }
     
     private void initializeManagers() {
@@ -1930,7 +1938,7 @@ public class MainView extends BorderPane {
         
         // 设置窗口内容
         VBox container = new VBox();
-        container.setStyle("-fx-background-color: #F1F5F9;");
+        container.setStyle("-fx-background-color: #F9FAFB;");
         container.getChildren().add(panel);
         VBox.setVgrow(panel, Priority.ALWAYS);
         

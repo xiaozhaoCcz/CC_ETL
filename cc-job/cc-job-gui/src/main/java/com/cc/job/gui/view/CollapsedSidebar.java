@@ -28,11 +28,7 @@ public class CollapsedSidebar extends VBox {
     }
     
     private void initializeUI() {
-        setStyle(
-            "-fx-background-color: #F3F4F6; " +
-            "-fx-border-color: #E5E7EB; " +
-            "-fx-border-width: 0 1 0 0;"
-        );
+        getStyleClass().add("collapsed-sidebar");
         // 设置固定宽度 - 使用min/max来确保宽度不变
         setMinWidth(40);
         setMaxWidth(40);
@@ -85,6 +81,7 @@ public class CollapsedSidebar extends VBox {
         button.setGraphic(iconWrapper);
         button.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
         button.setAlignment(Pos.CENTER);
+        button.getStyleClass().add("sidebar-icon-button");
         button.setStyle(
             "-fx-background-color: #FFFFFF; " +
             "-fx-padding: 4; " +
@@ -97,29 +94,37 @@ public class CollapsedSidebar extends VBox {
         button.setPrefSize(36, 36);
         button.setMaxSize(36, 36);
         button.setMinSize(36, 36);
-        
+        /* Preserve FeatherIcons font: setStyle() replaces entire inline style; without font, icon inherits .root and shows garbled (e.g. 韦). */
+        icon.setStyle("-fx-font-family: 'FeatherIcons';-fx-font-size: 16px;-fx-icon-color: #374151;");
+
         Tooltip tooltip = new Tooltip(tooltipText);
         button.setTooltip(tooltip);
         
-        button.setOnMouseEntered(e -> button.setStyle(
-            "-fx-background-color: #EEF2FF; " +
-            "-fx-padding: 4; " +
-            "-fx-background-radius: 4; " +
-            "-fx-border-color: #8B5CF6; " +
-            "-fx-border-width: 2; " +
-            "-fx-border-radius: 4; " +
-            "-fx-cursor: hand;"
-        ));
+        button.setOnMouseEntered(e -> {
+            button.setStyle(
+                "-fx-background-color: #E5E7EB; " +
+                "-fx-padding: 4; " +
+                "-fx-background-radius: 4; " +
+                "-fx-border-color: #D1D5DB; " +
+                "-fx-border-width: 1; " +
+                "-fx-border-radius: 4; " +
+                "-fx-cursor: hand;"
+            );
+            icon.setStyle("-fx-font-family: 'FeatherIcons';-fx-font-size: 16px;-fx-icon-color: #111827;");
+        });
         
-        button.setOnMouseExited(e -> button.setStyle(
-            "-fx-background-color: #FFFFFF; " +
-            "-fx-padding: 4; " +
-            "-fx-background-radius: 4; " +
-            "-fx-border-color: #E5E7EB; " +
-            "-fx-border-width: 1; " +
-            "-fx-border-radius: 4; " +
-            "-fx-cursor: hand;"
-        ));
+        button.setOnMouseExited(e -> {
+            button.setStyle(
+                "-fx-background-color: #FFFFFF; " +
+                "-fx-padding: 4; " +
+                "-fx-background-radius: 4; " +
+                "-fx-border-color: #E5E7EB; " +
+                "-fx-border-width: 1; " +
+                "-fx-border-radius: 4; " +
+                "-fx-cursor: hand;"
+            );
+            icon.setStyle("-fx-font-family: 'FeatherIcons';-fx-font-size: 16px;-fx-icon-color: #374151;");
+        });
         
         return button;
     }

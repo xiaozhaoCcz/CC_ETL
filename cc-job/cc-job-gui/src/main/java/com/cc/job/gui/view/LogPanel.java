@@ -83,7 +83,6 @@ public class LogPanel extends VBox {
         HBox titleBar = createTitleBar();
         
         logContainer = new StackPane();
-        logContainer.setPadding(new Insets(12));
         logContainer.setStyle("-fx-background-color: transparent;");
         VBox.setVgrow(logContainer, Priority.ALWAYS);
         
@@ -98,7 +97,7 @@ public class LogPanel extends VBox {
     
     private HBox createTabBar() {
         HBox tabBar = new HBox(0);
-        tabBar.setStyle("-fx-background-color: #F1F5F9; -fx-border-width: 0; -fx-padding: 0;");
+        tabBar.getStyleClass().add("log-panel-tab-bar");
         tabBar.setAlignment(Pos.CENTER_LEFT);
         tabBar.setPrefHeight(36);
         tabBar.setMinHeight(36);
@@ -156,10 +155,10 @@ public class LogPanel extends VBox {
         searchField.setPromptText("搜索日志...");
         searchField.setPrefWidth(200);
         searchField.setStyle(
-            "-fx-background-color: #F1F5F9; " +
+            "-fx-background-color: #F9FAFB; " +
             "-fx-text-fill: " + StyleUtil.GRAY_700 + "; " +
             "-fx-font-size: 12px; " +
-            "-fx-border-color: rgba(148,163,184,0.55); " +
+            "-fx-border-color: #E5E7EB; " +
             "-fx-border-width: 1; " +
             "-fx-border-radius: 8; " +
             "-fx-background-radius: 8; " +
@@ -185,10 +184,10 @@ public class LogPanel extends VBox {
         levelFilterCombo.setValue("全部");
         levelFilterCombo.setPrefWidth(100);
         levelFilterCombo.setStyle(
-            "-fx-background-color: #F1F5F9; " +
+            "-fx-background-color: #F9FAFB; " +
             "-fx-text-fill: " + StyleUtil.GRAY_700 + "; " +
             "-fx-font-size: 12px; " +
-            "-fx-border-color: rgba(148,163,184,0.55); " +
+            "-fx-border-color: #E5E7EB; " +
             "-fx-border-width: 1; " +
             "-fx-border-radius: 8; " +
             "-fx-background-radius: 8;"
@@ -219,18 +218,18 @@ public class LogPanel extends VBox {
         // 自动滚动开关
         autoScrollButton = new ToggleButton("自动滚动");
         autoScrollButton.setSelected(true);
-        String normal =   "-fx-background-color: linear-gradient(to bottom, #F1F5F9, rgba(241,245,249,0.98)); " +
+        String normal =   "-fx-background-color: #F9FAFB; " +
                 "-fx-text-fill: " + StyleUtil.GRAY_600 + "; " +
                 "-fx-font-size: 12px; " +
                 "-fx-font-weight: 600; " +
                 "-fx-padding: 6 12; " +
                 "-fx-border-radius: 8; " +
                 "-fx-background-radius: 8; " +
-                "-fx-border-color: rgba(148,163,184,0.6); " +
+                "-fx-border-color: #E5E7EB; " +
                 "-fx-border-width: 1; " +
                 "-fx-cursor: hand;";
         autoScrollButton.setTooltip(new Tooltip("自动滚动到底部"));
-        String hover = normal.replace("#F1F5F9", "rgba(226,232,240,0.99)").replace("rgba(148,163,184,0.6)", StyleUtil.PRIMARY_LIGHT);
+        String hover = normal.replace("#F9FAFB", "#F3F4F6").replace("#E5E7EB", StyleUtil.PRIMARY_LIGHT);
         autoScrollButton.setStyle(normal);
         autoScrollButton.setOnMouseEntered(e -> autoScrollButton.setStyle(hover));
         autoScrollButton.setOnMouseExited(e -> autoScrollButton.setStyle(normal));
@@ -271,7 +270,7 @@ public class LogPanel extends VBox {
         separator.setMinWidth(1);
         separator.setMaxWidth(1);
         separator.setPrefHeight(24);
-        separator.setStyle("-fx-background-color: #E2E8F0;");
+        separator.setStyle("-fx-background-color: #E5E7EB;");
         return separator;
     }
     
@@ -380,17 +379,17 @@ public class LogPanel extends VBox {
     private Button createButton(String text, Runnable action) {
         Button btn = new Button(text);
         String normal = 
-            "-fx-background-color: linear-gradient(to bottom, #F1F5F9, rgba(241,245,249,0.98)); " +
+            "-fx-background-color: #F9FAFB; " +
             "-fx-text-fill: " + StyleUtil.GRAY_600 + "; " +
             "-fx-font-size: 12px; " +
             "-fx-font-weight: 600; " +
             "-fx-padding: 6 16 6 16; " +
             "-fx-border-radius: 8; " +
             "-fx-background-radius: 8; " +
-            "-fx-border-color: rgba(148,163,184,0.6); " +
+            "-fx-border-color: #E5E7EB; " +
             "-fx-border-width: 1; " +
             "-fx-cursor: hand;";
-        String hover = normal.replace("#F1F5F9", "rgba(226,232,240,0.99)").replace("rgba(148,163,184,0.6)", StyleUtil.PRIMARY_LIGHT);
+        String hover = normal.replace("#F9FAFB", "#F3F4F6").replace("#E5E7EB", StyleUtil.PRIMARY_LIGHT);
         StyleUtil.applyButtonHover(btn, normal, hover);
         btn.setOnAction(e -> action.run());
         return btn;
@@ -527,7 +526,7 @@ public class LogPanel extends VBox {
             LogTabManager.LogTab tab = tabManager.getLogTab(taskGroupId);
             if (tab != null) {
                 tab.setOnClick(() -> switchToTaskGroup(taskGroupId));
-                tab.setOnClose(() -> tabManager.removeTaskGroup(taskGroupId, tabContainer));
+                tab.setOnClose(() -> handleTabClose(taskGroupId));
             }
         });
     }
@@ -555,9 +554,17 @@ public class LogPanel extends VBox {
             LogTabManager.LogTab tab = tabManager.getLogTab(taskGroupId);
             if (tab != null) {
                 tab.setOnClick(() -> switchToTaskGroup(taskGroupId));
-                tab.setOnClose(() -> tabManager.removeTaskGroup(taskGroupId, tabContainer));
+                tab.setOnClose(() -> handleTabClose(taskGroupId));
             }
         });
+    }
+    
+    /**
+     * 处理标签关闭：移除任务组标签后，根据当前选中的标签刷新下方日志展示区域。
+     */
+    private void handleTabClose(Long taskGroupId) {
+        tabManager.removeTaskGroup(taskGroupId, tabContainer);
+        switchToTaskGroup(tabManager.getCurrentTaskGroupId());
     }
     
     private void switchToTaskGroup(Long taskGroupId) {
@@ -667,7 +674,7 @@ public class LogPanel extends VBox {
             case "INFO" -> new String[]{"[i]", "#2563EB", "#1E40AF"};
             case "WARN" -> new String[]{"[!]", "#D97706", "#B45309"};
             case "ERROR" -> new String[]{"[×]", "#DC2626", "#B91C1C"};
-            case "DEBUG" -> new String[]{"[?]", "#7C3AED", "#6D28D9"};
+            case "DEBUG" -> new String[]{"[?]", "#2563EB", "#1D4ED8"};
             case "SUCCESS" -> new String[]{"[✓]", "#059669", "#047857"};
             default -> new String[]{"[-]", "#6B7280", "#374151"};
         };

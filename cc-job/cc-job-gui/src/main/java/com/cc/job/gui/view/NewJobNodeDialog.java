@@ -1175,6 +1175,11 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         getDialogPane().setMaxHeight(Double.MAX_VALUE);
         setResizable(true);
         
+        try {
+            String css = getClass().getResource("/styles.css").toExternalForm();
+            getDialogPane().getStylesheets().add(css);
+        } catch (Exception e) { /* 样式表加载失败时忽略 */ }
+        
         getDialogPane().setStyle(
             "-fx-background-color: #F9FAFB; " +
             "-fx-background-radius: 8; " +

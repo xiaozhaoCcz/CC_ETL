@@ -141,9 +141,9 @@ public class LogTabManager {
         private final Label nameLabel;
         
         private static final String BASE_STYLE = "-fx-background-radius: 0; -fx-border-radius: 0; -fx-cursor: hand; -fx-effect: null;";
-        private static final String NORMAL_STYLE = BASE_STYLE + "-fx-background-color: #F1F5F9; -fx-border-color: transparent transparent transparent rgba(243,244,246,0.9); -fx-border-width: 0 0 0 1;";
-        private static final String HOVER_STYLE = BASE_STYLE + "-fx-background-color: rgba(241,245,249,0.95); -fx-border-color: transparent transparent transparent rgba(243,244,246,0.9); -fx-border-width: 0 0 0 1;";
-        private static final String ACTIVE_STYLE = BASE_STYLE + "-fx-background-color: rgba(243,244,246,0.9); -fx-border-width: 0;";
+        private static final String NORMAL_STYLE = BASE_STYLE + "-fx-background-color: #F9FAFB; -fx-border-color: transparent transparent transparent #E5E7EB; -fx-border-width: 0 0 0 1;";
+        private static final String HOVER_STYLE = BASE_STYLE + "-fx-background-color: #F3F4F6; -fx-border-color: transparent transparent transparent #E5E7EB; -fx-border-width: 0 0 0 1;";
+        private static final String ACTIVE_STYLE = BASE_STYLE + "-fx-background-color: #F3F4F6; -fx-border-width: 0;";
         
         public LogTab(Long taskGroupId, String taskGroupName) {
             this.taskGroupId = taskGroupId;

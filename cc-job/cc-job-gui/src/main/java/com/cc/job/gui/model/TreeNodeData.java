@@ -87,7 +87,7 @@ public class TreeNodeData {
         if (type == null) return "#6B7280";
         return switch (type) {
             case 0 -> "#3B82F6";  // 分区 - 蓝色
-            case 1 -> "#8B5CF6";  // 任务组 - 紫色
+            case 1 -> "#2563EB";  // 任务组 - 蓝色
             case 2 -> "#10B981";  // 任务容器 - 绿色
             case 3 -> "#F59E0B";  // 关系容器 - 橙色
             case 4 -> "#06B6D4";  // 任务节点 - 青色

@@ -13,10 +13,10 @@ public class StyleUtil {
     
     // ============ 颜色定义 ============
     
-    // 主色调
-    public static final String PRIMARY = "#6366F1";           // 靛蓝色
-    public static final String PRIMARY_DARK = "#4F46E5";
-    public static final String PRIMARY_LIGHT = "#818CF8";
+    // 主色调（企业蓝）
+    public static final String PRIMARY = "#2563EB";
+    public static final String PRIMARY_DARK = "#1D4ED8";
+    public static final String PRIMARY_LIGHT = "#3B82F6";
     
     // 成功/错误/警告
     public static final String SUCCESS = "#10B981";           // 绿色
@@ -71,9 +71,8 @@ public class StyleUtil {
             "-fx-font-weight: 600; " +
             "-fx-padding: 8 16; " +
             "-fx-background-radius: %s; " +
-            "-fx-cursor: hand; " +
-            "-fx-effect: %s;",
-            PRIMARY, RADIUS_MD, SHADOW_SM
+            "-fx-cursor: hand;",
+            PRIMARY, RADIUS_MD
         );
     }
     
@@ -107,9 +106,8 @@ public class StyleUtil {
             "-fx-font-weight: 600; " +
             "-fx-padding: 8 16; " +
             "-fx-background-radius: %s; " +
-            "-fx-cursor: hand; " +
-            "-fx-effect: %s;",
-            SUCCESS, RADIUS_MD, SHADOW_SM
+            "-fx-cursor: hand;",
+            SUCCESS, RADIUS_MD
         );
     }
     
@@ -124,9 +122,8 @@ public class StyleUtil {
             "-fx-font-weight: 600; " +
             "-fx-padding: 8 16; " +
             "-fx-background-radius: %s; " +
-            "-fx-cursor: hand; " +
-            "-fx-effect: %s;",
-            ERROR, RADIUS_MD, SHADOW_SM
+            "-fx-cursor: hand;",
+            ERROR, RADIUS_MD
         );
     }
     
@@ -167,9 +164,8 @@ public class StyleUtil {
     public static String card() {
         return String.format(
             "-fx-background-color: -color-bg-elevated; " +
-            "-fx-background-radius: %s; " +
-            "-fx-effect: %s;",
-            RADIUS_LG, SHADOW_MD
+            "-fx-background-radius: %s;",
+            RADIUS_LG
         );
     }
     

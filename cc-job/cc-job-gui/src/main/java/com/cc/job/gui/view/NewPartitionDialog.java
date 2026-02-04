@@ -134,6 +134,11 @@ public class NewPartitionDialog extends Dialog<String> {
         getDialogPane().setMaxHeight(Double.MAX_VALUE);
         setResizable(true);
         
+        try {
+            String css = getClass().getResource("/styles.css").toExternalForm();
+            getDialogPane().getStylesheets().add(css);
+        } catch (Exception e) { /* 样式表加载失败时忽略 */ }
+        
         // 设置对话框样式
         getDialogPane().setStyle(
             "-fx-background-color: white; " +

@@ -1,6 +1,5 @@
 package com.cc.job.gui;
 
-import atlantafx.base.theme.PrimerLight;
 import com.cc.job.gui.service.SSEService;
 import com.cc.job.gui.util.NodeStatusSyncManager;
 import com.cc.job.gui.util.SessionManager;
@@ -33,7 +32,6 @@ public class CcJobGuiApplication extends Application {
     @Override
     public void start(Stage primaryStage) {
         this.primaryStage = primaryStage;
-        Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
         
         try {
             // 尝试从本地文件加载会话

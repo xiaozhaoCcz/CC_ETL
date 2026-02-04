@@ -87,7 +87,7 @@ public class MiniMapView extends VBox {
         
         // 画布容器 - 使用 Pane 支持绝对定位！
         Pane canvasContainer = new Pane();
-        canvasContainer.setStyle("-fx-background-color: #F8FAFC;");
+        canvasContainer.setStyle("-fx-background-color: #F3F3F3;");
         canvasContainer.setMinWidth(150);  // 最小宽度
         canvasContainer.setMinHeight(150); // 最小高度
         canvasContainer.setPrefHeight(MINIMAP_HEIGHT);  // 默认高度

@@ -243,8 +243,8 @@ public class TopToolBar extends VBox {
     
     private void initializeUI() {
         setStyle(
-            "-fx-background-color: #FFFFFF; " +
-            "-fx-border-color: transparent transparent rgba(148,163,184,0.35) transparent; " +
+            "-fx-background-color: #F3F4F6; " +
+            "-fx-border-color: transparent transparent #E5E7EB transparent; " +
             "-fx-border-width: 0 0 1 0;"
         );
         setPadding(new Insets(0));
@@ -260,7 +260,7 @@ public class TopToolBar extends VBox {
     private MenuBar createMenuBar() {
         MenuBar menuBar = new MenuBar();
         menuBar.setPadding(new Insets(0, 12, 0, 12));
-        menuBar.setStyle("-fx-background-color: #F8FAFC;");
+        menuBar.setStyle("-fx-background-color: #F3F4F6;");
 
         // 文件菜单
         Menu fileMenu = createFileMenu();
@@ -1007,8 +1007,7 @@ public class TopToolBar extends VBox {
             userCard.setStyle(
                 "-fx-background-color: #F3F4F6; " +
                 "-fx-background-radius: 8; " +
-                "-fx-cursor: hand; " +
-                "-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.1), 4, 0, 0, 2);"
+                "-fx-cursor: hand;"
             );
         });
         
@@ -1041,8 +1040,8 @@ public class TopToolBar extends VBox {
         
         // 圆形背景
         Circle circle = new Circle(16);
-        circle.setFill(Color.web("#6366F1"));
-        circle.setStroke(Color.web("#4F46E5"));
+        circle.setFill(Color.web("#2563EB"));
+        circle.setStroke(Color.web("#1D4ED8"));
         circle.setStrokeWidth(2);
         
         // 首字母
@@ -1286,8 +1285,7 @@ public class TopToolBar extends VBox {
                             "-fx-padding: 6 12 6 12; " +
                             "-fx-border-radius: 4; " +
                             "-fx-background-radius: 4; " +
-                            "-fx-cursor: hand; " +
-                            "-fx-effect: dropshadow(gaussian, rgba(37,99,235,0.3), 4, 0, 0, 2);"
+                            "-fx-cursor: hand;"
                         );
                     });
                     selectButton.setOnMouseExited(e -> {
@@ -1342,8 +1340,7 @@ public class TopToolBar extends VBox {
                             "-fx-padding: 6 12 6 12; " +
                             "-fx-border-radius: 4; " +
                             "-fx-background-radius: 4; " +
-                            "-fx-cursor: hand; " +
-                            "-fx-effect: dropshadow(gaussian, rgba(37,99,235,0.3), 4, 0, 0, 2);"
+                            "-fx-cursor: hand;"
                         );
                     });
                     snapToGridButton.setOnMouseExited(e -> {

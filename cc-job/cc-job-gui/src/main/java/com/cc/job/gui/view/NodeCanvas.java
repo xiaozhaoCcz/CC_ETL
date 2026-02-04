@@ -128,7 +128,7 @@ public class NodeCanvas extends Pane {
     
     public NodeCanvas() {
         setPrefSize(2000, 1000);
-        setStyle("-fx-background-color: #F3F4F6;");
+        getStyleClass().add("canvas-pane");
         
         initializeManagers();
         setupCanvasContextMenu();
@@ -825,7 +825,7 @@ public class NodeCanvas extends Pane {
     
     private void startTempLine(ProcessNode node, Circle connector) {
         tempLine = new Line();
-        tempLine.setStroke(Color.web("#8B5CF6"));
+        tempLine.setStroke(Color.web("#2563EB"));
         tempLine.setStrokeWidth(2);
         tempLine.getStrokeDashArray().addAll(5.0, 5.0);
         
@@ -1701,24 +1701,24 @@ public class NodeCanvas extends Pane {
         
         switch (theme) {
             case "default":
-                // 默认：纯色背景
-                setStyle("-fx-background-color: #F3F4F6;");
+                // 默认：纯色背景（与灰阶表中央画布 #FAFAFA 一致）
+                setStyle("-fx-background-color: #FAFAFA;");
                 log("✓ 已切换到默认主题");
                 break;
             case "grid":
                 // 框框：网格背景 - 使用Canvas绘制网格图案（更可靠）
-                setStyle("-fx-background-color: #F3F4F6;");
+                setStyle("-fx-background-color: #FAFAFA;");
                 createGridBackground();
                 log("✓ 已切换到框框主题");
                 break;
             case "dots":
                 // 圆点：圆点背景 - 使用Canvas绘制圆点图案
-                setStyle("-fx-background-color: #F3F4F6;");
+                setStyle("-fx-background-color: #FAFAFA;");
                 createDotsBackground();
                 log("✓ 已切换到圆点主题");
                 break;
             default:
-                setStyle("-fx-background-color: #F3F4F6;");
+                setStyle("-fx-background-color: #FAFAFA;");
                 log("⚠️ 未知主题，已切换到默认主题");
                 break;
         }
@@ -2575,7 +2575,7 @@ public class NodeCanvas extends Pane {
      */
     private void startTempLineForConditionNode(ConditionNode conditionNode, Circle connector) {
         tempLine = new Line();
-        tempLine.setStroke(Color.web("#8B5CF6"));
+        tempLine.setStroke(Color.web("#2563EB"));
         tempLine.setStrokeWidth(2);
         tempLine.getStrokeDashArray().addAll(5.0, 5.0);
         

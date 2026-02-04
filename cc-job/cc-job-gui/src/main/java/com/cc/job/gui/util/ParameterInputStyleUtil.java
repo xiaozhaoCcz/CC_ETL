@@ -29,7 +29,7 @@ public class ParameterInputStyleUtil {
     public static final String AUTOCOMPLETE_POPUP_STYLE = 
             "-fx-background-color: white; " +
             "-fx-background-radius: 4; " +
-            "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 8, 0, 0, 2); " +
+            "-fx-effect: null; " +
             "-fx-border-color: #E5E7EB; " +
             "-fx-border-radius: 4; " +
             "-fx-border-width: 1;";

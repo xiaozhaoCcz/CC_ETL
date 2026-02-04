@@ -165,8 +165,7 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         grid.setPadding(new Insets(16, 16, 16, 16));
         grid.setStyle(
                 "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                "-fx-background-radius: " + StyleUtil.RADIUS_LG + "; " +
-                "-fx-effect: " + StyleUtil.SHADOW_SM + ";"
+                "-fx-background-radius: " + StyleUtil.RADIUS_LG + ";"
         );
 
         String labelStyle = StyleUtil.body();
@@ -452,8 +451,7 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         pager.setPadding(new Insets(16, 16, 16, 16));
         pager.setStyle(
                 "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                "-fx-background-radius: " + StyleUtil.RADIUS_LG + "; " +
-                "-fx-effect: " + StyleUtil.SHADOW_SM + ";"
+                "-fx-background-radius: " + StyleUtil.RADIUS_LG + ";"
         );
         return pager;
     }

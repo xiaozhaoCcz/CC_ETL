@@ -68,7 +68,7 @@ public class TaskNavigationBar extends HBox {
     
     private void initializeUI() {
         setStyle(
-            "-fx-background-color: #FFFFFF; " +
+            "-fx-background-color: #F3F4F6; " +
             "-fx-border-color: transparent; " +
             "-fx-border-width: 0;"
         );
@@ -434,24 +434,24 @@ public class TaskNavigationBar extends HBox {
      */
     private static class TaskTab extends StackPane {
         
-        // 移除圆角和边框，未选中时背景为白色，选中时为浅灰色
-        // 未选中标签右边有分割线，颜色与选中标签背景一致
+        /* 企业级标签：标签栏浅灰，未选中标签浅灰，选中标签白底 + 蓝色底边 */
         private static final String BASE_STYLE =
             "-fx-background-radius: 0; " +
             "-fx-border-radius: 0; " +
             "-fx-cursor: hand; " +
             "-fx-effect: null;";
         private static final String NORMAL_STYLE = BASE_STYLE +
-            "-fx-background-color: #FFFFFF; " +
-            "-fx-border-color: transparent transparent transparent rgba(243,244,246,0.9); " +
+            "-fx-background-color: #F3F4F6; " +
+            "-fx-border-color: transparent transparent transparent #E5E7EB; " +
             "-fx-border-width: 0 0 0 1;";
         private static final String HOVER_STYLE = BASE_STYLE +
-            "-fx-background-color: rgba(241,245,249,0.95); " +
-            "-fx-border-color: transparent transparent transparent rgba(243,244,246,0.9); " +
+            "-fx-background-color: #E5E7EB; " +
+            "-fx-border-color: transparent transparent transparent #E5E7EB; " +
             "-fx-border-width: 0 0 0 1;";
         private static final String ACTIVE_STYLE = BASE_STYLE +
-            "-fx-background-color: rgba(243,244,246,0.9); " +
-            "-fx-border-width: 0;";
+            "-fx-background-color: #FFFFFF; " +
+            "-fx-border-color: transparent transparent #2563EB transparent; " +
+            "-fx-border-width: 0 0 2 0;";
         
         private final String taskGroupName;
         private final Long taskGroupId; // ⚠️ 关键修复：存储任务组ID

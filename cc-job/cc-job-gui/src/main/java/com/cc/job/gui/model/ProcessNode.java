@@ -109,7 +109,7 @@ public class ProcessNode extends StackPane {
     
     // 节点状态
     private boolean enabled = true;
-    private String currentColor = "#8B5CF6"; // 默认紫色
+    private String currentColor = "#2563EB"; // 默认企业蓝
     private String type = "Bean"; // 节点类型：Bean, API, SQL等
     private NodeStatus status = NodeStatus.IDLE; // 节点运行状态
     private GraphNodeState graphState = GraphNodeState.NORMAL; // 图节点状态（开始/终止/阻塞）
@@ -274,7 +274,7 @@ public class ProcessNode extends StackPane {
         
         remarkIcon = new FontIcon(org.kordamp.ikonli.feather.Feather.FILE_TEXT);
         remarkIcon.setIconSize(12);
-        remarkIcon.setIconColor(Color.web("#8B5CF6"));
+        remarkIcon.setIconColor(Color.web("#2563EB"));
         remarkIcon.setLayoutX(nodeWidth-20);
         remarkIcon.setLayoutY(nodeHeight-10);
         remarkIconContainer.setVisible(false);
@@ -459,7 +459,7 @@ public class ProcessNode extends StackPane {
      */
     private String lightenColor(String color) {
         if (color == null || !color.startsWith("#")) {
-            return "#A78BFA"; // 默认浅紫色
+            return "#93C5FD"; // 默认浅蓝
         }
         // 简单的颜色变浅处理，将RGB值增加
         try {
@@ -473,7 +473,7 @@ public class ProcessNode extends StackPane {
             
             return String.format("#%02X%02X%02X", r, g, b);
         } catch (Exception e) {
-            return "#A78BFA"; // 默认浅紫色
+            return "#93C5FD"; // 默认浅蓝
         }
     }
     
@@ -1201,12 +1201,12 @@ public class ProcessNode extends StackPane {
      */
     private void updateBorderColorByType() {
         if (type == null) {
-            currentColor = "#8B5CF6"; // 默认紫色
+            currentColor = "#2563EB"; // 默认企业蓝
             return;
         }
         
         currentColor = switch (type) {
-            case "Bean" -> "#8B5CF6";      // 紫色
+            case "Bean" -> "#2563EB";      // 蓝色
             case "API" -> "#FF6B35";      // 橙色
             case "SQL" -> "#3B82F6";      // 蓝色
             case "Java" -> "#E74C3C";     // 红色
@@ -1215,7 +1215,7 @@ public class ProcessNode extends StackPane {
             case "PHP" -> "#777BB4";     // 紫色
             case "Node" -> "#339933";     // 绿色
             case "PS" -> "#0078D4";       // 蓝色
-            default -> "#8B5CF6";          // 默认紫色
+            default -> "#2563EB";          // 默认蓝色
         };
         
         // 只有在普通状态下才更新边框颜色，特殊状态（开始/终止/阻塞）保持其样式
@@ -1381,7 +1381,7 @@ public class ProcessNode extends StackPane {
     
     /**
      * 公共方法: 设置节点颜色(供外部调用,如从数据库加载时)
-     * @param color 颜色值(如 "#8B5CF6")
+     * @param color 颜色值(如 "#2563EB")
      */
     public void setNodeColor(String color) {
         if (color != null && !color.isEmpty()) {
@@ -1838,7 +1838,7 @@ public class ProcessNode extends StackPane {
             tagLabel.setStyle(
                 "-fx-font-size: 10; " +
                 "-fx-font-weight: 500; " +
-                "-fx-text-fill: #6366F1; " +
+                "-fx-text-fill: #2563EB; " +
                 "-fx-background-color: #EEF2FF; " +
                 "-fx-background-radius: 8; " +
                 "-fx-padding: 2 6 2 6;"

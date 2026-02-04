@@ -113,8 +113,7 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
         container.setPadding(new Insets(16, 16, 16, 16));
         container.setStyle(
                 "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                "-fx-background-radius: " + StyleUtil.RADIUS_LG + "; " +
-                "-fx-effect: " + StyleUtil.SHADOW_SM + ";"
+                "-fx-background-radius: " + StyleUtil.RADIUS_LG + ";"
         );
 
         GridPane grid = new GridPane();
@@ -391,8 +390,7 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
         pager.setPadding(new Insets(16, 16, 16, 16));
         pager.setStyle(
                 "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                "-fx-background-radius: " + StyleUtil.RADIUS_LG + "; " +
-                "-fx-effect: " + StyleUtil.SHADOW_SM + ";"
+                "-fx-background-radius: " + StyleUtil.RADIUS_LG + ";"
         );
         return pager;
     }
