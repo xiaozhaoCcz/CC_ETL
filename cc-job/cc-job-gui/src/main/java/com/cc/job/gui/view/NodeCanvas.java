@@ -12,6 +12,8 @@ import com.cc.job.gui.util.NodeGraphStateManager;
 import com.cc.job.gui.util.NodeStatusSyncManager;
 import javafx.animation.AnimationTimer;
 import javafx.animation.PauseTransition;
+import javafx.geometry.BoundingBox;
+import javafx.geometry.Bounds;
 import javafx.geometry.Point2D;
 import javafx.scene.control.*;
 import javafx.scene.canvas.Canvas;
@@ -1504,6 +1506,56 @@ public class NodeCanvas extends Pane {
                 menu.hide();
             }
         });
+    }
+
+    /**
+     * 计算画布上所有内容（节点、组容器、条件节点）的包围盒，用于首次进入时扩展画布并居中。
+     * 无内容时返回 null。
+     */
+    public Bounds getContentBounds() {
+        double minX = Double.POSITIVE_INFINITY;
+        double minY = Double.POSITIVE_INFINITY;
+        double maxX = Double.NEGATIVE_INFINITY;
+        double maxY = Double.NEGATIVE_INFINITY;
+        boolean hasAny = false;
+        for (ProcessNode node : nodes) {
+            double w = node.getWidth() > 0 ? node.getWidth() : node.getPrefWidth();
+            double h = node.getHeight() > 0 ? node.getHeight() : node.getPrefHeight();
+            if (w <= 0 || h <= 0) continue;
+            double x = node.getLayoutX();
+            double y = node.getLayoutY();
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x + w);
+            maxY = Math.max(maxY, y + h);
+            hasAny = true;
+        }
+        for (GroupContainer container : groupContainers) {
+            double w = container.getFrame().getWidth();
+            double h = container.getFrame().getHeight();
+            if (w <= 0 || h <= 0) continue;
+            double x = container.getLayoutX();
+            double y = container.getLayoutY();
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x + w);
+            maxY = Math.max(maxY, y + h);
+            hasAny = true;
+        }
+        for (ConditionNode conditionNode : conditionNodes) {
+            double w = conditionNode.getFrame().getWidth();
+            double h = conditionNode.getFrame().getHeight();
+            if (w <= 0 || h <= 0) continue;
+            double x = conditionNode.getLayoutX();
+            double y = conditionNode.getLayoutY();
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x + w);
+            maxY = Math.max(maxY, y + h);
+            hasAny = true;
+        }
+        if (!hasAny) return null;
+        return new BoundingBox(minX, minY, maxX - minX, maxY - minY);
     }
     
     /**

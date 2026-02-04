@@ -8,6 +8,7 @@ import com.cc.job.gui.util.*;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.form.JobInfoForm;
 import javafx.application.Platform;
+import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
@@ -77,7 +78,10 @@ public class MainView extends BorderPane {
     
     // 任务组ID -> 滚动位置映射（用于保存和恢复每个任务组的画布位置）
     private final Map<Long, ScrollPosition> taskGroupScrollPositions = new HashMap<>();
-    
+
+    // 任务组ID -> 画布尺寸映射（每个任务组单独画布尺寸）
+    private final Map<Long, CanvasSize> taskGroupCanvasSizes = new HashMap<>();
+
     public MainView() {
         this.jobGroupService = new JobGroupService();
         initializeUI();
@@ -199,9 +203,19 @@ public class MainView extends BorderPane {
                 if (taskExecutionManager != null && taskExecutionManager.isTaskGroupRunning(currentTaskGroupId)) {
                     canvas.setAllConnectionsRunning(true);
                 }
-                
-                // ⭐ 修复：数据加载完成后恢复滚动位置
-                restoreScrollPosition(currentTaskGroupId);
+
+                // 首次进入该任务组：根据内容扩展画布并将内容居中；否则恢复滚动位置
+                if (currentTaskGroupId == 0) {
+                    restoreScrollPosition(currentTaskGroupId);
+                } else if (taskGroupScrollPositions.get(currentTaskGroupId) == null) {
+                    Platform.runLater(() -> {
+                        javafx.animation.PauseTransition delay = new javafx.animation.PauseTransition(javafx.util.Duration.millis(50));
+                        delay.setOnFinished(e -> expandCanvasToFitContentAndCenter(currentTaskGroupId));
+                        delay.play();
+                    });
+                } else {
+                    restoreScrollPosition(currentTaskGroupId);
+                }
             }
         });
         
@@ -560,6 +574,7 @@ public class MainView extends BorderPane {
                         canvas.markAsSaved();
                     }
                     // 保存当前任务组的滚动位置
+                    saveCurrentCanvasSize();
                     saveCurrentScrollPosition();
                 }
                 
@@ -572,6 +587,7 @@ public class MainView extends BorderPane {
                 navigationBar.addOrSelectTask(displayName, taskGroupId);
                 toolBar.setCurrentTaskGroupId(taskGroupId);
                 // 数据加载后会自动配置节点回调，并恢复滚动位置
+                restoreCanvasSize(taskGroupId);
                 dataManager.loadTaskGroupData(taskGroupId, displayName);
                 
                 // 添加到最近打开的文件列表
@@ -1133,6 +1149,7 @@ public class MainView extends BorderPane {
                 }
                 canvas.markAsSaved();
                 // 保存当前任务组的滚动位置
+                saveCurrentCanvasSize();
                 saveCurrentScrollPosition();
             }
             
@@ -1142,6 +1159,7 @@ public class MainView extends BorderPane {
                 toolBar.setCurrentTaskGroupId(resolvedTaskId);
                 pageStoreHelper.setCurrentPage(resolvedTaskId);
                 // 数据加载后会自动恢复滚动位置
+                restoreCanvasSize(resolvedTaskId);
                 dataManager.loadTaskGroupData(resolvedTaskId, taskGroupName);
                 
                 Platform.runLater(() -> {
@@ -1229,6 +1247,7 @@ public class MainView extends BorderPane {
             String taskGroupName = getJobNameById(taskGroupId);
             dialogManager.showJobNodeDialog(taskGroupId, taskGroupName, null, () -> {
                 // 数据加载后会自动配置节点回调
+                restoreCanvasSize(taskGroupId);
                 dataManager.loadTaskGroupData(taskGroupId, taskGroupName);
             });
         });
@@ -1400,6 +1419,7 @@ public class MainView extends BorderPane {
                             canvas.markAsSaved();
                         }
                         // 保存当前任务组的滚动位置
+                        saveCurrentCanvasSize();
                         saveCurrentScrollPosition();
                     }
                     
@@ -1408,6 +1428,7 @@ public class MainView extends BorderPane {
                     navigationBar.addOrSelectTask(taskName, taskId);
                     toolBar.setCurrentTaskGroupId(taskId);
                     // 数据加载后会自动恢复滚动位置
+                    restoreCanvasSize(taskId);
                     dataManager.loadTaskGroupData(taskId, taskName);
                     // 添加到最近打开的文件列表
                     com.cc.job.gui.util.RecentFilesManager.getInstance().addRecentFile(taskId, taskName);
@@ -1426,6 +1447,7 @@ public class MainView extends BorderPane {
             public void onNewJobNode(Long taskGroupId, String taskGroupName) {
                 dialogManager.showJobNodeDialog(taskGroupId, taskGroupName, null, () -> {
                     // 数据加载后会自动配置节点回调
+                    restoreCanvasSize(taskGroupId);
                     dataManager.loadTaskGroupData(taskGroupId, taskGroupName);
                 });
             }
@@ -1489,6 +1511,7 @@ public class MainView extends BorderPane {
                     
                     // 保存当前任务组的滚动位置
                     if (currentTaskGroupId != null && currentTaskGroupId != 0) {
+                        saveCurrentCanvasSize();
                         saveCurrentScrollPosition();
                     }
                     
@@ -1503,7 +1526,7 @@ public class MainView extends BorderPane {
                     pageStoreHelper.setCurrentPage(targetTaskGroupId);
                     navigationBar.addOrSelectTask(taskGroupName, targetTaskGroupId);
                     toolBar.setCurrentTaskGroupId(targetTaskGroupId);
-                    
+                    restoreCanvasSize(targetTaskGroupId);
                     // 加载任务组数据，加载完成后定位节点（滚动位置会在数据加载完成后自动恢复）
                     dataManager.loadTaskGroupData(targetTaskGroupId, taskGroupName);
                     
@@ -1581,6 +1604,7 @@ public class MainView extends BorderPane {
                     
                     // 保存当前任务组的滚动位置
                     if (currentTaskGroupId != null && currentTaskGroupId != 0) {
+                        saveCurrentCanvasSize();
                         saveCurrentScrollPosition();
                     }
                     
@@ -1595,7 +1619,7 @@ public class MainView extends BorderPane {
                     pageStoreHelper.setCurrentPage(targetTaskGroupId);
                     navigationBar.addOrSelectTask(taskGroupName, targetTaskGroupId);
                     toolBar.setCurrentTaskGroupId(targetTaskGroupId);
-                    
+                    restoreCanvasSize(targetTaskGroupId);
                     // 加载任务组数据，加载完成后定位连接线（滚动位置会在数据加载完成后自动恢复）
                     dataManager.loadTaskGroupData(targetTaskGroupId, taskGroupName);
                     
@@ -2349,6 +2373,82 @@ public class MainView extends BorderPane {
             this.vvalue = vvalue;
         }
     }
+
+    private static class CanvasSize {
+        final double width;
+        final double height;
+
+        CanvasSize(double width, double height) {
+            this.width = width;
+            this.height = height;
+        }
+    }
+
+    /**
+     * 保存当前任务组的画布尺寸
+     */
+    private void saveCurrentCanvasSize() {
+        Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
+        if (currentTaskGroupId != null && currentTaskGroupId != 0 && canvas != null) {
+            double w = canvas.getPrefWidth();
+            double h = canvas.getPrefHeight();
+            if (w > 0 && h > 0) {
+                taskGroupCanvasSizes.put(currentTaskGroupId, new CanvasSize(w, h));
+                logger.debug("保存任务组 {} 的画布尺寸: {} x {}", currentTaskGroupId, w, h);
+            }
+        }
+    }
+
+    /**
+     * 恢复指定任务组的画布尺寸；若无保存的尺寸则不做（首次进入由 onDataLoaded 中扩展）
+     */
+    private void restoreCanvasSize(Long taskGroupId) {
+        if (canvas == null || taskGroupId == null || taskGroupId == 0) return;
+        CanvasSize size = taskGroupCanvasSizes.get(taskGroupId);
+        if (size != null && size.width > 0 && size.height > 0) {
+            canvas.setPrefSize(size.width, size.height);
+            canvas.setMinSize(size.width, size.height);
+            logger.debug("恢复任务组 {} 的画布尺寸: {} x {}", taskGroupId, size.width, size.height);
+        }
+    }
+
+    private static final double FIRST_ENTER_CANVAS_MARGIN = 150.0;
+
+    /**
+     * 首次进入任务组时：根据内容扩展画布并将内容中心对准视口中心，然后保存状态。
+     */
+    private void expandCanvasToFitContentAndCenter(Long taskGroupId) {
+        if (scrollPane == null || canvas == null || taskGroupId == null || taskGroupId == 0) return;
+        Bounds bounds = canvas.getContentBounds();
+        if (bounds == null) {
+            scrollPane.setHvalue(0.5);
+            scrollPane.setVvalue(0.5);
+            saveCurrentScrollPosition();
+            saveCurrentCanvasSize();
+            logger.debug("任务组 {} 首次加载无内容，设置滚动居中并保存画布尺寸", taskGroupId);
+            return;
+        }
+        double viewportW = scrollPane.getViewportBounds().getWidth();
+        double viewportH = scrollPane.getViewportBounds().getHeight();
+        // 按内容在画布上的实际右、下边界扩展，保证可滚动看到所有节点
+        double newWidth = Math.max(bounds.getMaxX() + FIRST_ENTER_CANVAS_MARGIN, viewportW);
+        double newHeight = Math.max(bounds.getMaxY() + FIRST_ENTER_CANVAS_MARGIN, viewportH);
+        canvas.setPrefSize(newWidth, newHeight);
+        canvas.setMinSize(newWidth, newHeight);
+        double contentCenterX = bounds.getMinX() + bounds.getWidth() / 2;
+        double contentCenterY = bounds.getMinY() + bounds.getHeight() / 2;
+        double canvasW = canvas.getPrefWidth();
+        double canvasH = canvas.getPrefHeight();
+        double scrollableW = canvasW - viewportW;
+        double scrollableH = canvasH - viewportH;
+        double hvalue = scrollableW > 0 ? Math.max(0, Math.min(1, (contentCenterX - viewportW / 2) / scrollableW)) : 0.5;
+        double vvalue = scrollableH > 0 ? Math.max(0, Math.min(1, (contentCenterY - viewportH / 2) / scrollableH)) : 0.5;
+        scrollPane.setHvalue(hvalue);
+        scrollPane.setVvalue(vvalue);
+        saveCurrentScrollPosition();
+        saveCurrentCanvasSize();
+        logger.debug("任务组 {} 首次加载已扩展画布并居中: 画布 {}x{}, 滚动 h={}, v={}", taskGroupId, canvasW, canvasH, hvalue, vvalue);
+    }
     
     /**
      * 保存当前任务组的滚动位置
@@ -2522,6 +2622,7 @@ public class MainView extends BorderPane {
             }
             // 保存当前任务组的滚动位置
             saveCurrentScrollPosition();
+            saveCurrentCanvasSize();
         }
         
         String displayName = (taskGroupName != null && !taskGroupName.isBlank())
@@ -2534,7 +2635,7 @@ public class MainView extends BorderPane {
         toolBar.setCurrentTaskGroupId(taskGroupId);
         // 数据加载后会自动配置节点回调，并恢复滚动位置
         dataManager.loadTaskGroupData(taskGroupId, displayName);
-        
+        restoreCanvasSize(taskGroupId);
         // 添加到最近打开的文件列表
         com.cc.job.gui.util.RecentFilesManager.getInstance().addRecentFile(taskGroupId, displayName);
         toolBar.refreshRecentFilesMenu();
