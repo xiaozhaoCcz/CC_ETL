@@ -271,6 +271,67 @@ public class CanvasSelectionManager {
         updateSelectionBoundingBox();
     }
     
+    /**
+     * Shift+点击多选：切换节点的选中状态（已选则取消，未选则加入）
+     */
+    public void toggleNodeSelection(ProcessNode node) {
+        if (node == null || !nodes.contains(node)) return;
+        if (selectedNodes.contains(node)) {
+            selectedNodes.remove(node);
+            highlightNode(node, false);
+            selectionOriginalPositions.remove(node);
+            if (selectedNodes.isEmpty()) {
+                clearSelection();
+                return;
+            }
+        } else {
+            selectedNodes.add(node);
+            highlightNode(node, true);
+            selectionOriginalPositions.put(node, new double[]{node.getLayoutX(), node.getLayoutY()});
+        }
+        updateSelectionBoundingBox();
+    }
+    
+    /**
+     * Shift+点击多选：切换边的选中状态（已选则取消，未选则加入）
+     */
+    public void toggleConnectionSelection(NodeConnection conn) {
+        if (conn == null || !connections.contains(conn)) return;
+        if (selectedConnections.contains(conn)) {
+            selectedConnections.remove(conn);
+            conn.setSelected(false);
+        } else {
+            selectedConnections.add(conn);
+            conn.setSelected(true);
+        }
+        updateSelectionBoundingBox();
+    }
+    
+    /**
+     * 单选一条边时：只选该边及其两端节点（用于复制/剪切该子图）
+     */
+    public void selectNodesAndConnections(Collection<ProcessNode> nodesToSelect, Collection<NodeConnection> connectionsToSelect) {
+        clearSelection();
+        if (nodesToSelect != null) {
+            for (ProcessNode node : nodesToSelect) {
+                if (node != null && nodes.contains(node)) {
+                    selectedNodes.add(node);
+                    highlightNode(node, true);
+                    selectionOriginalPositions.put(node, new double[]{node.getLayoutX(), node.getLayoutY()});
+                }
+            }
+        }
+        if (connectionsToSelect != null) {
+            for (NodeConnection conn : connectionsToSelect) {
+                if (conn != null && connections.contains(conn)) {
+                    selectedConnections.add(conn);
+                    conn.setSelected(true);
+                }
+            }
+        }
+        updateSelectionBoundingBox();
+    }
+    
     public void alignHorizontal() {
         if (selectedNodes.size() < 2) {
             logger.accept("⚠ 需要至少选中 2 个节点");

@@ -85,6 +85,18 @@ public final class IconUtil {
         return createFeatherIcon(Feather.ALIGN_CENTER, SECONDARY_COLOR, 16);
     }
     
+    public static FontIcon alignLeftIcon() {
+        return createFeatherIcon(Feather.ALIGN_LEFT, SECONDARY_COLOR, 16);
+    }
+    
+    public static FontIcon alignRightIcon() {
+        return createFeatherIcon(Feather.ALIGN_RIGHT, SECONDARY_COLOR, 16);
+    }
+    
+    public static FontIcon alignCenterIcon() {
+        return createFeatherIcon(Feather.ALIGN_CENTER, SECONDARY_COLOR, 16);
+    }
+    
     public static FontIcon gridIcon() {
         return createFeatherIcon(Feather.GRID, SECONDARY_COLOR, 16);
     }

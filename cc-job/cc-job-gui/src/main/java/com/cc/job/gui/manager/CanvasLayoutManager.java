@@ -19,19 +19,18 @@ public class CanvasLayoutManager {
     
     private static final Logger logger = LoggerFactory.getLogger(CanvasLayoutManager.class);
     
-    // 布局参数
-    private static final double NODE_WIDTH = 180;
-    private static final double NODE_HEIGHT = 80;
-    private static final double HORIZONTAL_SPACING = 250; // 水平间距
-    private static final double VERTICAL_SPACING = 150; // 垂直间距
+    // 布局参数（间距为节点外的空隙，节点实际宽高用 prefWidth/prefHeight）
+    private static final double MIN_NODE_WIDTH = 120;
+    private static final double MIN_NODE_HEIGHT = 60;
+    private static final double GAP = 40; // 节点之间的最小间隙
     private static final double START_X = 100; // 起始X坐标
     private static final double START_Y = 100; // 起始Y坐标
     
     // 力导向布局参数
-    private static final double SPRING_LENGTH = 200; // 弹簧理想长度
-    private static final double SPRING_STRENGTH = 0.1; // 弹簧强度
-    private static final double REPULSION_STRENGTH = 10000; // 排斥力强度
-    private static final int ITERATIONS = 300; // 迭代次数
+    private static final double SPRING_STRENGTH = 0.08; // 弹簧强度
+    private static final double REPULSION_STRENGTH = 8000; // 排斥力强度
+    private static final int ITERATIONS = 350; // 迭代次数
+    private static final double FORCE_DAMPING = 0.12; // 阻尼
     
     private final Consumer<String> loggerCallback;
     
@@ -84,147 +83,159 @@ public class CanvasLayoutManager {
     }
     
     /**
-     * 网格布局（原有简单布局）
+     * 获取节点实际宽度（用于布局计算）
+     */
+    private static double nodeWidth(ProcessNode node) {
+        double w = node.getPrefWidth();
+        return w > 0 ? w : MIN_NODE_WIDTH;
+    }
+    
+    /**
+     * 获取节点实际高度（用于布局计算）
+     */
+    private static double nodeHeight(ProcessNode node) {
+        double h = node.getPrefHeight();
+        return h > 0 ? h : MIN_NODE_HEIGHT;
+    }
+    
+    /**
+     * 网格布局 - 按节点实际宽高计算列宽、行高，避免重叠
      */
     private void gridLayout(List<ProcessNode> nodes) {
         int cols = (int) Math.ceil(Math.sqrt(nodes.size()));
-        int spacing = 200;
-        int startX = 100;
-        int startY = 100;
-        
+        if (cols < 1) cols = 1;
+        // 每列宽度 = 该列节点最大宽度 + 间隙
+        double[] colWidths = new double[cols];
+        for (int i = 0; i < nodes.size(); i++) {
+            int c = i % cols;
+            colWidths[c] = Math.max(colWidths[c], nodeWidth(nodes.get(i)) + GAP);
+        }
+        double startX = START_X;
+        double startY = START_Y;
+        double[] colX = new double[cols];
+        for (int c = 0; c < cols; c++) {
+            colX[c] = startX;
+            startX += colWidths[c];
+        }
+        double rowHeight = 0;
         int col = 0;
-        int row = 0;
+        double currentY = startY;
         for (ProcessNode node : nodes) {
-            node.setLayoutX(startX + col * spacing);
-            node.setLayoutY(startY + row * spacing);
+            double h = nodeHeight(node);
+            rowHeight = Math.max(rowHeight, h + GAP);
+            node.setLayoutX(colX[col]);
+            node.setLayoutY(currentY);
             col++;
             if (col >= cols) {
                 col = 0;
-                row++;
+                currentY += rowHeight;
+                rowHeight = 0;
             }
         }
     }
     
     /**
-     * 层次化布局 - 基于节点依赖关系自动排列，上游节点在上方，下游节点在下方
+     * 层次化布局 - 基于节点依赖关系自动排列，上游在上方、下游在下方；按节点实际宽高留间距
      */
     private void hierarchicalLayout(List<ProcessNode> nodes, List<NodeConnection> connections) {
-        // 构建依赖关系图
         Map<ProcessNode, Set<ProcessNode>> graph = buildGraph(nodes, connections);
         Map<ProcessNode, Integer> levels = calculateLevels(nodes, graph);
         
-        // 按层级分组节点
         Map<Integer, List<ProcessNode>> levelGroups = new HashMap<>();
         for (ProcessNode node : nodes) {
             int level = levels.getOrDefault(node, 0);
             levelGroups.computeIfAbsent(level, k -> new ArrayList<>()).add(node);
         }
         
-        // 计算每层的最大节点数
-        int maxNodesPerLevel = levelGroups.values().stream()
-                .mapToInt(List::size)
-                .max()
-                .orElse(1);
-        
-        // 布局节点
+        int maxLevel = levelGroups.keySet().stream().mapToInt(Integer::intValue).max().orElse(0);
         double currentY = START_Y;
-        for (int level = 0; level <= levelGroups.keySet().stream().mapToInt(Integer::intValue).max().orElse(0); level++) {
+        for (int level = 0; level <= maxLevel; level++) {
             List<ProcessNode> levelNodes = levelGroups.getOrDefault(level, new ArrayList<>());
             if (levelNodes.isEmpty()) continue;
             
-            // 计算该层节点的总宽度
-            double levelWidth = levelNodes.size() * HORIZONTAL_SPACING;
-            double startX = START_X + (maxNodesPerLevel * HORIZONTAL_SPACING - levelWidth) / 2;
-            
-            // 水平排列该层的节点
-            for (int i = 0; i < levelNodes.size(); i++) {
-                ProcessNode node = levelNodes.get(i);
-                node.setLayoutX(startX + i * HORIZONTAL_SPACING);
-                node.setLayoutY(currentY);
+            double maxHeight = 0;
+            for (ProcessNode node : levelNodes) {
+                maxHeight = Math.max(maxHeight, nodeHeight(node));
             }
-            
-            currentY += VERTICAL_SPACING;
+            double startX = START_X;
+            for (ProcessNode node : levelNodes) {
+                double w = nodeWidth(node);
+                node.setLayoutX(startX);
+                node.setLayoutY(currentY);
+                startX += w + GAP;
+            }
+            currentY += maxHeight + GAP;
         }
     }
     
     /**
-     * 力导向布局 - 模拟物理力场，自动优化节点位置，减少连线交叉
+     * 力导向布局 - 按节点实际宽高引入最小距离，减少重叠与边交叉
      */
     private void forceDirectedLayout(List<ProcessNode> nodes, List<NodeConnection> connections) {
-        // 初始化节点位置（随机分布）
-        Random random = new Random(42); // 固定种子以便结果可重现
+        Random random = new Random(42);
+        double span = 400;
         for (ProcessNode node : nodes) {
-            node.setLayoutX(START_X + random.nextDouble() * 500);
-            node.setLayoutY(START_Y + random.nextDouble() * 500);
+            node.setLayoutX(START_X + random.nextDouble() * span);
+            node.setLayoutY(START_Y + random.nextDouble() * span);
         }
         
-        // 构建连接关系
-        Map<ProcessNode, Set<ProcessNode>> graph = buildGraph(nodes, connections);
-        
-        // 迭代优化位置
         for (int iteration = 0; iteration < ITERATIONS; iteration++) {
             Map<ProcessNode, Point2D> forces = new HashMap<>();
-            
-            // 初始化力向量
             for (ProcessNode node : nodes) {
                 forces.put(node, new Point2D(0, 0));
             }
             
-            // 计算弹簧力（连接的节点之间）
+            // 弹簧力：理想长度 = 两节点“半径”和 + 间隙（按中心距）
             for (NodeConnection conn : connections) {
                 ProcessNode source = conn.getSourceNode();
                 ProcessNode target = conn.getTargetNode();
-                
-                if (source != null && target != null && nodes.contains(source) && nodes.contains(target)) {
-                    Point2D sourcePos = new Point2D(source.getLayoutX(), source.getLayoutY());
-                    Point2D targetPos = new Point2D(target.getLayoutX(), target.getLayoutY());
-                    Point2D delta = targetPos.subtract(sourcePos);
-                    double distance = delta.magnitude();
-                    
-                    if (distance > 0) {
-                        // 弹簧力：F = k * (distance - idealLength)
-                        double force = SPRING_STRENGTH * (distance - SPRING_LENGTH);
-                        Point2D forceVector = delta.normalize().multiply(force);
-                        
-                        forces.put(source, forces.get(source).add(forceVector));
-                        forces.put(target, forces.get(target).subtract(forceVector));
-                    }
+                if (source == null || target == null || !nodes.contains(source) || !nodes.contains(target)) continue;
+                double w1 = nodeWidth(source); double h1 = nodeHeight(source);
+                double w2 = nodeWidth(target); double h2 = nodeHeight(target);
+                double idealLen = Math.max((w1 + w2) / 2, (h1 + h2) / 2) + GAP;
+                Point2D p1 = new Point2D(source.getLayoutX() + w1 / 2, source.getLayoutY() + h1 / 2);
+                Point2D p2 = new Point2D(target.getLayoutX() + w2 / 2, target.getLayoutY() + h2 / 2);
+                Point2D delta = p2.subtract(p1);
+                double dist = delta.magnitude();
+                if (dist > 1e-6) {
+                    double f = SPRING_STRENGTH * (dist - idealLen);
+                    Point2D vec = delta.normalize().multiply(f);
+                    forces.put(source, forces.get(source).add(vec));
+                    forces.put(target, forces.get(target).subtract(vec));
                 }
             }
             
-            // 计算排斥力（所有节点之间）
+            // 排斥力：中心距小于最小距离时加强排斥，避免包围盒重叠
             for (int i = 0; i < nodes.size(); i++) {
-                ProcessNode node1 = nodes.get(i);
-                Point2D pos1 = new Point2D(node1.getLayoutX(), node1.getLayoutY());
-                
+                ProcessNode n1 = nodes.get(i);
+                double w1 = nodeWidth(n1); double h1 = nodeHeight(n1);
+                Point2D c1 = new Point2D(n1.getLayoutX() + w1 / 2, n1.getLayoutY() + h1 / 2);
                 for (int j = i + 1; j < nodes.size(); j++) {
-                    ProcessNode node2 = nodes.get(j);
-                    Point2D pos2 = new Point2D(node2.getLayoutX(), node2.getLayoutY());
-                    Point2D delta = pos2.subtract(pos1);
-                    double distance = delta.magnitude();
-                    
-                    if (distance > 0) {
-                        // 排斥力：F = k / distance^2
-                        double force = REPULSION_STRENGTH / (distance * distance);
-                        Point2D forceVector = delta.normalize().multiply(force);
-                        
-                        forces.put(node1, forces.get(node1).subtract(forceVector));
-                        forces.put(node2, forces.get(node2).add(forceVector));
+                    ProcessNode n2 = nodes.get(j);
+                    double w2 = nodeWidth(n2); double h2 = nodeHeight(n2);
+                    Point2D c2 = new Point2D(n2.getLayoutX() + w2 / 2, n2.getLayoutY() + h2 / 2);
+                    Point2D delta = c2.subtract(c1);
+                    double dist = delta.magnitude();
+                    double minDist = (w1 + w2) / 2 + (h1 + h2) / 4 + GAP; // 中心最小距离，避免重叠
+                    if (dist < 1e-6) {
+                        delta = new Point2D(1, 0);
+                        dist = 1;
                     }
+                    double forceMag = dist < minDist
+                            ? REPULSION_STRENGTH * (minDist - dist) / (dist + 1)
+                            : REPULSION_STRENGTH / (dist * dist);
+                    Point2D vec = delta.normalize().multiply(forceMag);
+                    forces.put(n1, forces.get(n1).subtract(vec));
+                    forces.put(n2, forces.get(n2).add(vec));
                 }
             }
             
-            // 应用力并更新位置（带阻尼）
-            double damping = 0.1;
             for (ProcessNode node : nodes) {
-                Point2D force = forces.get(node);
-                double newX = node.getLayoutX() + force.getX() * damping;
-                double newY = node.getLayoutY() + force.getY() * damping;
-                
-                // 确保节点不超出画布边界
+                Point2D f = forces.get(node);
+                double newX = node.getLayoutX() + f.getX() * FORCE_DAMPING;
+                double newY = node.getLayoutY() + f.getY() * FORCE_DAMPING;
                 newX = Math.max(START_X, Math.min(newX, START_X + 2000));
                 newY = Math.max(START_Y, Math.min(newY, START_Y + 1500));
-                
                 node.setLayoutX(newX);
                 node.setLayoutY(newY);
             }
@@ -232,78 +243,80 @@ public class CanvasLayoutManager {
     }
     
     /**
-     * 树形布局 - 对于树状结构，自动生成清晰的树形排列
+     * 树形布局 - 按节点实际宽高与子树宽度分配，避免重叠
      */
     private void treeLayout(List<ProcessNode> nodes, List<NodeConnection> connections) {
-        // 构建依赖关系图
         Map<ProcessNode, Set<ProcessNode>> graph = buildGraph(nodes, connections);
-        
-        // 找到根节点（没有入边的节点）
         Set<ProcessNode> hasIncoming = new HashSet<>();
         for (NodeConnection conn : connections) {
             if (conn.getTargetNode() != null) {
                 hasIncoming.add(conn.getTargetNode());
             }
         }
-        
         List<ProcessNode> roots = new ArrayList<>();
         for (ProcessNode node : nodes) {
-            if (!hasIncoming.contains(node)) {
-                roots.add(node);
-            }
+            if (!hasIncoming.contains(node)) roots.add(node);
         }
+        if (roots.isEmpty() && !nodes.isEmpty()) roots.add(nodes.get(0));
         
-        // 如果没有根节点，选择第一个节点作为根
-        if (roots.isEmpty() && !nodes.isEmpty()) {
-            roots.add(nodes.get(0));
+        Map<ProcessNode, Double> subtreeWidths = new HashMap<>();
+        for (ProcessNode node : nodes) {
+            calculateSubtreeWidth(node, graph, subtreeWidths);
         }
-        
-        // 递归布局树
-        Map<ProcessNode, Integer> subtreeSizes = calculateSubtreeSizes(nodes, graph);
         double currentX = START_X;
-        
         for (ProcessNode root : roots) {
-            currentX = layoutTree(root, graph, subtreeSizes, currentX, START_Y, 0);
-            currentX += HORIZONTAL_SPACING; // 多个根节点之间的间距
+            currentX = layoutTree(root, graph, subtreeWidths, currentX, START_Y) + GAP;
         }
     }
     
     /**
-     * 递归布局树节点
+     * 递归计算子树占用宽度（像素）
+     */
+    private double calculateSubtreeWidth(ProcessNode node, Map<ProcessNode, Set<ProcessNode>> graph,
+                                         Map<ProcessNode, Double> out) {
+        if (out.containsKey(node)) return out.get(node);
+        Set<ProcessNode> children = graph.getOrDefault(node, new HashSet<>());
+        double width;
+        if (children.isEmpty()) {
+            width = nodeWidth(node) + GAP;
+        } else {
+            width = 0;
+            for (ProcessNode child : children) {
+                width += calculateSubtreeWidth(child, graph, out);
+            }
+            width = Math.max(width, nodeWidth(node) + GAP);
+        }
+        out.put(node, width);
+        return width;
+    }
+    
+    /**
+     * 递归布局树节点，按子树宽度分配 x
      */
     private double layoutTree(ProcessNode node, Map<ProcessNode, Set<ProcessNode>> graph,
-                              Map<ProcessNode, Integer> subtreeSizes, double x, double y, int depth) {
+                              Map<ProcessNode, Double> subtreeWidths, double x, double y) {
+        double w = nodeWidth(node);
+        double h = nodeHeight(node);
         Set<ProcessNode> children = graph.getOrDefault(node, new HashSet<>());
-        
         if (children.isEmpty()) {
-            // 叶子节点
             node.setLayoutX(x);
             node.setLayoutY(y);
-            return x + HORIZONTAL_SPACING;
+            return x + w + GAP;
         }
-        
-        // 计算子树的总宽度
-        double subtreeWidth = 0;
+        double totalChildWidth = 0;
         for (ProcessNode child : children) {
-            int size = subtreeSizes.getOrDefault(child, 1);
-            subtreeWidth += size * HORIZONTAL_SPACING;
+            totalChildWidth += subtreeWidths.getOrDefault(child, w + GAP);
         }
-        
-        // 父节点居中
-        double nodeX = x + subtreeWidth / 2 - HORIZONTAL_SPACING / 2;
+        double nodeX = x + totalChildWidth / 2 - w / 2;
         node.setLayoutX(nodeX);
         node.setLayoutY(y);
-        
-        // 布局子节点
+        double childY = y + h + GAP;
         double childX = x;
-        double childY = y + VERTICAL_SPACING;
-        
         for (ProcessNode child : children) {
-            int size = subtreeSizes.getOrDefault(child, 1);
-            childX = layoutTree(child, graph, subtreeSizes, childX, childY, depth + 1);
+            childX = layoutTree(child, graph, subtreeWidths, childX, childY);
+            childX += GAP;
         }
-        
-        return x + subtreeWidth;
+        return childX - GAP; // 返回子树右端，父节点会再加 GAP 作为下一兄弟起点
     }
     
     /**
@@ -379,43 +392,6 @@ public class CanvasLayoutManager {
         }
         
         return levels;
-    }
-    
-    /**
-     * 计算子树大小（用于树形布局）
-     */
-    private Map<ProcessNode, Integer> calculateSubtreeSizes(List<ProcessNode> nodes, Map<ProcessNode, Set<ProcessNode>> graph) {
-        Map<ProcessNode, Integer> sizes = new HashMap<>();
-        
-        // 递归计算
-        for (ProcessNode node : nodes) {
-            calculateSubtreeSize(node, graph, sizes);
-        }
-        
-        return sizes;
-    }
-    
-    /**
-     * 递归计算子树大小
-     */
-    private int calculateSubtreeSize(ProcessNode node, Map<ProcessNode, Set<ProcessNode>> graph, Map<ProcessNode, Integer> sizes) {
-        if (sizes.containsKey(node)) {
-            return sizes.get(node);
-        }
-        
-        Set<ProcessNode> children = graph.getOrDefault(node, new HashSet<>());
-        if (children.isEmpty()) {
-            sizes.put(node, 1);
-            return 1;
-        }
-        
-        int size = 1;
-        for (ProcessNode child : children) {
-            size += calculateSubtreeSize(child, graph, sizes);
-        }
-        
-        sizes.put(node, size);
-        return size;
     }
     
     private void log(String message) {

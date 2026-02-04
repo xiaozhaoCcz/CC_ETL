@@ -107,6 +107,9 @@ public class NodeCanvas extends Pane {
     private CanvasRuler ruler; // 标尺组件
     private Label coordinateLabel; // 坐标显示标签
     
+    // 画布右键菜单（用于左键点击空白时关闭）
+    private ContextMenu canvasContextMenu;
+    
     // 智能对齐相关
     private boolean smartAlignmentEnabled = true; // 智能对齐是否启用
     private boolean snapToGridEnabled = false; // 网格吸附是否启用
@@ -355,11 +358,14 @@ public class NodeCanvas extends Pane {
             }
         });
         
-        node.setOnClicked(() -> {
-            // 只有在没有发生拖拽的情况下才选中节点
-            // 如果节点正在被拖拽或刚刚完成拖拽，不选中节点
+        node.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_CLICKED, e -> {
+            if (e.getButton() != javafx.scene.input.MouseButton.PRIMARY) return;
             if (!selectionManager.isMovingSelection() && !isDragging) {
-                selectionManager.selectNode(node);
+                if (e.isShiftDown()) {
+                    selectionManager.toggleNodeSelection(node);
+                } else {
+                    selectionManager.selectNode(node);
+                }
             }
         });
         
@@ -661,12 +667,34 @@ public class NodeCanvas extends Pane {
     public NodeConnection addConnection(ProcessNode source, Circle sourceConnector,
                                         ProcessNode target, Circle targetConnector, boolean recordHistory) {
         NodeConnection connection = connectionManager.addConnection(source, sourceConnector, target, targetConnector);
+        setupConnectionSelectionClick(connection);
         if (recordHistory) {
             pushAction(new AddConnectionAction(connection));
         }
         // 标记有未保存的更改
         markAsUnsaved();
         return connection;
+    }
+    
+    /**
+     * 为连线绑定点击选择：Shift+点击多选/取消边；普通点击则只选该边及两端节点
+     */
+    private void setupConnectionSelectionClick(NodeConnection connection) {
+        if (connection == null) return;
+        connection.setOnMouseClicked(e -> {
+            if (e.getButton() != javafx.scene.input.MouseButton.PRIMARY) return;
+            if (e.isShiftDown()) {
+                selectionManager.toggleConnectionSelection(connection);
+            } else {
+                ProcessNode src = connection.getSourceNode();
+                ProcessNode tgt = connection.getTargetNode();
+                if (src != null && tgt != null) {
+                    selectionManager.selectNodesAndConnections(
+                        new HashSet<>(Arrays.asList(src, tgt)),
+                        Collections.singleton(connection));
+                }
+            }
+        });
     }
     
     public NodeConnection addConnection(ProcessNode source, ProcessNode target) {
@@ -869,8 +897,37 @@ public class NodeCanvas extends Pane {
     public void selectNode(ProcessNode node) { selectionManager.selectNode(node); }
     public void selectNodes(Collection<ProcessNode> nodesToSelect) { selectionManager.selectNodes(nodesToSelect); }
     public void clearSelection() { selectionManager.clearSelection(); }
-    public void alignHorizontal() { selectionManager.alignHorizontal(); }
-    public void alignVertical() { selectionManager.alignVertical(); }
+    /**
+     * 横向布局（Y 对齐到平均线），带撤销
+     */
+    public void alignHorizontal() {
+        Set<ProcessNode> selectedNodes = selectionManager.getSelectedNodes();
+        if (selectedNodes.size() < 2) {
+            log("⚠ 需要至少选中 2 个节点");
+            return;
+        }
+        Map<ProcessNode, double[]> oldPositions = snapshotNodePositions(selectedNodes);
+        selectionManager.alignHorizontal();
+        Map<ProcessNode, double[]> newPositions = snapshotNodePositions(selectedNodes);
+        pushAction(new BatchMoveAction(oldPositions, newPositions));
+        markAsUnsaved();
+    }
+    
+    /**
+     * 纵向布局（X 对齐到平均线），带撤销
+     */
+    public void alignVertical() {
+        Set<ProcessNode> selectedNodes = selectionManager.getSelectedNodes();
+        if (selectedNodes.size() < 2) {
+            log("⚠ 需要至少选中 2 个节点");
+            return;
+        }
+        Map<ProcessNode, double[]> oldPositions = snapshotNodePositions(selectedNodes);
+        selectionManager.alignVertical();
+        Map<ProcessNode, double[]> newPositions = snapshotNodePositions(selectedNodes);
+        pushAction(new BatchMoveAction(oldPositions, newPositions));
+        markAsUnsaved();
+    }
     public Set<NodeConnection> getSelectedConnections() { return selectionManager.getSelectedConnections(); }
     public void updateSelectionBoundingBox() { selectionManager.updateSelectionBoundingBox(); }
     public void highlightNode(ProcessNode node, boolean highlight) { selectionManager.highlightNode(node, highlight); }
@@ -1227,6 +1284,7 @@ public class NodeCanvas extends Pane {
         
         Map<ProcessNode, double[]> oldPositions = snapshotNodePositions(nodes);
         layoutManager.layout(nodes, connections, algorithm);
+        requestLayout(); // 确保边与节点位置同步刷新
         Map<ProcessNode, double[]> newPositions = snapshotNodePositions(nodes);
         pushAction(new LayoutAction(oldPositions, newPositions));
         markAsUnsaved();
@@ -1345,23 +1403,21 @@ public class NodeCanvas extends Pane {
         this.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> {
             if (e.isPrimaryButtonDown()) {
                 boolean isClickOnNodeOrEdge = isClickOnNodeOrEdge((javafx.scene.Node) e.getTarget());
-                
-                if (selectionManager.isSelectionMode() && !isClickOnNodeOrEdge) {
-                    // 选择模式下，点击空白区域开始框选
+                if (!isClickOnNodeOrEdge) {
+                    // 左键点击空白时关闭画布右键菜单（框选 filter 会 consume，setOnMousePressed 收不到）
+                    if (canvasContextMenu != null && canvasContextMenu.isShowing()) {
+                        canvasContextMenu.hide();
+                    }
+                    // 空白处按下即开始框选（无需先开框选模式）
                     Point2D localPoint = sceneToLocal(e.getSceneX(), e.getSceneY());
                     selectionManager.startSelection(localPoint.getX(), localPoint.getY());
                     e.consume();
-                } else if (!selectionManager.isSelectionMode() && !isClickOnNodeOrEdge) {
-                    // 非选择模式下，点击空白区域清除选择
-                    if (!selectionManager.getSelectedNodes().isEmpty()) {
-                        selectionManager.clearSelection();
-                    }
                 }
             }
         });
         
         this.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_DRAGGED, e -> {
-            if (selectionManager.isSelectionMode() && e.isPrimaryButtonDown() && selectionManager.getSelectionRect().isVisible()) {
+            if (e.isPrimaryButtonDown() && selectionManager.getSelectionRect().isVisible()) {
                 Point2D localPoint = sceneToLocal(e.getSceneX(), e.getSceneY());
                 selectionManager.updateSelection(localPoint.getX(), localPoint.getY());
                 e.consume();
@@ -1369,9 +1425,16 @@ public class NodeCanvas extends Pane {
         });
         
         this.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_RELEASED, e -> {
-            if (selectionManager.isSelectionMode() && selectionManager.getSelectionRect().isVisible()) {
+            if (selectionManager.getSelectionRect().isVisible()) {
                 Point2D localPoint = sceneToLocal(e.getSceneX(), e.getSceneY());
                 selectionManager.finishSelection(localPoint.getX(), localPoint.getY());
+                e.consume();
+            }
+        });
+        
+        // 消费右键事件，防止 ScrollPane pannable 用右键拖拽平移与右键菜单冲突
+        this.addEventHandler(javafx.scene.input.MouseEvent.ANY, e -> {
+            if (e.getButton() == javafx.scene.input.MouseButton.SECONDARY) {
                 e.consume();
             }
         });
@@ -1504,6 +1567,7 @@ public class NodeCanvas extends Pane {
     
     private void setupCanvasContextMenu() {
         ContextMenu menu = new ContextMenu();
+        this.canvasContextMenu = menu;
         
         MenuItem addNodeItem = new MenuItem("新增节点");
         addNodeItem.setOnAction(e -> { if (onRequestAddNode != null) onRequestAddNode.run(); });
@@ -1946,6 +2010,7 @@ public class NodeCanvas extends Pane {
                                 targetNode, targetNode.getConnectorPane(), targetConnector
                             );
                             if (edge != null) {
+                                setupConnectionSelectionClick(edge);
                                 edge.setEdgeId(edgeData.getId());
                                 
                                 // ⭐ 修复：从properties恢复连线样式、颜色和标签信息
@@ -2585,6 +2650,9 @@ public class NodeCanvas extends Pane {
                     sourceConditionNode, sourceConditionNode.getConnectorPane(), sourceConnectorCircle,
                     targetNode, getConnectorParentForNode(targetNode), targetConnectorCircle
                 );
+                if (connection != null) {
+                    setupConnectionSelectionClick(connection);
+                }
                 connections.add(connection);
                 
                 markAsUnsaved();
@@ -4306,6 +4374,212 @@ public class NodeCanvas extends Pane {
         pushAction(new BatchMoveAction(oldPositions, newPositions));
         markAsUnsaved();
         log("✓ 已对齐到画布中心: " + selectedNodes.size() + " 个节点");
+    }
+    
+    /**
+     * 左对齐（选中节点左边缘对齐到最左节点的左边缘），带撤销
+     */
+    public void alignLeft() {
+        Set<ProcessNode> selectedNodes = selectionManager.getSelectedNodes();
+        if (selectedNodes.size() < 2) {
+            log("⚠ 需要至少选中 2 个节点");
+            return;
+        }
+        Map<ProcessNode, double[]> oldPositions = snapshotNodePositions(selectedNodes);
+        double refX = selectedNodes.stream().mapToDouble(ProcessNode::getLayoutX).min().orElse(0);
+        for (ProcessNode node : selectedNodes) {
+            node.setLayoutX(Math.max(0, refX));
+        }
+        pushAction(new BatchMoveAction(oldPositions, snapshotNodePositions(selectedNodes)));
+        markAsUnsaved();
+        log("✓ 左对齐完成: " + selectedNodes.size() + " 个节点");
+    }
+    
+    /**
+     * 右对齐（选中节点右边缘对齐到最右节点的右边缘），带撤销
+     */
+    public void alignRight() {
+        Set<ProcessNode> selectedNodes = selectionManager.getSelectedNodes();
+        if (selectedNodes.size() < 2) {
+            log("⚠ 需要至少选中 2 个节点");
+            return;
+        }
+        Map<ProcessNode, double[]> oldPositions = snapshotNodePositions(selectedNodes);
+        double refRight = selectedNodes.stream()
+                .mapToDouble(n -> n.getLayoutX() + n.getPrefWidth())
+                .max().orElse(0);
+        for (ProcessNode node : selectedNodes) {
+            node.setLayoutX(Math.max(0, refRight - node.getPrefWidth()));
+        }
+        pushAction(new BatchMoveAction(oldPositions, snapshotNodePositions(selectedNodes)));
+        markAsUnsaved();
+        log("✓ 右对齐完成: " + selectedNodes.size() + " 个节点");
+    }
+    
+    /**
+     * 水平居中（选中节点水平中心对齐到它们水平中心线的平均值），带撤销
+     */
+    public void alignHorizontalCenter() {
+        Set<ProcessNode> selectedNodes = selectionManager.getSelectedNodes();
+        if (selectedNodes.size() < 2) {
+            log("⚠ 需要至少选中 2 个节点");
+            return;
+        }
+        Map<ProcessNode, double[]> oldPositions = snapshotNodePositions(selectedNodes);
+        double centerX = selectedNodes.stream()
+                .mapToDouble(n -> n.getLayoutX() + n.getPrefWidth() / 2)
+                .average().orElse(0);
+        for (ProcessNode node : selectedNodes) {
+            node.setLayoutX(Math.max(0, centerX - node.getPrefWidth() / 2));
+        }
+        pushAction(new BatchMoveAction(oldPositions, snapshotNodePositions(selectedNodes)));
+        markAsUnsaved();
+        log("✓ 水平居中完成: " + selectedNodes.size() + " 个节点");
+    }
+    
+    /**
+     * 顶端对齐（选中节点顶端对齐到最上节点的顶端），带撤销
+     */
+    public void alignTop() {
+        Set<ProcessNode> selectedNodes = selectionManager.getSelectedNodes();
+        if (selectedNodes.size() < 2) {
+            log("⚠ 需要至少选中 2 个节点");
+            return;
+        }
+        Map<ProcessNode, double[]> oldPositions = snapshotNodePositions(selectedNodes);
+        double refY = selectedNodes.stream().mapToDouble(ProcessNode::getLayoutY).min().orElse(0);
+        for (ProcessNode node : selectedNodes) {
+            node.setLayoutY(Math.max(0, refY));
+        }
+        pushAction(new BatchMoveAction(oldPositions, snapshotNodePositions(selectedNodes)));
+        markAsUnsaved();
+        log("✓ 顶端对齐完成: " + selectedNodes.size() + " 个节点");
+    }
+    
+    /**
+     * 底端对齐（选中节点底端对齐到最下节点的底端），带撤销
+     */
+    public void alignBottom() {
+        Set<ProcessNode> selectedNodes = selectionManager.getSelectedNodes();
+        if (selectedNodes.size() < 2) {
+            log("⚠ 需要至少选中 2 个节点");
+            return;
+        }
+        Map<ProcessNode, double[]> oldPositions = snapshotNodePositions(selectedNodes);
+        double refBottom = selectedNodes.stream()
+                .mapToDouble(n -> n.getLayoutY() + n.getPrefHeight())
+                .max().orElse(0);
+        for (ProcessNode node : selectedNodes) {
+            node.setLayoutY(Math.max(0, refBottom - node.getPrefHeight()));
+        }
+        pushAction(new BatchMoveAction(oldPositions, snapshotNodePositions(selectedNodes)));
+        markAsUnsaved();
+        log("✓ 底端对齐完成: " + selectedNodes.size() + " 个节点");
+    }
+    
+    /**
+     * 垂直居中（选中节点垂直中心对齐到它们垂直中心线的平均值），带撤销
+     */
+    public void alignVerticalCenter() {
+        Set<ProcessNode> selectedNodes = selectionManager.getSelectedNodes();
+        if (selectedNodes.size() < 2) {
+            log("⚠ 需要至少选中 2 个节点");
+            return;
+        }
+        Map<ProcessNode, double[]> oldPositions = snapshotNodePositions(selectedNodes);
+        double centerY = selectedNodes.stream()
+                .mapToDouble(n -> n.getLayoutY() + n.getPrefHeight() / 2)
+                .average().orElse(0);
+        for (ProcessNode node : selectedNodes) {
+            node.setLayoutY(Math.max(0, centerY - node.getPrefHeight() / 2));
+        }
+        pushAction(new BatchMoveAction(oldPositions, snapshotNodePositions(selectedNodes)));
+        markAsUnsaved();
+        log("✓ 垂直居中完成: " + selectedNodes.size() + " 个节点");
+    }
+    
+    /**
+     * 相对于对象组：对齐到选区包围盒的左边缘，带撤销
+     */
+    public void alignToGroupLeft() {
+        alignToGroupBy(GroupAlign.LEFT);
+    }
+    
+    /**
+     * 相对于对象组：对齐到选区包围盒的右边缘，带撤销
+     */
+    public void alignToGroupRight() {
+        alignToGroupBy(GroupAlign.RIGHT);
+    }
+    
+    /**
+     * 相对于对象组：对齐到选区包围盒的水平中心，带撤销
+     */
+    public void alignToGroupHorizontalCenter() {
+        alignToGroupBy(GroupAlign.HORIZONTAL_CENTER);
+    }
+    
+    /**
+     * 相对于对象组：对齐到选区包围盒的顶端，带撤销
+     */
+    public void alignToGroupTop() {
+        alignToGroupBy(GroupAlign.TOP);
+    }
+    
+    /**
+     * 相对于对象组：对齐到选区包围盒的底端，带撤销
+     */
+    public void alignToGroupBottom() {
+        alignToGroupBy(GroupAlign.BOTTOM);
+    }
+    
+    /**
+     * 相对于对象组：对齐到选区包围盒的垂直中心，带撤销
+     */
+    public void alignToGroupVerticalCenter() {
+        alignToGroupBy(GroupAlign.VERTICAL_CENTER);
+    }
+    
+    private enum GroupAlign { LEFT, RIGHT, HORIZONTAL_CENTER, TOP, BOTTOM, VERTICAL_CENTER }
+    
+    private void alignToGroupBy(GroupAlign align) {
+        Set<ProcessNode> selectedNodes = selectionManager.getSelectedNodes();
+        if (selectedNodes.isEmpty()) {
+            log("⚠ 请先选中节点");
+            return;
+        }
+        double minX = Double.MAX_VALUE, minY = Double.MAX_VALUE;
+        double maxX = Double.MIN_VALUE, maxY = Double.MIN_VALUE;
+        for (ProcessNode node : selectedNodes) {
+            double w = node.getPrefWidth();
+            double h = node.getPrefHeight();
+            minX = Math.min(minX, node.getLayoutX());
+            minY = Math.min(minY, node.getLayoutY());
+            maxX = Math.max(maxX, node.getLayoutX() + w);
+            maxY = Math.max(maxY, node.getLayoutY() + h);
+        }
+        double boxCenterX = (minX + maxX) / 2;
+        double boxCenterY = (minY + maxY) / 2;
+        Map<ProcessNode, double[]> oldPositions = snapshotNodePositions(selectedNodes);
+        for (ProcessNode node : selectedNodes) {
+            double nx = node.getLayoutX();
+            double ny = node.getLayoutY();
+            double nw = node.getPrefWidth();
+            double nh = node.getPrefHeight();
+            switch (align) {
+                case LEFT:   nx = minX; break;
+                case RIGHT:  nx = maxX - nw; break;
+                case HORIZONTAL_CENTER: nx = boxCenterX - nw / 2; break;
+                case TOP:    ny = minY; break;
+                case BOTTOM: ny = maxY - nh; break;
+                case VERTICAL_CENTER: ny = boxCenterY - nh / 2; break;
+            }
+            node.setLayoutX(Math.max(0, nx));
+            node.setLayoutY(Math.max(0, ny));
+        }
+        pushAction(new BatchMoveAction(oldPositions, snapshotNodePositions(selectedNodes)));
+        markAsUnsaved();
+        log("✓ 相对于对象组对齐完成: " + selectedNodes.size() + " 个节点");
     }
     
     /**

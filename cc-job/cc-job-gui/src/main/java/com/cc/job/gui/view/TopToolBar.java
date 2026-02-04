@@ -64,6 +64,18 @@ public class TopToolBar extends VBox {
         void onDistributeHorizontally(); // 水平等距分布
         void onDistributeVertically(); // 垂直等距分布
         void onAlignToCenter(); // 对齐到画布中心
+        void onAlignLeft(); // 左对齐
+        void onAlignRight(); // 右对齐
+        void onAlignHorizontalCenter(); // 水平居中
+        void onAlignTop(); // 顶端对齐
+        void onAlignBottom(); // 底端对齐
+        void onAlignVerticalCenter(); // 垂直居中
+        void onAlignToGroupLeft(); // 相对于对象组：左对齐
+        void onAlignToGroupRight(); // 相对于对象组：右对齐
+        void onAlignToGroupHorizontalCenter(); // 相对于对象组：水平居中
+        void onAlignToGroupTop(); // 相对于对象组：顶端对齐
+        void onAlignToGroupBottom(); // 相对于对象组：底端对齐
+        void onAlignToGroupVerticalCenter(); // 相对于对象组：垂直居中
         void onToggleSnapToGrid(); // 切换网格吸附
         void onDetectCycles(); // 检测循环依赖
         void onJobList();
@@ -770,41 +782,95 @@ public class TopToolBar extends VBox {
         selectButton = createIconButton(IconUtil.selectIcon(), "框选", "框选节点和边", () -> safeCall(ToolBarCallback::onSelect));
         snapToGridButton = createIconButton(IconUtil.gridIcon(), "网格吸附", "切换网格吸附功能", () -> safeCall(ToolBarCallback::onToggleSnapToGrid));
         
-        // 布局下拉菜单
+        // 布局下拉菜单（与图片一致：相对于对象组 + 左/水平居中/右/顶端/垂直居中/底端 + 横向/纵向/等距/居中对齐）
         javafx.scene.control.MenuButton layoutMenuButton = new javafx.scene.control.MenuButton("布局");
         layoutMenuButton.setGraphic(IconUtil.layoutHorizontalIcon());
         layoutMenuButton.setGraphicTextGap(6);
         
-        // 横向布局
+        // 相对于对象组(O) - 子菜单
+        javafx.scene.control.Menu alignToGroupMenu = new javafx.scene.control.Menu("相对于对象组(O)");
+        alignToGroupMenu.setGraphic(IconUtil.alignCenterIcon());
+        javafx.scene.control.MenuItem toGroupLeftItem = new javafx.scene.control.MenuItem("左对齐(L)");
+        toGroupLeftItem.setGraphic(IconUtil.alignLeftIcon());
+        toGroupLeftItem.setOnAction(e -> safeCall(ToolBarCallback::onAlignToGroupLeft));
+        javafx.scene.control.MenuItem toGroupHCenterItem = new javafx.scene.control.MenuItem("水平居中(C)");
+        toGroupHCenterItem.setGraphic(IconUtil.alignCenterIcon());
+        toGroupHCenterItem.setOnAction(e -> safeCall(ToolBarCallback::onAlignToGroupHorizontalCenter));
+        javafx.scene.control.MenuItem toGroupRightItem = new javafx.scene.control.MenuItem("右对齐(R)");
+        toGroupRightItem.setGraphic(IconUtil.alignRightIcon());
+        toGroupRightItem.setOnAction(e -> safeCall(ToolBarCallback::onAlignToGroupRight));
+        javafx.scene.control.MenuItem toGroupTopItem = new javafx.scene.control.MenuItem("顶端对齐(T)");
+        toGroupTopItem.setGraphic(IconUtil.layoutHorizontalIcon());
+        toGroupTopItem.setOnAction(e -> safeCall(ToolBarCallback::onAlignToGroupTop));
+        javafx.scene.control.MenuItem toGroupVCenterItem = new javafx.scene.control.MenuItem("垂直居中(M)");
+        toGroupVCenterItem.setGraphic(IconUtil.alignCenterIcon());
+        toGroupVCenterItem.setOnAction(e -> safeCall(ToolBarCallback::onAlignToGroupVerticalCenter));
+        javafx.scene.control.MenuItem toGroupBottomItem = new javafx.scene.control.MenuItem("底端对齐(B)");
+        toGroupBottomItem.setGraphic(IconUtil.layoutVerticalIcon());
+        toGroupBottomItem.setOnAction(e -> safeCall(ToolBarCallback::onAlignToGroupBottom));
+        alignToGroupMenu.getItems().addAll(toGroupLeftItem, toGroupHCenterItem, toGroupRightItem, toGroupTopItem, toGroupVCenterItem, toGroupBottomItem);
+        
+        // 左对齐(L)、水平居中(C)、右对齐(R)
+        javafx.scene.control.MenuItem alignLeftItem = new javafx.scene.control.MenuItem("左对齐(L)");
+        alignLeftItem.setGraphic(IconUtil.alignLeftIcon());
+        alignLeftItem.setAccelerator(new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.L, javafx.scene.input.KeyCombination.SHORTCUT_DOWN));
+        alignLeftItem.setOnAction(e -> safeCall(ToolBarCallback::onAlignLeft));
+        javafx.scene.control.MenuItem alignHCenterItem = new javafx.scene.control.MenuItem("水平居中(C)");
+        alignHCenterItem.setGraphic(IconUtil.alignCenterIcon());
+        alignHCenterItem.setAccelerator(new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.C, javafx.scene.input.KeyCombination.SHORTCUT_DOWN));
+        alignHCenterItem.setOnAction(e -> safeCall(ToolBarCallback::onAlignHorizontalCenter));
+        javafx.scene.control.MenuItem alignRightItem = new javafx.scene.control.MenuItem("右对齐(R)");
+        alignRightItem.setGraphic(IconUtil.alignRightIcon());
+        alignRightItem.setAccelerator(new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.R, javafx.scene.input.KeyCombination.SHORTCUT_DOWN));
+        alignRightItem.setOnAction(e -> safeCall(ToolBarCallback::onAlignRight));
+        // 顶端对齐(T)、垂直居中(M)、底端对齐(B)
+        javafx.scene.control.MenuItem alignTopItem = new javafx.scene.control.MenuItem("顶端对齐(T)");
+        alignTopItem.setGraphic(IconUtil.layoutHorizontalIcon());
+        alignTopItem.setAccelerator(new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.T, javafx.scene.input.KeyCombination.SHORTCUT_DOWN));
+        alignTopItem.setOnAction(e -> safeCall(ToolBarCallback::onAlignTop));
+        javafx.scene.control.MenuItem alignVCenterItem = new javafx.scene.control.MenuItem("垂直居中(M)");
+        alignVCenterItem.setGraphic(IconUtil.alignCenterIcon());
+        alignVCenterItem.setAccelerator(new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.M, javafx.scene.input.KeyCombination.SHORTCUT_DOWN));
+        alignVCenterItem.setOnAction(e -> safeCall(ToolBarCallback::onAlignVerticalCenter));
+        javafx.scene.control.MenuItem alignBottomItem = new javafx.scene.control.MenuItem("底端对齐(B)");
+        alignBottomItem.setGraphic(IconUtil.layoutVerticalIcon());
+        alignBottomItem.setAccelerator(new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.B, javafx.scene.input.KeyCombination.SHORTCUT_DOWN));
+        alignBottomItem.setOnAction(e -> safeCall(ToolBarCallback::onAlignBottom));
+        
+        // 横向布局、纵向布局
         javafx.scene.control.MenuItem layoutHorizontalItem = new javafx.scene.control.MenuItem("横向布局");
         layoutHorizontalItem.setGraphic(IconUtil.layoutHorizontalIcon());
         layoutHorizontalItem.setOnAction(e -> safeCall(ToolBarCallback::onLayoutHorizontal));
-        
-        // 纵向布局
         javafx.scene.control.MenuItem layoutVerticalItem = new javafx.scene.control.MenuItem("纵向布局");
         layoutVerticalItem.setGraphic(IconUtil.layoutVerticalIcon());
         layoutVerticalItem.setOnAction(e -> safeCall(ToolBarCallback::onLayoutVertical));
         
-        // 水平等距
+        // 水平等距、垂直等距
         javafx.scene.control.MenuItem distributeHorizontalItem = new javafx.scene.control.MenuItem("水平等距");
         distributeHorizontalItem.setGraphic(IconUtil.layoutHorizontalIcon());
         distributeHorizontalItem.setOnAction(e -> safeCall(ToolBarCallback::onDistributeHorizontally));
-        
-        // 垂直等距
         javafx.scene.control.MenuItem distributeVerticalItem = new javafx.scene.control.MenuItem("垂直等距");
         distributeVerticalItem.setGraphic(IconUtil.layoutVerticalIcon());
         distributeVerticalItem.setOnAction(e -> safeCall(ToolBarCallback::onDistributeVertically));
         
-        // 居中对齐
+        // 居中对齐（画布中心）
         javafx.scene.control.MenuItem alignToCenterItem = new javafx.scene.control.MenuItem("居中对齐");
         alignToCenterItem.setGraphic(IconUtil.expandIcon());
         alignToCenterItem.setOnAction(e -> safeCall(ToolBarCallback::onAlignToCenter));
         
         layoutMenuButton.getItems().addAll(
-            layoutHorizontalItem, 
-            layoutVerticalItem, 
+            alignToGroupMenu,
+            alignLeftItem,
+            alignHCenterItem,
+            alignRightItem,
+            alignTopItem,
+            alignVCenterItem,
+            alignBottomItem,
             new SeparatorMenuItem(),
-            distributeHorizontalItem, 
+            layoutHorizontalItem,
+            layoutVerticalItem,
+            new SeparatorMenuItem(),
+            distributeHorizontalItem,
             distributeVerticalItem,
             new SeparatorMenuItem(),
             alignToCenterItem

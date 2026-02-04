@@ -460,6 +460,66 @@ public class MainView extends BorderPane {
             }
             
             @Override
+            public void onAlignLeft() {
+                canvas.alignLeft();
+            }
+            
+            @Override
+            public void onAlignRight() {
+                canvas.alignRight();
+            }
+            
+            @Override
+            public void onAlignHorizontalCenter() {
+                canvas.alignHorizontalCenter();
+            }
+            
+            @Override
+            public void onAlignTop() {
+                canvas.alignTop();
+            }
+            
+            @Override
+            public void onAlignBottom() {
+                canvas.alignBottom();
+            }
+            
+            @Override
+            public void onAlignVerticalCenter() {
+                canvas.alignVerticalCenter();
+            }
+            
+            @Override
+            public void onAlignToGroupLeft() {
+                canvas.alignToGroupLeft();
+            }
+            
+            @Override
+            public void onAlignToGroupRight() {
+                canvas.alignToGroupRight();
+            }
+            
+            @Override
+            public void onAlignToGroupHorizontalCenter() {
+                canvas.alignToGroupHorizontalCenter();
+            }
+            
+            @Override
+            public void onAlignToGroupTop() {
+                canvas.alignToGroupTop();
+            }
+            
+            @Override
+            public void onAlignToGroupBottom() {
+                canvas.alignToGroupBottom();
+            }
+            
+            @Override
+            public void onAlignToGroupVerticalCenter() {
+                canvas.alignToGroupVerticalCenter();
+            }
+            
+            @Override
             public void onToggleSnapToGrid() {
                 boolean currentState = canvas.isSnapToGridEnabled();
                 canvas.setSnapToGridEnabled(!currentState);
