@@ -2760,6 +2760,10 @@ public class MainView extends BorderPane {
         dialog.setTitle("查找节点");
         dialog.setHeaderText(null);
         dialog.setContentText("请输入节点名称:");
+        dialog.setGraphic(null);
+        dialog.getDialogPane().getStylesheets().add(MainView.class.getResource("/styles.css").toExternalForm());
+        dialog.getDialogPane().setStyle(
+            "-fx-background-color: #FFFFFF; -fx-border-color: #E5E7EB; -fx-border-width: 1; -fx-effect: null;");
         
         Optional<String> result = dialog.showAndWait();
         result.ifPresent(nodeName -> {
