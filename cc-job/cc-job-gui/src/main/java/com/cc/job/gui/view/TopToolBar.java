@@ -622,13 +622,16 @@ public class TopToolBar extends VBox {
         
         runMenu.getItems().addAll(runItem, stopItem, rerunItem, new SeparatorMenuItem());
         
-        MenuItem runSelectedItem = new MenuItem("运行选中的节点");
-        runSelectedItem.setOnAction(e -> safeCall(ToolBarCallback::onRunSelectedNodes));
+//        MenuItem runSelectedItem = new MenuItem("运行选中的节点");
+//        runSelectedItem.setOnAction(e -> safeCall(ToolBarCallback::onRunSelectedNodes));
+//
+//        MenuItem runToHereItem = new MenuItem("运行到此处");
+//        runToHereItem.setOnAction(e -> safeCall(ToolBarCallback::onRunToHere));
         
-        MenuItem runToHereItem = new MenuItem("运行到此处");
-        runToHereItem.setOnAction(e -> safeCall(ToolBarCallback::onRunToHere));
-        
-        runMenu.getItems().addAll(runSelectedItem, runToHereItem, new SeparatorMenuItem());
+//        runMenu.getItems().addAll(
+//                runSelectedItem,
+//                runToHereItem,
+//                new SeparatorMenuItem());
         
         MenuItem historyItem = new MenuItem("查看执行历史");
         historyItem.setOnAction(e -> safeCall(ToolBarCallback::onNodeHistory));

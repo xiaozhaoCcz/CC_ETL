@@ -48,6 +48,13 @@ public class MiniMapView extends VBox {
     private boolean updatePending = false;
     private boolean viewportUpdatePending = false;
     private static final long THROTTLE_DELAY_MS = 200; // 节流延迟200ms
+
+    /** 正在拖拽视口框时跳过 updateViewport，避免覆盖用户拖拽位置 */
+    private boolean isDraggingViewport = false;
+    private double dragAnchorX;
+    private double dragAnchorY;
+    private double dragAnchorRectX;
+    private double dragAnchorRectY;
     
     // 关闭回调
     private Runnable onClose;
@@ -112,7 +119,7 @@ public class MiniMapView extends VBox {
         // 视口矩形
         viewportRect = new Rectangle();
         viewportRect.setFill(Color.TRANSPARENT);
-        viewportRect.setStroke(Color.web("#EF4444"));
+        viewportRect.setStroke(Color.web("#2563EB"));
         viewportRect.setStrokeWidth(2);
         viewportRect.setMouseTransparent(false);
         
@@ -120,8 +127,8 @@ public class MiniMapView extends VBox {
         
         getChildren().addAll(titleBar, canvasContainer);
         
-        // 点击小地图跳转
-        setupClickNavigation();
+        // 拖拽视口框移动画布（不再使用点击小地图跳转）
+        setupViewportDrag();
     }
     
     private HBox createTitleBar() {
@@ -371,8 +378,8 @@ public class MiniMapView extends VBox {
      */
     private void updateViewport() {
         if (nodeCanvas == null || scrollPane == null) return;
-        
-        
+        if (isDraggingViewport) return;
+
         double canvasWidth = nodeCanvas.getPrefWidth();
         double canvasHeight = nodeCanvas.getPrefHeight();
         
@@ -437,53 +444,61 @@ public class MiniMapView extends VBox {
     }
     
     /**
-     * 设置点击导航
+     * 设置拖拽视口框：拖拽蓝框时移动主画布视图（替代原点击小地图跳转）
      */
-    private void setupClickNavigation() {
-        canvas.setOnMouseClicked(e -> {
+    private void setupViewportDrag() {
+        viewportRect.setOnMousePressed(e -> {
             if (nodeCanvas == null || scrollPane == null) return;
-            
-            // 获取点击位置
-            double clickX = e.getX();
-            double clickY = e.getY();
-            
-            // 计算对应的画布位置
+            isDraggingViewport = true;
+            dragAnchorX = e.getX();
+            dragAnchorY = e.getY();
+            dragAnchorRectX = viewportRect.getX();
+            dragAnchorRectY = viewportRect.getY();
+        });
+
+        viewportRect.setOnMouseDragged(e -> {
+            if (nodeCanvas == null || scrollPane == null) return;
             double canvasWidth = nodeCanvas.getPrefWidth();
             double canvasHeight = nodeCanvas.getPrefHeight();
-            
             double scaleX = MINIMAP_WIDTH / canvasWidth;
             double scaleY = MINIMAP_HEIGHT / canvasHeight;
             double scale = Math.min(scaleX, scaleY);
-            
             double offsetX = (MINIMAP_WIDTH - canvasWidth * scale) / 2;
             double offsetY = (MINIMAP_HEIGHT - canvasHeight * scale) / 2;
-            
-            double targetX = (clickX - offsetX) / scale;
-            double targetY = (clickY - offsetY) / scale;
-            
-            // 计算滚动值
+            double rectW = viewportRect.getWidth();
+            double rectH = viewportRect.getHeight();
+
+            double newRectX = dragAnchorRectX + (e.getX() - dragAnchorX);
+            double newRectY = dragAnchorRectY + (e.getY() - dragAnchorY);
+            double minX = offsetX;
+            double minY = offsetY;
+            double maxX = offsetX + canvasWidth * scale - rectW;
+            double maxY = offsetY + canvasHeight * scale - rectH;
+            newRectX = Math.max(minX, Math.min(newRectX, maxX));
+            newRectY = Math.max(minY, Math.min(newRectY, maxY));
+
+            viewportRect.setX(newRectX);
+            viewportRect.setY(newRectY);
+
             Bounds viewportBounds = scrollPane.getViewportBounds();
             double viewportWidth = viewportBounds.getWidth();
             double viewportHeight = viewportBounds.getHeight();
-            
             double contentWidth = canvasWidth - viewportWidth;
             double contentHeight = canvasHeight - viewportHeight;
-            
-            // 将目标位置居中
-            double scrollX = targetX - viewportWidth / 2;
-            double scrollY = targetY - viewportHeight / 2;
-            
-            // 限制范围
-            scrollX = Math.max(0, Math.min(scrollX, contentWidth));
-            scrollY = Math.max(0, Math.min(scrollY, contentHeight));
-            
-            // 设置滚动值
+            double scrollX = (newRectX - offsetX) / scale;
+            double scrollY = (newRectY - offsetY) / scale;
+            scrollX = Math.max(0, Math.min(scrollX, contentWidth > 0 ? contentWidth : 0));
+            scrollY = Math.max(0, Math.min(scrollY, contentHeight > 0 ? contentHeight : 0));
             if (contentWidth > 0) {
                 scrollPane.setHvalue(scrollX / contentWidth);
             }
             if (contentHeight > 0) {
                 scrollPane.setVvalue(scrollY / contentHeight);
             }
+        });
+
+        viewportRect.setOnMouseReleased(e -> {
+            isDraggingViewport = false;
         });
     }
     
