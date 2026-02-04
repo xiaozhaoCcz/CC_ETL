@@ -30,6 +30,8 @@ public class CanvasConnectionManager {
     private final Runnable notifyChanged;
     private final Consumer<String> logger;
     private Stage ownerStage; // 主窗口Stage，用于打开对话框
+    /** 由画布设置：请求删除连接时调用（可带 recordHistory），用于撤销入栈 */
+    private Consumer<NodeConnection> onRequestRemoveConnection;
     
     public CanvasConnectionManager(Pane canvas, List<NodeConnection> connections, 
                                    List<GroupContainer> groupContainers,
@@ -48,6 +50,14 @@ public class CanvasConnectionManager {
      */
     public void setOwnerStage(Stage ownerStage) {
         this.ownerStage = ownerStage;
+    }
+    
+    /**
+     * 设置“请求删除连接”回调。由画布传入（如 c -> canvas.removeConnection(c, true)），
+     * 以便删除连接时入撤销栈；右键“删除连接”将调用此回调。
+     */
+    public void setOnRequestRemoveConnection(Consumer<NodeConnection> callback) {
+        this.onRequestRemoveConnection = callback;
     }
     
     /**
@@ -122,16 +132,27 @@ public class CanvasConnectionManager {
     }
     
     /**
+     * 根据 edgeId 查找连接
+     */
+    public NodeConnection getConnectionByEdgeId(String edgeId) {
+        if (edgeId == null) return null;
+        for (NodeConnection connection : connections) {
+            if (edgeIdMatches(edgeId, connection.getEdgeId())) {
+                return connection;
+            }
+        }
+        return null;
+    }
+    
+    /**
      * 根据 edgeId 移除连接
      */
     public boolean removeConnectionByEdgeId(String edgeId) {
         if (edgeId == null) return false;
-        
-        for (NodeConnection connection : new ArrayList<>(connections)) {
-            if (edgeIdMatches(edgeId, connection.getEdgeId())) {
-                removeConnection(connection);
-                return true;
-            }
+        NodeConnection connection = getConnectionByEdgeId(edgeId);
+        if (connection != null) {
+            removeConnection(connection);
+            return true;
         }
         return false;
     }
@@ -209,7 +230,11 @@ public class CanvasConnectionManager {
             String sourceName = getOwnerName(connection.getSourceOwner());
             String targetName = getOwnerName(connection.getTargetOwner());
             logger.accept("🗑️ 准备删除连接: " + sourceName + " → " + targetName);
-            removeConnection(connection);
+            if (onRequestRemoveConnection != null) {
+                onRequestRemoveConnection.accept(connection);
+            } else {
+                removeConnection(connection);
+            }
             logger.accept("提示: 删除后需点击保存按钮以持久化任务组变更");
         });
         

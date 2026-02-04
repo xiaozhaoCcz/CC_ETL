@@ -140,6 +140,7 @@ public class NodeCanvas extends Pane {
     private void initializeManagers() {
         nodeManager = new CanvasNodeManager(this, nodes, this::notifyNodeStructureChanged, this::log);
         connectionManager = new CanvasConnectionManager(this, connections, groupContainers, conditionNodes, this::notifyNodeStructureChanged, this::log);
+        connectionManager.setOnRequestRemoveConnection(conn -> removeConnection(conn, true));
         selectionManager = new CanvasSelectionManager(this, nodes, connections, this::log, this::notifyNodeStructureChanged);
         dataLoader = new CanvasDataLoader(this::log);
         layoutManager = new CanvasLayoutManager(this::log);
@@ -681,13 +682,52 @@ public class NodeCanvas extends Pane {
         markAsUnsaved();
     }
     
-    public boolean removeConnectionByEdgeId(String edgeId) {
-        boolean removed = connectionManager.removeConnectionByEdgeId(edgeId);
-        if (removed) {
-            // 标记有未保存的更改
-            markAsUnsaved();
+    /**
+     * 粘贴完成后由 NodeOperationManager 调用，将本次粘贴作为一步撤销入栈（方案 B）。
+     * @param newNodes 本次粘贴添加的节点（非 null）
+     * @param newConnections 本次粘贴添加的连接（非 null）
+     */
+    public void notifyPasteCompleted(List<ProcessNode> newNodes, List<NodeConnection> newConnections) {
+        if (newNodes == null || newNodes.isEmpty()) return;
+        pushAction(new PasteAction(newNodes, newConnections != null ? newConnections : Collections.emptyList()));
+    }
+    
+    /**
+     * 批量删除节点（剪切/Delete/批量编辑删除），作为一步撤销入栈。
+     * 内部先收集节点位置及关联连接，再以 recordHistory=false 逐个 removeNode，最后 push 一个 BatchRemoveAction。
+     */
+    public void removeNodesAsBatch(Set<ProcessNode> nodesToRemove) {
+        if (nodesToRemove == null || nodesToRemove.isEmpty()) return;
+        List<ProcessNode> list = new ArrayList<>(nodesToRemove);
+        double[] xPos = new double[list.size()];
+        double[] yPos = new double[list.size()];
+        List<NodeConnection> allConnections = new ArrayList<>();
+        for (int i = 0; i < list.size(); i++) {
+            ProcessNode node = list.get(i);
+            xPos[i] = node.getLayoutX();
+            yPos[i] = node.getLayoutY();
         }
-        return removed;
+        for (ProcessNode node : list) {
+            for (NodeConnection conn : new ArrayList<>(connections)) {
+                if (conn.getSourceOwner() == node || conn.getTargetOwner() == node) {
+                    allConnections.add(conn);
+                }
+            }
+        }
+        for (ProcessNode node : list) {
+            removeNode(node, false);
+        }
+        pushAction(new BatchRemoveAction(list, xPos, yPos, allConnections));
+        markAsUnsaved();
+    }
+    
+    public boolean removeConnectionByEdgeId(String edgeId) {
+        NodeConnection connection = connectionManager.getConnectionByEdgeId(edgeId);
+        if (connection != null) {
+            removeConnection(connection, true);
+            return true;
+        }
+        return false;
     }
     
     public void setAllConnectionsRunning(boolean running) {
@@ -1172,7 +1212,7 @@ public class NodeCanvas extends Pane {
     }
     
     /**
-     * 自动布局（指定布局算法）
+     * 自动布局（指定布局算法），作为一步撤销入栈
      * @param algorithm 布局算法类型
      */
     public void autoLayout(CanvasLayoutManager.LayoutAlgorithm algorithm) {
@@ -1185,8 +1225,24 @@ public class NodeCanvas extends Pane {
             layoutManager = new CanvasLayoutManager(this::log);
         }
         
+        Map<ProcessNode, double[]> oldPositions = snapshotNodePositions(nodes);
         layoutManager.layout(nodes, connections, algorithm);
+        Map<ProcessNode, double[]> newPositions = snapshotNodePositions(nodes);
+        pushAction(new LayoutAction(oldPositions, newPositions));
         markAsUnsaved();
+    }
+    
+    /** 对指定节点列表做位置快照，用于 LayoutAction/BatchMoveAction */
+    private Map<ProcessNode, double[]> snapshotNodePositions(Collection<ProcessNode> nodeList) {
+        Map<ProcessNode, double[]> map = new HashMap<>();
+        if (nodeList != null) {
+            for (ProcessNode node : nodeList) {
+                if (node != null) {
+                    map.put(node, new double[]{node.getLayoutX(), node.getLayoutY()});
+                }
+            }
+        }
+        return map;
     }
     
     /**
@@ -3894,6 +3950,149 @@ public class NodeCanvas extends Pane {
         }
     }
     
+    /** 一次粘贴产生的节点与连接，撤销时整体移除，重做时整体恢复 */
+    private class PasteAction implements CanvasAction {
+        private final List<ProcessNode> nodes;
+        private final List<NodeConnection> connections;
+        
+        PasteAction(List<ProcessNode> nodes, List<NodeConnection> connections) {
+            this.nodes = new ArrayList<>(nodes != null ? nodes : Collections.emptyList());
+            this.connections = new ArrayList<>(connections != null ? connections : Collections.emptyList());
+        }
+        
+        @Override
+        public void undo() {
+            for (ProcessNode node : nodes) {
+                removeNode(node, false);
+            }
+            notifyNodeStructureChanged();
+        }
+        
+        @Override
+        public void redo() {
+            for (ProcessNode node : nodes) {
+                addNode(node, false);
+            }
+            for (NodeConnection conn : connections) {
+                connectionManager.addConnectionInternal(conn);
+            }
+            notifyNodeStructureChanged();
+        }
+    }
+    
+    /** 批量删除（剪切/Delete/批量编辑删除），撤销时整体恢复，重做时整体移除 */
+    private class BatchRemoveAction implements CanvasAction {
+        private final List<ProcessNode> nodes;
+        private final double[] xPositions;
+        private final double[] yPositions;
+        private final List<NodeConnection> attachedConnections;
+        
+        BatchRemoveAction(List<ProcessNode> nodes, double[] xPositions, double[] yPositions, List<NodeConnection> attachedConnections) {
+            this.nodes = new ArrayList<>(nodes != null ? nodes : Collections.emptyList());
+            this.xPositions = xPositions != null ? xPositions.clone() : new double[0];
+            this.yPositions = yPositions != null ? yPositions.clone() : new double[0];
+            this.attachedConnections = new ArrayList<>(attachedConnections != null ? attachedConnections : Collections.emptyList());
+        }
+        
+        @Override
+        public void undo() {
+            for (int i = 0; i < nodes.size(); i++) {
+                ProcessNode node = nodes.get(i);
+                addNode(node, false);
+                if (i < xPositions.length && i < yPositions.length) {
+                    node.setLayoutX(xPositions[i]);
+                    node.setLayoutY(yPositions[i]);
+                }
+            }
+            for (NodeConnection conn : attachedConnections) {
+                connectionManager.addConnectionInternal(conn);
+            }
+            notifyNodeStructureChanged();
+        }
+        
+        @Override
+        public void redo() {
+            for (ProcessNode node : nodes) {
+                removeNode(node, false);
+            }
+            notifyNodeStructureChanged();
+        }
+    }
+    
+    /** 布局/批量位置变更：保存变更前后位置，撤销恢复旧位置，重做恢复新位置 */
+    private class LayoutAction implements CanvasAction {
+        private final Map<ProcessNode, double[]> oldPositions;
+        private final Map<ProcessNode, double[]> newPositions;
+        
+        LayoutAction(Map<ProcessNode, double[]> oldPositions, Map<ProcessNode, double[]> newPositions) {
+            this.oldPositions = new HashMap<>(oldPositions != null ? oldPositions : Collections.emptyMap());
+            this.newPositions = new HashMap<>(newPositions != null ? newPositions : Collections.emptyMap());
+        }
+        
+        @Override
+        public void undo() {
+            for (Map.Entry<ProcessNode, double[]> e : oldPositions.entrySet()) {
+                ProcessNode node = e.getKey();
+                double[] xy = e.getValue();
+                if (node != null && xy != null && xy.length >= 2) {
+                    node.setLayoutX(xy[0]);
+                    node.setLayoutY(xy[1]);
+                }
+            }
+            notifyNodeStructureChanged();
+        }
+        
+        @Override
+        public void redo() {
+            for (Map.Entry<ProcessNode, double[]> e : newPositions.entrySet()) {
+                ProcessNode node = e.getKey();
+                double[] xy = e.getValue();
+                if (node != null && xy != null && xy.length >= 2) {
+                    node.setLayoutX(xy[0]);
+                    node.setLayoutY(xy[1]);
+                }
+            }
+            notifyNodeStructureChanged();
+        }
+    }
+    
+    /** 等距分布/对齐到中心等批量移动，与 LayoutAction 相同结构 */
+    private class BatchMoveAction implements CanvasAction {
+        private final Map<ProcessNode, double[]> oldPositions;
+        private final Map<ProcessNode, double[]> newPositions;
+        
+        BatchMoveAction(Map<ProcessNode, double[]> oldPositions, Map<ProcessNode, double[]> newPositions) {
+            this.oldPositions = new HashMap<>(oldPositions != null ? oldPositions : Collections.emptyMap());
+            this.newPositions = new HashMap<>(newPositions != null ? newPositions : Collections.emptyMap());
+        }
+        
+        @Override
+        public void undo() {
+            for (Map.Entry<ProcessNode, double[]> e : oldPositions.entrySet()) {
+                ProcessNode node = e.getKey();
+                double[] xy = e.getValue();
+                if (node != null && xy != null && xy.length >= 2) {
+                    node.setLayoutX(xy[0]);
+                    node.setLayoutY(xy[1]);
+                }
+            }
+            notifyNodeStructureChanged();
+        }
+        
+        @Override
+        public void redo() {
+            for (Map.Entry<ProcessNode, double[]> e : newPositions.entrySet()) {
+                ProcessNode node = e.getKey();
+                double[] xy = e.getValue();
+                if (node != null && xy != null && xy.length >= 2) {
+                    node.setLayoutX(xy[0]);
+                    node.setLayoutY(xy[1]);
+                }
+            }
+            notifyNodeStructureChanged();
+        }
+    }
+    
     // ==================== 智能对齐相关方法 ====================
     
     /**
@@ -4014,7 +4213,7 @@ public class NodeCanvas extends Pane {
     }
     
     /**
-     * 等距分布（水平）
+     * 等距分布（水平），作为一步撤销入栈
      */
     public void distributeNodesHorizontally() {
         Set<ProcessNode> selectedNodes = selectionManager.getSelectedNodes();
@@ -4023,6 +4222,7 @@ public class NodeCanvas extends Pane {
             return;
         }
         
+        Map<ProcessNode, double[]> oldPositions = snapshotNodePositions(selectedNodes);
         List<ProcessNode> sortedNodes = new ArrayList<>(selectedNodes);
         sortedNodes.sort((a, b) -> Double.compare(a.getLayoutX(), b.getLayoutX()));
         
@@ -4034,12 +4234,14 @@ public class NodeCanvas extends Pane {
             sortedNodes.get(i).setLayoutX(minX + i * spacing);
         }
         
+        Map<ProcessNode, double[]> newPositions = snapshotNodePositions(selectedNodes);
+        pushAction(new BatchMoveAction(oldPositions, newPositions));
         markAsUnsaved();
         log("✓ 水平等距分布完成: " + sortedNodes.size() + " 个节点");
     }
     
     /**
-     * 等距分布（垂直）
+     * 等距分布（垂直），作为一步撤销入栈
      */
     public void distributeNodesVertically() {
         Set<ProcessNode> selectedNodes = selectionManager.getSelectedNodes();
@@ -4048,6 +4250,7 @@ public class NodeCanvas extends Pane {
             return;
         }
         
+        Map<ProcessNode, double[]> oldPositions = snapshotNodePositions(selectedNodes);
         List<ProcessNode> sortedNodes = new ArrayList<>(selectedNodes);
         sortedNodes.sort((a, b) -> Double.compare(a.getLayoutY(), b.getLayoutY()));
         
@@ -4059,12 +4262,14 @@ public class NodeCanvas extends Pane {
             sortedNodes.get(i).setLayoutY(minY + i * spacing);
         }
         
+        Map<ProcessNode, double[]> newPositions = snapshotNodePositions(selectedNodes);
+        pushAction(new BatchMoveAction(oldPositions, newPositions));
         markAsUnsaved();
         log("✓ 垂直等距分布完成: " + sortedNodes.size() + " 个节点");
     }
     
     /**
-     * 对齐到画布中心
+     * 对齐到画布中心，作为一步撤销入栈
      */
     public void alignToCanvasCenter() {
         Set<ProcessNode> selectedNodes = selectionManager.getSelectedNodes();
@@ -4073,6 +4278,7 @@ public class NodeCanvas extends Pane {
             return;
         }
         
+        Map<ProcessNode, double[]> oldPositions = snapshotNodePositions(selectedNodes);
         double canvasCenterX = getPrefWidth() / 2;
         double canvasCenterY = getPrefHeight() / 2;
         
@@ -4096,6 +4302,8 @@ public class NodeCanvas extends Pane {
             node.setLayoutY(Math.max(0, node.getLayoutY() + deltaY));
         }
         
+        Map<ProcessNode, double[]> newPositions = snapshotNodePositions(selectedNodes);
+        pushAction(new BatchMoveAction(oldPositions, newPositions));
         markAsUnsaved();
         log("✓ 已对齐到画布中心: " + selectedNodes.size() + " 个节点");
     }

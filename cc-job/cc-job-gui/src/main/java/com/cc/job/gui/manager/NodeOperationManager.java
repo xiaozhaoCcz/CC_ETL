@@ -252,7 +252,10 @@ public class NodeOperationManager {
                 JobNode newJobNode = jobInfoService.saveJobNode(pasteForm);
                 if (newJobNode != null) {
                     Platform.runLater(() -> {
-                        addNodeToCanvas(newJobNode, pasteForm);
+                        ProcessNode newNode = addNodeToCanvas(newJobNode, pasteForm, false);
+                        if (newNode != null) {
+                            canvas.notifyPasteCompleted(Collections.singletonList(newNode), Collections.emptyList());
+                        }
                         logPanel.success("✓ 节点粘贴成功");
                     });
                 }
@@ -297,7 +300,7 @@ public class NodeOperationManager {
                         Long originalJobId = nodeData.originalJobId;
                         Platform.runLater(() -> {
                             try {
-                                ProcessNode newNode = addNodeToCanvas(newJobNode, pasteForm);
+                                ProcessNode newNode = addNodeToCanvas(newJobNode, pasteForm, false);
                                 if (newNode != null) {
                                     synchronized (newNodes) {
                                         newNodes.add(newNode);
@@ -330,15 +333,21 @@ public class NodeOperationManager {
                     Platform.runLater(() -> logPanel.error("✗ 部分节点创建失败"));
                 }
                 
-                // 恢复连接
+                // 恢复连接（不记录历史，最后统一 notifyPasteCompleted 入栈一步撤销）
                 Platform.runLater(() -> {
+                    List<NodeConnection> newConnections = new ArrayList<>();
                     for (CopiedNodesData.ConnectionInfo connInfo : copiedNodesData.connections) {
                         ProcessNode src = oldJobIdToNewNode.get(connInfo.sourceJobId);
                         ProcessNode tgt = oldJobIdToNewNode.get(connInfo.targetJobId);
                         if (src != null && tgt != null) {
-                            canvas.addConnection(src, tgt);
+                            NodeConnection conn = canvas.addConnection(
+                                src, src.getRightConnector(), tgt, tgt.getLeftConnector(), false);
+                            if (conn != null) {
+                                newConnections.add(conn);
+                            }
                         }
                     }
+                    canvas.notifyPasteCompleted(newNodes, newConnections);
                     canvas.selectNodes(newNodes);
                     logPanel.success("✓ " + newNodes.size() + " 个节点粘贴成功");
                 });
@@ -394,6 +403,10 @@ public class NodeOperationManager {
     }
     
     private ProcessNode addNodeToCanvas(JobNode jobNode, JobInfoForm formData) {
+        return addNodeToCanvas(jobNode, formData, true);
+    }
+    
+    private ProcessNode addNodeToCanvas(JobNode jobNode, JobInfoForm formData, boolean recordHistory) {
         double[] position = calculateNewNodePosition();
         double x = jobNode.getNodePositionX() != null ? jobNode.getNodePositionX() : position[0];
         double y = jobNode.getNodePositionY() != null ? jobNode.getNodePositionY() : position[1];
@@ -401,7 +414,7 @@ public class NodeOperationManager {
         ProcessNode node = new ProcessNode(String.valueOf(jobNode.getId()), formData.getJobDesc(), x, y);
         node.setJobId(jobNode.getJobId());
         node.setType(getNodeTypeIcon(formData.getGlueType()));
-        canvas.addNode(node, true);
+        canvas.addNode(node, recordHistory);
         
         // 配置节点的业务逻辑回调（编辑、复制、查看详情等）
         if (nodeCallbackConfigurator != null && formData.getParentId() != null) {
@@ -575,8 +588,11 @@ public class NodeOperationManager {
                         failCount = nodes.size() - successCount;
                         break;
                     case DELETE:
-                        successCount = batchDeleteNodes(nodes);
-                        failCount = nodes.size() - successCount;
+                        Platform.runLater(() -> {
+                            canvas.removeNodesAsBatch(nodes);
+                        });
+                        successCount = nodes.size();
+                        failCount = 0;
                         break;
                 }
 

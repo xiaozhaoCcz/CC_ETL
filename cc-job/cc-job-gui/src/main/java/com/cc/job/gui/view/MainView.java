@@ -655,13 +655,9 @@ public class MainView extends BorderPane {
             @Override
             public void onCut() {
                 handleCopyShortcut();
-                // 复制后删除选中的节点
                 Set<ProcessNode> selectedNodes = canvas.getSelectedNodes();
                 if (!selectedNodes.isEmpty()) {
-                    for (ProcessNode node : selectedNodes) {
-                        canvas.removeNode(node, true);
-                    }
-                    canvas.markAsUnsaved();
+                    canvas.removeNodesAsBatch(selectedNodes);
                     logger.info("✓ 已剪切节点");
                 }
             }
@@ -684,10 +680,7 @@ public class MainView extends BorderPane {
                     logger.warn("⚠ 请先选中要删除的节点");
                     return;
                 }
-                for (ProcessNode node : selectedNodes) {
-                    canvas.removeNode(node, true);
-                }
-                canvas.markAsUnsaved();
+                canvas.removeNodesAsBatch(selectedNodes);
                 logger.info("✓ 已删除节点");
             }
             
