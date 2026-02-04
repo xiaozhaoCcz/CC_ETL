@@ -118,6 +118,8 @@ public class TopToolBar extends VBox {
         default void onFindNode() {} // 查找节点
         default void onFindNext() {} // 查找下一个
         default void onFindPrevious() {} // 查找上一个
+        default void onAddBookmark() {} // 添加书签
+        default void onBookmarkList() {} // 书签列表
         default void onAutoLayout() {} // 自动布局（默认网格布局）
         default void onAutoLayout(com.cc.job.gui.manager.CanvasLayoutManager.LayoutAlgorithm algorithm) {} // 自动布局（指定算法）
         
@@ -533,7 +535,12 @@ public class TopToolBar extends VBox {
         MenuItem resetLayoutItem = new MenuItem("重置布局");
         resetLayoutItem.setOnAction(e -> safeCall(ToolBarCallback::onResetLayout));
         
-        viewMenu.getItems().addAll(toggleTreeViewItem, toggleMiniMapItem, toggleLogPanelItem, new SeparatorMenuItem(), resetLayoutItem, new SeparatorMenuItem());
+        MenuItem addBookmarkItem = new MenuItem("添加书签");
+        addBookmarkItem.setOnAction(e -> safeCall(ToolBarCallback::onAddBookmark));
+        MenuItem bookmarkListItem = new MenuItem("书签列表");
+        bookmarkListItem.setOnAction(e -> safeCall(ToolBarCallback::onBookmarkList));
+        viewMenu.getItems().addAll(toggleTreeViewItem, toggleMiniMapItem, toggleLogPanelItem, new SeparatorMenuItem(),
+                addBookmarkItem, bookmarkListItem, new SeparatorMenuItem(), resetLayoutItem, new SeparatorMenuItem());
         
         // 视图选项
         MenuItem toggleGridItem = new MenuItem("显示网格");

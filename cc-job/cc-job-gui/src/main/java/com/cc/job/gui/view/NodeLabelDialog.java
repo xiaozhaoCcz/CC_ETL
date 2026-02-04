@@ -217,6 +217,7 @@ public class NodeLabelDialog extends Dialog<List<String>> {
     }
     
     private void styleDialog() {
+        getDialogPane().getStylesheets().add(getClass().getResource("/styles.css").toExternalForm());
         getDialogPane().setStyle(
             "-fx-background-color: #FFFFFF; " +
             "-fx-border-color: #E5E7EB; " +

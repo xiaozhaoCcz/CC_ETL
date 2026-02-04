@@ -1,5 +1,6 @@
 package com.cc.job.gui.manager;
 
+import com.cc.job.gui.model.ProcessNode;
 import com.cc.job.gui.service.*;
 import com.cc.job.gui.util.NotificationToast;
 import com.cc.job.gui.view.*;
@@ -30,6 +31,7 @@ public class DialogManager {
     private final JobInfoService jobInfoService;
     private final JobGroupService jobGroupService;
     private final JobPartService jobPartService;
+    private final NodeTemplateManager nodeTemplateManager;
     
     // 对话框实例缓存，避免重复创建
     private ShowJobListDialog jobListDialog;
@@ -45,6 +47,9 @@ public class DialogManager {
         this.jobInfoService = new JobInfoService();
         this.jobGroupService = new JobGroupService();
         this.jobPartService = new JobPartService();
+        this.nodeTemplateManager = new NodeTemplateManager(msg -> {
+            if (logPanel != null) logPanel.appendText(msg + "\n");
+        });
     }
     
     /**
@@ -287,6 +292,90 @@ public class DialogManager {
         }).start();
     }
     
+    /**
+     * 显示保存为节点模板对话框
+     * @param node 当前节点
+     * @param onSuccess 保存成功回调（可为 null）
+     */
+    public void showSaveAsTemplateDialog(ProcessNode node, Runnable onSuccess) {
+        if (node == null) {
+            NotificationToast.showWarning("⚠ 节点无效");
+            return;
+        }
+        SaveNodeTemplateDialog dialog = new SaveNodeTemplateDialog(ownerStage, node.getJobHandlerName());
+        Optional<SaveNodeTemplateDialog.Result> resultOpt = dialog.showAndWait();
+        resultOpt.ifPresent(result -> {
+            new Thread(() -> {
+                try {
+                    com.cc.job.xo.model.entity.JobNodeTemplate template = nodeTemplateManager.createTemplateFromNode(
+                        node,
+                        result.getTemplateName(),
+                        result.getTemplateCategory(),
+                        result.getDescription(),
+                        result.isPublic() ? 1 : 0
+                    );
+                    if (template != null && nodeTemplateManager.saveTemplate(template)) {
+                        Platform.runLater(() -> {
+                            NotificationToast.showSuccess("✓ 已保存为节点模板: " + result.getTemplateName());
+                            if (onSuccess != null) onSuccess.run();
+                        });
+                    } else {
+                        Platform.runLater(() -> NotificationToast.showError("✗ 保存模板失败"));
+                    }
+                } catch (Exception e) {
+                    Platform.runLater(() -> NotificationToast.showError("✗ 保存模板失败: " + e.getMessage()));
+                    logger.error("保存为节点模板失败", e);
+                }
+            }).start();
+        });
+    }
+
+    /**
+     * 获取节点模板管理器（供从模板创建节点等使用）
+     */
+    public NodeTemplateManager getNodeTemplateManager() {
+        return nodeTemplateManager;
+    }
+
+    /**
+     * 显示从模板创建节点对话框
+     * @param taskGroupId 当前任务组 ID
+     * @param taskGroupName 任务组名称（用于日志）
+     * @param positionX 节点放置 X 坐标
+     * @param positionY 节点放置 Y 坐标
+     * @param onSuccess 创建成功回调（可为 null，通常用于刷新画布）
+     */
+    public void showCreateNodeFromTemplateDialog(Long taskGroupId, String taskGroupName,
+                                                  double positionX, double positionY, Runnable onSuccess) {
+        Optional<com.cc.job.xo.model.entity.JobNodeTemplate> templateOpt =
+            CreateNodeFromTemplateDialog.showAndSelect(ownerStage, nodeTemplateManager);
+        templateOpt.ifPresent(template -> {
+            new Thread(() -> {
+                try {
+                    com.cc.job.xo.model.form.JobInfoForm formData = nodeTemplateManager.createNodeFromTemplate(
+                        template, positionX, positionY);
+                    if (formData == null) {
+                        Platform.runLater(() -> NotificationToast.showError("✗ 从模板创建节点失败"));
+                        return;
+                    }
+                    formData.setParentId(taskGroupId);
+                    com.cc.job.xo.model.entity.JobNode jobNode = jobInfoService.saveJobNode(formData);
+                    if (jobNode != null) {
+                        Platform.runLater(() -> {
+                            NotificationToast.showSuccess("✓ 已从模板创建节点: " + template.getTemplateName());
+                            if (onSuccess != null) onSuccess.run();
+                        });
+                    } else {
+                        Platform.runLater(() -> NotificationToast.showError("✗ 保存节点失败"));
+                    }
+                } catch (Exception e) {
+                    Platform.runLater(() -> NotificationToast.showError("✗ 创建失败: " + e.getMessage()));
+                    logger.error("从模板创建节点失败", e);
+                }
+            }).start();
+        });
+    }
+
     /**
      * 显示任务列表对话框
      */

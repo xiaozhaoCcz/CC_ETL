@@ -41,6 +41,7 @@ public class SettingsDialog extends Dialog<Void> {
         // 创建内容
         VBox content = createContent();
         getDialogPane().setContent(content);
+        getDialogPane().getStylesheets().add(getClass().getResource("/styles.css").toExternalForm());
         
         // 添加按钮
         ButtonType saveButtonType = new ButtonType("保存", ButtonBar.ButtonData.OK_DONE);

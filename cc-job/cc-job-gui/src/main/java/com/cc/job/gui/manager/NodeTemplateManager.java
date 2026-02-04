@@ -2,6 +2,7 @@ package com.cc.job.gui.manager;
 
 import com.cc.job.gui.model.ProcessNode;
 import com.cc.job.gui.service.JobInfoService;
+import com.cc.job.gui.service.JobNodeTemplateApiService;
 import com.cc.job.xo.model.entity.JobNodeTemplate;
 import com.cc.job.xo.model.form.JobInfoForm;
 import com.google.gson.Gson;
@@ -9,6 +10,7 @@ import com.google.gson.reflect.TypeToken;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.*;
 import java.util.function.Consumer;
@@ -25,51 +27,47 @@ public class NodeTemplateManager {
     
     private final Consumer<String> loggerCallback;
     private final JobInfoService jobInfoService;
-    
-    // 内存中的模板缓存
-    private Map<Long, JobNodeTemplate> templateCache = new HashMap<>();
+    private final JobNodeTemplateApiService templateApiService;
     
     public NodeTemplateManager(Consumer<String> loggerCallback) {
         this.loggerCallback = loggerCallback;
         this.jobInfoService = new JobInfoService();
+        this.templateApiService = new JobNodeTemplateApiService();
     }
     
     /**
-     * 从节点创建模板
+     * 从节点创建模板对象（不落库）
      *
      * @param node 源节点
      * @param templateName 模板名称
      * @param templateCategory 模板分类
      * @param description 模板描述
-     * @return 创建的模板
+     * @param isPublic 是否公开：0-私有，1-公开
+     * @return 创建的模板对象
      */
     public JobNodeTemplate createTemplateFromNode(ProcessNode node, String templateName,
-                                                  String templateCategory, String description) {
+                                                  String templateCategory, String description, Integer isPublic) {
         if (node == null || node.getJobId() == null) {
             log("⚠ 节点无效，无法创建模板");
             return null;
         }
         
         try {
-            // 获取节点的完整配置
             JobInfoForm formData = jobInfoService.getJobNodeFormData(node.getJobId());
             if (formData == null) {
                 log("✗ 获取节点配置失败");
                 return null;
             }
             
-            // 创建模板对象
             JobNodeTemplate template = new JobNodeTemplate();
             template.setTemplateName(templateName);
             template.setTemplateType(node.getType());
             template.setTemplateCategory(templateCategory);
             template.setDescription(description);
-            template.setIsPublic(0); // 默认私有
+            template.setIsPublic(isPublic != null ? isPublic : 0);
             
-            // 将节点配置序列化为JSON
             Gson gson = new Gson();
-            String configJson = gson.toJson(formData);
-            template.setTemplateConfig(configJson);
+            template.setTemplateConfig(gson.toJson(formData));
             
             log("✓ 模板已创建: " + templateName);
             return template;
@@ -118,32 +116,28 @@ public class NodeTemplateManager {
     }
     
     /**
-     * 获取模板列表（按分类）
+     * 获取模板列表（按分类，从 API 获取）
      *
      * @param category 分类（null表示所有分类）
      * @return 模板列表
      */
     public List<JobNodeTemplate> getTemplates(String category) {
-        // TODO: 从数据库或API获取模板列表
-        // 这里返回内存中的模板
-        List<JobNodeTemplate> templates = new ArrayList<>(templateCache.values());
-        
-        if (category != null && !category.trim().isEmpty()) {
-            templates.removeIf(t -> !category.equals(t.getTemplateCategory()));
+        try {
+            return templateApiService.list(category);
+        } catch (IOException e) {
+            log("✗ 获取模板列表失败: " + e.getMessage());
+            logger.error("获取模板列表失败", e);
+            return Collections.emptyList();
         }
-        
-        return templates;
     }
     
     /**
-     * 获取所有模板分类
-     *
-     * @return 分类列表
+     * 获取所有模板分类（从当前模板列表中提取）
      */
     public List<String> getTemplateCategories() {
         Set<String> categories = new HashSet<>();
-        for (JobNodeTemplate template : templateCache.values()) {
-            if (template.getTemplateCategory() != null) {
+        for (JobNodeTemplate template : getTemplates(null)) {
+            if (template.getTemplateCategory() != null && !template.getTemplateCategory().trim().isEmpty()) {
                 categories.add(template.getTemplateCategory());
             }
         }
@@ -151,20 +145,25 @@ public class NodeTemplateManager {
     }
     
     /**
-     * 保存模板到内存缓存（实际应该保存到数据库）
+     * 保存模板到后端
+     *
+     * @return 是否成功，成功时 template.getId() 会被设置
      */
-    public void saveTemplate(JobNodeTemplate template) {
+    public boolean saveTemplate(JobNodeTemplate template) {
         if (template == null) {
-            return;
+            return false;
         }
-        
-        // TODO: 保存到数据库
-        // 这里先保存到内存缓存
-        if (template.getId() == null) {
-            template.setId(System.currentTimeMillis()); // 临时ID
+        try {
+            Long id = templateApiService.save(template);
+            if (id != null) {
+                log("✓ 模板已保存: " + template.getTemplateName());
+                return true;
+            }
+        } catch (IOException e) {
+            log("✗ 保存模板失败: " + e.getMessage());
+            logger.error("保存模板失败", e);
         }
-        templateCache.put(template.getId(), template);
-        log("✓ 模板已保存: " + template.getTemplateName());
+        return false;
     }
     
     /**
@@ -174,13 +173,15 @@ public class NodeTemplateManager {
         if (templateId == null) {
             return false;
         }
-        
-        // TODO: 从数据库删除
-        // 这里先从内存缓存删除
-        JobNodeTemplate removed = templateCache.remove(templateId);
-        if (removed != null) {
-            log("✓ 模板已删除: " + removed.getTemplateName());
-            return true;
+        try {
+            boolean ok = templateApiService.delete(templateId);
+            if (ok) {
+                log("✓ 模板已删除");
+                return true;
+            }
+        } catch (IOException e) {
+            log("✗ 删除模板失败: " + e.getMessage());
+            logger.error("删除模板失败", e);
         }
         return false;
     }

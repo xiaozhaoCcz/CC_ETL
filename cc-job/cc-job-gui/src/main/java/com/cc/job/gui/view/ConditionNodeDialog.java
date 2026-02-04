@@ -412,6 +412,7 @@ public class ConditionNodeDialog extends Dialog<ConditionNodeDialog.ConditionDat
     }
     
     private void styleDialog() {
+        getDialogPane().getStylesheets().add(getClass().getResource("/styles.css").toExternalForm());
         getDialogPane().setStyle("-fx-background-color: #F9FAFB;");
     }
 }

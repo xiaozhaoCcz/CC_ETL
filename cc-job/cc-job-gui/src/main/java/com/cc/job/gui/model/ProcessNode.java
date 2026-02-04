@@ -89,6 +89,9 @@ public class ProcessNode extends StackPane {
     
     // 样式设置回调
     private Runnable onChangeStyle; // 样式设置回调
+
+    // 保存为节点模板回调
+    private Runnable onSaveAsTemplate;
     
     public interface DisableNodeCallback {
         void onDisableNode(Long jobId, boolean isDisabled);
@@ -676,6 +679,14 @@ public class ProcessNode extends StackPane {
                 onEditRemark.run();
             }
         });
+
+        // 保存为节点模板
+        MenuItem saveAsTemplateItem = new MenuItem("保存为节点模板");
+        saveAsTemplateItem.setOnAction(e -> {
+            if (onSaveAsTemplate != null) {
+                onSaveAsTemplate.run();
+            }
+        });
         
         // 分隔符
         SeparatorMenuItem separator1 = new SeparatorMenuItem();
@@ -755,6 +766,7 @@ public class ProcessNode extends StackPane {
             dependenciesItem,
             editTagsItem,
             editRemarkItem,
+            saveAsTemplateItem,
             separator1,
             styleItem,
             //toggleItem,
@@ -931,6 +943,10 @@ public class ProcessNode extends StackPane {
     
     public void setOnRemoveFromContainer(Runnable onRemoveFromContainer) {
         this.onRemoveFromContainer = onRemoveFromContainer;
+    }
+
+    public void setOnSaveAsTemplate(Runnable onSaveAsTemplate) {
+        this.onSaveAsTemplate = onSaveAsTemplate;
     }
     
     public void setIsInContainerChecker(java.util.function.Supplier<Boolean> isInContainerChecker) {

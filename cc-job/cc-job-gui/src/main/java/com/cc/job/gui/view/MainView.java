@@ -7,6 +7,7 @@ import com.cc.job.gui.service.*;
 import com.cc.job.gui.util.*;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.form.JobInfoForm;
+import com.cc.job.xo.model.vo.JobPartVo;
 import javafx.application.Platform;
 import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
@@ -901,6 +902,89 @@ public class MainView extends BorderPane {
                 updateLeftSidebar();
                 logger.info("✓ 已重置布局");
             }
+
+            @Override
+            public void onAddBookmark() {
+                Long taskGroupId = pageStoreHelper.getCurrentTaskGroupId();
+                if (taskGroupId == null || taskGroupId == 0) {
+                    NotificationToast.showWarning("请先选择任务组");
+                    return;
+                }
+                double hvalue = scrollPane != null ? scrollPane.getHvalue() : 0.5;
+                double vvalue = scrollPane != null ? scrollPane.getVvalue() : 0.5;
+                Long selectedNodeJobIdFinal = null;
+                Set<ProcessNode> selected = canvas.getSelectedNodes();
+                if (selected != null && selected.size() == 1) {
+                    ProcessNode node = selected.iterator().next();
+                    if (node != null && node.getJobId() != null) {
+                        selectedNodeJobIdFinal = node.getJobId();
+                    }
+                }
+                final Long selectedNodeJobId = selectedNodeJobIdFinal;
+                Stage stage = (Stage) MainView.this.getScene().getWindow();
+                AddBookmarkDialog dialog = new AddBookmarkDialog(stage, selectedNodeJobId != null);
+                dialog.showAndWait().ifPresent(result -> {
+                    com.cc.job.xo.model.entity.JobCanvasBookmark bookmark = new com.cc.job.xo.model.entity.JobCanvasBookmark();
+                    bookmark.setTaskGroupId(taskGroupId);
+                    bookmark.setBookmarkName(result.getBookmarkName());
+                    bookmark.setDescription(result.getDescription());
+                    bookmark.setBookmarkType(result.getBookmarkType());
+                    bookmark.setZoomLevel(1.0);
+                    if ("position".equals(result.getBookmarkType())) {
+                        bookmark.setCanvasPositionX(hvalue);
+                        bookmark.setCanvasPositionY(vvalue);
+                    } else {
+                        bookmark.setTargetNodeId(selectedNodeJobId);
+                    }
+                    new Thread(() -> {
+                        try {
+                            com.cc.job.gui.service.JobCanvasBookmarkApiService api = new com.cc.job.gui.service.JobCanvasBookmarkApiService();
+                            Long id = api.save(bookmark);
+                            Platform.runLater(() -> {
+                                if (id != null) {
+                                    NotificationToast.showSuccess("✓ 已添加书签: " + result.getBookmarkName());
+                                } else {
+                                    NotificationToast.showError("✗ 添加书签失败");
+                                }
+                            });
+                        } catch (Exception e) {
+                            Platform.runLater(() -> NotificationToast.showError("✗ 添加书签失败: " + e.getMessage()));
+                            logger.error("添加书签失败", e);
+                        }
+                    }).start();
+                });
+            }
+
+            @Override
+            public void onBookmarkList() {
+                Long taskGroupId = pageStoreHelper.getCurrentTaskGroupId();
+                if (taskGroupId == null || taskGroupId == 0) {
+                    NotificationToast.showWarning("请先选择任务组");
+                    return;
+                }
+                Stage stage = (Stage) MainView.this.getScene().getWindow();
+                BookmarkListDialog listDialog = new BookmarkListDialog(
+                    stage,
+                    taskGroupId,
+                    pos -> {
+                        if (scrollPane != null && pos != null && pos.length >= 2) {
+                            scrollPane.setHvalue(pos[0]);
+                            scrollPane.setVvalue(pos[1]);
+                        }
+                    },
+                    nodeJobId -> {
+                        if (nodeJobId != null) {
+                            ProcessNode node = canvas.getNodeByJobId(nodeJobId);
+                            if (node != null) {
+                                canvas.locateNode(node);
+                            } else {
+                                NotificationToast.showWarning("未找到对应节点");
+                            }
+                        }
+                    }
+                );
+                listDialog.showAndWait();
+            }
             
             @Override
             public void onToggleGrid() {
@@ -1311,6 +1395,22 @@ public class MainView extends BorderPane {
                 restoreCanvasSize(taskGroupId);
                 dataManager.loadTaskGroupData(taskGroupId, taskGroupName);
             });
+        });
+
+        canvas.setOnRequestCreateFromTemplate(() -> {
+            Long taskGroupId = pageStoreHelper.getCurrentTaskGroupId();
+            if (taskGroupId == null || taskGroupId == 0) {
+                NotificationToast.showWarning("请先选择任务组");
+                return;
+            }
+            String taskGroupName = getJobNameById(taskGroupId);
+            double[] pos = calculateNewNodePosition();
+            dialogManager.showCreateNodeFromTemplateDialog(
+                taskGroupId, taskGroupName, pos[0], pos[1],
+                () -> {
+                    restoreCanvasSize(taskGroupId);
+                    dataManager.loadTaskGroupData(taskGroupId, taskGroupName);
+                });
         });
         
         canvas.setOnRequestRunTaskGroup(() -> {
@@ -2292,6 +2392,9 @@ public class MainView extends BorderPane {
         content.setPadding(new Insets(16));
         content.getChildren().addAll(new Label("分区"), partCombo);
         dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().getStylesheets().add(MainView.class.getResource("/styles.css").toExternalForm());
+        dialog.getDialogPane().setStyle(
+            "-fx-background-color: #F9FAFB; -fx-background-radius: 8; -fx-padding: 16;");
 
         try {
             List<com.cc.job.xo.model.vo.JobPartVo> tree = new JobPartService().getTree();
@@ -2374,6 +2477,13 @@ public class MainView extends BorderPane {
         double y = 200 + row * 240;
         
         return new double[]{x, y};
+    }
+
+    /**
+     * 计算新节点放置位置（用于从模板创建节点等）
+     */
+    private double[] calculateNewNodePosition() {
+        return new double[]{200, 200};
     }
     
     /**
@@ -2712,41 +2822,56 @@ public class MainView extends BorderPane {
     
     /**
      * 显示转到任务组对话框
+     * 使用分区树（JobPartService.getTree）中的任务组（type=1）填充下拉，不再使用执行器列表。
      */
     private void showGoToTaskGroupDialog() {
-        // 显示任务组选择对话框
-        ChoiceDialog<String> dialog = new ChoiceDialog<>();
-        dialog.setTitle("转到任务组");
-        dialog.setHeaderText(null);
-        dialog.setContentText("请选择任务组:");
-        
-        // 获取所有任务组
-        try {
-            List<JobGroup> jobGroups = jobGroupService.getAllJobGroupList();
-            List<String> taskGroupNames = new ArrayList<>();
-            for (JobGroup group : jobGroups) {
-                taskGroupNames.add(group.getTitle() != null ? group.getTitle() : "任务组 " + group.getId());
-            }
-            dialog.getItems().addAll(taskGroupNames);
-            
-            Optional<String> result = dialog.showAndWait();
-            result.ifPresent(taskGroupName -> {
-                // 查找任务组ID
-                for (JobGroup group : jobGroups) {
-                    String groupName = group.getTitle() != null ? group.getTitle() : "任务组 " + group.getId();
-                    if (groupName.equals(taskGroupName)) {
-                        // 直接调用切换任务组的逻辑
-                        switchToTaskGroup(group.getId(), groupName);
-                        break;
+        new Thread(() -> {
+            try {
+                List<JobPartVo> tree = new JobPartService().getTree();
+                List<JobPartVo> taskGroups = new ArrayList<>();
+                if (tree != null) {
+                    for (JobPartVo part : tree) {
+                        if (part.getType() != null && part.getType() == 0 && part.getChildren() != null) {
+                            for (JobPartVo child : part.getChildren()) {
+                                if (child.getType() != null && child.getType() == 1) {
+                                    taskGroups.add(child);
+                                }
+                            }
+                        }
                     }
                 }
-            });
-        } catch (Exception e) {
-            Platform.runLater(() -> {
-                NotificationToast.showError("✗ 加载任务组列表失败: " + e.getMessage());
-            });
-            logger.error("✗ 加载任务组列表失败: {}", e.getMessage());
-        }
+                List<JobPartVo> finalList = taskGroups;
+                Platform.runLater(() -> {
+                    ChoiceDialog<String> dialog = new ChoiceDialog<>();
+                    dialog.setTitle("转到任务组");
+                    dialog.setHeaderText(null);
+                    dialog.setContentText("请选择任务组:");
+                    List<String> names = new ArrayList<>();
+                    for (JobPartVo g : finalList) {
+                        names.add(g.getLabel() != null ? g.getLabel() : "任务组 " + g.getId());
+                    }
+                    dialog.getItems().addAll(names);
+                    dialog.getDialogPane().getStylesheets().add(MainView.class.getResource("/styles.css").toExternalForm());
+                    dialog.getDialogPane().setStyle(
+                        "-fx-background-color: #F9FAFB; -fx-background-radius: 8; -fx-padding: 16;");
+                    Optional<String> result = dialog.showAndWait();
+                    result.ifPresent(taskGroupName -> {
+                        for (JobPartVo g : finalList) {
+                            String name = g.getLabel() != null ? g.getLabel() : "任务组 " + g.getId();
+                            if (name.equals(taskGroupName)) {
+                                switchToTaskGroup(g.getId(), name);
+                                break;
+                            }
+                        }
+                    });
+                });
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    NotificationToast.showError("✗ 加载任务组列表失败: " + e.getMessage());
+                });
+                logger.error("✗ 加载任务组列表失败: {}", e.getMessage());
+            }
+        }).start();
     }
     
     /**

@@ -230,6 +230,9 @@ public class SelectTaskGroupDialog extends Dialog<SelectTaskGroupDialog.Selectio
     }
     
     private void styleDialog() {
+        getDialogPane().getStylesheets().add(getClass().getResource("/styles.css").toExternalForm());
+        getDialogPane().setStyle(
+            "-fx-background-color: #F9FAFB; -fx-background-radius: 8; -fx-padding: 16;");
         getDialogPane().setPrefWidth(560);
         getDialogPane().setPrefHeight(220);
         getDialogPane().setMinWidth(520);

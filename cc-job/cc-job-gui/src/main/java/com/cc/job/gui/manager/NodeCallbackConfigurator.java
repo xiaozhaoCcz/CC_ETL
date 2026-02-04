@@ -265,6 +265,25 @@ public class NodeCallbackConfigurator {
                 });
             });
         });
+
+        // 保存为节点模板回调
+        node.setOnSaveAsTemplate(() -> {
+            Long jobId = node.getJobId();
+            if (jobId == null) {
+                Platform.runLater(() -> {
+                    NotificationToast.showWarning("⚠ 该节点未绑定后端任务，无法保存为模板");
+                });
+                logger.warn("⚠ 该节点未绑定后端任务，无法保存为模板");
+                return;
+            }
+            if (dialogManager != null) {
+                Platform.runLater(() -> dialogManager.showSaveAsTemplateDialog(node, null));
+            } else {
+                Platform.runLater(() -> {
+                    NotificationToast.showWarning("⚠ 对话框管理器未设置，无法保存为模板");
+                });
+            }
+        });
     }
     
     /**
