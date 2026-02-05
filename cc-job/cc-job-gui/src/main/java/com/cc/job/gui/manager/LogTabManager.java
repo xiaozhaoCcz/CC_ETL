@@ -1,6 +1,5 @@
 package com.cc.job.gui.manager;
 
-import com.cc.job.gui.util.StyleUtil;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
@@ -130,7 +129,7 @@ public class LogTabManager {
     }
     
     /**
-     * 日志标签页UI组件
+     * 日志标签页UI组件（样式由 .log-tab / .log-tab-active 等 CSS 控制，支持深色模式）
      */
     public static class LogTab extends StackPane {
         private final Long taskGroupId;
@@ -140,47 +139,32 @@ public class LogTabManager {
         private Runnable onCloseCallback;
         private final Label nameLabel;
         
-        private static final String BASE_STYLE = "-fx-background-radius: 0; -fx-border-radius: 0; -fx-cursor: hand; -fx-effect: null;";
-        private static final String NORMAL_STYLE = BASE_STYLE + "-fx-background-color: #F9FAFB; -fx-border-color: transparent transparent transparent #E5E7EB; -fx-border-width: 0 0 0 1;";
-        private static final String HOVER_STYLE = BASE_STYLE + "-fx-background-color: #F3F4F6; -fx-border-color: transparent transparent transparent #E5E7EB; -fx-border-width: 0 0 0 1;";
-        private static final String ACTIVE_STYLE = BASE_STYLE + "-fx-background-color: #F3F4F6; -fx-border-width: 0;";
-        
         public LogTab(Long taskGroupId, String taskGroupName) {
             this.taskGroupId = taskGroupId;
             this.taskGroupName = taskGroupName;
             
+            getStyleClass().add("log-tab");
             setPadding(new Insets(6, 8, 6, 8));
             setPrefHeight(38);
             setMinHeight(38);
             setMaxHeight(38);
-            setStyle(NORMAL_STYLE);
             
             HBox content = new HBox(6);
             content.setAlignment(Pos.CENTER_LEFT);
             
             nameLabel = new Label(taskGroupName);
-            nameLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: " + StyleUtil.GRAY_600 + "; -fx-font-weight: 600;");
+            nameLabel.getStyleClass().add("log-tab-name");
             nameLabel.setPrefWidth(100);
             nameLabel.setMaxWidth(100);
             nameLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
             Tooltip.install(nameLabel, new Tooltip(taskGroupName));
             
             Label closeIcon = new Label("×");
-            closeIcon.setStyle("-fx-text-fill: " + StyleUtil.GRAY_400 + "; -fx-font-size: 13px; -fx-cursor: hand;");
+            closeIcon.getStyleClass().add("log-tab-close-icon");
             
             StackPane closeBtn = new StackPane(closeIcon);
+            closeBtn.getStyleClass().add("log-tab-close");
             closeBtn.setPrefSize(20, 20);
-            closeBtn.setStyle("-fx-background-color: transparent; -fx-background-radius: 10; -fx-cursor: hand;");
-            
-            closeBtn.setOnMouseEntered(e -> {
-                closeBtn.setStyle("-fx-background-color: rgba(239, 68, 68, 0.12); -fx-background-radius: 10; -fx-cursor: hand;");
-                closeIcon.setStyle("-fx-text-fill: " + StyleUtil.ERROR + "; -fx-font-size: 13px;");
-            });
-            
-            closeBtn.setOnMouseExited(e -> {
-                closeBtn.setStyle("-fx-background-color: transparent; -fx-background-radius: 10; -fx-cursor: hand;");
-                closeIcon.setStyle("-fx-text-fill: " + StyleUtil.GRAY_400 + "; -fx-font-size: 13px;");
-            });
             
             closeBtn.setOnMouseClicked(e -> {
                 if (onCloseCallback != null) {
@@ -196,10 +180,7 @@ public class LogTabManager {
                 if (onClickCallback != null) onClickCallback.run();
             });
             
-            setOnMouseEntered(e -> {
-                if (!active) setStyle(HOVER_STYLE);
-            });
-            
+            setOnMouseEntered(e -> { /* hover 由 CSS .log-tab:hover 处理 */ });
             setOnMouseExited(e -> updateStyle());
         }
         
@@ -210,11 +191,11 @@ public class LogTabManager {
         
         private void updateStyle() {
             if (active) {
-                setStyle(ACTIVE_STYLE);
-                nameLabel.setStyle("-fx-font-size: 12.5px; -fx-text-fill: " + StyleUtil.PRIMARY_DARK + "; -fx-font-weight: 700;");
+                if (!getStyleClass().contains("log-tab-active")) {
+                    getStyleClass().add("log-tab-active");
+                }
             } else {
-                setStyle(NORMAL_STYLE);
-                nameLabel.setStyle("-fx-font-size: 12.5px; -fx-text-fill: " + StyleUtil.GRAY_600 + "; -fx-font-weight: 600;");
+                getStyleClass().remove("log-tab-active");
             }
         }
         

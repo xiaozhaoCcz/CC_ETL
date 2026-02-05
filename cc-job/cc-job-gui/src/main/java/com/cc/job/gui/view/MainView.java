@@ -98,7 +98,7 @@ public class MainView extends BorderPane {
     }
 
     private void initializeUI() {
-        this.setStyle("-fx-background-color: #FFFFFF;");
+        // 背景色由当前主题 CSS (.root) 控制
 
         // 顶部工具栏
         toolBar = new TopToolBar();
@@ -783,7 +783,10 @@ public class MainView extends BorderPane {
                             confirm.setHeaderText("确定要删除选中的 " + selectedNodes.size() + " 个节点吗？");
                             confirm.setContentText("此操作不可撤销！");
                             confirm.initOwner(ownerStage);
-                            
+                            String themeCss = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+                            if (themeCss != null && !themeCss.isEmpty()) {
+                                confirm.getDialogPane().getStylesheets().add(themeCss);
+                            }
                             confirm.showAndWait().ifPresent(buttonType -> {
                                 if (buttonType == ButtonType.OK) {
                                     nodeOperationManager.batchEditNodes(selectedNodes, result);
@@ -1012,8 +1015,17 @@ public class MainView extends BorderPane {
             
             @Override
             public void onSetTheme(String theme) {
-                // TODO: 实现主题切换
-                logger.info("主题切换功能开发中: " + theme);
+                ThemeManager.getInstance().setTheme(theme);
+                Scene scene = MainView.this.getScene();
+                if (scene != null) {
+                    scene.getStylesheets().clear();
+                    String url = ThemeManager.getInstance().getStylesheetUrl();
+                    if (url != null && !url.isEmpty()) {
+                        scene.getStylesheets().add(url);
+                    }
+                }
+                if (miniMap != null) miniMap.refresh();
+                logger.info("已切换主题: " + theme);
             }
             
             @Override
@@ -2038,12 +2050,13 @@ public class MainView extends BorderPane {
         
         // 设置窗口内容
         VBox container = new VBox();
-        container.setStyle("-fx-background-color: #F9FAFB;");
+        container.getStyleClass().add("detached-panel-root");
         container.getChildren().add(panel);
         VBox.setVgrow(panel, Priority.ALWAYS);
         
         // 设置窗口大小
         Scene scene = new Scene(container, 400, 500);
+        scene.getStylesheets().add(com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl());
         detachedStage.setScene(scene);
         
         // 窗口关闭时的处理
@@ -2111,7 +2124,7 @@ public class MainView extends BorderPane {
         
         // 创建容器（不需要 padding，因为子节点已经有自己的样式）
         VBox container = new VBox();
-        container.setStyle("-fx-background-color: #FFFFFF;");
+        container.getStyleClass().add("detached-panel-root");
         
         // 将日志面板的所有子节点移动到弹出窗口
         logPanel.detachContent(container);
@@ -2120,9 +2133,9 @@ public class MainView extends BorderPane {
         logPanelVisible = false;
         updateLeftSidebar();
         
-        // 设置窗口大小
-        Scene scene = new Scene(container, 800, 500);
-        detachedStage.setScene(scene);
+        Scene logScene = new Scene(container, 900, 500);
+        logScene.getStylesheets().add(com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl());
+        detachedStage.setScene(logScene);
         
         // 窗口关闭时的处理
         detachedStage.setOnHidden(event -> {
@@ -2392,10 +2405,10 @@ public class MainView extends BorderPane {
         content.setPadding(new Insets(16));
         content.getChildren().addAll(new Label("分区"), partCombo);
         dialog.getDialogPane().setContent(content);
-        dialog.getDialogPane().getStylesheets().add(MainView.class.getResource("/styles.css").toExternalForm());
-        dialog.getDialogPane().setStyle(
-            "-fx-background-color: #F9FAFB; -fx-background-radius: 8; -fx-padding: 16;");
-
+        String themeCss = ThemeManager.getInstance().getStylesheetUrl();
+        if (themeCss != null && !themeCss.isEmpty()) {
+            dialog.getDialogPane().getStylesheets().add(themeCss);
+        }
         try {
             List<com.cc.job.xo.model.vo.JobPartVo> tree = new JobPartService().getTree();
             partCombo.getItems().setAll(tree != null ? tree : Collections.emptyList());
@@ -2517,8 +2530,10 @@ public class MainView extends BorderPane {
         dialog.setTitle("节点执行历史 - " + taskGroupName);
         
         NodeHistoryView historyView = new NodeHistoryView(taskGroupId, taskGroupName);
+        historyView.getStyleClass().add("popup-window-root");
         
         Scene scene = new Scene(historyView, 1000, 600);
+        scene.getStylesheets().add(com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl());
         dialog.setScene(scene);
         dialog.show();
         
@@ -2761,10 +2776,10 @@ public class MainView extends BorderPane {
         dialog.setHeaderText(null);
         dialog.setContentText("请输入节点名称:");
         dialog.setGraphic(null);
-        dialog.getDialogPane().getStylesheets().add(MainView.class.getResource("/styles.css").toExternalForm());
-        dialog.getDialogPane().setStyle(
-            "-fx-background-color: #FFFFFF; -fx-border-color: #E5E7EB; -fx-border-width: 1; -fx-effect: null;");
-        
+        String themeCss2 = ThemeManager.getInstance().getStylesheetUrl();
+        if (themeCss2 != null && !themeCss2.isEmpty()) {
+            dialog.getDialogPane().getStylesheets().add(themeCss2);
+        }
         Optional<String> result = dialog.showAndWait();
         result.ifPresent(nodeName -> {
             ProcessNode foundNode = canvas.findNodeByName(nodeName);
@@ -2855,9 +2870,10 @@ public class MainView extends BorderPane {
                         names.add(g.getLabel() != null ? g.getLabel() : "任务组 " + g.getId());
                     }
                     dialog.getItems().addAll(names);
-                    dialog.getDialogPane().getStylesheets().add(MainView.class.getResource("/styles.css").toExternalForm());
-                    dialog.getDialogPane().setStyle(
-                        "-fx-background-color: #F9FAFB; -fx-background-radius: 8; -fx-padding: 16;");
+                    String themeCss3 = ThemeManager.getInstance().getStylesheetUrl();
+                    if (themeCss3 != null && !themeCss3.isEmpty()) {
+                        dialog.getDialogPane().getStylesheets().add(themeCss3);
+                    }
                     Optional<String> result = dialog.showAndWait();
                     result.ifPresent(taskGroupName -> {
                         for (JobPartVo g : finalList) {
@@ -2895,6 +2911,7 @@ public class MainView extends BorderPane {
         dialog.setTitle("快捷键列表");
         
         VBox content = new VBox(10);
+        content.getStyleClass().add("popup-window-root");
         content.setPadding(new Insets(20));
         
         Label title = new Label("快捷键列表");
@@ -2955,6 +2972,7 @@ public class MainView extends BorderPane {
         content.getChildren().addAll(title, scrollPane, buttonBox);
         
         Scene scene = new Scene(content, 400, 500);
+        scene.getStylesheets().add(com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl());
         dialog.setScene(scene);
         dialog.show();
     }
@@ -2968,6 +2986,7 @@ public class MainView extends BorderPane {
         dialog.setTitle("更新日志");
         
         VBox content = new VBox(10);
+        content.getStyleClass().add("popup-window-root");
         content.setPadding(new Insets(20));
         
         Label title = new Label("更新日志");
@@ -2992,6 +3011,7 @@ public class MainView extends BorderPane {
         content.getChildren().addAll(title, changelogArea, buttonBox);
         
         Scene scene = new Scene(content, 500, 400);
+        scene.getStylesheets().add(com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl());
         dialog.setScene(scene);
         dialog.show();
     }
@@ -3010,6 +3030,10 @@ public class MainView extends BorderPane {
             "项目地址:\n" +
             "GitHub: https://github.com/xiaozhaoCcz/CC_ETL\n" +
             "Gitee: https://gitee.com/xzjsccz/Cc_ETL");
+        String aboutCss = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (aboutCss != null && !aboutCss.isEmpty()) {
+            aboutAlert.getDialogPane().getStylesheets().add(aboutCss);
+        }
         aboutAlert.showAndWait();
     }
 }

@@ -49,7 +49,7 @@ public class NodeDetailsDialog extends Dialog<Void> {
         
         VBox root = new VBox(20);
         root.setPadding(new Insets(24));
-        root.setStyle("-fx-background-color: " + StyleUtil.BG_SECONDARY + ";");
+        root.getStyleClass().add("dialog-content-root");
         
         // 创建滚动面板以容纳更多内容
         ScrollPane scrollPane = new ScrollPane();
@@ -209,12 +209,10 @@ public class NodeDetailsDialog extends Dialog<Void> {
         getDialogPane().setMinWidth(700);
         getDialogPane().setMinHeight(600);
         setResizable(true);
-        
-        getDialogPane().setStyle(
-            "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-            "-fx-background-radius: " + StyleUtil.RADIUS_LG + "; " +
-            "-fx-border-radius: " + StyleUtil.RADIUS_LG + ";"
-        );
+        String css = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (css != null && !css.isEmpty()) {
+            getDialogPane().getStylesheets().add(css);
+        }
     }
     
     private Label addLabel(GridPane grid, String text, int col, int row) {

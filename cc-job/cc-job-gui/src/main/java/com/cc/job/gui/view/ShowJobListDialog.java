@@ -135,11 +135,7 @@ public class ShowJobListDialog extends Dialog<Void> {
         setResizable(true);
 
         // 设置对话框样式 - 与主页面背景色一致
-        getDialogPane().setStyle(
-                "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                        "-fx-background-radius: " + StyleUtil.RADIUS_LG + "; " +
-                        "-fx-border-radius: " + StyleUtil.RADIUS_LG + ";"
-        );
+        
 
         Platform.runLater(() -> {
             Stage stage = (Stage) getDialogPane().getScene().getWindow();
@@ -148,12 +144,10 @@ public class ShowJobListDialog extends Dialog<Void> {
                 stage.setMinWidth(1080);
                 stage.setMinHeight(580);
                 
-                // 加载全局CSS样式
-                try {
-                    String css = getClass().getResource("/styles.css").toExternalForm();
+                // 加载当前主题样式
+                String css = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+                if (css != null && !css.isEmpty()) {
                     stage.getScene().getStylesheets().add(css);
-                } catch (Exception e) {
-                    // CSS文件加载失败，忽略
                 }
                 
                 stage.setOnCloseRequest(event -> {

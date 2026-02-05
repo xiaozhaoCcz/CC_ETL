@@ -83,7 +83,10 @@ public class SaveNodeTemplateDialog extends Dialog<SaveNodeTemplateDialog.Result
         content.getChildren().add(grid);
 
         getDialogPane().setContent(content);
-        getDialogPane().getStylesheets().add(getClass().getResource("/styles.css").toExternalForm());
+        String cssUrl = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (cssUrl != null && !cssUrl.isEmpty()) {
+            getDialogPane().getStylesheets().add(cssUrl);
+        }
         ButtonType okType = new ButtonType("保存", ButtonBar.ButtonData.OK_DONE);
         ButtonType cancelType = new ButtonType("取消", ButtonBar.ButtonData.CANCEL_CLOSE);
         getDialogPane().getButtonTypes().addAll(cancelType, okType);

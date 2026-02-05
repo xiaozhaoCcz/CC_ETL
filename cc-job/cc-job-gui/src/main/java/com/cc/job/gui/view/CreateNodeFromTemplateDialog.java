@@ -72,7 +72,10 @@ public class CreateNodeFromTemplateDialog extends Dialog<JobNodeTemplate> {
         content.getChildren().add(templateList);
 
         getDialogPane().setContent(content);
-        getDialogPane().getStylesheets().add(getClass().getResource("/styles.css").toExternalForm());
+        String cssUrl = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (cssUrl != null && !cssUrl.isEmpty()) {
+            getDialogPane().getStylesheets().add(cssUrl);
+        }
         ButtonType createType = new ButtonType("创建节点", ButtonBar.ButtonData.OK_DONE);
         ButtonType cancelType = new ButtonType("取消", ButtonBar.ButtonData.CANCEL_CLOSE);
         getDialogPane().getButtonTypes().addAll(cancelType, createType);

@@ -197,7 +197,10 @@ public class GlueIdeDialog extends Dialog<Void> {
         );
         
         // 设置代码区域样式
-        codeEditorArea.getStylesheets().add(getClass().getResource("/styles.css").toExternalForm());
+        String cssUrl = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (cssUrl != null && !cssUrl.isEmpty()) {
+            codeEditorArea.getStylesheets().add(cssUrl);
+        }
         codeEditorArea.getStyleClass().add("code-editor");
         
         // 监听文本变化，实现语法高亮
@@ -340,11 +343,6 @@ public class GlueIdeDialog extends Dialog<Void> {
         getDialogPane().setMaxHeight(Double.MAX_VALUE);
         setResizable(true);
         
-        getDialogPane().setStyle(
-            "-fx-background-color: #F9FAFB; " +
-            "-fx-background-radius: 8; " +
-            "-fx-border-radius: 8;"
-        );
         
         Button saveButton = (Button) getDialogPane().lookupButton(saveButtonType);
         if (saveButton != null) {

@@ -207,12 +207,10 @@ public class BatchEditDialog extends Dialog<BatchEditDialog.BatchEditResult> {
     }
     
     private void styleDialog() {
-        getDialogPane().getStylesheets().add(getClass().getResource("/styles.css").toExternalForm());
-        getDialogPane().setStyle(
-            "-fx-background-color: #FFFFFF; " +
-            "-fx-border-color: #E5E7EB; " +
-            "-fx-border-width: 1;"
-        );
+        String cssUrl = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (cssUrl != null && !cssUrl.isEmpty()) {
+            getDialogPane().getStylesheets().add(cssUrl);
+        }
     }
     
     /**

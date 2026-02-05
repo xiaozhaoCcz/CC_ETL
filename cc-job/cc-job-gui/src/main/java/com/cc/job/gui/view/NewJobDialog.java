@@ -191,7 +191,7 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
         VBox formContent = new VBox(20);
         // 添加文字说明
         Label descLabel = new Label("此页面添加的任务是普通任务，请前往任务列表中查看");
-        descLabel.setStyle("-fx-text-fill: #6B7280; -fx-font-size: 13;");
+        descLabel.setStyle("-fx-font-size: 13;");
         formContent.getChildren().add(descLabel);
 
         formContent.setPadding(new Insets(10));
@@ -704,10 +704,10 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
             labelBox.setAlignment(Pos.CENTER_LEFT);
             
             Label textLabel = new Label(text);
-            textLabel.setStyle("-fx-text-fill: #374151; -fx-font-size: 13;");
+            textLabel.setStyle("-fx-font-size: 13;");
             
             Label starLabel = new Label("*");
-            starLabel.setStyle("-fx-text-fill: #EF4444; -fx-font-size: 13; -fx-font-weight: bold;");
+            starLabel.setStyle("-fx-font-size: 13; -fx-font-weight: bold;");
             
             labelBox.getChildren().addAll(textLabel, starLabel);
             executorHandlerLabel.setGraphic(labelBox);
@@ -776,13 +776,7 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
     
     private VBox createSection(String title, FontIcon icon) {
         VBox section = new VBox(10);
-        section.setStyle(
-            "-fx-background-color: white; " +
-            "-fx-border-color: #E5E7EB; " +
-            "-fx-border-radius: 8; " +
-            "-fx-background-radius: 8; " +
-            "-fx-padding: 10;"
-        );
+        section.getStyleClass().add("dialog-section");
         
         HBox titleBox = new HBox(8);
         titleBox.setAlignment(Pos.CENTER_LEFT);
@@ -796,8 +790,7 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
         Label titleLabel = new Label(title);
         titleLabel.setStyle(
             "-fx-font-size: 16; " +
-            "-fx-font-weight: bold; " +
-            "-fx-text-fill: #1F2937;"
+            "-fx-font-weight: bold;"
         );
         
         if (icon != null) {
@@ -822,10 +815,10 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
             labelBox.setAlignment(Pos.CENTER_LEFT);
             
             Label textLabel = new Label(text);
-            textLabel.setStyle("-fx-text-fill: #374151; -fx-font-size: 13;");
+            textLabel.setStyle("-fx-font-size: 13;");
             
             Label starLabel = new Label("*");
-            starLabel.setStyle("-fx-text-fill: #EF4444; -fx-font-size: 13; -fx-font-weight: bold;");
+            starLabel.setStyle("-fx-font-size: 13; -fx-font-weight: bold;");
             
             labelBox.getChildren().addAll(textLabel, starLabel);
             
@@ -835,7 +828,7 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
             label.setTooltip(new Tooltip(text + " *"));
         } else {
             label.setText(text);
-            label.setStyle("-fx-text-fill: #374151; -fx-font-size: 13;");
+            label.setStyle("-fx-font-size: 13;");
             label.setTooltip(new Tooltip(text));
         }
         
@@ -1136,19 +1129,12 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
         getDialogPane().setMaxHeight(Double.MAX_VALUE);
         setResizable(true);
         
-        // 加载全局扁平化样式，使对话框内输入框、下拉框、按钮与主界面一致
-        try {
-            String css = getClass().getResource("/styles.css").toExternalForm();
+        // 加载当前主题样式
+        String css = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (css != null && !css.isEmpty()) {
             getDialogPane().getStylesheets().add(css);
-        } catch (Exception e) {
-            // 样式表加载失败时忽略
         }
         
-        getDialogPane().setStyle(
-            "-fx-background-color: #F9FAFB; " +
-            "-fx-background-radius: 8; " +
-            "-fx-border-radius: 8;"
-        );
         
         Button saveButton = (Button) getDialogPane().lookupButton(saveButtonType);
         if (saveButton != null) {
@@ -1168,7 +1154,6 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
         if (cancelButton != null) {
             cancelButton.setStyle(
                 "-fx-background-color: #F3F4F6; " +
-                "-fx-text-fill: #374151; " +
                 "-fx-font-size: 13; " +
                 "-fx-padding: 8 20; " +
                 "-fx-border-color: #D1D5DB; " +

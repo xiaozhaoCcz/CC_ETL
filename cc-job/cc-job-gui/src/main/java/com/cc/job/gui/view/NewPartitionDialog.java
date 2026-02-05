@@ -134,17 +134,12 @@ public class NewPartitionDialog extends Dialog<String> {
         getDialogPane().setMaxHeight(Double.MAX_VALUE);
         setResizable(true);
         
-        try {
-            String css = getClass().getResource("/styles.css").toExternalForm();
+        String css = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (css != null && !css.isEmpty()) {
             getDialogPane().getStylesheets().add(css);
-        } catch (Exception e) { /* 样式表加载失败时忽略 */ }
+        }
         
         // 设置对话框样式
-        getDialogPane().setStyle(
-            "-fx-background-color: white; " +
-            "-fx-background-radius: 8; " +
-            "-fx-border-radius: 8;"
-        );
         
         // 样式化确认按钮
         Button confirmButton = (Button) getDialogPane().lookupButton(confirmButtonType);

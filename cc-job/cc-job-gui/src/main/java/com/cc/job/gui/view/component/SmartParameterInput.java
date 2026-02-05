@@ -117,15 +117,11 @@ public class SmartParameterInput extends CodeArea {
         // 设置样式
         setWrapText(true);
         
-        // 加载样式表，确保语法高亮样式可用
-        try {
-            String css = getClass().getResource("/styles.css").toExternalForm();
+        // 加载当前主题样式
+        String css = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (css != null && !css.isEmpty()) {
             getStylesheets().add(css);
-        } catch (Exception e) {
-            // 如果样式表加载失败，记录但不影响功能
-            System.err.println("加载样式表失败: " + e.getMessage());
         }
-        
         // 添加样式类，用于语法高亮
         getStyleClass().add("parameter-input");
         

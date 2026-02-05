@@ -53,6 +53,7 @@ public class LogContentManager {
     
     private void initializeCodeArea() {
         codeArea = new CodeArea();
+        codeArea.getStyleClass().add("log-code-area");
         codeArea.setEditable(false);
         codeArea.setWrapText(true);
         codeArea.setStyle(
@@ -60,7 +61,6 @@ public class LogContentManager {
             "-fx-background-insets: 0; " +
             "-fx-padding: 12 20; " +
             "-fx-border-width: 0; " +
-            "-fx-text-fill: #000000; " +
             "-fx-font-size: 13px; " +
             "-fx-font-family: 'Consolas', 'Monaco', 'Courier New', monospace;"
         );

@@ -82,6 +82,10 @@ public class BookmarkListDialog extends Dialog<Void> {
         content.getChildren().addAll(listView, new javafx.scene.layout.HBox(10, jumpBtn, deleteBtn, refreshBtn));
 
         getDialogPane().setContent(content);
+        String css = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (css != null && !css.isEmpty()) {
+            getDialogPane().getStylesheets().add(css);
+        }
         getDialogPane().getButtonTypes().add(new ButtonType("关闭", ButtonBar.ButtonData.CANCEL_CLOSE));
 
         loadBookmarks();

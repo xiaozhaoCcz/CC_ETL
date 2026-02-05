@@ -158,14 +158,14 @@ public class ConditionNodeDialog extends Dialog<ConditionNodeDialog.ConditionDat
     
     private VBox createBasicSection() {
         VBox section = new VBox(10);
-        section.setStyle("-fx-background-color: #FFFFFF; -fx-background-radius: 8; -fx-padding: 15;");
+        section.getStyleClass().add("dialog-section");
         
         Label titleLabel = new Label("基本信息");
-        titleLabel.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #374151;");
+        titleLabel.setStyle("-fx-font-size: 14; -fx-font-weight: bold;");
         
         // 条件节点名称
         Label nameLabel = new Label("条件节点名称：");
-        nameLabel.setStyle("-fx-font-size: 12; -fx-text-fill: #6B7280;");
+        nameLabel.setStyle("-fx-font-size: 12;");
         conditionNameField = new TextField();
         conditionNameField.setPromptText("请输入条件节点名称");
         conditionNameField.setStyle("-fx-font-size: 12;");
@@ -177,7 +177,7 @@ public class ConditionNodeDialog extends Dialog<ConditionNodeDialog.ConditionDat
         
         // 条件节点类型
         Label typeLabel = new Label("节点类型：");
-        typeLabel.setStyle("-fx-font-size: 12; -fx-text-fill: #6B7280;");
+        typeLabel.setStyle("-fx-font-size: 12;");
         conditionTypeCombo = new ComboBox<>();
         conditionTypeCombo.getItems().addAll(ConditionNode.ConditionType.IF, 
                                               ConditionNode.ConditionType.WHILE, 
@@ -245,14 +245,14 @@ public class ConditionNodeDialog extends Dialog<ConditionNodeDialog.ConditionDat
     
     private VBox createExpressionSection() {
         VBox section = new VBox(10);
-        section.setStyle("-fx-background-color: #FFFFFF; -fx-background-radius: 8; -fx-padding: 15;");
+        section.getStyleClass().add("dialog-section");
         
         Label titleLabel = new Label("条件表达式");
-        titleLabel.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #374151;");
+        titleLabel.setStyle("-fx-font-size: 14; -fx-font-weight: bold;");
         
         // 表达式类型选择
         Label typeLabel = new Label("表达式类型：");
-        typeLabel.setStyle("-fx-font-size: 12; -fx-text-fill: #6B7280;");
+        typeLabel.setStyle("-fx-font-size: 12;");
         expressionTypeCombo = new ComboBox<>();
         expressionTypeCombo.getItems().addAll(ConditionNode.ExpressionType.SIMPLE, ConditionNode.ExpressionType.SCRIPT);
         expressionTypeCombo.setValue(ConditionNode.ExpressionType.SIMPLE);
@@ -288,13 +288,13 @@ public class ConditionNodeDialog extends Dialog<ConditionNodeDialog.ConditionDat
         
         // 表达式类型说明
         expressionTypeLabel = new Label();
-        expressionTypeLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #9CA3AF; -fx-wrap-text: true;");
+        expressionTypeLabel.setStyle("-fx-font-size: 11; -fx-wrap-text: true;");
         updateExpressionTypeDescription(ConditionNode.ExpressionType.SIMPLE);
         
         // 简单表达式输入框
         simpleExpressionBox = new VBox(5);
         Label simpleLabel = new Label("简单表达式：");
-        simpleLabel.setStyle("-fx-font-size: 12; -fx-text-fill: #6B7280;");
+        simpleLabel.setStyle("-fx-font-size: 12;");
         simpleExpressionArea = new TextArea();
         simpleExpressionArea.setPromptText("例如：变量 > 100 或 status == \"success\"");
         simpleExpressionArea.setPrefRowCount(4);
@@ -305,7 +305,7 @@ public class ConditionNodeDialog extends Dialog<ConditionNodeDialog.ConditionDat
         // 脚本表达式输入框
         scriptExpressionBox = new VBox(5);
         Label scriptLabel = new Label("脚本表达式：");
-        scriptLabel.setStyle("-fx-font-size: 12; -fx-text-fill: #6B7280;");
+        scriptLabel.setStyle("-fx-font-size: 12;");
         scriptExpressionArea = new TextArea();
         scriptExpressionArea.setPromptText("例如：if (变量 > 100 && status == \"success\") { return true; } else { return false; }");
         scriptExpressionArea.setPrefRowCount(8);
@@ -412,8 +412,10 @@ public class ConditionNodeDialog extends Dialog<ConditionNodeDialog.ConditionDat
     }
     
     private void styleDialog() {
-        getDialogPane().getStylesheets().add(getClass().getResource("/styles.css").toExternalForm());
-        getDialogPane().setStyle("-fx-background-color: #F9FAFB;");
+        String cssUrl = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (cssUrl != null && !cssUrl.isEmpty()) {
+            getDialogPane().getStylesheets().add(cssUrl);
+        }
     }
 }
 

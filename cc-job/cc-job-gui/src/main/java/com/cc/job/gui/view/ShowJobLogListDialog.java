@@ -117,11 +117,7 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         getDialogPane().setMaxHeight(Double.MAX_VALUE);
         setResizable(true);
 
-        getDialogPane().setStyle(
-                "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                        "-fx-background-radius: " + StyleUtil.RADIUS_LG + "; " +
-                        "-fx-border-radius: " + StyleUtil.RADIUS_LG + ";"
-        );
+        
 
         Platform.runLater(() -> {
             Stage stage = (Stage) getDialogPane().getScene().getWindow();
@@ -130,11 +126,9 @@ public class ShowJobLogListDialog extends Dialog<Void> {
                 stage.setMinWidth(1400);
                 stage.setMinHeight(800);
 
-                try {
-                    String css = getClass().getResource("/styles.css").toExternalForm();
+                String css = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+                if (css != null && !css.isEmpty()) {
                     stage.getScene().getStylesheets().add(css);
-                } catch (Exception e) {
-                    // CSS文件加载失败，忽略
                 }
 
                 stage.setOnCloseRequest(event -> close());
@@ -877,10 +871,11 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
         dialog.setResizable(true);
 
-        // 添加CSS样式
-        try {
-            dialog.getDialogPane().getStylesheets().add(getClass().getResource("/styles.css").toExternalForm());
-        } catch (Exception ignored) {}
+        // 添加当前主题样式
+        String dialogCss = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (dialogCss != null && !dialogCss.isEmpty()) {
+            dialog.getDialogPane().getStylesheets().add(dialogCss);
+        }
 
         // 初始加载日志
         loadLogContentAsync(item.getId(), codeArea, fromLineNum, pullFailCount, isLogEnd, scrollPane);

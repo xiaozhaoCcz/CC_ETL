@@ -108,8 +108,7 @@ public class LogPanel extends VBox {
         titleContainer.setPadding(new Insets(0, 8, 0, 20));
         
         Label monitorLabel = new Label("监控");
-        monitorLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
-        monitorLabel.setTextFill(Color.web(StyleUtil.GRAY_900));
+        monitorLabel.getStyleClass().add("log-panel-tab-bar-title");
         
         detachBtn = new Button("", IconUtil.windowIcon());
         StyleUtil.applyIconButtonHover(detachBtn);
@@ -133,10 +132,10 @@ public class LogPanel extends VBox {
         tabContainer.setAlignment(Pos.CENTER_LEFT);
         
         ScrollPane scrollPane = new ScrollPane(tabContainer);
+        scrollPane.getStyleClass().add("log-panel-tab-bar-scroll");
         scrollPane.setFitToHeight(true);
         scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-        scrollPane.setStyle("-fx-background-color: transparent; -fx-border-width: 0; -fx-padding: 0;");
         scrollPane.setPannable(true);
         HBox.setHgrow(scrollPane, Priority.ALWAYS);
         
@@ -146,24 +145,15 @@ public class LogPanel extends VBox {
     
     private HBox createTitleBar() {
         HBox titleBar = new HBox(8);
+        titleBar.getStyleClass().add("log-panel-title-bar");
         titleBar.setAlignment(Pos.CENTER_LEFT);
-        titleBar.setStyle("-fx-border-width: 0; -fx-padding: 14 20;");
         titleBar.setPrefHeight(56);
         
         // 搜索框
         searchField = new TextField();
         searchField.setPromptText("搜索日志...");
         searchField.setPrefWidth(200);
-        searchField.setStyle(
-            "-fx-background-color: #F9FAFB; " +
-            "-fx-text-fill: " + StyleUtil.GRAY_700 + "; " +
-            "-fx-font-size: 12px; " +
-            "-fx-border-color: #E5E7EB; " +
-            "-fx-border-width: 1; " +
-            "-fx-border-radius: 8; " +
-            "-fx-background-radius: 8; " +
-            "-fx-padding: 6 12 6 32;"
-        );
+        searchField.getStyleClass().add("log-panel-search-field");
         
         searchField.textProperty().addListener((obs, oldVal, newVal) -> {
             if (searchDebounceTimeline != null) {
@@ -183,26 +173,18 @@ public class LogPanel extends VBox {
         levelFilterCombo.getItems().addAll("全部", "INFO", "WARN", "ERROR", "DEBUG", "SUCCESS");
         levelFilterCombo.setValue("全部");
         levelFilterCombo.setPrefWidth(100);
-        levelFilterCombo.setStyle(
-            "-fx-background-color: #F9FAFB; " +
-            "-fx-text-fill: " + StyleUtil.GRAY_700 + "; " +
-            "-fx-font-size: 12px; " +
-            "-fx-border-color: #E5E7EB; " +
-            "-fx-border-width: 1; " +
-            "-fx-border-radius: 8; " +
-            "-fx-background-radius: 8;"
-        );
+        levelFilterCombo.getStyleClass().add("log-panel-level-combo");
         levelFilterCombo.setOnAction(e -> applyFilters());
         
         // 正则表达式复选框
         regexCheckBox = new CheckBox("正则");
-        regexCheckBox.setStyle("-fx-font-size: 11px; -fx-text-fill: " + StyleUtil.GRAY_600 + ";");
+        regexCheckBox.getStyleClass().add("log-panel-filter-checkbox");
         regexCheckBox.setTooltip(new Tooltip("启用正则表达式搜索"));
         regexCheckBox.setOnAction(e -> applyFilters());
         
         // 大小写敏感复选框
         caseSensitiveCheckBox = new CheckBox("大小写");
-        caseSensitiveCheckBox.setStyle("-fx-font-size: 11px; -fx-text-fill: " + StyleUtil.GRAY_600 + ";");
+        caseSensitiveCheckBox.getStyleClass().add("log-panel-filter-checkbox");
         caseSensitiveCheckBox.setTooltip(new Tooltip("大小写敏感搜索"));
         caseSensitiveCheckBox.setOnAction(e -> applyFilters());
         
@@ -210,29 +192,15 @@ public class LogPanel extends VBox {
         HBox.setHgrow(spacer, Priority.ALWAYS);
         
         countLabel = new Label("0 条日志");
-        countLabel.setFont(Font.font("System", FontWeight.MEDIUM, 12));
-        countLabel.setTextFill(Color.web(StyleUtil.GRAY_500));
+        countLabel.getStyleClass().add("log-panel-count-label");
         
         Region separator = createSeparator();
         
         // 自动滚动开关
         autoScrollButton = new ToggleButton("自动滚动");
         autoScrollButton.setSelected(true);
-        String normal =   "-fx-background-color: #F9FAFB; " +
-                "-fx-text-fill: " + StyleUtil.GRAY_600 + "; " +
-                "-fx-font-size: 12px; " +
-                "-fx-font-weight: 600; " +
-                "-fx-padding: 6 12; " +
-                "-fx-border-radius: 8; " +
-                "-fx-background-radius: 8; " +
-                "-fx-border-color: #E5E7EB; " +
-                "-fx-border-width: 1; " +
-                "-fx-cursor: hand;";
+        autoScrollButton.getStyleClass().add("log-panel-auto-scroll-btn");
         autoScrollButton.setTooltip(new Tooltip("自动滚动到底部"));
-        String hover = normal.replace("#F9FAFB", "#F3F4F6").replace("#E5E7EB", StyleUtil.PRIMARY_LIGHT);
-        autoScrollButton.setStyle(normal);
-        autoScrollButton.setOnMouseEntered(e -> autoScrollButton.setStyle(hover));
-        autoScrollButton.setOnMouseExited(e -> autoScrollButton.setStyle(normal));
 
         autoScrollButton.selectedProperty().addListener((obs, oldVal, newVal) -> {
             LogContentManager data = tabManager.getCurrentTabData();
@@ -266,45 +234,39 @@ public class LogPanel extends VBox {
     
     private Region createSeparator() {
         Region separator = new Region();
+        separator.getStyleClass().add("log-panel-separator");
         separator.setPrefWidth(1);
         separator.setMinWidth(1);
         separator.setMaxWidth(1);
         separator.setPrefHeight(24);
-        separator.setStyle("-fx-background-color: #E5E7EB;");
         return separator;
     }
     
     private HBox createStatusBar() {
         HBox statusBar = new HBox(12);
+        statusBar.getStyleClass().add("log-panel-status-bar");
         statusBar.setAlignment(Pos.CENTER_LEFT);
         statusBar.setPadding(new Insets(10, 16, 10, 16));
         statusBar.setPrefHeight(36);
         
         Label infoLabel = new Label("提示: 启动任务后将显示实时日志信息");
-        infoLabel.setFont(Font.font("System", FontWeight.NORMAL, 11));
-        infoLabel.setTextFill(Color.web(StyleUtil.GRAY_500));
+        infoLabel.getStyleClass().add("log-panel-status-hint");
         
         Region separator1 = createSeparator();
         
         // 日志统计标签
         errorCountLabel = new Label("错误: 0");
-        errorCountLabel.setFont(Font.font("System", FontWeight.MEDIUM, 11));
-        errorCountLabel.setTextFill(Color.web(StyleUtil.ERROR));
-        errorCountLabel.setStyle("-fx-cursor: hand;");
+        errorCountLabel.getStyleClass().add("log-panel-stat-error");
         errorCountLabel.setOnMouseClicked(e -> filterByLevel("ERROR"));
         errorCountLabel.setTooltip(new Tooltip("点击过滤错误日志"));
         
         warnCountLabel = new Label("警告: 0");
-        warnCountLabel.setFont(Font.font("System", FontWeight.MEDIUM, 11));
-        warnCountLabel.setTextFill(Color.web(StyleUtil.WARNING));
-        warnCountLabel.setStyle("-fx-cursor: hand;");
+        warnCountLabel.getStyleClass().add("log-panel-stat-warn");
         warnCountLabel.setOnMouseClicked(e -> filterByLevel("WARN"));
         warnCountLabel.setTooltip(new Tooltip("点击过滤警告日志"));
         
         infoCountLabel = new Label("信息: 0");
-        infoCountLabel.setFont(Font.font("System", FontWeight.MEDIUM, 11));
-        infoCountLabel.setTextFill(Color.web(StyleUtil.GRAY_600));
-        infoCountLabel.setStyle("-fx-cursor: hand;");
+        infoCountLabel.getStyleClass().add("log-panel-stat-info");
         infoCountLabel.setOnMouseClicked(e -> filterByLevel("INFO"));
         infoCountLabel.setTooltip(new Tooltip("点击过滤信息日志"));
         
@@ -312,8 +274,7 @@ public class LogPanel extends VBox {
         HBox.setHgrow(spacer, Priority.ALWAYS);
         
         lastUpdateLabel = new Label("最后更新: 从未");
-        lastUpdateLabel.setFont(Font.font("System", FontWeight.NORMAL, 11));
-        lastUpdateLabel.setTextFill(Color.web(StyleUtil.GRAY_400));
+        lastUpdateLabel.getStyleClass().add("log-panel-last-update");
         
         statusBar.getChildren().addAll(
             infoLabel, separator1, errorCountLabel, warnCountLabel, infoCountLabel,
@@ -378,19 +339,7 @@ public class LogPanel extends VBox {
     
     private Button createButton(String text, Runnable action) {
         Button btn = new Button(text);
-        String normal = 
-            "-fx-background-color: #F9FAFB; " +
-            "-fx-text-fill: " + StyleUtil.GRAY_600 + "; " +
-            "-fx-font-size: 12px; " +
-            "-fx-font-weight: 600; " +
-            "-fx-padding: 6 16 6 16; " +
-            "-fx-border-radius: 8; " +
-            "-fx-background-radius: 8; " +
-            "-fx-border-color: #E5E7EB; " +
-            "-fx-border-width: 1; " +
-            "-fx-cursor: hand;";
-        String hover = normal.replace("#F9FAFB", "#F3F4F6").replace("#E5E7EB", StyleUtil.PRIMARY_LIGHT);
-        StyleUtil.applyButtonHover(btn, normal, hover);
+        btn.getStyleClass().add("log-panel-toolbar-btn");
         btn.setOnAction(e -> action.run());
         return btn;
     }
@@ -810,6 +759,10 @@ public class LogPanel extends VBox {
             return null;
         });
         
+        String themeCss = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (themeCss != null && !themeCss.isEmpty()) {
+            dialog.getDialogPane().getStylesheets().add(themeCss);
+        }
         Optional<ExportOptions> result = dialog.showAndWait();
         result.ifPresent(options -> {
             // 显示文件选择对话框
@@ -850,6 +803,10 @@ public class LogPanel extends VBox {
         content.getChildren().addAll(progressBar, statusLabel);
         progressDialog.getDialogPane().setContent(content);
         progressDialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
+        String progressCss = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (progressCss != null && !progressCss.isEmpty()) {
+            progressDialog.getDialogPane().getStylesheets().add(progressCss);
+        }
         
         // 在后台线程中执行导出
         new Thread(() -> {

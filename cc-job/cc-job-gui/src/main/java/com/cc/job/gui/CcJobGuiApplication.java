@@ -100,10 +100,12 @@ public class CcJobGuiApplication extends Application {
         // 创建登录场景
         Scene loginScene = new Scene(loginView, 900, 600);
         
-        // 加载全局CSS样式
+        // 按当前主题加载 CSS
         try {
-            String css = getClass().getResource("/styles.css").toExternalForm();
-            loginScene.getStylesheets().add(css);
+            String css = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+            if (css != null && !css.isEmpty()) {
+                loginScene.getStylesheets().add(css);
+            }
         } catch (Exception e) {
         }
         
@@ -164,10 +166,12 @@ public class CcJobGuiApplication extends Application {
         // 创建注册场景
         Scene registerScene = new Scene(registerView, 900, 600);
         
-        // 加载全局CSS样式
+        // 按当前主题加载 CSS
         try {
-            String css = getClass().getResource("/styles.css").toExternalForm();
-            registerScene.getStylesheets().add(css);
+            String css = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+            if (css != null && !css.isEmpty()) {
+                registerScene.getStylesheets().add(css);
+            }
         } catch (Exception e) {
         }
         
@@ -187,10 +191,12 @@ public class CcJobGuiApplication extends Application {
             // 创建场景
             Scene scene = new Scene(mainView, 1920, 1080);
             
-            // 加载全局CSS样式
+            // 按当前主题加载 CSS（与配置/ThemeManager 一致）
             try {
-                String css = getClass().getResource("/styles.css").toExternalForm();
-                scene.getStylesheets().add(css);
+                String css = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+                if (css != null && !css.isEmpty()) {
+                    scene.getStylesheets().add(css);
+                }
             } catch (Exception e) {
             }
             

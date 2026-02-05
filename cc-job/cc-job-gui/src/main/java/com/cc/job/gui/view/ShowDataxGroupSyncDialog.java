@@ -80,18 +80,14 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
         getDialogPane().setMinWidth(900);
         getDialogPane().setMinHeight(650);
         setResizable(true);
-        getDialogPane().setStyle(
-                "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                "-fx-background-radius: " + StyleUtil.RADIUS_LG + ";"
-        );
         Platform.runLater(() -> {
             Stage stage = (Stage) getDialogPane().getScene().getWindow();
             if (stage != null) {
                 stage.setResizable(true);
-                try {
-                    String css = getClass().getResource("/styles.css").toExternalForm();
+                String css = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+                if (css != null && !css.isEmpty()) {
                     stage.getScene().getStylesheets().add(css);
-                } catch (Exception ignored) {}
+                }
             }
         });
     }

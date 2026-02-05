@@ -4,6 +4,7 @@ import com.cc.job.gui.model.GroupContainer;
 import com.cc.job.gui.model.ProcessNode;
 import com.cc.job.gui.util.IconUtil;
 import com.cc.job.gui.util.StyleUtil;
+import com.cc.job.gui.util.ThemeManager;
 import javafx.geometry.Bounds;
 import javafx.geometry.Pos;
 import javafx.scene.canvas.Canvas;
@@ -71,11 +72,7 @@ public class MiniMapView extends VBox {
     }
     
     private void initializeUI() {
-        // 设置样式：SplitPane 会提供分隔线，移除顶部边框
-        setStyle(
-            "-fx-background-color: transparent; " +
-            "-fx-padding: 12 12 0 8;"
-        );
+        getStyleClass().add("minimap-view");
         setSpacing(12);
         setMinWidth(200);  // 最小宽度200px
         setMinHeight(200); // 最小高度
@@ -87,7 +84,7 @@ public class MiniMapView extends VBox {
         
         // 画布容器 - 使用 Pane 支持绝对定位！
         Pane canvasContainer = new Pane();
-        canvasContainer.setStyle("-fx-background-color: #F3F3F3;");
+        canvasContainer.getStyleClass().add("minimap-canvas-container");
         canvasContainer.setMinWidth(150);  // 最小宽度
         canvasContainer.setMinHeight(150); // 最小高度
         canvasContainer.setPrefHeight(MINIMAP_HEIGHT);  // 默认高度
@@ -116,10 +113,10 @@ public class MiniMapView extends VBox {
             }
         });
         
-        // 视口矩形
+        // 视口矩形（描边颜色在 refresh() 中随主题更新）
         viewportRect = new Rectangle();
         viewportRect.setFill(Color.TRANSPARENT);
-        viewportRect.setStroke(Color.web("#2563EB"));
+        applyThemeToViewportRect();
         viewportRect.setStrokeWidth(2);
         viewportRect.setMouseTransparent(false);
         
@@ -137,7 +134,7 @@ public class MiniMapView extends VBox {
         
         // 标题
         Label titleLabel = new Label("小地图");
-        titleLabel.setStyle(StyleUtil.caption() + "-fx-font-weight: 600;");
+        titleLabel.getStyleClass().add("minimap-title");
         
         HBox.setHgrow(titleLabel, Priority.ALWAYS);
         
@@ -236,8 +233,10 @@ public class MiniMapView extends VBox {
         // 清空画布
         gc.clearRect(0, 0, canvasW, canvasH);
         
-        // 绘制背景
-        gc.setFill(Color.web("#F3F4F6"));
+        // 按当前主题绘制背景
+        boolean dark = "dark".equals(ThemeManager.getInstance().getTheme());
+        String bgColor = dark ? "#252526" : "#F3F4F6";
+        gc.setFill(Color.web(bgColor));
         gc.fillRect(0, 0, canvasW, canvasH);
         
         // 获取画布尺寸
@@ -253,8 +252,9 @@ public class MiniMapView extends VBox {
         double offsetX = (MINIMAP_WIDTH - canvasWidth * scale) / 2;
         double offsetY = (MINIMAP_HEIGHT - canvasHeight * scale) / 2;
         
-        // 先绘制连接线（在节点下方）
-        gc.setStroke(Color.web("#6B7280"));
+        // 先绘制连接线（在节点下方）- 颜色随主题
+        String lineColor = dark ? "#9D9D9D" : "#6B7280";
+        gc.setStroke(Color.web(lineColor));
         gc.setLineWidth(1);
         
         nodeCanvas.getConnections().forEach(conn -> {
@@ -297,9 +297,11 @@ public class MiniMapView extends VBox {
             gc.strokeLine(x1, y1, x2, y2);
         });
         
-        // 再绘制节点（覆盖在线条上面）- 使用统一的颜色，不区分节点类型
-        gc.setFill(Color.WHITE);
-        gc.setStroke(Color.web("#9CA3AF")); // 统一的灰色边框
+        // 再绘制节点（覆盖在线条上面）- 颜色随主题
+        String nodeFill = dark ? "#3C3C3C" : "#FFFFFF";
+        String nodeStroke = dark ? "#6B6B6B" : "#9CA3AF";
+        gc.setFill(Color.web(nodeFill));
+        gc.setStroke(Color.web(nodeStroke));
         gc.setLineWidth(1);
         
         nodeCanvas.getNodes().forEach(node -> {
@@ -566,7 +568,14 @@ public class MiniMapView extends VBox {
         if (throttledUpdateTimeline != null) {
             throttledUpdateTimeline.stop();
         }
+        applyThemeToViewportRect();
         updateMiniMap();
+    }
+
+    private void applyThemeToViewportRect() {
+        if (viewportRect == null) return;
+        boolean dark = "dark".equals(ThemeManager.getInstance().getTheme());
+        viewportRect.setStroke(Color.web(dark ? "#569CD6" : "#2563EB"));
     }
     
     /**

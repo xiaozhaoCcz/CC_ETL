@@ -90,6 +90,10 @@ public class AddBookmarkDialog extends Dialog<AddBookmarkDialog.Result> {
         content.getChildren().add(grid);
 
         getDialogPane().setContent(content);
+        String css = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (css != null && !css.isEmpty()) {
+            getDialogPane().getStylesheets().add(css);
+        }
         ButtonType okType = new ButtonType("添加", ButtonBar.ButtonData.OK_DONE);
         ButtonType cancelType = new ButtonType("取消", ButtonBar.ButtonData.CANCEL_CLOSE);
         getDialogPane().getButtonTypes().addAll(cancelType, okType);

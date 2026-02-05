@@ -230,11 +230,6 @@ public class DependencyViewPanel extends Dialog<Void> {
     }
     
     private void styleDialog() {
-        getDialogPane().setStyle(
-            "-fx-background-color: #FFFFFF; " +
-            "-fx-border-color: #E5E7EB; " +
-            "-fx-border-width: 1;"
-        );
     }
     
     /**

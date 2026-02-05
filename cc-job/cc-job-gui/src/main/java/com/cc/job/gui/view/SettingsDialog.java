@@ -1,6 +1,7 @@
 package com.cc.job.gui.view;
 
 import com.cc.job.gui.util.ConfigManager;
+import com.cc.job.gui.util.ThemeManager;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
@@ -15,6 +16,7 @@ import javafx.stage.Stage;
  */
 public class SettingsDialog extends Dialog<Void> {
     
+    private final Stage ownerStage;
     private ConfigManager configManager;
     
     // 常规设置
@@ -31,6 +33,7 @@ public class SettingsDialog extends Dialog<Void> {
     private CheckBox animationCheckBox;
     
     public SettingsDialog(Stage owner) {
+        this.ownerStage = owner;
         this.configManager = ConfigManager.getInstance();
         
         initOwner(owner);
@@ -41,7 +44,10 @@ public class SettingsDialog extends Dialog<Void> {
         // 创建内容
         VBox content = createContent();
         getDialogPane().setContent(content);
-        getDialogPane().getStylesheets().add(getClass().getResource("/styles.css").toExternalForm());
+        String cssUrl = ThemeManager.getInstance().getStylesheetUrl();
+        if (cssUrl != null && !cssUrl.isEmpty()) {
+            getDialogPane().getStylesheets().add(cssUrl);
+        }
         
         // 添加按钮
         ButtonType saveButtonType = new ButtonType("保存", ButtonBar.ButtonData.OK_DONE);
@@ -174,9 +180,9 @@ public class SettingsDialog extends Dialog<Void> {
         String timeout = configManager.getProperty("connection.timeout", "30");
         connectionTimeoutField.setText(timeout);
         
-        // 加载界面设置
-        String theme = configManager.getProperty("theme", "浅色");
-        themeCombo.setValue(theme);
+        // 加载界面设置（配置存 light/dark/auto，显示 浅色/深色/自动）
+        String themeKey = ThemeManager.getInstance().getThemeConfigKey();
+        themeCombo.setValue(themeKeyToDisplay(themeKey));
         
         String defaultZoom = configManager.getProperty("default.zoom", "100");
         defaultZoomField.setText(defaultZoom);
@@ -198,11 +204,20 @@ public class SettingsDialog extends Dialog<Void> {
             }
             configManager.setProperty("connection.timeout", connectionTimeoutField.getText());
             
-            // 保存界面设置
-            configManager.setProperty("theme", themeCombo.getValue());
+            // 保存界面设置（显示 浅色/深色/自动 转为 light/dark/auto）
+            String themeKey = displayToThemeKey(themeCombo.getValue());
+            ThemeManager.getInstance().setTheme(themeKey);
+            configManager.setProperty("theme", themeKey);
             configManager.setProperty("default.zoom", defaultZoomField.getText());
             configManager.setProperty("animation.enabled", String.valueOf(animationCheckBox.isSelected()));
-            
+            // 若主窗口已打开，立即应用新主题
+            if (ownerStage != null && ownerStage.getScene() != null) {
+                ownerStage.getScene().getStylesheets().clear();
+                String url = ThemeManager.getInstance().getStylesheetUrl();
+                if (url != null && !url.isEmpty()) {
+                    ownerStage.getScene().getStylesheets().add(url);
+                }
+            }
             return true;
         } catch (Exception e) {
             Alert alert = new Alert(Alert.AlertType.ERROR);
@@ -211,6 +226,24 @@ public class SettingsDialog extends Dialog<Void> {
             alert.setContentText("保存设置时发生错误: " + e.getMessage());
             alert.showAndWait();
             return false;
+        }
+    }
+
+    private static String themeKeyToDisplay(String key) {
+        if (key == null) return "浅色";
+        switch (key) {
+            case "dark": return "深色";
+            case "auto": return "自动";
+            default: return "浅色";
+        }
+    }
+
+    private static String displayToThemeKey(String display) {
+        if (display == null) return "light";
+        switch (display) {
+            case "深色": return "dark";
+            case "自动": return "auto";
+            default: return "light";
         }
     }
 }

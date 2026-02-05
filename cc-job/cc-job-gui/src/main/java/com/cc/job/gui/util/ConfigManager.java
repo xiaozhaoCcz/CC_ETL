@@ -61,6 +61,7 @@ public class ConfigManager {
         // 先加载默认配置（从 application.properties）
         String defaultBaseUrl = ApplicationProperties.Api.getBaseUrl();
         properties.setProperty("api.base.url", defaultBaseUrl);
+        properties.setProperty("theme", "light");
         
         // 然后从用户配置文件加载（如果存在）
         if (Files.exists(configFilePath)) {

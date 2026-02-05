@@ -244,11 +244,7 @@ public class TopToolBar extends VBox {
     }
     
     private void initializeUI() {
-        setStyle(
-            "-fx-background-color: #F3F4F6; " +
-            "-fx-border-color: transparent transparent #E5E7EB transparent; " +
-            "-fx-border-width: 0 0 1 0;"
-        );
+        getStyleClass().add("top-tool-bar");
         setPadding(new Insets(0));
         
         // 顶部菜单栏
@@ -262,7 +258,6 @@ public class TopToolBar extends VBox {
     private MenuBar createMenuBar() {
         MenuBar menuBar = new MenuBar();
         menuBar.setPadding(new Insets(0, 12, 0, 12));
-        menuBar.setStyle("-fx-background-color: #F3F4F6;");
 
         // 文件菜单
         Menu fileMenu = createFileMenu();
@@ -774,6 +769,7 @@ public class TopToolBar extends VBox {
     
     private HBox createToolBar() {
         HBox toolBar = new HBox(8);
+        toolBar.getStyleClass().add("tool-bar-area");
         toolBar.setAlignment(Pos.CENTER_LEFT);
         toolBar.setPadding(new Insets(8, 12, 8, 12));
         
@@ -924,7 +920,7 @@ public class TopToolBar extends VBox {
         
         // 视图操作组
         zoomLabel = new Label("100%");
-        zoomLabel.setStyle(StyleUtil.body() + "-fx-font-weight: 700; -fx-padding: 0 8 0 8;");
+        zoomLabel.getStyleClass().add("tool-bar-zoom-label");
         
         HBox viewGroup = createToolGroup(
             createIconButton(IconUtil.zoomInIcon(), "放大", "放大画布", () -> safeCall(ToolBarCallback::onZoomIn)),
@@ -990,41 +986,20 @@ public class TopToolBar extends VBox {
         
         // 用户名
         Label nameLabel = new Label(username);
-        nameLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
-        nameLabel.setTextFill(Color.web("#1F2937"));
+        nameLabel.getStyleClass().add("tool-bar-user-name");
         
         // 用户ID
         Label idLabel = new Label("ID: " + (userId != null ? userId : "N/A"));
-        idLabel.setFont(Font.font("System", FontWeight.NORMAL, 11));
-        idLabel.setTextFill(Color.web("#6B7280"));
+        idLabel.getStyleClass().add("tool-bar-user-id");
         
         textArea.getChildren().addAll(nameLabel, idLabel);
         
         // 组合头像和文本
         HBox userCard = new HBox(8);
+        userCard.getStyleClass().add("tool-bar-user-card");
         userCard.setAlignment(Pos.CENTER);
         userCard.setPadding(new Insets(4, 12, 4, 12));
-        userCard.setStyle(
-            "-fx-cursor: hand;"
-        );
         userCard.getChildren().addAll(avatar, textArea);
-        
-        // 添加悬停效果
-        userCard.setOnMouseEntered(e -> {
-            userCard.setStyle(
-                "-fx-background-color: #F3F4F6; " +
-                "-fx-background-radius: 8; " +
-                "-fx-cursor: hand;"
-            );
-        });
-        
-        userCard.setOnMouseExited(e -> {
-            userCard.setStyle(
-                "-fx-background-color: #F9FAFB; " +
-                "-fx-background-radius: 8; " +
-                "-fx-cursor: hand;"
-            );
-        });
         
         // 添加点击事件（可选：显示用户菜单）
         userCard.setOnMouseClicked(e -> {
@@ -1123,12 +1098,12 @@ public class TopToolBar extends VBox {
      */
     private Region createSeparator() {
         Region separator = new Region();
+        separator.getStyleClass().add("tool-bar-separator");
         separator.setPrefWidth(1);
         separator.setMinWidth(1);
         separator.setMaxWidth(1);
         separator.setPrefHeight(28);
         separator.setMinHeight(20);
-        separator.setStyle("-fx-background-color: #E2E8F0;");
         return separator;
     }
 
@@ -1147,12 +1122,7 @@ public class TopToolBar extends VBox {
         MenuButton menuButton = new MenuButton("新建", IconUtil.plusIcon());
         menuButton.setGraphicTextGap(6);
         
-        // 应用图标按钮样式和悬停效果
-        String normalStyle = StyleUtil.iconButton();
-        String hoverStyle = normalStyle.replace("transparent", "#F3F4F6");
-        menuButton.setStyle(normalStyle);
-        menuButton.setOnMouseEntered(e -> menuButton.setStyle(hoverStyle));
-        menuButton.setOnMouseExited(e -> menuButton.setStyle(normalStyle));
+        menuButton.getStyleClass().add("tool-bar-menu-button");
         
         Tooltip tip = new Tooltip("创建新的任务或分区");
         tip.setStyle("-fx-font-size: 12px;");
@@ -1175,8 +1145,8 @@ public class TopToolBar extends VBox {
      */
     private Button createIconButton(Node icon, String text, String tooltip, Runnable action) {
         Button btn = new Button(text, icon);
+        btn.getStyleClass().add("tool-bar-button");
         btn.setGraphicTextGap(6);
-        StyleUtil.applyIconButtonHover(btn);
         
         if (tooltip != null) {
             Tooltip tip = new Tooltip(tooltip);

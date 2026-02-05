@@ -55,8 +55,12 @@ public class CanvasExportDialog extends Dialog<File> {
         ButtonType cancelButtonType = new ButtonType("取消", ButtonBar.ButtonData.CANCEL_CLOSE);
         getDialogPane().getButtonTypes().addAll(cancelButtonType, exportButtonType);
         
-        // 设置样式
+        // 设置样式与主题
         styleDialog();
+        String css = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (css != null && !css.isEmpty()) {
+            getDialogPane().getStylesheets().add(css);
+        }
         
         // 设置结果转换器
         setResultConverter(buttonType -> {
@@ -188,10 +192,5 @@ public class CanvasExportDialog extends Dialog<File> {
     }
     
     private void styleDialog() {
-        getDialogPane().setStyle(
-            "-fx-background-color: #FFFFFF; " +
-            "-fx-border-color: #E5E7EB; " +
-            "-fx-border-width: 1;"
-        );
     }
 }
