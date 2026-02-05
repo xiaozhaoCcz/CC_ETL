@@ -17,7 +17,7 @@ import javafx.util.converter.DoubleStringConverter;
  * @author cc-job-team
  * @since 2025-01-XX
  */
-public class NodeStyleDialog extends Dialog<Void> {
+public class NodeStyleDialog extends Dialog<Boolean> {
     
     private ProcessNode node;
     private ColorPicker colorPicker;
@@ -53,10 +53,11 @@ public class NodeStyleDialog extends Dialog<Void> {
         // 设置样式
         styleDialog();
         
-        // 设置结果转换器
+        // 设置结果转换器：保存时返回 true 以便调用方执行撤销入栈等逻辑，取消时返回 null
         setResultConverter(buttonType -> {
             if (buttonType == saveButtonType) {
                 applyStyles();
+                return Boolean.TRUE;
             }
             return null;
         });

@@ -1,6 +1,8 @@
 package com.cc.job.gui.view;
 
 import com.cc.job.gui.history.CanvasAction;
+import com.cc.job.gui.history.EdgeStyleSnapshot;
+import com.cc.job.gui.history.NodeStyleSnapshot;
 import com.cc.job.gui.history.UndoRedoManager;
 import com.cc.job.gui.manager.*;
 import com.cc.job.gui.model.ConditionNode;
@@ -23,6 +25,7 @@ import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Line;
+import javafx.scene.transform.Scale;
 import javafx.util.Duration;
 
 import java.util.*;
@@ -145,6 +148,7 @@ public class NodeCanvas extends Pane {
         nodeManager = new CanvasNodeManager(this, nodes, this::notifyNodeStructureChanged, this::log);
         connectionManager = new CanvasConnectionManager(this, connections, groupContainers, conditionNodes, this::notifyNodeStructureChanged, this::log);
         connectionManager.setOnRequestRemoveConnection(conn -> removeConnection(conn, true));
+        connectionManager.setOnRecordEdgeStyleChange(this::recordEdgeStyleChange);
         selectionManager = new CanvasSelectionManager(this, nodes, connections, this::log, this::notifyNodeStructureChanged);
         dataLoader = new CanvasDataLoader(this::log);
         layoutManager = new CanvasLayoutManager(this::log);
@@ -590,6 +594,15 @@ public class NodeCanvas extends Pane {
      */
     private void performSmoothScroll(ProcessNode node) {
         if (node == null || hostingScrollPane == null) return;
+        
+        // 缩小画布时禁用边缘自动滚动，避免与节点增量拖拽产生反向滚动正反馈
+        for (javafx.scene.transform.Transform t : getTransforms()) {
+            if (t instanceof Scale) {
+                Scale s = (Scale) t;
+                if (s.getX() < 1.0 || s.getY() < 1.0) return;
+                break;
+            }
+        }
         
         double nodeX = node.getLayoutX();
         double nodeY = node.getLayoutY();
@@ -4168,6 +4181,106 @@ public class NodeCanvas extends Pane {
             }
             notifyNodeStructureChanged();
         }
+    }
+    
+    /** 节点样式变更：颜色、大小、边框样式与粗细，支持撤销/重做 */
+    private class NodeStyleAction implements CanvasAction {
+        private final ProcessNode node;
+        private final NodeStyleSnapshot oldSnapshot;
+        private final NodeStyleSnapshot newSnapshot;
+        
+        NodeStyleAction(ProcessNode node, NodeStyleSnapshot oldSnapshot, NodeStyleSnapshot newSnapshot) {
+            this.node = node;
+            this.oldSnapshot = oldSnapshot;
+            this.newSnapshot = newSnapshot;
+        }
+        
+        @Override
+        public void undo() {
+            if (oldSnapshot != null && node != null) oldSnapshot.applyTo(node);
+        }
+        
+        @Override
+        public void redo() {
+            if (newSnapshot != null && node != null) newSnapshot.applyTo(node);
+        }
+    }
+    
+    /** 节点拖拽调整大小，支持撤销/重做 */
+    private class NodeResizeAction implements CanvasAction {
+        private final ProcessNode node;
+        private final double oldWidth;
+        private final double oldHeight;
+        private final double newWidth;
+        private final double newHeight;
+        
+        NodeResizeAction(ProcessNode node, double oldWidth, double oldHeight, double newWidth, double newHeight) {
+            this.node = node;
+            this.oldWidth = oldWidth;
+            this.oldHeight = oldHeight;
+            this.newWidth = newWidth;
+            this.newHeight = newHeight;
+        }
+        
+        @Override
+        public void undo() {
+            if (node != null) node.setNodeSize(oldWidth, oldHeight);
+        }
+        
+        @Override
+        public void redo() {
+            if (node != null) node.setNodeSize(newWidth, newHeight);
+        }
+    }
+    
+    /** 连线样式变更：样式、颜色、标签，支持撤销/重做 */
+    private class EdgeStyleAction implements CanvasAction {
+        private final NodeConnection conn;
+        private final EdgeStyleSnapshot oldSnapshot;
+        private final EdgeStyleSnapshot newSnapshot;
+        
+        EdgeStyleAction(NodeConnection conn, EdgeStyleSnapshot oldSnapshot, EdgeStyleSnapshot newSnapshot) {
+            this.conn = conn;
+            this.oldSnapshot = oldSnapshot;
+            this.newSnapshot = newSnapshot;
+        }
+        
+        @Override
+        public void undo() {
+            if (oldSnapshot != null && conn != null) oldSnapshot.applyTo(conn);
+        }
+        
+        @Override
+        public void redo() {
+            if (newSnapshot != null && conn != null) newSnapshot.applyTo(conn);
+        }
+    }
+    
+    /**
+     * 记录节点样式变更（颜色、大小、边框），用于撤销/重做；仅当快照不同时入栈。
+     */
+    public void recordNodeStyleChange(ProcessNode node, NodeStyleSnapshot oldSnapshot, NodeStyleSnapshot newSnapshot) {
+        if (node == null || oldSnapshot == null || newSnapshot == null) return;
+        if (oldSnapshot.equals(newSnapshot)) return;
+        pushAction(new NodeStyleAction(node, oldSnapshot, newSnapshot));
+    }
+    
+    /**
+     * 记录节点拖拽调整大小，用于撤销/重做；仅当尺寸实际变化时入栈。
+     */
+    public void recordNodeResize(ProcessNode node, double oldW, double oldH, double newW, double newH) {
+        if (node == null) return;
+        if (oldW == newW && oldH == newH) return;
+        pushAction(new NodeResizeAction(node, oldW, oldH, newW, newH));
+    }
+    
+    /**
+     * 记录连线样式变更，用于撤销/重做；仅当快照不同时入栈。
+     */
+    public void recordEdgeStyleChange(NodeConnection conn, EdgeStyleSnapshot oldSnapshot, EdgeStyleSnapshot newSnapshot) {
+        if (conn == null || oldSnapshot == null || newSnapshot == null) return;
+        if (oldSnapshot.equals(newSnapshot)) return;
+        pushAction(new EdgeStyleAction(conn, oldSnapshot, newSnapshot));
     }
     
     // ==================== 智能对齐相关方法 ====================

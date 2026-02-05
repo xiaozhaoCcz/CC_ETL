@@ -1,5 +1,6 @@
 package com.cc.job.gui.manager;
 
+import com.cc.job.gui.history.NodeStyleSnapshot;
 import com.cc.job.gui.model.ProcessNode;
 import com.cc.job.gui.service.JobInfoService;
 import com.cc.job.gui.util.NotificationToast;
@@ -203,9 +204,11 @@ public class NodeCallbackConfigurator {
                     logger.warn("⚠ 无法获取主窗口，无法显示样式设置对话框");
                     return;
                 }
+                NodeStyleSnapshot oldSnapshot = NodeStyleSnapshot.from(node);
                 com.cc.job.gui.view.NodeStyleDialog dialog = new com.cc.job.gui.view.NodeStyleDialog(stage, node);
                 dialog.showAndWait().ifPresent(result -> {
-                    // 对话框已经应用了样式，这里只需要触发保存回调
+                    NodeStyleSnapshot newSnapshot = NodeStyleSnapshot.from(node);
+                    canvas.recordNodeStyleChange(node, oldSnapshot, newSnapshot);
                     if (onColorChangedCallback != null) {
                         onColorChangedCallback.run();
                     }
@@ -213,6 +216,10 @@ public class NodeCallbackConfigurator {
                 });
             });
         });
+        
+        // 拖拽调整大小结束：入撤销/重做栈
+        node.setOnResizeFinished(record -> canvas.recordNodeResize(node,
+            record.getOldWidth(), record.getOldHeight(), record.getNewWidth(), record.getNewHeight()));
         
         // 编辑标签回调
         node.setOnEditTags(() -> {

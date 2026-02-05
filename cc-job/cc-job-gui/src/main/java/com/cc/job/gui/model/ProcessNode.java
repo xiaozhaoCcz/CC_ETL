@@ -41,6 +41,12 @@ public class ProcessNode extends StackPane {
     private double mouseOffsetInNodeX;
     private double mouseOffsetInNodeY;
     
+    // 拖拽增量计算：上一帧的 scene 与 layout，用于避免视口滚动导致节点方向错误
+    private double lastSceneX;
+    private double lastSceneY;
+    private double lastLayoutX;
+    private double lastLayoutY;
+    
     // 连接点
     private Circle topConnector;
     private Circle bottomConnector;
@@ -92,6 +98,27 @@ public class ProcessNode extends StackPane {
 
     // 保存为节点模板回调
     private Runnable onSaveAsTemplate;
+    
+    /** 拖拽调整大小结束回调，用于撤销/重做入栈；参数为 (旧宽, 旧高, 新宽, 新高) */
+    private Consumer<ResizeRecord> onResizeFinished;
+    
+    /** 节点调整大小记录，用于撤销/重做 */
+    public static final class ResizeRecord {
+        private final double oldWidth;
+        private final double oldHeight;
+        private final double newWidth;
+        private final double newHeight;
+        public ResizeRecord(double oldWidth, double oldHeight, double newWidth, double newHeight) {
+            this.oldWidth = oldWidth;
+            this.oldHeight = oldHeight;
+            this.newWidth = newWidth;
+            this.newHeight = newHeight;
+        }
+        public double getOldWidth() { return oldWidth; }
+        public double getOldHeight() { return oldHeight; }
+        public double getNewWidth() { return newWidth; }
+        public double getNewHeight() { return newHeight; }
+    }
     
     public interface DisableNodeCallback {
         void onDisableNode(Long jobId, boolean isDisabled);
@@ -382,7 +409,13 @@ public class ProcessNode extends StackPane {
         
         resizeHandle.setOnMouseReleased(e -> {
             if (isResizing) {
+                double oldW = resizeStartWidth;
+                double oldH = resizeStartHeight;
                 isResizing = false;
+                // 尺寸实际变化时通知撤销/重做
+                if (onResizeFinished != null && (oldW != nodeWidth || oldH != nodeHeight)) {
+                    onResizeFinished.accept(new ResizeRecord(oldW, oldH, nodeWidth, nodeHeight));
+                }
                 // 触发样式变更回调，用于保存到数据库
                 if (onColorChanged != null) {
                     onColorChanged.run();
@@ -534,11 +567,15 @@ public class ProcessNode extends StackPane {
                 initialLayoutY = this.getLayoutY();
                 
                 // 优化：记录鼠标在节点内部的偏移位置（使用节点局部坐标）
-                // 这样当画布扩展或滚动时，拖拽计算不会受到影响
                 mouseOffsetInNodeX = e.getX();
                 mouseOffsetInNodeY = e.getY();
                 
-                // 同时保留旧的计算方式作为备份
+                // 增量拖拽：记录首帧的 scene 与 layout，用于按位移增量更新位置，避免视口滚动导致方向错误
+                lastSceneX = e.getSceneX();
+                lastSceneY = e.getSceneY();
+                lastLayoutX = this.getLayoutX();
+                lastLayoutY = this.getLayoutY();
+                
                 dragStartX = e.getSceneX() - this.getLayoutX();
                 dragStartY = e.getSceneY() - this.getLayoutY();
                 
@@ -551,18 +588,18 @@ public class ProcessNode extends StackPane {
             }
         });
         
-        // 拖拽中
+        // 拖拽中：使用鼠标位移增量更新位置，避免画布缩小+视口自动滚动时节点方向错误
         this.setOnMouseDragged(e -> {
             if (e.isPrimaryButtonDown() && !isConnectorClick(e.getTarget())) {
-                // 优化：使用父容器坐标系计算新位置
-                // 将场景坐标转换为父容器（画布）坐标
                 javafx.scene.Node parent = this.getParent();
                 if (parent != null) {
-                    Point2D parentCoords = parent.sceneToLocal(e.getSceneX(), e.getSceneY());
+                    Point2D currentInParent = parent.sceneToLocal(e.getSceneX(), e.getSceneY());
+                    Point2D lastInParent = parent.sceneToLocal(lastSceneX, lastSceneY);
+                    double deltaX = currentInParent.getX() - lastInParent.getX();
+                    double deltaY = currentInParent.getY() - lastInParent.getY();
                     
-                    // 新位置 = 鼠标在父容器中的位置 - 鼠标在节点内的偏移
-                    double newX = parentCoords.getX() - mouseOffsetInNodeX;
-                    double newY = parentCoords.getY() - mouseOffsetInNodeY;
+                    double newX = lastLayoutX + deltaX;
+                    double newY = lastLayoutY + deltaY;
                     
                     double adjustedX = Math.max(0, newX);
                     double adjustedY = Math.max(0, newY);
@@ -578,11 +615,16 @@ public class ProcessNode extends StackPane {
                     this.setLayoutX(adjustedX);
                     this.setLayoutY(adjustedY);
                     
+                    // 更新本帧为下一帧的“上一帧”
+                    lastSceneX = e.getSceneX();
+                    lastSceneY = e.getSceneY();
+                    lastLayoutX = this.getLayoutX();
+                    lastLayoutY = this.getLayoutY();
+                    
                     if (onPositionChanged != null) {
                         onPositionChanged.accept(this);
                     }
                     
-                    // 触发拖动回调
                     if (onDragged != null) {
                         onDragged.run();
                     }
@@ -1175,6 +1217,8 @@ public class ProcessNode extends StackPane {
     public void adjustDragStart(double deltaX, double deltaY) {
         dragStartX += deltaX;
         dragStartY += deltaY;
+        lastLayoutX += deltaX;
+        lastLayoutY += deltaY;
     }
 
     public interface DragFinishedListener {
@@ -1556,6 +1600,13 @@ public class ProcessNode extends StackPane {
      */
     public void setOnChangeStyle(Runnable callback) {
         this.onChangeStyle = callback;
+    }
+    
+    /**
+     * 设置拖拽调整大小结束回调，用于撤销/重做入栈。
+     */
+    public void setOnResizeFinished(Consumer<ResizeRecord> callback) {
+        this.onResizeFinished = callback;
     }
     
     /**

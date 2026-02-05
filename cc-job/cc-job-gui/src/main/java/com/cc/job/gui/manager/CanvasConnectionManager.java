@@ -2,6 +2,7 @@ package com.cc.job.gui.manager;
 
 import com.cc.job.gui.model.ConditionNode;
 import com.cc.job.gui.model.GroupContainer;
+import com.cc.job.gui.history.EdgeStyleSnapshot;
 import com.cc.job.gui.model.NodeConnection;
 import com.cc.job.gui.model.ProcessNode;
 import com.cc.job.gui.view.EdgeStyleDialog;
@@ -32,6 +33,14 @@ public class CanvasConnectionManager {
     private Stage ownerStage; // 主窗口Stage，用于打开对话框
     /** 由画布设置：请求删除连接时调用（可带 recordHistory），用于撤销入栈 */
     private Consumer<NodeConnection> onRequestRemoveConnection;
+    /** 由画布设置：连线样式变更时调用，用于撤销/重做入栈 */
+    private EdgeStyleChangeRecordCallback onRecordEdgeStyleChange;
+    
+    /** 连线样式变更记录回调，参数为 (连接, 旧快照, 新快照) */
+    @FunctionalInterface
+    public interface EdgeStyleChangeRecordCallback {
+        void record(NodeConnection conn, EdgeStyleSnapshot oldSnapshot, EdgeStyleSnapshot newSnapshot);
+    }
     
     public CanvasConnectionManager(Pane canvas, List<NodeConnection> connections, 
                                    List<GroupContainer> groupContainers,
@@ -58,6 +67,13 @@ public class CanvasConnectionManager {
      */
     public void setOnRequestRemoveConnection(Consumer<NodeConnection> callback) {
         this.onRequestRemoveConnection = callback;
+    }
+    
+    /**
+     * 设置连线样式变更记录回调，用于撤销/重做入栈。
+     */
+    public void setOnRecordEdgeStyleChange(EdgeStyleChangeRecordCallback callback) {
+        this.onRecordEdgeStyleChange = callback;
     }
     
     /**
@@ -191,6 +207,7 @@ public class CanvasConnectionManager {
                     return;
                 }
                 
+                EdgeStyleSnapshot oldSnapshot = EdgeStyleSnapshot.from(connection);
                 EdgeStyleDialog dialog = new EdgeStyleDialog(stageToUse, connection);
                 java.util.Optional<NodeConnection.EdgeStyle> result = dialog.showAndWait();
                 if (result.isPresent()) {
@@ -215,6 +232,10 @@ public class CanvasConnectionManager {
                         connection.setLabelText("");
                     }
                     
+                    if (onRecordEdgeStyleChange != null) {
+                        EdgeStyleSnapshot newSnapshot = EdgeStyleSnapshot.from(connection);
+                        onRecordEdgeStyleChange.record(connection, oldSnapshot, newSnapshot);
+                    }
                     notifyChanged.run();
                     logger.accept("✓ 连线样式已更新");
                 }
@@ -261,6 +282,7 @@ public class CanvasConnectionManager {
                     return;
                 }
                 
+                EdgeStyleSnapshot oldSnapshot = EdgeStyleSnapshot.from(connection);
                 EdgeStyleDialog dialog = new EdgeStyleDialog(stageToUse, connection);
                 java.util.Optional<NodeConnection.EdgeStyle> result = dialog.showAndWait();
                 if (result.isPresent()) {
@@ -285,6 +307,10 @@ public class CanvasConnectionManager {
                         connection.setLabelText("");
                     }
                     
+                    if (onRecordEdgeStyleChange != null) {
+                        EdgeStyleSnapshot newSnapshot = EdgeStyleSnapshot.from(connection);
+                        onRecordEdgeStyleChange.record(connection, oldSnapshot, newSnapshot);
+                    }
                     notifyChanged.run();
                     logger.accept("✓ 连线样式已更新");
                 }
