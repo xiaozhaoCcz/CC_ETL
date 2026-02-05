@@ -1,6 +1,7 @@
 package com.cc.job.gui.view;
 
 import com.cc.job.gui.service.JobInfoService;
+import com.cc.job.gui.util.StyleUtil;
 import com.cc.job.xo.model.entity.JobLogglue;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -174,7 +175,7 @@ public class GlueIdeDialog extends Dialog<Void> {
         
         // 代码编辑器
         Label codeLabel = new Label("代码编辑区");
-        codeLabel.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #1F2937;");
+        codeLabel.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: " + StyleUtil.textPrimaryColor() + ";");
         
         // 使用 CodeArea 实现语法高亮
         codeEditorArea = new CodeArea();
@@ -219,7 +220,7 @@ public class GlueIdeDialog extends Dialog<Void> {
         
         // 备注输入框
         Label remarkLabel = new Label("备注*");
-        remarkLabel.setStyle("-fx-font-size: 13; -fx-text-fill: #374151;");
+        remarkLabel.setStyle("-fx-font-size: 13; -fx-text-fill: " + StyleUtil.textPrimaryColor() + ";");
         
         remarkField = new TextField();
         remarkField.setPrefWidth(600);
@@ -227,7 +228,7 @@ public class GlueIdeDialog extends Dialog<Void> {
         
         // 选择历史下拉框
         Label historyLabel = new Label("选择历史");
-        historyLabel.setStyle("-fx-font-size: 13; -fx-text-fill: #374151;");
+        historyLabel.setStyle("-fx-font-size: 13; -fx-text-fill: " + StyleUtil.textPrimaryColor() + ";");
         
         historyList = FXCollections.observableArrayList();
         historyCombo = new ComboBox<>(historyList);

@@ -1,5 +1,6 @@
 package com.cc.job.gui.model;
 
+import com.cc.job.gui.util.StyleUtil;
 import javafx.geometry.Insets;
 import javafx.scene.Cursor;
 import javafx.scene.control.ContextMenu;
@@ -92,29 +93,38 @@ public class GroupContainer extends StackPane {
 
         header = new VBox();
         header.setPadding(new Insets(6, 10, 6, 10));
-        header.setStyle("-fx-background-color: rgba(99,102,241,0.10); -fx-background-radius: 10 10 0 0;");
+        boolean dark = StyleUtil.isDarkTheme();
+        if (dark) {
+            header.setStyle("-fx-background-color: #2D2D30; -fx-background-radius: 10 10 0 0;");
+        } else {
+            header.setStyle("-fx-background-color: rgba(99,102,241,0.10); -fx-background-radius: 10 10 0 0;");
+        }
 
-        // 顶部栏：左标题 + 右上角 +/- 按钮
         HBox headerBar = new HBox();
         headerBar.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
 
         titleLabel = new Label(groupName);
-        titleLabel.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: #3730A3;");
+        titleLabel.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: " + (dark ? "#569CD6" : "#3730A3") + ";");
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         toggleBtn = new Label("-");
-        toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #3730A3; -fx-background-color: rgba(99,102,241,0.12); -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;");
+        if (dark) {
+            toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #569CD6; -fx-background-color: #3C3C3C; -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;");
+            toggleBtn.setOnMouseEntered(e -> toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: white; -fx-background-color: #007ACC; -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;"));
+            toggleBtn.setOnMouseExited(e -> toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #569CD6; -fx-background-color: #3C3C3C; -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;"));
+        } else {
+            toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #3730A3; -fx-background-color: rgba(99,102,241,0.12); -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;");
+            toggleBtn.setOnMouseEntered(e -> toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: white; -fx-background-color: #2563EB; -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;"));
+            toggleBtn.setOnMouseExited(e -> toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #3730A3; -fx-background-color: rgba(99,102,241,0.12); -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;"));
+        }
         toggleBtn.setOnMouseClicked(e -> {
             toggle();
             e.consume();
         });
-        toggleBtn.setOnMouseEntered(e -> toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: white; -fx-background-color: #2563EB; -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;"));
-        toggleBtn.setOnMouseExited(e -> toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #3730A3; -fx-background-color: rgba(99,102,241,0.12); -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;"));
 
-        // 缩放比例显示标签
         zoomLabel = new Label("100%");
-        zoomLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #2563EB; -fx-background-color: rgba(37,99,235,0.12); -fx-padding: 2 6 2 6; -fx-background-radius: 4;");
+        zoomLabel.setStyle("-fx-font-size: 11; -fx-text-fill: " + (dark ? "#569CD6" : "#2563EB") + "; -fx-background-color: " + (dark ? "#3C3C3C" : "rgba(37,99,235,0.12)") + "; -fx-padding: 2 6 2 6; -fx-background-radius: 4;");
 
         headerBar.getChildren().addAll(titleLabel, spacer, zoomLabel, toggleBtn);
         header.getChildren().add(headerBar);

@@ -2,7 +2,7 @@ package com.cc.job.gui.view;
 
 import com.cc.job.gui.service.LoginService;
 import com.cc.job.gui.util.ConfigManager;
-import com.cc.job.gui.util.StyleUtil;
+import com.cc.job.gui.util.ThemeManager;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -41,10 +41,8 @@ public class LoginView extends StackPane {
     }
     
     private void initializeUI() {
-        // 设置背景渐变
-        setStyle(
-            "-fx-background-color: linear-gradient(135deg, #667EEA 0%, #764BA2 100%);"
-        );
+        getStyleClass().add("login-root");
+        applyRootBackground();
         
         // 创建登录卡片
         VBox loginCard = createLoginCard();
@@ -53,6 +51,15 @@ public class LoginView extends StackPane {
         Pane decorations = createDecorations();
         
         getChildren().addAll(decorations, loginCard);
+    }
+    
+    private void applyRootBackground() {
+        boolean dark = "dark".equals(ThemeManager.getInstance().getTheme());
+        if (dark) {
+            setStyle("-fx-background-color: linear-gradient(135deg, #252526 0%, #1E1E1E 100%);");
+        } else {
+            setStyle("-fx-background-color: linear-gradient(135deg, #667EEA 0%, #764BA2 100%);");
+        }
     }
     
     /**
@@ -111,21 +118,16 @@ public class LoginView extends StackPane {
         card.setMaxWidth(420);
         card.setMaxHeight(550);
         card.setPadding(new Insets(48, 48, 48, 48));
-        card.setStyle(
-            "-fx-background-color: transparent;"
-        );
+        card.getStyleClass().add("login-card");
         
         // Logo/图标区域
         VBox logoArea = createLogoArea();
         
-        // 标题（改为深色，提高对比度）
         Label titleLabel = new Label("欢迎回来");
-        titleLabel.setFont(Font.font("System", FontWeight.BOLD, 28));
-        titleLabel.setTextFill(Color.web("#1F2937")); // 深灰色，在浅色渐变背景上清晰可见
+        titleLabel.getStyleClass().add("login-title");
         
         Label subtitleLabel = new Label("登录以继续使用 CC_ETL");
-        subtitleLabel.setFont(Font.font("System", FontWeight.NORMAL, 14));
-        subtitleLabel.setTextFill(Color.web("#4B5563")); // 中灰色，清晰可读
+        subtitleLabel.getStyleClass().add("login-subtitle");
         
         // 表单区域
         VBox formArea = createFormArea();
@@ -135,13 +137,7 @@ public class LoginView extends StackPane {
         errorLabel.setVisible(false);
         errorLabel.setWrapText(true);
         errorLabel.setMaxWidth(320);
-        errorLabel.setStyle(
-            "-fx-background-color: #FEE2E2; " +
-            "-fx-text-fill: #DC2626; " +
-            "-fx-padding: 12 16; " +
-            "-fx-background-radius: 8; " +
-            "-fx-font-size: 13px;"
-        );
+        errorLabel.getStyleClass().add("login-error");
         
         // 登录按钮
         HBox buttonArea = createButtonArea();
@@ -196,159 +192,39 @@ public class LoginView extends StackPane {
         form.setAlignment(Pos.CENTER);
         form.setMaxWidth(320);
         
-        // 用户名输入框（标签改为深色）
         VBox usernameBox = new VBox(8);
         Label usernameLabel = new Label("用户名");
-        usernameLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
-        usernameLabel.setTextFill(Color.web("#374151")); // 深灰色，清晰可读
+        usernameLabel.getStyleClass().add("login-label");
         
         usernameField = new TextField();
         usernameField.setPromptText("请输入用户名");
         usernameField.setPrefHeight(44);
-        usernameField.setStyle(
-            "-fx-background-color: #F9FAFB; " +
-            "-fx-border-color: #E5E7EB; " +
-            "-fx-border-width: 1; " +
-            "-fx-border-radius: 8; " +
-            "-fx-background-radius: 8; " +
-            "-fx-padding: 12 16; " +
-            "-fx-font-size: 14px; " +
-            "-fx-text-fill: #111827;"
-        );
-        
-        // 聚焦时的样式
-        usernameField.focusedProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal) {
-                usernameField.setStyle(
-                    "-fx-background-color: white; " +
-                    "-fx-border-color: #667EEA; " +
-                    "-fx-border-width: 2; " +
-                    "-fx-border-radius: 8; " +
-                    "-fx-background-radius: 8; " +
-                    "-fx-padding: 12 16; " +
-                    "-fx-font-size: 14px; " +
-                    "-fx-text-fill: #111827; " +
-                    "-fx-effect: dropshadow(gaussian, rgba(102, 126, 234, 0.25), 8, 0, 0, 0);"
-                );
-            } else {
-                usernameField.setStyle(
-                    "-fx-background-color: #F9FAFB; " +
-                    "-fx-border-color: #E5E7EB; " +
-                    "-fx-border-width: 1; " +
-                    "-fx-border-radius: 8; " +
-                    "-fx-background-radius: 8; " +
-                    "-fx-padding: 12 16; " +
-                    "-fx-font-size: 14px; " +
-                    "-fx-text-fill: #111827;"
-                );
-            }
-        });
+        usernameField.getStyleClass().add("login-field");
         
         usernameBox.getChildren().addAll(usernameLabel, usernameField);
         
-        // 密码输入框（标签改为深色）
         VBox passwordBox = new VBox(8);
         Label passwordLabel = new Label("密码");
-        passwordLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
-        passwordLabel.setTextFill(Color.web("#374151")); // 深灰色，清晰可读
+        passwordLabel.getStyleClass().add("login-label");
         
         passwordField = new PasswordField();
         passwordField.setPromptText("请输入密码");
         passwordField.setPrefHeight(44);
-        passwordField.setStyle(
-            "-fx-background-color: #F9FAFB; " +
-            "-fx-border-color: #E5E7EB; " +
-            "-fx-border-width: 1; " +
-            "-fx-border-radius: 8; " +
-            "-fx-background-radius: 8; " +
-            "-fx-padding: 12 16; " +
-            "-fx-font-size: 14px; " +
-            "-fx-text-fill: #111827;"
-        );
-        
-        // 聚焦时的样式
-        passwordField.focusedProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal) {
-                passwordField.setStyle(
-                    "-fx-background-color: white; " +
-                    "-fx-border-color: #667EEA; " +
-                    "-fx-border-width: 2; " +
-                    "-fx-border-radius: 8; " +
-                    "-fx-background-radius: 8; " +
-                    "-fx-padding: 12 16; " +
-                    "-fx-font-size: 14px; " +
-                    "-fx-text-fill: #111827; " +
-                    "-fx-effect: dropshadow(gaussian, rgba(102, 126, 234, 0.25), 8, 0, 0, 0);"
-                );
-            } else {
-                passwordField.setStyle(
-                    "-fx-background-color: #F9FAFB; " +
-                    "-fx-border-color: #E5E7EB; " +
-                    "-fx-border-width: 1; " +
-                    "-fx-border-radius: 8; " +
-                    "-fx-background-radius: 8; " +
-                    "-fx-padding: 12 16; " +
-                    "-fx-font-size: 14px; " +
-                    "-fx-text-fill: #111827;"
-                );
-            }
-        });
-        
-        // 按Enter键登录
+        passwordField.getStyleClass().add("login-field");
         passwordField.setOnAction(e -> handleLogin());
         
         passwordBox.getChildren().addAll(passwordLabel, passwordField);
         
-        // 后台地址输入框
         VBox serverUrlBox = new VBox(8);
         Label serverUrlLabel = new Label("后台地址");
-        serverUrlLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
-        serverUrlLabel.setTextFill(Color.web("#374151"));
+        serverUrlLabel.getStyleClass().add("login-label");
         
         serverUrlField = new TextField();
         serverUrlField.setPromptText("请输入后台地址，如: http://localhost:8989");
         serverUrlField.setPrefHeight(44);
-        // 加载保存的配置
         String savedUrl = configManager.getBaseUrl();
         serverUrlField.setText(savedUrl != null ? savedUrl : "http://localhost:8989");
-        serverUrlField.setStyle(
-            "-fx-background-color: #F9FAFB; " +
-            "-fx-border-color: #E5E7EB; " +
-            "-fx-border-width: 1; " +
-            "-fx-border-radius: 8; " +
-            "-fx-background-radius: 8; " +
-            "-fx-padding: 12 16; " +
-            "-fx-font-size: 14px; " +
-            "-fx-text-fill: #111827;"
-        );
-        
-        // 聚焦时的样式
-        serverUrlField.focusedProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal) {
-                serverUrlField.setStyle(
-                    "-fx-background-color: white; " +
-                    "-fx-border-color: #667EEA; " +
-                    "-fx-border-width: 2; " +
-                    "-fx-border-radius: 8; " +
-                    "-fx-background-radius: 8; " +
-                    "-fx-padding: 12 16; " +
-                    "-fx-font-size: 14px; " +
-                    "-fx-text-fill: #111827; " +
-                    "-fx-effect: dropshadow(gaussian, rgba(102, 126, 234, 0.25), 8, 0, 0, 0);"
-                );
-            } else {
-                serverUrlField.setStyle(
-                    "-fx-background-color: #F9FAFB; " +
-                    "-fx-border-color: #E5E7EB; " +
-                    "-fx-border-width: 1; " +
-                    "-fx-border-radius: 8; " +
-                    "-fx-background-radius: 8; " +
-                    "-fx-padding: 12 16; " +
-                    "-fx-font-size: 14px; " +
-                    "-fx-text-fill: #111827;"
-                );
-            }
-        });
+        serverUrlField.getStyleClass().add("login-field");
         
         serverUrlBox.getChildren().addAll(serverUrlLabel, serverUrlField);
         
@@ -365,48 +241,11 @@ public class LoginView extends StackPane {
         buttonBox.setAlignment(Pos.CENTER);
         buttonBox.setMaxWidth(320);
         
-        // 登录按钮
         loginButton = new Button("登录");
         loginButton.setPrefHeight(44);
         loginButton.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(loginButton, Priority.ALWAYS);
-        loginButton.setStyle(
-            "-fx-background-color: linear-gradient(135deg, #667EEA 0%, #764BA2 100%); " +
-            "-fx-text-fill: black; " +
-            "-fx-font-size: 15px; " +
-            "-fx-font-weight: 600; " +
-            "-fx-background-radius: 8; " +
-            "-fx-cursor: hand; " +
-            "-fx-effect: dropshadow(gaussian, rgba(102, 126, 234, 0.4), 8, 0, 0, 2);"
-        );
-        
-        // 悬停效果
-        loginButton.setOnMouseEntered(e -> {
-            loginButton.setStyle(
-                "-fx-background-color: linear-gradient(135deg, #5568D3 0%, #6941C6 100%); " +
-                "-fx-text-fill: black; " +
-                "-fx-font-size: 15px; " +
-                "-fx-font-weight: 600; " +
-                "-fx-background-radius: 8; " +
-                "-fx-cursor: hand; " +
-                "-fx-effect: dropshadow(gaussian, rgba(102, 126, 234, 0.6), 12, 0, 0, 4);"
-            );
-        });
-        
-        loginButton.setOnMouseExited(e -> {
-            if (!loginButton.isDisabled()) {
-                loginButton.setStyle(
-                    "-fx-background-color: linear-gradient(135deg, #667EEA 0%, #764BA2 100%); " +
-                    "-fx-text-fill: black; " +
-                    "-fx-font-size: 15px; " +
-                    "-fx-font-weight: 600; " +
-                    "-fx-background-radius: 8; " +
-                    "-fx-cursor: hand; " +
-                    "-fx-effect: dropshadow(gaussian, rgba(102, 126, 234, 0.4), 8, 0, 0, 2);"
-                );
-            }
-        });
-        
+        loginButton.getStyleClass().add("login-primary-btn");
         loginButton.setOnAction(e -> handleLogin());
         
         // 加载指示器
@@ -520,25 +359,10 @@ public class LoginView extends StackPane {
         
         if (loading) {
             loginButton.setText("登录中...");
-            loginButton.setStyle(
-                "-fx-background-color: #9CA3AF; " +
-                "-fx-text-fill: black; " +
-                "-fx-font-size: 15px; " +
-                "-fx-font-weight: 600; " +
-                "-fx-background-radius: 8; " +
-                "-fx-cursor: default;"
-            );
+            loginButton.getStyleClass().add("login-primary-btn-loading");
         } else {
             loginButton.setText("登录");
-            loginButton.setStyle(
-                "-fx-background-color: linear-gradient(135deg, #667EEA 0%, #764BA2 100%); " +
-                "-fx-text-fill: black; " +
-                "-fx-font-size: 15px; " +
-                "-fx-font-weight: 600; " +
-                "-fx-background-radius: 8; " +
-                "-fx-cursor: hand; " +
-                "-fx-effect: dropshadow(gaussian, rgba(102, 126, 234, 0.4), 8, 0, 0, 2);"
-            );
+            loginButton.getStyleClass().remove("login-primary-btn-loading");
         }
     }
     
@@ -550,22 +374,10 @@ public class LoginView extends StackPane {
         registerArea.setAlignment(Pos.CENTER);
         
         Label text = new Label("还没有账号？");
-        text.setFont(Font.font("System", 13));
-        text.setTextFill(Color.web("#4B5563")); // 中灰色，清晰可读
+        text.getStyleClass().add("login-subtitle");
         
         registerButton = new Button("立即注册");
-        registerButton.setFont(Font.font("System", FontWeight.BOLD, 13));
-        registerButton.setTextFill(Color.web("#667EEA"));
-        registerButton.setStyle(
-            "-fx-background-color: transparent; " +
-            "-fx-border-width: 0; " +
-            "-fx-cursor: hand; " +
-            "-fx-underline: true;"
-        );
-        
-        registerButton.setOnMouseEntered(e -> registerButton.setTextFill(Color.web("#5568D3")));
-        registerButton.setOnMouseExited(e -> registerButton.setTextFill(Color.web("#667EEA")));
-        
+        registerButton.getStyleClass().add("login-link");
         registerButton.setOnAction(e -> {
             if (onRegister != null) {
                 onRegister.run();

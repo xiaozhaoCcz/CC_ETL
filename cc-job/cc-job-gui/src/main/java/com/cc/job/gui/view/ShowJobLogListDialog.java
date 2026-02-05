@@ -281,7 +281,7 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         triggerMsgCol.setCellFactory(col -> new TableCell<>() {
             private final Hyperlink viewLink = new Hyperlink("查看");
             {
-                viewLink.setStyle("-fx-text-fill: " + StyleUtil.PRIMARY + ";");
+                viewLink.setStyle("-fx-text-fill: " + StyleUtil.linkPrimaryColor() + ";");
                 viewLink.setOnAction(e -> {
                     JobLogVO item = getTableView().getItems().get(getIndex());
                     if (item != null) {
@@ -325,7 +325,7 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         nodeStatusCol.setCellFactory(col -> new TableCell<>() {
             private final Hyperlink viewLink = new Hyperlink("查看");
             {
-                viewLink.setStyle("-fx-text-fill: " + StyleUtil.PRIMARY + ";");
+                viewLink.setStyle("-fx-text-fill: " + StyleUtil.linkPrimaryColor() + ";");
                 viewLink.setOnAction(e -> {
                     JobLogVO item = getTableView().getItems().get(getIndex());
                     if (item != null) {
@@ -353,7 +353,7 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         actionCol.setCellFactory(col -> new TableCell<>() {
             private final Hyperlink logLink = new Hyperlink("执行日志");
             {
-                logLink.setStyle("-fx-text-fill: " + StyleUtil.PRIMARY + ";");
+                logLink.setStyle("-fx-text-fill: " + StyleUtil.linkPrimaryColor() + ";");
                 logLink.setOnAction(e -> {
                     JobLogVO item = getTableView().getItems().get(getIndex());
                     if (item != null && item.getId() != null) {
@@ -590,10 +590,10 @@ public class ShowJobLogListDialog extends Dialog<Void> {
 
         // 标题信息
         Label titleLabel = new Label("任务组: " + safe(item.getJobDesc()));
-        titleLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #374151;");
+        titleLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: " + StyleUtil.textPrimaryColor() + ";");
         
         Label timeLabel = new Label("执行时间: " + formatTime(item.getHandleTime()));
-        timeLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #6B7280;");
+        timeLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: " + StyleUtil.textSecondaryColor() + ";");
 
         // 节点状态网格
         FlowPane nodeStatusGrid = createNodeStatusGrid(nodeStatusJson);
@@ -621,7 +621,7 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         
         if (nodeStatusJson == null || nodeStatusJson.trim().isEmpty()) {
             Label emptyLabel = new Label("暂无节点状态记录");
-            emptyLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #9CA3AF;");
+            emptyLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: " + StyleUtil.textSecondaryColor() + ";");
             grid.getChildren().add(emptyLabel);
             return grid;
         }
@@ -658,16 +658,26 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         VBox nodeCard = new VBox(8);
         nodeCard.setPadding(new Insets(12));
         nodeCard.setPrefWidth(180);
-        nodeCard.setStyle(
-            "-fx-background-color: #F9FAFB; " +
-            "-fx-border-color: #E5E7EB; " +
-            "-fx-border-width: 1; " +
-            "-fx-border-radius: 6; " +
-            "-fx-background-radius: 6;"
-        );
+        if (StyleUtil.isDarkTheme()) {
+            nodeCard.setStyle(
+                "-fx-background-color: #2D2D30; " +
+                "-fx-border-color: #3C3C3C; " +
+                "-fx-border-width: 1; " +
+                "-fx-border-radius: 6; " +
+                "-fx-background-radius: 6;"
+            );
+        } else {
+            nodeCard.setStyle(
+                "-fx-background-color: #F9FAFB; " +
+                "-fx-border-color: #E5E7EB; " +
+                "-fx-border-width: 1; " +
+                "-fx-border-radius: 6; " +
+                "-fx-background-radius: 6;"
+            );
+        }
         
         Label nameLabel = new Label(nodeName);
-        nameLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: 500; -fx-text-fill: #374151;");
+        nameLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: 500; -fx-text-fill: " + StyleUtil.textPrimaryColor() + ";");
         nameLabel.setWrapText(true);
         
         Label statusLabel = createStatusLabel(status);
@@ -748,7 +758,6 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         codeArea.setWrapText(false);
         codeArea.setParagraphGraphicFactory(LineNumberFactory.get(codeArea));
         codeArea.setStyle(
-            "-fx-background-color: #FAFAFA; " +
             "-fx-font-family: 'Consolas', 'Monaco', 'Courier New', monospace; " +
             "-fx-font-size: 13px;"
         );
@@ -778,7 +787,7 @@ public class ShowJobLogListDialog extends Dialog<Void> {
 
         // 使用VirtualizedScrollPane包装
         VirtualizedScrollPane<CodeArea> scrollPane = new VirtualizedScrollPane<>(codeArea);
-        scrollPane.setStyle("-fx-background-color: #FAFAFA; -fx-border-color: #E5E7EB; -fx-border-width: 1; -fx-border-radius: 6;");
+        scrollPane.setStyle(StyleUtil.dialogScrollPaneBackgroundStyle());
         VBox.setVgrow(scrollPane, Priority.ALWAYS);
 
         // 工具栏

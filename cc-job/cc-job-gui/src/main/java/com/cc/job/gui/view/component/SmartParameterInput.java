@@ -165,12 +165,10 @@ public class SmartParameterInput extends CodeArea {
                     HBox container = new HBox(8);
                     container.setAlignment(Pos.CENTER_LEFT);
                     
-                    // 节点名称标签
                     Label nameLabel = new Label(item.getName());
-                    nameLabel.setStyle(ParameterInputStyleUtil.AUTOCOMPLETE_ITEM_STYLE);
+                    nameLabel.setStyle(dark ? ParameterInputStyleUtil.AUTOCOMPLETE_ITEM_STYLE_DARK : ParameterInputStyleUtil.AUTOCOMPLETE_ITEM_STYLE);
                     container.getChildren().add(nameLabel);
                     
-                    // 节点类型标签（如果类型不为空）
                     if (item.getType() != null && !item.getType().isEmpty()) {
                         Label typeLabel = new Label("[" + item.getType() + "]");
                         String typeStyle = getNodeTypeStyle(item.getType());
@@ -178,8 +176,8 @@ public class SmartParameterInput extends CodeArea {
                         container.getChildren().add(typeLabel);
                     }
                     setGraphic(container);
-                    setText(null); // 清空文本，使用图形
-                    setStyle(ParameterInputStyleUtil.AUTOCOMPLETE_ITEM_STYLE);
+                    setText(null);
+                    setStyle(dark ? ParameterInputStyleUtil.AUTOCOMPLETE_ITEM_STYLE_DARK : ParameterInputStyleUtil.AUTOCOMPLETE_ITEM_STYLE);
                 }
             }
         });
@@ -867,8 +865,17 @@ public class SmartParameterInput extends CodeArea {
      * 获取节点类型对应的样式
      */
     private String getNodeTypeStyle(String type) {
+        boolean dark = "dark".equals(com.cc.job.gui.util.ThemeManager.getInstance().getTheme());
         if (type == null) {
-            return ParameterInputStyleUtil.NODE_TYPE_OTHER_STYLE;
+            return dark ? ParameterInputStyleUtil.NODE_TYPE_OTHER_STYLE_DARK : ParameterInputStyleUtil.NODE_TYPE_OTHER_STYLE;
+        }
+        if (dark) {
+            return switch (type.toUpperCase()) {
+                case "SQL" -> ParameterInputStyleUtil.NODE_TYPE_SQL_STYLE_DARK;
+                case "API" -> ParameterInputStyleUtil.NODE_TYPE_API_STYLE_DARK;
+                case "BEAN" -> ParameterInputStyleUtil.NODE_TYPE_BEAN_STYLE_DARK;
+                default -> ParameterInputStyleUtil.NODE_TYPE_OTHER_STYLE_DARK;
+            };
         }
         return switch (type.toUpperCase()) {
             case "SQL" -> ParameterInputStyleUtil.NODE_TYPE_SQL_STYLE;

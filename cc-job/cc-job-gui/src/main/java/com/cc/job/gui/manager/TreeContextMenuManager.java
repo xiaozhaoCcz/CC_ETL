@@ -1,6 +1,7 @@
 package com.cc.job.gui.manager;
 
 import com.cc.job.gui.model.TreeNodeData;
+import com.cc.job.gui.util.StyleUtil;
 import com.cc.job.gui.util.ThemeManager;
 import com.cc.job.gui.view.TaskTreeView;
 import javafx.application.Platform;
@@ -45,14 +46,14 @@ public class TreeContextMenuManager {
     
     private void createPartitionMenu(ContextMenu menu, TreeNodeData nodeData, Runnable onRefresh, Runnable onDelete) {
         MenuItem newTaskItem = new MenuItem("新建任务组");
-        newTaskItem.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: #2563EB;");
+        newTaskItem.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: " + StyleUtil.linkPrimaryColor() + ";");
         newTaskItem.setOnAction(e -> {
             if (selectionCallback != null) {
                 selectionCallback.onNewJobGroup(nodeData.getId(), nodeData.getLabel());
             }
         });
         MenuItem importTaskGroupItem = new MenuItem("导入任务组");
-        importTaskGroupItem.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: #2563EB;");
+        importTaskGroupItem.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: " + StyleUtil.linkPrimaryColor() + ";");
         importTaskGroupItem.setOnAction(e -> {
             if (selectionCallback != null) {
                 selectionCallback.onPartitionAction(nodeData.getId(), nodeData.getLabel(),
@@ -83,7 +84,7 @@ public class TreeContextMenuManager {
     
     private void createTaskGroupMenu(ContextMenu menu, TreeNodeData nodeData, Runnable onRefresh, Runnable onDelete) {
         MenuItem addNodeItem = new MenuItem("新增节点");
-        addNodeItem.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: #10B981;");
+        addNodeItem.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: " + (StyleUtil.isDarkTheme() ? "#4EC9B0" : "#10B981") + ";");
         addNodeItem.setOnAction(e -> {
             if (selectionCallback != null) {
                 selectionCallback.onNewJobNode(nodeData.getId(), nodeData.getLabel());

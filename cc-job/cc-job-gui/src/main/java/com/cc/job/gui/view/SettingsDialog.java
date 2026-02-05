@@ -210,14 +210,7 @@ public class SettingsDialog extends Dialog<Void> {
             configManager.setProperty("theme", themeKey);
             configManager.setProperty("default.zoom", defaultZoomField.getText());
             configManager.setProperty("animation.enabled", String.valueOf(animationCheckBox.isSelected()));
-            // 若主窗口已打开，立即应用新主题
-            if (ownerStage != null && ownerStage.getScene() != null) {
-                ownerStage.getScene().getStylesheets().clear();
-                String url = ThemeManager.getInstance().getStylesheetUrl();
-                if (url != null && !url.isEmpty()) {
-                    ownerStage.getScene().getStylesheets().add(url);
-                }
-            }
+            // 主窗口样式表与小地图刷新由 ThemeManager 的主题变更监听器统一处理
             return true;
         } catch (Exception e) {
             Alert alert = new Alert(Alert.AlertType.ERROR);

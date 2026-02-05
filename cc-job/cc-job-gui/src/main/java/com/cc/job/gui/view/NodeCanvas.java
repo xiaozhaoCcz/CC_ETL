@@ -12,6 +12,7 @@ import com.cc.job.gui.model.NodeConnection;
 import com.cc.job.gui.model.ProcessNode;
 import com.cc.job.gui.util.NodeGraphStateManager;
 import com.cc.job.gui.util.NodeStatusSyncManager;
+import com.cc.job.gui.util.ThemeManager;
 import javafx.animation.AnimationTimer;
 import javafx.animation.PauseTransition;
 import javafx.geometry.BoundingBox;
@@ -1721,29 +1722,32 @@ public class NodeCanvas extends Pane {
             gridBackgroundCanvas = null;
         }
         
+        boolean dark = "dark".equals(ThemeManager.getInstance().getTheme());
+        String bgColor = dark ? "#2D2D30" : "#FAFAFA";
         switch (theme) {
             case "default":
-                // 默认：纯色背景（与灰阶表中央画布 #FAFAFA 一致）
-                setStyle("-fx-background-color: #FAFAFA;");
+                setStyle("-fx-background-color: " + bgColor + ";");
                 log("✓ 已切换到默认主题");
                 break;
             case "grid":
-                // 框框：网格背景 - 使用Canvas绘制网格图案（更可靠）
-                setStyle("-fx-background-color: #FAFAFA;");
+                setStyle("-fx-background-color: " + bgColor + ";");
                 createGridBackground();
                 log("✓ 已切换到框框主题");
                 break;
             case "dots":
-                // 圆点：圆点背景 - 使用Canvas绘制圆点图案
-                setStyle("-fx-background-color: #FAFAFA;");
+                setStyle("-fx-background-color: " + bgColor + ";");
                 createDotsBackground();
                 log("✓ 已切换到圆点主题");
                 break;
             default:
-                setStyle("-fx-background-color: #FAFAFA;");
+                setStyle("-fx-background-color: " + bgColor + ";");
                 log("⚠️ 未知主题，已切换到默认主题");
                 break;
         }
+    }
+    
+    private static String getCanvasGridDotColor() {
+        return "dark".equals(ThemeManager.getInstance().getTheme()) ? "#505050" : "#D1D5DB";
     }
     
     /**
@@ -1761,7 +1765,7 @@ public class NodeCanvas extends Pane {
         dotsBackgroundCanvas.toBack(); // 放在最底层
         
         GraphicsContext gc = dotsBackgroundCanvas.getGraphicsContext2D();
-        gc.setFill(Color.web("#D1D5DB"));
+        gc.setFill(Color.web(getCanvasGridDotColor()));
         
         // 绘制圆点网格，每个圆点间隔20px
         double spacing = 20.0;
@@ -1803,7 +1807,7 @@ public class NodeCanvas extends Pane {
         
         GraphicsContext gc = dotsBackgroundCanvas.getGraphicsContext2D();
         gc.clearRect(0, 0, dotsBackgroundCanvas.getWidth(), dotsBackgroundCanvas.getHeight());
-        gc.setFill(Color.web("#D1D5DB"));
+        gc.setFill(Color.web(getCanvasGridDotColor()));
         
         double spacing = 20.0;
         double dotRadius = 1.5;
@@ -1830,7 +1834,7 @@ public class NodeCanvas extends Pane {
         gridBackgroundCanvas.toBack(); // 放在最底层
         
         GraphicsContext gc = gridBackgroundCanvas.getGraphicsContext2D();
-        gc.setStroke(Color.web("#D1D5DB"));
+        gc.setStroke(Color.web(getCanvasGridDotColor()));
         gc.setLineWidth(1.0);
         
         // 绘制网格线，每个网格20px
@@ -1876,7 +1880,7 @@ public class NodeCanvas extends Pane {
         
         GraphicsContext gc = gridBackgroundCanvas.getGraphicsContext2D();
         gc.clearRect(0, 0, gridBackgroundCanvas.getWidth(), gridBackgroundCanvas.getHeight());
-        gc.setStroke(Color.web("#D1D5DB"));
+        gc.setStroke(Color.web(getCanvasGridDotColor()));
         gc.setLineWidth(1.0);
         
         double spacing = 20.0;

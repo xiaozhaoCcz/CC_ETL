@@ -31,6 +31,7 @@ public class DetachablePanel {
     
     private Runnable onDetach;           // 弹出时的回调
     private Runnable onReattach;         // 恢复时的回调
+    private Runnable themeChangeListener; // 主题变更时更新弹出窗口样式表，reattach 时移除
     
     public DetachablePanel(Region content, String title) {
         this.content = content;
@@ -78,7 +79,23 @@ public class DetachablePanel {
         
         // 创建场景
         Scene scene = new Scene(root, defaultWidth, defaultHeight);
+        String themeCss = ThemeManager.getInstance().getStylesheetUrl();
+        if (themeCss != null && !themeCss.isEmpty()) {
+            scene.getStylesheets().add(themeCss);
+        }
         detachedStage.setScene(scene);
+        
+        // 主题变更时更新弹出窗口的样式表
+        themeChangeListener = () -> {
+            if (detachedStage != null && detachedStage.getScene() != null) {
+                detachedStage.getScene().getStylesheets().clear();
+                String url = ThemeManager.getInstance().getStylesheetUrl();
+                if (url != null && !url.isEmpty()) {
+                    detachedStage.getScene().getStylesheets().add(url);
+                }
+            }
+        };
+        ThemeManager.getInstance().addOnThemeChanged(themeChangeListener);
         
         // 确保StackPane填充整个场景
         root.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
@@ -143,6 +160,10 @@ public class DetachablePanel {
         
         // 从窗口中移除内容
         if (detachedStage != null) {
+            if (themeChangeListener != null) {
+                ThemeManager.getInstance().removeOnThemeChanged(themeChangeListener);
+                themeChangeListener = null;
+            }
             detachedStage.hide();
             detachedStage.setScene(null);
         }

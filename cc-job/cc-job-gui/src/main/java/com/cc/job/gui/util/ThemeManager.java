@@ -1,6 +1,10 @@
 package com.cc.job.gui.util;
 
+import javafx.application.Platform;
+
 import java.net.URL;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * 主题管理器：维护当前 light/dark/auto，提供样式表 URL，与 ConfigManager 同步。
@@ -16,6 +20,7 @@ public class ThemeManager {
 
     private static volatile ThemeManager instance;
     private final ConfigManager configManager;
+    private final List<Runnable> onThemeChangedListeners = new CopyOnWriteArrayList<>();
 
     private ThemeManager() {
         this.configManager = ConfigManager.getInstance();
@@ -82,10 +87,36 @@ public class ThemeManager {
 
     /**
      * 设置主题并持久化。theme 应为 "light" | "dark" | "auto"。
+     * 会通知所有已注册的主题变更监听器（在 JavaFX 线程执行）。
      */
     public void setTheme(String theme) {
         String key = normalizeThemeKey(theme != null ? theme : LIGHT);
         configManager.setProperty(CONFIG_KEY_THEME, key);
+        Platform.runLater(() -> {
+            for (Runnable r : onThemeChangedListeners) {
+                try {
+                    r.run();
+                } catch (Exception e) {
+                    // 避免单个监听器异常影响其他监听器
+                }
+            }
+        });
+    }
+
+    /**
+     * 注册主题变更监听器。主题变更后会在 JavaFX 线程回调。
+     */
+    public void addOnThemeChanged(Runnable listener) {
+        if (listener != null && !onThemeChangedListeners.contains(listener)) {
+            onThemeChangedListeners.add(listener);
+        }
+    }
+
+    /**
+     * 移除主题变更监听器。
+     */
+    public void removeOnThemeChanged(Runnable listener) {
+        onThemeChangedListeners.remove(listener);
     }
 
     /**

@@ -1046,11 +1046,11 @@ public class TopToolBar extends VBox {
         // 用户信息菜单项（不可点击）
         SessionManager session = SessionManager.getInstance();
         MenuItem infoItem = new MenuItem("用户: " + session.getUsername());
-        infoItem.setStyle("-fx-font-weight: bold; -fx-text-fill: #1F2937;");
+        infoItem.setStyle("-fx-font-weight: bold; -fx-text-fill: " + StyleUtil.textPrimaryColor() + ";");
         infoItem.setDisable(true);
         
         MenuItem idItem = new MenuItem("ID: " + session.getUserId());
-        idItem.setStyle("-fx-text-fill: #6B7280;");
+        idItem.setStyle("-fx-text-fill: " + StyleUtil.textSecondaryColor() + ";");
         idItem.setDisable(true);
         
         SeparatorMenuItem separator = new SeparatorMenuItem();

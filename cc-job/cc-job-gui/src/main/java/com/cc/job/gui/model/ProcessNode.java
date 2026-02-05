@@ -17,6 +17,7 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.util.Duration;
 import java.util.function.Consumer;
+import com.cc.job.gui.util.StyleUtil;
 import org.kordamp.ikonli.feather.Feather;
 import org.kordamp.ikonli.javafx.FontIcon;
 import org.slf4j.Logger;
@@ -236,13 +237,13 @@ public class ProcessNode extends StackPane {
         
         // 类型标签 - 增大字体大小
         typeLabel = new Label(type);
-        typeLabel.setStyle("-fx-font-size: 14; -fx-font-weight: 600; -fx-text-fill: #374151;");
+        typeLabel.setStyle("-fx-font-size: 14; -fx-font-weight: 600; -fx-text-fill: " + StyleUtil.textPrimaryColor() + ";");
         
         typeContainer.getChildren().add(typeLabel);
         
         // 任务处理器名称
         handlerLabel = new Label(jobHandlerName);
-        handlerLabel.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #1F2937;");
+        handlerLabel.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: " + StyleUtil.textPrimaryColor() + ";");
         handlerLabel.setMaxWidth(nodeWidth - 20);
         
         contentBox.getChildren().addAll(typeContainer, handlerLabel);

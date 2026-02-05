@@ -1016,15 +1016,6 @@ public class MainView extends BorderPane {
             @Override
             public void onSetTheme(String theme) {
                 ThemeManager.getInstance().setTheme(theme);
-                Scene scene = MainView.this.getScene();
-                if (scene != null) {
-                    scene.getStylesheets().clear();
-                    String url = ThemeManager.getInstance().getStylesheetUrl();
-                    if (url != null && !url.isEmpty()) {
-                        scene.getStylesheets().add(url);
-                    }
-                }
-                if (miniMap != null) miniMap.refresh();
                 logger.info("已切换主题: " + theme);
             }
             
@@ -1290,6 +1281,19 @@ public class MainView extends BorderPane {
                 // 打开在线帮助
                 logger.info("在线帮助功能开发中...");
             }
+        });
+
+        // 主题变更监听：统一更新主 Scene 样式表并刷新小地图（菜单、系统设置等入口切换主题时都会触发）
+        ThemeManager.getInstance().addOnThemeChanged(() -> {
+            Scene scene = MainView.this.getScene();
+            if (scene != null) {
+                scene.getStylesheets().clear();
+                String url = ThemeManager.getInstance().getStylesheetUrl();
+                if (url != null && !url.isEmpty()) {
+                    scene.getStylesheets().add(url);
+                }
+            }
+            if (miniMap != null) miniMap.refresh();
         });
 
         // 导航栏回调

@@ -2,6 +2,7 @@ package com.cc.job.gui.view;
 
 import com.cc.job.gui.service.JobJdbcDatasourceService;
 import com.cc.job.gui.util.IconUtil;
+import com.cc.job.gui.util.StyleUtil;
 import com.cc.job.gui.view.component.SmartParameterInput;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.entity.JobJdbcDatasource;
@@ -1300,10 +1301,15 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
         ParameterTable(String title) {
             setSpacing(8);
             setPadding(new Insets(12));
-            setStyle("-fx-background-color: linear-gradient(145deg,#6847FF,#8A6BFF); -fx-border-radius: 10; -fx-background-radius: 10;");
+            boolean dark = StyleUtil.isDarkTheme();
+            if (dark) {
+                setStyle("-fx-background-color: #2D2D30; -fx-border-radius: 10; -fx-background-radius: 10; -fx-border-color: #3C3C3C; -fx-border-width: 1;");
+            } else {
+                setStyle("-fx-background-color: linear-gradient(145deg,#6847FF,#8A6BFF); -fx-border-radius: 10; -fx-background-radius: 10;");
+            }
 
             Label titleLabel = new Label(title);
-            titleLabel.setStyle("-fx-text-fill: rgba(255,255,255,0.9); -fx-font-size: 13; -fx-font-weight: bold;");
+            titleLabel.setStyle("-fx-text-fill: " + (dark ? "#D4D4D4" : "rgba(255,255,255,0.9)") + "; -fx-font-size: 13; -fx-font-weight: bold;");
 
             tableView = new TableView<>();
             tableView.setEditable(true);
@@ -1350,10 +1356,15 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
             tableView.getColumns().add(actionColumn);
 
             Button addButton = new Button("+ 新增参数");
-            // 使用蓝色背景，使按钮更明显
-            addButton.setStyle("-fx-background-color: #4A90E2; -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 6 14; -fx-background-radius: 4; -fx-border-color: #357ABD; -fx-border-radius: 4; -fx-cursor: hand;");
-            addButton.setOnMouseEntered(e -> addButton.setStyle("-fx-background-color: #5BA0F2; -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 6 14; -fx-background-radius: 4; -fx-border-color: #357ABD; -fx-border-radius: 4; -fx-cursor: hand;"));
-            addButton.setOnMouseExited(e -> addButton.setStyle("-fx-background-color: #4A90E2; -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 6 14; -fx-background-radius: 4; -fx-border-color: #357ABD; -fx-border-radius: 4; -fx-cursor: hand;"));
+            if (dark) {
+                addButton.setStyle("-fx-background-color: #007ACC; -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 6 14; -fx-background-radius: 4; -fx-border-color: #094771; -fx-border-radius: 4; -fx-cursor: hand;");
+                addButton.setOnMouseEntered(e -> addButton.setStyle("-fx-background-color: #1E88E5; -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 6 14; -fx-background-radius: 4; -fx-border-color: #094771; -fx-border-radius: 4; -fx-cursor: hand;"));
+                addButton.setOnMouseExited(e -> addButton.setStyle("-fx-background-color: #007ACC; -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 6 14; -fx-background-radius: 4; -fx-border-color: #094771; -fx-border-radius: 4; -fx-cursor: hand;"));
+            } else {
+                addButton.setStyle("-fx-background-color: #4A90E2; -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 6 14; -fx-background-radius: 4; -fx-border-color: #357ABD; -fx-border-radius: 4; -fx-cursor: hand;");
+                addButton.setOnMouseEntered(e -> addButton.setStyle("-fx-background-color: #5BA0F2; -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 6 14; -fx-background-radius: 4; -fx-border-color: #357ABD; -fx-border-radius: 4; -fx-cursor: hand;"));
+                addButton.setOnMouseExited(e -> addButton.setStyle("-fx-background-color: #4A90E2; -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 6 14; -fx-background-radius: 4; -fx-border-color: #357ABD; -fx-border-radius: 4; -fx-cursor: hand;"));
+            }
             addButton.setOnAction(e -> addRow("", ""));
 
             // 将新增按钮放在表格上方

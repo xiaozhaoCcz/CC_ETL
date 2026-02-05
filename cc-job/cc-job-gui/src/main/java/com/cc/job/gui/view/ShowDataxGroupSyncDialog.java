@@ -119,9 +119,9 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
 
     private void updateStepLabelStyle(Label label, boolean active) {
         if (active) {
-            label.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: " + StyleUtil.PRIMARY + ";");
+            label.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: " + StyleUtil.linkPrimaryColor() + ";");
         } else {
-            label.setStyle("-fx-font-size: 14; -fx-text-fill: " + StyleUtil.TEXT_SECONDARY + ";");
+            label.setStyle("-fx-font-size: 14; -fx-text-fill: " + StyleUtil.textSecondaryColor() + ";");
         }
     }
 

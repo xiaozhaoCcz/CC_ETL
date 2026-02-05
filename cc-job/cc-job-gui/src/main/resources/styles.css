@@ -1639,6 +1639,115 @@
     -fx-fill: #0369A1 !important;
 }
 
+/* ============ 登录/注册页浅色（供 style class 使用） ============ */
+
+.login-root,
+.register-root {
+    -fx-background-color: linear-gradient(135deg, #667EEA 0%, #764BA2 100%);
+}
+
+.login-card,
+.register-card {
+    -fx-background-color: transparent;
+}
+
+.login-title,
+.register-title {
+    -fx-text-fill: #1F2937;
+    -fx-font-size: 28px;
+    -fx-font-weight: bold;
+}
+
+.login-subtitle,
+.register-subtitle {
+    -fx-text-fill: #4B5563;
+    -fx-font-size: 14px;
+}
+
+.login-field,
+.register-field {
+    -fx-background-color: #F9FAFB;
+    -fx-text-fill: #111827;
+    -fx-prompt-text-fill: #6B7280;
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 12 16;
+    -fx-font-size: 14px;
+}
+
+.login-field:focused,
+.register-field:focused {
+    -fx-border-color: #2563EB;
+    -fx-background-color: white;
+}
+
+.login-label,
+.register-label {
+    -fx-text-fill: #374151;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+}
+
+.login-error,
+.register-error {
+    -fx-background-color: #FEE2E2;
+    -fx-text-fill: #DC2626;
+    -fx-padding: 12 16;
+    -fx-background-radius: 8;
+    -fx-font-size: 13px;
+}
+
+.login-primary-btn,
+.register-primary-btn {
+    -fx-background-color: #2563EB;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-padding: 12 24;
+    -fx-background-radius: 8;
+    -fx-cursor: hand;
+}
+
+.login-primary-btn:hover,
+.register-primary-btn:hover {
+    -fx-background-color: #1D4ED8;
+}
+
+.login-primary-btn-loading,
+.login-primary-btn:disabled {
+    -fx-background-color: #9CA3AF;
+    -fx-text-fill: #374151;
+    -fx-cursor: default;
+}
+
+.login-link,
+.register-link {
+    -fx-text-fill: #2563EB;
+    -fx-font-size: 13px;
+    -fx-cursor: hand;
+    -fx-background-color: transparent;
+    -fx-border-width: 0;
+    -fx-underline: true;
+}
+
+.login-link:hover,
+.register-link:hover {
+    -fx-text-fill: #1D4ED8;
+}
+
+/* ============ 链接色（供 Java 按主题选用或 CSS 类） ============ */
+
+.link-primary {
+    -fx-text-fill: #2563EB;
+    -fx-cursor: hand;
+}
+
+.link-primary:hover {
+    -fx-text-fill: #1D4ED8;
+}
+
 /* ============ 底部状态栏（企业级 IDE 风格） ============ */
 
 .status-bar {

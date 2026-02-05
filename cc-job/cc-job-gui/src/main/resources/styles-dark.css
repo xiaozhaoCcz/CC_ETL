@@ -1779,6 +1779,186 @@
     -fx-fill: #094771;
 }
 
+/* ============ 登录/注册页深色 ============ */
+
+.login-root,
+.register-root {
+    -fx-background-color: linear-gradient(135deg, #252526 0%, #1E1E1E 100%);
+}
+
+.login-card,
+.register-card {
+    -fx-background-color: transparent;
+}
+
+.login-title,
+.register-title {
+    -fx-text-fill: #FFFFFF;
+    -fx-font-size: 28px;
+    -fx-font-weight: bold;
+}
+
+.login-subtitle,
+.register-subtitle {
+    -fx-text-fill: #9D9D9D;
+    -fx-font-size: 14px;
+}
+
+.login-field,
+.register-field {
+    -fx-background-color: #3C3C3C;
+    -fx-text-fill: #D4D4D4;
+    -fx-prompt-text-fill: #9D9D9D;
+    -fx-border-color: #505050;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 12 16;
+    -fx-font-size: 14px;
+}
+
+.login-field:focused,
+.register-field:focused {
+    -fx-border-color: #007ACC;
+    -fx-background-color: #3C3C3C;
+}
+
+.login-label,
+.register-label {
+    -fx-text-fill: #D4D4D4;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+}
+
+.login-error,
+.register-error {
+    -fx-background-color: #3d2020;
+    -fx-text-fill: #F48771;
+    -fx-padding: 12 16;
+    -fx-background-radius: 8;
+    -fx-font-size: 13px;
+}
+
+.login-primary-btn,
+.register-primary-btn {
+    -fx-background-color: #007ACC;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-padding: 12 24;
+    -fx-background-radius: 8;
+    -fx-cursor: hand;
+}
+
+.login-primary-btn:hover,
+.register-primary-btn:hover {
+    -fx-background-color: #1E88E5;
+}
+
+.login-primary-btn-loading,
+.login-primary-btn:disabled {
+    -fx-background-color: #505050;
+    -fx-text-fill: #9D9D9D;
+    -fx-cursor: default;
+}
+
+.login-link,
+.register-link {
+    -fx-text-fill: #569CD6;
+    -fx-font-size: 13px;
+    -fx-cursor: hand;
+    -fx-background-color: transparent;
+    -fx-border-width: 0;
+    -fx-underline: true;
+}
+
+.login-link:hover,
+.register-link:hover {
+    -fx-text-fill: #9CDCFE;
+}
+
+/* ============ 节点历史等弹窗标题栏标题 ============ */
+
+.popup-title-bar-title {
+    -fx-text-fill: #D4D4D4;
+    -fx-font-size: 14px;
+    -fx-font-weight: 700;
+}
+
+/* ============ Toast 深色 ============ */
+
+.toast-dark .toast-title {
+    -fx-text-fill: #D4D4D4;
+    -fx-font-weight: bold;
+}
+
+.toast-dark .toast-message {
+    -fx-text-fill: #9D9D9D;
+}
+
+.toast-dark .toast-close {
+    -fx-text-fill: #9D9D9D;
+    -fx-background-color: transparent;
+}
+
+.toast-dark .toast-close:hover {
+    -fx-text-fill: #D4D4D4;
+    -fx-background-color: rgba(255,255,255,0.08);
+}
+
+/* ============ DatePicker 弹出日历深色 ============ */
+
+.date-picker-popup {
+    -fx-background-color: #252526;
+    -fx-border-color: #3C3C3C;
+}
+
+.date-picker-popup .month-year-pane {
+    -fx-background-color: #2D2D30;
+}
+
+.date-picker-popup .month-year-pane .label {
+    -fx-text-fill: #D4D4D4;
+}
+
+.date-picker-popup .calendar-grid {
+    -fx-background-color: #252526;
+}
+
+.date-picker-popup .day-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #D4D4D4;
+}
+
+.date-picker-popup .day-cell:hover {
+    -fx-background-color: #3C3C3C;
+}
+
+.date-picker-popup .day-cell:selected {
+    -fx-background-color: #094771;
+    -fx-text-fill: #FFFFFF;
+}
+
+.date-picker-popup .spinner {
+    -fx-background-color: #2D2D30;
+}
+
+.date-picker-popup .spinner .text-field {
+    -fx-background-color: #3C3C3C;
+    -fx-text-fill: #D4D4D4;
+}
+
+/* ============ 链接色（供 Java 按主题选用或 CSS 类） ============ */
+
+.link-primary {
+    -fx-text-fill: #569CD6;
+    -fx-cursor: hand;
+}
+
+.link-primary:hover {
+    -fx-text-fill: #9CDCFE;
+}
+
 /* ============ 底部状态栏 ============ */
 
 .status-bar {

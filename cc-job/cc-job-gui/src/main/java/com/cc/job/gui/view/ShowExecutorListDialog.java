@@ -245,7 +245,7 @@ public class ShowExecutorListDialog extends Dialog<Void> {
         addressCol.setCellFactory(col -> new TableCell<>() {
             private final Hyperlink viewLink = new Hyperlink("查看");
             {
-                viewLink.setStyle("-fx-text-fill: " + StyleUtil.PRIMARY + ";");
+                viewLink.setStyle("-fx-text-fill: " + StyleUtil.linkPrimaryColor() + ";");
                 viewLink.setOnAction(e -> {
                     JobGroupVO item = getTableView().getItems().get(getIndex());
                     if (item != null) {
@@ -274,8 +274,8 @@ public class ShowExecutorListDialog extends Dialog<Void> {
             private final Hyperlink editLink = new Hyperlink("编辑");
             private final Hyperlink deleteLink = new Hyperlink("删除");
             {
-                viewLink.setStyle("-fx-text-fill: " + StyleUtil.PRIMARY + ";");
-                editLink.setStyle("-fx-text-fill: " + StyleUtil.PRIMARY + ";");
+                viewLink.setStyle("-fx-text-fill: " + StyleUtil.linkPrimaryColor() + ";");
+                editLink.setStyle("-fx-text-fill: " + StyleUtil.linkPrimaryColor() + ";");
                 deleteLink.setStyle("-fx-text-fill: " + StyleUtil.ERROR + ";");
                 
                 viewLink.setOnAction(e -> {

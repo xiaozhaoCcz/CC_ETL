@@ -284,7 +284,7 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
             private final Hyperlink testLink = new Hyperlink("测试连接");
             private final Hyperlink deleteLink = new Hyperlink("删除");
             {
-                editLink.setStyle("-fx-text-fill: " + StyleUtil.PRIMARY + ";");
+                editLink.setStyle("-fx-text-fill: " + StyleUtil.linkPrimaryColor() + ";");
                 testLink.setStyle("-fx-text-fill: " + StyleUtil.SUCCESS + ";");
                 deleteLink.setStyle("-fx-text-fill: " + StyleUtil.ERROR + ";");
                 

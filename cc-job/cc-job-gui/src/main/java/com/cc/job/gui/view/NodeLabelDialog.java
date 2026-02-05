@@ -2,6 +2,7 @@ package com.cc.job.gui.view;
 
 import com.cc.job.gui.model.ProcessNode;
 import com.cc.job.gui.util.IconUtil;
+import com.cc.job.gui.util.StyleUtil;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
@@ -141,7 +142,7 @@ public class NodeLabelDialog extends Dialog<List<String>> {
         
         // 预定义标签按钮
         Label predefinedLabel = new Label("快速添加：");
-        predefinedLabel.setStyle("-fx-font-size: 12; -fx-text-fill: #6B7280;");
+        predefinedLabel.setStyle("-fx-font-size: 12; -fx-text-fill: " + StyleUtil.textSecondaryColor() + ";");
         
         FlowPane predefinedTagsPane = new FlowPane(8, 8);
         predefinedTagsPane.setPrefWrapLength(450);

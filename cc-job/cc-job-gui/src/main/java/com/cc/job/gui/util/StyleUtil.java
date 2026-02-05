@@ -44,6 +44,15 @@ public class StyleUtil {
     public static final String BG_PRIMARY = "#FFFFFF";
     public static final String BG_SECONDARY = "#F9FAFB";
     public static final String BG_HOVER = "#F3F4F6";
+
+    // ============ 深色主题色（与 styles-dark.css 一致） ============
+    public static final String PRIMARY_DARK_THEME = "#569CD6";   // 链接/主色深色
+    public static final String TEXT_PRIMARY_DARK = "#D4D4D4";
+    public static final String TEXT_SECONDARY_DARK = "#9D9D9D";
+    public static final String BG_PRIMARY_DARK = "#2D2D30";
+    public static final String BG_SECONDARY_DARK = "#3C3C3C";
+    public static final String BORDER_DARK = "#505050";
+    public static final String SCROLL_PANE_BG_DARK = "#2D2D30";
     
     // ============ 阴影效果 ============
     
@@ -283,6 +292,67 @@ public class StyleUtil {
      */
     public static String captionFontOnly() {
         return "-fx-font-size: 12px; -fx-font-weight: 400;";
+    }
+
+    // ============ 主题感知样式（按当前 light/dark 返回） ============
+
+    /**
+     * 当前是否为深色主题
+     */
+    public static boolean isDarkTheme() {
+        return "dark".equals(ThemeManager.getInstance().getTheme());
+    }
+
+    /**
+     * 链接/主色文字样式（-fx-text-fill），按当前主题返回
+     */
+    public static String linkPrimaryTextFill() {
+        return "-fx-text-fill: " + (isDarkTheme() ? PRIMARY_DARK_THEME : PRIMARY) + ";";
+    }
+
+    /**
+     * 主色文字色值（供拼接 style 用）
+     */
+    public static String linkPrimaryColor() {
+        return isDarkTheme() ? PRIMARY_DARK_THEME : PRIMARY;
+    }
+
+    /**
+     * 正文主文字色值
+     */
+    public static String textPrimaryColor() {
+        return isDarkTheme() ? TEXT_PRIMARY_DARK : TEXT_PRIMARY;
+    }
+
+    /**
+     * 正文主文字样式
+     */
+    public static String textPrimaryStyle() {
+        return "-fx-text-fill: " + textPrimaryColor() + ";";
+    }
+
+    /**
+     * 次要文字色值
+     */
+    public static String textSecondaryColor() {
+        return isDarkTheme() ? TEXT_SECONDARY_DARK : TEXT_SECONDARY;
+    }
+
+    /**
+     * 次要文字样式
+     */
+    public static String textSecondaryStyle() {
+        return "-fx-text-fill: " + textSecondaryColor() + ";";
+    }
+
+    /**
+     * 对话框/弹窗内滚动区域背景样式（按主题）
+     */
+    public static String dialogScrollPaneBackgroundStyle() {
+        if (isDarkTheme()) {
+            return "-fx-background-color: #2D2D30; -fx-border-color: #3C3C3C; -fx-border-width: 1; -fx-border-radius: 6;";
+        }
+        return "-fx-background-color: #FAFAFA; -fx-border-color: #E5E7EB; -fx-border-width: 1; -fx-border-radius: 6;";
     }
     
     // ============ 应用样式方法 ============

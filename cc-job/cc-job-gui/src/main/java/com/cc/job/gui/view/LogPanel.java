@@ -685,8 +685,8 @@ public class LogPanel extends VBox {
                               lowerText.contains("失败") || lowerText.contains("exception"));
             boolean isWarn = lowerText.contains("警告") || lowerText.contains("warn") || lowerText.contains("⚠");
             
-            String messageColor = isError ? "#DC2626" : (isWarn ? "#D97706" : "#000000");
-            String levelColor = isError ? "#DC2626" : (isWarn ? "#D97706" : StyleUtil.GRAY_500);
+            String messageColor = isError ? "#DC2626" : (isWarn ? "#D97706" : StyleUtil.textPrimaryColor());
+            String levelColor = isError ? "#DC2626" : (isWarn ? "#D97706" : StyleUtil.textSecondaryColor());
             
             LogContentManager.LogEntry entry = new LogContentManager.LogEntry(
                 null, null, "TEXT", levelColor, decodedText, messageColor, true, true

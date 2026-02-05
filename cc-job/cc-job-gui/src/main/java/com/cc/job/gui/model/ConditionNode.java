@@ -1,5 +1,6 @@
 package com.cc.job.gui.model;
 
+import com.cc.job.gui.util.StyleUtil;
 import javafx.geometry.Insets;
 import javafx.scene.Cursor;
 import javafx.scene.control.ContextMenu;
@@ -142,34 +143,43 @@ public class ConditionNode extends StackPane {
 
         header = new VBox();
         header.setPadding(new Insets(6, 10, 6, 10));
-        header.setStyle("-fx-background-color: rgba(245,158,11,0.15); -fx-background-radius: 10 10 0 0;"); // 橙色背景
+        boolean dark = StyleUtil.isDarkTheme();
+        if (dark) {
+            header.setStyle("-fx-background-color: #2D2D30; -fx-background-radius: 10 10 0 0;");
+        } else {
+            header.setStyle("-fx-background-color: rgba(245,158,11,0.15); -fx-background-radius: 10 10 0 0;");
+        }
 
-        // 顶部栏：条件图标 + 标题 + 缩放 + 展开/收起按钮
         HBox headerBar = new HBox(8);
         headerBar.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
 
-        // 条件图标（根据类型选择）
         FontIcon conditionIcon = new FontIcon(getIconForType(this.conditionType));
         conditionIcon.setIconSize(16);
-        conditionIcon.setIconColor(Color.web("#F59E0B"));
+        conditionIcon.setIconColor(dark ? Color.web("#DCDCAA") : Color.web("#F59E0B"));
         
         titleLabel = new Label(conditionName);
-        titleLabel.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: #92400E;");
+        titleLabel.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: " + (dark ? "#DCDCAA" : "#92400E") + ";");
         
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         toggleBtn = new Label("-");
-        toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #92400E; -fx-background-color: rgba(245,158,11,0.15); -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;");
+        if (dark) {
+            toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #DCDCAA; -fx-background-color: #3C3C3C; -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;");
+            toggleBtn.setOnMouseEntered(e -> toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #1E1E1E; -fx-background-color: #DCDCAA; -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;"));
+            toggleBtn.setOnMouseExited(e -> toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #DCDCAA; -fx-background-color: #3C3C3C; -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;"));
+        } else {
+            toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #92400E; -fx-background-color: rgba(245,158,11,0.15); -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;");
+            toggleBtn.setOnMouseEntered(e -> toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: white; -fx-background-color: #F59E0B; -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;"));
+            toggleBtn.setOnMouseExited(e -> toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #92400E; -fx-background-color: rgba(245,158,11,0.15); -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;"));
+        }
         toggleBtn.setOnMouseClicked(e -> {
             toggle();
             e.consume();
         });
-        toggleBtn.setOnMouseEntered(e -> toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: white; -fx-background-color: #F59E0B; -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;"));
-        toggleBtn.setOnMouseExited(e -> toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #92400E; -fx-background-color: rgba(245,158,11,0.15); -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;"));
 
         zoomLabel = new Label("100%");
-        zoomLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #F59E0B; -fx-background-color: rgba(245,158,11,0.15); -fx-padding: 2 6 2 6; -fx-background-radius: 4;");
+        zoomLabel.setStyle("-fx-font-size: 11; -fx-text-fill: " + (dark ? "#DCDCAA" : "#F59E0B") + "; -fx-background-color: " + (dark ? "#3C3C3C" : "rgba(245,158,11,0.15)") + "; -fx-padding: 2 6 2 6; -fx-background-radius: 4;");
 
         headerBar.getChildren().addAll(conditionIcon, titleLabel, spacer, zoomLabel, toggleBtn);
         header.getChildren().add(headerBar);

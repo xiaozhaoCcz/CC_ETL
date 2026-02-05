@@ -120,7 +120,7 @@ public class NodeDetailsDialog extends Dialog<Void> {
         
         addLabel(taskGrid, "下一次运行时间:", 0, row);
         Label nextTriggerTimeLabel = addValueLabel(taskGrid, "加载中...", 1, row++);
-        nextTriggerTimeLabel.setStyle("-fx-text-fill: " + StyleUtil.PRIMARY + ";");
+        nextTriggerTimeLabel.setStyle("-fx-text-fill: " + StyleUtil.linkPrimaryColor() + ";");
         
         contentBox.getChildren().add(taskGrid);
         
@@ -180,11 +180,11 @@ public class NodeDetailsDialog extends Dialog<Void> {
         row = 0;
         addLabel(predictedTimeGrid, "预测到达时间:", 0, row);
         Label predictedArrivalTimeLabel = addValueLabel(predictedTimeGrid, "未启动任务组", 1, row++);
-        predictedArrivalTimeLabel.setStyle("-fx-text-fill: " + StyleUtil.PRIMARY + ";");
+        predictedArrivalTimeLabel.setStyle("-fx-text-fill: " + StyleUtil.linkPrimaryColor() + ";");
         
         addLabel(predictedTimeGrid, "预测完成时间:", 0, row);
         Label predictedFinishTimeLabel = addValueLabel(predictedTimeGrid, "未启动任务组", 1, row++);
-        predictedFinishTimeLabel.setStyle("-fx-text-fill: " + StyleUtil.PRIMARY + ";");
+        predictedFinishTimeLabel.setStyle("-fx-text-fill: " + StyleUtil.linkPrimaryColor() + ";");
 
         contentBox.getChildren().add(predictedTimeGrid);
         
