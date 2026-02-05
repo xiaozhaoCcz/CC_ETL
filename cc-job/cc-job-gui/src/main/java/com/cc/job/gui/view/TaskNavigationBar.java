@@ -14,7 +14,9 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.util.Duration;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -119,6 +121,7 @@ public class TaskNavigationBar extends HBox {
         TaskTab tab = new TaskTab(taskGroupName, taskGroupId);
         tab.setOnClick(() -> switchToTaskGroup(taskGroupId));
         tab.setOnClose(() -> removeTaskGroup(taskGroupId));
+        setupTabContextMenu(tab);
         
         tabs.put(taskGroupId, tab);
         taskGroupIdToNameMap.put(taskGroupId, taskGroupName);
@@ -126,6 +129,99 @@ public class TaskNavigationBar extends HBox {
         
         // 自动切换到新添加的标签
         switchToTaskGroup(taskGroupId);
+    }
+    
+    /**
+     * 按界面从左到右顺序返回任务组 ID 列表
+     */
+    private List<Long> getOrderedTaskGroupIds() {
+        List<Long> ordered = new ArrayList<>();
+        for (javafx.scene.Node node : tabContainer.getChildren()) {
+            if (node instanceof TaskTab) {
+                ordered.add(((TaskTab) node).getTaskGroupId());
+            }
+        }
+        return ordered;
+    }
+    
+    /**
+     * 关闭除指定任务组外的所有标签
+     */
+    private void removeOtherTaskGroups(Long keepTaskGroupId) {
+        List<Long> toRemove = new ArrayList<>();
+        for (Long id : getOrderedTaskGroupIds()) {
+            if (!id.equals(keepTaskGroupId)) {
+                toRemove.add(id);
+            }
+        }
+        for (Long id : toRemove) {
+            removeTaskGroup(id);
+        }
+        if (tabs.containsKey(keepTaskGroupId)) {
+            switchToTaskGroup(keepTaskGroupId);
+        }
+    }
+    
+    /**
+     * 关闭指定任务组左侧的所有标签
+     */
+    private void removeTaskGroupsToLeft(Long ofTaskGroupId) {
+        List<Long> ordered = getOrderedTaskGroupIds();
+        int idx = ordered.indexOf(ofTaskGroupId);
+        if (idx <= 0) return;
+        List<Long> toRemove = new ArrayList<>(ordered.subList(0, idx));
+        for (Long id : toRemove) {
+            removeTaskGroup(id);
+        }
+        if (tabs.containsKey(ofTaskGroupId)) {
+            switchToTaskGroup(ofTaskGroupId);
+        }
+    }
+    
+    /**
+     * 关闭指定任务组右侧的所有标签
+     */
+    private void removeTaskGroupsToRight(Long ofTaskGroupId) {
+        List<Long> ordered = getOrderedTaskGroupIds();
+        int idx = ordered.indexOf(ofTaskGroupId);
+        if (idx < 0 || idx >= ordered.size() - 1) return;
+        List<Long> toRemove = new ArrayList<>(ordered.subList(idx + 1, ordered.size()));
+        for (Long id : toRemove) {
+            removeTaskGroup(id);
+        }
+        if (tabs.containsKey(ofTaskGroupId)) {
+            switchToTaskGroup(ofTaskGroupId);
+        }
+    }
+    
+    /**
+     * 为任务组标签设置右键菜单（关闭当前页 / 关闭其他页 / 关闭左侧页 / 关闭右侧页）
+     */
+    private void setupTabContextMenu(TaskTab tab) {
+        ContextMenu menu = new ContextMenu();
+        MenuItem closeCurrent = new MenuItem("关闭当前页");
+        MenuItem closeOthers = new MenuItem("关闭其他页");
+        MenuItem closeLeft = new MenuItem("关闭左侧页");
+        MenuItem closeRight = new MenuItem("关闭右侧页");
+        
+        closeCurrent.setOnAction(e -> removeTaskGroup(tab.getTaskGroupId()));
+        closeOthers.setOnAction(e -> removeOtherTaskGroups(tab.getTaskGroupId()));
+        closeLeft.setOnAction(e -> removeTaskGroupsToLeft(tab.getTaskGroupId()));
+        closeRight.setOnAction(e -> removeTaskGroupsToRight(tab.getTaskGroupId()));
+        
+        menu.setOnShowing(e -> {
+            List<Long> ordered = getOrderedTaskGroupIds();
+            int index = ordered.indexOf(tab.getTaskGroupId());
+            int size = ordered.size();
+            closeOthers.setDisable(size <= 1);
+            closeLeft.setDisable(index <= 0);
+            closeRight.setDisable(index < 0 || index >= size - 1);
+        });
+        
+        menu.getItems().addAll(closeCurrent, closeOthers, closeLeft, closeRight);
+        tab.setOnContextMenuRequested(e -> {
+            menu.show(tab, e.getScreenX(), e.getScreenY());
+        });
     }
     
     /**

@@ -89,8 +89,8 @@ public class ShowJobLogListDialog extends Dialog<Void> {
 
         styleDialog();
         BorderPane root = new BorderPane();
+        root.getStyleClass().add("dialog-content-root");
         root.setPadding(new Insets(16));
-        root.setStyle("-fx-background-color: " + StyleUtil.BG_SECONDARY + ";");
 
         root.setTop(createFilterBar());
         root.setCenter(createTable());
@@ -117,7 +117,10 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         getDialogPane().setMaxHeight(Double.MAX_VALUE);
         setResizable(true);
 
-        
+        String dialogCss = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (dialogCss != null && !dialogCss.isEmpty()) {
+            getDialogPane().getStylesheets().add(dialogCss);
+        }
 
         Platform.runLater(() -> {
             Stage stage = (Stage) getDialogPane().getScene().getWindow();
@@ -154,15 +157,12 @@ public class ShowJobLogListDialog extends Dialog<Void> {
 
     private Node createFilterBar() {
         GridPane grid = new GridPane();
+        grid.getStyleClass().add("dialog-section");
         grid.setHgap(12);
         grid.setVgap(10);
         grid.setPadding(new Insets(16, 16, 16, 16));
-        grid.setStyle(
-                "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                "-fx-background-radius: " + StyleUtil.RADIUS_LG + ";"
-        );
 
-        String labelStyle = StyleUtil.body();
+        String labelStyle = StyleUtil.bodyFontOnly();
 
         // 执行器下拉框
         jobGroupCombo = new ComboBox<>();
@@ -199,15 +199,14 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         endDatePicker = new DatePicker();
 
         Button searchBtn = new Button("搜索");
-        searchBtn.setStyle(StyleUtil.primaryButton());
-        StyleUtil.applyPrimaryButtonHover(searchBtn);
+        searchBtn.getStyleClass().add("dialog-button-primary");
         searchBtn.setOnAction(e -> {
             pageNum = 1;
             loadPage(true);
         });
 
         Button resetBtn = new Button("重置");
-        resetBtn.setStyle(StyleUtil.secondaryButton());
+        resetBtn.getStyleClass().add("dialog-button-secondary");
         resetBtn.setOnAction(e -> {
             jobGroupCombo.getSelectionModel().selectFirst();
             logStatusCombo.getSelectionModel().selectFirst();
@@ -218,8 +217,7 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         });
 
         Button clearBtn = new Button("清理");
-        clearBtn.setStyle(StyleUtil.errorButton());
-        StyleUtil.applyErrorButtonHover(clearBtn);
+        clearBtn.getStyleClass().add("dialog-button-error");
         clearBtn.setOnAction(e -> handleClear());
 
         Label executorLabel = new Label("执行器");
@@ -384,16 +382,16 @@ public class ShowJobLogListDialog extends Dialog<Void> {
 
     private Node createPagerBar() {
         totalLabel = new Label("共 0 条");
-        totalLabel.setStyle(StyleUtil.body());
+        totalLabel.setStyle(StyleUtil.bodyFontOnly());
 
         prevBtn = new Button("上一页");
-        prevBtn.setStyle(StyleUtil.secondaryButton());
+        prevBtn.getStyleClass().add("dialog-button-secondary");
         nextBtn = new Button("下一页");
-        nextBtn.setStyle(StyleUtil.secondaryButton());
+        nextBtn.getStyleClass().add("dialog-button-secondary");
         
         pageField = new TextField(String.valueOf(pageNum));
         pageField.setPrefWidth(60);
-        pageField.setStyle(StyleUtil.searchField());
+        pageField.getStyleClass().add("dialog-search-field");
         pageField.setOnAction(e -> {
             try {
                 int p = Integer.parseInt(pageField.getText().trim());
@@ -430,9 +428,9 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         });
 
         Label pageSizeLabel = new Label("每页");
-        pageSizeLabel.setStyle(StyleUtil.body());
+        pageSizeLabel.setStyle(StyleUtil.bodyFontOnly());
         Label pageLabel = new Label("页码");
-        pageLabel.setStyle(StyleUtil.body());
+        pageLabel.setStyle(StyleUtil.bodyFontOnly());
 
         HBox pager = new HBox(12,
                 totalLabel,
@@ -441,12 +439,9 @@ public class ShowJobLogListDialog extends Dialog<Void> {
                 pageLabel, pageField,
                 nextBtn
         );
+        pager.getStyleClass().add("dialog-section");
         pager.setAlignment(Pos.CENTER_LEFT);
         pager.setPadding(new Insets(16, 16, 16, 16));
-        pager.setStyle(
-                "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                "-fx-background-radius: " + StyleUtil.RADIUS_LG + ";"
-        );
         return pager;
     }
 
@@ -604,10 +599,10 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         FlowPane nodeStatusGrid = createNodeStatusGrid(nodeStatusJson);
 
         ScrollPane scrollPane = new ScrollPane(nodeStatusGrid);
+        scrollPane.getStyleClass().add("dialog-section");
         scrollPane.setFitToWidth(true);
         scrollPane.setFitToHeight(true);
         scrollPane.setPrefHeight(500);
-        scrollPane.setStyle("-fx-background-color: #F9FAFB;");
 
         content.getChildren().addAll(titleLabel, timeLabel, scrollPane);
 
@@ -788,7 +783,7 @@ public class ShowJobLogListDialog extends Dialog<Void> {
 
         // 工具栏
         Button refreshBtn = new Button("刷新");
-        refreshBtn.setStyle(StyleUtil.secondaryButton());
+        refreshBtn.getStyleClass().add("dialog-button-secondary");
         refreshBtn.setOnAction(e -> {
             fromLineNum.set(0);
             pullFailCount.set(0);
@@ -799,7 +794,7 @@ public class ShowJobLogListDialog extends Dialog<Void> {
 
         ToggleButton autoRefreshBtn = new ToggleButton("自动刷新");
         autoRefreshBtn.setSelected(true);
-        autoRefreshBtn.setStyle(StyleUtil.secondaryButton());
+        autoRefreshBtn.getStyleClass().add("dialog-button-secondary");
         autoRefreshBtn.selectedProperty().addListener((obs, oldVal, newVal) -> {
             isAutoRefresh.set(newVal);
             if (newVal) {
@@ -810,14 +805,14 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         });
 
         Button scrollTopBtn = new Button("↑ 顶部");
-        scrollTopBtn.setStyle(StyleUtil.secondaryButton());
+        scrollTopBtn.getStyleClass().add("dialog-button-secondary");
         scrollTopBtn.setOnAction(e -> {
             codeArea.moveTo(0);
             codeArea.requestFollowCaret();
         });
 
         Button scrollBottomBtn = new Button("↓ 底部");
-        scrollBottomBtn.setStyle(StyleUtil.secondaryButton());
+        scrollBottomBtn.getStyleClass().add("dialog-button-secondary");
         scrollBottomBtn.setOnAction(e -> {
             codeArea.moveTo(codeArea.getLength());
             codeArea.requestFollowCaret();
@@ -825,7 +820,7 @@ public class ShowJobLogListDialog extends Dialog<Void> {
 
         // 全屏按钮
         Button fullscreenBtn = new Button("全屏");
-        fullscreenBtn.setStyle(StyleUtil.secondaryButton());
+        fullscreenBtn.getStyleClass().add("dialog-button-secondary");
         fullscreenBtn.setOnAction(e -> {
             Stage stage = (Stage) dialog.getDialogPane().getScene().getWindow();
             if (stage != null) {
@@ -852,7 +847,6 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         // 状态标签
         Label statusLabel = new Label("正在加载...");
         statusLabel.setFont(Font.font("System", FontWeight.NORMAL, 12));
-        statusLabel.setTextFill(Color.web(StyleUtil.GRAY_500));
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -900,7 +894,6 @@ public class ShowJobLogListDialog extends Dialog<Void> {
                         isLogEnd.set(true);
                     } else {
                         statusLabel.setText("正在监听日志... 行数: " + codeArea.getParagraphs().size());
-                        statusLabel.setTextFill(Color.web(StyleUtil.GRAY_500));
                     }
                 });
             }

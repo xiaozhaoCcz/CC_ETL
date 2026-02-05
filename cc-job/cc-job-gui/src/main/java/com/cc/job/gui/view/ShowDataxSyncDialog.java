@@ -85,8 +85,8 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
 
         styleDialog();
         VBox root = new VBox(16);
+        root.getStyleClass().add("dialog-content-root");
         root.setPadding(new Insets(16));
-        root.setStyle("-fx-background-color: " + StyleUtil.BG_SECONDARY + ";");
 
         root.getChildren().addAll(createStepIndicator(), createContentPane(), createButtonBar());
 
@@ -102,6 +102,10 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         getDialogPane().setMinWidth(900);
         getDialogPane().setMinHeight(700);
         setResizable(true);
+        String dialogCss = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (dialogCss != null && !dialogCss.isEmpty()) {
+            getDialogPane().getStylesheets().add(dialogCss);
+        }
         Platform.runLater(() -> {
             Stage stage = (Stage) getDialogPane().getScene().getWindow();
             if (stage != null) {
@@ -122,7 +126,8 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         HBox steps = new HBox(40);
         steps.setAlignment(Pos.CENTER);
         steps.setPadding(new Insets(16));
-        steps.setStyle("-fx-background-color: " + StyleUtil.BG_PRIMARY + "; -fx-background-radius: 8;");
+        steps.getStyleClass().add("dialog-section");
+        steps.setStyle("-fx-background-radius: 8;");
 
         step1Label = createStepLabel("1. Reader配置", true);
         step2Label = createStepLabel("2. Writer配置", false);
@@ -156,7 +161,8 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     private StackPane createContentPane() {
         contentPane = new StackPane();
         contentPane.setPadding(new Insets(16));
-        contentPane.setStyle("-fx-background-color: " + StyleUtil.BG_PRIMARY + "; -fx-background-radius: 8;");
+        contentPane.getStyleClass().add("dialog-section");
+        contentPane.setStyle("-fx-background-radius: 8;");
         VBox.setVgrow(contentPane, Priority.ALWAYS);
         return contentPane;
     }
@@ -167,7 +173,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         bar.setPadding(new Insets(16));
 
         prevBtn = new Button("上一步");
-        prevBtn.setStyle(StyleUtil.secondaryButton());
+        prevBtn.getStyleClass().add("dialog-button-secondary");
         prevBtn.setOnAction(e -> {
             if (currentStep > 0) {
                 currentStep--;
@@ -176,12 +182,11 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         });
 
         nextBtn = new Button("下一步");
-        nextBtn.setStyle(StyleUtil.primaryButton());
-        StyleUtil.applyPrimaryButtonHover(nextBtn);
+        nextBtn.getStyleClass().add("dialog-button-primary");
         nextBtn.setOnAction(e -> handleNext());
 
         Button resetBtn = new Button("重置");
-        resetBtn.setStyle(StyleUtil.secondaryButton());
+        resetBtn.getStyleClass().add("dialog-button-secondary");
         resetBtn.setOnAction(e -> handleReset());
 
         bar.getChildren().addAll(resetBtn, prevBtn, nextBtn);
@@ -207,10 +212,10 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     private Node createReaderPane() {
         VBox pane = new VBox(16);
         pane.setPadding(new Insets(20));
-        pane.setStyle("-fx-background-color: " + StyleUtil.BG_PRIMARY + ";");
+        pane.getStyleClass().add("dialog-section");
         HBox.setHgrow(pane, Priority.ALWAYS);
 
-        String labelStyle = StyleUtil.body() + " -fx-min-width: 100;";
+        String labelStyle = StyleUtil.bodyFontOnly() + " -fx-min-width: 100;";
 
         // 使用GridPane创建两列布局，充分利用空间
         GridPane grid = new GridPane();
@@ -263,7 +268,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         tableColumnsContainer.setMinHeight(50);
         // 默认显示提示信息
         Label tablePlaceholder = new Label("请选择数据源");
-        tablePlaceholder.setStyle(StyleUtil.body() + " -fx-text-fill: " + StyleUtil.TEXT_SECONDARY + ";");
+        tablePlaceholder.setStyle(StyleUtil.bodyFontOnly());
         tablePlaceholder.setAlignment(Pos.CENTER);
         tablePlaceholder.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(tablePlaceholder, Priority.ALWAYS);
@@ -292,7 +297,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         HBox sqlBtnRow = new HBox(8);
         sqlBtnRow.setAlignment(Pos.CENTER_RIGHT);
         Button parseSqlBtn = new Button("SQL解析");
-        parseSqlBtn.setStyle(StyleUtil.successButton());
+        parseSqlBtn.getStyleClass().add("dialog-button-success");
         parseSqlBtn.setOnAction(e -> loadReaderColumns());
         sqlBtnRow.getChildren().add(parseSqlBtn);
         VBox sqlContainer = new VBox(8, readerSqlArea, sqlBtnRow);
@@ -306,7 +311,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         HBox columnHeader = new HBox(8);
         columnHeader.setAlignment(Pos.CENTER_LEFT);
         Button selectAllBtn = new Button("全选");
-        selectAllBtn.setStyle(StyleUtil.secondaryButton());
+        selectAllBtn.getStyleClass().add("dialog-button-secondary");
         selectAllBtn.setPrefWidth(80);
         selectAllBtn.setOnAction(e -> {
             readerColumnCheckBox.getChildren().forEach(columnNode -> {
@@ -320,7 +325,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
             });
         });
         Button clearAllBtn = new Button("清空");
-        clearAllBtn.setStyle(StyleUtil.secondaryButton());
+        clearAllBtn.getStyleClass().add("dialog-button-secondary");
         clearAllBtn.setPrefWidth(80);
         clearAllBtn.setOnAction(e -> {
             readerColumnCheckBox.getChildren().forEach(columnNode -> {
@@ -343,7 +348,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         columnColumnsContainer.setMinHeight(50);
         // 默认显示提示信息
         Label columnPlaceholder = new Label("请选择数据表");
-        columnPlaceholder.setStyle(StyleUtil.body() + " -fx-text-fill: " + StyleUtil.TEXT_SECONDARY + ";");
+        columnPlaceholder.setStyle(StyleUtil.bodyFontOnly());
         columnPlaceholder.setAlignment(Pos.CENTER);
         columnPlaceholder.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(columnPlaceholder, Priority.ALWAYS);
@@ -373,18 +378,15 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         // 增量配置容器
         incrConfigBox = new VBox(8);
         incrConfigBox.setPadding(new Insets(12));
-        incrConfigBox.setStyle("-fx-background-color: " + StyleUtil.BG_SECONDARY + "; " +
-                "-fx-background-radius: " + StyleUtil.RADIUS_MD + "; " +
-                "-fx-border-color: " + StyleUtil.GRAY_300 + "; " +
-                "-fx-border-width: 1; " +
-                "-fx-border-radius: " + StyleUtil.RADIUS_MD + ";");
+        incrConfigBox.getStyleClass().add("dialog-section");
+        incrConfigBox.setStyle("-fx-background-radius: " + StyleUtil.RADIUS_MD + "; -fx-border-width: 1; -fx-border-radius: " + StyleUtil.RADIUS_MD + ";");
         incrConfigBox.setVisible(false);
         
         // 增量模式
         HBox incrModeRow = new HBox(12);
         incrModeRow.setAlignment(Pos.CENTER_LEFT);
         Label incrModeLabel = new Label("增量模式");
-        incrModeLabel.setStyle(StyleUtil.body() + " -fx-min-width: 80;");
+        incrModeLabel.setStyle(StyleUtil.bodyFontOnly() + " -fx-min-width: 80;");
         incrModeCombo = new ComboBox<>(FXCollections.observableArrayList(INCR_MODES));
         incrModeCombo.getSelectionModel().selectFirst();
         HBox.setHgrow(incrModeCombo, Priority.ALWAYS);
@@ -395,7 +397,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         HBox incrColumnRow = new HBox(12);
         incrColumnRow.setAlignment(Pos.CENTER_LEFT);
         Label incrColumnLabel = new Label("增量字段");
-        incrColumnLabel.setStyle(StyleUtil.body() + " -fx-min-width: 80;");
+        incrColumnLabel.setStyle(StyleUtil.bodyFontOnly() + " -fx-min-width: 80;");
         incrColumnField = new TextField();
         incrColumnField.setPromptText("请输入字段名，如：id 或 create_time");
         HBox.setHgrow(incrColumnField, Priority.ALWAYS);
@@ -405,7 +407,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         HBox incrValueRow = new HBox(12);
         incrValueRow.setAlignment(Pos.CENTER_LEFT);
         Label incrValueLabel = new Label("初始值");
-        incrValueLabel.setStyle(StyleUtil.body() + " -fx-min-width: 80;");
+        incrValueLabel.setStyle(StyleUtil.bodyFontOnly() + " -fx-min-width: 80;");
         incrInitValueField = new TextField();
         incrInitValueField.setPromptText("ID自增请输入数字，时间自增请输入时间戳(毫秒)");
         HBox.setHgrow(incrInitValueField, Priority.ALWAYS);
@@ -415,7 +417,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         HBox incrTimeFormatRow = new HBox(12);
         incrTimeFormatRow.setAlignment(Pos.CENTER_LEFT);
         Label incrTimeFormatLabel = new Label("时间格式");
-        incrTimeFormatLabel.setStyle(StyleUtil.body() + " -fx-min-width: 80;");
+        incrTimeFormatLabel.setStyle(StyleUtil.bodyFontOnly() + " -fx-min-width: 80;");
         incrTimeFormatCombo = new ComboBox<>(FXCollections.observableArrayList(TIME_FORMATS));
         incrTimeFormatCombo.getSelectionModel().selectFirst();
         HBox.setHgrow(incrTimeFormatCombo, Priority.ALWAYS);
@@ -452,10 +454,10 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     private Node createWriterPane() {
         VBox pane = new VBox(16);
         pane.setPadding(new Insets(20));
-        pane.setStyle("-fx-background-color: " + StyleUtil.BG_PRIMARY + ";");
+        pane.getStyleClass().add("dialog-section");
         HBox.setHgrow(pane, Priority.ALWAYS);
 
-        String labelStyle = StyleUtil.body() + " -fx-min-width: 100;";
+        String labelStyle = StyleUtil.bodyFontOnly() + " -fx-min-width: 100;";
 
         // 使用GridPane创建两列布局，充分利用空间
         GridPane grid = new GridPane();
@@ -508,7 +510,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         tableColumnsContainer.setMinHeight(50);
         // 默认显示提示信息
         Label tablePlaceholder = new Label("请选择数据源");
-        tablePlaceholder.setStyle(StyleUtil.body() + " -fx-text-fill: " + StyleUtil.TEXT_SECONDARY + ";");
+        tablePlaceholder.setStyle(StyleUtil.bodyFontOnly());
         tablePlaceholder.setAlignment(Pos.CENTER);
         tablePlaceholder.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(tablePlaceholder, Priority.ALWAYS);
@@ -536,7 +538,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         HBox sqlBtnRow = new HBox(8);
         sqlBtnRow.setAlignment(Pos.CENTER_RIGHT);
         Button parseSqlBtn = new Button("SQL解析");
-        parseSqlBtn.setStyle(StyleUtil.successButton());
+        parseSqlBtn.getStyleClass().add("dialog-button-success");
         parseSqlBtn.setOnAction(e -> loadWriterColumns());
         sqlBtnRow.getChildren().add(parseSqlBtn);
         VBox sqlContainer = new VBox(8, writerSqlArea, sqlBtnRow);
@@ -550,7 +552,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         HBox columnHeader = new HBox(8);
         columnHeader.setAlignment(Pos.CENTER_LEFT);
         Button selectAllBtn = new Button("全选");
-        selectAllBtn.setStyle(StyleUtil.secondaryButton());
+        selectAllBtn.getStyleClass().add("dialog-button-secondary");
         selectAllBtn.setPrefWidth(80);
         selectAllBtn.setOnAction(e -> {
             writerColumnCheckBox.getChildren().forEach(columnNode -> {
@@ -564,7 +566,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
             });
         });
         Button clearAllBtn = new Button("清空");
-        clearAllBtn.setStyle(StyleUtil.secondaryButton());
+        clearAllBtn.getStyleClass().add("dialog-button-secondary");
         clearAllBtn.setPrefWidth(80);
         clearAllBtn.setOnAction(e -> {
             writerColumnCheckBox.getChildren().forEach(columnNode -> {
@@ -587,7 +589,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         columnColumnsContainer.setMinHeight(50);
         // 默认显示提示信息
         Label columnPlaceholder = new Label("请选择数据表");
-        columnPlaceholder.setStyle(StyleUtil.body() + " -fx-text-fill: " + StyleUtil.TEXT_SECONDARY + ";");
+        columnPlaceholder.setStyle(StyleUtil.bodyFontOnly());
         columnPlaceholder.setAlignment(Pos.CENTER);
         columnPlaceholder.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(columnPlaceholder, Priority.ALWAYS);
@@ -640,7 +642,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         pane.setPadding(new Insets(16));
 
         Label label = new Label("生成的DataX JSON配置");
-        label.setStyle(StyleUtil.body() + "-fx-font-weight: bold;");
+        label.setStyle(StyleUtil.bodyFontOnly() + "-fx-font-weight: bold;");
 
         jsonResultArea = new TextArea();
         jsonResultArea.setEditable(false);
@@ -1056,10 +1058,8 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         // 根据消息内容决定是否显示边框
         boolean showBorder = !message.equals("请选择数据源");
         if (showBorder) {
-            container.setStyle("-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                    "-fx-background-radius: " + StyleUtil.RADIUS_MD + "; " +
-                    "-fx-border-color: " + StyleUtil.GRAY_300 + "; " +
-                    "-fx-border-width: 1; " +
+            container.getStyleClass().add("dialog-section");
+            container.setStyle("-fx-background-radius: " + StyleUtil.RADIUS_MD + "; -fx-border-width: 1; " +
                     "-fx-border-radius: " + StyleUtil.RADIUS_MD + ";");
             container.setMinHeight(220);
             container.setPrefHeight(220);
@@ -1079,7 +1079,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
             }
         }
         Label placeholder = new Label(message);
-        placeholder.setStyle(StyleUtil.body() + " -fx-text-fill: " + StyleUtil.TEXT_SECONDARY + ";");
+        placeholder.setStyle(StyleUtil.bodyFontOnly());
         placeholder.setAlignment(Pos.CENTER);
         placeholder.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(placeholder, Priority.ALWAYS);
@@ -1091,10 +1091,8 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                                   java.util.function.Consumer<DataxTable> onSelect) {
         container.getChildren().clear();
         container.setPadding(new Insets(12, 16, 12, 16));
-        container.setStyle("-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                "-fx-background-radius: " + StyleUtil.RADIUS_MD + "; " +
-                "-fx-border-color: " + StyleUtil.GRAY_300 + "; " +
-                "-fx-border-width: 1; " +
+        container.getStyleClass().add("dialog-section");
+        container.setStyle("-fx-background-radius: " + StyleUtil.RADIUS_MD + "; -fx-border-width: 1; " +
                 "-fx-border-radius: " + StyleUtil.RADIUS_MD + ";");
         container.setMinHeight(220);
         container.setPrefHeight(220);
@@ -1114,10 +1112,8 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         // 根据消息内容决定是否显示边框
         boolean showBorder = !message.equals("请选择数据源") && !message.equals("请选择数据表");
         if (showBorder) {
-            container.setStyle("-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                    "-fx-background-radius: " + StyleUtil.RADIUS_MD + "; " +
-                    "-fx-border-color: " + StyleUtil.GRAY_300 + "; " +
-                    "-fx-border-width: 1; " +
+            container.getStyleClass().add("dialog-section");
+            container.setStyle("-fx-background-radius: " + StyleUtil.RADIUS_MD + "; -fx-border-width: 1; " +
                     "-fx-border-radius: " + StyleUtil.RADIUS_MD + ";");
             container.setMinHeight(220);
             container.setPrefHeight(220);
@@ -1137,7 +1133,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
             }
         }
         Label placeholder = new Label(message);
-        placeholder.setStyle(StyleUtil.body() + " -fx-text-fill: " + StyleUtil.TEXT_SECONDARY + ";");
+        placeholder.setStyle(StyleUtil.bodyFontOnly());
         placeholder.setAlignment(Pos.CENTER);
         placeholder.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(placeholder, Priority.ALWAYS);
@@ -1148,10 +1144,8 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     private void showColumnContent(HBox container, List<String> items) {
         container.getChildren().clear();
         container.setPadding(new Insets(12, 16, 12, 16));
-        container.setStyle("-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                "-fx-background-radius: " + StyleUtil.RADIUS_MD + "; " +
-                "-fx-border-color: " + StyleUtil.GRAY_300 + "; " +
-                "-fx-border-width: 1; " +
+        container.getStyleClass().add("dialog-section");
+        container.setStyle("-fx-background-radius: " + StyleUtil.RADIUS_MD + "; -fx-border-width: 1; " +
                 "-fx-border-radius: " + StyleUtil.RADIUS_MD + ";");
         container.setMinHeight(220);
         container.setPrefHeight(220);
@@ -1189,7 +1183,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                                 ? table.getTableSchema() + "." : "") + table.getTableName());
                 radio.setToggleGroup(toggleGroup);
                 radio.setUserData(table);
-                radio.setStyle(StyleUtil.body() + " -fx-background-color: transparent;"); // 移除背景颜色
+                radio.setStyle(StyleUtil.bodyFontOnly() + " -fx-background-color: transparent;"); // 移除背景颜色
                 radio.setOnAction(e -> {
                     if (onSelect != null) {
                         onSelect.accept(table);
@@ -1221,7 +1215,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
             for (int i = startIndex; i < endIndex; i++) {
                 String columnName = items.get(i);
                 CheckBox checkBox = new CheckBox(columnName);
-                checkBox.setStyle(StyleUtil.body() + " -fx-background-color: transparent;"); // 移除背景颜色
+                checkBox.setStyle(StyleUtil.bodyFontOnly() + " -fx-background-color: transparent;"); // 移除背景颜色
                 column.getChildren().add(checkBox);
             }
             

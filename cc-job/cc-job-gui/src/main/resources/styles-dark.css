@@ -34,9 +34,11 @@
     -fx-prompt-text-fill: #9D9D9D;
     -fx-background-color: #3C3C3C;
     -fx-border-color: #505050;
+    -fx-control-inner-background: #3C3C3C;
 }
 
-.dialog-pane .text-area .content {
+.dialog-pane .text-area .content,
+.dialog-pane .text-area .viewport {
     -fx-background-color: #3C3C3C;
     -fx-text-fill: #FFFFFF;
 }
@@ -53,7 +55,145 @@
 }
 
 .dialog-pane .button {
-    -fx-text-fill: #FFFFFF;
+    -fx-cursor: hand;
+    -fx-background-color: #3C3C3C;
+    -fx-text-fill: #D4D4D4;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-padding: 8 16;
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+    -fx-effect: null;
+}
+
+.dialog-pane .button:hover {
+    -fx-background-color: #505050;
+    -fx-effect: null;
+}
+
+.dialog-pane .button:pressed {
+    -fx-background-color: #6B6B6B;
+    -fx-effect: null;
+}
+
+.dialog-pane .dialog-button-secondary {
+    -fx-background-color: #3C3C3C;
+    -fx-text-fill: #D4D4D4;
+    -fx-font-size: 13px;
+    -fx-font-weight: 500;
+    -fx-padding: 8 16;
+    -fx-border-color: #505050;
+    -fx-border-width: 1;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-cursor: hand;
+}
+
+.dialog-pane .dialog-button-secondary:hover {
+    -fx-background-color: #505050;
+}
+
+.dialog-pane .dialog-button-secondary:pressed {
+    -fx-background-color: #6B6B6B;
+}
+
+/* 对话框内主按钮 / 成功 / 错误（深色） */
+.dialog-pane .dialog-button-primary {
+    -fx-background-color: #007ACC;
+    -fx-text-fill: white;
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+    -fx-padding: 8 16;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-cursor: hand;
+    -fx-effect: null;
+}
+.dialog-pane .dialog-button-primary:hover {
+    -fx-background-color: #1E88E5;
+    -fx-effect: null;
+}
+.dialog-pane .dialog-button-primary:pressed {
+    -fx-background-color: #094771;
+    -fx-effect: null;
+}
+
+.dialog-pane .dialog-button-success {
+    -fx-background-color: #1e3a2f;
+    -fx-text-fill: #4EC9B0;
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+    -fx-padding: 8 16;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-cursor: hand;
+    -fx-effect: null;
+}
+.dialog-pane .dialog-button-success:hover {
+    -fx-background-color: #2d4a3e;
+    -fx-text-fill: #6EE7C7;
+    -fx-effect: null;
+}
+.dialog-pane .dialog-button-success:pressed {
+    -fx-background-color: #2d4a3e;
+    -fx-effect: null;
+}
+
+.dialog-pane .dialog-button-error {
+    -fx-background-color: #3d2020;
+    -fx-text-fill: #F48771;
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+    -fx-padding: 8 16;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-cursor: hand;
+    -fx-effect: null;
+}
+.dialog-pane .dialog-button-error:hover {
+    -fx-background-color: #4d2828;
+    -fx-text-fill: #F48771;
+    -fx-effect: null;
+}
+.dialog-pane .dialog-button-error:pressed {
+    -fx-background-color: #4d2828;
+    -fx-effect: null;
+}
+
+/* 对话框内搜索/筛选输入框（深色） */
+.dialog-pane .dialog-search-field {
+    -fx-background-color: #3C3C3C;
+    -fx-text-fill: #D4D4D4;
+    -fx-prompt-text-fill: #9D9D9D;
+    -fx-control-inner-background: #3C3C3C;
+    -fx-font-size: 13px;
+    -fx-padding: 8 12;
+    -fx-border-color: #505050;
+    -fx-border-width: 1;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+}
+
+/* 表格内操作列 MenuButton（深色） */
+.dialog-pane .dialog-table-action-button {
+    -fx-background-color: #3C3C3C;
+    -fx-text-fill: #D4D4D4;
+    -fx-font-size: 11px;
+    -fx-font-weight: 500;
+    -fx-padding: 4 8;
+    -fx-border-color: #505050;
+    -fx-border-width: 1;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-content-display: LEFT;
+    -fx-cursor: hand;
+}
+.dialog-pane .dialog-table-action-button:hover {
+    -fx-background-color: #505050;
+    -fx-border-color: #6B6B6B;
+}
+.dialog-pane .dialog-table-action-button:pressed {
+    -fx-background-color: #6B6B6B;
 }
 
 .dialog-pane .radio-button,
@@ -63,9 +203,60 @@
 
 .dialog-pane .list-view,
 .dialog-pane .table-view,
-.dialog-pane .tree-table-view {
+.dialog-pane .tree-table-view,
+.dialog-pane .tree-view {
     -fx-background-color: #2D2D30;
     -fx-text-fill: #FFFFFF;
+}
+
+.dialog-pane .tree-view .tree-cell {
+    -fx-text-fill: #FFFFFF;
+    -fx-background-color: transparent;
+}
+
+.dialog-pane .tree-view .tree-cell:hover {
+    -fx-background-color: #3C3C3C;
+}
+
+.dialog-pane .tree-view .tree-cell:selected {
+    -fx-background-color: #094771;
+    -fx-text-fill: #FFFFFF;
+}
+
+.dialog-pane .tab-pane {
+    -fx-background-color: #2D2D30;
+}
+
+.dialog-pane .tab-pane .tab-header-area {
+    -fx-background-color: #2D2D30;
+}
+
+.dialog-pane .tab-pane .tab-content-area {
+    -fx-background-color: #2D2D30;
+}
+
+.dialog-pane .tab-pane .tab {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent transparent #3C3C3C transparent;
+    -fx-border-width: 0 0 2 0;
+}
+
+.dialog-pane .tab-pane .tab:hover {
+    -fx-background-color: #3C3C3C;
+}
+
+.dialog-pane .tab-pane .tab:selected {
+    -fx-background-color: #2D2D30;
+    -fx-border-color: transparent transparent #007ACC transparent;
+}
+
+.dialog-pane .tab-pane .tab .tab-label {
+    -fx-text-fill: #D4D4D4;
+}
+
+.dialog-pane .tab-pane .tab:selected .tab-label {
+    -fx-text-fill: #FFFFFF;
+    -fx-font-weight: 600;
 }
 
 .dialog-pane .list-cell,
@@ -75,10 +266,32 @@
     -fx-background-color: #2D2D30;
 }
 
+.dialog-pane .table-view .table-cell {
+    -fx-text-fill: #FFFFFF;
+    -fx-background-color: transparent;
+}
+
+.dialog-pane .table-view .column-header,
+.dialog-pane .table-view .column-header-background {
+    -fx-background-color: #2D2D30;
+}
+
+.dialog-pane .table-view .column-header .label {
+    -fx-text-fill: #FFFFFF;
+}
+
 .dialog-pane .list-cell:filled:selected,
 .dialog-pane .table-row-cell:selected,
 .dialog-pane .tree-table-row-cell:selected {
     -fx-background-color: #094771;
+    -fx-text-fill: #FFFFFF;
+}
+
+.dialog-pane .table-cell {
+    -fx-text-fill: #FFFFFF;
+}
+
+.dialog-pane .table-view .column-header {
     -fx-text-fill: #FFFFFF;
 }
 
@@ -93,6 +306,45 @@
 
 .dialog-pane .dialog-content-root {
     -fx-background-color: #2D2D30;
+}
+
+.dialog-pane .scroll-pane {
+    -fx-background-color: transparent;
+}
+
+.dialog-pane .scroll-pane .content,
+.dialog-pane .scroll-pane .viewport {
+    -fx-background-color: transparent;
+}
+
+/* 系统设置等对话框内 Accordion / TitledPane 深色 */
+.dialog-pane .accordion {
+    -fx-background-color: #2D2D30;
+}
+
+.dialog-pane .titled-pane {
+    -fx-background-color: #2D2D30;
+    -fx-border-color: #505050;
+    -fx-text-fill: #D4D4D4;
+}
+
+.dialog-pane .titled-pane > .content {
+    -fx-background-color: #2D2D30;
+}
+
+.dialog-pane .titled-pane .label {
+    -fx-text-fill: #D4D4D4;
+}
+
+/* Dialog 头部区域（标题栏 + header 文字） */
+.dialog-pane .header-panel,
+.dialog-pane:header .header-panel {
+    -fx-background-color: #2D2D30;
+}
+
+.dialog-pane .header-panel .label,
+.dialog-pane:header .header-panel .label {
+    -fx-text-fill: #FFFFFF;
 }
 
 /* Stage 弹窗根容器（快捷键/更新日志等，非 DialogPane） */
@@ -112,6 +364,138 @@
 
 .popup-window-root .button {
     -fx-text-fill: #FFFFFF;
+}
+
+/* 快捷键列表等弹窗内 ScrollPane 内容区深色（避免白底浅字） */
+.popup-window-root .scroll-pane {
+    -fx-background-color: #2D2D30;
+}
+
+.popup-window-root .scroll-pane .content,
+.popup-window-root .scroll-pane .viewport {
+    -fx-background-color: #2D2D30;
+}
+
+/* 节点执行历史等弹窗子区域（深色） */
+.popup-window-root.popup-history-root,
+.popup-title-bar {
+    -fx-background-color: #2D2D30;
+    -fx-border-color: #3C3C3C;
+    -fx-border-width: 0 0 1 0;
+}
+
+.popup-title-bar .label {
+    -fx-text-fill: #D4D4D4;
+}
+
+.popup-tool-bar {
+    -fx-background-color: #2D2D30;
+    -fx-border-color: #3C3C3C;
+    -fx-border-width: 0 0 1 0;
+}
+
+.popup-tool-bar .label {
+    -fx-text-fill: #9D9D9D;
+}
+
+.popup-content-area,
+.popup-window-root .scroll-pane.popup-content-scroll {
+    -fx-background-color: #1E1E1E;
+}
+
+.popup-card {
+    -fx-background-color: #2D2D30;
+    -fx-border-color: #3C3C3C;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+
+.popup-card .label,
+.popup-card-time {
+    -fx-text-fill: #D4D4D4;
+}
+
+.popup-node-card {
+    -fx-background-color: #252526;
+    -fx-border-color: #3C3C3C;
+    -fx-border-width: 1;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+}
+
+.popup-node-card .label {
+    -fx-text-fill: #D4D4D4;
+}
+
+.popup-tool-button,
+.popup-pagination-button {
+    -fx-background-color: #3C3C3C;
+    -fx-text-fill: #D4D4D4;
+    -fx-font-size: 12px;
+    -fx-font-weight: 500;
+    -fx-padding: 6 12 6 12;
+    -fx-border-color: #505050;
+    -fx-border-width: 1;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-cursor: hand;
+}
+
+.popup-tool-button:hover,
+.popup-pagination-button:hover {
+    -fx-background-color: #505050;
+    -fx-border-color: #6B6B6B;
+}
+
+.popup-pagination-bar {
+    -fx-background-color: #2D2D30;
+    -fx-border-color: #3C3C3C;
+    -fx-border-width: 1 0 0 0;
+}
+
+.popup-pagination-bar .label {
+    -fx-text-fill: #9D9D9D;
+}
+
+.popup-status-success {
+    -fx-background-color: #1e3a2f;
+    -fx-text-fill: #4EC9B0;
+    -fx-padding: 4 12 4 12;
+    -fx-background-radius: 4;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.popup-status-fail {
+    -fx-background-color: #3d2020;
+    -fx-text-fill: #F48771;
+    -fx-padding: 4 12 4 12;
+    -fx-background-radius: 4;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.popup-status-running {
+    -fx-background-color: #094771;
+    -fx-text-fill: #569CD6;
+    -fx-padding: 4 12 4 12;
+    -fx-background-radius: 4;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.popup-status-unknown {
+    -fx-background-color: #3C3C3C;
+    -fx-text-fill: #9D9D9D;
+    -fx-padding: 4 12 4 12;
+    -fx-background-radius: 4;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.popup-error-text {
+    -fx-text-fill: #F48771;
 }
 
 /* 拆出面板根容器 */
@@ -166,6 +550,20 @@
     -fx-background-color: #094771;
     -fx-text-fill: #FFFFFF;
     -fx-background-radius: 4;
+}
+
+.sidebar-left .tree-view .tree-cell .tree-cell-label {
+    -fx-text-fill: #FFFFFF;
+}
+
+.sidebar-left .tree-view .tree-cell:selected .tree-cell-label,
+.sidebar-left .tree-view .tree-cell:selected .tree-cell-label-selected {
+    -fx-text-fill: #FFFFFF;
+}
+
+.sidebar-left .tree-view .tree-cell.tree-cell-content {
+    -fx-padding: 8 12;
+    -fx-background-radius: 6;
 }
 
 .sidebar-left .tree-view .tree-cell > .tree-disclosure-node > .arrow {
@@ -578,13 +976,13 @@
 .tool-bar-zoom-label {
     -fx-font-size: 13px;
     -fx-font-weight: 700;
-    -fx-text-fill: #D4D4D4;
+    -fx-text-fill: #FFFFFF;
     -fx-padding: 0 8 0 8;
 }
 
 .top-tool-bar .tool-bar-button {
     -fx-background-color: transparent;
-    -fx-text-fill: #D4D4D4;
+    -fx-text-fill: #FFFFFF;
     -fx-padding: 6;
     -fx-background-radius: 4;
     -fx-cursor: hand;
@@ -596,10 +994,14 @@
 
 .top-tool-bar .tool-bar-menu-button {
     -fx-background-color: #2D2D30;
-    -fx-text-fill: #D4D4D4;
+    -fx-text-fill: #FFFFFF;
     -fx-padding: 6;
     -fx-background-radius: 4;
     -fx-cursor: hand;
+}
+
+.top-tool-bar .tool-bar-menu-button .label {
+    -fx-text-fill: #FFFFFF;
 }
 
 .top-tool-bar .tool-bar-menu-button:hover,
@@ -620,12 +1022,12 @@
 .tool-bar-user-name {
     -fx-font-size: 13px;
     -fx-font-weight: bold;
-    -fx-text-fill: #D4D4D4;
+    -fx-text-fill: #FFFFFF;
 }
 
 .tool-bar-user-id {
     -fx-font-size: 11px;
-    -fx-text-fill: #9D9D9D;
+    -fx-text-fill: #FFFFFF;
 }
 
 /* ============ 菜单栏 ============ */
@@ -659,6 +1061,20 @@
     -fx-effect: null;
 }
 
+/* 导航栏内菜单栏与下拉按钮统一白字 */
+.top-tool-bar .menu-bar .label {
+    -fx-text-fill: #FFFFFF;
+    -fx-font-size: 13px;
+}
+
+.top-tool-bar .menu-button {
+    -fx-text-fill: #FFFFFF;
+}
+
+.top-tool-bar .menu-button .label {
+    -fx-text-fill: #FFFFFF;
+}
+
 /* ============ 上下文菜单 ============ */
 
 .context-menu {
@@ -679,7 +1095,7 @@
 }
 
 .menu-item .label {
-    -fx-text-fill: #D4D4D4;
+    -fx-text-fill: #FFFFFF;
     -fx-font-size: 13px;
 }
 
@@ -1348,6 +1764,19 @@
 .parameter-input .parameter-expression {
     -rtfx-background-color: #264F78 !important;
     -fx-fill: #9CDCFE !important;
+}
+
+/* 任务参数 CodeArea 深色：文字、光标、选区 */
+.parameter-input .text {
+    -fx-fill: #D4D4D4;
+}
+
+.parameter-input .caret {
+    -fx-stroke: #007ACC;
+}
+
+.parameter-input .selection {
+    -fx-fill: #094771;
 }
 
 /* ============ 底部状态栏 ============ */

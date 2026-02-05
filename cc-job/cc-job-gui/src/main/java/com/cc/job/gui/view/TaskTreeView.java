@@ -13,7 +13,6 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.StackPane;
-import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.util.Duration;
 
@@ -223,6 +222,7 @@ public class TaskTreeView extends VBox {
                     iconContainer.setMaxSize(16, 16);
                     
                     textLabel = new Label();
+                    textLabel.getStyleClass().add("tree-cell-label");
                     
 //                    runningIndicator = new Circle(4);
 //                    runningIndicator.setFill(Color.web("#10B981"));
@@ -251,14 +251,13 @@ public class TaskTreeView extends VBox {
                 setText(null);
                 setGraphic(contentBox);
                 
-                setStyle(StyleUtil.body() + "-fx-padding: 8 12; -fx-background-radius: " + StyleUtil.RADIUS_MD + ";");
-                
+                getStyleClass().removeAll("tree-cell-content", "tree-cell-content-selected");
+                getStyleClass().add("tree-cell-content");
                 if (isSelected()) {
-                    setStyle("-fx-background-color: " + StyleUtil.PRIMARY + "20; -fx-text-fill: " + StyleUtil.PRIMARY + "; " +
-                        "-fx-font-size: 13px; -fx-font-weight: 600; -fx-padding: 8 12; -fx-background-radius: " + StyleUtil.RADIUS_MD + ";");
-                    textLabel.setStyle("-fx-text-fill: " + StyleUtil.PRIMARY + ";");
+                    getStyleClass().add("tree-cell-content-selected");
+                    textLabel.getStyleClass().add("tree-cell-label-selected");
                 } else {
-                    textLabel.setStyle("-fx-text-fill: #374151;");
+                    textLabel.getStyleClass().remove("tree-cell-label-selected");
                 }
                 
                 setContextMenu(contextMenuManager.createContextMenu(item, getTreeItem(),

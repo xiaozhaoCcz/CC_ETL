@@ -2,7 +2,6 @@ package com.cc.job.gui.view;
 
 import com.cc.job.gui.service.JobLogService;
 import com.cc.job.gui.util.IconUtil;
-import com.cc.job.gui.util.StyleUtil;
 import com.cc.job.xo.common.result.PageResult;
 import com.cc.job.xo.model.vo.JobLogVO;
 import com.google.gson.JsonObject;
@@ -58,7 +57,7 @@ public class NodeHistoryView extends VBox {
     
     private void initializeUI() {
         setSpacing(0);
-        setStyle("-fx-background-color: #FFFFFF;");
+        getStyleClass().add("popup-history-root");
         
         // 标题栏
         HBox titleBar = createTitleBar();
@@ -69,11 +68,11 @@ public class NodeHistoryView extends VBox {
         // 内容容器（卡片布局）
         contentContainer = new VBox(16);
         contentContainer.setPadding(new Insets(20));
-        contentContainer.setStyle("-fx-background-color: #F9FAFB;");
+        contentContainer.getStyleClass().add("popup-content-area");
         
         scrollPane = new ScrollPane(contentContainer);
         scrollPane.setFitToWidth(true);
-        scrollPane.setStyle("-fx-background-color: #F9FAFB;");
+        scrollPane.getStyleClass().add("popup-content-scroll");
         VBox.setVgrow(scrollPane, Priority.ALWAYS);
         
         // 分页栏
@@ -84,21 +83,22 @@ public class NodeHistoryView extends VBox {
     
     private HBox createTitleBar() {
         HBox titleBar = new HBox(12);
+        titleBar.getStyleClass().add("popup-title-bar");
         titleBar.setAlignment(Pos.CENTER_LEFT);
         titleBar.setPadding(new Insets(16, 20, 16, 20));
-        titleBar.setStyle("-fx-background-color: #F9FAFB; -fx-border-color: #E5E7EB; -fx-border-width: 0 0 1 0;");
         
         Label titleLabel = new Label("节点执行历史");
-        titleLabel.setStyle(StyleUtil.subtitle() + "-fx-font-weight: 700;");
+        titleLabel.getStyleClass().add("popup-title-bar-title");
+        titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: 700;");
         
         Label groupLabel = new Label("任务组: " + taskGroupName);
-        groupLabel.setStyle(StyleUtil.body() + "-fx-text-fill: #6B7280;");
+        groupLabel.setStyle("-fx-font-size: 13px;");
         
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         
         statusLabel = new Label("");
-        statusLabel.setStyle(StyleUtil.caption() + "-fx-text-fill: #9CA3AF;");
+        statusLabel.setStyle("-fx-font-size: 12px;");
         
         titleBar.getChildren().addAll(titleLabel, groupLabel, spacer, statusLabel);
         return titleBar;
@@ -106,9 +106,9 @@ public class NodeHistoryView extends VBox {
     
     private HBox createToolBar() {
         HBox toolBar = new HBox(8);
+        toolBar.getStyleClass().add("popup-tool-bar");
         toolBar.setAlignment(Pos.CENTER_LEFT);
         toolBar.setPadding(new Insets(12, 20, 12, 20));
-        toolBar.setStyle("-fx-background-color: #FFFFFF; -fx-border-color: #E5E7EB; -fx-border-width: 0 0 1 0;");
         
         Button refreshButton = createToolButton("刷新", IconUtil.refreshIcon());
         refreshButton.setOnAction(e -> loadData());
@@ -117,7 +117,7 @@ public class NodeHistoryView extends VBox {
         HBox.setHgrow(spacer, Priority.ALWAYS);
         
         Label tipsLabel = new Label("提示：显示该任务组每次执行时所有节点的执行状态");
-        tipsLabel.setStyle(StyleUtil.caption() + "-fx-text-fill: #9CA3AF;");
+        tipsLabel.setStyle("-fx-font-size: 12px;");
         
         toolBar.getChildren().addAll(refreshButton, spacer, tipsLabel);
         return toolBar;
@@ -125,45 +125,7 @@ public class NodeHistoryView extends VBox {
     
     private Button createToolButton(String text, javafx.scene.Node icon) {
         Button button = new Button(text, icon);
-        button.setStyle(
-            "-fx-background-color: #FFFFFF; " +
-            "-fx-text-fill: #374151; " +
-            "-fx-font-size: 12px; " +
-            "-fx-font-weight: 500; " +
-            "-fx-padding: 6 12 6 12; " +
-            "-fx-border-color: #D1D5DB; " +
-            "-fx-border-width: 1; " +
-            "-fx-border-radius: 4; " +
-            "-fx-background-radius: 4; " +
-            "-fx-cursor: hand;"
-        );
-        
-        button.setOnMouseEntered(e -> button.setStyle(
-            "-fx-background-color: #F3F4F6; " +
-            "-fx-text-fill: #374151; " +
-            "-fx-font-size: 12px; " +
-            "-fx-font-weight: 500; " +
-            "-fx-padding: 6 12 6 12; " +
-            "-fx-border-color: #9CA3AF; " +
-            "-fx-border-width: 1; " +
-            "-fx-border-radius: 4; " +
-            "-fx-background-radius: 4; " +
-            "-fx-cursor: hand;"
-        ));
-        
-        button.setOnMouseExited(e -> button.setStyle(
-            "-fx-background-color: #FFFFFF; " +
-            "-fx-text-fill: #374151; " +
-            "-fx-font-size: 12px; " +
-            "-fx-font-weight: 500; " +
-            "-fx-padding: 6 12 6 12; " +
-            "-fx-border-color: #D1D5DB; " +
-            "-fx-border-width: 1; " +
-            "-fx-border-radius: 4; " +
-            "-fx-background-radius: 4; " +
-            "-fx-cursor: hand;"
-        ));
-        
+        button.getStyleClass().add("popup-tool-button");
         return button;
     }
     
@@ -172,21 +134,16 @@ public class NodeHistoryView extends VBox {
      */
     private VBox createExecutionCard(JobLogVO log) {
         VBox card = new VBox(12);
+        card.getStyleClass().add("popup-card");
         card.setPadding(new Insets(16));
-        card.setStyle(
-            "-fx-background-color: #FFFFFF; " +
-            "-fx-border-color: #E5E7EB; " +
-            "-fx-border-width: 1; " +
-            "-fx-border-radius: 8; " +
-            "-fx-background-radius: 8;"
-        );
         
         // 卡片头部：执行时间和总体状态
         HBox header = new HBox(12);
         header.setAlignment(Pos.CENTER_LEFT);
         
         Label timeLabel = new Label("执行时间: " + formatTime(log.getTriggerTime()));
-        timeLabel.setStyle(StyleUtil.body() + "-fx-font-weight: 600; -fx-text-fill: #1F2937;");
+        timeLabel.getStyleClass().add("popup-card-time");
+        timeLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: 600;");
         
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -212,7 +169,7 @@ public class NodeHistoryView extends VBox {
         String nodeStatusJson = log.getNodeStatus();
         if (nodeStatusJson == null || nodeStatusJson.trim().isEmpty()) {
             Label emptyLabel = new Label("暂无节点状态记录");
-            emptyLabel.setStyle(StyleUtil.caption() + "-fx-text-fill: #9CA3AF;");
+            emptyLabel.setStyle("-fx-font-size: 12px;");
             grid.getChildren().add(emptyLabel);
             return grid;
         }
@@ -235,7 +192,8 @@ public class NodeHistoryView extends VBox {
         } catch (Exception e) {
             logger.error("解析节点状态JSON失败", e);
             Label errorLabel = new Label("解析节点状态失败: " + e.getMessage());
-            errorLabel.setStyle(StyleUtil.caption() + "-fx-text-fill: #EF4444;");
+            errorLabel.getStyleClass().add("popup-error-text");
+            errorLabel.setStyle("-fx-font-size: 12px;");
             grid.getChildren().add(errorLabel);
         }
         
@@ -247,18 +205,12 @@ public class NodeHistoryView extends VBox {
      */
     private VBox createNodeCard(String nodeName, int status) {
         VBox nodeCard = new VBox(8);
+        nodeCard.getStyleClass().add("popup-node-card");
         nodeCard.setPadding(new Insets(12));
         nodeCard.setPrefWidth(180);
-        nodeCard.setStyle(
-            "-fx-background-color: #F9FAFB; " +
-            "-fx-border-color: #E5E7EB; " +
-            "-fx-border-width: 1; " +
-            "-fx-border-radius: 6; " +
-            "-fx-background-radius: 6;"
-        );
         
         Label nameLabel = new Label(nodeName);
-        nameLabel.setStyle(StyleUtil.body() + "-fx-font-weight: 500; -fx-text-fill: #374151;");
+        nameLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: 500;");
         nameLabel.setWrapText(true);
         
         Label statusLabel = createStatusLabel(status);
@@ -274,44 +226,16 @@ public class NodeHistoryView extends VBox {
         Label label = new Label();
         if (status == 1) {
             label.setText("成功");
-            label.setStyle(
-                "-fx-background-color: #D1FAE5; " +
-                "-fx-text-fill: #065F46; " +
-                "-fx-padding: 4 12 4 12; " +
-                "-fx-background-radius: 4; " +
-                "-fx-font-size: 12px; " +
-                "-fx-font-weight: 600;"
-            );
+            label.getStyleClass().add("popup-status-success");
         } else if (status == 0) {
             label.setText("失败");
-            label.setStyle(
-                "-fx-background-color: #FEE2E2; " +
-                "-fx-text-fill: #991B1B; " +
-                "-fx-padding: 4 12 4 12; " +
-                "-fx-background-radius: 4; " +
-                "-fx-font-size: 12px; " +
-                "-fx-font-weight: 600;"
-            );
+            label.getStyleClass().add("popup-status-fail");
         } else if (status == 2) {
             label.setText("运行中");
-            label.setStyle(
-                "-fx-background-color: #DBEAFE; " +
-                "-fx-text-fill: #1E40AF; " +
-                "-fx-padding: 4 12 4 12; " +
-                "-fx-background-radius: 4; " +
-                "-fx-font-size: 12px; " +
-                "-fx-font-weight: 600;"
-            );
+            label.getStyleClass().add("popup-status-running");
         } else {
             label.setText("未知");
-            label.setStyle(
-                "-fx-background-color: #F3F4F6; " +
-                "-fx-text-fill: #6B7280; " +
-                "-fx-padding: 4 12 4 12; " +
-                "-fx-background-radius: 4; " +
-                "-fx-font-size: 12px; " +
-                "-fx-font-weight: 600;"
-            );
+            label.getStyleClass().add("popup-status-unknown");
         }
         return label;
     }
@@ -334,22 +258,12 @@ public class NodeHistoryView extends VBox {
     
     private HBox createPaginationBar() {
         HBox paginationBar = new HBox(16);
+        paginationBar.getStyleClass().add("popup-pagination-bar");
         paginationBar.setAlignment(Pos.CENTER);
         paginationBar.setPadding(new Insets(12, 20, 12, 20));
-        paginationBar.setStyle("-fx-background-color: #F9FAFB; -fx-border-color: #E5E7EB; -fx-border-width: 1 0 0 0;");
         
         Button prevButton = new Button("上一页");
-        prevButton.setStyle(
-            "-fx-background-color: #FFFFFF; " +
-            "-fx-text-fill: #374151; " +
-            "-fx-font-size: 12px; " +
-            "-fx-padding: 6 12 6 12; " +
-            "-fx-border-color: #D1D5DB; " +
-            "-fx-border-width: 1; " +
-            "-fx-border-radius: 4; " +
-            "-fx-background-radius: 4; " +
-            "-fx-cursor: hand;"
-        );
+        prevButton.getStyleClass().add("popup-pagination-button");
         prevButton.setOnAction(e -> {
             if (currentPage > 1) {
                 currentPage--;
@@ -358,20 +272,10 @@ public class NodeHistoryView extends VBox {
         });
         
         pageLabel = new Label("第 " + currentPage + " 页");
-        pageLabel.setStyle(StyleUtil.body() + "-fx-text-fill: #6B7280;");
+        pageLabel.setStyle("-fx-font-size: 13px;");
         
         nextButton = new Button("下一页");
-        nextButton.setStyle(
-            "-fx-background-color: #FFFFFF; " +
-            "-fx-text-fill: #374151; " +
-            "-fx-font-size: 12px; " +
-            "-fx-padding: 6 12 6 12; " +
-            "-fx-border-color: #D1D5DB; " +
-            "-fx-border-width: 1; " +
-            "-fx-border-radius: 4; " +
-            "-fx-background-radius: 4; " +
-            "-fx-cursor: hand;"
-        );
+        nextButton.getStyleClass().add("popup-pagination-button");
         nextButton.setOnAction(e -> {
             if (currentPage < totalPages) {
                 currentPage++;
@@ -412,7 +316,7 @@ public class NodeHistoryView extends VBox {
                         }
                     } else {
                         Label emptyLabel = new Label("暂无执行记录");
-                        emptyLabel.setStyle(StyleUtil.body() + "-fx-text-fill: #9CA3AF; -fx-padding: 40;");
+                        emptyLabel.setStyle("-fx-font-size: 13px; -fx-padding: 40;");
                         emptyLabel.setAlignment(Pos.CENTER);
                         contentContainer.getChildren().add(emptyLabel);
                         statusLabel.setText("无数据");

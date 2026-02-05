@@ -132,6 +132,7 @@ public class ConditionNodeDialog extends Dialog<ConditionNodeDialog.ConditionDat
     
     private VBox createContent() {
         VBox container = new VBox(20);
+        container.getStyleClass().add("dialog-content-root");
         container.setPadding(new Insets(20));
         container.setPrefWidth(600);
         container.setPrefHeight(500);

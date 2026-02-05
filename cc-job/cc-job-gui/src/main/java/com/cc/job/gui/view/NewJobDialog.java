@@ -180,6 +180,7 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
     
     private VBox createContent(List<JobGroup> jobGroupList) {
         VBox container = new VBox(15);
+        container.getStyleClass().add("dialog-content-root");
         container.setPadding(new Insets(20));
         container.setPrefWidth(800);
         container.setPrefHeight(550);

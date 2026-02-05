@@ -1,8 +1,11 @@
 package com.cc.job.gui.manager;
 
 import com.cc.job.gui.model.TreeNodeData;
+import com.cc.job.gui.util.ThemeManager;
 import com.cc.job.gui.view.TaskTreeView;
+import javafx.application.Platform;
 import javafx.scene.control.*;
+import javafx.scene.Scene;
 import java.util.Optional;
 
 /**
@@ -36,6 +39,7 @@ public class TreeContextMenuManager {
             default -> createDefaultMenu(menu, onRefresh);
         }
         
+        applyThemeToContextMenu(menu);
         return menu;
     }
     
@@ -161,12 +165,24 @@ public class TreeContextMenuManager {
     private ContextMenu createDefaultMenu(Runnable onRefresh) {
         ContextMenu menu = new ContextMenu();
         menu.getItems().add(createMenuItem("刷新", onRefresh));
+        applyThemeToContextMenu(menu);
         return menu;
+    }
+    
+    private void applyThemeToContextMenu(ContextMenu menu) {
+        menu.setOnShowing(e -> Platform.runLater(() -> {
+            Scene scene = menu.getScene();
+            if (scene != null) {
+                String url = ThemeManager.getInstance().getStylesheetUrl();
+                if (url != null && !url.isEmpty()) {
+                    scene.getStylesheets().add(url);
+                }
+            }
+        }));
     }
     
     private MenuItem createMenuItem(String text, Runnable action) {
         MenuItem item = new MenuItem(text);
-        item.setStyle("-fx-text-fill: #000000;");
         item.setOnAction(e -> { if (action != null) action.run(); });
         return item;
     }

@@ -64,8 +64,8 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
 
         styleDialog();
         VBox root = new VBox(16);
+        root.getStyleClass().add("dialog-content-root");
         root.setPadding(new Insets(16));
-        root.setStyle("-fx-background-color: " + StyleUtil.BG_SECONDARY + ";");
 
         root.getChildren().addAll(createStepIndicator(), createContentPane(), createButtonBar());
 
@@ -80,6 +80,10 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
         getDialogPane().setMinWidth(900);
         getDialogPane().setMinHeight(650);
         setResizable(true);
+        String dialogCss = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (dialogCss != null && !dialogCss.isEmpty()) {
+            getDialogPane().getStylesheets().add(dialogCss);
+        }
         Platform.runLater(() -> {
             Stage stage = (Stage) getDialogPane().getScene().getWindow();
             if (stage != null) {
@@ -96,7 +100,8 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
         HBox steps = new HBox(40);
         steps.setAlignment(Pos.CENTER);
         steps.setPadding(new Insets(16));
-        steps.setStyle("-fx-background-color: " + StyleUtil.BG_PRIMARY + "; -fx-background-radius: 8;");
+        steps.getStyleClass().add("dialog-section");
+        steps.setStyle("-fx-background-radius: 8;");
 
         step1Label = createStepLabel("1. 读取表配置", true);
         step2Label = createStepLabel("2. 写入表配置", false);
@@ -130,7 +135,8 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
     private StackPane createContentPane() {
         contentPane = new StackPane();
         contentPane.setPadding(new Insets(16));
-        contentPane.setStyle("-fx-background-color: " + StyleUtil.BG_PRIMARY + "; -fx-background-radius: 8;");
+        contentPane.getStyleClass().add("dialog-section");
+        contentPane.setStyle("-fx-background-radius: 8;");
         VBox.setVgrow(contentPane, Priority.ALWAYS);
         return contentPane;
     }
@@ -141,7 +147,7 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
         bar.setPadding(new Insets(16));
 
         prevBtn = new Button("上一步");
-        prevBtn.setStyle(StyleUtil.secondaryButton());
+        prevBtn.getStyleClass().add("dialog-button-secondary");
         prevBtn.setOnAction(e -> {
             if (currentStep > 0) {
                 currentStep--;
@@ -150,12 +156,11 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
         });
 
         nextBtn = new Button("下一步");
-        nextBtn.setStyle(StyleUtil.primaryButton());
-        StyleUtil.applyPrimaryButtonHover(nextBtn);
+        nextBtn.getStyleClass().add("dialog-button-primary");
         nextBtn.setOnAction(e -> handleNext());
 
         Button resetBtn = new Button("重置");
-        resetBtn.setStyle(StyleUtil.secondaryButton());
+        resetBtn.getStyleClass().add("dialog-button-secondary");
         resetBtn.setOnAction(e -> handleReset());
 
         bar.getChildren().addAll(resetBtn, prevBtn, nextBtn);
@@ -182,10 +187,10 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
         VBox pane = new VBox(16);
         pane.setPadding(new Insets(16));
 
-        String labelStyle = StyleUtil.body();
+        String labelStyle = StyleUtil.bodyFontOnly();
 
         Label title = new Label("选择读取数据源和表（支持多选）");
-        title.setStyle(StyleUtil.body() + "-fx-font-weight: bold; -fx-font-size: 14;");
+        title.setStyle(StyleUtil.bodyFontOnly() + "-fx-font-weight: bold; -fx-font-size: 14;");
 
         // 数据源类型
         Label dsTypeLabel = new Label("数据源类型");
@@ -254,10 +259,10 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
         VBox pane = new VBox(16);
         pane.setPadding(new Insets(16));
 
-        String labelStyle = StyleUtil.body();
+        String labelStyle = StyleUtil.bodyFontOnly();
 
         Label title = new Label("选择写入数据源和表（支持多选）");
-        title.setStyle(StyleUtil.body() + "-fx-font-weight: bold; -fx-font-size: 14;");
+        title.setStyle(StyleUtil.bodyFontOnly() + "-fx-font-weight: bold; -fx-font-size: 14;");
 
         // 数据源类型
         Label dsTypeLabel = new Label("数据源类型");
@@ -327,7 +332,7 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
         pane.setPadding(new Insets(16));
 
         Label label = new Label("生成的批量DataX JSON配置");
-        label.setStyle(StyleUtil.body() + "-fx-font-weight: bold;");
+        label.setStyle(StyleUtil.bodyFontOnly() + "-fx-font-weight: bold;");
 
         jsonResultArea = new TextArea();
         jsonResultArea.setEditable(false);

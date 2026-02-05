@@ -64,7 +64,7 @@ public class NodeDetailsDialog extends Dialog<Void> {
         
         // 任务基本信息区域
         Label taskInfoTitle = new Label("任务基本信息");
-        taskInfoTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #111827;");
+        taskInfoTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
         contentBox.getChildren().add(taskInfoTitle);
         
         GridPane taskGrid = new GridPane();
@@ -126,7 +126,7 @@ public class NodeDetailsDialog extends Dialog<Void> {
         
         // 节点信息区域
         Label nodeInfoTitle = new Label("节点信息");
-        nodeInfoTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #111827; -fx-padding: 16 0 0 0;");
+        nodeInfoTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-padding: 16 0 0 0;");
         contentBox.getChildren().add(nodeInfoTitle);
         
         GridPane nodeGrid = new GridPane();
@@ -169,7 +169,7 @@ public class NodeDetailsDialog extends Dialog<Void> {
         
         // 预测时间区域
         Label predictedTimeTitle = new Label("预测执行时间");
-        predictedTimeTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #111827; -fx-padding: 16 0 0 0;");
+        predictedTimeTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-padding: 16 0 0 0;");
         contentBox.getChildren().add(predictedTimeTitle);
         
         GridPane predictedTimeGrid = new GridPane();
@@ -217,14 +217,14 @@ public class NodeDetailsDialog extends Dialog<Void> {
     
     private Label addLabel(GridPane grid, String text, int col, int row) {
         Label label = new Label(text);
-        label.setStyle(StyleUtil.body() + "-fx-font-weight: 600; -fx-text-fill: #6B7280;");
+        label.setStyle("-fx-font-size: 13px; -fx-font-weight: 600;");
         grid.add(label, col, row);
         return label;
     }
     
     private Label addValueLabel(GridPane grid, String text, int col, int row) {
         Label label = new Label(text);
-        label.setStyle(StyleUtil.body() + "-fx-text-fill: #111827;");
+        label.setStyle("-fx-font-size: 13px; -fx-font-weight: 400;");
         label.setWrapText(true);
         grid.add(label, col, row);
         return label;

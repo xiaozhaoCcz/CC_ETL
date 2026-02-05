@@ -3,6 +3,8 @@ package com.cc.job.gui.view;
 import com.cc.job.gui.manager.DependencyNavigator;
 import com.cc.job.gui.model.NodeConnection;
 import com.cc.job.gui.model.ProcessNode;
+import com.cc.job.gui.util.ThemeManager;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
@@ -230,6 +232,19 @@ public class DependencyViewPanel extends Dialog<Void> {
     }
     
     private void styleDialog() {
+        String css = ThemeManager.getInstance().getStylesheetUrl();
+        if (css != null && !css.isEmpty()) {
+            getDialogPane().getStylesheets().add(css);
+        }
+        Platform.runLater(() -> {
+            Stage stage = (Stage) getDialogPane().getScene().getWindow();
+            if (stage != null) {
+                String themeCss = ThemeManager.getInstance().getStylesheetUrl();
+                if (themeCss != null && !themeCss.isEmpty()) {
+                    stage.getScene().getStylesheets().add(themeCss);
+                }
+            }
+        });
     }
     
     /**

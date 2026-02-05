@@ -471,12 +471,13 @@ public class LogPanel extends VBox {
                 updateStatusBar(tabData);
             }
             
-            // 设置标签的点击和关闭回调
+            // 设置标签的点击和关闭回调，并确保所有标签都有右键菜单
             LogTabManager.LogTab tab = tabManager.getLogTab(taskGroupId);
             if (tab != null) {
                 tab.setOnClick(() -> switchToTaskGroup(taskGroupId));
                 tab.setOnClose(() -> handleTabClose(taskGroupId));
             }
+            ensureAllTabsHaveContextMenu();
         });
     }
     
@@ -499,12 +500,13 @@ public class LogPanel extends VBox {
                 updateStatusBar(tabData);
             }
             
-            // 设置标签的点击和关闭回调
+            // 设置标签的点击和关闭回调，并确保所有标签都有右键菜单
             LogTabManager.LogTab tab = tabManager.getLogTab(taskGroupId);
             if (tab != null) {
                 tab.setOnClick(() -> switchToTaskGroup(taskGroupId));
                 tab.setOnClose(() -> handleTabClose(taskGroupId));
             }
+            ensureAllTabsHaveContextMenu();
         });
     }
     
@@ -514,6 +516,108 @@ public class LogPanel extends VBox {
     private void handleTabClose(Long taskGroupId) {
         tabManager.removeTaskGroup(taskGroupId, tabContainer);
         switchToTaskGroup(tabManager.getCurrentTaskGroupId());
+    }
+    
+    /**
+     * 按界面从左到右顺序返回日志标签的任务组 ID 列表
+     */
+    private List<Long> getOrderedLogTabIds() {
+        List<Long> ordered = new ArrayList<>();
+        for (Node node : tabContainer.getChildren()) {
+            if (node instanceof LogTabManager.LogTab) {
+                ordered.add(((LogTabManager.LogTab) node).getTaskGroupId());
+            }
+        }
+        return ordered;
+    }
+    
+    /**
+     * 关闭除指定任务组外的所有日志标签
+     */
+    private void closeOtherTabs(Long keepTaskGroupId) {
+        List<Long> toRemove = new ArrayList<>();
+        for (Long id : getOrderedLogTabIds()) {
+            if (!id.equals(keepTaskGroupId)) {
+                toRemove.add(id);
+            }
+        }
+        for (Long id : toRemove) {
+            handleTabClose(id);
+        }
+        if (tabManager.getLogTab(keepTaskGroupId) != null) {
+            switchToTaskGroup(keepTaskGroupId);
+        }
+    }
+    
+    /**
+     * 关闭指定任务组左侧的所有日志标签
+     */
+    private void closeTabsToLeft(Long ofTaskGroupId) {
+        List<Long> ordered = getOrderedLogTabIds();
+        int idx = ordered.indexOf(ofTaskGroupId);
+        if (idx <= 0) return;
+        List<Long> toRemove = new ArrayList<>(ordered.subList(0, idx));
+        for (Long id : toRemove) {
+            handleTabClose(id);
+        }
+        if (tabManager.getLogTab(ofTaskGroupId) != null) {
+            switchToTaskGroup(ofTaskGroupId);
+        }
+    }
+    
+    /**
+     * 关闭指定任务组右侧的所有日志标签
+     */
+    private void closeTabsToRight(Long ofTaskGroupId) {
+        List<Long> ordered = getOrderedLogTabIds();
+        int idx = ordered.indexOf(ofTaskGroupId);
+        if (idx < 0 || idx >= ordered.size() - 1) return;
+        List<Long> toRemove = new ArrayList<>(ordered.subList(idx + 1, ordered.size()));
+        for (Long id : toRemove) {
+            handleTabClose(id);
+        }
+        if (tabManager.getLogTab(ofTaskGroupId) != null) {
+            switchToTaskGroup(ofTaskGroupId);
+        }
+    }
+    
+    /**
+     * 为日志标签设置右键菜单（关闭当前页 / 关闭其他页 / 关闭左侧页 / 关闭右侧页）
+     */
+    private void setupTabContextMenu(LogTabManager.LogTab tab) {
+        ContextMenu menu = new ContextMenu();
+        MenuItem closeCurrent = new MenuItem("关闭当前页");
+        MenuItem closeOthers = new MenuItem("关闭其他页");
+        MenuItem closeLeft = new MenuItem("关闭左侧页");
+        MenuItem closeRight = new MenuItem("关闭右侧页");
+        
+        closeCurrent.setOnAction(e -> handleTabClose(tab.getTaskGroupId()));
+        closeOthers.setOnAction(e -> closeOtherTabs(tab.getTaskGroupId()));
+        closeLeft.setOnAction(e -> closeTabsToLeft(tab.getTaskGroupId()));
+        closeRight.setOnAction(e -> closeTabsToRight(tab.getTaskGroupId()));
+        
+        menu.setOnShowing(e -> {
+            List<Long> ordered = getOrderedLogTabIds();
+            int index = ordered.indexOf(tab.getTaskGroupId());
+            int size = ordered.size();
+            closeOthers.setDisable(size <= 1);
+            closeLeft.setDisable(index <= 0);
+            closeRight.setDisable(index < 0 || index >= size - 1);
+        });
+        
+        menu.getItems().addAll(closeCurrent, closeOthers, closeLeft, closeRight);
+        tab.setOnContextMenuRequested(ev -> menu.show(tab, ev.getScreenX(), ev.getScreenY()));
+    }
+    
+    /**
+     * 确保所有日志标签都有右键菜单（在添加或切换标签后调用）
+     */
+    private void ensureAllTabsHaveContextMenu() {
+        for (Node node : tabContainer.getChildren()) {
+            if (node instanceof LogTabManager.LogTab) {
+                setupTabContextMenu((LogTabManager.LogTab) node);
+            }
+        }
     }
     
     private void switchToTaskGroup(Long taskGroupId) {

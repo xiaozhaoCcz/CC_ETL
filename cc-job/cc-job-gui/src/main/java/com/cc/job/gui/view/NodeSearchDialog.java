@@ -84,6 +84,7 @@ public class NodeSearchDialog extends Dialog<ProcessNode> {
     
     private VBox createContent() {
         VBox container = new VBox(15);
+        container.getStyleClass().add("dialog-content-root");
         container.setPadding(new Insets(20));
         container.setPrefWidth(700);
         container.setPrefHeight(600);

@@ -270,6 +270,20 @@ public class StyleUtil {
             GRAY_500
         );
     }
+
+    /**
+     * 正文样式（仅字体，不含颜色，供对话框内标签用，颜色由主题 CSS 控制）
+     */
+    public static String bodyFontOnly() {
+        return "-fx-font-size: 13px; -fx-font-weight: 400;";
+    }
+
+    /**
+     * 说明文字样式（仅字体，不含颜色）
+     */
+    public static String captionFontOnly() {
+        return "-fx-font-size: 12px; -fx-font-weight: 400;";
+    }
     
     // ============ 应用样式方法 ============
     

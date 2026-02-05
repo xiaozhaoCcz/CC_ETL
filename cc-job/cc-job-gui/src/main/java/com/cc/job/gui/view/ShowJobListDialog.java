@@ -74,8 +74,8 @@ public class ShowJobListDialog extends Dialog<Void> {
 
         styleDialog();
         BorderPane root = new BorderPane();
+        root.getStyleClass().add("dialog-content-root");
         root.setPadding(new Insets(16));
-        root.setStyle("-fx-background-color: " + StyleUtil.BG_SECONDARY + ";");
 
         root.setTop(createTopSection());
         root.setCenter(createTable());
@@ -107,13 +107,11 @@ public class ShowJobListDialog extends Dialog<Void> {
         actionBar.setPadding(new Insets(0, 16, 0, 16));
 
         Button addBtn = new Button("新增");
-        addBtn.setStyle(StyleUtil.successButton());
-        StyleUtil.applySuccessButtonHover(addBtn);
+        addBtn.getStyleClass().add("dialog-button-success");
         addBtn.setOnAction(e -> handleAdd());
 
         Button deleteBtn = new Button("删除");
-        deleteBtn.setStyle(StyleUtil.errorButton());
-        StyleUtil.applyErrorButtonHover(deleteBtn);
+        deleteBtn.getStyleClass().add("dialog-button-error");
         deleteBtn.setOnAction(e -> handleBatchDelete());
 
         actionBar.getChildren().addAll(addBtn, deleteBtn);
@@ -134,8 +132,10 @@ public class ShowJobListDialog extends Dialog<Void> {
         getDialogPane().setMaxHeight(Double.MAX_VALUE);
         setResizable(true);
 
-        // 设置对话框样式 - 与主页面背景色一致
-        
+        String dialogCss = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (dialogCss != null && !dialogCss.isEmpty()) {
+            getDialogPane().getStylesheets().add(dialogCss);
+        }
 
         Platform.runLater(() -> {
             Stage stage = (Stage) getDialogPane().getScene().getWindow();
@@ -164,16 +164,13 @@ public class ShowJobListDialog extends Dialog<Void> {
 
     private Node createFilterBar() {
         FlowPane pane = new FlowPane();
+        pane.getStyleClass().add("dialog-section");
         pane.setHgap(12);
         pane.setVgap(10);
         pane.setPadding(new Insets(16, 16, 16, 16));
-        pane.setStyle(
-                "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                "-fx-background-radius: " + StyleUtil.RADIUS_LG + ";"
-        );
 
         // 创建标签样式
-        String labelStyle = StyleUtil.body();
+        String labelStyle = StyleUtil.bodyFontOnly();
 
         // 执行器下拉框
         jobGroupCombo = new ComboBox<>();
@@ -210,33 +207,29 @@ public class ShowJobListDialog extends Dialog<Void> {
         // 任务描述输入框
         jobDescField = new TextField();
         jobDescField.setPromptText("请输入任务描述");
-        jobDescField.setStyle(StyleUtil.searchField());
         jobDescField.setPrefWidth(180);
         jobDescField.setOnAction(e -> handleSearch());
 
         // JobHandler输入框
         handlerField = new TextField();
         handlerField.setPromptText("请输入JobHandler");
-        handlerField.setStyle(StyleUtil.searchField());
         handlerField.setPrefWidth(160);
         handlerField.setOnAction(e -> handleSearch());
 
         // 负责人输入框
         authorField = new TextField();
         authorField.setPromptText("请输入负责人");
-        authorField.setStyle(StyleUtil.searchField());
         authorField.setPrefWidth(140);
         authorField.setOnAction(e -> handleSearch());
 
         // 搜索按钮
         Button searchBtn = new Button("搜索");
-        searchBtn.setStyle(StyleUtil.primaryButton());
-        StyleUtil.applyPrimaryButtonHover(searchBtn);
+        searchBtn.getStyleClass().add("dialog-button-primary");
         searchBtn.setOnAction(e -> handleSearch());
 
         // 重置按钮
         Button resetBtn = new Button("重置");
-        resetBtn.setStyle(StyleUtil.secondaryButton());
+        resetBtn.getStyleClass().add("dialog-button-secondary");
         resetBtn.setOnAction(e -> handleReset());
 
         // 创建标签
@@ -589,20 +582,7 @@ public class ShowJobListDialog extends Dialog<Void> {
                 actionMenuBtn.setMaxWidth(90);
                 actionMenuBtn.setPrefHeight(26);
                 actionMenuBtn.setGraphicTextGap(4);
-                // 确保文字显示：设置文本颜色和内容显示方式
-                // 使用明确的样式设置，确保文字可见
-                actionMenuBtn.setStyle(
-                    "-fx-background-color: white; " +
-                    "-fx-text-fill: #374151; " +
-                    "-fx-font-size: 11px; " +
-                    "-fx-font-weight: 500; " +
-                    "-fx-padding: 4 8 4 8; " +
-                    "-fx-border-color: #D1D5DB; " +
-                    "-fx-border-width: 1; " +
-                    "-fx-border-radius: 4; " +
-                    "-fx-background-radius: 4; " +
-                    "-fx-content-display: LEFT; " +
-                    "-fx-text-overrun: VISIBLE;");
+                actionMenuBtn.getStyleClass().add("dialog-table-action-button");
             }
 
             @Override
@@ -649,16 +629,15 @@ public class ShowJobListDialog extends Dialog<Void> {
 
     private Node createPagerBar() {
         totalLabel = new Label("共 0 条");
-        totalLabel.setStyle(StyleUtil.body());
+        totalLabel.setStyle(StyleUtil.bodyFontOnly());
 
         prevBtn = new Button("上一页");
-        prevBtn.setStyle(StyleUtil.secondaryButton());
+        prevBtn.getStyleClass().add("dialog-button-secondary");
         nextBtn = new Button("下一页");
-        nextBtn.setStyle(StyleUtil.secondaryButton());
+        nextBtn.getStyleClass().add("dialog-button-secondary");
         
         pageField = new TextField(String.valueOf(pageNum));
         pageField.setPrefWidth(60);
-        pageField.setStyle(StyleUtil.searchField());
         pageField.setOnAction(e -> {
             try {
                 int p = Integer.parseInt(pageField.getText().trim());
@@ -695,9 +674,9 @@ public class ShowJobListDialog extends Dialog<Void> {
         });
 
         Label pageSizeLabel = new Label("每页");
-        pageSizeLabel.setStyle(StyleUtil.body());
+        pageSizeLabel.setStyle(StyleUtil.bodyFontOnly());
         Label pageLabel = new Label("页码");
-        pageLabel.setStyle(StyleUtil.body());
+        pageLabel.setStyle(StyleUtil.bodyFontOnly());
 
         HBox pager = new HBox(12,
                 totalLabel,
@@ -706,12 +685,9 @@ public class ShowJobListDialog extends Dialog<Void> {
                 pageLabel, pageField,
                 nextBtn
         );
+        pager.getStyleClass().add("dialog-section");
         pager.setAlignment(Pos.CENTER_LEFT);
         pager.setPadding(new Insets(16, 16, 16, 16));
-        pager.setStyle(
-                "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                "-fx-background-radius: " + StyleUtil.RADIUS_LG + ";"
-        );
         return pager;
     }
 

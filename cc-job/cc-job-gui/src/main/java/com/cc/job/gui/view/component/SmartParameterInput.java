@@ -125,19 +125,23 @@ public class SmartParameterInput extends CodeArea {
         // 添加样式类，用于语法高亮
         getStyleClass().add("parameter-input");
         
+        boolean dark = "dark".equals(com.cc.job.gui.util.ThemeManager.getInstance().getTheme());
+        String inputStyle = dark ? ParameterInputStyleUtil.INPUT_FIELD_STYLE_DARK : ParameterInputStyleUtil.INPUT_FIELD_STYLE;
+        String selectionStyle = dark ? ParameterInputStyleUtil.SELECTION_BACKGROUND_STYLE_DARK : ParameterInputStyleUtil.SELECTION_BACKGROUND_STYLE;
+        
         // 应用输入框基础样式
-        setStyle(ParameterInputStyleUtil.INPUT_FIELD_STYLE + " " + 
-                 ParameterInputStyleUtil.SELECTION_BACKGROUND_STYLE);
+        setStyle(inputStyle + " " + selectionStyle);
         
         // 监听焦点变化以应用焦点样式
         focusedProperty().addListener((obs, wasFocused, isFocused) -> {
+            boolean isDark = "dark".equals(com.cc.job.gui.util.ThemeManager.getInstance().getTheme());
+            String base = isDark ? ParameterInputStyleUtil.INPUT_FIELD_STYLE_DARK : ParameterInputStyleUtil.INPUT_FIELD_STYLE;
+            String focus = isDark ? ParameterInputStyleUtil.INPUT_FIELD_FOCUSED_STYLE_DARK : ParameterInputStyleUtil.INPUT_FIELD_FOCUSED_STYLE;
+            String sel = isDark ? ParameterInputStyleUtil.SELECTION_BACKGROUND_STYLE_DARK : ParameterInputStyleUtil.SELECTION_BACKGROUND_STYLE;
             if (isFocused) {
-                setStyle(ParameterInputStyleUtil.INPUT_FIELD_STYLE + " " + 
-                        ParameterInputStyleUtil.INPUT_FIELD_FOCUSED_STYLE + " " +
-                        ParameterInputStyleUtil.SELECTION_BACKGROUND_STYLE);
+                setStyle(base + " " + focus + " " + sel);
             } else {
-                setStyle(ParameterInputStyleUtil.INPUT_FIELD_STYLE + " " + 
-                        ParameterInputStyleUtil.SELECTION_BACKGROUND_STYLE);
+                setStyle(base + " " + sel);
             }
         });
         
@@ -145,7 +149,7 @@ public class SmartParameterInput extends CodeArea {
         suggestionListView = new ListView<>(suggestions);
         suggestionListView.setPrefWidth(300);
         suggestionListView.setPrefHeight(200);
-        suggestionListView.setStyle(ParameterInputStyleUtil.AUTOCOMPLETE_POPUP_STYLE);
+        suggestionListView.setStyle(dark ? ParameterInputStyleUtil.AUTOCOMPLETE_POPUP_STYLE_DARK : ParameterInputStyleUtil.AUTOCOMPLETE_POPUP_STYLE);
         
         // 设置列表项样式（显示节点名称和类型标签）
         suggestionListView.setCellFactory(listView -> new ListCell<ParameterAutocompleteService.SuggestionItem>() {
@@ -192,7 +196,7 @@ public class SmartParameterInput extends CodeArea {
         // 将列表添加到弹出窗口
         VBox popupContent = new VBox();
         popupContent.getChildren().add(suggestionListView);
-        popupContent.setStyle(ParameterInputStyleUtil.AUTOCOMPLETE_POPUP_STYLE);
+        popupContent.setStyle(dark ? ParameterInputStyleUtil.AUTOCOMPLETE_POPUP_STYLE_DARK : ParameterInputStyleUtil.AUTOCOMPLETE_POPUP_STYLE);
         autocompletePopup.getContent().add(popupContent);
         
         // 监听文本变化（用于自动补全和语法高亮）

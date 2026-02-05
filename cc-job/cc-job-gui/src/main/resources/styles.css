@@ -49,6 +49,240 @@
     -fx-background-color: #F9FAFB;
 }
 
+.dialog-pane .dialog-button-secondary {
+    -fx-background-color: white;
+    -fx-text-fill: #374151;
+    -fx-font-size: 13px;
+    -fx-font-weight: 500;
+    -fx-padding: 8 16;
+    -fx-border-color: #D1D5DB;
+    -fx-border-width: 1;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-cursor: hand;
+}
+
+.dialog-pane .dialog-button-secondary:hover {
+    -fx-background-color: #F3F4F6;
+    -fx-border-color: #9CA3AF;
+}
+
+.dialog-pane .dialog-button-secondary:pressed {
+    -fx-background-color: #E5E7EB;
+}
+
+/* 对话框内主按钮 / 成功 / 错误（任务列表、执行器、数据源等） */
+.dialog-pane .dialog-button-primary {
+    -fx-background-color: #2563EB;
+    -fx-text-fill: white;
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+    -fx-padding: 8 16;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-cursor: hand;
+}
+.dialog-pane .dialog-button-primary:hover {
+    -fx-background-color: #1D4ED8;
+}
+.dialog-pane .dialog-button-primary:pressed {
+    -fx-background-color: #1D4ED8;
+}
+
+.dialog-pane .dialog-button-success {
+    -fx-background-color: #10B981;
+    -fx-text-fill: white;
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+    -fx-padding: 8 16;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-cursor: hand;
+}
+.dialog-pane .dialog-button-success:hover {
+    -fx-background-color: #059669;
+}
+.dialog-pane .dialog-button-success:pressed {
+    -fx-background-color: #059669;
+}
+
+.dialog-pane .dialog-button-error {
+    -fx-background-color: #EF4444;
+    -fx-text-fill: white;
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+    -fx-padding: 8 16;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-cursor: hand;
+}
+.dialog-pane .dialog-button-error:hover {
+    -fx-background-color: #DC2626;
+}
+.dialog-pane .dialog-button-error:pressed {
+    -fx-background-color: #DC2626;
+}
+
+/* 对话框内搜索/筛选输入框 */
+.dialog-pane .dialog-search-field {
+    -fx-background-color: #FFFFFF;
+    -fx-text-fill: #1F2937;
+    -fx-prompt-text-fill: #6B7280;
+    -fx-font-size: 13px;
+    -fx-padding: 8 12;
+    -fx-border-color: #D1D5DB;
+    -fx-border-width: 1;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+}
+
+/* 表格内操作列 MenuButton（任务列表「操作」下拉） */
+.dialog-pane .dialog-table-action-button {
+    -fx-background-color: white;
+    -fx-text-fill: #374151;
+    -fx-font-size: 11px;
+    -fx-font-weight: 500;
+    -fx-padding: 4 8;
+    -fx-border-color: #D1D5DB;
+    -fx-border-width: 1;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-content-display: LEFT;
+    -fx-cursor: hand;
+}
+.dialog-pane .dialog-table-action-button:hover {
+    -fx-background-color: #F3F4F6;
+    -fx-border-color: #9CA3AF;
+}
+.dialog-pane .dialog-table-action-button:pressed {
+    -fx-background-color: #E5E7EB;
+}
+
+/* ============ 节点执行历史等弹窗子区域（浅色） ============ */
+.popup-window-root.popup-history-root {
+    -fx-background-color: #FFFFFF;
+}
+
+.popup-title-bar {
+    -fx-background-color: #F9FAFB;
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 0 0 1 0;
+}
+
+.popup-title-bar .label {
+    -fx-text-fill: #1F2937;
+}
+
+.popup-tool-bar {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 0 0 1 0;
+}
+
+.popup-tool-bar .label {
+    -fx-text-fill: #6B7280;
+}
+
+.popup-content-area,
+.popup-window-root .scroll-pane.popup-content-scroll {
+    -fx-background-color: #F9FAFB;
+}
+
+.popup-card {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+
+.popup-card .label,
+.popup-card-time {
+    -fx-text-fill: #1F2937;
+}
+
+.popup-node-card {
+    -fx-background-color: #F9FAFB;
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 1;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+}
+
+.popup-node-card .label {
+    -fx-text-fill: #374151;
+}
+
+.popup-tool-button,
+.popup-pagination-button {
+    -fx-background-color: #FFFFFF;
+    -fx-text-fill: #374151;
+    -fx-font-size: 12px;
+    -fx-font-weight: 500;
+    -fx-padding: 6 12 6 12;
+    -fx-border-color: #D1D5DB;
+    -fx-border-width: 1;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-cursor: hand;
+}
+
+.popup-tool-button:hover,
+.popup-pagination-button:hover {
+    -fx-background-color: #F3F4F6;
+    -fx-border-color: #9CA3AF;
+}
+
+.popup-pagination-bar {
+    -fx-background-color: #F9FAFB;
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 1 0 0 0;
+}
+
+.popup-pagination-bar .label {
+    -fx-text-fill: #6B7280;
+}
+
+.popup-status-success {
+    -fx-background-color: #D1FAE5;
+    -fx-text-fill: #065F46;
+    -fx-padding: 4 12 4 12;
+    -fx-background-radius: 4;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.popup-status-fail {
+    -fx-background-color: #FEE2E2;
+    -fx-text-fill: #991B1B;
+    -fx-padding: 4 12 4 12;
+    -fx-background-radius: 4;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.popup-status-running {
+    -fx-background-color: #DBEAFE;
+    -fx-text-fill: #1E40AF;
+    -fx-padding: 4 12 4 12;
+    -fx-background-radius: 4;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.popup-status-unknown {
+    -fx-background-color: #F3F4F6;
+    -fx-text-fill: #6B7280;
+    -fx-padding: 4 12 4 12;
+    -fx-background-radius: 4;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.popup-error-text {
+    -fx-text-fill: #EF4444;
+}
+
 /* ============ 企业级布局：左侧边栏浅灰 #F3F3F3 + 中央白底 ============ */
 
 .sidebar-left {
@@ -92,6 +326,20 @@
     -fx-background-color: #DBEAFE;
     -fx-text-fill: #2563EB;
     -fx-background-radius: 4;
+}
+
+.sidebar-left .tree-view .tree-cell .tree-cell-label {
+    -fx-text-fill: #374151;
+}
+
+.sidebar-left .tree-view .tree-cell:selected .tree-cell-label,
+.sidebar-left .tree-view .tree-cell:selected .tree-cell-label-selected {
+    -fx-text-fill: #2563EB;
+}
+
+.sidebar-left .tree-view .tree-cell.tree-cell-content {
+    -fx-padding: 8 12;
+    -fx-background-radius: 6;
 }
 
 .sidebar-left .tree-view .tree-cell > .tree-disclosure-node > .arrow {

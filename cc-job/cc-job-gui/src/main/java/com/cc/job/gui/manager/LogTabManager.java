@@ -206,6 +206,10 @@ public class LogTabManager {
         public void setOnClose(Runnable callback) {
             this.onCloseCallback = callback;
         }
+        
+        public Long getTaskGroupId() {
+            return taskGroupId;
+        }
     }
 }
 

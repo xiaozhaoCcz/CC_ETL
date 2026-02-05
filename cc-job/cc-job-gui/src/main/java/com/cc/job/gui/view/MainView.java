@@ -153,14 +153,14 @@ public class MainView extends BorderPane {
         verticalSplit.getStyleClass().add("content-area");
         verticalSplit.getItems().addAll(canvasArea, logPanel);
         verticalSplit.setDividerPositions(0.7);
-        verticalSplit.setPadding(new Insets(0, 0, 12, 0));
+        verticalSplit.setPadding(Insets.EMPTY);
 
         // 水平分割面板
         horizontalSplit = new SplitPane();
         horizontalSplit.setOrientation(Orientation.HORIZONTAL);
         horizontalSplit.getItems().addAll(leftContainer, verticalSplit);
         horizontalSplit.setDividerPositions(0.2);
-        horizontalSplit.setPadding(new Insets(0, 0, 12, 0));
+        horizontalSplit.setPadding(Insets.EMPTY);
 
         miniMap.bindTo(canvas, scrollPane);
         this.setCenter(horizontalSplit);
@@ -2961,6 +2961,7 @@ public class MainView extends BorderPane {
         shortcutsBox.getChildren().add(new Label("Ctrl+Shift+? - 快捷键列表"));
         
         ScrollPane scrollPane = new ScrollPane(shortcutsBox);
+        scrollPane.getStyleClass().add("popup-content-scroll");
         scrollPane.setFitToWidth(true);
         
         Button closeButton = new Button("关闭");

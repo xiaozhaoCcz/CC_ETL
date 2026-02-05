@@ -181,6 +181,7 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
      */
     private VBox createContent(List<JobGroup> jobGroupList) {
         VBox container = new VBox(15);
+        container.getStyleClass().add("dialog-content-root");
         container.setPadding(new Insets(20));
         container.setPrefWidth(700);
         // 初始高度较小，只显示基本信息和执行配置

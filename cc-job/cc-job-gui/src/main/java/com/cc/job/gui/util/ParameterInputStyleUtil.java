@@ -94,6 +94,36 @@ public class ParameterInputStyleUtil {
             "-fx-selection-bar: #BFDBFE; " +
             "-fx-selection-bar-non-focused: #E0E7FF;";
     
+    /** 深色主题：输入框基础样式 */
+    public static final String INPUT_FIELD_STYLE_DARK =
+            "-fx-background-color: #3C3C3C; " +
+            "-fx-border-color: #505050; " +
+            "-fx-border-radius: 6; " +
+            "-fx-background-radius: 6; " +
+            "-fx-border-width: 1; " +
+            "-fx-padding: 8 12 8 12; " +
+            "-fx-font-size: 14; " +
+            "-fx-text-fill: #D4D4D4;";
+    
+    /** 深色主题：输入框焦点状态样式 */
+    public static final String INPUT_FIELD_FOCUSED_STYLE_DARK =
+            "-fx-border-color: #007ACC; " +
+            "-fx-border-width: 2;";
+    
+    /** 深色主题：选中文本背景样式 */
+    public static final String SELECTION_BACKGROUND_STYLE_DARK =
+            "-fx-selection-bar: #094771; " +
+            "-fx-selection-bar-non-focused: #3C3C3C;";
+    
+    /** 深色主题：自动补全弹出窗口样式 */
+    public static final String AUTOCOMPLETE_POPUP_STYLE_DARK =
+            "-fx-background-color: #2D2D30; " +
+            "-fx-background-radius: 4; " +
+            "-fx-effect: null; " +
+            "-fx-border-color: #505050; " +
+            "-fx-border-radius: 4; " +
+            "-fx-border-width: 1;";
+    
     /**
      * 节点类型标签样式 - SQL
      */
