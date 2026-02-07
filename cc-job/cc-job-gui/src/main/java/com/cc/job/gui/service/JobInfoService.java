@@ -5,6 +5,7 @@ import com.cc.job.xo.common.result.Result;
 import com.cc.job.xo.common.result.PageResult;
 import com.cc.job.xo.model.dto.JobInfoTriggerDto;
 import com.cc.job.xo.model.entity.JobEdge;
+import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobLogglue;
 import com.cc.job.xo.model.entity.JobNode;
 import com.cc.job.xo.model.form.JobEdgeForm;
@@ -107,6 +108,22 @@ public class JobInfoService extends BaseService {
         Result<Boolean> result = httpClient.get(path, Boolean.class);
         Boolean data = httpClient.extractDataOrNull(result, "获取任务运行状态失败");
         return data != null && data;
+    }
+
+    /**
+     * 获取任务列表（不分页）
+     * @param jobType 任务类型，如 2 表示仅任务组，null 表示 0 和 2
+     * @return 任务列表
+     * @throws IOException 网络异常
+     */
+    public List<JobInfo> getJobInfoList(Integer jobType) throws IOException {
+        Map<String, String> params = new HashMap<>();
+        if (jobType != null) {
+            params.put("jobType", String.valueOf(jobType));
+        }
+        TypeToken<List<JobInfo>> typeToken = new TypeToken<List<JobInfo>>() {};
+        Result<List<JobInfo>> result = httpClient.get("/api/v1/jobInfos/list", typeToken, params);
+        return httpClient.extractData(result, "获取任务列表失败");
     }
 
     /**

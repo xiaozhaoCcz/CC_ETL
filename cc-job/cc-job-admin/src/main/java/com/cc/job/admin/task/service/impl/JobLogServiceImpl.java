@@ -26,6 +26,7 @@ import com.cc.job.xo.model.entity.JobLog;
 import com.cc.job.xo.model.query.JobLogQuery;
 import com.cc.job.xo.model.vo.JobLogVO;
 
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
@@ -281,6 +282,41 @@ public class JobLogServiceImpl extends ServiceImpl<JobLogMapper, JobLog> impleme
     @Override
     public long countLogRunning() {
         return this.count(new LambdaQueryWrapper<JobLog>().eq(JobLog::getHandleCode, 0));
+    }
+
+    @Override
+    public long countLogSuccess(LocalDateTime start, LocalDateTime end, Long jobId) {
+        LambdaQueryWrapper<JobLog> w = new LambdaQueryWrapper<JobLog>().eq(JobLog::getHandleCode, 200);
+        applyDashboardFilter(w, start, end, jobId);
+        return this.count(w);
+    }
+
+    @Override
+    public long countLogFail(LocalDateTime start, LocalDateTime end, Long jobId) {
+        LambdaQueryWrapper<JobLog> w = new LambdaQueryWrapper<JobLog>()
+                .ne(JobLog::getHandleCode, 0)
+                .ne(JobLog::getHandleCode, 200);
+        applyDashboardFilter(w, start, end, jobId);
+        return this.count(w);
+    }
+
+    @Override
+    public long countLogRunning(LocalDateTime start, LocalDateTime end, Long jobId) {
+        LambdaQueryWrapper<JobLog> w = new LambdaQueryWrapper<JobLog>().eq(JobLog::getHandleCode, 0);
+        applyDashboardFilter(w, start, end, jobId);
+        return this.count(w);
+    }
+
+    private void applyDashboardFilter(LambdaQueryWrapper<JobLog> wrapper, LocalDateTime start, LocalDateTime end, Long jobId) {
+        if (start != null) {
+            wrapper.ge(JobLog::getTriggerTime, start);
+        }
+        if (end != null) {
+            wrapper.le(JobLog::getTriggerTime, end);
+        }
+        if (jobId != null) {
+            wrapper.eq(JobLog::getJobId, jobId);
+        }
     }
     
     /**

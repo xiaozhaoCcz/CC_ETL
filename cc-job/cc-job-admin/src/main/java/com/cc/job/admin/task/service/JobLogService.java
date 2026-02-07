@@ -8,6 +8,8 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.xxl.job.core.biz.model.LogResult;
 import com.xxl.job.core.biz.model.ReturnT;
 
+import java.time.LocalDateTime;
+
 /**
  * task_log服务类
  *
@@ -58,4 +60,22 @@ public interface JobLogService extends IService<JobLog> {
      * 统计运行中的日志数量（handle_code = 0）
      */
     long countLogRunning();
+
+    /**
+     * 统计执行成功的日志数量（支持时间范围与任务组筛选）
+     * @param start 开始时间，null 表示不限制
+     * @param end 结束时间，null 表示不限制
+     * @param jobId 任务组ID，null 表示不限制
+     */
+    long countLogSuccess(LocalDateTime start, LocalDateTime end, Long jobId);
+
+    /**
+     * 统计执行失败的日志数量（支持时间范围与任务组筛选）
+     */
+    long countLogFail(LocalDateTime start, LocalDateTime end, Long jobId);
+
+    /**
+     * 统计运行中的日志数量（支持时间范围与任务组筛选）
+     */
+    long countLogRunning(LocalDateTime start, LocalDateTime end, Long jobId);
 }

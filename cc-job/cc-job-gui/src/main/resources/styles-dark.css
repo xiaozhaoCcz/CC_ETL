@@ -1975,3 +1975,8 @@
     -fx-text-fill: #FFFFFF;
     -fx-font-size: 12px;
 }
+
+/* 任务报表饼图：成功绿、失败红、运行中橙 */
+.task-report-pie-chart .chart-pie.default-color0 { -fx-pie-color: #10B981; }
+.task-report-pie-chart .chart-pie.default-color1 { -fx-pie-color: #EF4444; }
+.task-report-pie-chart .chart-pie.default-color2 { -fx-pie-color: #F59E0B; }
