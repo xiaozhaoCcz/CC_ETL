@@ -1753,17 +1753,19 @@
     -fx-background-radius: 6;
 }
 
-/* ============ 参数表达式高亮 ============ */
+/* ============ 参数表达式高亮（级联参数标签，深色） ============ */
 
 .parameter-expression {
     -rtfx-background-color: #264F78 !important;
     -fx-fill: #9CDCFE !important;
     -fx-font-weight: 500;
+    -rtfx-background-radius: 6;
 }
 
 .parameter-input .parameter-expression {
     -rtfx-background-color: #264F78 !important;
     -fx-fill: #9CDCFE !important;
+    -rtfx-background-radius: 6;
 }
 
 /* 任务参数 CodeArea 深色：文字、光标、选区 */

@@ -145,10 +145,11 @@ public class SmartParameterInput extends CodeArea {
             }
         });
         
-        // 创建自动补全列表
+        // 创建自动补全列表（固定宽度、最大高度，避免过长）
         suggestionListView = new ListView<>(suggestions);
-        suggestionListView.setPrefWidth(300);
+        suggestionListView.setPrefWidth(320);
         suggestionListView.setPrefHeight(200);
+        suggestionListView.setMaxHeight(280);
         suggestionListView.setStyle(dark ? ParameterInputStyleUtil.AUTOCOMPLETE_POPUP_STYLE_DARK : ParameterInputStyleUtil.AUTOCOMPLETE_POPUP_STYLE);
         
         // 设置列表项样式（显示节点名称和类型标签）
@@ -324,17 +325,11 @@ public class SmartParameterInput extends CodeArea {
         
         // 检查是否输入了 .（可能是属性补全）
         if (caretPosition > 0 && text.charAt(caretPosition - 1) == '.') {
-            // 检查前面是否有 #{jobdesc} 模式，支持链式调用
+            // 使用最后一个参数段，支持多个级联参数（如 #{节点1}.code ,#{节点2}.）
             String beforeDot = text.substring(0, caretPosition - 1);
-            Matcher matcher = Pattern.compile("#\\{([^}]+)\\}(.*)$").matcher(beforeDot);
-            if (matcher.find()) {
-                String jobDesc = matcher.group(1);
-                String attributePath = matcher.group(2); // 可能是 "data" 或 "data.range" 等
-                // 移除开头的点号（如果有）
-                if (attributePath.startsWith(".")) {
-                    attributePath = attributePath.substring(1);
-                }
-                triggerAttributeAutocomplete(caretPosition, jobDesc, attributePath);
+            LastParameterExpression last = findLastParameterExpression(beforeDot);
+            if (last != null) {
+                triggerAttributeAutocomplete(caretPosition, last.jobDesc, last.attributePath);
                 return;
             }
         }
@@ -359,6 +354,56 @@ public class SmartParameterInput extends CodeArea {
         }
     }
     
+    /**
+     * 解析结果：光标所在处对应的最后一个 #{jobDesc}.attr 段
+     */
+    private static final class LastParameterExpression {
+        final String jobDesc;
+        final String attributePath;
+        /** 在传入字符串中，该段 #{...} 的闭合 '}' 的下标 */
+        final int endOfBrace;
+
+        LastParameterExpression(String jobDesc, String attributePath, int endOfBrace) {
+            this.jobDesc = jobDesc != null ? jobDesc : "";
+            this.attributePath = attributePath != null ? attributePath : "";
+            this.endOfBrace = endOfBrace;
+        }
+    }
+
+    /**
+     * 在给定字符串中从后往前找最后一个参数表达式 #{jobDesc}.xxx，跳过转义 `#
+     * @param text 通常为光标前的文本（如 beforeDot 或 beforeTrigger）
+     * @return 最后一个参数段的 jobDesc、attributePath 及 '}' 的下标；未找到返回 null
+     */
+    private static LastParameterExpression findLastParameterExpression(String text) {
+        if (text == null || text.length() < 3) {
+            return null;
+        }
+        int lastHashBrace = -1;
+        for (int i = text.length() - 1; i >= 1; i--) {
+            if (text.charAt(i) == '{' && text.charAt(i - 1) == '#') {
+                if (i >= 2 && text.charAt(i - 2) == '`') {
+                    continue;
+                }
+                lastHashBrace = i - 1;
+                break;
+            }
+        }
+        if (lastHashBrace < 0) {
+            return null;
+        }
+        int closeBrace = text.indexOf('}', lastHashBrace + 2);
+        if (closeBrace < 0) {
+            return null;
+        }
+        String jobDesc = text.substring(lastHashBrace + 2, closeBrace);
+        String pathPart = text.substring(closeBrace + 1).trim();
+        if (pathPart.startsWith(".")) {
+            pathPart = pathPart.substring(1);
+        }
+        return new LastParameterExpression(jobDesc, pathPart, closeBrace);
+    }
+
     /**
      * 检查当前位置是否是转义的 #
      */
@@ -508,40 +553,26 @@ public class SmartParameterInput extends CodeArea {
             return;
         }
         
-        // 获取任务描述和属性路径
-        // triggerPosition 是 . 的位置，所以 beforeTrigger 是 #{node}.data 这样的格式
+        // 获取任务描述和属性路径（使用最后一个参数段，支持多参数）
         String beforeTrigger = text.substring(0, triggerPosition - 1);
-        Matcher matcher = Pattern.compile("#\\{([^}]+)\\}(.*)$").matcher(beforeTrigger);
+        LastParameterExpression last = findLastParameterExpression(beforeTrigger);
         String jobDesc = "";
         String attributePath = currentAttributePath;
-        
-        if (matcher.find()) {
-            jobDesc = matcher.group(1);
-            String pathPart = matcher.group(2);
-            // 如果路径部分不为空，提取属性路径（去掉开头的点号）
+
+        if (last != null) {
+            jobDesc = last.jobDesc;
+            String pathPart = last.attributePath;
             if (pathPart != null && !pathPart.isEmpty()) {
-                if (pathPart.startsWith(".")) {
-                    pathPart = pathPart.substring(1);
-                }
-                // pathPart 现在应该是 "data" 或 "data.range" 这样的格式
-                // 如果 currentPrefix 不为空，说明用户正在输入，需要从 pathPart 中移除 currentPrefix
-                if (!pathPart.isEmpty()) {
-                    if (currentPrefix.isEmpty()) {
-                        // 用户刚输入 .，pathPart 就是完整的属性路径
-                        attributePath = pathPart;
-                    } else {
-                        // 用户正在输入属性名，pathPart 包含完整路径，需要移除当前前缀
-                        // 例如：pathPart = "data.ran", currentPrefix = "ran", attributePath 应该是 "data"
-                        if (pathPart.endsWith(currentPrefix)) {
-                            attributePath = pathPart.substring(0, pathPart.length() - currentPrefix.length());
-                            // 移除末尾的点号（如果有）
-                            if (attributePath.endsWith(".")) {
-                                attributePath = attributePath.substring(0, attributePath.length() - 1);
-                            }
-                        } else {
-                            // 如果格式不匹配，使用 pathPart 作为属性路径
-                            attributePath = pathPart;
+                if (currentPrefix.isEmpty()) {
+                    attributePath = pathPart;
+                } else {
+                    if (pathPart.endsWith(currentPrefix)) {
+                        attributePath = pathPart.substring(0, pathPart.length() - currentPrefix.length());
+                        if (attributePath.endsWith(".")) {
+                            attributePath = attributePath.substring(0, attributePath.length() - 1);
                         }
+                    } else {
+                        attributePath = pathPart;
                     }
                 }
             }
@@ -641,12 +672,11 @@ public class SmartParameterInput extends CodeArea {
                 // 移动光标到插入的文本之后
                 moveTo(dotPos + 1 + suggestion.length());
             } else {
-                // 如果没有找到 .，可能是在 #{node} 之后直接输入属性
-                // 查找 #{node} 的位置
+                // 如果没有找到 .，可能是在 #{node} 之后直接输入属性（使用最后一个参数段，支持多参数）
                 String beforeTrigger = text.substring(0, triggerPosition - 1);
-                Matcher matcher = Pattern.compile("#\\{([^}]+)\\}$").matcher(beforeTrigger);
-                if (matcher.find()) {
-                    int nodeEnd = matcher.end();
+                LastParameterExpression last = findLastParameterExpression(beforeTrigger);
+                if (last != null) {
+                    int nodeEnd = last.endOfBrace + 1;
                     String before = text.substring(0, nodeEnd);
                     String after = text.substring(caretPosition);
                     String newText = before + "." + suggestion + after;

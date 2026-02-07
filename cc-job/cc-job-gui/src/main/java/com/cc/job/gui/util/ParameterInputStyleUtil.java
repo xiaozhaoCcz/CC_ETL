@@ -24,22 +24,23 @@ public class ParameterInputStyleUtil {
             "-fx-font-weight: bold;";
     
     /**
-     * 自动补全弹出窗口样式
+     * 自动补全弹出窗口样式（圆角、边框、轻微阴影）
      */
     public static final String AUTOCOMPLETE_POPUP_STYLE = 
             "-fx-background-color: white; " +
-            "-fx-background-radius: 4; " +
-            "-fx-effect: null; " +
+            "-fx-background-radius: 8; " +
             "-fx-border-color: #E5E7EB; " +
-            "-fx-border-radius: 4; " +
-            "-fx-border-width: 1;";
+            "-fx-border-radius: 8; " +
+            "-fx-border-width: 1; " +
+            "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.12), 8, 0, 0, 2);";
     
     /**
      * 自动补全列表项样式（普通状态）
      */
     public static final String AUTOCOMPLETE_ITEM_STYLE = 
             "-fx-background-color: transparent; " +
-            "-fx-padding: 8 12 8 12; " +
+            "-fx-padding: 10 14 10 14; " +
+            "-fx-font-size: 13; " +
             "-fx-cursor: hand;";
     
     /**
@@ -47,7 +48,8 @@ public class ParameterInputStyleUtil {
      */
     public static final String AUTOCOMPLETE_ITEM_HOVER_STYLE = 
             "-fx-background-color: #F3F4F6; " +
-            "-fx-padding: 8 12 8 12; " +
+            "-fx-padding: 10 14 10 14; " +
+            "-fx-font-size: 13; " +
             "-fx-cursor: hand;";
     
     /**
@@ -55,7 +57,8 @@ public class ParameterInputStyleUtil {
      */
     public static final String AUTOCOMPLETE_ITEM_SELECTED_STYLE = 
             "-fx-background-color: #2563EB; " +
-            "-fx-padding: 8 12 8 12; " +
+            "-fx-padding: 10 14 10 14; " +
+            "-fx-font-size: 13; " +
             "-fx-cursor: hand; " +
             "-fx-text-fill: white;";
     
@@ -118,30 +121,33 @@ public class ParameterInputStyleUtil {
     /** 深色主题：自动补全弹出窗口样式 */
     public static final String AUTOCOMPLETE_POPUP_STYLE_DARK =
             "-fx-background-color: #2D2D30; " +
-            "-fx-background-radius: 4; " +
-            "-fx-effect: null; " +
+            "-fx-background-radius: 8; " +
             "-fx-border-color: #505050; " +
-            "-fx-border-radius: 4; " +
-            "-fx-border-width: 1;";
+            "-fx-border-radius: 8; " +
+            "-fx-border-width: 1; " +
+            "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 10, 0, 0, 2);";
 
     /** 深色主题：自动补全列表项样式（普通状态） */
     public static final String AUTOCOMPLETE_ITEM_STYLE_DARK =
             "-fx-background-color: transparent; " +
             "-fx-text-fill: #D4D4D4; " +
-            "-fx-padding: 8 12 8 12; " +
+            "-fx-padding: 10 14 10 14; " +
+            "-fx-font-size: 13; " +
             "-fx-cursor: hand;";
 
     /** 深色主题：自动补全列表项样式（悬停状态） */
     public static final String AUTOCOMPLETE_ITEM_HOVER_STYLE_DARK =
             "-fx-background-color: #3C3C3C; " +
             "-fx-text-fill: #D4D4D4; " +
-            "-fx-padding: 8 12 8 12; " +
+            "-fx-padding: 10 14 10 14; " +
+            "-fx-font-size: 13; " +
             "-fx-cursor: hand;";
 
     /** 深色主题：自动补全列表项样式（选中状态） */
     public static final String AUTOCOMPLETE_ITEM_SELECTED_STYLE_DARK =
             "-fx-background-color: #094771; " +
-            "-fx-padding: 8 12 8 12; " +
+            "-fx-padding: 10 14 10 14; " +
+            "-fx-font-size: 13; " +
             "-fx-cursor: hand; " +
             "-fx-text-fill: white;";
     
