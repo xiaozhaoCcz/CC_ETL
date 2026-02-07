@@ -23,6 +23,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+
 /**
  * 多数据源同步对话框 - 支持多表批量同步
  */
@@ -42,6 +45,11 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
     private ComboBox<JobJdbcDatasource> readerDatasourceCombo;
     private ListView<String> readerTableList;
     private ComboBox<String> incrTypeCombo;
+    private VBox incrConfigBox;
+    private ComboBox<String> incrModeCombo;
+    private TextField incrColumnField;
+    private TextField incrInitValueField;
+    private ComboBox<String> incrTimeFormatCombo;
 
     // Step 2 - Writer配置（多表）
     private ComboBox<String> writerDsTypeCombo;
@@ -56,6 +64,8 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
 
     private static final String[] DS_TYPES = {"MYSQL", "ORACLE", "POSTGRESQL"};
     private static final String[] WRITE_MODES = {"insert", "update", "replace"};
+    private static final String[] INCR_MODES = {"ID自增", "时间自增"};
+    private static final String[] TIME_FORMATS = {"YYYY-MM-DD HH:mm:ss", "YYYY-MM-DD", "YYYY/MM/DD HH:mm:ss", "YYYY/MM/DD"};
 
     public ShowDataxGroupSyncDialog(Stage ownerStage) {
         setTitle("多数据源同步");
@@ -237,6 +247,53 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
         incrLabel.setStyle(labelStyle);
         incrTypeCombo = new ComboBox<>(FXCollections.observableArrayList("全量", "增量"));
         incrTypeCombo.getSelectionModel().selectFirst();
+        incrTypeCombo.setOnAction(e -> updateIncrConfigVisibility());
+
+        // 增量配置容器
+        incrConfigBox = new VBox(8);
+        incrConfigBox.setPadding(new Insets(12));
+        incrConfigBox.getStyleClass().add("dialog-section");
+        incrConfigBox.setStyle("-fx-background-radius: 8; -fx-border-width: 1; -fx-border-radius: 8;");
+        incrConfigBox.setVisible(false);
+
+        Label incrModeLabel = new Label("增量模式");
+        incrModeLabel.setStyle(labelStyle + " -fx-min-width: 80;");
+        incrModeCombo = new ComboBox<>(FXCollections.observableArrayList(INCR_MODES));
+        incrModeCombo.getSelectionModel().selectFirst();
+        incrModeCombo.setOnAction(e -> updateIncrModeConfig());
+        HBox incrModeRow = new HBox(12);
+        incrModeRow.setAlignment(Pos.CENTER_LEFT);
+        incrModeRow.getChildren().addAll(incrModeLabel, incrModeCombo);
+
+        Label incrColumnLabel = new Label("增量字段");
+        incrColumnLabel.setStyle(labelStyle + " -fx-min-width: 80;");
+        incrColumnField = new TextField();
+        incrColumnField.setPromptText("如：id 或 create_time");
+        HBox incrColumnRow = new HBox(12);
+        incrColumnRow.setAlignment(Pos.CENTER_LEFT);
+        incrColumnRow.getChildren().addAll(incrColumnLabel, incrColumnField);
+        HBox.setHgrow(incrColumnField, Priority.ALWAYS);
+
+        Label incrValueLabel = new Label("初始值");
+        incrValueLabel.setStyle(labelStyle + " -fx-min-width: 80;");
+        incrInitValueField = new TextField();
+        incrInitValueField.setPromptText("ID自增填数字，时间自增填时间戳(毫秒)");
+        HBox incrValueRow = new HBox(12);
+        incrValueRow.setAlignment(Pos.CENTER_LEFT);
+        incrValueRow.getChildren().addAll(incrValueLabel, incrInitValueField);
+        HBox.setHgrow(incrInitValueField, Priority.ALWAYS);
+
+        Label incrTimeFormatLabel = new Label("时间格式");
+        incrTimeFormatLabel.setStyle(labelStyle + " -fx-min-width: 80;");
+        incrTimeFormatCombo = new ComboBox<>(FXCollections.observableArrayList(TIME_FORMATS));
+        incrTimeFormatCombo.getSelectionModel().selectFirst();
+        HBox incrTimeFormatRow = new HBox(12);
+        incrTimeFormatRow.setAlignment(Pos.CENTER_LEFT);
+        incrTimeFormatRow.getChildren().addAll(incrTimeFormatLabel, incrTimeFormatCombo);
+        incrTimeFormatRow.setVisible(false);
+
+        incrConfigBox.getChildren().addAll(incrModeRow, incrColumnRow, incrValueRow, incrTimeFormatRow);
+        VBox incrContainer = new VBox(8, incrTypeCombo, incrConfigBox);
 
         GridPane grid = new GridPane();
         grid.setHgap(16);
@@ -249,7 +306,7 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
         VBox tableBox = new VBox(8, readerTableList, new HBox(8, selectAllBtn, clearBtn));
         grid.add(tableBox, 1, 2);
         grid.add(incrLabel, 0, 3);
-        grid.add(incrTypeCombo, 1, 3);
+        grid.add(incrContainer, 1, 3);
 
         pane.getChildren().addAll(title, grid);
         return new ScrollPane(pane);
@@ -352,6 +409,16 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
                 showError("验证失败", "请选择要读取的数据表");
                 return;
             }
+            if ("增量".equals(incrTypeCombo.getValue())) {
+                if (isBlank(incrColumnField.getText())) {
+                    showError("验证失败", "增量同步需要填写增量字段");
+                    return;
+                }
+                if (isBlank(incrInitValueField.getText())) {
+                    showError("验证失败", "增量同步需要填写初始值");
+                    return;
+                }
+            }
             currentStep++;
             updateStepView();
         } else if (currentStep == 1) {
@@ -406,7 +473,11 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
                     readerParams.setIp(readerIpPort[0]);
                     readerParams.setPort(readerIpPort[1]);
                     readerParams.setType(0);
-                    readerParams.setIncrType("全量".equals(incrTypeCombo.getValue()) ? 0 : 1);
+                    int incrType = "全量".equals(incrTypeCombo.getValue()) ? 0 : 1;
+                    readerParams.setIncrementType(incrType);
+                    if (incrType == 1) {
+                        readerParams.setIncrementContent(buildIncrementContent());
+                    }
 
                     // 构建Writer参数
                     JobDataxService.DataXParams writerParams = new JobDataxService.DataXParams();
@@ -464,6 +535,50 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
     private void handleReset() {
         currentStep = 0;
         updateStepView();
+        if (incrTypeCombo != null) incrTypeCombo.getSelectionModel().selectFirst();
+        if (incrConfigBox != null) {
+            updateIncrConfigVisibility();
+            if (incrColumnField != null) incrColumnField.clear();
+            if (incrInitValueField != null) incrInitValueField.clear();
+        }
+    }
+
+    private void updateIncrConfigVisibility() {
+        boolean isIncremental = "增量".equals(incrTypeCombo != null ? incrTypeCombo.getValue() : null);
+        if (incrConfigBox != null) {
+            incrConfigBox.setVisible(isIncremental);
+            incrConfigBox.setManaged(isIncremental);
+        }
+    }
+
+    private void updateIncrModeConfig() {
+        if (incrModeCombo == null || incrConfigBox == null || incrConfigBox.getChildren().size() <= 3) return;
+        boolean isTimeMode = "时间自增".equals(incrModeCombo.getValue());
+        Node timeFormatRow = incrConfigBox.getChildren().get(3);
+        timeFormatRow.setVisible(isTimeMode);
+        timeFormatRow.setManaged(isTimeMode);
+    }
+
+    private String buildIncrementContent() {
+        String columnKey = incrColumnField.getText().trim();
+        String columnValue = incrInitValueField.getText().trim();
+        String mode = incrModeCombo.getValue();
+        int columnType = "时间自增".equals(mode) ? 1 : 0;
+        String timeFormat = columnType == 1 && incrTimeFormatCombo.getValue() != null
+                ? incrTimeFormatCombo.getValue() : "x";
+        JsonObject columnObj = new JsonObject();
+        columnObj.addProperty("columnKey", columnKey);
+        columnObj.addProperty("columnValue", columnValue);
+        columnObj.addProperty("columnParam", columnKey);
+        columnObj.addProperty("columnTimeFormat", timeFormat);
+        columnObj.addProperty("columnType", columnType);
+        JsonArray jsonArray = new JsonArray();
+        jsonArray.add(columnObj);
+        return new Gson().toJson(jsonArray);
+    }
+
+    private static boolean isBlank(String v) {
+        return v == null || v.trim().isEmpty();
     }
 
     private void loadDatasources() {

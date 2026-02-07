@@ -144,8 +144,8 @@ public class JobDataxService extends BaseService {
         private String port;
         private String querySql;
         private Integer type; // 0=reader, 1=writer
-        private Integer incrType;
-        private String incrContent;
+        private Integer incrementType;
+        private String incrementContent;
         private String schemaName;
         private String writeMode;
         
@@ -170,10 +170,10 @@ public class JobDataxService extends BaseService {
         public void setQuerySql(String querySql) { this.querySql = querySql; }
         public Integer getType() { return type; }
         public void setType(Integer type) { this.type = type; }
-        public Integer getIncrType() { return incrType; }
-        public void setIncrType(Integer incrType) { this.incrType = incrType; }
-        public String getIncrContent() { return incrContent; }
-        public void setIncrContent(String incrContent) { this.incrContent = incrContent; }
+        public Integer getIncrementType() { return incrementType; }
+        public void setIncrementType(Integer incrementType) { this.incrementType = incrementType; }
+        public String getIncrementContent() { return incrementContent; }
+        public void setIncrementContent(String incrementContent) { this.incrementContent = incrementContent; }
         public String getSchemaName() { return schemaName; }
         public void setSchemaName(String schemaName) { this.schemaName = schemaName; }
         public String getWriteMode() { return writeMode; }

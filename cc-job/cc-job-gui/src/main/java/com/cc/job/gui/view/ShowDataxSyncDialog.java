@@ -733,11 +733,11 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                 
                 // 设置增量类型和内容
                 int incrType = "全量".equals(incrTypeCombo.getValue()) ? 0 : 1;
-                readerParams.setIncrType(incrType);
+                readerParams.setIncrementType(incrType);
                 if (incrType == 1) {
                     // 构建增量内容
                     String incrementContent = buildIncrementContent();
-                    readerParams.setIncrContent(incrementContent);
+                    readerParams.setIncrementContent(incrementContent);
                 }
 
                 // 构建Writer参数
