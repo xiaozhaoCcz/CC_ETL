@@ -33,6 +33,8 @@ public class DialogManager {
     private final JobPartService jobPartService;
     private final NodeTemplateManager nodeTemplateManager;
     
+    private NodeOperationManager nodeOperationManager;
+    
     // 对话框实例缓存，避免重复创建
     private ShowJobListDialog jobListDialog;
     private ShowExecutorListDialog executorListDialog;
@@ -57,6 +59,13 @@ public class DialogManager {
      */
     public void setTaskExecutionManager(TaskExecutionManager taskExecutionManager) {
         this.taskExecutionManager = taskExecutionManager;
+    }
+    
+    /**
+     * 设置节点操作管理器（用于从任务列表添加节点时本地入画布并支持撤销）
+     */
+    public void setNodeOperationManager(NodeOperationManager nodeOperationManager) {
+        this.nodeOperationManager = nodeOperationManager;
     }
     
     /**
@@ -371,6 +380,46 @@ public class DialogManager {
                 } catch (Exception e) {
                     Platform.runLater(() -> NotificationToast.showError("✗ 创建失败: " + e.getMessage()));
                     logger.error("从模板创建节点失败", e);
+                }
+            }).start();
+        });
+    }
+
+    /**
+     * 显示从任务列表添加节点对话框：选择单任务后加入当前任务组画布
+     * @param taskGroupId 当前任务组ID
+     * @param taskGroupName 任务组名称（用于提示）
+     * @param posX 节点放置 X 坐标
+     * @param posY 节点放置 Y 坐标
+     * @param onSuccess 添加成功回调（可为 null，通常用于刷新画布）
+     */
+    public void showAddJobFromListDialog(Long taskGroupId, String taskGroupName,
+                                         double posX, double posY, Runnable onSuccess) {
+        Optional<com.cc.job.xo.model.vo.JobInfoVO> selectedOpt =
+            AddJobFromListDialog.showAndSelect(ownerStage);
+        selectedOpt.ifPresent(selected -> {
+            if (selected.getId() == null) {
+                Platform.runLater(() -> NotificationToast.showError("✗ 未选择有效任务"));
+                return;
+            }
+            new Thread(() -> {
+                try {
+                    com.cc.job.xo.model.entity.JobNode jobNode = jobInfoService.addExistingJobToCompose(
+                        selected.getId(), taskGroupId, posX, posY);
+                    if (jobNode != null) {
+                        Platform.runLater(() -> {
+                            NotificationToast.showSuccess("✓ 已添加任务到画布: " + selected.getJobDesc());
+                            if (nodeOperationManager != null) {
+                                nodeOperationManager.addExistingJobNodeToCanvas(jobNode, taskGroupId);
+                            }
+                            if (onSuccess != null) onSuccess.run();
+                        });
+                    } else {
+                        Platform.runLater(() -> NotificationToast.showError("✗ 添加失败"));
+                    }
+                } catch (Exception e) {
+                    Platform.runLater(() -> NotificationToast.showError("✗ 添加失败: " + e.getMessage()));
+                    logger.error("从任务列表添加节点失败", e);
                 }
             }).start();
         });

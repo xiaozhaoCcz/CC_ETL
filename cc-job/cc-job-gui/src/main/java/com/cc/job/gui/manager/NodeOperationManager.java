@@ -57,6 +57,36 @@ public class NodeOperationManager {
     }
     
     /**
+     * 将「从任务列表添加」得到的 JobNode 在本地加入画布并入栈，支持撤销/重做。
+     * 在后台线程拉取 JobInfoForm 后于 JavaFX 线程执行 addNode(recordHistory=true)。
+     */
+    public void addExistingJobNodeToCanvas(JobNode jobNode, Long taskGroupId) {
+        if (jobNode == null || taskGroupId == null) {
+            Platform.runLater(() -> logPanel.warn("⚠ 节点或任务组ID为空"));
+            return;
+        }
+        new Thread(() -> {
+            try {
+                JobInfoForm formData = jobInfoService.getJobNodeFormData(jobNode.getJobId());
+                if (formData == null) {
+                    Platform.runLater(() -> logPanel.error("✗ 获取任务表单失败"));
+                    return;
+                }
+                formData.setNodeId(String.valueOf(jobNode.getId()));
+                formData.setNodePositionX(jobNode.getNodePositionX());
+                formData.setNodePositionY(jobNode.getNodePositionY());
+                formData.setParentId(taskGroupId);
+                JobNode nodeRef = jobNode;
+                JobInfoForm formRef = formData;
+                Platform.runLater(() -> addNodeToCanvas(nodeRef, formRef, true));
+            } catch (Exception e) {
+                logger.error("从任务列表添加节点到画布失败", e);
+                Platform.runLater(() -> logPanel.error("✗ 添加节点失败: " + e.getMessage()));
+            }
+        }, "add-existing-job-to-canvas").start();
+    }
+    
+    /**
      * 直接复制并创建新节点（右键菜单使用）- 复制+粘贴一步完成
      */
     public void duplicateNode(ProcessNode sourceNode, Long currentTaskGroupId) {

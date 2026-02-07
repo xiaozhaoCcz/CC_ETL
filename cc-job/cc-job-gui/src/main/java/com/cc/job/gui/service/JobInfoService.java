@@ -124,9 +124,28 @@ public class JobInfoService extends BaseService {
         extractors.put("jobDesc", JobInfoQuery::getJobDesc);
         extractors.put("executorHandler", JobInfoQuery::getExecutorHandler);
         extractors.put("author", JobInfoQuery::getAuthor);
+        extractors.put("jobType", JobInfoQuery::getJobType);
         
         Map<String, String> queryParams = HttpClientUtil.buildQueryParams(query, extractors);
         return httpClient.getPage("/api/v1/jobInfos/page", JobInfoVO.class, queryParams);
+    }
+
+    /**
+     * 将已有单任务加入画布（仅创建 JobNode，不创建/修改 JobInfo）
+     * @param jobInfoId 已有任务ID
+     * @param parentId 任务组ID
+     * @param x 节点X坐标
+     * @param y 节点Y坐标
+     * @return 创建的 JobNode，失败时抛出 IOException
+     */
+    public JobNode addExistingJobToCompose(Long jobInfoId, Long parentId, double x, double y) throws IOException {
+        Map<String, Object> body = new HashMap<>();
+        body.put("jobInfoId", jobInfoId);
+        body.put("parentId", parentId);
+        body.put("x", x);
+        body.put("y", y);
+        Result<JobNode> result = httpClient.post("/api/v1/jobInfos/addExistingJobToCompose", body, JobNode.class);
+        return httpClient.extractData(result, "将任务加入画布失败");
     }
 
     /**

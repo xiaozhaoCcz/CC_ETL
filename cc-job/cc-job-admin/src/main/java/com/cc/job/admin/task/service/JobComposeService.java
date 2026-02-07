@@ -22,6 +22,16 @@ public interface JobComposeService extends IService<JobCompose> {
 
     JobNode saveJobNode(JobInfoForm formData);
 
+    /**
+     * 将已有单任务加入画布（仅创建 JobNode，不创建/修改 JobInfo）
+     * @param jobInfoId 已有任务ID（单任务，jobType=0）
+     * @param parentId 任务组ID
+     * @param x 节点X坐标
+     * @param y 节点Y坐标
+     * @return 创建的 JobNode
+     */
+    JobNode addExistingJobToCompose(Long jobInfoId, Long parentId, Double x, Double y);
+
     Long updateJobNode(Long jobId, Long nodeId);
 
     List<Long> pauseJobs(Long[] jobIds);

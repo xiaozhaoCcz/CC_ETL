@@ -159,8 +159,11 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         if (StringUtils.isNotBlank(queryParams.getExecutorHandler())) {
             wrapper.eq(JobInfo::getExecutorHandler, queryParams.getExecutorHandler());
         }
-
-        wrapper.in(JobInfo::getJobType, 0, 2);
+        if (queryParams.getJobType() != null) {
+            wrapper.eq(JobInfo::getJobType, queryParams.getJobType());
+        } else {
+            wrapper.in(JobInfo::getJobType, 0, 2);
+        }
         wrapper.in(JobInfo::getNodeFlag, "N");
         wrapper.orderByDesc(JobInfo::getUpdateTime);
 

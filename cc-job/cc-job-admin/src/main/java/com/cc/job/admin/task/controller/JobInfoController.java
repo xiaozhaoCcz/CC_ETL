@@ -259,6 +259,20 @@ public class JobInfoController {
         return Result.success(jobEdge);
     }
 
+    @Operation(summary = "将已有单任务加入画布")
+    @PostMapping("addExistingJobToCompose")
+    public Result<JobNode> addExistingJobToCompose(@RequestBody Map<String, Object> formMap) {
+        Long jobInfoId = formMap.get("jobInfoId") != null ? Long.parseLong(String.valueOf(formMap.get("jobInfoId"))) : null;
+        Long parentId = formMap.get("parentId") != null ? Long.parseLong(String.valueOf(formMap.get("parentId"))) : null;
+        Double x = formMap.get("x") != null ? Double.parseDouble(String.valueOf(formMap.get("x"))) : 0.0;
+        Double y = formMap.get("y") != null ? Double.parseDouble(String.valueOf(formMap.get("y"))) : 0.0;
+        if (jobInfoId == null || parentId == null) {
+            return Result.failed("jobInfoId 和 parentId 不能为空");
+        }
+        JobNode jobNode = jobComposeService.addExistingJobToCompose(jobInfoId, parentId, x, y);
+        return Result.success(jobNode);
+    }
+
     @Operation(summary = "创建条件节点")
     @PostMapping("createConditionNode")
     public Result<Map<String, Object>> createConditionNode(@RequestBody Map<String, Object> formMap) {

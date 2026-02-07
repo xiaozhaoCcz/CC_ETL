@@ -56,6 +56,7 @@ public class NodeCanvas extends Pane {
     private Runnable onRequestAddNode;
     private Runnable onRequestAddConditionNode; // 创建条件节点回调
     private Runnable onRequestCreateFromTemplate; // 从模板创建节点回调
+    private Runnable onRequestAddJobFromList; // 从任务列表添加节点回调
     private Runnable onRequestRunTaskGroup;
     private Runnable onRequestClearCanvas;
     private java.util.function.Consumer<GroupContainer> onDeleteGroupContainer;
@@ -202,6 +203,10 @@ public class NodeCanvas extends Pane {
 
     public void setOnRequestCreateFromTemplate(Runnable runnable) {
         this.onRequestCreateFromTemplate = runnable;
+    }
+    
+    public void setOnRequestAddJobFromList(Runnable runnable) {
+        this.onRequestAddJobFromList = runnable;
     }
     
     public void setOnRequestRunTaskGroup(Runnable runnable) {
@@ -1599,6 +1604,9 @@ public class NodeCanvas extends Pane {
         MenuItem createFromTemplateItem = new MenuItem("从模板创建节点");
         createFromTemplateItem.setOnAction(e -> { if (onRequestCreateFromTemplate != null) onRequestCreateFromTemplate.run(); });
         
+        MenuItem addJobFromListItem = new MenuItem("从任务列表添加节点");
+        addJobFromListItem.setOnAction(e -> { if (onRequestAddJobFromList != null) onRequestAddJobFromList.run(); });
+        
         MenuItem clearItem = new MenuItem("清空页面");
         clearItem.setOnAction(e -> { if (onRequestClearCanvas != null) onRequestClearCanvas.run(); else clearViewOnly(); });
         
@@ -1628,6 +1636,7 @@ public class NodeCanvas extends Pane {
         
         menu.getItems().addAll(addNodeItem,
                 createFromTemplateItem,
+                addJobFromListItem,
                 //addConditionNodeItem,
                 new SeparatorMenuItem(),
                 clearItem,

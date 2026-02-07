@@ -181,6 +181,8 @@ public class MainView extends BorderPane {
         
         // 重要：设置对话框管理器的任务执行管理器（用于获取预测时间）
         dialogManager.setTaskExecutionManager(taskExecutionManager);
+        // 重要：设置节点操作管理器（用于从任务列表添加节点时本地入画布并支持撤销）
+        dialogManager.setNodeOperationManager(nodeOperationManager);
         
         // 重要：设置节点操作管理器的回调配置器（用于新增节点时自动配置回调）
         nodeOperationManager.setNodeCallbackConfigurator(nodeCallbackConfigurator);
@@ -1427,6 +1429,19 @@ public class MainView extends BorderPane {
                     restoreCanvasSize(taskGroupId);
                     dataManager.loadTaskGroupData(taskGroupId, taskGroupName);
                 });
+        });
+        
+        canvas.setOnRequestAddJobFromList(() -> {
+            Long taskGroupId = pageStoreHelper.getCurrentTaskGroupId();
+            if (taskGroupId == null || taskGroupId == 0) {
+                NotificationToast.showWarning("请先选择任务组");
+                return;
+            }
+            String taskGroupName = getJobNameById(taskGroupId);
+            double[] pos = calculateNewNodePosition();
+            dialogManager.showAddJobFromListDialog(
+                taskGroupId, taskGroupName, pos[0], pos[1],
+                () -> restoreCanvasSize(taskGroupId));
         });
         
         canvas.setOnRequestRunTaskGroup(() -> {

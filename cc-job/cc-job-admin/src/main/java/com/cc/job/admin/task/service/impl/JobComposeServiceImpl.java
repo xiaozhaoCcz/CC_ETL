@@ -865,14 +865,16 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
             .filter(n -> !nodeIdsFromRequest.contains(n.getId()))
             .toList();
 
-        // 批量删除
+        // 批量删除：只删除 JobNode；仅当 JobInfo 为画布内创建（nodeFlag=Y）时才删除 JobInfo，不删单任务（nodeFlag=N）
         List<JobNode>  delNodeList = new ArrayList<>();
         List<Long>  delJobInfoList = new ArrayList<>();
         for (JobNode nodeToDelete : nodesToDelete) {
             delNodeList.add(nodeToDelete);
-            // ⭐ 修复：条件节点的jobId为null，不应该删除JobInfo
             if (nodeToDelete.getJobId() != null) {
-                delJobInfoList.add(nodeToDelete.getJobId());
+                JobInfo toDeleteJobInfo = jobInfoService.getById(nodeToDelete.getJobId());
+                if (toDeleteJobInfo != null && "Y".equals(toDeleteJobInfo.getNodeFlag())) {
+                    delJobInfoList.add(nodeToDelete.getJobId());
+                }
             }
         }
         jobNodeService.removeBatchByIds(delNodeList);
@@ -1287,6 +1289,45 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
         properties.put(JOB_ID, jobInfo.getId());
         properties.put("width",160);
         properties.put("height",90);
+        jobNode.setProperties(JSONUtil.toJsonStr(properties));
+        jobNodeService.save(jobNode);
+        return jobNode;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public JobNode addExistingJobToCompose(Long jobInfoId, Long parentId, Double x, Double y) {
+        JobInfo jobInfo = jobInfoService.getById(jobInfoId);
+        if (jobInfo == null) {
+            throw new BusinessException("任务不存在");
+        }
+        if (jobInfo.getJobType() == null || jobInfo.getJobType() != 0) {
+            throw new BusinessException("仅支持将单任务加入画布");
+        }
+        if (!"N".equalsIgnoreCase(jobInfo.getNodeFlag())) {
+            throw new BusinessException("该任务已是画布节点，请从任务列表选择单任务");
+        }
+        long count = jobNodeService.count(new LambdaQueryWrapper<JobNode>()
+                .eq(JobNode::getJobId, jobInfoId)
+                .eq(JobNode::getJobParentId, parentId));
+        if (count > 0) {
+            throw new BusinessException("该任务已在本任务组中，请勿重复添加");
+        }
+        String nodeType = NODE_TYPE_MAP.get(jobInfo.getGlueType());
+        if (nodeType == null) {
+            nodeType = "custom-bean";
+        }
+        JobNode jobNode = new JobNode();
+        jobNode.setJobId(jobInfoId);
+        jobNode.setJobParentId(parentId);
+        jobNode.setNodePositionX(x != null ? x : 0.0);
+        jobNode.setNodePositionY(y != null ? y : 0.0);
+        jobNode.setNodeType(nodeType);
+        jobNode.setTriggerStatus(-1);
+        Map<String, Object> properties = new HashMap<>();
+        properties.put(JOB_ID, jobInfoId);
+        properties.put("width", 160);
+        properties.put("height", 90);
         jobNode.setProperties(JSONUtil.toJsonStr(properties));
         jobNodeService.save(jobNode);
         return jobNode;

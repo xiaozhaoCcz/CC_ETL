@@ -66,6 +66,8 @@ public class ShowJobListDialog extends Dialog<Void> {
     private int pageSize = 10;
     private long total = 0;
 
+    private Runnable themeChangedListener;
+
     public ShowJobListDialog(Stage ownerStage) {
         this.ownerStage = ownerStage;
         setTitle("任务列表");
@@ -73,6 +75,11 @@ public class ShowJobListDialog extends Dialog<Void> {
         initModality(Modality.WINDOW_MODAL);
 
         styleDialog();
+        setOnHidden(e -> {
+            if (themeChangedListener != null) {
+                com.cc.job.gui.util.ThemeManager.getInstance().removeOnThemeChanged(themeChangedListener);
+            }
+        });
         BorderPane root = new BorderPane();
         root.getStyleClass().add("dialog-content-root");
         root.setPadding(new Insets(16));
@@ -136,6 +143,18 @@ public class ShowJobListDialog extends Dialog<Void> {
         if (dialogCss != null && !dialogCss.isEmpty()) {
             getDialogPane().getStylesheets().add(dialogCss);
         }
+
+        themeChangedListener = () -> {
+            javafx.scene.Scene scene = getDialogPane().getScene();
+            if (scene != null) {
+                scene.getStylesheets().clear();
+                String url = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+                if (url != null && !url.isEmpty()) {
+                    scene.getStylesheets().add(url);
+                }
+            }
+        };
+        com.cc.job.gui.util.ThemeManager.getInstance().addOnThemeChanged(themeChangedListener);
 
         Platform.runLater(() -> {
             Stage stage = (Stage) getDialogPane().getScene().getWindow();
