@@ -15,6 +15,7 @@ import javafx.scene.shape.Polygon;
 import javafx.scene.layout.Pane;
 import javafx.scene.transform.Rotate;
 import javafx.util.Duration;
+import com.cc.job.gui.util.ThemeManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -467,10 +468,11 @@ public class NodeConnection extends Group {
         } else if (selected) {
             stopDashAnimation();
             applyEdgeStyle(edgeStyle);
-            curve.setStroke(Color.web("#2563EB"));
+            String selectedColor = "dark".equals(ThemeManager.getInstance().getTheme()) ? "#60A5FA" : "#2563EB";
+            curve.setStroke(Color.web(selectedColor));
             curve.setStrokeWidth(3.5);
-            arrowHead.setFill(Color.web("#2563EB"));
-            arrowHead.setStroke(Color.web("#2563EB"));
+            arrowHead.setFill(Color.web(selectedColor));
+            arrowHead.setStroke(Color.web(selectedColor));
         } else if (isBlocked) {
             // 阻塞状态：灰色虚线，不带动画（优先级高于运行状态）
             // 即使设置了运行状态，如果连接线连接到阻塞节点，也不显示运行动画

@@ -143,6 +143,8 @@ public class NodeCanvas extends Pane {
         
         // 初始化标尺（默认显示）
         initializeRuler();
+        // 监听应用主题切换，使画布背景与选择框随主题更新
+        ThemeManager.getInstance().addOnThemeChanged(this::refreshCanvasForTheme);
     }
     
     private void initializeManagers() {
@@ -1748,6 +1750,58 @@ public class NodeCanvas extends Pane {
     
     private static String getCanvasGridDotColor() {
         return "dark".equals(ThemeManager.getInstance().getTheme()) ? "#505050" : "#D1D5DB";
+    }
+    
+    /**
+     * 应用主题（浅色/深色）切换时刷新画布：背景色、网格/圆点、选择框与选中样式。
+     */
+    private void refreshCanvasForTheme() {
+        boolean dark = "dark".equals(ThemeManager.getInstance().getTheme());
+        String bgColor = dark ? "#2D2D30" : "#FAFAFA";
+        setStyle("-fx-background-color: " + bgColor + ";");
+        if ("grid".equals(currentTheme) && gridBackgroundCanvas != null) {
+            redrawGridBackground();
+        } else if ("dots".equals(currentTheme) && dotsBackgroundCanvas != null) {
+            redrawDotsBackground();
+        }
+        if (selectionManager != null) {
+            selectionManager.refreshThemeColors();
+        }
+    }
+    
+    /**
+     * 将 JavaFX Color 转为 CSS 颜色字符串（用于 -fx-background-color）。
+     */
+    private static String colorToCss(Color c) {
+        if (c == null) return "#FAFAFA";
+        int r = (int) Math.round(c.getRed() * 255);
+        int g = (int) Math.round(c.getGreen() * 255);
+        int b = (int) Math.round(c.getBlue() * 255);
+        double a = c.getOpacity();
+        if (a >= 1.0) {
+            return String.format("#%02X%02X%02X", r, g, b);
+        }
+        return String.format("rgba(%d,%d,%d,%s)", r, g, b, String.format("%.2f", a).replace(',', '.'));
+    }
+    
+    /**
+     * 导出时临时使用指定背景色渲染画布并执行 runnable（如拍快照），执行完毕后恢复原样式与网格/圆点可见性。
+     * 用于解决导出对话框中选择的背景颜色能正确铺满整幅图像（而非仅边缘）。
+     */
+    public void runWithExportBackground(Color backgroundColor, Runnable runnable) {
+        String savedStyle = getStyle();
+        boolean dotsVisible = dotsBackgroundCanvas != null && dotsBackgroundCanvas.isVisible();
+        boolean gridVisible = gridBackgroundCanvas != null && gridBackgroundCanvas.isVisible();
+        try {
+            setStyle("-fx-background-color: " + colorToCss(backgroundColor) + ";");
+            if (dotsBackgroundCanvas != null) dotsBackgroundCanvas.setVisible(false);
+            if (gridBackgroundCanvas != null) gridBackgroundCanvas.setVisible(false);
+            runnable.run();
+        } finally {
+            setStyle(savedStyle);
+            if (dotsBackgroundCanvas != null) dotsBackgroundCanvas.setVisible(dotsVisible);
+            if (gridBackgroundCanvas != null) gridBackgroundCanvas.setVisible(gridVisible);
+        }
     }
     
     /**

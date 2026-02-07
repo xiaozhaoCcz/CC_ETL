@@ -2,6 +2,7 @@ package com.cc.job.gui.manager;
 
 import com.cc.job.gui.model.NodeConnection;
 import com.cc.job.gui.model.ProcessNode;
+import com.cc.job.gui.util.ThemeManager;
 import javafx.scene.Node;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
@@ -43,10 +44,30 @@ public class CanvasSelectionManager {
         initializeSelectionRectangles();
     }
     
+    private static boolean isDarkTheme() {
+        return "dark".equals(ThemeManager.getInstance().getTheme());
+    }
+    
+    private static void applySelectionRectColors(Rectangle rect, String fillStrokeHex) {
+        rect.setFill(Color.web(fillStrokeHex, 0.1));
+        rect.setStroke(Color.web(fillStrokeHex));
+    }
+    
+    private static String getSelectionRectColor() {
+        return isDarkTheme() ? "#3B82F6" : "#2563EB";
+    }
+    
+    private static String getSelectionBoundingBoxStrokeColor() {
+        return isDarkTheme() ? "#F87171" : "#EF4444";
+    }
+    
+    private static String getSelectionHighlightShadowRgba() {
+        return isDarkTheme() ? "rgba(96,165,250,0.5)" : "rgba(37,99,235,0.5)";
+    }
+    
     private void initializeSelectionRectangles() {
         selectionRect = new Rectangle();
-        selectionRect.setFill(Color.web("#2563EB", 0.1));
-        selectionRect.setStroke(Color.web("#2563EB"));
+        applySelectionRectColors(selectionRect, getSelectionRectColor());
         selectionRect.setStrokeWidth(2);
         selectionRect.getStrokeDashArray().addAll(5.0, 5.0);
         selectionRect.setVisible(false);
@@ -55,7 +76,7 @@ public class CanvasSelectionManager {
         
         selectionBoundingBox = new Rectangle();
         selectionBoundingBox.setFill(Color.TRANSPARENT);
-        selectionBoundingBox.setStroke(Color.web("#EF4444"));
+        selectionBoundingBox.setStroke(Color.web(getSelectionBoundingBoxStrokeColor()));
         selectionBoundingBox.setStrokeWidth(2);
         selectionBoundingBox.getStrokeDashArray().addAll(8.0, 4.0);
         selectionBoundingBox.setVisible(false);
@@ -238,7 +259,8 @@ public class CanvasSelectionManager {
     
     public void highlightNode(ProcessNode node, boolean highlight) {
         if (highlight) {
-            node.setStyle("-fx-effect: dropshadow(gaussian, rgba(37,99,235,0.5), 10, 0, 0, 0);");
+            String shadowRgba = getSelectionHighlightShadowRgba();
+            node.setStyle("-fx-effect: dropshadow(gaussian, " + shadowRgba + ", 10, 0, 0, 0);");
         } else {
             node.setStyle("-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 5, 0, 0, 2);");
         }
@@ -413,6 +435,20 @@ public class CanvasSelectionManager {
     
     public javafx.scene.shape.Rectangle getSelectionBoundingBox() {
         return selectionBoundingBox;
+    }
+    
+    /**
+     * 主题切换后刷新选择框、外框及选中节点/连线的颜色。
+     */
+    public void refreshThemeColors() {
+        applySelectionRectColors(selectionRect, getSelectionRectColor());
+        selectionBoundingBox.setStroke(Color.web(getSelectionBoundingBoxStrokeColor()));
+        for (ProcessNode node : selectedNodes) {
+            highlightNode(node, true);
+        }
+        for (NodeConnection conn : selectedConnections) {
+            conn.setSelected(true);
+        }
     }
     
     /**

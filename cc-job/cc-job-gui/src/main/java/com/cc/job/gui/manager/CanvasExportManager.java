@@ -133,23 +133,35 @@ public class CanvasExportManager {
                 bounds = canvas.getBoundsInLocal();
             }
             
-            // 创建快照参数
+            // 创建快照参数：包含背景时用透明 fill，由画布临时背景色渲染整图，避免仅边缘变色
             SnapshotParameters params = new SnapshotParameters();
-            params.setFill(config.isIncludeBackground() ? config.getBackgroundColor() : Color.TRANSPARENT);
+            params.setFill(Color.TRANSPARENT);
             
             // 计算快照尺寸
             int width = (int) (bounds.getWidth() * config.getScale());
             int height = (int) (bounds.getHeight() * config.getScale());
             
-            // 如果导出区域不是整个画布，需要调整画布的视图
-            WritableImage image;
-            if (bounds.equals(canvas.getBoundsInLocal())) {
-                // 导出整个画布
-                image = canvas.snapshot(params, null);
+            final Bounds boundsFinal = bounds;
+            final SnapshotParameters paramsFinal = params;
+            final int widthFinal = width;
+            final int heightFinal = height;
+            final WritableImage[] imageHolder = new WritableImage[1];
+            
+            Runnable snapshotRunnable = () -> {
+                if (boundsFinal.equals(canvas.getBoundsInLocal())) {
+                    imageHolder[0] = canvas.snapshot(paramsFinal, null);
+                } else {
+                    imageHolder[0] = exportRegion(canvas, boundsFinal, paramsFinal, widthFinal, heightFinal);
+                }
+            };
+            
+            if (config.isIncludeBackground()) {
+                canvas.runWithExportBackground(config.getBackgroundColor(), snapshotRunnable);
             } else {
-                // 导出指定区域（需要创建临时视图）
-                image = exportRegion(canvas, bounds, params, width, height);
+                snapshotRunnable.run();
             }
+            
+            WritableImage image = imageHolder[0];
             
             // 缩放图片（如果需要）
             if (config.getScale() != 1.0) {

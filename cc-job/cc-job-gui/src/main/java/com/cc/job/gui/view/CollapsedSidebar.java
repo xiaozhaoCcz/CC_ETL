@@ -68,6 +68,13 @@ public class CollapsedSidebar extends VBox {
         showTreeViewButton(false);
         showMiniMapButton(false);
         showLogPanelButton(false);
+        
+        // 主题切换时重新应用按钮样式，使图标颜色跟随主题
+        ThemeManager.getInstance().addOnThemeChanged(() -> {
+            refreshButtonStyle(treeViewButton, false);
+            refreshButtonStyle(miniMapButton, false);
+            refreshButtonStyle(logPanelButton, false);
+        });
     }
     
     private Button createIconButton(FontIcon icon, String tooltipText) {
@@ -83,8 +90,7 @@ public class CollapsedSidebar extends VBox {
         button.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
         button.setAlignment(Pos.CENTER);
         button.getStyleClass().add("sidebar-icon-button");
-        boolean dark = "dark".equals(ThemeManager.getInstance().getTheme());
-        applyIconButtonStyle(button, icon, dark, false);
+        refreshButtonStyle(button, false);
         button.setPrefSize(36, 36);
         button.setMaxSize(36, 36);
         button.setMinSize(36, 36);
@@ -92,10 +98,20 @@ public class CollapsedSidebar extends VBox {
         Tooltip tooltip = new Tooltip(tooltipText);
         button.setTooltip(tooltip);
         
-        button.setOnMouseEntered(e -> applyIconButtonStyle(button, icon, dark, true));
-        button.setOnMouseExited(e -> applyIconButtonStyle(button, icon, dark, false));
+        button.setOnMouseEntered(e -> refreshButtonStyle(button, true));
+        button.setOnMouseExited(e -> refreshButtonStyle(button, false));
         
         return button;
+    }
+    
+    /**
+     * 根据当前主题和悬停状态刷新按钮及图标样式（主题切换或悬停时调用）。
+     */
+    private void refreshButtonStyle(Button button, boolean hover) {
+        if (button.getGraphic() instanceof StackPane wrapper && !wrapper.getChildren().isEmpty() && wrapper.getChildren().get(0) instanceof FontIcon icon) {
+            boolean dark = "dark".equals(ThemeManager.getInstance().getTheme());
+            applyIconButtonStyle(button, icon, dark, hover);
+        }
     }
     
     private void applyIconButtonStyle(Button button, FontIcon icon, boolean dark, boolean hover) {
