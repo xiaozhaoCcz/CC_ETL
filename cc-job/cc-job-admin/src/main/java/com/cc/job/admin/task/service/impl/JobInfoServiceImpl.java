@@ -1299,4 +1299,18 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         }
         return jobInfoMapper.stopJobCompose(id);
     }
+
+    @Override
+    public long countTaskGroups() {
+        LambdaQueryWrapper<JobInfo> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(JobInfo::getJobType, 2).eq(JobInfo::getNodeFlag, "N");
+        return this.count(wrapper);
+    }
+
+    @Override
+    public long countJobs() {
+        LambdaQueryWrapper<JobInfo> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(JobInfo::getJobType, 0, 2).eq(JobInfo::getNodeFlag, "N");
+        return this.count(wrapper);
+    }
 }

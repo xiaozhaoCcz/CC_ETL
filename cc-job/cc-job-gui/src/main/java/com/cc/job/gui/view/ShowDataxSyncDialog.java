@@ -640,6 +640,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     private Node createResultPane() {
         VBox pane = new VBox(12);
         pane.setPadding(new Insets(16));
+        //创建任务组页面
 
         Label label = new Label("生成的DataX JSON配置");
         label.setStyle(StyleUtil.bodyFontOnly() + "-fx-font-weight: bold;");

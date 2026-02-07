@@ -265,6 +265,23 @@ public class JobLogServiceImpl extends ServiceImpl<JobLogMapper, JobLog> impleme
             return false;
         }
     }
+
+    @Override
+    public long countLogSuccess() {
+        return this.count(new LambdaQueryWrapper<JobLog>().eq(JobLog::getHandleCode, 200));
+    }
+
+    @Override
+    public long countLogFail() {
+        return this.count(new LambdaQueryWrapper<JobLog>()
+                .ne(JobLog::getHandleCode, 0)
+                .ne(JobLog::getHandleCode, 200));
+    }
+
+    @Override
+    public long countLogRunning() {
+        return this.count(new LambdaQueryWrapper<JobLog>().eq(JobLog::getHandleCode, 0));
+    }
     
     /**
      * 将节点状态更新到 job_node 表

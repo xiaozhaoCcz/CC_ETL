@@ -108,4 +108,14 @@ public interface JobInfoService extends IService<JobInfo> {
      * @return 是否更新了行（1 表示已重置为 0）
      */
     int resetTriggerOneStatus(Long id);
+
+    /**
+     * 统计任务组数量（jobType=2 且 nodeFlag='N'）
+     */
+    long countTaskGroups();
+
+    /**
+     * 统计任务数量（jobType in (0,2) 且 nodeFlag='N'，与任务列表口径一致）
+     */
+    long countJobs();
 }

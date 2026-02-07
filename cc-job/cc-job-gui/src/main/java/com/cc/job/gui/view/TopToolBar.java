@@ -81,6 +81,7 @@ public class TopToolBar extends VBox {
         void onJobList();
         void onJobGroupList();
         void onJobLogList();
+        void onTaskReport(); // 任务报表
         void onDatasourceList();
         void onDataxSync();
         void onDataxGroupSync();
@@ -655,7 +656,10 @@ public class TopToolBar extends VBox {
         MenuItem jobLogMenuList = new MenuItem("任务日志");
         jobLogMenuList.setOnAction(e -> safeCall(ToolBarCallback::onJobLogList));
         
-        jobMenu.getItems().addAll(jobMenuList, jobGroupMenuList, jobLogMenuList, new SeparatorMenuItem());
+        MenuItem taskReportItem = new MenuItem("任务报表");
+        taskReportItem.setOnAction(e -> safeCall(ToolBarCallback::onTaskReport));
+        
+        jobMenu.getItems().addAll(jobMenuList, jobGroupMenuList, jobLogMenuList, taskReportItem, new SeparatorMenuItem());
         
         MenuItem datasourceMenuList = new MenuItem("数据源管理");
         datasourceMenuList.setOnAction(e -> safeCall(ToolBarCallback::onDatasourceList));

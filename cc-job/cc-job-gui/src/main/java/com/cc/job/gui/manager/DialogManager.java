@@ -39,6 +39,7 @@ public class DialogManager {
     private ShowJobListDialog jobListDialog;
     private ShowExecutorListDialog executorListDialog;
     private ShowJobLogListDialog jobLogListDialog;
+    private TaskReportDialog taskReportDialog;
     private ShowDatasourceListDialog datasourceListDialog;
     private ShowDataxSyncDialog dataxSyncDialog;
     private ShowDataxGroupSyncDialog dataxGroupSyncDialog;
@@ -480,6 +481,19 @@ public class DialogManager {
         jobLogListDialog.setOnHidden(event -> jobLogListDialog = null);
         
         jobLogListDialog.show();
+    }
+
+    /**
+     * 显示任务报表对话框
+     */
+    public void showTaskReportDialog() {
+        if (taskReportDialog != null && taskReportDialog.isShowing()) {
+            taskReportDialog.getDialogPane().getScene().getWindow().requestFocus();
+            return;
+        }
+        taskReportDialog = new TaskReportDialog(ownerStage);
+        taskReportDialog.setOnHidden(event -> taskReportDialog = null);
+        taskReportDialog.show();
     }
     
     /**

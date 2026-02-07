@@ -43,4 +43,19 @@ public interface JobLogService extends IService<JobLog> {
      * @return 是否保存成功
      */
     boolean saveNodeStatus(Long taskGroupId, String executionBatchId, String nodeStatusJson);
+
+    /**
+     * 统计执行成功的日志数量（handle_code = 200）
+     */
+    long countLogSuccess();
+
+    /**
+     * 统计执行失败的日志数量（handle_code 不为 0 且不为 200）
+     */
+    long countLogFail();
+
+    /**
+     * 统计运行中的日志数量（handle_code = 0）
+     */
+    long countLogRunning();
 }

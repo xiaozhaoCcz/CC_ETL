@@ -609,6 +609,11 @@ public class MainView extends BorderPane {
             }
 
             @Override
+            public void onTaskReport() {
+                dialogManager.showTaskReportDialog();
+            }
+
+            @Override
             public void onDatasourceList() {
                 dialogManager.showDatasourceListDialog();
             }
