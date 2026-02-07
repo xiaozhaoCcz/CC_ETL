@@ -28,4 +28,11 @@ public interface JobNodeService extends IService<JobNode> {
      * @return 成功重置的节点数量
      */
     int resetAllNodeStatus(Long jobParentId);
+
+    /**
+     * 统计任务组下节点数量（用于判断全量跑批次）
+     * @param jobParentId 任务组ID（父任务ID）
+     * @return 节点数量
+     */
+    long countByJobParentId(Long jobParentId);
 }

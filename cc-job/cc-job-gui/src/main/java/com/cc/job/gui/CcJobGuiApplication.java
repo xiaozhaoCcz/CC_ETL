@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * JavaFX流程节点编辑器应用程序主入口
+ * @author xiaozhao
  */
 public class CcJobGuiApplication extends Application {
     

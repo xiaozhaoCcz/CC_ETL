@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.cc.job.xo.mapper.JobNodeResultMapper;
 import com.cc.job.xo.model.entity.JobNodeResult;
 import com.cc.job.admin.task.service.JobNodeResultService;
+import com.cc.job.admin.task.service.JobNodeService;
 import com.cc.job.admin.task.util.FileStorageUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,9 +29,11 @@ public class JobNodeResultServiceImpl extends ServiceImpl<JobNodeResultMapper, J
     private static final Logger log = LoggerFactory.getLogger(JobNodeResultServiceImpl.class);
     
     private final FileStorageUtil fileStorageUtil;
+    private final JobNodeService jobNodeService;
     
-    public JobNodeResultServiceImpl(FileStorageUtil fileStorageUtil) {
+    public JobNodeResultServiceImpl(FileStorageUtil fileStorageUtil, JobNodeService jobNodeService) {
         this.fileStorageUtil = fileStorageUtil;
+        this.jobNodeService = jobNodeService;
     }
     
     /**
@@ -197,6 +200,28 @@ public class JobNodeResultServiceImpl extends ServiceImpl<JobNodeResultMapper, J
         } catch (Exception e) {
             log.error("[JobNodeResult] 获取最近一次节点结果异常 - taskGroupId: {}, jobId: {}", 
                     taskGroupId, jobId, e);
+            return null;
+        }
+    }
+
+    @Override
+    public String getLatestFullRunBatchId(Long taskGroupId) {
+        if (taskGroupId == null) {
+            return null;
+        }
+        try {
+            long nodeCount = jobNodeService.countByJobParentId(taskGroupId);
+            if (nodeCount <= 0) {
+                log.debug("[JobNodeResult] 任务组无节点，无法判定全量跑批次 - taskGroupId: {}", taskGroupId);
+                return null;
+            }
+            String batchId = baseMapper.selectLatestFullRunBatchId(taskGroupId, nodeCount);
+            if (batchId != null) {
+                log.debug("[JobNodeResult] 获取最近一次全量跑批次ID - taskGroupId: {}, batchId: {}", taskGroupId, batchId);
+            }
+            return batchId;
+        } catch (Exception e) {
+            log.error("[JobNodeResult] 获取最近一次全量跑批次ID异常 - taskGroupId: {}", taskGroupId, e);
             return null;
         }
     }

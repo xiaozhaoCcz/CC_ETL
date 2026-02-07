@@ -541,4 +541,67 @@ public class AdminApiClient {
             return null;
         }
     }
+
+    /**
+     * 获取最近一次全量跑的批次ID（该批次下节点结果数等于任务组节点总数）
+     *
+     * @param taskGroupId 任务组ID
+     * @return 批次ID，若无全量跑批次则返回null
+     */
+    public String getLatestFullRunBatchId(Long taskGroupId) {
+        try {
+            String path = "/api/v1/jobNodeResults/latestFullRunBatchId?taskGroupId=" + taskGroupId;
+            HttpResponse response = executeGet(path);
+            if (response != null && response.isOk()) {
+                Map<String, Object> resultMap = JSONUtil.toBean(response.body(), Map.class);
+                Object data = resultMap.get("data");
+                if (data != null) {
+                    String batchId = data.toString();
+                    logger.debug("[AdminApiClient] 获取最近一次全量跑批次ID成功 - taskGroupId: {}, batchId: {}",
+                            taskGroupId, batchId);
+                    return batchId;
+                }
+                logger.debug("[AdminApiClient] 未找到最近一次全量跑批次ID - taskGroupId: {}", taskGroupId);
+                return null;
+            } else {
+                logger.error("[AdminApiClient] 获取最近一次全量跑批次ID失败 - taskGroupId: {}", taskGroupId);
+                return null;
+            }
+        } catch (Exception e) {
+            logger.error("[AdminApiClient] 获取最近一次全量跑批次ID异常 - taskGroupId: {}", taskGroupId, e);
+            return null;
+        }
+    }
+
+    /**
+     * 根据任务组ID和节点jobId获取该节点最近一次执行结果（用于补全缺失上游）
+     *
+     * @param taskGroupId 任务组ID
+     * @param jobId 节点任务ID
+     * @return 节点结果 Map（含 jobId, jobName, resultData, filePath 等），不存在则返回null
+     */
+    public Map<String, Object> getLatestNodeResult(Long taskGroupId, Long jobId) {
+        try {
+            String path = "/api/v1/jobNodeResults/latestByJob?taskGroupId=" + taskGroupId + "&jobId=" + jobId;
+            HttpResponse response = executeGet(path);
+            if (response != null && response.isOk()) {
+                Map<String, Object> resultMap = JSONUtil.toBean(response.body(), Map.class);
+                Object data = resultMap.get("data");
+                if (data != null && data instanceof Map) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> nodeResult = (Map<String, Object>) data;
+                    logger.debug("[AdminApiClient] 获取节点最近一次结果成功 - taskGroupId: {}, jobId: {}",
+                            taskGroupId, jobId);
+                    return nodeResult;
+                }
+                return null;
+            } else {
+                logger.warn("[AdminApiClient] 获取节点最近一次结果失败 - taskGroupId: {}, jobId: {}", taskGroupId, jobId);
+                return null;
+            }
+        } catch (Exception e) {
+            logger.error("[AdminApiClient] 获取节点最近一次结果异常 - taskGroupId: {}, jobId: {}", taskGroupId, jobId, e);
+            return null;
+        }
+    }
 }

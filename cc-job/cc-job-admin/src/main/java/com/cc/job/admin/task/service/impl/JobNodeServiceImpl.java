@@ -197,4 +197,14 @@ public class JobNodeServiceImpl extends ServiceImpl<JobNodeMapper, JobNode> impl
             }
         }
     }
+
+    @Override
+    public long countByJobParentId(Long jobParentId) {
+        if (jobParentId == null) {
+            return 0;
+        }
+        LambdaQueryWrapper<JobNode> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(JobNode::getJobParentId, jobParentId);
+        return this.count(wrapper);
+    }
 }

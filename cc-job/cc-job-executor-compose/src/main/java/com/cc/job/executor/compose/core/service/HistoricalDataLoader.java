@@ -71,8 +71,11 @@ public class HistoricalDataLoader {
             
             int loadedCount = 0;
             for (Map<String, Object> nodeResult : nodeResults) {
+                Long logJobId = null;
+                String logJsonData = null;
                 try {
                     Long jobId = Long.valueOf(nodeResult.get("jobId").toString());
+                    logJobId = jobId;
                     String jobName = nodeResult.get("jobName") != null ? nodeResult.get("jobName").toString() : null;
                     String filePath = nodeResult.get("filePath") != null ? nodeResult.get("filePath").toString() : null;
                     String resultData = nodeResult.get("resultData") != null ? nodeResult.get("resultData").toString() : null;
@@ -102,12 +105,32 @@ public class HistoricalDataLoader {
                         logger.debug("[HistoricalDataLoader] 节点结果数据为空，跳过 - jobId: {}", jobId);
                         continue;
                     }
+                    logJsonData = jsonData;
                     
                     // 规范化任务名称
                     String normalizedJobName = normalizeJobName(jobName, jobId);
                     
-                    // 解析结果数据（JSON格式）
-                    Object parsedResult = JSONUtil.parse(jsonData);
+                    // 规范化 JSON 字符串：trim 并去掉 UTF-8 BOM，避免从文件读取时解析失败
+                    String trimmed = jsonData.trim().replaceFirst("^\uFEFF", "");
+                    if (trimmed.isEmpty()) {
+                        logger.debug("[HistoricalDataLoader] 节点结果数据为空（trim 后），跳过 - jobId: {}", jobId);
+                        continue;
+                    }
+                    // 按首字符分流解析：对象 / 数组 / 其它（字符串、数字等）
+                    Object parsedResult;
+                    if (trimmed.startsWith("{")) {
+                        parsedResult = JSONUtil.parseObj(trimmed);
+                    } else if (trimmed.startsWith("[")) {
+                        parsedResult = JSONUtil.parseArray(trimmed);
+                    } else {
+                        try {
+                            parsedResult = JSONUtil.parse(trimmed);
+                        } catch (Exception parseEx) {
+                            // 非 JSON 格式的普通数据（如纯文本），直接当字符串存储，避免解析报错
+                            parsedResult = trimmed;
+                            logger.debug("[HistoricalDataLoader] 内容非标准 JSON，按原文字符串存储 - jobId: {}", jobId);
+                        }
+                    }
                     
                     // 将数据存储到DataContext，标记为DATABASE来源
                     storeResultToContext(dataContext, normalizedJobName, parsedResult, jobId);
@@ -116,8 +139,11 @@ public class HistoricalDataLoader {
                     logger.debug("[HistoricalDataLoader] 加载节点历史数据成功 - jobId: {}, jobName: {}, source: {}", 
                             jobId, normalizedJobName, dataSource);
                 } catch (Exception e) {
-                    logger.error("[HistoricalDataLoader] 加载单个节点历史数据失败 - nodeResult: {}", 
-                            nodeResult, e);
+                    String dataSnippet = logJsonData != null && !logJsonData.isEmpty()
+                            ? (logJsonData.length() > 100 ? logJsonData.substring(0, 100) + "..." : logJsonData)
+                            : "null";
+                    logger.error("[HistoricalDataLoader] 加载单个节点历史数据失败 - jobId: {}, 数据摘要: {} - nodeResult: {}", 
+                            logJobId, dataSnippet, nodeResult, e);
                 }
             }
             
@@ -130,6 +156,93 @@ public class HistoricalDataLoader {
                     taskGroupId, executionBatchId, e);
             return 0;
         }
+    }
+
+    /**
+     * 加载单条节点结果到上下文（用于按节点补全缺失上游）
+     *
+     * @param dataContext 数据上下文
+     * @param taskGroupId 任务组ID
+     * @param nodeResult 单条节点结果 Map（含 jobId, jobName, resultData, filePath）
+     * @return 是否加载成功
+     */
+    public boolean loadSingleNodeResult(DataContext dataContext, Long taskGroupId, Map<String, Object> nodeResult) {
+        if (dataContext == null || nodeResult == null) {
+            return false;
+        }
+        try {
+            Long jobId = Long.valueOf(nodeResult.get("jobId").toString());
+            String jobName = nodeResult.get("jobName") != null ? nodeResult.get("jobName").toString() : null;
+            String filePath = nodeResult.get("filePath") != null ? nodeResult.get("filePath").toString() : null;
+            String resultData = nodeResult.get("resultData") != null ? nodeResult.get("resultData").toString() : null;
+
+            String jsonData = null;
+            if (filePath != null && !filePath.isEmpty() && fileStorageService != null) {
+                jsonData = fileStorageService.readFromFile(filePath);
+            }
+            if ((jsonData == null || jsonData.isEmpty()) && resultData != null && !resultData.isEmpty()) {
+                jsonData = resultData;
+            }
+            if (jsonData == null || jsonData.isEmpty()) {
+                return false;
+            }
+
+            String normalizedJobName = normalizeJobName(jobName, jobId);
+            String trimmed = jsonData.trim().replaceFirst("^\uFEFF", "");
+            if (trimmed.isEmpty()) {
+                return false;
+            }
+            Object parsedResult;
+            if (trimmed.startsWith("{")) {
+                parsedResult = JSONUtil.parseObj(trimmed);
+            } else if (trimmed.startsWith("[")) {
+                parsedResult = JSONUtil.parseArray(trimmed);
+            } else {
+                try {
+                    parsedResult = JSONUtil.parse(trimmed);
+                } catch (Exception parseEx) {
+                    parsedResult = trimmed;
+                }
+            }
+            storeResultToContext(dataContext, normalizedJobName, parsedResult, jobId);
+            logger.debug("[HistoricalDataLoader] 单节点结果加载成功 - jobId: {}, jobName: {}", jobId, normalizedJobName);
+            return true;
+        } catch (Exception e) {
+            logger.warn("[HistoricalDataLoader] 单节点结果加载失败 - nodeResult: {}", nodeResult, e);
+            return false;
+        }
+    }
+
+    /**
+     * 补全缺失的上游节点结果（方案二：按节点拉取最近一次结果填入上下文）
+     *
+     * @param context 执行上下文
+     * @param taskGroupId 任务组ID
+     * @param ancestorJobIdToJobName 上游 jobId -> 节点名称（用于规范化与校验是否存在）
+     */
+    public int fillMissingAncestors(ExecutionContext context, Long taskGroupId,
+                                    Map<Long, String> ancestorJobIdToJobName) {
+        if (context == null || context.getDataContext() == null || ancestorJobIdToJobName == null || ancestorJobIdToJobName.isEmpty()) {
+            return 0;
+        }
+        DataContext dataContext = context.getDataContext();
+        int filled = 0;
+        for (Map.Entry<Long, String> entry : ancestorJobIdToJobName.entrySet()) {
+            Long jobId = entry.getKey();
+            String jobName = entry.getValue();
+            String normalizedJobName = normalizeJobName(jobName, jobId);
+            if (dataContext.get(normalizedJobName + ".result") != null) {
+                continue;
+            }
+            Map<String, Object> nodeResult = adminApiClient.getLatestNodeResult(taskGroupId, jobId);
+            if (nodeResult != null && loadSingleNodeResult(dataContext, taskGroupId, nodeResult)) {
+                filled++;
+            }
+        }
+        if (filled > 0) {
+            logger.info("[HistoricalDataLoader] 补全缺失上游节点结果 - taskGroupId: {}, 补全数量: {}", taskGroupId, filled);
+        }
+        return filled;
     }
     
     /**

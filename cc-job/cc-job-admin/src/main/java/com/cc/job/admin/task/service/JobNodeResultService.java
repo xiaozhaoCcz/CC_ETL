@@ -61,5 +61,13 @@ public interface JobNodeResultService extends IService<JobNodeResult> {
      * @return 节点执行结果，如果不存在则返回null
      */
     JobNodeResult getLatestNodeResult(Long taskGroupId, Long jobId);
+
+    /**
+     * 获取最近一次全量跑的批次ID（该批次下节点结果数等于任务组节点总数）
+     *
+     * @param taskGroupId 任务组ID
+     * @return 批次ID，若无全量跑批次则返回null
+     */
+    String getLatestFullRunBatchId(Long taskGroupId);
 }
 
