@@ -216,17 +216,21 @@ public class MainView extends BorderPane {
                 }
 
                 // 首次进入该任务组：根据内容扩展画布并将内容居中；否则恢复滚动位置
-                if (currentTaskGroupId == 0) {
-                    restoreScrollPosition(currentTaskGroupId);
-                } else if (taskGroupScrollPositions.get(currentTaskGroupId) == null) {
-                    Platform.runLater(() -> {
-                        javafx.animation.PauseTransition delay = new javafx.animation.PauseTransition(javafx.util.Duration.millis(50));
-                        delay.setOnFinished(e -> expandCanvasToFitContentAndCenter(currentTaskGroupId));
-                        delay.play();
+                // 统一使用 50ms 延迟，在回调中先执行「画布过大则收缩」，再扩展或恢复滚动，避免右侧/下方大片空白
+                Platform.runLater(() -> {
+                    javafx.animation.PauseTransition delay = new javafx.animation.PauseTransition(javafx.util.Duration.millis(50));
+                    delay.setOnFinished(e -> {
+                        shrinkCanvasToFitContentIfNeeded(currentTaskGroupId);
+                        if (currentTaskGroupId == 0) {
+                            restoreScrollPosition(currentTaskGroupId);
+                        } else if (taskGroupScrollPositions.get(currentTaskGroupId) == null) {
+                            expandCanvasToFitContentAndCenter(currentTaskGroupId);
+                        } else {
+                            restoreScrollPosition(currentTaskGroupId);
+                        }
                     });
-                } else {
-                    restoreScrollPosition(currentTaskGroupId);
-                }
+                    delay.play();
+                });
             }
         });
         
@@ -2613,19 +2617,59 @@ public class MainView extends BorderPane {
     }
 
     /**
-     * 恢复指定任务组的画布尺寸；若无保存的尺寸则不做（首次进入由 onDataLoaded 中扩展）
+     * 恢复指定任务组的画布尺寸；若无保存的尺寸则不做（首次进入由 onDataLoaded 中扩展）。
+     * 恢复时不低于当前视口，避免放大窗口后再切换时画布小于视口导致右侧和下方空白。
      */
     private void restoreCanvasSize(Long taskGroupId) {
         if (canvas == null || taskGroupId == null || taskGroupId == 0) return;
         CanvasSize size = taskGroupCanvasSizes.get(taskGroupId);
         if (size != null && size.width > 0 && size.height > 0) {
-            canvas.setPrefSize(size.width, size.height);
-            canvas.setMinSize(size.width, size.height);
-            logger.debug("恢复任务组 {} 的画布尺寸: {} x {}", taskGroupId, size.width, size.height);
+            double w = size.width;
+            double h = size.height;
+            if (scrollPane != null) {
+                double viewportW = scrollPane.getViewportBounds().getWidth();
+                double viewportH = scrollPane.getViewportBounds().getHeight();
+                if (viewportW > 0 && viewportH > 0) {
+                    w = Math.max(w, viewportW);
+                    h = Math.max(h, viewportH);
+                }
+            }
+            canvas.setPrefSize(w, h);
+            canvas.setMinSize(w, h);
+            logger.debug("恢复任务组 {} 的画布尺寸: {} x {}", taskGroupId, w, h);
         }
     }
 
     private static final double FIRST_ENTER_CANVAS_MARGIN = 150.0;
+
+    /** 画布面积超过「内容+边距」面积的该倍数时才收缩，避免频繁微调 */
+    private static final double SHRINK_CANVAS_AREA_RATIO_THRESHOLD = 1.2;
+
+    /**
+     * 若当前画布尺寸明显大于当前任务组内容的包围盒，则收缩到「内容+边距」与视口取大，并保存尺寸与滚动位置，
+     * 避免恢复出过大的画布导致右侧和下方出现大片空白。
+     */
+    private void shrinkCanvasToFitContentIfNeeded(Long taskGroupId) {
+        if (scrollPane == null || canvas == null || taskGroupId == null || taskGroupId == 0) return;
+        Bounds bounds = canvas.getContentBounds();
+        if (bounds == null) return;
+        double contentRight = bounds.getMaxX() + FIRST_ENTER_CANVAS_MARGIN;
+        double contentBottom = bounds.getMaxY() + FIRST_ENTER_CANVAS_MARGIN;
+        double viewportW = scrollPane.getViewportBounds().getWidth();
+        double viewportH = scrollPane.getViewportBounds().getHeight();
+        double targetW = Math.max(contentRight, viewportW);
+        double targetH = Math.max(contentBottom, viewportH);
+        double currentW = canvas.getPrefWidth();
+        double currentH = canvas.getPrefHeight();
+        double targetArea = targetW * targetH;
+        double currentArea = currentW * currentH;
+        if (targetArea <= 0 || currentArea < targetArea * SHRINK_CANVAS_AREA_RATIO_THRESHOLD) return;
+        canvas.setPrefSize(targetW, targetH);
+        canvas.setMinSize(targetW, targetH);
+        saveCurrentScrollPosition();
+        saveCurrentCanvasSize();
+        logger.debug("任务组 {} 画布已收缩至贴合内容: {}x{}", taskGroupId, targetW, targetH);
+    }
 
     /**
      * 首次进入任务组时：根据内容扩展画布并将内容中心对准视口中心，然后保存状态。

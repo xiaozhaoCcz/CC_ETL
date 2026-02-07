@@ -72,7 +72,9 @@ public class TaskNavigationBar extends HBox {
         getStyleClass().add("task-nav-bar");
         setSpacing(0);
         setAlignment(Pos.CENTER_LEFT);
-        setPrefHeight(54);
+        setPrefHeight(40);
+        setMinHeight(40);
+        setMaxHeight(40);
         
         // 标签容器 - 无间距，标签页紧贴
         tabContainer = new HBox(0);

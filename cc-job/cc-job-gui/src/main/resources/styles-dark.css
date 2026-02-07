@@ -897,13 +897,14 @@
     -fx-background-color: transparent !important;
 }
 
+/* 统一占位：所有标签均为左 1px + 底 2px，未选中时底边透明，保证切换任务组时高度一致 */
 .task-nav-tab {
     -fx-background-radius: 0;
     -fx-border-radius: 0;
     -fx-cursor: hand;
     -fx-effect: null;
     -fx-background-color: #2D2D30;
-    -fx-border-color: transparent transparent transparent #3C3C3C;
+    -fx-border-color: #3C3C3C transparent transparent transparent;
     -fx-border-width: 0 0 0 1;
 }
 
@@ -913,8 +914,8 @@
 
 .task-nav-tab-active {
     -fx-background-color: #1E1E1E;
-    -fx-border-color: transparent transparent #007ACC transparent;
-    -fx-border-width: 0 0 2 0;
+    -fx-border-color: #3C3C3C transparent #007ACC transparent;
+    -fx-border-width: 1 0 2 0;
 }
 
 .task-nav-tab-name {
