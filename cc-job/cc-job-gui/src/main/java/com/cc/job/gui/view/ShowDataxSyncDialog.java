@@ -1,9 +1,12 @@
 package com.cc.job.gui.view;
 
 import com.cc.job.gui.service.JobDataxService;
+import com.cc.job.gui.service.JobGroupService;
 import com.cc.job.gui.service.JobJdbcDatasourceService;
+import com.cc.job.gui.util.IconUtil;
 import com.cc.job.gui.util.StyleUtil;
 import com.cc.job.xo.model.datax.DataxTable;
+import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.entity.JobJdbcDatasource;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -11,11 +14,22 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import org.fxmisc.flowless.VirtualizedScrollPane;
+import org.fxmisc.richtext.CodeArea;
+import org.fxmisc.richtext.LineNumberFactory;
+import org.fxmisc.richtext.model.StyleSpans;
+import org.fxmisc.richtext.model.StyleSpansBuilder;
+import org.kordamp.ikonli.javafx.FontIcon;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
@@ -77,8 +91,32 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     // 存储字段数据，用于多选
     private List<String> readerColumns = new ArrayList<>();
     private List<String> writerColumns = new ArrayList<>();
+    private final JobGroupService jobGroupService;
+    // 表单字段
+    private ComboBox<JobGroup> jobGroupCombo;
+    private TextField jobDescField;
+    private TextField authorField;
+    private TextField alarmEmailField;
+
+    // 调度配置
+    private ComboBox<NewJobDialog.ScheduleType> scheduleTypeCombo;
+    private TextField scheduleConfField;
+    private Label scheduleConfLabel;
+
+    // 高级配置
+    private ComboBox<NewJobDialog.RouteStrategy> routeStrategyCombo;
+    private ComboBox<NewJobDialog.MisfireStrategy> misfireStrategyCombo;
+    private ComboBox<NewJobDialog.BlockStrategy> blockStrategyCombo;
+    private TextField childJobIdField;
+    private TextField executorTimeoutField;
+    private TextField executorFailRetryCountField;
+
+    // 高级配置容器
+    private VBox advancedSection;
+    private boolean advancedSectionVisible = false;
 
     public ShowDataxSyncDialog(Stage ownerStage) {
+        this.jobGroupService = new JobGroupService();
         setTitle("数据源同步");
         initOwner(ownerStage);
         initModality(Modality.WINDOW_MODAL);
@@ -98,9 +136,9 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     }
 
     private void styleDialog() {
-        getDialogPane().setPrefSize(1000, 750);
+        getDialogPane().setPrefSize(1000, 950);
         getDialogPane().setMinWidth(900);
-        getDialogPane().setMinHeight(700);
+        getDialogPane().setMinHeight(950);
         setResizable(true);
         String dialogCss = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
         if (dialogCss != null && !dialogCss.isEmpty()) {
@@ -638,22 +676,340 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     }
 
     private Node createResultPane() {
+        VBox container = new VBox(15);
+        container.getStyleClass().add("dialog-content-root");
+        container.setPadding(new Insets(20));
+        container.setPrefWidth(800);
+        container.setPrefHeight(550);
+
+//        ScrollPane scrollPane = new ScrollPane();
+//        scrollPane.setFitToWidth(true);
+//        scrollPane.setStyle("-fx-background-color: transparent;");
+        //创建任务组页面
+        VBox formContent = new VBox(20);
+        formContent.setPadding(new Insets(10));
+        formContent.getChildren().add(createBasicSection());
+
+        // 调度配置
+        formContent.getChildren().add(createScheduleSection());
+
+        // 高级配置（默认隐藏）
+        advancedSection = createAdvancedSection();
+        advancedSection.setVisible(false);
+        advancedSection.setManaged(false);
+        formContent.getChildren().add(advancedSection);
+
+        // JSON 标题行：左侧标题 + 右侧放大按钮
+        HBox jsonTitleRow = new HBox(8);
+        jsonTitleRow.setAlignment(Pos.CENTER_LEFT);
+        Label jsonLabel = new Label("生成的DataX JSON配置");
+        jsonLabel.setStyle(StyleUtil.bodyFontOnly() + "-fx-font-weight: bold;");
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        Button expandJsonBtn = new Button();
+        FontIcon expandIcon = IconUtil.expandIcon();
+        expandIcon.setIconSize(18);
+        expandJsonBtn.setGraphic(expandIcon);
+        expandJsonBtn.setTooltip(new Tooltip("放大编辑"));
+        expandJsonBtn.getStyleClass().add("dialog-button-secondary");
+        expandJsonBtn.setOnAction(e -> showJsonExpandDialog());
+        jsonTitleRow.getChildren().addAll(jsonLabel, spacer, expandJsonBtn);
+
         VBox pane = new VBox(12);
         pane.setPadding(new Insets(16));
-        //创建任务组页面
-
-        Label label = new Label("生成的DataX JSON配置");
-        label.setStyle(StyleUtil.bodyFontOnly() + "-fx-font-weight: bold;");
-
         jsonResultArea = new TextArea();
         jsonResultArea.setEditable(false);
         jsonResultArea.setWrapText(true);
         jsonResultArea.setPrefRowCount(20);
-        jsonResultArea.setStyle("-fx-font-family: 'Consolas', 'Monaco', monospace;");
+        jsonResultArea.setStyle("-fx-font-family: 'Consolas', 'Monaco', monospace; -fx-font-size: 13px;");
 
         VBox.setVgrow(jsonResultArea, Priority.ALWAYS);
-        pane.getChildren().addAll(label, jsonResultArea);
-        return pane;
+        pane.getChildren().addAll(jsonTitleRow, jsonResultArea);
+
+        container.getChildren().addAll(formContent, pane);
+        VBox.setVgrow(container, Priority.ALWAYS);
+        return container;
+    }
+
+    /**
+     * 创建section容器
+     */
+    private VBox createSection(String title, FontIcon icon) {
+        VBox section = new VBox(10);
+        section.getStyleClass().add("dialog-section");
+
+        HBox titleBox = new HBox(8);
+        titleBox.setAlignment(Pos.CENTER_LEFT);
+        titleBox.setPadding(new Insets(0, 0, 5, 0));
+
+        // 设置图标样式
+        if (icon != null) {
+            icon.setIconSize(18);
+            icon.setIconColor(Color.web("#6B7280"));
+        }
+
+        Label titleLabel = new Label(title);
+        titleLabel.setStyle(
+                "-fx-font-size: 16; " +
+                        "-fx-font-weight: bold;"
+        );
+
+        if (icon != null) {
+            titleBox.getChildren().add(icon);
+        }
+        titleBox.getChildren().add(titleLabel);
+
+        section.getChildren().add(titleBox);
+        return section;
+    }
+
+    /**
+     * 创建表单标签
+     */
+    private Label createFormLabel(String text, boolean required) {
+        Label label = new Label();
+        label.setMinWidth(140);
+        label.setPrefWidth(140);
+        label.setMaxWidth(140);
+        label.setWrapText(false);
+        label.setTextOverrun(OverrunStyle.ELLIPSIS);
+
+        if (required) {
+            // 必填项：使用HBox来组合文本和红色星号
+            HBox labelBox = new HBox(2);
+            labelBox.setAlignment(Pos.CENTER_LEFT);
+
+            Label textLabel = new Label(text);
+            textLabel.setStyle("-fx-font-size: 13;");
+
+            Label starLabel = new Label("*");
+            starLabel.setStyle("-fx-font-size: 13; -fx-font-weight: bold;");
+
+            labelBox.getChildren().addAll(textLabel, starLabel);
+
+            // 使用自定义图形节点
+            label.setGraphic(labelBox);
+            label.setText("");
+            label.setContentDisplay(ContentDisplay.LEFT);
+            label.setTooltip(new Tooltip(text + " *"));
+        } else {
+            label.setText(text);
+            label.setStyle("-fx-font-size: 13;");
+            label.setTooltip(new Tooltip(text));
+        }
+
+        return label;
+    }
+
+    /**
+     * 创建基本信息部分
+     */
+    private VBox createBasicSection() {
+        List<JobGroup> jobGroupList;
+        try{
+            jobGroupList = jobGroupService.getAllJobGroupList();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        VBox section = createSection("基本信息", IconUtil.fileIcon());
+
+        GridPane grid = new GridPane();
+        grid.setHgap(15);
+        grid.setVgap(15);
+        grid.setPadding(new Insets(15));
+
+
+
+        // 执行器
+        Label jobGroupLabel = createFormLabel("执行器", true);
+        jobGroupCombo = new ComboBox<>();
+        jobGroupCombo.setPrefWidth(300);
+        jobGroupCombo.setPromptText("请选择执行器");
+        jobGroupCombo.getItems().addAll(jobGroupList);
+        jobGroupCombo.setCellFactory(param -> new ListCell<>() {
+            @Override
+            protected void updateItem(JobGroup item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item.getTitle());
+            }
+        });
+        jobGroupCombo.setButtonCell(new ListCell<>() {
+            @Override
+            protected void updateItem(JobGroup item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item.getTitle());
+            }
+        });
+
+        // 负责人
+        Label authorLabel = createFormLabel("负责人", true);
+        authorField = new TextField();
+        authorField.setPrefWidth(300);
+        authorField.setPromptText("请输入负责人姓名");
+
+        // 任务描述
+        Label jobDescLabel = createFormLabel("任务描述", true);
+        jobDescField = new TextField();
+        jobDescField.setPrefWidth(615);
+        jobDescField.setPromptText("请输入任务描述");
+
+        // 报警邮件
+        Label alarmEmailLabel = createFormLabel("报警邮件", false);
+        alarmEmailField = new TextField();
+        alarmEmailField.setPrefWidth(615);
+        alarmEmailField.setPromptText("请输入报警邮件地址，多个用逗号分隔");
+
+        grid.add(jobGroupLabel, 0, 0);
+        grid.add(jobGroupCombo, 1, 0);
+        grid.add(authorLabel, 2, 0);
+        grid.add(authorField, 3, 0);
+
+        grid.add(jobDescLabel, 0, 1);
+        grid.add(jobDescField, 1, 1, 3, 1);
+
+        grid.add(alarmEmailLabel, 0, 2);
+        grid.add(alarmEmailField, 1, 2, 3, 1);
+
+        section.getChildren().add(grid);
+        return section;
+    }
+
+    private VBox createScheduleSection() {
+        VBox section = createSection("调度配置", IconUtil.clockIcon());
+
+        GridPane grid = new GridPane();
+        grid.setHgap(15);
+        grid.setVgap(15);
+        grid.setPadding(new Insets(15));
+
+        // 调度类型
+        Label scheduleTypeLabel = createFormLabel("调度类型", true);
+        scheduleTypeCombo = new ComboBox<>();
+        scheduleTypeCombo.setPrefWidth(300);
+        scheduleTypeCombo.setPromptText("Select");
+        scheduleTypeCombo.getItems().addAll(NewJobDialog.ScheduleType.values());
+        scheduleTypeCombo.setValue(NewJobDialog.ScheduleType.CRON);
+
+        // CRON表达式/固定速率
+        scheduleConfLabel = createFormLabel("Cron", false);
+        scheduleConfField = new TextField();
+        scheduleConfField.setPrefWidth(300);
+        scheduleConfField.setPromptText("请输入Cron表达式");
+        scheduleConfField.setText("0 0 0 * * ?");
+
+        grid.add(scheduleTypeLabel, 0, 0);
+        grid.add(scheduleTypeCombo, 1, 0);
+        grid.add(scheduleConfLabel, 2, 0);
+        grid.add(scheduleConfField, 3, 0);
+
+        section.getChildren().add(grid);
+
+        // 添加高级配置链接
+        HBox linkContainer = new HBox(5);
+        linkContainer.setPadding(new Insets(10, 15, 0, 15));
+        linkContainer.setAlignment(Pos.CENTER_LEFT);
+        Hyperlink advancedLink = new Hyperlink("高级配置");
+        advancedLink.setStyle(
+            "-fx-text-fill: #2563EB; " +
+            "-fx-font-size: 13; " +
+            "-fx-underline: true; " +
+            "-fx-cursor: hand;"
+        );
+        advancedLink.setOnAction(e -> toggleAdvancedSection());
+        linkContainer.getChildren().add(advancedLink);
+        section.getChildren().add(linkContainer);
+
+        return section;
+    }
+
+    private void toggleAdvancedSection() {
+        advancedSectionVisible = !advancedSectionVisible;
+        advancedSection.setVisible(advancedSectionVisible);
+        advancedSection.setManaged(advancedSectionVisible);
+        Platform.runLater(() -> {
+            Stage stage = (Stage) getDialogPane().getScene().getWindow();
+            if (stage != null) {
+                if (advancedSectionVisible) {
+                    getDialogPane().setPrefHeight(1000);
+                    stage.setMinHeight(1000);
+                } else {
+                    getDialogPane().setPrefHeight(950);
+                    stage.setMinHeight(950);
+                }
+                Platform.runLater(stage::sizeToScene);
+            }
+        });
+    }
+
+    private VBox createAdvancedSection() {
+        VBox section = createSection("高级配置", IconUtil.wrenchIcon());
+
+        GridPane grid = new GridPane();
+        grid.setHgap(15);
+        grid.setVgap(15);
+        grid.setPadding(new Insets(15));
+
+        // 路由策略
+        Label routeStrategyLabel = createFormLabel("路由策略", true);
+        routeStrategyCombo = new ComboBox<>();
+        routeStrategyCombo.setPrefWidth(300);
+        routeStrategyCombo.setPromptText("请选择");
+        routeStrategyCombo.getItems().addAll(NewJobDialog.RouteStrategy.values());
+        routeStrategyCombo.setValue(NewJobDialog.RouteStrategy.FIRST);
+
+        // 子任务ID
+        Label childJobIdLabel = createFormLabel("子任务id", false);
+        childJobIdField = new TextField();
+        childJobIdField.setPrefWidth(300);
+        childJobIdField.setPromptText("多个子任务使用逗号分隔");
+
+        // 调度过期策略
+        Label misfireStrategyLabel = createFormLabel("调度过期策略", true);
+        misfireStrategyCombo = new ComboBox<>();
+        misfireStrategyCombo.setPrefWidth(300);
+        misfireStrategyCombo.setPromptText("Select");
+        misfireStrategyCombo.getItems().addAll(NewJobDialog.MisfireStrategy.values());
+        misfireStrategyCombo.setValue(NewJobDialog.MisfireStrategy.DO_NOTHING);
+
+        // 阻塞处理策略
+        Label blockStrategyLabel = createFormLabel("阻塞处理策略", true);
+        blockStrategyCombo = new ComboBox<>();
+        blockStrategyCombo.setPrefWidth(300);
+        blockStrategyCombo.setPromptText("Select");
+        blockStrategyCombo.getItems().addAll(NewJobDialog.BlockStrategy.values());
+        blockStrategyCombo.setValue(NewJobDialog.BlockStrategy.SERIAL_EXECUTION);
+
+        // 任务超时时间
+        Label timeoutLabel = createFormLabel("任务超时时间", false);
+        executorTimeoutField = new TextField();
+        executorTimeoutField.setPrefWidth(300);
+        executorTimeoutField.setPromptText("");
+
+        // 失败重试次数
+        Label retryLabel = createFormLabel("失败重试次数", false);
+        executorFailRetryCountField = new TextField();
+        executorFailRetryCountField.setPrefWidth(300);
+        executorFailRetryCountField.setPromptText("");
+        executorFailRetryCountField.setText("0");
+
+        grid.add(routeStrategyLabel, 0, 0);
+        grid.add(routeStrategyCombo, 1, 0);
+        grid.add(childJobIdLabel, 2, 0);
+        grid.add(childJobIdField, 3, 0);
+
+        grid.add(misfireStrategyLabel, 0, 1);
+        grid.add(misfireStrategyCombo, 1, 1);
+        grid.add(blockStrategyLabel, 2, 1);
+        grid.add(blockStrategyCombo, 3, 1);
+
+        grid.add(timeoutLabel, 0, 2);
+        grid.add(executorTimeoutField, 1, 2);
+        grid.add(retryLabel, 2, 2);
+        grid.add(executorFailRetryCountField, 3, 2);
+
+        section.getChildren().add(grid);
+        return section;
     }
 
     private void handleNext() {
@@ -782,6 +1138,114 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
             return gson.toJson(obj);
         } catch (Exception e) {
             return json;
+        }
+    }
+
+    /**
+     * 打开 JSON 放大编辑弹窗：大号 CodeArea、语法高亮、确定时回写主界面
+     */
+    private void showJsonExpandDialog() {
+        Dialog<String> dialog = new Dialog<>();
+        dialog.setTitle("DataX JSON 配置 - 放大编辑");
+        dialog.initOwner(getDialogPane().getScene().getWindow());
+        dialog.initModality(Modality.WINDOW_MODAL);
+
+        CodeArea codeArea = new CodeArea();
+        codeArea.setEditable(true);
+        codeArea.setWrapText(false);
+        codeArea.setParagraphGraphicFactory(LineNumberFactory.get(codeArea));
+        codeArea.getStyleClass().add("log-code-area");
+        codeArea.getStyleClass().add("json-editor-area");
+        codeArea.setStyle("-fx-font-family: 'Consolas', 'Monaco', 'Courier New', monospace; -fx-font-size: 13px;");
+        codeArea.replaceText(jsonResultArea.getText());
+
+        ContextMenu ctx = new ContextMenu();
+        MenuItem copyItem = new MenuItem("复制");
+        copyItem.setOnAction(e -> {
+            String text = codeArea.getSelectedText();
+            if (text == null || text.isEmpty()) text = codeArea.getText();
+            if (text != null && !text.isEmpty()) {
+                ClipboardContent content = new ClipboardContent();
+                content.putString(text);
+                Clipboard.getSystemClipboard().setContent(content);
+            }
+        });
+        MenuItem selectAllItem = new MenuItem("全选");
+        selectAllItem.setOnAction(e -> codeArea.selectAll());
+        ctx.getItems().addAll(copyItem, selectAllItem);
+        codeArea.setContextMenu(ctx);
+
+        codeArea.textProperty().addListener((obs, oldVal, newVal) -> applyJsonHighlighting(codeArea));
+
+        VirtualizedScrollPane<CodeArea> scrollPane = new VirtualizedScrollPane<>(codeArea);
+        scrollPane.setStyle(com.cc.job.gui.util.StyleUtil.dialogScrollPaneBackgroundStyle());
+        VBox content = new VBox(10);
+        content.setPadding(new Insets(16));
+        content.setPrefWidth(900);
+        content.setPrefHeight(600);
+        content.getChildren().add(scrollPane);
+        VBox.setVgrow(scrollPane, Priority.ALWAYS);
+
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        dialog.getDialogPane().setPrefSize(920, 640);
+        dialog.setResultConverter(btn -> btn == ButtonType.OK ? codeArea.getText() : null);
+
+        String dialogCss = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (dialogCss != null && !dialogCss.isEmpty()) {
+            dialog.getDialogPane().getStylesheets().add(dialogCss);
+        }
+
+        applyJsonHighlighting(codeArea);
+
+        dialog.showAndWait().ifPresent(result -> {
+            if (result != null) jsonResultArea.setText(result);
+        });
+    }
+
+    /**
+     * 为 CodeArea 应用 JSON 语法高亮（key/string/number/boolean/null/括号）
+     */
+    private void applyJsonHighlighting(CodeArea codeArea) {
+        String text = codeArea.getText();
+        if (text == null || text.isEmpty()) return;
+        try {
+            // 按顺序匹配：双引号字符串、数字、true/false、null、键名（引号后跟冒号前的部分在上一段已高亮为 string）
+            // 这里用简单正则覆盖整段文本，避免遗漏
+            // 分组: 1=字符串 2=数字 3=指数部分 4=true|false 5=null 6=括号/冒号/逗号
+            Pattern pattern = Pattern.compile("(\"(?:[^\"\\\\]|\\\\.)*\")|(-?\\d+\\.?\\d*([eE][+-]?\\d+)?)|(true|false)|(null)|([{}\\[\\]:,])");
+            Matcher matcher = pattern.matcher(text);
+            StyleSpansBuilder<Collection<String>> builder = new StyleSpansBuilder<>();
+            int lastEnd = 0;
+            while (matcher.find()) {
+                if (matcher.start() > lastEnd) {
+                    builder.add(Collections.emptyList(), matcher.start() - lastEnd);
+                }
+                int len = matcher.group(0).length();
+                if (matcher.group(1) != null) {
+                    builder.add(Collections.singleton("json-string"), len);
+                } else if (matcher.group(2) != null) {
+                    builder.add(Collections.singleton("json-number"), len);
+                } else if (matcher.group(4) != null) {
+                    builder.add(Collections.singleton("json-boolean"), len);
+                } else if (matcher.group(5) != null) {
+                    builder.add(Collections.singleton("json-null"), len);
+                } else if (matcher.group(6) != null) {
+                    builder.add(Collections.singleton("json-bracket"), len);
+                } else {
+                    builder.add(Collections.emptyList(), len);
+                }
+                lastEnd = matcher.end();
+            }
+            if (lastEnd < text.length()) {
+                builder.add(Collections.emptyList(), text.length() - lastEnd);
+            }
+            StyleSpans<Collection<String>> spans = builder.create();
+            if (spans.length() > 0) {
+                codeArea.setStyleSpans(0, spans);
+            }
+        } catch (Exception ignored) {
+            // 高亮失败时保持原样
         }
     }
 

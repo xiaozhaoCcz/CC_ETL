@@ -1591,6 +1591,13 @@
     -fx-fill: #9CA3AF;
 }
 
+/* JSON 语法高亮（弹窗放大编辑） */
+.json-string { -fx-fill: #059669; }
+.json-number { -fx-fill: #2563EB; }
+.json-boolean { -fx-fill: #D97706; }
+.json-null { -fx-fill: #6B7280; }
+.json-bracket { -fx-fill: #4B5563; }
+
 /* 选中文本样式 */
 .log-code-area .selection {
     -fx-fill: #BFDBFE;

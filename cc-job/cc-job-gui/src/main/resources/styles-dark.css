@@ -1746,6 +1746,13 @@
     -fx-background-color: #6B6B6B;
 }
 
+/* JSON 语法高亮（弹窗放大编辑，深色） */
+.json-string { -fx-fill: #4EC9B0; }
+.json-number { -fx-fill: #B5CEA8; }
+.json-boolean { -fx-fill: #CE9178; }
+.json-null { -fx-fill: #6A9955; }
+.json-bracket { -fx-fill: #808080; }
+
 .virtualized-scroll-pane {
     -fx-background-color: #252526;
     -fx-border-color: #3C3C3C;
