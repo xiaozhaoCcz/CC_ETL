@@ -283,19 +283,21 @@ public class JobInfoController {
             return Result.success(false);
         }
         
-        // 对于任务组（jobType == 2），需要检查执行器中的实际运行状态
-        // 因为定时任务和手动启动可能使用不同的randomId，可以并行运行
+        // 对于任务组（jobType == 2），以执行器为准：先查执行器，再决定是否自愈 DB
         if (jobInfo.getJobType() == 2) {
-            // 检查执行器中是否有该任务组正在运行
             boolean isRunningInExecutor = jobInfoService.checkJobGroupRunningInExecutor(id);
-            // 如果执行器中有运行中的任务，返回true
             if (isRunningInExecutor) {
                 return Result.success(true);
             }
+            // 执行器上已无该任务组：视为未运行，并自愈 DB（避免异常退出后 trigger_one_status 一直为 1）
+            if (jobInfo.getTriggerOneStatus() != null && jobInfo.getTriggerOneStatus() > 0) {
+                jobInfoService.resetTriggerOneStatus(id);
+            }
+            return Result.success(false);
         }
         
-        // 对于普通任务或执行器中没有运行的任务组，检查数据库状态
-        return Result.success(jobInfo.getTriggerOneStatus() > 0);
+        // 普通任务：以数据库状态为准
+        return Result.success(jobInfo.getTriggerOneStatus() != null && jobInfo.getTriggerOneStatus() > 0);
     }
 
     @Operation(summary = "修改任务节点")

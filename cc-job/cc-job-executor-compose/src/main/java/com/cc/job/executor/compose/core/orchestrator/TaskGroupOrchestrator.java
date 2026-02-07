@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -289,7 +290,7 @@ public class TaskGroupOrchestrator {
             }
         }
         // 部分跑时按节点补全缺失上游结果（方案二）
-        if (jobFlowPositionIds != null && !jobFlowPositionIds.isEmpty() && fullJobNameMap != null && !fullJobNameMap.isEmpty()) {
+        if (jobFlowPositionIds != null && !jobFlowPositionIds.isEmpty() && !fullJobNameMap.isEmpty()) {
             Set<Long> currentRunNodeIds = nodes.stream().map(BaseEntity::getId).collect(Collectors.toSet());
             Set<Long> ancestorNodeIds = computeAncestorNodeIds(allEdges, currentRunNodeIds);
             Map<Long, String> ancestorJobIdToJobName = new HashMap<>();
@@ -949,6 +950,31 @@ public class TaskGroupOrchestrator {
      */
     private static String buildExecuteKey(Long taskGroupId, String executionBatchId) {
         return taskGroupId + ":" + executionBatchId;
+    }
+
+    /**
+     * 本实例退出时：仅对本实例 RUNNING_JOBS 中的任务组通知 Admin 将 trigger_one_status 置 0，
+     * 满足集群下「只停止当前调度器实例上的任务组」。
+     */
+    @PreDestroy
+    public void onDestroy() {
+        if (RUNNING_JOBS.isEmpty()) {
+            return;
+        }
+        Set<String> keys = new HashSet<>(RUNNING_JOBS.keySet());
+        for (String executeKey : keys) {
+            try {
+                int colon = executeKey.indexOf(':');
+                if (colon <= 0) {
+                    continue;
+                }
+                Long taskGroupId = Long.parseLong(executeKey.substring(0, colon));
+                adminApiClient.updateRankTriggerStatus(taskGroupId, 0);
+                logger.info("[Orchestrator] 本实例退出，已通知 Admin 重置任务组状态 - taskGroupId: {}", taskGroupId);
+            } catch (Exception e) {
+                logger.warn("[Orchestrator] 退出时更新任务组状态失败 - executeKey: {}", executeKey, e);
+            }
+        }
     }
 
     /**

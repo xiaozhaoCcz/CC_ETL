@@ -407,9 +407,18 @@ public class TaskExecutionManager {
         return runningJob != null && runningJob.isRunning();
     }
     
+    /**
+     * 应用退出时调用：仅停止本客户端发起的任务组（通知 Admin 置 trigger_one_status=0），再清理本地状态与 SSE。
+     * 关标签不调用此逻辑，不会停止任务组。
+     */
     public void cleanup() {
         for (Map.Entry<Long, RunningJobGroup> entry : new HashMap<>(runningJobs).entrySet()) {
             RunningJobGroup runningJob = entry.getValue();
+            try {
+                jobInfoService.stopJobCompose(runningJob.getJobId(), runningJob.getRandomId());
+            } catch (Exception e) {
+                logger.debug("退出时通知停止任务组失败（可忽略）- jobId: {}, randomId: {}", runningJob.getJobId(), runningJob.getRandomId(), e);
+            }
             try {
                 runningJob.cleanup();
                 SSEService.getInstance().disconnect(runningJob.getJobId(), runningJob.getRandomId());

@@ -1288,4 +1288,12 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
             return false;
         }
     }
+
+    @Override
+    public int resetTriggerOneStatus(Long id) {
+        if (id == null) {
+            return 0;
+        }
+        return jobInfoMapper.stopJobCompose(id);
+    }
 }

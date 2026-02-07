@@ -99,4 +99,13 @@ public interface JobInfoService extends IService<JobInfo> {
     boolean pauseJob(Long id, Integer pauseStatus);
 
     boolean checkJobGroupRunningInExecutor(Long id);
+
+    /**
+     * 仅将任务组 DB 状态 trigger_one_status 置为 0（不通知执行器）。
+     * 用于自愈：执行器上已无该任务时对齐 DB 状态。
+     *
+     * @param id 任务组ID
+     * @return 是否更新了行（1 表示已重置为 0）
+     */
+    int resetTriggerOneStatus(Long id);
 }
