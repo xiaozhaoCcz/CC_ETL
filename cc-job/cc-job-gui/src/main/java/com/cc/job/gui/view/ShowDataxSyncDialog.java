@@ -127,9 +127,22 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     private VBox advancedSection;
     private boolean advancedSectionVisible = false;
 
+    /** 编辑模式下的任务表单数据，非 null 且 id 非 null 时表示编辑 */
+    private JobInfoForm editForm;
+
     public ShowDataxSyncDialog(Stage ownerStage) {
+        this(ownerStage, null);
+    }
+
+    public ShowDataxSyncDialog(Stage ownerStage, JobInfoForm editData) {
         this.jobGroupService = new JobGroupService();
-        setTitle("数据源同步");
+        if (editData != null && editData.getId() != null) {
+            this.editForm = editData;
+            setTitle("数据源同步（编辑）");
+        } else {
+            this.editForm = null;
+            setTitle("数据源同步");
+        }
         initOwner(ownerStage);
         initModality(Modality.WINDOW_MODAL);
 
@@ -145,6 +158,12 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         // 加载数据源
         loadDatasources();
         updateStepView();
+        // 编辑模式：直接进入第三步并预填
+        if (editForm != null) {
+            currentStep = 2;
+            updateStepView();
+            Platform.runLater(() -> applyEditData(editForm));
+        }
     }
 
     private void styleDialog() {
@@ -183,7 +202,11 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         step2Label = createStepLabel("2. Writer配置", false);
         step3Label = createStepLabel("3. 生成JSON", false);
 
-        steps.getChildren().addAll(step1Label, createStepLine(), step2Label, createStepLine(), step3Label);
+        if (editForm != null) {
+            steps.getChildren().add(step3Label);
+        } else {
+            steps.getChildren().addAll(step1Label, createStepLine(), step2Label, createStepLine(), step3Label);
+        }
         return steps;
     }
 
@@ -239,7 +262,12 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         resetBtn.getStyleClass().add("dialog-button-secondary");
         resetBtn.setOnAction(e -> handleReset());
 
-        bar.getChildren().addAll(resetBtn, prevBtn, nextBtn);
+        if (editForm != null) {
+            nextBtn.setText("确认");
+            bar.getChildren().add(nextBtn);
+        } else {
+            bar.getChildren().addAll(resetBtn, prevBtn, nextBtn);
+        }
         return bar;
     }
 
@@ -260,6 +288,73 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
             case 0 -> contentPane.getChildren().add(readerPaneCache);
             case 1 -> contentPane.getChildren().add(writerPaneCache);
             case 2 -> contentPane.getChildren().add(resultPaneCache);
+        }
+    }
+
+    /**
+     * 编辑模式下预填第三步表单与 JSON（执行器、负责人、调度、高级配置、executorParam）
+     */
+    private void applyEditData(JobInfoForm form) {
+        if (form == null || jobGroupCombo == null) return;
+        Long jobGroupId = form.getJobGroup();
+        if (jobGroupId != null) {
+            for (JobGroup g : jobGroupCombo.getItems()) {
+                if (g != null && jobGroupId.equals(g.getId())) {
+                    jobGroupCombo.setValue(g);
+                    break;
+                }
+            }
+        }
+        if (jobDescField != null) jobDescField.setText(form.getJobDesc() != null ? form.getJobDesc() : "");
+        if (authorField != null) authorField.setText(form.getAuthor() != null ? form.getAuthor() : "");
+        if (alarmEmailField != null) alarmEmailField.setText(form.getAlarmEmail() != null ? form.getAlarmEmail() : "");
+        if (scheduleTypeCombo != null) {
+            try {
+                if (form.getScheduleType() != null && !form.getScheduleType().isEmpty()) {
+                    scheduleTypeCombo.setValue(NewJobDialog.ScheduleType.valueOf(form.getScheduleType()));
+                }
+            } catch (Exception e) {
+                scheduleTypeCombo.setValue(NewJobDialog.ScheduleType.CRON);
+            }
+        }
+        if (scheduleConfField != null) scheduleConfField.setText(form.getScheduleConf() != null ? form.getScheduleConf() : "0 0 0 * * ?");
+        if (routeStrategyCombo != null) {
+            try {
+                if (form.getExecutorRouteStrategy() != null) {
+                    routeStrategyCombo.setValue(NewJobDialog.RouteStrategy.valueOf(form.getExecutorRouteStrategy()));
+                }
+            } catch (Exception e) {
+                routeStrategyCombo.setValue(NewJobDialog.RouteStrategy.FIRST);
+            }
+        }
+        if (misfireStrategyCombo != null) {
+            try {
+                if (form.getMisfireStrategy() != null) {
+                    misfireStrategyCombo.setValue(NewJobDialog.MisfireStrategy.valueOf(form.getMisfireStrategy()));
+                }
+            } catch (Exception e) {
+                misfireStrategyCombo.setValue(NewJobDialog.MisfireStrategy.DO_NOTHING);
+            }
+        }
+        if (blockStrategyCombo != null) {
+            try {
+                if (form.getExecutorBlockStrategy() != null) {
+                    blockStrategyCombo.setValue(NewJobDialog.BlockStrategy.valueOf(form.getExecutorBlockStrategy()));
+                }
+            } catch (Exception e) {
+                blockStrategyCombo.setValue(NewJobDialog.BlockStrategy.SERIAL_EXECUTION);
+            }
+        }
+        if (childJobIdField != null) childJobIdField.setText(form.getChildJobId() != null ? form.getChildJobId() : "");
+        if (executorTimeoutField != null) {
+            executorTimeoutField.setText(form.getExecutorTimeout() != null ? String.valueOf(form.getExecutorTimeout()) : "");
+        }
+        if (executorFailRetryCountField != null) {
+            executorFailRetryCountField.setText(form.getExecutorFailRetryCount() != null ? String.valueOf(form.getExecutorFailRetryCount()) : "0");
+        }
+        if (jsonResultArea != null) {
+            jsonResultArea.setText(form.getExecutorParam() != null ? form.getExecutorParam() : "");
+            jsonResultArea.setEditable(true);
         }
     }
 
@@ -1059,13 +1154,26 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
             }
             JobInfoForm form = buildDataxJobInfoForm();
             form.setExecutorParam(jsonParam);
+            final boolean isEdit = editForm != null && editForm.getId() != null;
             new Thread(() -> {
                 try {
-                    long id = jobInfoService.saveJobInfo(form);
-                    Platform.runLater(() -> {
-                        showInfo("任务已成功添加到任务列表，ID: " + id);
-                        close();
-                    });
+                    if (isEdit) {
+                        boolean ok = jobInfoService.updateJobInfo(editForm.getId(), form);
+                        Platform.runLater(() -> {
+                            if (ok) {
+                                showInfo("保存成功");
+                                close();
+                            } else {
+                                showError("保存失败", "更新任务失败");
+                            }
+                        });
+                    } else {
+                        long id = jobInfoService.saveJobInfo(form);
+                        Platform.runLater(() -> {
+                            showInfo("任务已成功添加到任务列表，ID: " + id);
+                            close();
+                        });
+                    }
                 } catch (Exception e) {
                     Platform.runLater(() -> showError("保存失败", e.getMessage()));
                 }
@@ -1110,6 +1218,9 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         String childIds = childJobIdField.getText() != null ? childJobIdField.getText().trim() : "";
         if (!childIds.isEmpty()) {
             form.setChildJobId(childIds);
+        }
+        if (editForm != null && editForm.getId() != null) {
+            form.setId(editForm.getId());
         }
         return form;
     }

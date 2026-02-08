@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 /**
@@ -68,8 +69,16 @@ public class ShowJobListDialog extends Dialog<Void> {
 
     private Runnable themeChangedListener;
 
+    /** 跳转到任务组回调（主窗口切换任务组），仅任务组行显示「跳转」时使用 */
+    private final BiConsumer<Long, String> onGoToTaskGroup;
+
     public ShowJobListDialog(Stage ownerStage) {
+        this(ownerStage, null);
+    }
+
+    public ShowJobListDialog(Stage ownerStage, BiConsumer<Long, String> onGoToTaskGroup) {
         this.ownerStage = ownerStage;
+        this.onGoToTaskGroup = onGoToTaskGroup;
         setTitle("任务列表");
         initOwner(ownerStage);
         initModality(Modality.WINDOW_MODAL);
@@ -607,13 +616,14 @@ public class ShowJobListDialog extends Dialog<Void> {
             private final MenuItem startItem = new MenuItem("启动");
             private final MenuItem stopItem = new MenuItem("停止");
             private final SeparatorMenuItem sep2 = new SeparatorMenuItem();
+            private final MenuItem goToItem = new MenuItem("跳转");
             private final MenuItem editItem = new MenuItem("编辑");
             private final MenuItem deleteItem = new MenuItem("删除");
             private final MenuItem copyItem = new MenuItem("复制");
 
             {
                 actionMenuBtn.getItems().addAll(runItem, logItem, nextTimeItem, sep1,
-                        startItem, stopItem, sep2, editItem, deleteItem, copyItem);
+                        startItem, stopItem, sep2, goToItem, editItem, deleteItem, copyItem);
                 actionMenuBtn.setPrefWidth(90);
                 actionMenuBtn.setMinWidth(90);
                 actionMenuBtn.setMaxWidth(90);
@@ -645,6 +655,20 @@ public class ShowJobListDialog extends Dialog<Void> {
                 stopItem.setDisable(!running);
                 editItem.setDisable(running);
                 deleteItem.setDisable(running);
+
+                // 跳转：仅任务组且回调存在时显示，点击后执行回调并关闭对话框
+                goToItem.setVisible(isTaskGroup && onGoToTaskGroup != null);
+                goToItem.setOnAction(e -> {
+                    if (onGoToTaskGroup != null && currentJob.getJobType() != null && currentJob.getJobType() == 2) {
+                        Long id = currentJob.getId();
+                        String name = (currentJob.getJobDesc() != null && !currentJob.getJobDesc().isBlank())
+                                ? currentJob.getJobDesc() : "任务组 " + id;
+                        onGoToTaskGroup.accept(id, name);
+                        if (getDialogPane() != null && getDialogPane().getScene() != null && getDialogPane().getScene().getWindow() != null) {
+                            getDialogPane().getScene().getWindow().hide();
+                        }
+                    }
+                });
 
                 // 绑定事件处理器
                 runItem.setOnAction(e -> handleRun(currentJob));
@@ -941,14 +965,23 @@ public class ShowJobListDialog extends Dialog<Void> {
                                 saveEditedJob(job.getId(), result, true);
                             }
                         });
+                        loadPage(false);
                     } else {
-                        // 普通任务 - 使用 NewJobDialog
-                        NewJobDialog dialog = new NewJobDialog(ownerStage, formData, groupList);
-                        dialog.showAndWait().ifPresent(result -> {
-                            if (result != null) {
-                                saveEditedJob(job.getId(), result, false);
-                            }
-                        });
+                        // DataX 任务 - 使用数据源同步向导页
+                        if ("runDataxHandler".equals(job.getExecutorHandler())) {
+                            ShowDataxSyncDialog dataxDialog = new ShowDataxSyncDialog(ownerStage, formData);
+                            dataxDialog.showAndWait();
+                            loadPage(false);
+                        } else {
+                            // 普通任务 - 使用 NewJobDialog
+                            NewJobDialog dialog = new NewJobDialog(ownerStage, formData, groupList);
+                            dialog.showAndWait().ifPresent(result -> {
+                                if (result != null) {
+                                    saveEditedJob(job.getId(), result, false);
+                                }
+                            });
+                            loadPage(false);
+                        }
                     }
                 });
             } catch (Exception ex) {

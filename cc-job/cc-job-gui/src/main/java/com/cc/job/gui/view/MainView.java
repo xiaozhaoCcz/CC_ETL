@@ -183,6 +183,8 @@ public class MainView extends BorderPane {
         dialogManager.setTaskExecutionManager(taskExecutionManager);
         // 重要：设置节点操作管理器（用于从任务列表添加节点时本地入画布并支持撤销）
         dialogManager.setNodeOperationManager(nodeOperationManager);
+        // 任务列表中点「跳转」时切换到对应任务组并关闭对话框
+        dialogManager.setOnGoToTaskGroupCallback((id, name) -> switchToTaskGroup(id, name));
         
         // 重要：设置节点操作管理器的回调配置器（用于新增节点时自动配置回调）
         nodeOperationManager.setNodeCallbackConfigurator(nodeCallbackConfigurator);

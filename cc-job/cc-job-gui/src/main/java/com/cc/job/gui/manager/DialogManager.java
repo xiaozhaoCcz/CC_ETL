@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 
 /**
  * 对话框管理器 - 负责各种对话框的显示和处理
@@ -34,6 +35,9 @@ public class DialogManager {
     private final NodeTemplateManager nodeTemplateManager;
     
     private NodeOperationManager nodeOperationManager;
+
+    /** 从任务列表跳转到任务组的回调（主窗口切换任务组） */
+    private BiConsumer<Long, String> onGoToTaskGroupCallback;
     
     // 对话框实例缓存，避免重复创建
     private ShowJobListDialog jobListDialog;
@@ -67,6 +71,13 @@ public class DialogManager {
      */
     public void setNodeOperationManager(NodeOperationManager nodeOperationManager) {
         this.nodeOperationManager = nodeOperationManager;
+    }
+
+    /**
+     * 设置从任务列表跳转到任务组的回调（主窗口切换任务组后，任务列表会关闭）
+     */
+    public void setOnGoToTaskGroupCallback(BiConsumer<Long, String> callback) {
+        this.onGoToTaskGroupCallback = callback;
     }
     
     /**
@@ -436,8 +447,8 @@ public class DialogManager {
             return;
         }
         
-        // 创建新对话框
-        jobListDialog = new ShowJobListDialog(ownerStage);
+        // 创建新对话框（传入跳转回调，任务组行显示「跳转」）
+        jobListDialog = new ShowJobListDialog(ownerStage, onGoToTaskGroupCallback);
         
         // 监听对话框关闭事件，清空缓存
         jobListDialog.setOnHidden(event -> jobListDialog = null);
