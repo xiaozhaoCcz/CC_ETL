@@ -2,12 +2,14 @@ package com.cc.job.gui.view;
 
 import com.cc.job.gui.service.JobDataxService;
 import com.cc.job.gui.service.JobGroupService;
+import com.cc.job.gui.service.JobInfoService;
 import com.cc.job.gui.service.JobJdbcDatasourceService;
 import com.cc.job.gui.util.IconUtil;
 import com.cc.job.gui.util.StyleUtil;
 import com.cc.job.xo.model.datax.DataxTable;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.entity.JobJdbcDatasource;
+import com.cc.job.xo.model.form.JobInfoForm;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
@@ -96,6 +98,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     private List<String> readerColumns = new ArrayList<>();
     private List<String> writerColumns = new ArrayList<>();
     private final JobGroupService jobGroupService;
+    private final JobInfoService jobInfoService = new JobInfoService();
     // 表单字段
     private ComboBox<JobGroup> jobGroupCombo;
     private TextField jobDescField;
@@ -242,7 +245,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         updateStepLabelStyle(step3Label, currentStep == 2);
 
         prevBtn.setDisable(currentStep == 0);
-        nextBtn.setText(currentStep == 2 ? "复制JSON" : "下一步");
+        nextBtn.setText(currentStep == 2 ? "确认" : "下一步");
 
         switch (currentStep) {
             case 0 -> contentPane.getChildren().add(createReaderPane());
@@ -665,13 +668,19 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         advancedSection.setManaged(false);
         formContent.getChildren().add(advancedSection);
 
-        // JSON 标题行：左侧标题 + 右侧放大按钮
+        // JSON 标题行：左侧标题 + 右侧复制JSON、放大按钮
         HBox jsonTitleRow = new HBox(8);
         jsonTitleRow.setAlignment(Pos.CENTER_LEFT);
         Label jsonLabel = new Label("生成的DataX JSON配置");
         jsonLabel.setStyle(StyleUtil.bodyFontOnly() + "-fx-font-weight: bold;");
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
+        Button copyJsonBtn = new Button("复制JSON");
+        copyJsonBtn.getStyleClass().add("dialog-button-secondary");
+        copyJsonBtn.setOnAction(e -> {
+            copyToClipboard(jsonResultArea.getText());
+            showInfo("已复制到剪贴板");
+        });
         Button expandJsonBtn = new Button();
         FontIcon expandIcon = IconUtil.expandIcon();
         expandIcon.setIconSize(18);
@@ -679,7 +688,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         expandJsonBtn.setTooltip(new Tooltip("放大编辑"));
         expandJsonBtn.getStyleClass().add("dialog-button-secondary");
         expandJsonBtn.setOnAction(e -> showJsonExpandDialog());
-        jsonTitleRow.getChildren().addAll(jsonLabel, spacer, expandJsonBtn);
+        jsonTitleRow.getChildren().addAll(jsonLabel, spacer, copyJsonBtn, expandJsonBtn);
 
         VBox pane = new VBox(12);
         pane.setPadding(new Insets(16));
@@ -1011,10 +1020,89 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
             currentStep++;
             updateStepView();
         } else {
-            // 复制JSON
-            copyToClipboard(jsonResultArea.getText());
-            showInfo("已复制到剪贴板");
+            // 确认：校验并新增任务
+            if (jobGroupCombo.getValue() == null) {
+                showError("验证失败", "请选择执行器");
+                return;
+            }
+            String author = authorField.getText() != null ? authorField.getText().trim() : "";
+            String jobDesc = jobDescField.getText() != null ? jobDescField.getText().trim() : "";
+            if (jobDesc.isEmpty()) {
+                showError("验证失败", "请输入任务描述");
+                return;
+            }
+            if (author.isEmpty()) {
+                showError("验证失败", "请输入负责人姓名");
+                return;
+            }
+            NewJobDialog.ScheduleType scheduleType = scheduleTypeCombo.getValue();
+            if (scheduleType != null && scheduleType != NewJobDialog.ScheduleType.NONE) {
+                String scheduleConf = scheduleConfField.getText() != null ? scheduleConfField.getText().trim() : "";
+                if (scheduleConf.isEmpty()) {
+                    showError("验证失败", "请填写调度配置（Cron 或固定速率秒数）");
+                    return;
+                }
+            }
+            String jsonParam = jsonResultArea.getText() != null ? jsonResultArea.getText().trim() : "";
+            if (jsonParam.isEmpty()) {
+                showError("验证失败", "生成的 JSON 为空，请先完成 Reader/Writer 配置并生成 JSON");
+                return;
+            }
+            JobInfoForm form = buildDataxJobInfoForm();
+            form.setExecutorParam(jsonParam);
+            new Thread(() -> {
+                try {
+                    long id = jobInfoService.saveJobInfo(form);
+                    Platform.runLater(() -> {
+                        showInfo("任务已成功添加到任务列表，ID: " + id);
+                        close();
+                    });
+                } catch (Exception e) {
+                    Platform.runLater(() -> showError("保存失败", e.getMessage()));
+                }
+            }, "datax-save-job").start();
         }
+    }
+
+    /**
+     * 组装 DataX 任务的 JobInfoForm（不含 executorParam，由调用方设置）
+     */
+    private JobInfoForm buildDataxJobInfoForm() {
+        JobInfoForm form = new JobInfoForm();
+        form.setJobGroup(jobGroupCombo.getValue().getId());
+        form.setJobDesc(jobDescField.getText() != null ? jobDescField.getText().trim() : "");
+        form.setAuthor(authorField.getText() != null ? authorField.getText().trim() : "");
+        form.setAlarmEmail(alarmEmailField.getText() != null ? alarmEmailField.getText().trim() : "");
+        NewJobDialog.ScheduleType st = scheduleTypeCombo.getValue();
+        form.setScheduleType(st != null ? st.getType() : "CRON");
+        form.setScheduleConf(scheduleConfField.getText() != null ? scheduleConfField.getText().trim() : "0 0 0 * * ?");
+        form.setMisfireStrategy(misfireStrategyCombo.getValue() != null
+                ? misfireStrategyCombo.getValue().getType() : "DO_NOTHING");
+        form.setExecutorRouteStrategy(routeStrategyCombo.getValue() != null
+                ? routeStrategyCombo.getValue().getType() : "FIRST");
+        form.setFailStrategy("JOB_FAIL");
+        form.setExecutorBlockStrategy(blockStrategyCombo.getValue() != null
+                ? blockStrategyCombo.getValue().getType() : "SERIAL_EXECUTION");
+        form.setGlueType("DATAX");
+        form.setExecutorHandler("runDataxHandler");
+        form.setJobType(0);
+        String timeoutStr = executorTimeoutField.getText() != null ? executorTimeoutField.getText().trim() : "";
+        if (!timeoutStr.isEmpty()) {
+            try {
+                form.setExecutorTimeout(Integer.parseInt(timeoutStr));
+            } catch (NumberFormatException ignored) { }
+        }
+        String retryStr = executorFailRetryCountField.getText() != null ? executorFailRetryCountField.getText().trim() : "";
+        if (!retryStr.isEmpty()) {
+            try {
+                form.setExecutorFailRetryCount(Integer.parseInt(retryStr));
+            } catch (NumberFormatException ignored) { }
+        }
+        String childIds = childJobIdField.getText() != null ? childJobIdField.getText().trim() : "";
+        if (!childIds.isEmpty()) {
+            form.setChildJobId(childIds);
+        }
+        return form;
     }
 
     private void generateJson() {

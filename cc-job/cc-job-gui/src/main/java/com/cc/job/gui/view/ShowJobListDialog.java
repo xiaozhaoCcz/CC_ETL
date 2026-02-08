@@ -415,6 +415,7 @@ public class ShowJobListDialog extends Dialog<Void> {
                 JobInfoVO job = getTableRow().getItem();
                 Label tag = createJobTypeTag(job.getJobType());
                 setGraphic(tag);
+                setAlignment(Pos.CENTER);
             }
         });
         typeCol.setMinWidth(80);
@@ -432,6 +433,7 @@ public class ShowJobListDialog extends Dialog<Void> {
                 JobInfoVO job = getTableRow().getItem();
                 Label tag = createStatusTag(job.getTriggerStatus());
                 setGraphic(tag);
+                setAlignment(Pos.CENTER);
             }
         });
         statusCol.setMinWidth(70);
@@ -444,6 +446,14 @@ public class ShowJobListDialog extends Dialog<Void> {
             }
             return new SimpleStringProperty("");
         });
+        createTimeCol.setCellFactory(col -> new TableCell<JobInfoVO, String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item);
+                setAlignment(Pos.CENTER);
+            }
+        });
         createTimeCol.setMinWidth(140);
 
         // 修改时间列
@@ -453,6 +463,14 @@ public class ShowJobListDialog extends Dialog<Void> {
                 return new SimpleStringProperty(c.getValue().getUpdateTime().format(DATE_FORMATTER));
             }
             return new SimpleStringProperty("");
+        });
+        updateTimeCol.setCellFactory(col -> new TableCell<JobInfoVO, String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item);
+                setAlignment(Pos.CENTER);
+            }
         });
         updateTimeCol.setMinWidth(140);
 
