@@ -84,6 +84,10 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     private static final String[] WRITE_MODES = {"insert", "update", "replace"};
     private static final String[] INCR_MODES = {"ID自增", "时间自增"};
     private static final String[] TIME_FORMATS = {"YYYY-MM-DD HH:mm:ss", "YYYY-MM-DD", "YYYY/MM/DD HH:mm:ss", "YYYY/MM/DD"};
+    /** 数据表/表字段区域固定高度（约6行），保证一列完整可见且仅横向滚动 */
+    private static final double TABLE_AND_COLUMN_AREA_HEIGHT = 165;
+    /** 数据表/表字段每列宽度，避免表名与字段名被裁切 */
+    private static final double TABLE_AND_COLUMN_COLUMN_WIDTH = 165;
     
     // 存储表数据，用于单选
     private List<DataxTable> readerTables = new ArrayList<>();
@@ -295,15 +299,13 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         grid.add(dsLabel, 0, 1);
         grid.add(readerDatasourceCombo, 1, 1);
 
-        // 数据表 - 单选框（多列布局，每列8条）
+        // 数据表 - 单选框（多列布局，每列6条）
         Label tableLabel = new Label("数据表");
         tableLabel.setStyle(labelStyle);
         readerTableToggleGroup = new ToggleGroup();
         HBox tableColumnsContainer = new HBox(12);
-        tableColumnsContainer.setPadding(new Insets(12, 16, 12, 16));
         // 默认状态：无边框，只显示提示文字
         tableColumnsContainer.setStyle("-fx-background-color: transparent;");
-        tableColumnsContainer.setMinHeight(50);
         // 默认显示提示信息
         Label tablePlaceholder = new Label("请选择数据源");
         tablePlaceholder.setStyle(StyleUtil.bodyFontOnly());
@@ -318,7 +320,8 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         tableScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         tableScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         tableScrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
-        tableScrollPane.setMinHeight(50); // 默认较小高度
+        tableScrollPane.setMinHeight(TABLE_AND_COLUMN_AREA_HEIGHT);
+        tableScrollPane.setPrefHeight(TABLE_AND_COLUMN_AREA_HEIGHT);
         VBox.setVgrow(tableScrollPane, Priority.ALWAYS);
         grid.add(tableLabel, 0, 2);
         grid.add(tableScrollPane, 1, 2);
@@ -351,34 +354,14 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         Button selectAllBtn = new Button("全选");
         selectAllBtn.getStyleClass().add("dialog-button-secondary");
         selectAllBtn.setPrefWidth(80);
-        selectAllBtn.setOnAction(e -> {
-            readerColumnCheckBox.getChildren().forEach(columnNode -> {
-                if (columnNode instanceof VBox) {
-                    ((VBox) columnNode).getChildren().forEach(node -> {
-                        if (node instanceof CheckBox) {
-                            ((CheckBox) node).setSelected(true);
-                        }
-                    });
-                }
-            });
-        });
+        selectAllBtn.setOnAction(e -> forEachColumnCheckBox(readerColumnCheckBox, cb -> cb.setSelected(true)));
         Button clearAllBtn = new Button("清空");
         clearAllBtn.getStyleClass().add("dialog-button-secondary");
         clearAllBtn.setPrefWidth(80);
-        clearAllBtn.setOnAction(e -> {
-            readerColumnCheckBox.getChildren().forEach(columnNode -> {
-                if (columnNode instanceof VBox) {
-                    ((VBox) columnNode).getChildren().forEach(node -> {
-                        if (node instanceof CheckBox) {
-                            ((CheckBox) node).setSelected(false);
-                        }
-                    });
-                }
-            });
-        });
+        clearAllBtn.setOnAction(e -> forEachColumnCheckBox(readerColumnCheckBox, cb -> cb.setSelected(false)));
         columnHeader.getChildren().addAll(selectAllBtn, clearAllBtn);
         
-        // 表字段多列容器（每列8条）
+        // 表字段多列容器（每列6条）
         HBox columnColumnsContainer = new HBox(12);
         columnColumnsContainer.setPadding(new Insets(12, 16, 12, 16));
         // 默认状态：无边框，只显示提示文字
@@ -398,7 +381,8 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         readerColumnScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         readerColumnScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         readerColumnScrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
-        readerColumnScrollPane.setMinHeight(50); // 默认较小高度
+        readerColumnScrollPane.setMinHeight(TABLE_AND_COLUMN_AREA_HEIGHT);
+        readerColumnScrollPane.setPrefHeight(TABLE_AND_COLUMN_AREA_HEIGHT);
         VBox.setVgrow(readerColumnScrollPane, Priority.ALWAYS);
         VBox columnContainer = new VBox(8, columnHeader, readerColumnScrollPane);
         VBox.setVgrow(columnContainer, Priority.ALWAYS);
@@ -537,7 +521,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         grid.add(dsLabel, 0, 1);
         grid.add(writerDatasourceCombo, 1, 1);
 
-        // 数据表 - 单选框（多列布局，每列8条）
+        // 数据表 - 单选框（多列布局，每列6条）
         Label tableLabel = new Label("数据表");
         tableLabel.setStyle(labelStyle);
         writerTableToggleGroup = new ToggleGroup();
@@ -560,7 +544,8 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         tableScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         tableScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         tableScrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
-        tableScrollPane.setMinHeight(50); // 默认较小高度
+        tableScrollPane.setMinHeight(TABLE_AND_COLUMN_AREA_HEIGHT);
+        tableScrollPane.setPrefHeight(TABLE_AND_COLUMN_AREA_HEIGHT);
         VBox.setVgrow(tableScrollPane, Priority.ALWAYS);
         grid.add(tableLabel, 0, 2);
         grid.add(tableScrollPane, 1, 2);
@@ -592,34 +577,14 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         Button selectAllBtn = new Button("全选");
         selectAllBtn.getStyleClass().add("dialog-button-secondary");
         selectAllBtn.setPrefWidth(80);
-        selectAllBtn.setOnAction(e -> {
-            writerColumnCheckBox.getChildren().forEach(columnNode -> {
-                if (columnNode instanceof VBox) {
-                    ((VBox) columnNode).getChildren().forEach(node -> {
-                        if (node instanceof CheckBox) {
-                            ((CheckBox) node).setSelected(true);
-                        }
-                    });
-                }
-            });
-        });
+        selectAllBtn.setOnAction(e -> forEachColumnCheckBox(writerColumnCheckBox, cb -> cb.setSelected(true)));
         Button clearAllBtn = new Button("清空");
         clearAllBtn.getStyleClass().add("dialog-button-secondary");
         clearAllBtn.setPrefWidth(80);
-        clearAllBtn.setOnAction(e -> {
-            writerColumnCheckBox.getChildren().forEach(columnNode -> {
-                if (columnNode instanceof VBox) {
-                    ((VBox) columnNode).getChildren().forEach(node -> {
-                        if (node instanceof CheckBox) {
-                            ((CheckBox) node).setSelected(false);
-                        }
-                    });
-                }
-            });
-        });
+        clearAllBtn.setOnAction(e -> forEachColumnCheckBox(writerColumnCheckBox, cb -> cb.setSelected(false)));
         columnHeader.getChildren().addAll(selectAllBtn, clearAllBtn);
         
-        // 表字段多列容器（每列8条）
+        // 表字段多列容器（每列6条）
         HBox columnColumnsContainer = new HBox(12);
         columnColumnsContainer.setPadding(new Insets(12, 16, 12, 16));
         // 默认状态：无边框，只显示提示文字
@@ -639,7 +604,8 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         writerColumnScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         writerColumnScrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         writerColumnScrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
-        writerColumnScrollPane.setMinHeight(50); // 默认较小高度
+        writerColumnScrollPane.setMinHeight(TABLE_AND_COLUMN_AREA_HEIGHT);
+        writerColumnScrollPane.setPrefHeight(TABLE_AND_COLUMN_AREA_HEIGHT);
         VBox.setVgrow(writerColumnScrollPane, Priority.ALWAYS);
         VBox columnContainer = new VBox(8, columnHeader, writerColumnScrollPane);
         VBox.setVgrow(columnContainer, Priority.ALWAYS);
@@ -1436,6 +1402,24 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         }).start();
     }
     
+    /** 遍历表字段容器中所有 CheckBox（支持 VBox 下直接 CheckBox 或 HBox 行内的 CheckBox） */
+    private void forEachColumnCheckBox(HBox container, java.util.function.Consumer<CheckBox> action) {
+        if (container == null) return;
+        container.getChildren().forEach(columnNode -> {
+            if (columnNode instanceof VBox) {
+                ((VBox) columnNode).getChildren().forEach(node -> {
+                    if (node instanceof CheckBox) {
+                        action.accept((CheckBox) node);
+                    } else if (node instanceof HBox) {
+                        ((HBox) node).getChildren().forEach(n -> {
+                            if (n instanceof CheckBox) action.accept((CheckBox) n);
+                        });
+                    }
+                });
+            }
+        });
+    }
+
     // 辅助方法：获取选中的Reader表
     private DataxTable getSelectedReaderTable() {
         if (readerTableToggleGroup.getSelectedToggle() != null) {
@@ -1456,16 +1440,9 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     private List<String> getSelectedReaderColumns() {
         List<String> selected = new ArrayList<>();
         if (readerColumnCheckBox != null) {
-            readerColumnCheckBox.getChildren().forEach(columnNode -> {
-                if (columnNode instanceof VBox) {
-                    ((VBox) columnNode).getChildren().forEach(node -> {
-                        if (node instanceof CheckBox) {
-                            CheckBox cb = (CheckBox) node;
-                            if (cb.isSelected()) {
-                                selected.add(cb.getText());
-                            }
-                        }
-                    });
+            forEachColumnCheckBox(readerColumnCheckBox, cb -> {
+                if (cb.isSelected() && cb.getUserData() != null) {
+                    selected.add(cb.getUserData().toString());
                 }
             });
         }
@@ -1476,16 +1453,9 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     private List<String> getSelectedWriterColumns() {
         List<String> selected = new ArrayList<>();
         if (writerColumnCheckBox != null) {
-            writerColumnCheckBox.getChildren().forEach(columnNode -> {
-                if (columnNode instanceof VBox) {
-                    ((VBox) columnNode).getChildren().forEach(node -> {
-                        if (node instanceof CheckBox) {
-                            CheckBox cb = (CheckBox) node;
-                            if (cb.isSelected()) {
-                                selected.add(cb.getText());
-                            }
-                        }
-                    });
+            forEachColumnCheckBox(writerColumnCheckBox, cb -> {
+                if (cb.isSelected() && cb.getUserData() != null) {
+                    selected.add(cb.getUserData().toString());
                 }
             });
         }
@@ -1526,12 +1496,12 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
             container.getStyleClass().add("dialog-section");
             container.setStyle("-fx-background-radius: " + StyleUtil.RADIUS_MD + "; -fx-border-width: 1; " +
                     "-fx-border-radius: " + StyleUtil.RADIUS_MD + ";");
-            container.setMinHeight(220);
-            container.setPrefHeight(220);
+            container.setMinHeight(TABLE_AND_COLUMN_AREA_HEIGHT);
+            container.setPrefHeight(TABLE_AND_COLUMN_AREA_HEIGHT);
             if (container.getParent() instanceof ScrollPane) {
                 ScrollPane scrollPane = (ScrollPane) container.getParent();
-                scrollPane.setMinHeight(220);
-                scrollPane.setPrefHeight(220);
+                scrollPane.setMinHeight(TABLE_AND_COLUMN_AREA_HEIGHT);
+                scrollPane.setPrefHeight(TABLE_AND_COLUMN_AREA_HEIGHT);
             }
         } else {
             container.setStyle("-fx-background-color: transparent;");
@@ -1559,13 +1529,13 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         container.getStyleClass().add("dialog-section");
         container.setStyle("-fx-background-radius: " + StyleUtil.RADIUS_MD + "; -fx-border-width: 1; " +
                 "-fx-border-radius: " + StyleUtil.RADIUS_MD + ";");
-        container.setMinHeight(220);
-        container.setPrefHeight(220);
+        container.setMinHeight(TABLE_AND_COLUMN_AREA_HEIGHT);
+        container.setPrefHeight(TABLE_AND_COLUMN_AREA_HEIGHT);
         // 更新ScrollPane高度
         if (container.getParent() instanceof ScrollPane) {
             ScrollPane scrollPane = (ScrollPane) container.getParent();
-            scrollPane.setMinHeight(220);
-            scrollPane.setPrefHeight(220);
+            scrollPane.setMinHeight(TABLE_AND_COLUMN_AREA_HEIGHT);
+            scrollPane.setPrefHeight(TABLE_AND_COLUMN_AREA_HEIGHT);
         }
         createMultiColumnRadioButtons(container, items, toggleGroup, onSelect);
     }
@@ -1580,12 +1550,12 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
             container.getStyleClass().add("dialog-section");
             container.setStyle("-fx-background-radius: " + StyleUtil.RADIUS_MD + "; -fx-border-width: 1; " +
                     "-fx-border-radius: " + StyleUtil.RADIUS_MD + ";");
-            container.setMinHeight(220);
-            container.setPrefHeight(220);
+            container.setMinHeight(TABLE_AND_COLUMN_AREA_HEIGHT);
+            container.setPrefHeight(TABLE_AND_COLUMN_AREA_HEIGHT);
             if (container.getParent() instanceof ScrollPane) {
                 ScrollPane scrollPane = (ScrollPane) container.getParent();
-                scrollPane.setMinHeight(220);
-                scrollPane.setPrefHeight(220);
+                scrollPane.setMinHeight(TABLE_AND_COLUMN_AREA_HEIGHT);
+                scrollPane.setPrefHeight(TABLE_AND_COLUMN_AREA_HEIGHT);
             }
         } else {
             container.setStyle("-fx-background-color: transparent;");
@@ -1612,76 +1582,103 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         container.getStyleClass().add("dialog-section");
         container.setStyle("-fx-background-radius: " + StyleUtil.RADIUS_MD + "; -fx-border-width: 1; " +
                 "-fx-border-radius: " + StyleUtil.RADIUS_MD + ";");
-        container.setMinHeight(220);
-        container.setPrefHeight(220);
+        container.setMinHeight(TABLE_AND_COLUMN_AREA_HEIGHT);
+        container.setPrefHeight(TABLE_AND_COLUMN_AREA_HEIGHT);
         // 更新ScrollPane高度
         if (container.getParent() instanceof ScrollPane) {
             ScrollPane scrollPane = (ScrollPane) container.getParent();
-            scrollPane.setMinHeight(220);
-            scrollPane.setPrefHeight(220);
+            scrollPane.setMinHeight(TABLE_AND_COLUMN_AREA_HEIGHT);
+            scrollPane.setPrefHeight(TABLE_AND_COLUMN_AREA_HEIGHT);
         }
         createMultiColumnCheckBoxes(container, items);
     }
     
-    // 创建多列RadioButton布局（每列最多8条）
+    // 创建多列RadioButton布局（每列最多6条）
     private void createMultiColumnRadioButtons(HBox container, List<DataxTable> items, 
                                                ToggleGroup toggleGroup, 
                                                java.util.function.Consumer<DataxTable> onSelect) {
         container.getChildren().clear();
         if (items == null || items.isEmpty()) return;
-        
-        final int ITEMS_PER_COLUMN = 8;
+        final int ITEMS_PER_COLUMN = 6;
         int totalColumns = (items.size() + ITEMS_PER_COLUMN - 1) / ITEMS_PER_COLUMN; // 向上取整
         
         for (int colIndex = 0; colIndex < totalColumns; colIndex++) {
             VBox column = new VBox(6);
-            column.setMinWidth(180); // 每列最小宽度
-            column.setPrefWidth(180);
+            column.setMinWidth(TABLE_AND_COLUMN_COLUMN_WIDTH);
+            column.setPrefWidth(TABLE_AND_COLUMN_COLUMN_WIDTH);
+            column.setMaxHeight(TABLE_AND_COLUMN_AREA_HEIGHT);
             
             int startIndex = colIndex * ITEMS_PER_COLUMN;
             int endIndex = Math.min(startIndex + ITEMS_PER_COLUMN, items.size());
             
             for (int i = startIndex; i < endIndex; i++) {
                 DataxTable table = items.get(i);
-                RadioButton radio = new RadioButton(
-                        (table.getTableSchema() != null && !table.getTableSchema().isEmpty() 
-                                ? table.getTableSchema() + "." : "") + table.getTableName());
+                String schema = table.getTableSchema() != null ? table.getTableSchema() : "";
+                String name = table.getTableName() != null ? table.getTableName() : "";
+                String display = (schema.isEmpty() ? "" : schema + ".") + name;
+                if (display.isEmpty()) display = "未命名";
+                RadioButton radio = new RadioButton();
                 radio.setToggleGroup(toggleGroup);
                 radio.setUserData(table);
-                radio.setStyle(StyleUtil.bodyFontOnly() + " -fx-background-color: transparent;"); // 移除背景颜色
+                radio.setStyle("-fx-background-color: transparent;");
                 radio.setOnAction(e -> {
-                    if (onSelect != null) {
-                        onSelect.accept(table);
-                    }
+                    if (onSelect != null) onSelect.accept(table);
                 });
-                column.getChildren().add(radio);
+                Label tableLabel = new Label(display);
+                tableLabel.setWrapText(true);
+                tableLabel.setMinWidth(120);
+                tableLabel.setMaxWidth(Double.MAX_VALUE);
+                String textFill = StyleUtil.isDarkTheme() ? "#FFFFFF" : "#1F2937";
+                tableLabel.setStyle(StyleUtil.bodyFontOnly() + " -fx-background-color: transparent; -fx-text-fill: " + textFill + ";");
+                tableLabel.setTooltip(new Tooltip(display));
+                HBox.setHgrow(tableLabel, Priority.ALWAYS);
+                HBox row = new HBox(8, radio, tableLabel);
+                row.setAlignment(Pos.CENTER_LEFT);
+                row.setMaxWidth(Double.MAX_VALUE);
+                row.setOnMouseClicked(e -> {
+                    radio.setSelected(true);
+                    if (onSelect != null) onSelect.accept(table);
+                });
+                column.getChildren().add(row);
             }
             
             container.getChildren().add(column);
         }
     }
     
-    // 创建多列CheckBox布局（每列最多8条）
+    // 创建多列CheckBox布局（每列最多6条）
     private void createMultiColumnCheckBoxes(HBox container, List<String> items) {
         container.getChildren().clear();
         if (items == null || items.isEmpty()) return;
         
-        final int ITEMS_PER_COLUMN = 8;
+        final int ITEMS_PER_COLUMN = 6;
         int totalColumns = (items.size() + ITEMS_PER_COLUMN - 1) / ITEMS_PER_COLUMN; // 向上取整
         
         for (int colIndex = 0; colIndex < totalColumns; colIndex++) {
             VBox column = new VBox(6);
-            column.setMinWidth(180); // 每列最小宽度
-            column.setPrefWidth(180);
+            column.setMinWidth(TABLE_AND_COLUMN_COLUMN_WIDTH);
+            column.setPrefWidth(TABLE_AND_COLUMN_COLUMN_WIDTH);
+            column.setMaxHeight(TABLE_AND_COLUMN_AREA_HEIGHT);
             
             int startIndex = colIndex * ITEMS_PER_COLUMN;
             int endIndex = Math.min(startIndex + ITEMS_PER_COLUMN, items.size());
             
             for (int i = startIndex; i < endIndex; i++) {
-                String columnName = items.get(i);
-                CheckBox checkBox = new CheckBox(columnName);
-                checkBox.setStyle(StyleUtil.bodyFontOnly() + " -fx-background-color: transparent;"); // 移除背景颜色
-                column.getChildren().add(checkBox);
+                String columnName = items.get(i) != null ? items.get(i) : "";
+                CheckBox checkBox = new CheckBox();
+                checkBox.setUserData(columnName);
+                checkBox.setStyle("-fx-background-color: transparent;");
+                Label fieldLabel = new Label(columnName);
+                fieldLabel.setWrapText(true);
+                fieldLabel.setMinWidth(120);
+                fieldLabel.setMaxWidth(Double.MAX_VALUE);
+                String textFillCol = StyleUtil.isDarkTheme() ? "#FFFFFF" : "#1F2937";
+                fieldLabel.setStyle(StyleUtil.bodyFontOnly() + " -fx-background-color: transparent; -fx-text-fill: " + textFillCol + ";");
+                HBox.setHgrow(fieldLabel, Priority.ALWAYS);
+                HBox row = new HBox(8, checkBox, fieldLabel);
+                row.setAlignment(Pos.CENTER_LEFT);
+                row.setMaxWidth(Double.MAX_VALUE);
+                column.getChildren().add(row);
             }
             
             container.getChildren().add(column);
