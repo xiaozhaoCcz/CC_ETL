@@ -51,6 +51,11 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     private Button prevBtn, nextBtn;
     private Label step1Label, step2Label, step3Label;
 
+    /** 步骤面板缓存，避免「上一步」时重新创建导致数据丢失 */
+    private Node readerPaneCache;
+    private Node writerPaneCache;
+    private Node resultPaneCache;
+
     // Step 1 - Reader配置
     private ComboBox<String> readerDsTypeCombo;
     private ComboBox<JobJdbcDatasource> readerDatasourceCombo;
@@ -239,7 +244,6 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     }
 
     private void updateStepView() {
-        contentPane.getChildren().clear();
         updateStepLabelStyle(step1Label, currentStep == 0);
         updateStepLabelStyle(step2Label, currentStep == 1);
         updateStepLabelStyle(step3Label, currentStep == 2);
@@ -247,10 +251,15 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         prevBtn.setDisable(currentStep == 0);
         nextBtn.setText(currentStep == 2 ? "确认" : "下一步");
 
+        if (readerPaneCache == null) readerPaneCache = createReaderPane();
+        if (writerPaneCache == null) writerPaneCache = createWriterPane();
+        if (resultPaneCache == null) resultPaneCache = createResultPane();
+
+        contentPane.getChildren().clear();
         switch (currentStep) {
-            case 0 -> contentPane.getChildren().add(createReaderPane());
-            case 1 -> contentPane.getChildren().add(createWriterPane());
-            case 2 -> contentPane.getChildren().add(createResultPane());
+            case 0 -> contentPane.getChildren().add(readerPaneCache);
+            case 1 -> contentPane.getChildren().add(writerPaneCache);
+            case 2 -> contentPane.getChildren().add(resultPaneCache);
         }
     }
 

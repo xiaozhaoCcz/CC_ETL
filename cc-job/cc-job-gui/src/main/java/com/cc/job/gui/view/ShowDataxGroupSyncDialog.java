@@ -14,9 +14,11 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.beans.property.SimpleStringProperty;
 import javafx.scene.control.*;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.OverrunStyle;
@@ -52,6 +54,11 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
     private Button prevBtn, nextBtn;
     private Label step1Label, step2Label, step3Label;
 
+    /** 步骤面板缓存，避免「上一步」时重新创建导致数据丢失 */
+    private Node readerPaneCache;
+    private Node writerPaneCache;
+    private Node resultPaneCache;
+
     // Step 1 - Reader配置（多表）
     private ComboBox<String> readerDsTypeCombo;
     private ComboBox<JobJdbcDatasource> readerDatasourceCombo;
@@ -69,8 +76,8 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
     private ListView<String> writerTableList;
     private ComboBox<String> writeModeCombo;
 
-    // Step 3 - 结果
-    private TextArea jsonResultArea;
+    // Step 3 - 结果：可移动表格，每行一对表 + JSON
+    private ObservableList<DataxPairRow> jsonTableItems = FXCollections.observableArrayList();
 
     // Step 3 - 基本信息与调度（与单数据源一致）
     private ComboBox<JobGroup> jobGroupCombo;
@@ -127,6 +134,9 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
             Stage stage = (Stage) getDialogPane().getScene().getWindow();
             if (stage != null) {
                 stage.setResizable(true);
+                stage.setOnCloseRequest(event -> {
+                    close();
+                });
                 String css = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
                 if (css != null && !css.isEmpty()) {
                     stage.getScene().getStylesheets().add(css);
@@ -207,7 +217,6 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
     }
 
     private void updateStepView() {
-        contentPane.getChildren().clear();
         updateStepLabelStyle(step1Label, currentStep == 0);
         updateStepLabelStyle(step2Label, currentStep == 1);
         updateStepLabelStyle(step3Label, currentStep == 2);
@@ -215,10 +224,15 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
         prevBtn.setDisable(currentStep == 0);
         nextBtn.setText(currentStep == 2 ? "确认" : "下一步");
 
+        if (readerPaneCache == null) readerPaneCache = createReaderPane();
+        if (writerPaneCache == null) writerPaneCache = createWriterPane();
+        if (resultPaneCache == null) resultPaneCache = createResultPane();
+
+        contentPane.getChildren().clear();
         switch (currentStep) {
-            case 0 -> contentPane.getChildren().add(createReaderPane());
-            case 1 -> contentPane.getChildren().add(createWriterPane());
-            case 2 -> contentPane.getChildren().add(createResultPane());
+            case 0 -> contentPane.getChildren().add(readerPaneCache);
+            case 1 -> contentPane.getChildren().add(writerPaneCache);
+            case 2 -> contentPane.getChildren().add(resultPaneCache);
         }
     }
 
@@ -260,7 +274,7 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
         readerDatasourceCombo.setOnAction(e -> loadReaderTables());
 
         // 表列表（多选）
-        Label tableLabel = new Label("数据表（按住Ctrl多选）");
+        Label tableLabel = new Label("数据表");
         tableLabel.setStyle(labelStyle);
         readerTableList = new ListView<>();
         readerTableList.setPrefHeight(250);
@@ -379,7 +393,7 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
         writerDatasourceCombo.setOnAction(e -> loadWriterTables());
 
         // 表列表（多选）
-        Label tableLabel = new Label("数据表（按住Ctrl多选）");
+        Label tableLabel = new Label("数据表");
         tableLabel.setStyle(labelStyle);
         writerTableList = new ListView<>();
         writerTableList.setPrefHeight(250);
@@ -433,25 +447,145 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
         jsonTitleRow.setAlignment(Pos.CENTER_LEFT);
         Label jsonLabel = new Label("生成的批量DataX JSON配置");
         jsonLabel.setStyle(StyleUtil.bodyFontOnly() + "-fx-font-weight: bold;");
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        Button copyJsonBtn = new Button("复制JSON");
-        copyJsonBtn.getStyleClass().add("dialog-button-secondary");
-        copyJsonBtn.setOnAction(e -> {
-            copyToClipboard(jsonResultArea.getText());
-            showInfo("已复制到剪贴板");
+        jsonTitleRow.getChildren().add(jsonLabel);
+
+        TableView<DataxPairRow> jsonTable = new TableView<>(jsonTableItems);
+        jsonTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+        jsonTable.setFixedCellSize(36);
+        jsonTable.setPrefHeight(36 * 5 + 30);
+        jsonTable.setMinHeight(120);
+
+        TableColumn<DataxPairRow, String> readerCol = new TableColumn<>("Reader表");
+        readerCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue() != null ? c.getValue().getReaderTable() : ""));
+        readerCol.setCellFactory(col -> new TableCell<>() {
+            private final Label label = new Label();
+            private final Button upBtn = new Button("上移");
+            private final Button downBtn = new Button("下移");
+            private final HBox box = new HBox(4, label, upBtn, downBtn);
+
+            {
+                upBtn.setStyle("-fx-font-size: 11px; -fx-padding: 2 6 2 6;");
+                downBtn.setStyle("-fx-font-size: 11px; -fx-padding: 2 6 2 6;");
+                upBtn.setMaxHeight(22);
+                downBtn.setMaxHeight(22);
+                box.setAlignment(Pos.CENTER);
+                upBtn.setOnAction(e -> moveReaderUp(getIndex()));
+                downBtn.setOnAction(e -> moveReaderDown(getIndex()));
+            }
+
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || getItem() == null) {
+                    setGraphic(null);
+                    setText(null);
+                } else {
+                    DataxPairRow row = getTableView().getItems().get(getIndex());
+                    if (row != null) {
+                        label.setText(row.getReaderTable());
+                        setGraphic(box);
+                        setAlignment(Pos.CENTER);
+                    }
+                }
+            }
         });
-        jsonTitleRow.getChildren().addAll(jsonLabel, spacer, copyJsonBtn);
+        readerCol.setPrefWidth(180);
+
+        TableColumn<DataxPairRow, String> writerCol = new TableColumn<>("Writer表");
+        writerCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue() != null ? c.getValue().getWriterTable() : ""));
+        writerCol.setCellFactory(col -> new TableCell<>() {
+            private final Label label = new Label();
+            private final Button upBtn = new Button("上移");
+            private final Button downBtn = new Button("下移");
+            private final HBox box = new HBox(4, label, upBtn, downBtn);
+
+            {
+                upBtn.setStyle("-fx-font-size: 11px; -fx-padding: 2 6 2 6;");
+                downBtn.setStyle("-fx-font-size: 11px; -fx-padding: 2 6 2 6;");
+                upBtn.setMaxHeight(22);
+                downBtn.setMaxHeight(22);
+                box.setAlignment(Pos.CENTER);
+                upBtn.setOnAction(e -> moveWriterUp(getIndex()));
+                downBtn.setOnAction(e -> moveWriterDown(getIndex()));
+            }
+
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || getItem() == null) {
+                    setGraphic(null);
+                    setText(null);
+                } else {
+                    DataxPairRow row = getTableView().getItems().get(getIndex());
+                    if (row != null) {
+                        label.setText(row.getWriterTable());
+                        setGraphic(box);
+                        setAlignment(Pos.CENTER);
+                    }
+                }
+            }
+        });
+        writerCol.setPrefWidth(180);
+
+        TableColumn<DataxPairRow, String> jsonCol = new TableColumn<>("生成JSON数据");
+        jsonCol.setCellValueFactory(c -> new SimpleStringProperty(c.getValue() != null ? truncateJson(c.getValue().getJsonString()) : ""));
+        jsonCol.setCellFactory(col -> new TableCell<>() {
+            private final Hyperlink link = new Hyperlink("查看/编辑");
+
+            {
+                link.setOnAction(e -> {
+                    DataxPairRow row = getTableView().getItems().get(getIndex());
+                    if (row != null) openJsonEditor(row);
+                });
+            }
+
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || getItem() == null) {
+                    setGraphic(null);
+                    setText(null);
+                } else {
+                    setGraphic(link);
+                    setAlignment(Pos.CENTER);
+                }
+            }
+        });
+        jsonCol.setPrefWidth(200);
+
+        TableColumn<DataxPairRow, Void> deleteCol = new TableColumn<>("删除");
+        deleteCol.setCellFactory(col -> new TableCell<>() {
+            private final Button btn = new Button("删除");
+            { btn.getStyleClass().add("dialog-button-secondary"); }
+
+            @Override
+            protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    btn.setOnAction(e -> {
+                        int idx = getIndex();
+                        if (idx >= 0 && idx < jsonTableItems.size()) {
+                            jsonTableItems.remove(idx);
+                        }
+                    });
+                    setGraphic(btn);
+                    setAlignment(Pos.CENTER);
+                }
+            }
+        });
+        deleteCol.setMaxWidth(80);
+
+        jsonTable.getColumns().add(readerCol);
+        jsonTable.getColumns().add(writerCol);
+        jsonTable.getColumns().add(jsonCol);
+        jsonTable.getColumns().add(deleteCol);
 
         VBox pane = new VBox(12);
         pane.setPadding(new Insets(16));
-        jsonResultArea = new TextArea();
-        jsonResultArea.setEditable(false);
-        jsonResultArea.setWrapText(true);
-        jsonResultArea.setPrefRowCount(20);
-        jsonResultArea.setStyle("-fx-font-family: 'Consolas', 'Monaco', monospace; -fx-font-size: 13px;");
-        VBox.setVgrow(jsonResultArea, Priority.ALWAYS);
-        pane.getChildren().addAll(jsonTitleRow, jsonResultArea);
+        VBox.setVgrow(jsonTable, Priority.ALWAYS);
+        pane.getChildren().addAll(jsonTitleRow, jsonTable);
 
         container.getChildren().addAll(formContent, pane);
         VBox.setVgrow(container, Priority.ALWAYS);
@@ -702,23 +836,17 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
                     return;
                 }
             }
-            List<String> readerTables = new ArrayList<>(readerTableList.getSelectionModel().getSelectedItems());
-            List<String> writerTables = new ArrayList<>(writerTableList.getSelectionModel().getSelectedItems());
-            int size = Math.min(readerTables.size(), writerTables.size());
-            if (size == 0) {
-                showError("验证失败", "请至少选择一对读表与写表");
+            if (jsonTableItems.isEmpty()) {
+                showError("验证失败", "请先生成JSON并至少保留一行配置");
                 return;
             }
             new Thread(() -> {
                 int created = 0;
                 try {
-                    for (int i = 0; i < size; i++) {
-                        String readerTable = readerTables.get(i);
-                        String writerTable = writerTables.get(i);
-                        String jsonParam = buildSinglePairJson(readerTable, writerTable);
+                    for (DataxPairRow row : new ArrayList<>(jsonTableItems)) {
                         JobInfoForm form = buildDataxJobInfoForm();
-                        form.setExecutorParam(jsonParam);
-                        form.setJobDesc(jobDesc + " - " + readerTable + "->" + writerTable);
+                        form.setExecutorParam(row.getJsonString());
+                        form.setJobDesc(jobDesc + " - " + row.getReaderTable() + "->" + row.getWriterTable());
                         jobInfoService.saveJobInfo(form);
                         created++;
                     }
@@ -824,18 +952,16 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
                 List<String> readerTables = new ArrayList<>(readerTableList.getSelectionModel().getSelectedItems());
                 List<String> writerTables = new ArrayList<>(writerTableList.getSelectionModel().getSelectedItems());
 
-                StringBuilder contentBuilder = new StringBuilder();
                 int size = Math.min(readerTables.size(), writerTables.size());
+                List<DataxPairRow> rows = new ArrayList<>(size);
 
                 for (int i = 0; i < size; i++) {
                     String readerTable = readerTables.get(i);
                     String writerTable = writerTables.get(i);
 
-                    // 获取字段
                     List<String> readerCols = dataxService.getColumns(readerDs.getId(), readerTable, null, null);
                     List<String> writerCols = dataxService.getColumns(writerDs.getId(), writerTable, null, null);
 
-                    // 构建Reader参数
                     JobDataxService.DataXParams readerParams = new JobDataxService.DataXParams();
                     readerParams.setColumns(readerCols);
                     readerParams.setSourceType(readerDs.getDatasource());
@@ -847,9 +973,8 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
                     readerParams.setIp(readerIpPort[0]);
                     readerParams.setPort(readerIpPort[1]);
                     readerParams.setType(0);
-                    readerParams.setIncrementType(0); // 多数据源仅支持全量
+                    readerParams.setIncrementType(0);
 
-                    // 构建Writer参数
                     JobDataxService.DataXParams writerParams = new JobDataxService.DataXParams();
                     writerParams.setColumns(writerCols);
                     writerParams.setSourceType(writerDs.getDatasource());
@@ -865,16 +990,13 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
 
                     String readerJson = dataxService.getJson(readerParams);
                     String writerJson = dataxService.getJson(writerParams);
-
-                    if (i > 0) contentBuilder.append(",");
-                    contentBuilder.append("{\"reader\":").append(readerJson)
-                            .append(",\"writer\":").append(writerJson).append("}");
+                    String singleContent = "{\"reader\":" + readerJson + ",\"writer\":" + writerJson + "}";
+                    String singlePairJson = "{\"job\":{\"content\":[" + singleContent + "],\"setting\":{\"speed\":{\"channel\":3,\"byte\":-1},\"errorLimit\":{\"record\":0,\"percentage\":0.02}}}";
+                    rows.add(new DataxPairRow(readerTable, writerTable, singlePairJson));
                 }
 
-                String finalJson = "{\"job\":{\"content\":[" + contentBuilder.toString() +
-                        "],\"setting\":{\"speed\":{\"channel\":3,\"byte\":-1},\"errorLimit\":{\"record\":0,\"percentage\":0.02}}}}";
-
-                Platform.runLater(() -> jsonResultArea.setText(formatJson(finalJson)));
+                List<DataxPairRow> finalRows = rows;
+                Platform.runLater(() -> jsonTableItems.setAll(finalRows));
             } catch (Exception e) {
                 Platform.runLater(() -> showError("生成失败", e.getMessage()));
             } finally {
@@ -904,6 +1026,7 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
 
     private void handleReset() {
         currentStep = 0;
+        jsonTableItems.clear();
         updateStepView();
         if (incrTypeCombo != null) incrTypeCombo.getSelectionModel().selectFirst();
         if (incrConfigBox != null) {
@@ -1011,6 +1134,122 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
         }).start();
     }
 
+    private static String truncateJson(String json) {
+        if (json == null || json.isEmpty()) return "";
+        if (json.length() <= 50) return json;
+        return json.substring(0, 47) + "...";
+    }
+
+    private void openJsonEditor(DataxPairRow row) {
+        String initial = row.getJsonString();
+        String display = (initial != null && !initial.isEmpty()) ? formatJson(initial) : "";
+        TextArea area = new TextArea(display);
+        area.setWrapText(true);
+        area.setPrefRowCount(18);
+        area.setStyle("-fx-font-family: 'Consolas', 'Monaco', monospace; -fx-font-size: 12px;");
+        Dialog<String> dialog = new Dialog<>();
+        dialog.setTitle("编辑 JSON");
+        dialog.initOwner(getDialogPane().getScene().getWindow());
+        dialog.getDialogPane().setContent(area);
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, ButtonType.OK);
+        dialog.setResultConverter(btn -> btn == ButtonType.OK ? area.getText() : null);
+        dialog.showAndWait().ifPresent(edited -> {
+            if (edited != null && !edited.trim().isEmpty()) {
+                row.setJsonString(edited.trim());
+                int i = jsonTableItems.indexOf(row);
+                if (i >= 0) jsonTableItems.set(i, row);
+            }
+        });
+    }
+
+    private void moveReaderUp(int index) {
+        if (index <= 0 || index >= jsonTableItems.size()) return;
+        DataxPairRow row = jsonTableItems.get(index);
+        DataxPairRow prev = jsonTableItems.get(index - 1);
+        String t = row.getReaderTable();
+        row.setReaderTable(prev.getReaderTable());
+        prev.setReaderTable(t);
+        regenerateJsonForRows(index - 1, index);
+    }
+
+    private void moveReaderDown(int index) {
+        if (index < 0 || index >= jsonTableItems.size() - 1) return;
+        DataxPairRow row = jsonTableItems.get(index);
+        DataxPairRow next = jsonTableItems.get(index + 1);
+        String t = row.getReaderTable();
+        row.setReaderTable(next.getReaderTable());
+        next.setReaderTable(t);
+        regenerateJsonForRows(index, index + 1);
+    }
+
+    private void moveWriterUp(int index) {
+        if (index <= 0 || index >= jsonTableItems.size()) return;
+        DataxPairRow row = jsonTableItems.get(index);
+        DataxPairRow prev = jsonTableItems.get(index - 1);
+        String t = row.getWriterTable();
+        row.setWriterTable(prev.getWriterTable());
+        prev.setWriterTable(t);
+        regenerateJsonForRows(index - 1, index);
+    }
+
+    private void moveWriterDown(int index) {
+        if (index < 0 || index >= jsonTableItems.size() - 1) return;
+        DataxPairRow row = jsonTableItems.get(index);
+        DataxPairRow next = jsonTableItems.get(index + 1);
+        String t = row.getWriterTable();
+        row.setWriterTable(next.getWriterTable());
+        next.setWriterTable(t);
+        regenerateJsonForRows(index, index + 1);
+    }
+
+    private void regenerateJsonForRows(int index1, int index2) {
+        if (index1 < 0 || index2 >= jsonTableItems.size()) return;
+        new Thread(() -> {
+            try {
+                for (int i : new int[]{index1, index2}) {
+                    if (i < 0 || i >= jsonTableItems.size()) continue;
+                    DataxPairRow r = jsonTableItems.get(i);
+                    String json = buildSinglePairJson(r.getReaderTable(), r.getWriterTable());
+                    String finalJson = json;
+                    int finalI = i;
+                    Platform.runLater(() -> {
+                        if (finalI < jsonTableItems.size()) {
+                            jsonTableItems.get(finalI).setJsonString(finalJson);
+                            jsonTableItems.set(finalI, jsonTableItems.get(finalI));
+                        }
+                    });
+                }
+            } catch (Exception e) {
+                Platform.runLater(() -> showError("重算JSON失败", e.getMessage()));
+            }
+        }).start();
+    }
+
+    private void copyAggregatedJson() {
+        if (jsonTableItems.isEmpty()) {
+            showError("复制失败", "暂无JSON数据");
+            return;
+        }
+        try {
+            StringBuilder content = new StringBuilder();
+            for (DataxPairRow row : jsonTableItems) {
+                String js = row.getJsonString();
+                if (js == null || js.trim().isEmpty()) continue;
+                com.google.gson.JsonObject job = new Gson().fromJson(js, com.google.gson.JsonObject.class);
+                if (job != null && job.has("job") && job.getAsJsonObject("job").has("content")) {
+                    if (content.length() > 0) content.append(",");
+                    content.append(job.getAsJsonObject("job").getAsJsonArray("content").get(0).toString());
+                }
+            }
+            String setting = "{\"speed\":{\"channel\":3,\"byte\":-1},\"errorLimit\":{\"record\":0,\"percentage\":0.02}}";
+            String aggregated = "{\"job\":{\"content\":[" + content + "],\"setting\":" + setting + "}}";
+            copyToClipboard(formatJson(aggregated));
+            showInfo("已复制到剪贴板");
+        } catch (Exception e) {
+            showError("复制失败", e.getMessage());
+        }
+    }
+
     private void copyToClipboard(String text) {
         Clipboard clipboard = Clipboard.getSystemClipboard();
         ClipboardContent content = new ClipboardContent();
@@ -1030,5 +1269,27 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
         alert.setTitle("提示");
         alert.initOwner(getDialogPane().getScene().getWindow());
         alert.showAndWait();
+    }
+
+    /**
+     * 一行数据：Reader 表、Writer 表、该对生成的 DataX JSON
+     */
+    public static class DataxPairRow {
+        private String readerTable;
+        private String writerTable;
+        private String jsonString;
+
+        public DataxPairRow(String readerTable, String writerTable, String jsonString) {
+            this.readerTable = readerTable;
+            this.writerTable = writerTable;
+            this.jsonString = jsonString;
+        }
+
+        public String getReaderTable() { return readerTable; }
+        public void setReaderTable(String readerTable) { this.readerTable = readerTable; }
+        public String getWriterTable() { return writerTable; }
+        public void setWriterTable(String writerTable) { this.writerTable = writerTable; }
+        public String getJsonString() { return jsonString; }
+        public void setJsonString(String jsonString) { this.jsonString = jsonString; }
     }
 }
