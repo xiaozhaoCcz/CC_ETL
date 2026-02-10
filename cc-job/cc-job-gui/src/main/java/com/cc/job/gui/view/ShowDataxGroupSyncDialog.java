@@ -98,6 +98,9 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
 
     private List<JobJdbcDatasource> allDatasources = new ArrayList<>();
 
+    /** 主窗口引用，用于关闭弹窗后弹出成功提示时的 Alert owner */
+    private final Stage ownerStage;
+
     private static final String[] DS_TYPES = {"MYSQL", "ORACLE", "POSTGRESQL"};
     private static final String[] WRITE_MODES = {"insert", "update", "replace"};
     private static final String[] INCR_MODES = {"ID自增", "时间自增"};
@@ -106,6 +109,7 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
     public ShowDataxGroupSyncDialog(Stage ownerStage) {
         setTitle("多数据源同步");
         initOwner(ownerStage);
+        this.ownerStage = ownerStage;
         initModality(Modality.WINDOW_MODAL);
 
         styleDialog();
@@ -852,8 +856,12 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
                     }
                     int finalCreated = created;
                     Platform.runLater(() -> {
-                        showInfo("已成功创建 " + finalCreated + " 个任务");
+                        setResult(null);
+                        if (getDialogPane().getScene() != null && getDialogPane().getScene().getWindow() instanceof Stage) {
+                            ((Stage) getDialogPane().getScene().getWindow()).close();
+                        }
                         close();
+                        Platform.runLater(() -> showInfoWithOwner(ownerStage, "已成功创建 " + finalCreated + " 个任务"));
                     });
                 } catch (Exception e) {
                     Platform.runLater(() -> showError("保存失败", e.getMessage()));
@@ -1268,6 +1276,19 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
         Alert alert = new Alert(Alert.AlertType.INFORMATION, msg, ButtonType.OK);
         alert.setTitle("提示");
         alert.initOwner(getDialogPane().getScene().getWindow());
+        alert.showAndWait();
+    }
+
+    /**
+     * 关闭弹窗后使用的成功提示，仅一个“确定”按钮，owner 为主窗口避免已关闭 Dialog 导致异常。
+     */
+    private void showInfoWithOwner(Stage owner, String msg) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION, msg, ButtonType.OK);
+        alert.getButtonTypes().setAll(ButtonType.OK);
+        alert.setTitle("提示");
+        if (owner != null) {
+            alert.initOwner(owner);
+        }
         alert.showAndWait();
     }
 

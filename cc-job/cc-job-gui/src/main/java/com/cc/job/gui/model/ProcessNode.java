@@ -1276,6 +1276,7 @@ public class ProcessNode extends StackPane {
             case "PHP" -> "#777BB4";     // 紫色
             case "Node" -> "#339933";     // 绿色
             case "PS" -> "#0078D4";       // 蓝色
+            case "DataX" -> "#0D9488";   // teal 数据同步
             default -> "#2563EB";          // 默认蓝色
         };
         
@@ -1311,6 +1312,7 @@ public class ProcessNode extends StackPane {
             case "PHP" -> createNodeIcon(Feather.FILE_TEXT, "#6B21A8", 18);
             case "Node" -> createNodeIcon(Feather.PACKAGE, "#15803D", 18);
             case "PS" -> createNodeIcon(Feather.ZAP, "#0369A1", 18);
+            case "DataX" -> createNodeIcon(Feather.REPEAT, "#0D9488", 18);
             default -> createNodeIcon(Feather.CPU, "#4B5563", 18);
         };
     }

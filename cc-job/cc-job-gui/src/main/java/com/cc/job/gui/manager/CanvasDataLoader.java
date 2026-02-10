@@ -237,6 +237,7 @@ public class CanvasDataLoader {
             case "node", "nodejs", "glue(nodejs)", "custom-nodejs" -> "Node";
             case "powershell", "ps", "glue(powershell)", "custom-powershell" -> "PS";
             case "csharp", "c#", "glue(csharp)", "custom-csharp" -> "C#";
+            case "datax" -> "DataX";
             default -> "Bean";
         };
     }

@@ -122,6 +122,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         put("SQL","custom-sql");
         put("API","custom-api");
         put("BEAN","custom-bean");
+        put("DATAX","datax");
         put("GLUE_GROOVY","custom-java");
         put("GLUE_SHELL","custom-shell");
         put("GLUE_PYTHON","custom-python");

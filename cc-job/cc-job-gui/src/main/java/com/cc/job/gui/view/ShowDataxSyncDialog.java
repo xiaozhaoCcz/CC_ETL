@@ -34,6 +34,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -130,20 +131,43 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     /** 编辑模式下的任务表单数据，非 null 且 id 非 null 时表示编辑 */
     private JobInfoForm editForm;
 
+    /** 仅配置模式：从节点对话框打开，确认时回调 JSON 不保存任务 */
+    private Consumer<String> onJsonReturn;
+    /** 仅配置模式下可预填的 JSON */
+    private String initialJsonForNode;
+
+    /** 主窗口引用，用于关闭弹窗后弹出成功提示时的 Alert owner */
+    private final Stage ownerStage;
+
     public ShowDataxSyncDialog(Stage ownerStage) {
         this(ownerStage, null);
     }
 
     public ShowDataxSyncDialog(Stage ownerStage, JobInfoForm editData) {
+        this(ownerStage, editData, null, null);
+    }
+
+    /**
+     * 仅配置并带回 JSON 模式（供节点对话框「配置datax」使用）。
+     * 确认时仅校验 JSON 非空并回调，不保存任务。
+     */
+    public ShowDataxSyncDialog(Stage ownerStage, String initialJson, Consumer<String> onJsonReturn) {
+        this(ownerStage, null, initialJson, onJsonReturn);
+    }
+
+    private ShowDataxSyncDialog(Stage ownerStage, JobInfoForm editData, String initialJson, Consumer<String> onJsonReturn) {
         this.jobGroupService = new JobGroupService();
+        this.onJsonReturn = onJsonReturn;
+        this.initialJsonForNode = (initialJson != null && !initialJson.trim().isEmpty()) ? initialJson.trim() : null;
         if (editData != null && editData.getId() != null) {
             this.editForm = editData;
             setTitle("数据源同步（编辑）");
         } else {
             this.editForm = null;
-            setTitle("数据源同步");
+            setTitle(onJsonReturn != null ? "数据源同步（配置 DataX）" : "数据源同步");
         }
         initOwner(ownerStage);
+        this.ownerStage = ownerStage;
         initModality(Modality.WINDOW_MODAL);
 
         styleDialog();
@@ -287,7 +311,13 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         switch (currentStep) {
             case 0 -> contentPane.getChildren().add(readerPaneCache);
             case 1 -> contentPane.getChildren().add(writerPaneCache);
-            case 2 -> contentPane.getChildren().add(resultPaneCache);
+            case 2 -> {
+                contentPane.getChildren().add(resultPaneCache);
+                if (initialJsonForNode != null && jsonResultArea != null) {
+                    jsonResultArea.setText(initialJsonForNode);
+                    jsonResultArea.setEditable(true);
+                }
+            }
         }
     }
 
@@ -805,7 +835,11 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         VBox.setVgrow(jsonResultArea, Priority.ALWAYS);
         pane.getChildren().addAll(jsonTitleRow, jsonResultArea);
 
-        container.getChildren().addAll(formContent, pane);
+        if (onJsonReturn != null) {
+            container.getChildren().add(pane);
+        } else {
+            container.getChildren().addAll(formContent, pane);
+        }
         VBox.setVgrow(container, Priority.ALWAYS);
         return container;
     }
@@ -1124,7 +1158,26 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
             currentStep++;
             updateStepView();
         } else {
-            // 确认：校验并新增任务
+            // 确认
+            String jsonParam = jsonResultArea.getText() != null ? jsonResultArea.getText().trim() : "";
+            if (jsonParam.isEmpty()) {
+                showError("验证失败", "生成的 JSON 为空，请先完成 Reader/Writer 配置并生成 JSON");
+                return;
+            }
+            // 仅配置模式：回调 JSON 并关闭，不保存任务
+            if (onJsonReturn != null) {
+                String json = jsonParam;
+                Platform.runLater(() -> {
+                    onJsonReturn.accept(json);
+                    setResult(null);
+                    if (getDialogPane().getScene() != null && getDialogPane().getScene().getWindow() instanceof Stage) {
+                        ((Stage) getDialogPane().getScene().getWindow()).close();
+                    }
+                    close();
+                });
+                return;
+            }
+            // 校验并新增/更新任务
             if (jobGroupCombo.getValue() == null) {
                 showError("验证失败", "请选择执行器");
                 return;
@@ -1147,11 +1200,6 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                     return;
                 }
             }
-            String jsonParam = jsonResultArea.getText() != null ? jsonResultArea.getText().trim() : "";
-            if (jsonParam.isEmpty()) {
-                showError("验证失败", "生成的 JSON 为空，请先完成 Reader/Writer 配置并生成 JSON");
-                return;
-            }
             JobInfoForm form = buildDataxJobInfoForm();
             form.setExecutorParam(jsonParam);
             final boolean isEdit = editForm != null && editForm.getId() != null;
@@ -1161,8 +1209,12 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                         boolean ok = jobInfoService.updateJobInfo(editForm.getId(), form);
                         Platform.runLater(() -> {
                             if (ok) {
-                                showInfo("保存成功");
+                                setResult(null);
+                                if (getDialogPane().getScene() != null && getDialogPane().getScene().getWindow() instanceof Stage) {
+                                    ((Stage) getDialogPane().getScene().getWindow()).close();
+                                }
                                 close();
+                                Platform.runLater(() -> showInfoWithOwner(ownerStage, "保存成功"));
                             } else {
                                 showError("保存失败", "更新任务失败");
                             }
@@ -1170,8 +1222,12 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                     } else {
                         long id = jobInfoService.saveJobInfo(form);
                         Platform.runLater(() -> {
-                            showInfo("任务已成功添加到任务列表，ID: " + id);
+                            setResult(null);
+                            if (getDialogPane().getScene() != null && getDialogPane().getScene().getWindow() instanceof Stage) {
+                                ((Stage) getDialogPane().getScene().getWindow()).close();
+                            }
                             close();
+                            Platform.runLater(() -> showInfoWithOwner(ownerStage, "任务已成功添加到任务列表，ID: " + id));
                         });
                     }
                 } catch (Exception e) {
@@ -1940,6 +1996,19 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         Alert alert = new Alert(Alert.AlertType.INFORMATION, msg, ButtonType.OK);
         alert.setTitle("提示");
         alert.initOwner(getDialogPane().getScene().getWindow());
+        alert.showAndWait();
+    }
+
+    /**
+     * 关闭弹窗后使用的成功提示，仅一个“确定”按钮，owner 为主窗口避免已关闭 Dialog 导致异常。
+     */
+    private void showInfoWithOwner(Stage owner, String msg) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION, msg, ButtonType.OK);
+        alert.getButtonTypes().setAll(ButtonType.OK);
+        alert.setTitle("提示");
+        if (owner != null) {
+            alert.initOwner(owner);
+        }
         alert.showAndWait();
     }
 }

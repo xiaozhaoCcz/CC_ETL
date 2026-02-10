@@ -584,6 +584,7 @@ public class NodeOperationManager {
             case "GLUE_NODEJS": return "Node";
             case "GLUE_POWERSHELL": return "PS";
             case "GLUE_CSHARP": return "C#";
+            case "DATAX": return "DataX";
             default: return "Bean";
         }
     }
