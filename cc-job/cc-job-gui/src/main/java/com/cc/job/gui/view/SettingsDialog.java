@@ -22,7 +22,6 @@ public class SettingsDialog extends Dialog<Void> {
     // 常规设置
     private TextField autoSaveIntervalField;
     private CheckBox restoreSessionCheckBox;
-    private TextField dataxPathField;
     
     // 网络设置
     private TextField apiUrlField;
@@ -111,12 +110,6 @@ public class SettingsDialog extends Dialog<Void> {
         restoreSessionCheckBox = new CheckBox();
         grid.add(restoreSessionCheckBox, 1, 1);
         
-        // DataX 路径
-        grid.add(new Label("DataX 路径(可选):"), 0, 2);
-        dataxPathField = new TextField();
-        dataxPathField.setPromptText("DataX 安装目录或 datax.py 路径，如 /opt/datax 或 /opt/datax/bin/datax.py");
-        grid.add(dataxPathField, 1, 2);
-        
         TitledPane pane = new TitledPane("常规设置", grid);
         return pane;
     }
@@ -180,9 +173,6 @@ public class SettingsDialog extends Dialog<Void> {
         String restoreSession = configManager.getProperty("restore.session", "true");
         restoreSessionCheckBox.setSelected("true".equals(restoreSession));
         
-        String dataxPath = configManager.getProperty("datax.path", "");
-        dataxPathField.setText(dataxPath);
-        
         // 加载网络设置
         String apiUrl = configManager.getBaseUrl();
         apiUrlField.setText(apiUrl);
@@ -206,7 +196,6 @@ public class SettingsDialog extends Dialog<Void> {
             // 保存常规设置
             configManager.setProperty("auto.save.interval", autoSaveIntervalField.getText());
             configManager.setProperty("restore.session", String.valueOf(restoreSessionCheckBox.isSelected()));
-            configManager.setProperty("datax.path", dataxPathField.getText().trim());
             
             // 保存网络设置
             String apiUrl = apiUrlField.getText().trim();

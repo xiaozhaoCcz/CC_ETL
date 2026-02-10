@@ -847,14 +847,23 @@ public class ShowJobListDialog extends Dialog<Void> {
 
     private void handleRun(JobInfoVO job) {
         if (job == null || job.getId() == null) return;
-        
-        // 显示执行参数输入对话框
+
+        // DataX 任务：不弹框，直接使用任务已配置的执行参数触发
+        if ("DATAX".equalsIgnoreCase(job.getGlueType())) {
+            runAsync("执行任务", () -> {
+                jobInfoService.triggerOnce(job.getId(), safe(job.getExecutorParam()));
+                return "触发成功";
+            });
+            return;
+        }
+
+        // 非 DataX：显示执行参数输入对话框
         TextInputDialog dialog = new TextInputDialog(safe(job.getExecutorParam()));
         dialog.setTitle("执行一次");
         dialog.setHeaderText("任务: " + safe(job.getJobDesc()));
         dialog.setContentText("执行参数:");
         dialog.initOwner(getDialogPane().getScene().getWindow());
-        
+
         dialog.showAndWait().ifPresent(param -> {
             runAsync("执行任务", () -> {
                 jobInfoService.triggerOnce(job.getId(), param);

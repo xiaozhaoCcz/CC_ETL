@@ -35,11 +35,11 @@ public class DataxCommandBuilder {
      * @param jobInfo 任务信息
      * @return 命令数组
      */
-    public String[] buildCommand(String dataxPy, String jsonFile, JobInfo jobInfo) {
+    public String[] buildCommand(String pythonPath,String dataxPy, String jsonFile, JobInfo jobInfo) {
         logger.debug("[DataxCommandBuilder] 构建DataX命令 - jobId: {}", jobInfo.getId());
         
         List<String> cmdList = new ArrayList<>();
-        cmdList.add(DataxConstant.PYTHON);
+        cmdList.add(pythonPath);
         cmdList.add(dataxPy);
         cmdList.add(jsonFile);
         

@@ -56,8 +56,7 @@ cc-job:
     accessToken: default_token
 
   executor:
-    #jsonpath: D:\\temp\\executor\\json\\
-    jsonpath:  /Users/zhaowenpeng/Downloads/datax/
+    jsonpath: /Users/xiaozhao/Downloads/datax/
+    pypath: /usr/bin/python3
+    dataxpath: /Users/xiaozhao/Downloads/datax/bin/datax.py
 
-  #pypath: F:\tools\datax\bin\datax.py
-  pypath: /Users/zhaowenpeng/Downloads/datax/bin/datax.py
