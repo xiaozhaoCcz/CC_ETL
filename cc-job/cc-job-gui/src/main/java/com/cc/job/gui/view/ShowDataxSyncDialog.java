@@ -386,6 +386,47 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
             jsonResultArea.setText(form.getExecutorParam() != null ? form.getExecutorParam() : "");
             jsonResultArea.setEditable(true);
         }
+        // 回填增量配置
+        if (incrTypeCombo != null) {
+            Integer incrType = form.getIncrementType();
+            if (incrType != null && incrType == 1) {
+                incrTypeCombo.setValue("增量");
+                String content = form.getIncrementContent();
+                if (content != null && !content.trim().isEmpty()) {
+                    try {
+                        com.google.gson.JsonElement parsed = com.google.gson.JsonParser.parseString(content);
+                        if (parsed.isJsonArray()) {
+                            com.google.gson.JsonArray arr = parsed.getAsJsonArray();
+                            if (arr.size() > 0) {
+                                com.google.gson.JsonObject first = arr.get(0).getAsJsonObject();
+                                if (incrColumnField != null && first.has("columnKey")) {
+                                    incrColumnField.setText(first.get("columnKey").getAsString());
+                                }
+                                if (incrInitValueField != null && first.has("columnValue")) {
+                                    incrInitValueField.setText(first.get("columnValue").getAsString());
+                                }
+                                if (incrModeCombo != null && first.has("columnType")) {
+                                    int ct = first.get("columnType").getAsInt();
+                                    incrModeCombo.setValue(ct == 1 ? "时间自增" : "ID自增");
+                                }
+                                if (incrTimeFormatCombo != null && first.has("columnTimeFormat")) {
+                                    String tf = first.get("columnTimeFormat").getAsString();
+                                    if (!"x".equalsIgnoreCase(tf)) {
+                                        incrTimeFormatCombo.setValue(tf);
+                                    }
+                                }
+                            }
+                        }
+                    } catch (Exception ignored) {
+                        // 解析失败时仅保留增量类型，不填明细
+                    }
+                }
+                updateIncrConfigVisibility();
+            } else {
+                incrTypeCombo.setValue("全量");
+                updateIncrConfigVisibility();
+            }
+        }
     }
 
     private Node createReaderPane() {
@@ -1277,6 +1318,16 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         }
         if (editForm != null && editForm.getId() != null) {
             form.setId(editForm.getId());
+        }
+        // 增量类型与增量内容（执行器依赖此判断是否追加 -p 参数及刷新增量标记）
+        if (incrTypeCombo != null) {
+            int incrType = "增量".equals(incrTypeCombo.getValue()) ? 1 : 0;
+            form.setIncrementType(incrType);
+            if (incrType == 1) {
+                form.setIncrementContent(buildIncrementContent());
+            } else {
+                form.setIncrementContent(null);
+            }
         }
         return form;
     }
