@@ -1,7 +1,9 @@
 package com.cc.job.admin.task.controller;
 
 
+import com.cc.job.admin.task.auth.AuthContext;
 import com.cc.job.admin.task.service.JobUserService;
+import com.cc.job.admin.task.service.PermissionService;
 import com.cc.job.xo.common.result.Result;
 import com.cc.job.xo.model.dto.LoginResult;
 import io.swagger.v3.oas.annotations.Operation;
@@ -10,6 +12,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 /**
  * 认证控制层
@@ -26,8 +30,11 @@ public class AuthController {
 
     private final JobUserService jobUserService;
 
-    public AuthController(JobUserService jobUserService) {
+    private final PermissionService permissionService;
+
+    public AuthController(JobUserService jobUserService, PermissionService permissionService) {
         this.jobUserService = jobUserService;
+        this.permissionService = permissionService;
     }
 
     @Operation(summary = "登录")
@@ -65,5 +72,16 @@ public class AuthController {
     public Result<?> logout() {
         // TODO: 可以在这里清理session、token黑名单等
         return Result.success("注销成功");
+    }
+
+    @Operation(summary = "当前用户权限码列表（用于前端按钮级权限）")
+    @GetMapping("/permissions")
+    public Result<List<String>> getPermissions() {
+        Long userId = AuthContext.getUserId();
+        if (userId == null) {
+            return Result.success(List.of());
+        }
+        List<String> codes = permissionService.getPermissionCodes(userId);
+        return Result.success(codes);
     }
 }

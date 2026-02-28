@@ -1,5 +1,7 @@
 package com.cc.job.admin.task.controller;
 
+import com.cc.job.admin.task.auth.RequirePermission;
+import com.cc.job.admin.task.auth.PermissionConstants;
 import com.cc.job.admin.task.service.JobPartService;
 import com.cc.job.xo.common.result.Result;
 import com.cc.job.xo.model.entity.JobPart;
@@ -11,7 +13,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
-import java.util.Objects;
 
 @Tag(name = "job_part接口")
 @RestController
@@ -24,7 +25,7 @@ public class JobPartController {
         this.jobPartService = jobPartService;
     }
 
-
+    @RequirePermission(PermissionConstants.PART_VIEW)
     @Operation(summary = "获取所有的树形数据")
     @GetMapping("getTree")
     public Result<List<JobPartVo>> getTree() {
@@ -32,6 +33,7 @@ public class JobPartController {
         return Result.success(list);
     }
 
+    @RequirePermission(PermissionConstants.PART_EDIT)
     @Operation(summary = "保存数据")
     @PostMapping("saveJobPart")
     public Result<Void> saveJobPart(@RequestBody JobPart jobPart) {
@@ -39,6 +41,7 @@ public class JobPartController {
         return Result.judge(save);
     }
 
+    @RequirePermission(PermissionConstants.PART_EDIT)
     @Operation(summary = "修改数据")
     @PostMapping("updateJobPart")
     public Result<Void> updateJobPart(@RequestBody JobPart jobPart) {
@@ -46,6 +49,7 @@ public class JobPartController {
         return Result.judge(save);
     }
 
+    @RequirePermission(PermissionConstants.PART_DELETE)
     @Operation(summary = "删除数据")
     @GetMapping("deleteJobPart/{id}")
     public Result<Void> deleteJobPart(@PathVariable("id") Long id) {
@@ -53,6 +57,7 @@ public class JobPartController {
         return Result.success();
     }
 
+    @RequirePermission(PermissionConstants.PART_VIEW)
     @Operation(summary = "获取子节点数据")
     @GetMapping("getChildren/{id}/{type}")
     public Result<Object> getChildren(@PathVariable Long id, @PathVariable Integer type) {
@@ -60,6 +65,7 @@ public class JobPartController {
         return Result.success(o);
     }
 
+    @RequirePermission(PermissionConstants.PART_VIEW)
     @Operation(summary = "导出数据")
     @GetMapping("exportData/{id}")
     public ResponseEntity<byte[]> exportData(@PathVariable Long id){
@@ -73,6 +79,7 @@ public class JobPartController {
         return new ResponseEntity<>(b, headers, HttpStatus.OK);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_VIEW)
     @Operation(summary = "导出任务组数据")
     @GetMapping("exportTaskGroup/{jobId}")
     public ResponseEntity<byte[]> exportTaskGroup(@PathVariable Long jobId) {
@@ -85,6 +92,7 @@ public class JobPartController {
         return new ResponseEntity<>(b, headers, HttpStatus.OK);
     }
 
+    @RequirePermission(PermissionConstants.PART_EDIT)
     @Operation(summary = "导入数据")
     @PostMapping("importData")
     public Result<Void> importData(@RequestParam("file") MultipartFile file) {
@@ -92,6 +100,7 @@ public class JobPartController {
         return Result.success();
     }
 
+    @RequirePermission(PermissionConstants.PART_EDIT)
     @Operation(summary = "导入任务组到指定分区")
     @PostMapping("importTaskGroup")
     public Result<Void> importTaskGroup(

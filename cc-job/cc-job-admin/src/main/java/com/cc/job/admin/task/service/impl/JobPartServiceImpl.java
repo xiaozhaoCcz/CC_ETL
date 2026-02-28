@@ -2,10 +2,14 @@ package com.cc.job.admin.task.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.cc.job.admin.task.auth.AuthContext;
+import com.cc.job.admin.task.auth.PermissionConstants;
 import com.cc.job.admin.task.service.JobEdgeService;
 import com.cc.job.admin.task.service.JobInfoService;
 import com.cc.job.admin.task.service.JobNodeService;
 import com.cc.job.admin.task.service.JobPartService;
+import com.cc.job.admin.task.service.PermissionService;
+import com.cc.job.admin.exception.ForbiddenException;
 import com.cc.job.xo.mapper.JobPartMapper;
 import com.cc.job.xo.model.dto.PartitionExportData;
 import com.cc.job.xo.model.entity.JobEdge;
@@ -45,19 +49,46 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
 
     private final JobEdgeService jobEdgeService;
 
-    public JobPartServiceImpl(JobInfoService jobInfoService, JobNodeService jobNodeService, JobEdgeService jobEdgeService) {
+    private final PermissionService permissionService;
+
+    public JobPartServiceImpl(JobInfoService jobInfoService, JobNodeService jobNodeService, JobEdgeService jobEdgeService,
+                              PermissionService permissionService) {
         this.jobInfoService = jobInfoService;
         this.jobNodeService = jobNodeService;
         this.jobEdgeService = jobEdgeService;
+        this.permissionService = permissionService;
+    }
+
+    @Override
+    public boolean updateById(JobPart entity) {
+        if (entity != null && entity.getId() != null) {
+            Long userId = AuthContext.getUserId();
+            if (!permissionService.canAccessResource(userId, PermissionConstants.RESOURCE_PART, PermissionConstants.ACTION_EDIT, entity.getId())) {
+                throw new ForbiddenException("无权限修改该分区");
+            }
+        }
+        return super.updateById(entity);
     }
 
     @Override
     public List<JobPartVo> getTree() {
         List<JobPartVo> jobPartVos = new ArrayList<>();
-        // 获取所有的分区
+        Long userId = AuthContext.getUserId();
+        List<Long> allowedPartIds = permissionService.getAllowedResourceIds(userId, PermissionConstants.RESOURCE_PART, PermissionConstants.ACTION_VIEW);
+        List<Long> allowedJobInfoIds = permissionService.getAllowedResourceIds(userId, PermissionConstants.RESOURCE_JOB_INFO, PermissionConstants.ACTION_VIEW);
+
+        // 获取所有的分区（无全局权限时只保留允许的分区）
         List<JobPart> jobPartList = this.list();
+        if (allowedPartIds != null) {
+            Set<Long> partIdSet = new HashSet<>(allowedPartIds);
+            jobPartList = jobPartList.stream().filter(p -> partIdSet.contains(p.getId())).collect(Collectors.toList());
+        }
 
         List<JobInfo> jobInfoList = jobInfoService.list(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getJobType, 2).eq(JobInfo::getNodeFlag, "N"));
+        if (allowedJobInfoIds != null) {
+            Set<Long> jobInfoIdSet = new HashSet<>(allowedJobInfoIds);
+            jobInfoList = jobInfoList.stream().filter(j -> jobInfoIdSet.contains(j.getId())).collect(Collectors.toList());
+        }
 
         Map<Integer, List<JobInfo>> jobInfoMap = jobInfoList.stream().collect(Collectors.groupingBy(JobInfo::getJobPartId));
 
@@ -208,6 +239,16 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
 
     @Override
     public Object getChildren(Long id, Integer type) {
+        Long userId = AuthContext.getUserId();
+        if (type == 0) {
+            if (!permissionService.canAccessResource(userId, PermissionConstants.RESOURCE_PART, PermissionConstants.ACTION_VIEW, id)) {
+                throw new ForbiddenException("无权限查看该分区");
+            }
+        } else if (type == 1) {
+            if (!permissionService.canAccessResource(userId, PermissionConstants.RESOURCE_JOB_INFO, PermissionConstants.ACTION_VIEW, id)) {
+                throw new ForbiddenException("无权限查看该任务");
+            }
+        }
         if(type==0){
             List<JobPartVo> list = new ArrayList<>();
             List<JobInfo> jobInfoList = jobInfoService.list(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getJobPartId, id));
@@ -260,6 +301,10 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
+        Long userId = AuthContext.getUserId();
+        if (!permissionService.canAccessResource(userId, PermissionConstants.RESOURCE_PART, PermissionConstants.ACTION_DELETE, id)) {
+            throw new ForbiddenException("无权限删除该分区");
+        }
         //删除任务分区同时要删除下面的所有子任务组
         List<JobInfo> jobInfoList = jobInfoService.list(new LambdaQueryWrapper<JobInfo>().eq(JobInfo::getJobPartId, id));
         List<Long> ids = jobInfoList.stream().map(JobInfo::getId).toList();
@@ -279,6 +324,10 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
      */
     @Override
     public byte[] exportData(Long id) {
+        Long userId = AuthContext.getUserId();
+        if (!permissionService.canAccessResource(userId, PermissionConstants.RESOURCE_PART, PermissionConstants.ACTION_VIEW, id)) {
+            throw new ForbiddenException("无权限导出该分区");
+        }
         // 1. 获取分区信息
         JobPart jobPart = this.getById(id);
         if (jobPart == null) {
@@ -413,6 +462,10 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
      */
     @Override
     public byte[] exportTaskGroupData(Long jobId) {
+        Long userId = AuthContext.getUserId();
+        if (!permissionService.canAccessResource(userId, PermissionConstants.RESOURCE_JOB_INFO, PermissionConstants.ACTION_VIEW, jobId)) {
+            throw new ForbiddenException("无权限导出该任务组");
+        }
         JobInfo taskGroup = jobInfoService.getById(jobId);
         if (taskGroup == null) {
             throw new RuntimeException("任务组不存在: " + jobId);
@@ -671,6 +724,10 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
     public void importTaskGroup(Long partitionId, MultipartFile file) {
         if (partitionId == null) {
             throw new RuntimeException("分区ID不能为空");
+        }
+        Long userId = AuthContext.getUserId();
+        if (!permissionService.canAccessResource(userId, PermissionConstants.RESOURCE_PART, PermissionConstants.ACTION_EDIT, partitionId)) {
+            throw new ForbiddenException("无权限向该分区导入任务组");
         }
         JobPart partition = this.getById(partitionId);
         if (partition == null) {

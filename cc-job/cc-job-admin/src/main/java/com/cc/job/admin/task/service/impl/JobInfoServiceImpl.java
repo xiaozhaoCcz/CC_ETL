@@ -7,6 +7,9 @@ import cn.hutool.http.HttpResponse;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cc.job.admin.exception.ForbiddenException;
+import com.cc.job.admin.task.auth.AuthContext;
+import com.cc.job.admin.task.auth.PermissionConstants;
 import com.cc.job.admin.task.service.*;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.admin.cron.CronExpression;
@@ -90,6 +93,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
     private final JobComposeMapper jobComposeMapper;
 
+    private final PermissionService permissionService;
+
     // 构造函数注入PlatformTransactionManager并创建TransactionTemplate
     public JobInfoServiceImpl(JobGroupService jobGroupService,
                               JobNodeService jobNodeService,
@@ -99,7 +104,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
                               JobLogMapper jobLogMapper,
                               JobGroupSnapshotService jobGroupSnapshotService,
                               PlatformTransactionManager transactionManager,
-                              JobComposeMapper jobComposeMapper) {
+                              JobComposeMapper jobComposeMapper,
+                              PermissionService permissionService) {
         this.jobGroupService = jobGroupService;
         this.jobNodeService = jobNodeService;
         this.jobEdgeService = jobEdgeService;
@@ -109,6 +115,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         this.jobGroupSnapshotService = jobGroupSnapshotService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.jobComposeMapper = jobComposeMapper;
+        this.permissionService = permissionService;
     }
 
     // ⭐ 用于异步调用停止接口的线程池
@@ -168,6 +175,16 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         wrapper.in(JobInfo::getNodeFlag, "N");
         wrapper.orderByDesc(JobInfo::getUpdateTime);
 
+        Long userId = AuthContext.getUserId();
+        List<Long> allowedJobInfoIds = permissionService.getAllowedResourceIds(userId, PermissionConstants.RESOURCE_JOB_INFO, PermissionConstants.ACTION_VIEW);
+        if (allowedJobInfoIds != null) {
+            if (allowedJobInfoIds.isEmpty()) {
+                wrapper.eq(JobInfo::getId, -1L);
+            } else {
+                wrapper.in(JobInfo::getId, allowedJobInfoIds);
+            }
+        }
+
         Page<JobInfo> page = this.page(new Page<>(queryParams.getPageNum(), queryParams.getPageSize()), wrapper);
         List<JobInfo> records = page.getRecords();
         List<JobInfoVO> voList = records.stream().map(v -> BeanUtil.copyProperties(v, JobInfoVO.class)).toList();
@@ -184,6 +201,10 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
      */
     @Override
     public JobInfoForm getJobInfoForm(Long id) {
+        Long userId = AuthContext.getUserId();
+        if (!permissionService.canAccessResource(userId, PermissionConstants.RESOURCE_JOB_INFO, PermissionConstants.ACTION_VIEW, id)) {
+            throw new ForbiddenException("无权限查看该任务");
+        }
         JobInfo entity = this.getById(id);
         JobInfoForm taskInfoForm = BeanUtil.copyProperties(entity, JobInfoForm.class);
         if (entity!=null && entity.getJobType() == 2) {
@@ -247,6 +268,10 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean updateJobInfo(Long id, JobInfoForm formData) {
+        Long userId = AuthContext.getUserId();
+        if (!permissionService.canAccessResource(userId, PermissionConstants.RESOURCE_JOB_INFO, PermissionConstants.ACTION_EDIT, id)) {
+            throw new ForbiddenException("无权限修改该任务");
+        }
         // valid trigger
         JobInfo existsJobInfo = baseUpdateJobInfo(id, formData);
 
@@ -294,10 +319,15 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     @Transactional(rollbackFor = Exception.class)
     public boolean deleteJobInfos(String ids) {
         Assert.isTrue(StrUtil.isNotBlank(ids), "删除的task_info数据为空");
-        // 逻辑删除
+        Long userId = AuthContext.getUserId();
         List<Long> idList = Arrays.stream(ids.split(","))
                 .map(Long::parseLong)
                 .toList();
+        for (Long jobId : idList) {
+            if (!permissionService.canAccessResource(userId, PermissionConstants.RESOURCE_JOB_INFO, PermissionConstants.ACTION_DELETE, jobId)) {
+                throw new ForbiddenException("无权限删除任务: " + jobId);
+            }
+        }
         for (Long jobId : idList) {
             delNodes(jobId);
         }
@@ -328,6 +358,10 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     //@Transactional(rollbackFor = Exception.class)
     public String triggerJob(JobInfoTriggerDto taskInfoTriggerDto) {
         Long jobId = taskInfoTriggerDto.getId();
+        Long userId = AuthContext.getUserId();
+        if (!permissionService.canAccessResource(userId, PermissionConstants.RESOURCE_JOB_INFO, PermissionConstants.ACTION_EXECUTE, jobId)) {
+            throw new ForbiddenException("无权限执行该任务");
+        }
         String randomId = taskInfoTriggerDto.getExecutorParam();
 
         // 【数据库行锁】使用 FOR UPDATE 查询，防止并发执行
@@ -478,6 +512,10 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
     @Override
     public boolean startJob(Long id) {
+        Long userId = AuthContext.getUserId();
+        if (!permissionService.canAccessResource(userId, PermissionConstants.RESOURCE_JOB_INFO, PermissionConstants.ACTION_EXECUTE, id)) {
+            throw new ForbiddenException("无权限启动该任务");
+        }
         JobInfo xxlJobInfo = this.getById(id);
 
         // valid
@@ -506,8 +544,32 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
     }
 
     @Override
+    public List<JobInfo> getJobInfoListWithPermission(Integer jobType) {
+        LambdaQueryWrapper<JobInfo> wrapper = new LambdaQueryWrapper<>();
+        if (jobType != null) {
+            wrapper.eq(JobInfo::getJobType, jobType);
+        } else {
+            wrapper.in(JobInfo::getJobType, 0, 2);
+        }
+        wrapper.eq(JobInfo::getNodeFlag, "N");
+        Long userId = AuthContext.getUserId();
+        List<Long> allowedJobInfoIds = permissionService.getAllowedResourceIds(userId, PermissionConstants.RESOURCE_JOB_INFO, PermissionConstants.ACTION_VIEW);
+        if (allowedJobInfoIds != null) {
+            if (allowedJobInfoIds.isEmpty()) {
+                return Collections.emptyList();
+            }
+            wrapper.in(JobInfo::getId, allowedJobInfoIds);
+        }
+        return this.list(wrapper);
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean stopJob(Long id) {
+        Long userId = AuthContext.getUserId();
+        if (!permissionService.canAccessResource(userId, PermissionConstants.RESOURCE_JOB_INFO, PermissionConstants.ACTION_EXECUTE, id)) {
+            throw new ForbiddenException("无权限停止该任务");
+        }
         JobInfo xxlJobInfo = this.getById(id);
         xxlJobInfo.setTriggerStatus(0);
         xxlJobInfo.setTriggerLastTime(0L);

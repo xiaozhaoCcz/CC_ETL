@@ -58,6 +58,7 @@ public class TopToolBar extends VBox {
         void onStop(Long jobId);
         void onClear();
         void onSettings();
+        default void onPermissionManage() {}
         void onSelect(); // 框选功能
         void onLayoutHorizontal(); // 横向布局
         void onLayoutVertical(); // 纵向布局
@@ -239,6 +240,8 @@ public class TopToolBar extends VBox {
     
     // 最近打开的文件菜单引用
     private Menu recentFilesMenu;
+
+    private MenuItem permissionManageItem;
     
     public TopToolBar() {
         initializeUI();
@@ -748,11 +751,16 @@ public class TopToolBar extends VBox {
         
         MenuItem settingsItem = new MenuItem("系统设置");
         settingsItem.setOnAction(e -> safeCall(ToolBarCallback::onSettings));
+
+        permissionManageItem = new MenuItem("权限管理");
+        permissionManageItem.setOnAction(e -> safeCall(ToolBarCallback::onPermissionManage));
+        permissionManageItem.setDisable(true);
+        updatePermissionMenuVisibility();
         
         MenuItem aboutItem = new MenuItem("关于 CcETL");
         aboutItem.setOnAction(e -> safeCall(ToolBarCallback::onAbout));
         
-        helpMenu.getItems().addAll(settingsItem, aboutItem, new SeparatorMenuItem());
+        helpMenu.getItems().addAll(settingsItem, permissionManageItem, aboutItem, new SeparatorMenuItem());
         
         MenuItem checkUpdateItem = new MenuItem("检查更新");
         checkUpdateItem.setOnAction(e -> safeCall(ToolBarCallback::onCheckUpdate));
@@ -769,6 +777,15 @@ public class TopToolBar extends VBox {
         helpMenu.getItems().addAll(checkUpdateItem, reportIssueItem, feedbackItem, new SeparatorMenuItem(), onlineHelpItem);
         
         return helpMenu;
+    }
+
+    /**
+     * 根据当前用户权限更新「权限管理」菜单是否可用（仅拥有 permission:manage 的管理员可用）
+     */
+    public void updatePermissionMenuVisibility() {
+        if (permissionManageItem != null) {
+            permissionManageItem.setDisable(!SessionManager.getInstance().hasPermission("permission:manage"));
+        }
     }
     
     private HBox createToolBar() {

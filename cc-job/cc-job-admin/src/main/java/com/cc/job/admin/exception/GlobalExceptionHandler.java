@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 
 /**
  * 全局异常处理器
+ * 权限不足时抛出 ForbiddenException，返回 403
  * 
  * @author cc-job
  * @since 2025-12-02
@@ -45,6 +46,17 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ReturnT<String> handleBusinessException(BusinessException exception) {
         log.warn("业务异常: {}", exception.getMessage());
+        return new ReturnT<>(ReturnT.FAIL_CODE, exception.getMessage());
+    }
+
+    /**
+     * 处理无权限（403）
+     */
+    @ExceptionHandler(ForbiddenException.class)
+    @ResponseBody
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ReturnT<String> handleForbiddenException(ForbiddenException exception) {
+        log.warn("无权限: {}", exception.getMessage());
         return new ReturnT<>(ReturnT.FAIL_CODE, exception.getMessage());
     }
 

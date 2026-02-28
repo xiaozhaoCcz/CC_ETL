@@ -9,6 +9,9 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * 会话管理器 - 单例模式
@@ -24,6 +27,7 @@ public class SessionManager {
     private String userId;
     private String username;
     private boolean loggedIn;
+    private List<String> permissions = new ArrayList<>();
     
     // 会话文件路径
     private static final String SESSION_DIR = System.getProperty("user.home") + File.separator + ".cc-job";
@@ -67,10 +71,11 @@ public class SessionManager {
         this.userId = null;
         this.username = null;
         this.loggedIn = false;
-        
+        this.permissions = new ArrayList<>();
+
         // 删除本地会话文件
         deleteSessionFile();
-        
+
     }
     
     /**
@@ -101,6 +106,27 @@ public class SessionManager {
         return username;
     }
     
+    /**
+     * 设置当前用户权限码列表（登录后由权限管理接口拉取）
+     */
+    public void setPermissions(List<String> permissions) {
+        this.permissions = permissions != null ? new ArrayList<>(permissions) : new ArrayList<>();
+    }
+
+    /**
+     * 获取当前用户权限码列表
+     */
+    public List<String> getPermissions() {
+        return permissions == null ? Collections.emptyList() : Collections.unmodifiableList(permissions);
+    }
+
+    /**
+     * 是否拥有某权限
+     */
+    public boolean hasPermission(String permissionCode) {
+        return permissions != null && permissions.contains(permissionCode);
+    }
+
     /**
      * 获取带Token的请求头
      */

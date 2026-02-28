@@ -2,6 +2,7 @@ package com.cc.job.gui.service;
 
 import com.cc.job.gui.util.ApiUtil;
 import com.cc.job.gui.util.NotificationToast;
+import com.cc.job.gui.util.SessionManager;
 import com.cc.job.xo.common.result.PageResult;
 import com.cc.job.xo.common.result.Result;
 import com.google.gson.reflect.TypeToken;
@@ -193,10 +194,12 @@ public class HttpClientUtil {
                     queryParams.forEach(urlBuilder::addQueryParameter);
                 }
                 
-                Request request = new Request.Builder()
-                        .url(urlBuilder.build())
-                        .get()
-                        .build();
+                Request.Builder reqBuilder = new Request.Builder().url(urlBuilder.build()).get();
+                String auth = SessionManager.getInstance().getAuthorizationHeader();
+                if (auth != null && !auth.isEmpty()) {
+                    reqBuilder.addHeader("Authorization", auth);
+                }
+                Request request = reqBuilder.build();
                 
                 PageResult<T> result = executePageRequest(request, itemType);
                 logger.debug("[HttpClientUtil] GET请求成功 - url: {}", url);
@@ -403,7 +406,10 @@ public class HttpClientUtil {
                     default:
                         throw new IllegalArgumentException("不支持的HTTP方法: " + method);
                 }
-                
+                String auth = SessionManager.getInstance().getAuthorizationHeader();
+                if (auth != null && !auth.isEmpty()) {
+                    requestBuilder.addHeader("Authorization", auth);
+                }
                 Request request = requestBuilder.build();
                 
                 // 根据类型执行请求

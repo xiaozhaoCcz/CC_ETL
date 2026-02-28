@@ -93,6 +93,11 @@ public class MainView extends BorderPane {
                 initializeManagers();
                 setupCallbacks();
                 setupKeyboardShortcuts();
+                // 后台拉取当前用户权限并刷新「权限管理」菜单可见性
+                new Thread(() -> {
+                    new PermissionManageService().fetchAndStorePermissions();
+                    Platform.runLater(() -> toolBar.updatePermissionMenuVisibility());
+                }).start();
             }
         });
     }
@@ -439,6 +444,13 @@ public class MainView extends BorderPane {
                 Stage ownerStage = (Stage) MainView.this.getScene().getWindow();
                 SettingsDialog settingsDialog = new SettingsDialog(ownerStage);
                 settingsDialog.showAndWait();
+            }
+
+            @Override
+            public void onPermissionManage() {
+                Stage ownerStage = (Stage) MainView.this.getScene().getWindow();
+                PermissionManageDialog dialog = new PermissionManageDialog(ownerStage);
+                dialog.showAndWait();
             }
 
             @Override
