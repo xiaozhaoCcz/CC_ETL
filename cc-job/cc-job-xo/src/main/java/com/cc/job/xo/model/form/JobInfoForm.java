@@ -116,6 +116,8 @@ public class JobInfoForm implements Serializable {
 
     private String incrementContent;
 
+    private String incrementParamTemplate;
+
     private Integer pauseStatus;
 
     private Integer jobPartId;
@@ -383,6 +385,14 @@ public class JobInfoForm implements Serializable {
 
     public void setIncrementContent(String incrementContent) {
         this.incrementContent = incrementContent;
+    }
+
+    public String getIncrementParamTemplate() {
+        return incrementParamTemplate;
+    }
+
+    public void setIncrementParamTemplate(String incrementParamTemplate) {
+        this.incrementParamTemplate = incrementParamTemplate;
     }
 
     public Integer getPauseStatus() {

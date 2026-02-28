@@ -69,6 +69,7 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
     private TextField incrColumnField;
     private TextField incrInitValueField;
     private ComboBox<String> incrTimeFormatCombo;
+    private TextField incrParamTemplateField;
 
     // Step 2 - Writer配置（多表）
     private ComboBox<String> writerDsTypeCombo;
@@ -339,7 +340,16 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
         incrTimeFormatRow.getChildren().addAll(incrTimeFormatLabel, incrTimeFormatCombo);
         incrTimeFormatRow.setVisible(false);
 
-        incrConfigBox.getChildren().addAll(incrModeRow, incrColumnRow, incrValueRow, incrTimeFormatRow);
+        Label incrParamTemplateLabel = new Label("ID增量参数");
+        incrParamTemplateLabel.setStyle(labelStyle + " -fx-min-width: 80;");
+        incrParamTemplateField = new TextField();
+        incrParamTemplateField.setPromptText("可选，如 -DstartId=%s -DendId=%s");
+        HBox incrParamTemplateRow = new HBox(12);
+        incrParamTemplateRow.setAlignment(Pos.CENTER_LEFT);
+        incrParamTemplateRow.getChildren().addAll(incrParamTemplateLabel, incrParamTemplateField);
+        HBox.setHgrow(incrParamTemplateField, Priority.ALWAYS);
+
+        incrConfigBox.getChildren().addAll(incrModeRow, incrColumnRow, incrValueRow, incrTimeFormatRow, incrParamTemplateRow);
         VBox incrContainer = new VBox(8, incrTypeCombo, incrConfigBox);
 
         GridPane grid = new GridPane();
@@ -1041,6 +1051,7 @@ public class ShowDataxGroupSyncDialog extends Dialog<Void> {
             updateIncrConfigVisibility();
             if (incrColumnField != null) incrColumnField.clear();
             if (incrInitValueField != null) incrInitValueField.clear();
+            if (incrParamTemplateField != null) incrParamTemplateField.clear();
         }
     }
 

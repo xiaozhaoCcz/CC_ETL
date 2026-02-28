@@ -38,6 +38,9 @@ public class DataXParams implements Serializable {
     // 增量字段，json
     private String incrementContent;
 
+    // 自定义增量参数模板，如 -DstartId=%s -DendId=%s
+    private String incrementParamTemplate;
+
     private String schemaName;
 
     public String getName() {
@@ -160,6 +163,14 @@ public class DataXParams implements Serializable {
         this.incrementContent = incrementContent;
     }
 
+    public String getIncrementParamTemplate() {
+        return incrementParamTemplate;
+    }
+
+    public void setIncrementParamTemplate(String incrementParamTemplate) {
+        this.incrementParamTemplate = incrementParamTemplate;
+    }
+
     public String getSchemaName() {
         return schemaName;
     }
@@ -188,12 +199,13 @@ public class DataXParams implements Serializable {
                 Objects.equals(type, that.type) &&
                 Objects.equals(incrementType, that.incrementType) &&
                 Objects.equals(incrementContent, that.incrementContent) &&
+                Objects.equals(incrementParamTemplate, that.incrementParamTemplate) &&
                 Objects.equals(schemaName, that.schemaName);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(name, columns, sourceType, username, password, dbName, tableName, jdbcUrl, ip, port, querySql, writeMode, type, incrementType, incrementContent, schemaName);
+        return Objects.hash(name, columns, sourceType, username, password, dbName, tableName, jdbcUrl, ip, port, querySql, writeMode, type, incrementType, incrementContent, incrementParamTemplate, schemaName);
     }
 
     @Override
@@ -213,6 +225,7 @@ public class DataXParams implements Serializable {
                 ", type=" + type +
                 ", incrementType=" + incrementType +
                 ", incrementContent='" + incrementContent + '\'' +
+                ", incrementParamTemplate='" + incrementParamTemplate + '\'' +
                 ", schemaName='" + schemaName + '\'' +
                 '}';
     }

@@ -146,6 +146,7 @@ public class JobDataxService extends BaseService {
         private Integer type; // 0=reader, 1=writer
         private Integer incrementType;
         private String incrementContent;
+        private String incrementParamTemplate;
         private String schemaName;
         private String writeMode;
         
@@ -174,6 +175,8 @@ public class JobDataxService extends BaseService {
         public void setIncrementType(Integer incrementType) { this.incrementType = incrementType; }
         public String getIncrementContent() { return incrementContent; }
         public void setIncrementContent(String incrementContent) { this.incrementContent = incrementContent; }
+        public String getIncrementParamTemplate() { return incrementParamTemplate; }
+        public void setIncrementParamTemplate(String incrementParamTemplate) { this.incrementParamTemplate = incrementParamTemplate; }
         public String getSchemaName() { return schemaName; }
         public void setSchemaName(String schemaName) { this.schemaName = schemaName; }
         public String getWriteMode() { return writeMode; }

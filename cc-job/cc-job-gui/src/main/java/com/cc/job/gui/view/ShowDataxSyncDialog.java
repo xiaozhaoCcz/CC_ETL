@@ -71,6 +71,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     private TextField incrColumnField;  // 增量字段名
     private TextField incrInitValueField;  // 增量初始值
     private ComboBox<String> incrTimeFormatCombo;  // 时间格式（仅时间自增时显示）
+    private TextField incrParamTemplateField;  // 自定义增量参数模板，如 -DstartId=%s -DendId=%s
 
     // Step 2 - Writer配置
     private ComboBox<String> writerDsTypeCombo;
@@ -421,6 +422,9 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                         // 解析失败时仅保留增量类型，不填明细
                     }
                 }
+                if (incrParamTemplateField != null && form.getIncrementParamTemplate() != null) {
+                    incrParamTemplateField.setText(form.getIncrementParamTemplate());
+                }
                 updateIncrConfigVisibility();
             } else {
                 incrTypeCombo.setValue("全量");
@@ -624,7 +628,17 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         incrTimeFormatRow.getChildren().addAll(incrTimeFormatLabel, incrTimeFormatCombo);
         incrTimeFormatRow.setVisible(false);
         
-        incrConfigBox.getChildren().addAll(incrModeRow, incrColumnRow, incrValueRow, incrTimeFormatRow);
+        // ID增量参数（可选）：自定义传给 DataX 的 -p 参数字符串，%s 按顺序替换为增量值
+        HBox incrParamTemplateRow = new HBox(12);
+        incrParamTemplateRow.setAlignment(Pos.CENTER_LEFT);
+        Label incrParamTemplateLabel = new Label("ID增量参数");
+        incrParamTemplateLabel.setStyle(StyleUtil.bodyFontOnly() + " -fx-min-width: 80;");
+        incrParamTemplateField = new TextField();
+        incrParamTemplateField.setPromptText("可选，如 -DstartId=%s -DendId=%s，留空则按上方字段生成");
+        HBox.setHgrow(incrParamTemplateField, Priority.ALWAYS);
+        incrParamTemplateRow.getChildren().addAll(incrParamTemplateLabel, incrParamTemplateField);
+        
+        incrConfigBox.getChildren().addAll(incrModeRow, incrColumnRow, incrValueRow, incrTimeFormatRow, incrParamTemplateRow);
         
         VBox incrContainer = new VBox(8, incrTypeCombo, incrConfigBox);
         VBox.setVgrow(incrContainer, Priority.ALWAYS);
@@ -1325,8 +1339,11 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
             form.setIncrementType(incrType);
             if (incrType == 1) {
                 form.setIncrementContent(buildIncrementContent());
+                form.setIncrementParamTemplate(incrParamTemplateField != null && incrParamTemplateField.getText() != null
+                        ? incrParamTemplateField.getText().trim() : null);
             } else {
                 form.setIncrementContent(null);
+                form.setIncrementParamTemplate(null);
             }
         }
         return form;
@@ -1376,6 +1393,9 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                     // 构建增量内容
                     String incrementContent = buildIncrementContent();
                     readerParams.setIncrementContent(incrementContent);
+                    if (incrParamTemplateField != null && incrParamTemplateField.getText() != null && !incrParamTemplateField.getText().trim().isEmpty()) {
+                        readerParams.setIncrementParamTemplate(incrParamTemplateField.getText().trim());
+                    }
                 }
 
                 // 构建Writer参数

@@ -1,6 +1,11 @@
 server:
   port: 8500
 
+# 开发环境日志目录（相对路径）
+app:
+  log:
+    base: ./logs
+
 spring:
   jackson:
     ## 默认序列化时间格式

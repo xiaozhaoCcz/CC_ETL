@@ -6,16 +6,6 @@ spring:
   profiles:
       active: dev
 
-# 日志配置
-logging:
-  level:
-    root: INFO
-    com.cc.job.executor.compose: DEBUG
-  pattern:
-    console: '%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n'
-  file:
-    name: /data/applogs/cc-job/executor-compose/executor-compose.log
-
 # Actuator 配置（健康检查）
 management:
   endpoints:

@@ -521,6 +521,7 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
         taskInfoData.setJdbcDatasourceId(jobInfo.getJdbcDatasourceId());
         taskInfoData.setIncrementType(jobInfo.getIncrementType());
         taskInfoData.setIncrementContent(jobInfo.getIncrementContent());
+        taskInfoData.setIncrementParamTemplate(jobInfo.getIncrementParamTemplate());
         taskInfoData.setRunTime(jobInfo.getRunTime());
         taskInfoData.setPauseStatus(jobInfo.getPauseStatus());
         taskInfoData.setJobPartId(jobInfo.getJobPartId());
@@ -806,6 +807,7 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
         jobInfo.setJdbcDatasourceId(taskInfoData.getJdbcDatasourceId());
         jobInfo.setIncrementType(taskInfoData.getIncrementType());
         jobInfo.setIncrementContent(taskInfoData.getIncrementContent());
+        jobInfo.setIncrementParamTemplate(taskInfoData.getIncrementParamTemplate());
         jobInfo.setRunTime(taskInfoData.getRunTime());
         jobInfo.setPauseStatus(taskInfoData.getPauseStatus());
         jobInfo.setJobPartId(taskInfoData.getJobPartId());

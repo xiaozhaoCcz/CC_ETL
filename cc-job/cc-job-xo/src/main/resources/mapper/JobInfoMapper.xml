@@ -27,7 +27,10 @@
 		t.child_job_id,
 		t.trigger_status,
 		t.trigger_last_time,
-		t.trigger_next_time
+		t.trigger_next_time,
+		t.increment_type,
+		t.increment_content,
+		t.increment_param_template
     </sql>
 
     <update id="stopJobCompose">

@@ -168,7 +168,11 @@ public class IncrementalDataRefresher {
              ResultSet rs = ps.executeQuery()) {
 
             if (rs.next()) {
-                updateColumnValues(rs, columnList);
+                if (columnList.size() >= 2) {
+                    applyStartEndRoll(rs, columnList);
+                } else {
+                    updateColumnValues(rs, columnList);
+                }
                 saveIncrementalData(jobInfo, columnList);
             }
 
@@ -201,7 +205,11 @@ public class IncrementalDataRefresher {
              ResultSet rs = ps.executeQuery()) {
             
             if (rs.next()) {
-                updateColumnValues(rs, columnList);
+                if (columnList.size() >= 2) {
+                    applyStartEndRoll(rs, columnList);
+                } else {
+                    updateColumnValues(rs, columnList);
+                }
                 saveIncrementalData(jobInfo, columnList);
             }
             
@@ -295,7 +303,7 @@ public class IncrementalDataRefresher {
     }
     
     /**
-     * 更新列值
+     * 更新列值（单列或每列独立取 max 时使用）
      */
     private void updateColumnValues(ResultSet rs, List<DataxColumn> columnList) throws SQLException {
         for (int i = 0; i < columnList.size(); i++) {
@@ -307,6 +315,32 @@ public class IncrementalDataRefresher {
                 } else {
                     columnList.get(i).setColumnValue(value.toString());
                 }
+            }
+        }
+    }
+    
+    /**
+     * start/end 双参数（或多列）滚动：前 N-1 列设为「原最后一列的值」，最后一列设为本次查询的 max。
+     * 语义为下次运行时 start=本次 end，end=本次新 max。
+     */
+    private void applyStartEndRoll(ResultSet rs, List<DataxColumn> columnList) throws SQLException {
+        int lastIdx = columnList.size() - 1;
+        String previousEnd = columnList.get(lastIdx).getColumnValue();
+        // 最后一列：本次 max
+        Object lastValue = rs.getObject(lastIdx + 1);
+        if (lastValue != null) {
+            DataxColumn lastCol = columnList.get(lastIdx);
+            long timestamp = parseTimestamp(lastValue.toString());
+            if (timestamp > 0) {
+                lastCol.setColumnValue(String.valueOf(timestamp));
+            } else {
+                lastCol.setColumnValue(lastValue.toString());
+            }
+        }
+        // 前 N-1 列：均设为原最后一列的值（本次的 end 作为下次的 start）
+        if (previousEnd != null) {
+            for (int i = 0; i < lastIdx; i++) {
+                columnList.get(i).setColumnValue(previousEnd);
             }
         }
     }

@@ -3334,6 +3334,7 @@ CREATE TABLE `job_info` (
   `jdbc_datasource_id` bigint DEFAULT NULL COMMENT 'JDBC数据源ID',
   `increment_type` tinyint DEFAULT NULL COMMENT '增量类型：0-全量，1-增量',
   `increment_content` varchar(2000) DEFAULT NULL COMMENT '增量字段配置（JSON格式）',
+  `increment_param_template` varchar(500) DEFAULT NULL COMMENT '自定义增量参数模板，如 -DstartId=%s -DendId=%s，%s 按顺序替换为 increment_content 中的值',
   `pause_status` tinyint DEFAULT '0' COMMENT '暂停状态：0-运行，1-暂停',
   `job_part_id` int DEFAULT NULL COMMENT '任务分区ID',
   `trigger_user_id` bigint DEFAULT NULL COMMENT '触发用户ID',

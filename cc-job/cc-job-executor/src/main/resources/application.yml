@@ -1,10 +1,9 @@
 server:
   port: 8400
 
-logging:
-  config: classpath:logback.xml
-
 spring:
+  application:
+    name: cc-job-executor
   jackson:
     ## 默认序列化时间格式
     date-format: yyyy-MM-dd HH:mm:ss

@@ -94,11 +94,16 @@ public class NodeCanvas extends Pane {
     private long lastScrollCheckTime = 0;
     private static final long EXPAND_THROTTLE_MS = 50;   // 扩展检查节流间隔（50ms）
     private static final long SCROLL_THROTTLE_MS = 16;   // 滚动检查节流间隔（约16ms，约60fps）
+    private static final long COORDINATE_LABEL_THROTTLE_MS = 32; // 坐标标签更新节流（约30fps）
+    private long lastCoordinateLabelUpdateTime = 0;
+    private static final long ALIGNMENT_GUIDE_THROTTLE_MS = 50; // 对齐线更新节流
+    private long lastAlignmentGuideUpdateTime = 0;
     
     // 拖拽过程中的平滑滚动
     private AnimationTimer dragScrollTimer;
     private ProcessNode currentDragNode;
     private volatile boolean scrollAnimationRunning = false;
+    private long lastScrollFrameTime = 0; // 纳秒，用于 deltaTime 计算
     
     // 主题相关
     private String currentTheme = "default"; // "default", "grid", "dots"
@@ -120,7 +125,10 @@ public class NodeCanvas extends Pane {
     private boolean smartAlignmentEnabled = true; // 智能对齐是否启用
     private boolean snapToGridEnabled = false; // 网格吸附是否启用
     private double gridSnapSize = 20.0; // 网格吸附大小
-    private List<Line> alignmentGuideLines = new ArrayList<>(); // 对齐参考线
+    private static final int MAX_HORIZONTAL_GUIDES = 6;
+    private static final int MAX_VERTICAL_GUIDES = 6;
+    private final List<Line> horizontalGuideLinePool = new ArrayList<>();
+    private final List<Line> verticalGuideLinePool = new ArrayList<>();
     private static final double ALIGNMENT_THRESHOLD = 5.0; // 对齐阈值（像素）
     
     // 自动保存相关
@@ -137,6 +145,7 @@ public class NodeCanvas extends Pane {
         getStyleClass().add("canvas-pane");
         
         initializeManagers();
+        initializeAlignmentGuidePool();
         setupCanvasContextMenu();
         setupSelectionHandlers();
         setupAutoSave();
@@ -156,6 +165,36 @@ public class NodeCanvas extends Pane {
         selectionManager = new CanvasSelectionManager(this, nodes, connections, this::log, this::notifyNodeStructureChanged);
         dataLoader = new CanvasDataLoader(this::log);
         layoutManager = new CanvasLayoutManager(this::log);
+    }
+    
+    /**
+     * 初始化对齐参考线池（复用 Line，避免拖拽时每帧 remove/add）
+     */
+    private void initializeAlignmentGuidePool() {
+        double w = getPrefWidth();
+        double h = getPrefHeight();
+        for (int i = 0; i < MAX_HORIZONTAL_GUIDES; i++) {
+            Line line = new Line(0, 0, w, 0);
+            line.setStroke(Color.web("#3B82F6"));
+            line.setStrokeWidth(1);
+            line.getStrokeDashArray().addAll(5.0, 5.0);
+            line.setMouseTransparent(true);
+            line.setVisible(false);
+            horizontalGuideLinePool.add(line);
+            this.getChildren().add(line);
+        }
+        for (int i = 0; i < MAX_VERTICAL_GUIDES; i++) {
+            Line line = new Line(0, 0, 0, h);
+            line.setStroke(Color.web("#3B82F6"));
+            line.setStrokeWidth(1);
+            line.getStrokeDashArray().addAll(5.0, 5.0);
+            line.setMouseTransparent(true);
+            line.setVisible(false);
+            verticalGuideLinePool.add(line);
+            this.getChildren().add(line);
+        }
+        for (Line line : horizontalGuideLinePool) line.toBack();
+        for (Line line : verticalGuideLinePool) line.toBack();
     }
     
     // ==================== Setters ====================
@@ -338,14 +377,18 @@ public class NodeCanvas extends Pane {
                 selectionManager.updateSelectionBoundingBox();
             }
             
-            // 更新坐标显示（节点移动时）
+            // 更新坐标显示（节点移动时，节流以减少布局/字符串开销）
             if (coordinateLabel != null) {
-                double nodeX = node.getLayoutX();
-                double nodeY = node.getLayoutY();
-                coordinateLabel.setText(String.format("坐标: (%.0f, %.0f)", nodeX, nodeY));
-                coordinateLabel.setLayoutX(nodeX + 10);
-                coordinateLabel.setLayoutY(nodeY - 30);
-                coordinateLabel.setVisible(true);
+                long now = System.currentTimeMillis();
+                if (now - lastCoordinateLabelUpdateTime >= COORDINATE_LABEL_THROTTLE_MS) {
+                    lastCoordinateLabelUpdateTime = now;
+                    double nodeX = node.getLayoutX();
+                    double nodeY = node.getLayoutY();
+                    coordinateLabel.setText(String.format("坐标: (%.0f, %.0f)", nodeX, nodeY));
+                    coordinateLabel.setLayoutX(nodeX + 10);
+                    coordinateLabel.setLayoutY(nodeY - 30);
+                    coordinateLabel.setVisible(true);
+                }
             }
         });
         
@@ -468,11 +511,14 @@ public class NodeCanvas extends Pane {
         if (dragScrollTimer != null || scrollAnimationRunning) return;
         
         scrollAnimationRunning = true;
+        lastScrollFrameTime = 0;
         dragScrollTimer = new AnimationTimer() {
             @Override
             public void handle(long now) {
                 if (currentDragNode != null && isDragging) {
-                    performSmoothScroll(currentDragNode);
+                    long deltaNanos = lastScrollFrameTime == 0 ? 0 : (now - lastScrollFrameTime);
+                    lastScrollFrameTime = now;
+                    performSmoothScroll(currentDragNode, deltaNanos);
                 }
             }
         };
@@ -516,9 +562,13 @@ public class NodeCanvas extends Pane {
     private void handleNodeDrag(ProcessNode node) {
         // 优化：画布扩展检查已在 onDragged 中通过节流处理
         
-        // 智能对齐：显示对齐参考线
+        // 智能对齐：显示对齐参考线（节流，减少每帧重算）
         if (smartAlignmentEnabled && !selectionManager.isMovingSelection()) {
-            showAlignmentGuides(node);
+            long now = System.currentTimeMillis();
+            if (now - lastAlignmentGuideUpdateTime >= ALIGNMENT_GUIDE_THROTTLE_MS) {
+                lastAlignmentGuideUpdateTime = now;
+                showAlignmentGuides(node);
+            }
         }
         
         // 网格吸附
@@ -597,13 +647,17 @@ public class NodeCanvas extends Pane {
         }
     }
     
+    /** 平滑滚动最大 delta 时间（纳秒），防止长时间未运行导致大跳变 */
+    private static final long SCROLL_DELTA_NANOS_CAP = 100_000_000L; // 100ms
+    /** 每秒可滚动的比例（与帧率无关），约 0.5 即半屏/秒，提高跟手度 */
+    private static final double SMOOTH_SCROLL_SPEED_PER_SECOND = 0.5;
+
     /**
-     * 执行平滑滚动（由 AnimationTimer 调用）
+     * 执行平滑滚动（由 AnimationTimer 调用，基于 deltaTime 与帧率脱耦）
      */
-    private void performSmoothScroll(ProcessNode node) {
+    private void performSmoothScroll(ProcessNode node, long deltaTimeNanos) {
         if (node == null || hostingScrollPane == null) return;
         
-        // 缩小画布时禁用边缘自动滚动，避免与节点增量拖拽产生反向滚动正反馈
         for (javafx.scene.transform.Transform t : getTransforms()) {
             if (t instanceof Scale) {
                 Scale s = (Scale) t;
@@ -612,31 +666,25 @@ public class NodeCanvas extends Pane {
             }
         }
         
+        double deltaSec = Math.min(deltaTimeNanos, SCROLL_DELTA_NANOS_CAP) / 1e9;
+        if (deltaSec <= 0) return;
+        
         double nodeX = node.getLayoutX();
         double nodeY = node.getLayoutY();
-        
         double nodeWidth = node.getWidth() > 0 ? node.getWidth() : node.getPrefWidth();
         double nodeHeight = node.getHeight() > 0 ? node.getHeight() : node.getPrefHeight();
-        
         if (nodeWidth <= 0 || nodeHeight <= 0) return;
         
-        // 节点中心点
         double nodeCenterX = nodeX + nodeWidth / 2;
         double nodeCenterY = nodeY + nodeHeight / 2;
-        
         double viewportWidth = hostingScrollPane.getViewportBounds().getWidth();
         double viewportHeight = hostingScrollPane.getViewportBounds().getHeight();
-        
         double currentHValue = hostingScrollPane.getHvalue();
         double currentVValue = hostingScrollPane.getVvalue();
-        
         double canvasWidth = getPrefWidth();
         double canvasHeight = getPrefHeight();
-        
-        // 计算可视区域在画布上的位置
         double scrollableWidth = canvasWidth - viewportWidth;
         double scrollableHeight = canvasHeight - viewportHeight;
-        
         if (scrollableWidth <= 0 && scrollableHeight <= 0) return;
         
         double viewportLeft = scrollableWidth > 0 ? currentHValue * scrollableWidth : 0;
@@ -647,41 +695,32 @@ public class NodeCanvas extends Pane {
         double newHValue = currentHValue;
         double newVValue = currentVValue;
         boolean needsScroll = false;
+        double step = SMOOTH_SCROLL_SPEED_PER_SECOND * deltaSec;
         
-        // 优化的滚动速度计算 - 使用更平滑的插值
-        double smoothScrollSpeed = 0.008; // 更小的基础滚动速度，更平滑
-        
-        // 检查左边缘
         if (nodeCenterX < viewportLeft + VIEWPORT_EDGE_THRESHOLD && scrollableWidth > 0) {
             double distance = (viewportLeft + VIEWPORT_EDGE_THRESHOLD) - nodeCenterX;
             double speedMultiplier = Math.min(distance / VIEWPORT_EDGE_THRESHOLD, 2.0);
-            newHValue = Math.max(0, currentHValue - smoothScrollSpeed * speedMultiplier);
+            newHValue = Math.max(0, currentHValue - step * speedMultiplier);
             needsScroll = true;
-        }
-        // 检查右边缘
-        else if (nodeCenterX > viewportRight - VIEWPORT_EDGE_THRESHOLD && scrollableWidth > 0) {
+        } else if (nodeCenterX > viewportRight - VIEWPORT_EDGE_THRESHOLD && scrollableWidth > 0) {
             double distance = nodeCenterX - (viewportRight - VIEWPORT_EDGE_THRESHOLD);
             double speedMultiplier = Math.min(distance / VIEWPORT_EDGE_THRESHOLD, 2.0);
-            newHValue = Math.min(1, currentHValue + smoothScrollSpeed * speedMultiplier);
+            newHValue = Math.min(1, currentHValue + step * speedMultiplier);
             needsScroll = true;
         }
         
-        // 检查上边缘
         if (nodeCenterY < viewportTop + VIEWPORT_EDGE_THRESHOLD && scrollableHeight > 0) {
             double distance = (viewportTop + VIEWPORT_EDGE_THRESHOLD) - nodeCenterY;
             double speedMultiplier = Math.min(distance / VIEWPORT_EDGE_THRESHOLD, 2.0);
-            newVValue = Math.max(0, currentVValue - smoothScrollSpeed * speedMultiplier);
+            newVValue = Math.max(0, currentVValue - step * speedMultiplier);
             needsScroll = true;
-        }
-        // 检查下边缘
-        else if (nodeCenterY > viewportBottom - VIEWPORT_EDGE_THRESHOLD && scrollableHeight > 0) {
+        } else if (nodeCenterY > viewportBottom - VIEWPORT_EDGE_THRESHOLD && scrollableHeight > 0) {
             double distance = nodeCenterY - (viewportBottom - VIEWPORT_EDGE_THRESHOLD);
             double speedMultiplier = Math.min(distance / VIEWPORT_EDGE_THRESHOLD, 2.0);
-            newVValue = Math.min(1, currentVValue + smoothScrollSpeed * speedMultiplier);
+            newVValue = Math.min(1, currentVValue + step * speedMultiplier);
             needsScroll = true;
         }
         
-        // 执行平滑滚动
         if (needsScroll) {
             hostingScrollPane.setHvalue(newHValue);
             hostingScrollPane.setVvalue(newVValue);
@@ -4353,10 +4392,11 @@ public class NodeCanvas extends Pane {
     // ==================== 智能对齐相关方法 ====================
     
     /**
-     * 显示对齐参考线
+     * 显示对齐参考线（复用池中的 Line，只更新属性和可见性，不修改 children）
      */
     private void showAlignmentGuides(ProcessNode draggedNode) {
-        hideAlignmentGuides(); // 先清除旧的参考线
+        for (Line line : horizontalGuideLinePool) line.setVisible(false);
+        for (Line line : verticalGuideLinePool) line.setVisible(false);
         
         if (draggedNode == null) return;
         
@@ -4372,7 +4412,11 @@ public class NodeCanvas extends Pane {
         double nodeTop = nodeY;
         double nodeBottom = nodeY + nodeHeight;
         
-        // 检查与其他节点的对齐
+        List<Double> horizontalYs = new ArrayList<>();
+        List<Double> verticalXs = new ArrayList<>();
+        Double lastSnapY = null;
+        Double lastSnapX = null;
+        
         for (ProcessNode otherNode : nodes) {
             if (otherNode == draggedNode) continue;
             
@@ -4388,68 +4432,62 @@ public class NodeCanvas extends Pane {
             double otherTop = otherY;
             double otherBottom = otherY + otherHeight;
             
-            // 检查水平对齐（中心、顶部、底部）
             if (Math.abs(nodeCenterY - otherCenterY) < ALIGNMENT_THRESHOLD) {
-                createHorizontalGuideLine(otherCenterY);
-                draggedNode.setLayoutY(otherCenterY - nodeHeight / 2);
+                horizontalYs.add(otherCenterY);
+                lastSnapY = otherCenterY - nodeHeight / 2;
             } else if (Math.abs(nodeTop - otherTop) < ALIGNMENT_THRESHOLD) {
-                createHorizontalGuideLine(otherTop);
-                draggedNode.setLayoutY(otherTop);
+                horizontalYs.add(otherTop);
+                lastSnapY = otherTop;
             } else if (Math.abs(nodeBottom - otherBottom) < ALIGNMENT_THRESHOLD) {
-                createHorizontalGuideLine(otherBottom);
-                draggedNode.setLayoutY(otherBottom - nodeHeight);
+                horizontalYs.add(otherBottom);
+                lastSnapY = otherBottom - nodeHeight;
             }
             
-            // 检查垂直对齐（中心、左侧、右侧）
             if (Math.abs(nodeCenterX - otherCenterX) < ALIGNMENT_THRESHOLD) {
-                createVerticalGuideLine(otherCenterX);
-                draggedNode.setLayoutX(otherCenterX - nodeWidth / 2);
+                verticalXs.add(otherCenterX);
+                lastSnapX = otherCenterX - nodeWidth / 2;
             } else if (Math.abs(nodeLeft - otherLeft) < ALIGNMENT_THRESHOLD) {
-                createVerticalGuideLine(otherLeft);
-                draggedNode.setLayoutX(otherLeft);
+                verticalXs.add(otherLeft);
+                lastSnapX = otherLeft;
             } else if (Math.abs(nodeRight - otherRight) < ALIGNMENT_THRESHOLD) {
-                createVerticalGuideLine(otherRight);
-                draggedNode.setLayoutX(otherRight - nodeWidth);
+                verticalXs.add(otherRight);
+                lastSnapX = otherRight - nodeWidth;
             }
         }
+        
+        if (lastSnapY != null) draggedNode.setLayoutY(lastSnapY);
+        if (lastSnapX != null) draggedNode.setLayoutX(lastSnapX);
+        
+        double canvasW = getPrefWidth();
+        double canvasH = getPrefHeight();
+        int hi = 0;
+        for (int i = 0; i < Math.min(horizontalYs.size(), MAX_HORIZONTAL_GUIDES); i++, hi++) {
+            double y = horizontalYs.get(i);
+            Line line = horizontalGuideLinePool.get(hi);
+            line.setStartX(0);
+            line.setStartY(y);
+            line.setEndX(canvasW);
+            line.setEndY(y);
+            line.setVisible(true);
+        }
+        int vi = 0;
+        for (int i = 0; i < Math.min(verticalXs.size(), MAX_VERTICAL_GUIDES); i++, vi++) {
+            double x = verticalXs.get(i);
+            Line line = verticalGuideLinePool.get(vi);
+            line.setStartX(x);
+            line.setStartY(0);
+            line.setEndX(x);
+            line.setEndY(canvasH);
+            line.setVisible(true);
+        }
     }
     
     /**
-     * 创建水平对齐参考线
-     */
-    private void createHorizontalGuideLine(double y) {
-        Line guideLine = new Line(0, y, getPrefWidth(), y);
-        guideLine.setStroke(Color.web("#3B82F6"));
-        guideLine.setStrokeWidth(1);
-        guideLine.getStrokeDashArray().addAll(5.0, 5.0);
-        guideLine.setMouseTransparent(true);
-        guideLine.toBack();
-        alignmentGuideLines.add(guideLine);
-        this.getChildren().add(guideLine);
-    }
-    
-    /**
-     * 创建垂直对齐参考线
-     */
-    private void createVerticalGuideLine(double x) {
-        Line guideLine = new Line(x, 0, x, getPrefHeight());
-        guideLine.setStroke(Color.web("#3B82F6"));
-        guideLine.setStrokeWidth(1);
-        guideLine.getStrokeDashArray().addAll(5.0, 5.0);
-        guideLine.setMouseTransparent(true);
-        guideLine.toBack();
-        alignmentGuideLines.add(guideLine);
-        this.getChildren().add(guideLine);
-    }
-    
-    /**
-     * 隐藏对齐参考线
+     * 隐藏对齐参考线（仅设置不可见，不 remove 节点）
      */
     private void hideAlignmentGuides() {
-        for (Line guideLine : alignmentGuideLines) {
-            this.getChildren().remove(guideLine);
-        }
-        alignmentGuideLines.clear();
+        for (Line line : horizontalGuideLinePool) line.setVisible(false);
+        for (Line line : verticalGuideLinePool) line.setVisible(false);
     }
     
     /**
