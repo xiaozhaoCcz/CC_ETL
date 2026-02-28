@@ -75,46 +75,46 @@ public class JobPartService extends  BaseService {
     private JobComposeData parseJobComposeData(Map<String, Object> data) {
         JobComposeData composeData = new JobComposeData();
 
-        Object jobNodeObj = data.get("jobNode");
-        if (jobNodeObj instanceof Map) {
-            Map<?, ?> jnMap = (Map<?, ?>) jobNodeObj;
-            JobComposeData.NodeData jobNode = new JobComposeData.NodeData();
-            jobNode.setId(String.valueOf(jnMap.get("id")));
-            jobNode.setType(String.valueOf(jnMap.get("nodeType")));
-            jobNode.setJobName(String.valueOf(jnMap.get("jobName")));
-            if (jnMap.get("jobId") != null) {
-                try {
-                    jobNode.setJobId(((Number) jnMap.get("jobId")).longValue());
-                } catch (Exception ignored) {}
-            }
-            if (jnMap.get("nodePositionX") != null) {
-                jobNode.setX(((Number) jnMap.get("nodePositionX")).doubleValue());
-            }
-            if (jnMap.get("nodePositionY") != null) {
-                jobNode.setY(((Number) jnMap.get("nodePositionY")).doubleValue());
-            }
-            Map<String, Object> jnProps = new HashMap<>();
-            Object jnPropsObj = jnMap.get("properties");
-            if (jnPropsObj instanceof String) {
-                try {
-                    jnProps = apiUtil.getGson().fromJson(
-                            (String) jnPropsObj,
-                            new TypeToken<Map<String, Object>>(){}.getType()
-                    );
-                } catch (Exception e) {
-                    logger.error("解析 jobNode.properties 失败: {}", e.getMessage(), e);
-                }
-            } else if (jnPropsObj instanceof Map) {
-                //noinspection unchecked
-                jnProps = (Map<String, Object>) jnPropsObj;
-            }
-            Object jnChildren = jnMap.get("children");
-            if (jnChildren != null) {
-                jnProps.put("children", jnChildren);
-            }
-            jobNode.setProperties(jnProps);
-            composeData.setJobNode(jobNode);
-        }
+//        Object jobNodeObj = data.get("jobNode");
+//        if (jobNodeObj instanceof Map) {
+//            Map<?, ?> jnMap = (Map<?, ?>) jobNodeObj;
+//            JobComposeData.NodeData jobNode = new JobComposeData.NodeData();
+//            jobNode.setId(String.valueOf(jnMap.get("id")));
+//            jobNode.setType(String.valueOf(jnMap.get("nodeType")));
+//            jobNode.setJobName(String.valueOf(jnMap.get("jobName")));
+//            if (jnMap.get("jobId") != null) {
+//                try {
+//                    jobNode.setJobId(((Number) jnMap.get("jobId")).longValue());
+//                } catch (Exception ignored) {}
+//            }
+//            if (jnMap.get("nodePositionX") != null) {
+//                jobNode.setX(((Number) jnMap.get("nodePositionX")).doubleValue());
+//            }
+//            if (jnMap.get("nodePositionY") != null) {
+//                jobNode.setY(((Number) jnMap.get("nodePositionY")).doubleValue());
+//            }
+//            Map<String, Object> jnProps = new HashMap<>();
+//            Object jnPropsObj = jnMap.get("properties");
+//            if (jnPropsObj instanceof String) {
+//                try {
+//                    jnProps = apiUtil.getGson().fromJson(
+//                            (String) jnPropsObj,
+//                            new TypeToken<Map<String, Object>>(){}.getType()
+//                    );
+//                } catch (Exception e) {
+//                    logger.error("解析 jobNode.properties 失败: {}", e.getMessage(), e);
+//                }
+//            } else if (jnPropsObj instanceof Map) {
+//                //noinspection unchecked
+//                jnProps = (Map<String, Object>) jnPropsObj;
+//            }
+//            Object jnChildren = jnMap.get("children");
+//            if (jnChildren != null) {
+//                jnProps.put("children", jnChildren);
+//            }
+//            jobNode.setProperties(jnProps);
+//            composeData.setJobNode(jobNode);
+//        }
 
         Object nodesObj = data.get("nodes");
         if (nodesObj instanceof List) {
@@ -407,6 +407,25 @@ public class JobPartService extends  BaseService {
             return response.body().bytes();
         }
     }
+
+    /**
+     * 导出任务组数据（.cel 格式）
+     * @param jobId 任务组ID
+     * @return 导出的字节数组
+     * @throws IOException 网络异常
+     */
+    public byte[] exportTaskGroupData(Long jobId) throws IOException {
+        okhttp3.Request request = new okhttp3.Request.Builder()
+                .url(httpClient.buildUrl("/api/v1/jobParts/exportTaskGroup/" + jobId))
+                .get()
+                .build();
+        try (okhttp3.Response response = apiUtil.getClient().newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("导出任务组数据失败: " + response);
+            }
+            return response.body() != null ? response.body().bytes() : new byte[0];
+        }
+    }
     
     /**
      * 更新分区名称
@@ -465,6 +484,42 @@ public class JobPartService extends  BaseService {
             Type resultType = new TypeToken<Result<Void>>(){}.getType();
             Result<Void> result = apiUtil.getGson().fromJson(responseBody, resultType);
             
+            return Result.isSuccess(result);
+        }
+    }
+
+    /**
+     * 导入任务组到指定分区
+     * @param partitionId 分区ID
+     * @param file .cel 文件
+     * @return 是否导入成功
+     * @throws IOException 网络异常
+     */
+    public boolean importTaskGroup(Long partitionId, java.io.File file) throws IOException {
+        String url = httpClient.buildUrl("/api/v1/jobParts/importTaskGroup?partitionId=" + partitionId);
+
+        byte[] fileBytes = java.nio.file.Files.readAllBytes(file.toPath());
+        okhttp3.MultipartBody.Builder builder = new okhttp3.MultipartBody.Builder()
+                .setType(okhttp3.MultipartBody.FORM);
+        okhttp3.RequestBody fileBody = okhttp3.RequestBody.create(
+                fileBytes,
+                okhttp3.MediaType.parse("application/octet-stream")
+        );
+        builder.addFormDataPart("file", file.getName(), fileBody);
+        okhttp3.RequestBody requestBody = builder.build();
+        okhttp3.Request request = new okhttp3.Request.Builder()
+                .url(url)
+                .post(requestBody)
+                .build();
+
+        try (okhttp3.Response response = apiUtil.getClient().newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                String errorBody = response.body() != null ? response.body().string() : "";
+                throw new IOException("导入任务组失败: " + response.code() + " - " + errorBody);
+            }
+            String responseBody = response.body() != null ? response.body().string() : "";
+            Type resultType = new TypeToken<Result<Void>>(){}.getType();
+            Result<Void> result = apiUtil.getGson().fromJson(responseBody, resultType);
             return Result.isSuccess(result);
         }
     }

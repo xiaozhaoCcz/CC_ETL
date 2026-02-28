@@ -4,6 +4,7 @@ import com.cc.job.gui.model.GroupContainer;
 import com.cc.job.gui.model.ProcessNode;
 import com.cc.job.gui.util.IconUtil;
 import com.cc.job.gui.util.StyleUtil;
+import com.cc.job.gui.util.ThemeManager;
 import javafx.geometry.Bounds;
 import javafx.geometry.Pos;
 import javafx.scene.canvas.Canvas;
@@ -48,6 +49,13 @@ public class MiniMapView extends VBox {
     private boolean updatePending = false;
     private boolean viewportUpdatePending = false;
     private static final long THROTTLE_DELAY_MS = 200; // 节流延迟200ms
+
+    /** 正在拖拽视口框时跳过 updateViewport，避免覆盖用户拖拽位置 */
+    private boolean isDraggingViewport = false;
+    private double dragAnchorX;
+    private double dragAnchorY;
+    private double dragAnchorRectX;
+    private double dragAnchorRectY;
     
     // 关闭回调
     private Runnable onClose;
@@ -64,13 +72,7 @@ public class MiniMapView extends VBox {
     }
     
     private void initializeUI() {
-        // 设置样式：顶部边框作为分割线，左边距为0确保分割线从最左边开始
-        setStyle(
-            "-fx-background-color: transparent; " +
-            "-fx-border-color: rgba(148,163,184,0.3) transparent transparent transparent; " +
-            "-fx-border-width: 1 0 0 0; " +
-            "-fx-padding: 12 12 0 8;"
-        );
+        getStyleClass().add("minimap-view");
         setSpacing(12);
         setMinWidth(200);  // 最小宽度200px
         setMinHeight(200); // 最小高度
@@ -82,7 +84,7 @@ public class MiniMapView extends VBox {
         
         // 画布容器 - 使用 Pane 支持绝对定位！
         Pane canvasContainer = new Pane();
-        canvasContainer.setStyle("-fx-background-color: #F8FAFC;");
+        canvasContainer.getStyleClass().add("minimap-canvas-container");
         canvasContainer.setMinWidth(150);  // 最小宽度
         canvasContainer.setMinHeight(150); // 最小高度
         canvasContainer.setPrefHeight(MINIMAP_HEIGHT);  // 默认高度
@@ -111,10 +113,10 @@ public class MiniMapView extends VBox {
             }
         });
         
-        // 视口矩形
+        // 视口矩形（描边颜色在 refresh() 中随主题更新）
         viewportRect = new Rectangle();
         viewportRect.setFill(Color.TRANSPARENT);
-        viewportRect.setStroke(Color.web("#EF4444"));
+        applyThemeToViewportRect();
         viewportRect.setStrokeWidth(2);
         viewportRect.setMouseTransparent(false);
         
@@ -122,8 +124,8 @@ public class MiniMapView extends VBox {
         
         getChildren().addAll(titleBar, canvasContainer);
         
-        // 点击小地图跳转
-        setupClickNavigation();
+        // 拖拽视口框移动画布（不再使用点击小地图跳转）
+        setupViewportDrag();
     }
     
     private HBox createTitleBar() {
@@ -132,7 +134,7 @@ public class MiniMapView extends VBox {
         
         // 标题
         Label titleLabel = new Label("小地图");
-        titleLabel.setStyle(StyleUtil.caption() + "-fx-font-weight: 600;");
+        titleLabel.getStyleClass().add("minimap-title");
         
         HBox.setHgrow(titleLabel, Priority.ALWAYS);
         
@@ -231,8 +233,10 @@ public class MiniMapView extends VBox {
         // 清空画布
         gc.clearRect(0, 0, canvasW, canvasH);
         
-        // 绘制背景
-        gc.setFill(Color.web("#F3F4F6"));
+        // 按当前主题绘制背景
+        boolean dark = "dark".equals(ThemeManager.getInstance().getTheme());
+        String bgColor = dark ? "#252526" : "#F3F4F6";
+        gc.setFill(Color.web(bgColor));
         gc.fillRect(0, 0, canvasW, canvasH);
         
         // 获取画布尺寸
@@ -248,8 +252,9 @@ public class MiniMapView extends VBox {
         double offsetX = (MINIMAP_WIDTH - canvasWidth * scale) / 2;
         double offsetY = (MINIMAP_HEIGHT - canvasHeight * scale) / 2;
         
-        // 先绘制连接线（在节点下方）
-        gc.setStroke(Color.web("#6B7280"));
+        // 先绘制连接线（在节点下方）- 颜色随主题
+        String lineColor = dark ? "#9D9D9D" : "#6B7280";
+        gc.setStroke(Color.web(lineColor));
         gc.setLineWidth(1);
         
         nodeCanvas.getConnections().forEach(conn -> {
@@ -292,9 +297,11 @@ public class MiniMapView extends VBox {
             gc.strokeLine(x1, y1, x2, y2);
         });
         
-        // 再绘制节点（覆盖在线条上面）- 使用统一的颜色，不区分节点类型
-        gc.setFill(Color.WHITE);
-        gc.setStroke(Color.web("#9CA3AF")); // 统一的灰色边框
+        // 再绘制节点（覆盖在线条上面）- 颜色随主题
+        String nodeFill = dark ? "#3C3C3C" : "#FFFFFF";
+        String nodeStroke = dark ? "#6B6B6B" : "#9CA3AF";
+        gc.setFill(Color.web(nodeFill));
+        gc.setStroke(Color.web(nodeStroke));
         gc.setLineWidth(1);
         
         nodeCanvas.getNodes().forEach(node -> {
@@ -373,8 +380,8 @@ public class MiniMapView extends VBox {
      */
     private void updateViewport() {
         if (nodeCanvas == null || scrollPane == null) return;
-        
-        
+        if (isDraggingViewport) return;
+
         double canvasWidth = nodeCanvas.getPrefWidth();
         double canvasHeight = nodeCanvas.getPrefHeight();
         
@@ -439,53 +446,61 @@ public class MiniMapView extends VBox {
     }
     
     /**
-     * 设置点击导航
+     * 设置拖拽视口框：拖拽蓝框时移动主画布视图（替代原点击小地图跳转）
      */
-    private void setupClickNavigation() {
-        canvas.setOnMouseClicked(e -> {
+    private void setupViewportDrag() {
+        viewportRect.setOnMousePressed(e -> {
             if (nodeCanvas == null || scrollPane == null) return;
-            
-            // 获取点击位置
-            double clickX = e.getX();
-            double clickY = e.getY();
-            
-            // 计算对应的画布位置
+            isDraggingViewport = true;
+            dragAnchorX = e.getX();
+            dragAnchorY = e.getY();
+            dragAnchorRectX = viewportRect.getX();
+            dragAnchorRectY = viewportRect.getY();
+        });
+
+        viewportRect.setOnMouseDragged(e -> {
+            if (nodeCanvas == null || scrollPane == null) return;
             double canvasWidth = nodeCanvas.getPrefWidth();
             double canvasHeight = nodeCanvas.getPrefHeight();
-            
             double scaleX = MINIMAP_WIDTH / canvasWidth;
             double scaleY = MINIMAP_HEIGHT / canvasHeight;
             double scale = Math.min(scaleX, scaleY);
-            
             double offsetX = (MINIMAP_WIDTH - canvasWidth * scale) / 2;
             double offsetY = (MINIMAP_HEIGHT - canvasHeight * scale) / 2;
-            
-            double targetX = (clickX - offsetX) / scale;
-            double targetY = (clickY - offsetY) / scale;
-            
-            // 计算滚动值
+            double rectW = viewportRect.getWidth();
+            double rectH = viewportRect.getHeight();
+
+            double newRectX = dragAnchorRectX + (e.getX() - dragAnchorX);
+            double newRectY = dragAnchorRectY + (e.getY() - dragAnchorY);
+            double minX = offsetX;
+            double minY = offsetY;
+            double maxX = offsetX + canvasWidth * scale - rectW;
+            double maxY = offsetY + canvasHeight * scale - rectH;
+            newRectX = Math.max(minX, Math.min(newRectX, maxX));
+            newRectY = Math.max(minY, Math.min(newRectY, maxY));
+
+            viewportRect.setX(newRectX);
+            viewportRect.setY(newRectY);
+
             Bounds viewportBounds = scrollPane.getViewportBounds();
             double viewportWidth = viewportBounds.getWidth();
             double viewportHeight = viewportBounds.getHeight();
-            
             double contentWidth = canvasWidth - viewportWidth;
             double contentHeight = canvasHeight - viewportHeight;
-            
-            // 将目标位置居中
-            double scrollX = targetX - viewportWidth / 2;
-            double scrollY = targetY - viewportHeight / 2;
-            
-            // 限制范围
-            scrollX = Math.max(0, Math.min(scrollX, contentWidth));
-            scrollY = Math.max(0, Math.min(scrollY, contentHeight));
-            
-            // 设置滚动值
+            double scrollX = (newRectX - offsetX) / scale;
+            double scrollY = (newRectY - offsetY) / scale;
+            scrollX = Math.max(0, Math.min(scrollX, contentWidth > 0 ? contentWidth : 0));
+            scrollY = Math.max(0, Math.min(scrollY, contentHeight > 0 ? contentHeight : 0));
             if (contentWidth > 0) {
                 scrollPane.setHvalue(scrollX / contentWidth);
             }
             if (contentHeight > 0) {
                 scrollPane.setVvalue(scrollY / contentHeight);
             }
+        });
+
+        viewportRect.setOnMouseReleased(e -> {
+            isDraggingViewport = false;
         });
     }
     
@@ -553,7 +568,14 @@ public class MiniMapView extends VBox {
         if (throttledUpdateTimeline != null) {
             throttledUpdateTimeline.stop();
         }
+        applyThemeToViewportRect();
         updateMiniMap();
+    }
+
+    private void applyThemeToViewportRect() {
+        if (viewportRect == null) return;
+        boolean dark = "dark".equals(ThemeManager.getInstance().getTheme());
+        viewportRect.setStroke(Color.web(dark ? "#569CD6" : "#2563EB"));
     }
     
     /**

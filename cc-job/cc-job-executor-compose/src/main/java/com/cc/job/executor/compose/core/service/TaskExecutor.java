@@ -2,6 +2,7 @@ package com.cc.job.executor.compose.core.service;
 
 import com.cc.job.executor.compose.client.AdminApiClient;
 import com.cc.job.executor.compose.core.model.ExecutionContext;
+import com.cc.job.executor.compose.core.service.ResultStorageService;
 import com.cc.job.executor.compose.service.JobExecutionMonitor;
 import com.cc.job.executor.compose.service.JobTriggerService;
 import com.cc.job.xo.model.entity.JobInfo;
@@ -10,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
@@ -31,10 +33,12 @@ public class TaskExecutor {
     
     private final AdminApiClient adminApiClient;
     private final JobTriggerService jobTriggerService;
+    private final ResultStorageService resultStorageService;
 
-    public TaskExecutor(AdminApiClient adminApiClient, JobTriggerService jobTriggerService) {
+    public TaskExecutor(AdminApiClient adminApiClient, JobTriggerService jobTriggerService, ResultStorageService resultStorageService) {
         this.adminApiClient = adminApiClient;
         this.jobTriggerService = jobTriggerService;
+        this.resultStorageService = resultStorageService;
     }
     
     /**
@@ -53,12 +57,12 @@ public class TaskExecutor {
                 jobInfo.getId(), node.getId(), retryCount);
         
         try {
-            // 1. 检查并处理暂停状态
-            handlePauseIfNeeded(jobInfo);
+            // 1. 检查并处理暂停状态（废弃）
+            //handlePauseIfNeeded(node,context.getJobPauseStatusIds());
             
-            // 2. 触发任务执行
+            // 2. 触发任务执行（传入执行上下文，用于参数解析）
             boolean triggerSuccess = jobTriggerService.triggerJob(
-                    context.getXxlJobContext(), jobInfo, context.getExecutionBatchId());
+                    context.getXxlJobContext(), jobInfo, context.getExecutionBatchId(), context);
             
             if (!triggerSuccess) {
                 return handleTriggerFailure(jobInfo);
@@ -71,24 +75,28 @@ public class TaskExecutor {
             return handleExecutionError(context, node, jobInfo, e);
         }
     }
-    
+
     /**
-     * 处理任务暂停
+     * 处理任务暂停(废弃功能)
      */
-    private void handlePauseIfNeeded(JobInfo jobInfo) {
-        JobInfo latestJobInfo = adminApiClient.getJobInfo(jobInfo.getId());
+    @Deprecated
+    private void handlePauseIfNeeded(JobNode jobNode, List<Integer> jobPauseStatusIds) {
+       JobInfo latestJobInfo = adminApiClient.getJobInfo(jobNode.getJobId());
         if (latestJobInfo == null) {
             return;
         }
+        if(jobPauseStatusIds==null||jobPauseStatusIds.isEmpty()){
+            return;
+        }
         
-        boolean isPaused = latestJobInfo.getPauseStatus() != null && latestJobInfo.getPauseStatus() == 1;
+        boolean isPaused = jobPauseStatusIds.contains(jobNode.getId().intValue());
         if (!isPaused) {
             return;
         }
         
-        logger.info("[TaskExecutor] 任务处于暂停状态，等待恢复 - jobId: {}", jobInfo.getId());
+        logger.info("[TaskExecutor] 任务处于暂停状态，等待恢复 - jobId: {}", latestJobInfo.getId());
         
-        long timeout = calculatePauseTimeout(jobInfo);
+        long timeout = calculatePauseTimeout(latestJobInfo);
         long deadline = System.currentTimeMillis() + timeout;
         
         while (isPaused && System.currentTimeMillis() < deadline) {
@@ -96,21 +104,21 @@ public class TaskExecutor {
                 TimeUnit.SECONDS.sleep(5);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                logger.warn("[TaskExecutor] 暂停等待被中断 - jobId: {}", jobInfo.getId());
+                logger.warn("[TaskExecutor] 暂停等待被中断 - jobId: {}", latestJobInfo.getId());
                 throw new RuntimeException("暂停等待被中断", e);
             }
             
-            JobInfo checkJobInfo = adminApiClient.getJobInfo(jobInfo.getId());
-            if (checkJobInfo != null) {
-                isPaused = checkJobInfo.getPauseStatus() != null && checkJobInfo.getPauseStatus() == 1;
-            }
+//            JobInfo checkJobInfo = adminApiClient.getJobInfo(latestJobInfo.getId());
+//            if (checkJobInfo != null) {
+//                isPaused = checkJobInfo.getPauseStatus() != null && checkJobInfo.getPauseStatus() == 1;
+//            }
         }
         
-        if (!isPaused) {
-            logger.info("[TaskExecutor] 任务恢复执行 - jobId: {}", jobInfo.getId());
-        } else {
-            logger.warn("[TaskExecutor] 任务暂停等待超时 - jobId: {}", jobInfo.getId());
-        }
+//        if (!isPaused) {
+//            logger.info("[TaskExecutor] 任务恢复执行 - jobId: {}", latestJobInfo.getId());
+//        } else {
+//            logger.warn("[TaskExecutor] 任务暂停等待超时 - jobId: {}", latestJobInfo.getId());
+//        }
     }
     
     /**
@@ -126,7 +134,7 @@ public class TaskExecutor {
         
         try {
             monitor = new JobExecutionMonitor(jobInfo, node, 
-                    context.getExecutionBatchId(), jobResults, retryCount);
+                    context, jobResults, retryCount, resultStorageService);
             
             TaskWrapperFactory.registerMonitor(monitor.getExecuteKey(), monitor);
             

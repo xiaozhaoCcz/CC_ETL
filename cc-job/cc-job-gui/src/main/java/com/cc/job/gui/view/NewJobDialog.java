@@ -2,6 +2,8 @@ package com.cc.job.gui.view;
 
 import com.cc.job.gui.service.JobJdbcDatasourceService;
 import com.cc.job.gui.util.IconUtil;
+import com.cc.job.gui.util.StyleUtil;
+import com.cc.job.gui.view.component.SmartParameterInput;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.entity.JobJdbcDatasource;
 import com.cc.job.xo.model.form.JobInfoForm;
@@ -58,19 +60,19 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
     private TextField executorHandlerField;
     private ComboBox<JobJdbcDatasource> datasourceCombo;
     private Button glueIdeButton;
-    private TextArea executorParamArea;
+    private SmartParameterInput executorParamArea;
     private Label executorParamLabel;
     
     // API 配置相关字段
     private ComboBox<String> reqTypeCombo;
     private TextField reqUrlField;
     private Label reqBodyLabel;
-    private TextArea reqBodyArea;
+    private SmartParameterInput reqBodyArea;
     private ParameterTable bodyTable;
     
-    private JobJdbcDatasourceService datasourceService;
+    private final JobJdbcDatasourceService datasourceService;
     private Long pendingDatasourceId;
-    private TextArea glueEditorArea;
+    private final TextArea glueEditorArea;
     private String glueRemark;
     private GlueType lastGlueType = null;
     
@@ -82,8 +84,8 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
     private TextField executorTimeoutField;
     private TextField executorFailRetryCountField;
     
-    private ButtonType saveButtonType;
-    private ButtonType cancelButtonType;
+    private final ButtonType saveButtonType;
+    private final ButtonType cancelButtonType;
     
     // 高级配置容器
     private VBox advancedSection;
@@ -179,6 +181,7 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
     
     private VBox createContent(List<JobGroup> jobGroupList) {
         VBox container = new VBox(15);
+        container.getStyleClass().add("dialog-content-root");
         container.setPadding(new Insets(20));
         container.setPrefWidth(800);
         container.setPrefHeight(550);
@@ -188,6 +191,11 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
         scrollPane.setStyle("-fx-background-color: transparent;");
         
         VBox formContent = new VBox(20);
+        // 添加文字说明
+        Label descLabel = new Label("此页面添加的任务是普通任务，请前往任务列表中查看");
+        descLabel.setStyle("-fx-font-size: 13;");
+        formContent.getChildren().add(descLabel);
+
         formContent.setPadding(new Insets(10));
         
         // 基础配置
@@ -402,10 +410,10 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
         
         // 任务参数
         executorParamLabel = createFormLabel("任务参数", false);
-        executorParamArea = new TextArea();
+        executorParamArea = new SmartParameterInput();
         executorParamArea.setPrefWidth(615);
         executorParamArea.setPrefRowCount(3);
-        executorParamArea.setPromptText("");
+        executorParamArea.setPromptText("输入参数，使用 #{任务描述}.属性 引用其他任务的结果，使用 `# 输入普通#号");
         executorParamArea.setWrapText(true);
         
         grid.add(glueTypeLabel, 0, 0);
@@ -552,10 +560,10 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
 
         // 请求体（POST/PUT时显示）
         reqBodyLabel = createFormLabel("请求体", false);
-        reqBodyArea = new TextArea();
+        reqBodyArea = new SmartParameterInput();
         reqBodyArea.setPrefWidth(615);
         reqBodyArea.setPrefRowCount(6);
-        reqBodyArea.setPromptText("请输入JSON格式的请求体");
+        reqBodyArea.setPromptText("请输入JSON格式的请求体，使用 #{任务描述}.属性 引用其他任务的结果，使用 `# 输入普通#号");
         reqBodyArea.setWrapText(true);
         reqBodyArea.setVisible(false);
         reqBodyArea.setManaged(false);
@@ -566,6 +574,9 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
         grid.add(reqUrlField, 1, 1, 3, 1);
         grid.add(reqBodyLabel, 0, 2);
         grid.add(reqBodyArea, 1, 2, 3, 1);
+        
+        // 注意：NewJobDialog是普通任务对话框，没有任务组ID，所以不需要设置taskGroupId
+        // 如果需要从任务组获取节点信息，可以在后续扩展中支持
 
         // 监听请求类型变化，显示/隐藏请求体
         reqTypeCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
@@ -695,10 +706,10 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
             labelBox.setAlignment(Pos.CENTER_LEFT);
             
             Label textLabel = new Label(text);
-            textLabel.setStyle("-fx-text-fill: #374151; -fx-font-size: 13;");
+            textLabel.setStyle("-fx-font-size: 13;");
             
             Label starLabel = new Label("*");
-            starLabel.setStyle("-fx-text-fill: #EF4444; -fx-font-size: 13; -fx-font-weight: bold;");
+            starLabel.setStyle("-fx-font-size: 13; -fx-font-weight: bold;");
             
             labelBox.getChildren().addAll(textLabel, starLabel);
             executorHandlerLabel.setGraphic(labelBox);
@@ -767,13 +778,7 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
     
     private VBox createSection(String title, FontIcon icon) {
         VBox section = new VBox(10);
-        section.setStyle(
-            "-fx-background-color: white; " +
-            "-fx-border-color: #E5E7EB; " +
-            "-fx-border-radius: 8; " +
-            "-fx-background-radius: 8; " +
-            "-fx-padding: 10;"
-        );
+        section.getStyleClass().add("dialog-section");
         
         HBox titleBox = new HBox(8);
         titleBox.setAlignment(Pos.CENTER_LEFT);
@@ -787,8 +792,7 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
         Label titleLabel = new Label(title);
         titleLabel.setStyle(
             "-fx-font-size: 16; " +
-            "-fx-font-weight: bold; " +
-            "-fx-text-fill: #1F2937;"
+            "-fx-font-weight: bold;"
         );
         
         if (icon != null) {
@@ -813,10 +817,10 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
             labelBox.setAlignment(Pos.CENTER_LEFT);
             
             Label textLabel = new Label(text);
-            textLabel.setStyle("-fx-text-fill: #374151; -fx-font-size: 13;");
+            textLabel.setStyle("-fx-font-size: 13;");
             
             Label starLabel = new Label("*");
-            starLabel.setStyle("-fx-text-fill: #EF4444; -fx-font-size: 13; -fx-font-weight: bold;");
+            starLabel.setStyle("-fx-font-size: 13; -fx-font-weight: bold;");
             
             labelBox.getChildren().addAll(textLabel, starLabel);
             
@@ -826,7 +830,7 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
             label.setTooltip(new Tooltip(text + " *"));
         } else {
             label.setText(text);
-            label.setStyle("-fx-text-fill: #374151; -fx-font-size: 13;");
+            label.setStyle("-fx-font-size: 13;");
             label.setTooltip(new Tooltip(text));
         }
         
@@ -863,9 +867,15 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
                 .findFirst()
                 .ifPresent(jobGroupCombo::setValue);
         }
-        if (data.getJobDesc() != null) jobDescField.setText(data.getJobDesc());
-        if (data.getAuthor() != null) authorField.setText(data.getAuthor());
-        if (data.getAlarmEmail() != null) alarmEmailField.setText(data.getAlarmEmail());
+        if (data.getJobDesc() != null) {
+            jobDescField.setText(data.getJobDesc());
+        }
+        if (data.getAuthor() != null) {
+            authorField.setText(data.getAuthor());
+        }
+        if (data.getAlarmEmail() != null) {
+            alarmEmailField.setText(data.getAlarmEmail());
+        }
         
         // 调度配置
         if (data.getScheduleType() != null) {
@@ -875,7 +885,9 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
                 scheduleTypeCombo.setValue(ScheduleType.CRON);
             }
         }
-        if (data.getScheduleConf() != null) scheduleConfField.setText(data.getScheduleConf());
+        if (data.getScheduleConf() != null) {
+            scheduleConfField.setText(data.getScheduleConf());
+        }
         
         // 任务配置
         GlueType glueType = GlueType.fromType(data.getGlueType());
@@ -912,7 +924,7 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
                 reqUrlField.setText(data.getReqUrl());
             }
             if (data.getReqBody() != null) {
-                reqBodyArea.setText(data.getReqBody());
+                reqBodyArea.setTextWithEscape(data.getReqBody());
             }
             // 只使用一个参数表格，优先使用executorParam，如果没有则使用reqHeader
             String paramData = data.getExecutorParam();
@@ -922,7 +934,7 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
             bodyTable.setData(paramData);
         } else {
             if (data.getExecutorParam() != null) {
-                executorParamArea.setText(data.getExecutorParam());
+                executorParamArea.setTextWithEscape(data.getExecutorParam());
             }
         }
         
@@ -1003,7 +1015,7 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
             form.setReqUrl(reqUrl);
             // 如果是POST或PUT，设置请求体
             if ("POST".equals(reqType) || "PUT".equals(reqType)) {
-                String reqBody = reqBodyArea.getText() != null ? reqBodyArea.getText().trim() : "";
+                String reqBody = reqBodyArea.getActualText() != null ? reqBodyArea.getActualText().trim() : "";
                 form.setReqBody(reqBody.isEmpty() ? null : reqBody);
             } else {
                 form.setReqBody(null);
@@ -1015,7 +1027,8 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
             form.setReqUrl(null);
             form.setReqBody(null);
             form.setReqHeader(null);
-            form.setExecutorParam(executorParamArea.getText().trim());
+            form.setExecutorParam(executorParamArea.getActualText() != null ? 
+                    executorParamArea.getActualText().trim() : "");
         }
         
         // 高级配置
@@ -1118,11 +1131,12 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
         getDialogPane().setMaxHeight(Double.MAX_VALUE);
         setResizable(true);
         
-        getDialogPane().setStyle(
-            "-fx-background-color: #F9FAFB; " +
-            "-fx-background-radius: 8; " +
-            "-fx-border-radius: 8;"
-        );
+        // 加载当前主题样式
+        String css = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (css != null && !css.isEmpty()) {
+            getDialogPane().getStylesheets().add(css);
+        }
+        
         
         Button saveButton = (Button) getDialogPane().lookupButton(saveButtonType);
         if (saveButton != null) {
@@ -1142,7 +1156,6 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
         if (cancelButton != null) {
             cancelButton.setStyle(
                 "-fx-background-color: #F3F4F6; " +
-                "-fx-text-fill: #374151; " +
                 "-fx-font-size: 13; " +
                 "-fx-padding: 8 20; " +
                 "-fx-border-color: #D1D5DB; " +
@@ -1288,10 +1301,15 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
         ParameterTable(String title) {
             setSpacing(8);
             setPadding(new Insets(12));
-            setStyle("-fx-background-color: linear-gradient(145deg,#6847FF,#8A6BFF); -fx-border-radius: 10; -fx-background-radius: 10;");
+            boolean dark = StyleUtil.isDarkTheme();
+            if (dark) {
+                setStyle("-fx-background-color: #2D2D30; -fx-border-radius: 10; -fx-background-radius: 10; -fx-border-color: #3C3C3C; -fx-border-width: 1;");
+            } else {
+                setStyle("-fx-background-color: linear-gradient(145deg,#6847FF,#8A6BFF); -fx-border-radius: 10; -fx-background-radius: 10;");
+            }
 
             Label titleLabel = new Label(title);
-            titleLabel.setStyle("-fx-text-fill: rgba(255,255,255,0.9); -fx-font-size: 13; -fx-font-weight: bold;");
+            titleLabel.setStyle("-fx-text-fill: " + (dark ? "#D4D4D4" : "rgba(255,255,255,0.9)") + "; -fx-font-size: 13; -fx-font-weight: bold;");
 
             tableView = new TableView<>();
             tableView.setEditable(true);
@@ -1315,7 +1333,10 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
             actionColumn.setCellFactory(col -> new TableCell<>() {
                 private final Button deleteButton = new Button("删除");
                 {
-                    deleteButton.setStyle("-fx-background-color: rgba(255,255,255,0.15); -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 4 10; -fx-background-radius: 4; -fx-border-color: rgba(255,255,255,0.3); -fx-border-radius: 4; -fx-cursor: hand;");
+                    // 使用红色背景，使按钮更明显
+                    deleteButton.setStyle("-fx-background-color: #FF4444; -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 4 10; -fx-background-radius: 4; -fx-border-color: #CC0000; -fx-border-radius: 4; -fx-cursor: hand;");
+                    deleteButton.setOnMouseEntered(e -> deleteButton.setStyle("-fx-background-color: #FF6666; -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 4 10; -fx-background-radius: 4; -fx-border-color: #CC0000; -fx-border-radius: 4; -fx-cursor: hand;"));
+                    deleteButton.setOnMouseExited(e -> deleteButton.setStyle("-fx-background-color: #FF4444; -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 4 10; -fx-background-radius: 4; -fx-border-color: #CC0000; -fx-border-radius: 4; -fx-cursor: hand;"));
                     deleteButton.setOnAction(e -> {
                         ParamItem item = getTableView().getItems().get(getIndex());
                         items.remove(item);
@@ -1335,10 +1356,23 @@ public class NewJobDialog extends Dialog<JobInfoForm> {
             tableView.getColumns().add(actionColumn);
 
             Button addButton = new Button("+ 新增参数");
-            addButton.setStyle("-fx-background-color: rgba(255,255,255,0.2); -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 6 14; -fx-background-radius: 4; -fx-border-color: rgba(255,255,255,0.4); -fx-border-radius: 4; -fx-cursor: hand;");
+            if (dark) {
+                addButton.setStyle("-fx-background-color: #007ACC; -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 6 14; -fx-background-radius: 4; -fx-border-color: #094771; -fx-border-radius: 4; -fx-cursor: hand;");
+                addButton.setOnMouseEntered(e -> addButton.setStyle("-fx-background-color: #1E88E5; -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 6 14; -fx-background-radius: 4; -fx-border-color: #094771; -fx-border-radius: 4; -fx-cursor: hand;"));
+                addButton.setOnMouseExited(e -> addButton.setStyle("-fx-background-color: #007ACC; -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 6 14; -fx-background-radius: 4; -fx-border-color: #094771; -fx-border-radius: 4; -fx-cursor: hand;"));
+            } else {
+                addButton.setStyle("-fx-background-color: #4A90E2; -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 6 14; -fx-background-radius: 4; -fx-border-color: #357ABD; -fx-border-radius: 4; -fx-cursor: hand;");
+                addButton.setOnMouseEntered(e -> addButton.setStyle("-fx-background-color: #5BA0F2; -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 6 14; -fx-background-radius: 4; -fx-border-color: #357ABD; -fx-border-radius: 4; -fx-cursor: hand;"));
+                addButton.setOnMouseExited(e -> addButton.setStyle("-fx-background-color: #4A90E2; -fx-text-fill: white; -fx-font-size: 12; -fx-padding: 6 14; -fx-background-radius: 4; -fx-border-color: #357ABD; -fx-border-radius: 4; -fx-cursor: hand;"));
+            }
             addButton.setOnAction(e -> addRow("", ""));
 
-            getChildren().addAll(titleLabel, tableView, addButton);
+            // 将新增按钮放在表格上方
+            HBox buttonContainer = new HBox();
+            buttonContainer.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+            buttonContainer.getChildren().add(addButton);
+
+            getChildren().addAll(titleLabel, buttonContainer, tableView);
             ensureAtLeastOneRow();
         }
 

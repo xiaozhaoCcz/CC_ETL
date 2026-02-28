@@ -1,6 +1,11 @@
 server:
   port: 8500
 
+# 开发环境日志目录（相对路径）
+app:
+  log:
+    base: ./logs
+
 spring:
   jackson:
     ## 默认序列化时间格式
@@ -61,10 +66,22 @@ cc-job:
       port: 15000
       ### job log path
       #logpath: ./data/applogs/executor/jobhandler
-      logpath: C:\Users\48423\OneDrive\Desktop\pp\ccJob\logs
+      logpath: /Users/xiaozhao/Desktop/xz/logs
       ### job log retention days
       logretentiondays: 30
     ### job, access token
     accessToken: default_token
+  # 节点执行结果存储配置
+  result:
+    storage:
+      file:
+        # 是否启用文件存储（默认true）
+        enabled: true
+        # 文件存储基础路径（绝对路径），默认：系统临时目录下的 cc-job-results
+        basePath: /Users/xiaozhao/Desktop/xz/cc-job-results
+        # 子路径格式（如：{taskGroupId}/{executionBatchId}）
+        subPath: "{taskGroupId}/{executionBatchId}"
+        # 文件编码（默认UTF-8）
+        encoding: UTF-8
 
 

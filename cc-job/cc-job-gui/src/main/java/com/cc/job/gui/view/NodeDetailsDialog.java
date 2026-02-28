@@ -49,7 +49,7 @@ public class NodeDetailsDialog extends Dialog<Void> {
         
         VBox root = new VBox(20);
         root.setPadding(new Insets(24));
-        root.setStyle("-fx-background-color: " + StyleUtil.BG_SECONDARY + ";");
+        root.getStyleClass().add("dialog-content-root");
         
         // 创建滚动面板以容纳更多内容
         ScrollPane scrollPane = new ScrollPane();
@@ -64,7 +64,7 @@ public class NodeDetailsDialog extends Dialog<Void> {
         
         // 任务基本信息区域
         Label taskInfoTitle = new Label("任务基本信息");
-        taskInfoTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #111827;");
+        taskInfoTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
         contentBox.getChildren().add(taskInfoTitle);
         
         GridPane taskGrid = new GridPane();
@@ -120,13 +120,13 @@ public class NodeDetailsDialog extends Dialog<Void> {
         
         addLabel(taskGrid, "下一次运行时间:", 0, row);
         Label nextTriggerTimeLabel = addValueLabel(taskGrid, "加载中...", 1, row++);
-        nextTriggerTimeLabel.setStyle("-fx-text-fill: " + StyleUtil.PRIMARY + ";");
+        nextTriggerTimeLabel.setStyle("-fx-text-fill: " + StyleUtil.linkPrimaryColor() + ";");
         
         contentBox.getChildren().add(taskGrid);
         
         // 节点信息区域
         Label nodeInfoTitle = new Label("节点信息");
-        nodeInfoTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #111827; -fx-padding: 16 0 0 0;");
+        nodeInfoTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-padding: 16 0 0 0;");
         contentBox.getChildren().add(nodeInfoTitle);
         
         GridPane nodeGrid = new GridPane();
@@ -169,7 +169,7 @@ public class NodeDetailsDialog extends Dialog<Void> {
         
         // 预测时间区域
         Label predictedTimeTitle = new Label("预测执行时间");
-        predictedTimeTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #111827; -fx-padding: 16 0 0 0;");
+        predictedTimeTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-padding: 16 0 0 0;");
         contentBox.getChildren().add(predictedTimeTitle);
         
         GridPane predictedTimeGrid = new GridPane();
@@ -180,11 +180,11 @@ public class NodeDetailsDialog extends Dialog<Void> {
         row = 0;
         addLabel(predictedTimeGrid, "预测到达时间:", 0, row);
         Label predictedArrivalTimeLabel = addValueLabel(predictedTimeGrid, "未启动任务组", 1, row++);
-        predictedArrivalTimeLabel.setStyle("-fx-text-fill: " + StyleUtil.PRIMARY + ";");
+        predictedArrivalTimeLabel.setStyle("-fx-text-fill: " + StyleUtil.linkPrimaryColor() + ";");
         
         addLabel(predictedTimeGrid, "预测完成时间:", 0, row);
         Label predictedFinishTimeLabel = addValueLabel(predictedTimeGrid, "未启动任务组", 1, row++);
-        predictedFinishTimeLabel.setStyle("-fx-text-fill: " + StyleUtil.PRIMARY + ";");
+        predictedFinishTimeLabel.setStyle("-fx-text-fill: " + StyleUtil.linkPrimaryColor() + ";");
 
         contentBox.getChildren().add(predictedTimeGrid);
         
@@ -209,24 +209,22 @@ public class NodeDetailsDialog extends Dialog<Void> {
         getDialogPane().setMinWidth(700);
         getDialogPane().setMinHeight(600);
         setResizable(true);
-        
-        getDialogPane().setStyle(
-            "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-            "-fx-background-radius: " + StyleUtil.RADIUS_LG + "; " +
-            "-fx-border-radius: " + StyleUtil.RADIUS_LG + ";"
-        );
+        String css = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (css != null && !css.isEmpty()) {
+            getDialogPane().getStylesheets().add(css);
+        }
     }
     
     private Label addLabel(GridPane grid, String text, int col, int row) {
         Label label = new Label(text);
-        label.setStyle(StyleUtil.body() + "-fx-font-weight: 600; -fx-text-fill: #6B7280;");
+        label.setStyle("-fx-font-size: 13px; -fx-font-weight: 600;");
         grid.add(label, col, row);
         return label;
     }
     
     private Label addValueLabel(GridPane grid, String text, int col, int row) {
         Label label = new Label(text);
-        label.setStyle(StyleUtil.body() + "-fx-text-fill: #111827;");
+        label.setStyle("-fx-font-size: 13px; -fx-font-weight: 400;");
         label.setWrapText(true);
         grid.add(label, col, row);
         return label;

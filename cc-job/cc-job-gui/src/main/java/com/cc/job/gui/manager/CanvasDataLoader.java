@@ -38,6 +38,13 @@ public class CanvasDataLoader {
     }
     
     private ProcessNode createNode(JobComposeData.NodeData nodeData) {
+        return createNodeFromData(nodeData);
+    }
+    
+    /**
+     * ⭐ 新增：从NodeData创建ProcessNode（公共方法，供外部调用）
+     */
+    public ProcessNode createNodeFromData(JobComposeData.NodeData nodeData) {
         String text = nodeData.getJobName() != null ? nodeData.getJobName() : "Node";
         ProcessNode node = new ProcessNode(nodeData.getId(), text);
         
@@ -60,6 +67,111 @@ public class CanvasDataLoader {
         }
         
         node.setType(mapNodeType(nodeData.getType(), nodeData.getProperties()));
+        
+        // 从properties读取颜色并应用
+        if (nodeData.getProperties() != null) {
+            Object colorObj = nodeData.getProperties().get("color");
+            if (colorObj != null) {
+                String color = colorObj.toString();
+                if (color != null && !color.isEmpty()) {
+                    node.setNodeColor(color);
+                }
+            }
+            
+            // 从properties读取节点大小
+            double width = 180.0; // 默认宽度
+            double height = 80.0; // 默认高度
+            Object widthObj = nodeData.getProperties().get("width");
+            if (widthObj != null) {
+                try {
+                    if (widthObj instanceof Number) {
+                        width = ((Number) widthObj).doubleValue();
+                    } else {
+                        width = Double.parseDouble(widthObj.toString());
+                    }
+                } catch (NumberFormatException e) {
+                    // 使用默认值
+                }
+            }
+            Object heightObj = nodeData.getProperties().get("height");
+            if (heightObj != null) {
+                try {
+                    if (heightObj instanceof Number) {
+                        height = ((Number) heightObj).doubleValue();
+                    } else {
+                        height = Double.parseDouble(heightObj.toString());
+                    }
+                } catch (NumberFormatException e) {
+                    // 使用默认值
+                }
+            }
+            node.setNodeSize(width, height);
+            
+            // 从properties读取边框样式
+            Object borderStyleObj = nodeData.getProperties().get("borderStyle");
+            if (borderStyleObj != null) {
+                try {
+                    String borderStyleStr = borderStyleObj.toString();
+                    ProcessNode.BorderStyle borderStyle = ProcessNode.BorderStyle.valueOf(borderStyleStr);
+                    node.setBorderStyle(borderStyle);
+                } catch (IllegalArgumentException e) {
+                    // 使用默认值 SOLID
+                }
+            }
+            
+            // 从properties读取边框粗细
+            Object borderWidthObj = nodeData.getProperties().get("borderWidth");
+            if (borderWidthObj != null) {
+                try {
+                    double borderWidth;
+                    if (borderWidthObj instanceof Number) {
+                        borderWidth = ((Number) borderWidthObj).doubleValue();
+                    } else {
+                        borderWidth = Double.parseDouble(borderWidthObj.toString());
+                    }
+                    node.setBorderWidth(borderWidth);
+                } catch (NumberFormatException e) {
+                    // 使用默认值
+                }
+            }
+            
+            // 从properties读取标签
+            Object tagsObj = nodeData.getProperties().get("tags");
+            if (tagsObj != null) {
+                java.util.List<String> tags = new java.util.ArrayList<>();
+                if (tagsObj instanceof java.util.List) {
+                    for (Object tag : (java.util.List<?>) tagsObj) {
+                        if (tag != null) {
+                            tags.add(tag.toString());
+                        }
+                    }
+                } else if (tagsObj instanceof String) {
+                    // 尝试解析JSON数组字符串
+                    try {
+                        com.google.gson.Gson gson = new com.google.gson.Gson();
+                        java.util.List<?> tagList = gson.fromJson((String) tagsObj, java.util.List.class);
+                        for (Object tag : tagList) {
+                            if (tag != null) {
+                                tags.add(tag.toString());
+                            }
+                        }
+                    } catch (Exception e) {
+                        // 解析失败，忽略
+                    }
+                }
+                node.setTags(tags);
+            }
+            
+            // 从properties读取备注
+            Object remarkObj = nodeData.getProperties().get("remark");
+            if (remarkObj != null) {
+                String remark = remarkObj.toString();
+                if (remark != null && !remark.trim().isEmpty()) {
+                    node.setRemark(remark);
+                }
+            }
+        }
+        
         return node;
     }
     
@@ -125,6 +237,7 @@ public class CanvasDataLoader {
             case "node", "nodejs", "glue(nodejs)", "custom-nodejs" -> "Node";
             case "powershell", "ps", "glue(powershell)", "custom-powershell" -> "PS";
             case "csharp", "c#", "glue(csharp)", "custom-csharp" -> "C#";
+            case "datax" -> "DataX";
             default -> "Bean";
         };
     }

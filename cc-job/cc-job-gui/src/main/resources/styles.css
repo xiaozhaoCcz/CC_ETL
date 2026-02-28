@@ -1,32 +1,445 @@
 /* NodeFx - 流程节点编辑器样式表 */
 
+/*
+ * ============ 唯一灰阶与主色表（全界面只引用以下色值） ============
+ * 主色/强调:     #2563EB  按钮、选中、焦点、连接线、标签下划线
+ * 顶栏/标签栏:   #F3F4F6  TopToolBar、TaskNavigationBar、菜单栏
+ * 中央画布:      #FAFAFA  网格 #E8E8E8  NodeCanvas 背景
+ * 日志面板标题:  #F9FAFB  LogPanel tabBar、log-tab
+ * 分割线/边框:   #E5E7EB  SplitPane、输入框边框、tab 分割
+ * 左侧边栏:      #F3F3F3  sidebar-left、collapsed-sidebar（浅灰，非黑色）
+ * 底部状态栏:    #007ACC  StatusBar
+ * ============ 勿使用 #F1F5F9、#F8FAFC 等中间灰，统一归入上表 ============
+ */
+
 /* ============ 全局样式 ============ */
 
 .root {
     -fx-font-family: "Inter", "Segoe UI", "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
     -fx-font-size: 13px;
-    -fx-background-color: #F1F5F9;
+    -fx-background-color: #FFFFFF;
+}
+
+/* ============ 弹窗浅色（与 styles-dark 对应，由主题控制） ============ */
+
+.dialog-pane {
+    -fx-background-color: #F9FAFB;
+}
+
+.dialog-pane .label {
+    -fx-text-fill: #1F2937;
+}
+
+.dialog-pane .text-field,
+.dialog-pane .text-area {
+    -fx-text-fill: #1F2937;
+    -fx-prompt-text-fill: #6B7280;
+}
+
+.dialog-pane .dialog-section {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 10;
+}
+
+.dialog-pane .dialog-content-root {
+    -fx-background-color: #F9FAFB;
+}
+
+.dialog-pane .dialog-button-secondary {
+    -fx-background-color: white;
+    -fx-text-fill: #374151;
+    -fx-font-size: 13px;
+    -fx-font-weight: 500;
+    -fx-padding: 8 16;
+    -fx-border-color: #D1D5DB;
+    -fx-border-width: 1;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-cursor: hand;
+}
+
+.dialog-pane .dialog-button-secondary:hover {
+    -fx-background-color: #F3F4F6;
+    -fx-border-color: #9CA3AF;
+}
+
+.dialog-pane .dialog-button-secondary:pressed {
+    -fx-background-color: #E5E7EB;
+}
+
+/* 对话框内主按钮 / 成功 / 错误（任务列表、执行器、数据源等） */
+.dialog-pane .dialog-button-primary {
+    -fx-background-color: #2563EB;
+    -fx-text-fill: white;
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+    -fx-padding: 8 16;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-cursor: hand;
+}
+.dialog-pane .dialog-button-primary:hover {
+    -fx-background-color: #1D4ED8;
+}
+.dialog-pane .dialog-button-primary:pressed {
+    -fx-background-color: #1D4ED8;
+}
+
+.dialog-pane .dialog-button-success {
+    -fx-background-color: #10B981;
+    -fx-text-fill: white;
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+    -fx-padding: 8 16;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-cursor: hand;
+}
+.dialog-pane .dialog-button-success:hover {
+    -fx-background-color: #059669;
+}
+.dialog-pane .dialog-button-success:pressed {
+    -fx-background-color: #059669;
+}
+
+.dialog-pane .dialog-button-error {
+    -fx-background-color: #EF4444;
+    -fx-text-fill: white;
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+    -fx-padding: 8 16;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-cursor: hand;
+}
+.dialog-pane .dialog-button-error:hover {
+    -fx-background-color: #DC2626;
+}
+.dialog-pane .dialog-button-error:pressed {
+    -fx-background-color: #DC2626;
+}
+
+/* 对话框内搜索/筛选输入框 */
+.dialog-pane .dialog-search-field {
+    -fx-background-color: #FFFFFF;
+    -fx-text-fill: #1F2937;
+    -fx-prompt-text-fill: #6B7280;
+    -fx-font-size: 13px;
+    -fx-padding: 8 12;
+    -fx-border-color: #D1D5DB;
+    -fx-border-width: 1;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+}
+
+/* 表格内操作列 MenuButton（任务列表「操作」下拉） */
+.dialog-pane .dialog-table-action-button {
+    -fx-background-color: white;
+    -fx-text-fill: #374151;
+    -fx-font-size: 11px;
+    -fx-font-weight: 500;
+    -fx-padding: 4 8;
+    -fx-border-color: #D1D5DB;
+    -fx-border-width: 1;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-content-display: LEFT;
+    -fx-cursor: hand;
+}
+.dialog-pane .dialog-table-action-button:hover {
+    -fx-background-color: #F3F4F6;
+    -fx-border-color: #9CA3AF;
+}
+.dialog-pane .dialog-table-action-button:pressed {
+    -fx-background-color: #E5E7EB;
+}
+
+/* ============ 节点执行历史等弹窗子区域（浅色） ============ */
+.popup-window-root.popup-history-root {
+    -fx-background-color: #FFFFFF;
+}
+
+.popup-title-bar {
+    -fx-background-color: #F9FAFB;
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 0 0 1 0;
+}
+
+.popup-title-bar .label {
+    -fx-text-fill: #1F2937;
+}
+
+.popup-tool-bar {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 0 0 1 0;
+}
+
+.popup-tool-bar .label {
+    -fx-text-fill: #6B7280;
+}
+
+.popup-content-area,
+.popup-window-root .scroll-pane.popup-content-scroll {
+    -fx-background-color: #F9FAFB;
+}
+
+.popup-card {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+
+.popup-card .label,
+.popup-card-time {
+    -fx-text-fill: #1F2937;
+}
+
+.popup-node-card {
+    -fx-background-color: #F9FAFB;
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 1;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+}
+
+.popup-node-card .label {
+    -fx-text-fill: #374151;
+}
+
+.popup-tool-button,
+.popup-pagination-button {
+    -fx-background-color: #FFFFFF;
+    -fx-text-fill: #374151;
+    -fx-font-size: 12px;
+    -fx-font-weight: 500;
+    -fx-padding: 6 12 6 12;
+    -fx-border-color: #D1D5DB;
+    -fx-border-width: 1;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-cursor: hand;
+}
+
+.popup-tool-button:hover,
+.popup-pagination-button:hover {
+    -fx-background-color: #F3F4F6;
+    -fx-border-color: #9CA3AF;
+}
+
+.popup-pagination-bar {
+    -fx-background-color: #F9FAFB;
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 1 0 0 0;
+}
+
+.popup-pagination-bar .label {
+    -fx-text-fill: #6B7280;
+}
+
+.popup-status-success {
+    -fx-background-color: #D1FAE5;
+    -fx-text-fill: #065F46;
+    -fx-padding: 4 12 4 12;
+    -fx-background-radius: 4;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.popup-status-fail {
+    -fx-background-color: #FEE2E2;
+    -fx-text-fill: #991B1B;
+    -fx-padding: 4 12 4 12;
+    -fx-background-radius: 4;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.popup-status-running {
+    -fx-background-color: #DBEAFE;
+    -fx-text-fill: #1E40AF;
+    -fx-padding: 4 12 4 12;
+    -fx-background-radius: 4;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.popup-status-unknown {
+    -fx-background-color: #F3F4F6;
+    -fx-text-fill: #6B7280;
+    -fx-padding: 4 12 4 12;
+    -fx-background-radius: 4;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.popup-error-text {
+    -fx-text-fill: #EF4444;
+}
+
+/* ============ 企业级布局：左侧边栏浅灰 #F3F3F3 + 中央白底 ============ */
+
+.sidebar-left {
+    -fx-background-color: #F3F3F3;
+}
+
+.content-area {
+    -fx-background-color: #FFFFFF;
+}
+
+.content-area .scroll-pane {
+    -fx-background-color: #FFFFFF;
+}
+
+.collapsed-sidebar {
+    -fx-background-color: #F3F3F3;
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 0 1 0 0;
+}
+
+.sidebar-left .tree-view-panel {
+    -fx-background-color: transparent;
+}
+
+.sidebar-left .tree-view-panel .label,
+.sidebar-left .label {
+    -fx-text-fill: #374151;
+}
+
+.sidebar-left .tree-view .tree-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #374151;
+}
+
+.sidebar-left .tree-view .tree-cell:hover {
+    -fx-background-color: #E5E7EB;
+    -fx-background-radius: 4;
+}
+
+.sidebar-left .tree-view .tree-cell:selected {
+    -fx-background-color: #DBEAFE;
+    -fx-text-fill: #2563EB;
+    -fx-background-radius: 4;
+}
+
+.sidebar-left .tree-view .tree-cell .tree-cell-label {
+    -fx-text-fill: #374151;
+}
+
+.sidebar-left .tree-view .tree-cell:selected .tree-cell-label,
+.sidebar-left .tree-view .tree-cell:selected .tree-cell-label-selected {
+    -fx-text-fill: #2563EB;
+}
+
+.sidebar-left .tree-view .tree-cell.tree-cell-content {
+    -fx-padding: 8 12;
+    -fx-background-radius: 6;
+}
+
+.sidebar-left .tree-view .tree-cell > .tree-disclosure-node > .arrow {
+    -fx-background-color: #6B7280;
+}
+
+.sidebar-left .tree-view {
+    -fx-background-color: transparent;
+}
+
+.sidebar-left .tree-view .virtual-flow {
+    -fx-background-color: transparent;
+}
+
+.sidebar-left .scroll-bar .track {
+    -fx-background-color: #E5E7EB;
+    -fx-background-radius: 0;
+}
+
+.sidebar-left .scroll-bar .thumb {
+    -fx-background-color: #D1D5DB;
+    -fx-background-radius: 0;
+}
+
+.sidebar-left .scroll-bar .thumb:hover {
+    -fx-background-color: #9CA3AF;
+}
+
+.sidebar-left .scroll-bar .thumb:pressed {
+    -fx-background-color: #6B7280;
+}
+
+.sidebar-left .split-pane-divider {
+    -fx-background-color: #E5E7EB;
+}
+
+.sidebar-left .split-pane-divider:hover {
+    -fx-background-color: #D1D5DB;
+}
+
+.sidebar-left .text-field {
+    -fx-background-color: #FFFFFF;
+    -fx-text-fill: #111827;
+    -fx-border-color: #D1D5DB;
+    -fx-prompt-text-fill: #9CA3AF;
+    -fx-effect: null;
+}
+
+.sidebar-left .text-field:focused {
+    -fx-border-color: #2563EB;
+    -fx-background-color: #FFFFFF;
+}
+
+.sidebar-left .tree-search-field {
+    -fx-background-color: #FFFFFF;
+    -fx-text-fill: #111827;
+    -fx-border-color: #D1D5DB;
+    -fx-prompt-text-fill: #9CA3AF;
+    -fx-effect: null;
+}
+
+.sidebar-left .tree-search-field:focused {
+    -fx-border-color: #2563EB;
+    -fx-background-color: #FFFFFF;
+}
+
+.tree-search-field {
+    -fx-background-color: #FFFFFF;
+    -fx-text-fill: #111827;
+    -fx-font-size: 12px;
+    -fx-padding: 4 8;
+    -fx-border-color: #D1D5DB;
+    -fx-border-width: 1;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-prompt-text-fill: #9CA3AF;
+    -fx-effect: null;
+}
+
+.tree-search-field:focused {
+    -fx-border-color: #2563EB;
+    -fx-background-color: #FFFFFF;
 }
 
 /* ============ 画布节点样式 ============ */
 
 .canvas-node {
-    -fx-background-color: linear-gradient(to bottom, #8B5CF6, #7C3AED);
+    -fx-background-color: #2563EB;
     -fx-background-radius: 8;
-    -fx-effect: dropshadow(gaussian, rgba(139, 92, 246, 0.4), 8, 0, 0, 2);
     -fx-padding: 12 20;
     -fx-cursor: hand;
 }
 
 .canvas-node:hover {
-    -fx-background-color: linear-gradient(to bottom, #7C3AED, #6D28D9);
-    -fx-effect: dropshadow(gaussian, rgba(139, 92, 246, 0.6), 12, 0, 0, 4);
+    -fx-background-color: #1D4ED8;
 }
 
 .canvas-node-selected {
-    -fx-background-color: linear-gradient(to bottom, #6D28D9, #5B21B6);
-    -fx-effect: dropshadow(gaussian, rgba(139, 92, 246, 0.8), 16, 0, 0, 4);
-    -fx-border-color: #A78BFA;
+    -fx-background-color: #1E40AF;
+    -fx-border-color: #3B82F6;
     -fx-border-width: 2;
     -fx-border-radius: 8;
 }
@@ -47,9 +460,9 @@
 
 .canvas-pane {
     -fx-background-color: 
-        linear-gradient(to right, #E5E7EB 1px, transparent 1px),
-        linear-gradient(to bottom, #E5E7EB 1px, transparent 1px),
-        #F1F5F9;
+        linear-gradient(to right, #E8E8E8 1px, transparent 1px),
+        linear-gradient(to bottom, #E8E8E8 1px, transparent 1px),
+        #FAFAFA;
     -fx-background-size: 20px 20px, 20px 20px, 100% 100%;
     -fx-background-position: 0 0, 0 0, 0 0;
 }
@@ -57,20 +470,17 @@
 /* ============ 连接线样式 ============ */
 
 .connection-line {
-    -fx-stroke: #8B5CF6;
+    -fx-stroke: #2563EB;
     -fx-stroke-width: 2.5;
-    -fx-effect: dropshadow(gaussian, rgba(139, 92, 246, 0.3), 4, 0, 0, 1);
 }
 
 .connection-line:hover {
-    -fx-stroke: #7C3AED;
+    -fx-stroke: #1D4ED8;
     -fx-stroke-width: 3;
-    -fx-effect: dropshadow(gaussian, rgba(139, 92, 246, 0.5), 6, 0, 0, 2);
 }
 
 .connection-arrow {
-    -fx-fill: #8B5CF6;
-    -fx-effect: dropshadow(gaussian, rgba(139, 92, 246, 0.3), 3, 0, 0, 1);
+    -fx-fill: #2563EB;
 }
 
 /* ============ 滚动条样式 ============ */
@@ -81,12 +491,12 @@
 
 .scroll-bar .track {
     -fx-background-color: #F3F4F6;
-    -fx-background-radius: 4;
+    -fx-background-radius: 0;
 }
 
 .scroll-bar .thumb {
     -fx-background-color: #D1D5DB;
-    -fx-background-radius: 4;
+    -fx-background-radius: 0;
 }
 
 .scroll-bar .thumb:hover {
@@ -121,8 +531,8 @@
 }
 
 .tree-cell:selected {
-    -fx-background-color: #EDE9FE;
-    -fx-text-fill: #6366F1;
+    -fx-background-color: #DBEAFE;
+    -fx-text-fill: #2563EB;
     -fx-background-radius: 6;
 }
 
@@ -141,10 +551,10 @@
     -fx-rotate: 90;
 }
 
-/* ============ 文本输入框样式 ============ */
+/* ============ 文本输入框样式（扁平化） ============ */
 
 .text-field {
-    -fx-background-color: white;
+    -fx-background-color: #FFFFFF;
     -fx-border-color: #D1D5DB;
     -fx-border-width: 1;
     -fx-border-radius: 6;
@@ -153,30 +563,35 @@
     -fx-font-size: 13px;
     -fx-text-fill: #111827;
     -fx-prompt-text-fill: #9CA3AF;
+    -fx-effect: null;
 }
 
 .text-field:focused {
-    -fx-border-color: #6366F1;
-    -fx-effect: dropshadow(gaussian, rgba(99, 102, 241, 0.3), 4, 0, 0, 0);
+    -fx-border-color: #2563EB;
+    -fx-background-color: #FFFFFF;
 }
 
-/* ============ 按钮样式 ============ */
+/* ============ 按钮样式（扁平化，与开始按钮一致） ============ */
 
 .button {
     -fx-cursor: hand;
+    -fx-background-color: #E5E7EB;
     -fx-background-radius: 6;
     -fx-border-radius: 6;
     -fx-padding: 8 16;
     -fx-font-size: 13px;
     -fx-font-weight: 600;
+    -fx-effect: null;
 }
 
 .button:hover {
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.1), 4, 0, 0, 2);
+    -fx-background-color: #D1D5DB;
+    -fx-effect: null;
 }
 
 .button:pressed {
-    -fx-effect: innershadow(gaussian, rgba(0, 0, 0, 0.2), 2, 0, 0, 1);
+    -fx-background-color: #9CA3AF;
+    -fx-effect: null;
 }
 
 /* ============ 标签页样式 ============ */
@@ -206,8 +621,8 @@
 
 .tab-pane .tab:selected {
     -fx-background-color: white;
-    -fx-border-color: transparent transparent #6366F1 transparent;
-    -fx-text-fill: #6366F1;
+    -fx-border-color: transparent transparent #2563EB transparent;
+    -fx-text-fill: #2563EB;
 }
 
 .tab-pane .tab .tab-label {
@@ -217,17 +632,210 @@
 }
 
 .tab-pane .tab:selected .tab-label {
-    -fx-text-fill: #6366F1;
+    -fx-text-fill: #2563EB;
     -fx-font-weight: 600;
+}
+
+/* ============ 小地图组件 ============ */
+
+.minimap-view {
+    -fx-background-color: transparent;
+    -fx-padding: 12 12 0 8;
+}
+
+.minimap-canvas-container {
+    -fx-background-color: #F3F3F3;
+}
+
+.minimap-title {
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-text-fill: #6B7280;
+}
+
+/* ============ 任务组导航栏 ============ */
+
+.task-nav-bar {
+    -fx-background-color: #F3F4F6;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+}
+
+.task-nav-scroll-pane {
+    -fx-background-color: transparent;
+    -fx-border-width: 0;
+    -fx-padding: 0;
+    -fx-background-insets: 0;
+}
+
+/* 统一占位：所有标签均为左 1px + 底 2px，未选中时底边透明，保证切换任务组时高度一致 */
+.task-nav-tab {
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
+    -fx-cursor: hand;
+    -fx-effect: null;
+    -fx-background-color: #F3F4F6;
+    -fx-border-color: #E5E7EB transparent transparent transparent;
+    -fx-border-width: 0 0 0 1;
+}
+
+.task-nav-tab:hover {
+    -fx-background-color: #E5E7EB;
+}
+
+.task-nav-tab-active {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #E5E7EB transparent #2563EB transparent;
+    -fx-border-width: 1 0 2 0;
+}
+
+.task-nav-tab-name {
+    -fx-font-size: 12.5px;
+    -fx-font-weight: 600;
+    -fx-text-fill: #4B5563;
+}
+
+.task-nav-tab-name-active {
+    -fx-font-size: 12.5px;
+    -fx-font-weight: 700;
+    -fx-text-fill: #1D4ED8;
+}
+
+.task-nav-tab-name-running {
+    -fx-font-size: 12.5px;
+    -fx-font-weight: 600;
+    -fx-text-fill: #059669;
+}
+
+.task-nav-tab-close {
+    -fx-background-color: transparent;
+    -fx-background-radius: 10;
+    -fx-cursor: hand;
+}
+
+.task-nav-tab-close:hover {
+    -fx-background-color: rgba(239, 68, 68, 0.12);
+}
+
+.task-nav-tab-close-icon {
+    -fx-text-fill: #9CA3AF;
+    -fx-font-size: 13px;
+    -fx-font-weight: 400;
+    -fx-padding: 0;
+}
+
+.task-nav-tab-close:hover .task-nav-tab-close-icon {
+    -fx-text-fill: #EF4444;
+    -fx-font-weight: 500;
+}
+
+/* ============ 顶部工具栏 ============ */
+
+.top-tool-bar {
+    -fx-background-color: #F3F4F6;
+    -fx-border-color: transparent transparent #E5E7EB transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+.tool-bar-area {
+    -fx-background-color: #F3F4F6;
+}
+
+.tool-bar-separator {
+    -fx-background-color: #E2E8F0;
+}
+
+.tool-bar-zoom-label {
+    -fx-font-size: 13px;
+    -fx-font-weight: 700;
+    -fx-text-fill: #374151;
+    -fx-padding: 0 8 0 8;
+}
+
+.top-tool-bar .tool-bar-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: #374151;
+    -fx-padding: 6;
+    -fx-background-radius: 4;
+    -fx-cursor: hand;
+}
+
+.top-tool-bar .tool-bar-button:hover {
+    -fx-background-color: #E5E7EB;
+}
+
+.top-tool-bar .tool-bar-menu-button {
+    -fx-background-color: #F3F4F6;
+    -fx-text-fill: #374151;
+    -fx-padding: 6;
+    -fx-background-radius: 4;
+    -fx-cursor: hand;
+}
+
+.top-tool-bar .tool-bar-menu-button:hover,
+.top-tool-bar .tool-bar-menu-button:showing {
+    -fx-background-color: #E5E7EB;
+}
+
+.tool-bar-user-card {
+    -fx-background-color: #F9FAFB;
+    -fx-background-radius: 8;
+    -fx-cursor: hand;
+}
+
+.tool-bar-user-card:hover {
+    -fx-background-color: #F3F4F6;
+}
+
+.tool-bar-user-name {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1F2937;
+}
+
+.tool-bar-user-id {
+    -fx-font-size: 11px;
+    -fx-text-fill: #6B7280;
+}
+
+/* ============ 菜单栏样式（与顶栏 #F3F4F6 一致） ============ */
+
+.menu-bar {
+    -fx-background-color: #F3F4F6;
+    -fx-border-color: transparent transparent #E5E7EB transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+.menu-bar .label {
+    -fx-text-fill: #374151;
+    -fx-font-size: 13px;
+}
+
+.menu-bar .menu-button:hover,
+.menu-bar .menu-button:showing {
+    -fx-background-color: #E5E7EB;
+}
+
+/* MenuButton 扁平（工具栏下拉如 布局、自动布局） */
+.menu-button {
+    -fx-background-color: #F3F4F6;
+    -fx-background-radius: 0;
+    -fx-effect: null;
+}
+
+.menu-button:hover,
+.menu-button:showing {
+    -fx-background-color: #E5E7EB;
+    -fx-effect: null;
 }
 
 /* ============ 上下文菜单样式 ============ */
 
 .context-menu {
     -fx-background-color: white;
-    -fx-background-radius: 8;
+    -fx-background-radius: 4;
     -fx-padding: 4;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.15), 12, 0, 0, 4);
+    -fx-effect: null;
 }
 
 .menu-item {
@@ -248,35 +856,35 @@
 /* ============ 分隔符样式 ============ */
 
 .separator {
-    -fx-background-color: #E2E8F0;
+    -fx-background-color: #E5E7EB;
     -fx-opacity: 1;
 }
 
 .separator:horizontal {
     -fx-pref-height: 1;
-    -fx-background-color: #E2E8F0;
+    -fx-background-color: #E5E7EB;
 }
 
 .separator:vertical {
     -fx-pref-width: 1;
-    -fx-background-color: #E2E8F0;
+    -fx-background-color: #E5E7EB;
 }
 
-/* SplitPane 分割线优化 */
+/* SplitPane 分割线优化（企业级细分割线） */
 .split-pane-divider {
-    -fx-background-color: #E2E8F0;
-    -fx-pref-width: 3;
-    -fx-pref-height: 3;
-    -fx-background-radius: 2;
+    -fx-background-color: #E5E7EB;
+    -fx-pref-width: 2;
+    -fx-pref-height: 2;
+    -fx-background-radius: 0;
 }
 
 .split-pane-divider:horizontal,
 .split-pane-divider:vertical {
-    -fx-background-color: #E2E8F0;
+    -fx-background-color: #E5E7EB;
 }
 
 .split-pane-divider:hover {
-    -fx-background-color: #CBD5F5;
+    -fx-background-color: #BFDBFE;
 }
 
 /* ScrollPane 内容边距优化 - 确保标签页从最左边开始 */
@@ -294,20 +902,41 @@
 
 .tooltip {
     -fx-background-color: #1F2937;
-    -fx-background-radius: 6;
+    -fx-background-radius: 2;
     -fx-padding: 6 10;
     -fx-text-fill: white;
     -fx-font-size: 12px;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.2), 8, 0, 0, 2);
+    -fx-effect: null;
 }
 
-/* ============ 下拉菜单样式 ============ */
+/* ============ 下拉框样式（扁平化，左右圆角完整） ============ */
 
 .combo-box {
-    -fx-background-color: white;
+    -fx-background-color: transparent;
     -fx-border-color: #D1D5DB;
+    -fx-border-width: 1;
     -fx-border-radius: 6;
     -fx-background-radius: 6;
+    -fx-effect: null;
+    -fx-background-insets: 0;
+}
+
+/* 左侧显示区域：左圆角，避免角缺失 */
+.combo-box > .list-cell {
+    -fx-background-color: white;
+    -fx-background-radius: 6 0 0 6;
+    -fx-background-insets: 0;
+    -fx-text-fill: #111827;
+    -fx-padding: 8 12;
+    -fx-effect: null;
+}
+
+/* 右侧箭头按钮：右圆角 */
+.combo-box .arrow-button {
+    -fx-background-color: #F9FAFB;
+    -fx-background-radius: 0 6 6 0;
+    -fx-background-insets: 0;
+    -fx-effect: null;
 }
 
 .combo-box:hover {
@@ -315,7 +944,105 @@
 }
 
 .combo-box:focused {
-    -fx-border-color: #6366F1;
+    -fx-border-color: #2563EB;
+}
+
+/* ComboBox 弹出列表（扁平化，顶部直角与控件衔接，避免角缺失） */
+.combo-box-popup .list-view {
+    -fx-background-color: white;
+    -fx-background-radius: 0 0 4 4;
+    -fx-background-insets: 0;
+    -fx-effect: null;
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 1;
+    -fx-border-radius: 0 0 4 4;
+}
+
+.combo-box-popup .list-view .list-cell {
+    -fx-background-color: white;
+    -fx-text-fill: #111827;
+    -fx-padding: 8 12;
+    -fx-effect: null;
+}
+
+.combo-box-popup .list-view .list-cell:filled:selected {
+    -fx-background-color: #2563EB;
+    -fx-text-fill: white;
+}
+
+.combo-box-popup .list-view .list-cell:filled:hover {
+    -fx-background-color: #DBEAFE;
+}
+
+/* ============ 日期选择器样式（扁平化，左右圆角完整） ============ */
+
+.date-picker {
+    -fx-background-color: transparent;
+    -fx-border-color: #D1D5DB;
+    -fx-border-width: 1;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-effect: null;
+    -fx-background-insets: 0;
+}
+
+.date-picker .text-field {
+    -fx-background-color: #FFFFFF;
+    -fx-background-radius: 6 0 0 6;
+    -fx-background-insets: 0;
+    -fx-effect: null;
+}
+
+.date-picker .arrow-button {
+    -fx-background-color: #F9FAFB;
+    -fx-background-radius: 0 6 6 0;
+    -fx-background-insets: 0;
+    -fx-effect: null;
+}
+
+/* ============ 数字输入框（Spinner）样式（扁平化） ============ */
+
+.spinner {
+    -fx-background-color: transparent;
+    -fx-border-color: #D1D5DB;
+    -fx-border-width: 1;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-effect: null;
+    -fx-background-insets: 0;
+}
+
+.spinner .text-field {
+    -fx-background-color: #FFFFFF;
+    -fx-background-radius: 6 0 0 6;
+    -fx-background-insets: 0;
+    -fx-effect: null;
+}
+
+.spinner .increment-arrow-button,
+.spinner .decrement-arrow-button {
+    -fx-background-color: #F9FAFB;
+    -fx-background-insets: 0;
+    -fx-effect: null;
+}
+
+.spinner .increment-arrow-button {
+    -fx-background-radius: 0 6 0 0;
+}
+
+.spinner .decrement-arrow-button {
+    -fx-background-radius: 0 0 6 0;
+}
+
+.spinner .increment-arrow-button .increment-arrow,
+.spinner .decrement-arrow-button .decrement-arrow {
+    -fx-background-color: #6B7280;
+    -fx-effect: null;
+}
+
+.spinner .increment-arrow-button:hover,
+.spinner .decrement-arrow-button:hover {
+    -fx-background-color: #E5E7EB;
 }
 
 /* ============ 选择框样式 ============ */
@@ -329,11 +1056,12 @@
     -fx-border-color: #D1D5DB;
     -fx-border-radius: 4;
     -fx-background-radius: 4;
+    -fx-effect: null;
 }
 
 .check-box:selected .box {
-    -fx-background-color: #6366F1;
-    -fx-border-color: #6366F1;
+    -fx-background-color: #2563EB;
+    -fx-border-color: #2563EB;
 }
 
 /* ============ 进度条样式 ============ */
@@ -344,7 +1072,7 @@
 }
 
 .progress-bar .bar {
-    -fx-background-color: #6366F1;
+    -fx-background-color: #2563EB;
     -fx-background-radius: 8;
     -fx-padding: 4;
 }
@@ -376,28 +1104,29 @@
 }
 
 .table-row-cell:selected {
-    -fx-background-color: #EDE9FE;
-    -fx-text-fill: #6366F1;
+    -fx-background-color: #DBEAFE;
+    -fx-text-fill: #2563EB;
 }
 
-/* ============ 文本区域样式 ============ */
+/* ============ 文本区域样式（扁平化） ============ */
 
 .text-area {
-    -fx-background-color: transparent;
+    -fx-background-color: #FFFFFF;
     -fx-border-color: #D1D5DB;
     -fx-border-width: 1;
     -fx-border-radius: 6;
     -fx-background-radius: 6;
     -fx-padding: 8;
+    -fx-effect: null;
 }
 
 .text-area:focused {
-    -fx-border-color: #6366F1;
-    -fx-effect: dropshadow(gaussian, rgba(99, 102, 241, 0.3), 4, 0, 0, 0);
+    -fx-border-color: #2563EB;
+    -fx-background-color: #FFFFFF;
 }
 
 .text-area .content {
-    -fx-background-color: transparent;
+    -fx-background-color: #FFFFFF;
 }
 
 /* 日志面板中的 TextArea 特殊样式 - 完全透明，无滚动条，纯黑色字体，无行间距，无空白 */
@@ -467,12 +1196,12 @@
 
 .log-panel .scroll-pane .scroll-bar:vertical .track {
     -fx-background-color: rgba(226, 232, 240, 0.55);
-    -fx-background-radius: 4;
+    -fx-background-radius: 0;
 }
 
 .log-panel .scroll-pane .scroll-bar:vertical .thumb {
     -fx-background-color: rgba(148, 163, 184, 0.7);
-    -fx-background-radius: 4;
+    -fx-background-radius: 0;
 }
 
 .log-panel .scroll-pane .scroll-bar:vertical .thumb:hover {
@@ -492,8 +1221,9 @@
 .log-panel .title-bar {
 }
 
-.log-panel .tab-bar {
-    -fx-background-color: #F8FAFC;
+.log-panel .tab-bar,
+.log-panel-tab-bar {
+    -fx-background-color: #F9FAFB;
     -fx-border-color: transparent;
     -fx-border-width: 0;
     -fx-padding: 0;
@@ -510,9 +1240,149 @@
     -fx-padding: 0;
 }
 
+.log-panel-tab-bar-scroll {
+    -fx-background-color: transparent;
+    -fx-border-width: 0;
+    -fx-padding: 0;
+}
+
+.log-panel-tab-bar-scroll .viewport,
+.log-panel-tab-bar-scroll .content {
+    -fx-background-color: transparent;
+}
+
+.log-panel-tab-bar-title {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #111827;
+}
+
+.log-panel-title-bar {
+    -fx-background-color: #F9FAFB;
+    -fx-border-width: 0;
+    -fx-padding: 14 20;
+}
+
+.log-panel-search-field {
+    -fx-background-color: #F9FAFB;
+    -fx-text-fill: #374151;
+    -fx-font-size: 12px;
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 6 12 6 32;
+}
+
+.log-panel-search-field:focused {
+    -fx-border-color: #2563EB;
+}
+
+.log-panel-level-combo {
+    -fx-background-color: #F9FAFB;
+    -fx-text-fill: #374151;
+    -fx-font-size: 12px;
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+
+.log-panel-filter-checkbox {
+    -fx-font-size: 11px;
+    -fx-text-fill: #4B5563;
+}
+
+.log-panel-count-label {
+    -fx-font-size: 12px;
+    -fx-font-weight: 500;
+    -fx-text-fill: #6B7280;
+}
+
+.log-panel-separator {
+    -fx-background-color: #E5E7EB;
+}
+
+.log-panel-auto-scroll-btn {
+    -fx-background-color: #F9FAFB;
+    -fx-text-fill: #4B5563;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-padding: 6 12;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 1;
+    -fx-cursor: hand;
+}
+
+.log-panel-auto-scroll-btn:hover {
+    -fx-background-color: #F3F4F6;
+    -fx-border-color: #3B82F6;
+}
+
+.log-panel-auto-scroll-btn:selected {
+    -fx-background-color: #DBEAFE;
+    -fx-text-fill: #2563EB;
+    -fx-border-color: #2563EB;
+}
+
+.log-panel-toolbar-btn {
+    -fx-background-color: #F9FAFB;
+    -fx-text-fill: #4B5563;
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+    -fx-padding: 6 16;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 1;
+    -fx-cursor: hand;
+}
+
+.log-panel-toolbar-btn:hover {
+    -fx-background-color: #F3F4F6;
+    -fx-border-color: #3B82F6;
+}
+
+.log-panel-status-bar {
+    -fx-background-color: #F9FAFB;
+}
+
+.log-panel-status-hint {
+    -fx-font-size: 11px;
+    -fx-text-fill: #6B7280;
+}
+
+.log-panel-stat-error {
+    -fx-font-size: 11px;
+    -fx-font-weight: 500;
+    -fx-text-fill: #EF4444;
+    -fx-cursor: hand;
+}
+
+.log-panel-stat-warn {
+    -fx-font-size: 11px;
+    -fx-font-weight: 500;
+    -fx-text-fill: #F59E0B;
+    -fx-cursor: hand;
+}
+
+.log-panel-stat-info {
+    -fx-font-size: 11px;
+    -fx-font-weight: 500;
+    -fx-text-fill: #4B5563;
+    -fx-cursor: hand;
+}
+
+.log-panel-last-update {
+    -fx-font-size: 11px;
+    -fx-text-fill: #9CA3AF;
+}
+
 .log-panel .log-tab {
-    -fx-background-color: #F1F5F9;
-    -fx-border-color: transparent transparent transparent rgba(243,244,246,0.9);
+    -fx-background-color: #F9FAFB;
+    -fx-border-color: transparent transparent transparent #E5E7EB;
     -fx-border-width: 0 0 0 1;
     -fx-background-radius: 0;
     -fx-border-radius: 0;
@@ -521,13 +1391,13 @@
 }
 
 .log-panel .log-tab:hover {
-    -fx-background-color: rgba(241,245,249,0.95);
-    -fx-border-color: transparent transparent transparent rgba(243,244,246,0.9);
+    -fx-background-color: #F3F4F6;
+    -fx-border-color: transparent transparent transparent #E5E7EB;
     -fx-border-width: 0 0 0 1;
 }
 
 .log-panel .log-tab-active {
-    -fx-background-color: rgba(243,244,246,0.9);
+    -fx-background-color: #F3F4F6;
     -fx-border-color: transparent;
     -fx-border-width: 0;
     -fx-background-radius: 0;
@@ -535,9 +1405,41 @@
     -fx-effect: none;
 }
 
+.log-panel .log-tab .log-tab-name {
+    -fx-font-size: 12px;
+    -fx-text-fill: #4B5563;
+    -fx-font-weight: 600;
+}
+
+.log-panel .log-tab-active .log-tab-name {
+    -fx-font-size: 12.5px;
+    -fx-text-fill: #1D4ED8;
+    -fx-font-weight: 700;
+}
+
+.log-panel .log-tab .log-tab-close {
+    -fx-background-color: transparent;
+    -fx-background-radius: 10;
+    -fx-cursor: hand;
+}
+
+.log-panel .log-tab .log-tab-close:hover {
+    -fx-background-color: rgba(239, 68, 68, 0.12);
+    -fx-background-radius: 10;
+}
+
+.log-panel .log-tab .log-tab-close-icon {
+    -fx-text-fill: #9CA3AF;
+    -fx-font-size: 13px;
+    -fx-cursor: hand;
+}
+
+.log-panel .log-tab .log-tab-close:hover .log-tab-close-icon {
+    -fx-text-fill: #EF4444;
+}
+
 .log-panel .status-indicator {
     -fx-background-radius: 50%;
-    -fx-effect: dropshadow(gaussian, rgba(16, 185, 129, 0.5), 4, 0, 0, 0);
 }
 
 .log-text-flow {
@@ -568,7 +1470,7 @@
 }
 
 .log-level-debug {
-    -fx-fill: #7C3AED;
+    -fx-fill: #2563EB;
     -fx-font-weight: 600;
 }
 
@@ -689,24 +1591,32 @@
     -fx-fill: #9CA3AF;
 }
 
+/* JSON 语法高亮（弹窗放大编辑） */
+.json-string { -fx-fill: #059669; }
+.json-number { -fx-fill: #2563EB; }
+.json-boolean { -fx-fill: #D97706; }
+.json-null { -fx-fill: #6B7280; }
+.json-bracket { -fx-fill: #4B5563; }
+
 /* 选中文本样式 */
 .log-code-area .selection {
-    -fx-fill: #C7D2FE;
+    -fx-fill: #BFDBFE;
 }
 
 /* 光标样式 */
 .log-code-area .caret {
-    -fx-stroke: #6366F1;
+    -fx-stroke: #2563EB;
 }
 
 /* CodeArea内部滚动条 */
 .log-code-area .scroll-bar:vertical .track {
     -fx-background-color: #F3F4F6;
+    -fx-background-radius: 0;
 }
 
 .log-code-area .scroll-bar:vertical .thumb {
     -fx-background-color: #D1D5DB;
-    -fx-background-radius: 4;
+    -fx-background-radius: 0;
 }
 
 .log-code-area .scroll-bar:vertical .thumb:hover {
@@ -721,3 +1631,148 @@
     -fx-border-radius: 6;
     -fx-background-radius: 6;
 }
+
+/* ============ 参数输入语法高亮样式（级联参数标签） ============ */
+
+/* 参数表达式高亮样式（#{nodeName}.code 等），级联标签感 */
+.parameter-expression {
+    -rtfx-background-color: #BFDBFE !important;
+    -fx-fill: #0369A1 !important;
+    -fx-font-weight: 500;
+    -rtfx-background-radius: 6;
+}
+
+/* 确保参数表达式背景色正确显示（针对 CodeArea） */
+.parameter-input .parameter-expression {
+    -rtfx-background-color: #BFDBFE !important;
+    -fx-fill: #0369A1 !important;
+    -rtfx-background-radius: 6;
+}
+
+/* ============ 登录/注册页浅色（供 style class 使用） ============ */
+
+.login-root,
+.register-root {
+    -fx-background-color: linear-gradient(135deg, #667EEA 0%, #764BA2 100%);
+}
+
+.login-card,
+.register-card {
+    -fx-background-color: transparent;
+}
+
+.login-title,
+.register-title {
+    -fx-text-fill: #1F2937;
+    -fx-font-size: 28px;
+    -fx-font-weight: bold;
+}
+
+.login-subtitle,
+.register-subtitle {
+    -fx-text-fill: #4B5563;
+    -fx-font-size: 14px;
+}
+
+.login-field,
+.register-field {
+    -fx-background-color: #F9FAFB;
+    -fx-text-fill: #111827;
+    -fx-prompt-text-fill: #6B7280;
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 12 16;
+    -fx-font-size: 14px;
+}
+
+.login-field:focused,
+.register-field:focused {
+    -fx-border-color: #2563EB;
+    -fx-background-color: white;
+}
+
+.login-label,
+.register-label {
+    -fx-text-fill: #374151;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+}
+
+.login-error,
+.register-error {
+    -fx-background-color: #FEE2E2;
+    -fx-text-fill: #DC2626;
+    -fx-padding: 12 16;
+    -fx-background-radius: 8;
+    -fx-font-size: 13px;
+}
+
+.login-primary-btn,
+.register-primary-btn {
+    -fx-background-color: #2563EB;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-padding: 12 24;
+    -fx-background-radius: 8;
+    -fx-cursor: hand;
+}
+
+.login-primary-btn:hover,
+.register-primary-btn:hover {
+    -fx-background-color: #1D4ED8;
+}
+
+.login-primary-btn-loading,
+.login-primary-btn:disabled {
+    -fx-background-color: #9CA3AF;
+    -fx-text-fill: #374151;
+    -fx-cursor: default;
+}
+
+.login-link,
+.register-link {
+    -fx-text-fill: #2563EB;
+    -fx-font-size: 13px;
+    -fx-cursor: hand;
+    -fx-background-color: transparent;
+    -fx-border-width: 0;
+    -fx-underline: true;
+}
+
+.login-link:hover,
+.register-link:hover {
+    -fx-text-fill: #1D4ED8;
+}
+
+/* ============ 链接色（供 Java 按主题选用或 CSS 类） ============ */
+
+.link-primary {
+    -fx-text-fill: #2563EB;
+    -fx-cursor: hand;
+}
+
+.link-primary:hover {
+    -fx-text-fill: #1D4ED8;
+}
+
+/* ============ 底部状态栏（企业级 IDE 风格） ============ */
+
+.status-bar {
+    -fx-background-color: #007ACC;
+    -fx-text-fill: #FFFFFF;
+    -fx-font-size: 12px;
+    -fx-padding: 2 8;
+}
+
+.status-bar .status-bar-label {
+    -fx-text-fill: #FFFFFF;
+    -fx-font-size: 12px;
+}
+
+/* 任务报表饼图：成功绿、失败红、运行中橙 */
+.task-report-pie-chart .chart-pie.default-color0 { -fx-pie-color: #10B981; }
+.task-report-pie-chart .chart-pie.default-color1 { -fx-pie-color: #EF4444; }
+.task-report-pie-chart .chart-pie.default-color2 { -fx-pie-color: #F59E0B; }

@@ -83,6 +83,18 @@ public class CSharpGlueFactory {
         "    {\n" +
         "        return getShardTotal();\n" +
         "    }\n" +
+        "    \n" +
+        "    // 获取执行上下文数据（JSON格式）\n" +
+        "    public static string getContextJson()\n" +
+        "    {\n" +
+        "        return Environment.GetEnvironmentVariable(\"XXL_JOB_CONTEXT\") ?? \"{}\";\n" +
+        "    }\n" +
+        "    \n" +
+        "    // 获取执行上下文数据（JSON格式，大写版本）\n" +
+        "    public static string GetContextJson()\n" +
+        "    {\n" +
+        "        return getContextJson();\n" +
+        "    }\n" +
         "}\n" +
         "\n" +
         "public class DynamicJobHandler\n" +
@@ -114,6 +126,19 @@ public class CSharpGlueFactory {
      * @throws Exception 执行异常
      */
     public static void executeCSharpGlue(String codeSource, int jobId, long glueUpdatetime) throws Exception {
+        executeCSharpGlue(codeSource, jobId, glueUpdatetime, null);
+    }
+    
+    /**
+     * 执行 C# GLUE 代码（带上下文数据）
+     * 
+     * @param codeSource C# 源代码
+     * @param jobId 任务ID
+     * @param glueUpdatetime GLUE更新时间
+     * @param contextData 执行上下文数据（JSON格式）
+     * @throws Exception 执行异常
+     */
+    public static void executeCSharpGlue(String codeSource, int jobId, long glueUpdatetime, String contextData) throws Exception {
         logger.info("[CSharpGlueFactory] 开始执行 C# GLUE 任务 - jobId: {}", jobId);
         
         // 1. 提取用户代码
@@ -137,7 +162,7 @@ public class CSharpGlueFactory {
         
         // 6. 编译并执行
         try {
-            compileAndRun(csFile, logFile);
+            compileAndRun(csFile, logFile, contextData);
         } finally {
             // 7. 清理临时文件
             File tempFile = new File(csFile);
@@ -225,6 +250,14 @@ public class CSharpGlueFactory {
      * 使用 dotnet-script 或 dotnet run 执行
      */
     private static void compileAndRun(String csFile, String logFile) throws Exception {
+        compileAndRun(csFile, logFile, null);
+    }
+    
+    /**
+     * 编译并运行 C# 代码（带上下文数据）
+     * 使用 dotnet-script 或 dotnet run 执行
+     */
+    private static void compileAndRun(String csFile, String logFile, String contextData) throws Exception {
         // 检查是否安装了 dotnet-script
         String command = "dotnet-script";
         String scriptFile = csFile;
@@ -233,7 +266,7 @@ public class CSharpGlueFactory {
         if (!isCommandAvailable(command)) {
             logger.warn("[CSharpGlueFactory] dotnet-script 不可用，尝试使用 dotnet run");
             // 创建临时项目并编译运行
-            compileAndRunWithDotnet(csFile, logFile);
+            compileAndRunWithDotnet(csFile, logFile, contextData);
             return;
         }
         
@@ -247,6 +280,12 @@ public class CSharpGlueFactory {
             String.valueOf(XxlJobContext.getXxlJobContext().getShardIndex()));
         pb.environment().put("XXL_JOB_SHARD_TOTAL", 
             String.valueOf(XxlJobContext.getXxlJobContext().getShardTotal()));
+        
+        // 设置上下文数据（如果存在）
+        if (contextData != null && !contextData.isEmpty()) {
+            pb.environment().put("XXL_JOB_CONTEXT", contextData);
+            XxlJobHelper.log("----------- 设置执行上下文数据到环境变量 -----------");
+        }
         
         // 执行脚本
         Process process = pb.start();
@@ -298,6 +337,13 @@ public class CSharpGlueFactory {
      * 使用 dotnet run 编译并运行
      */
     private static void compileAndRunWithDotnet(String csFile, String logFile) throws Exception {
+        compileAndRunWithDotnet(csFile, logFile, null);
+    }
+    
+    /**
+     * 使用 dotnet run 编译并运行（带上下文数据）
+     */
+    private static void compileAndRunWithDotnet(String csFile, String logFile, String contextData) throws Exception {
         // 创建临时项目目录
         File csFileObj = new File(csFile);
         String projectDir = csFileObj.getParent();
@@ -346,6 +392,12 @@ public class CSharpGlueFactory {
             String.valueOf(XxlJobContext.getXxlJobContext().getShardIndex()));
         pb.environment().put("XXL_JOB_SHARD_TOTAL", 
             String.valueOf(XxlJobContext.getXxlJobContext().getShardTotal()));
+        
+        // 设置上下文数据（如果存在）
+        if (contextData != null && !contextData.isEmpty()) {
+            pb.environment().put("XXL_JOB_CONTEXT", contextData);
+            XxlJobHelper.log("----------- 设置执行上下文数据到环境变量 -----------");
+        }
         
         Process process = pb.start();
         

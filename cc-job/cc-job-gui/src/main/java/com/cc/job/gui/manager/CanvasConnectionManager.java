@@ -1,12 +1,19 @@
 package com.cc.job.gui.manager;
 
+import com.cc.job.gui.model.ConditionNode;
 import com.cc.job.gui.model.GroupContainer;
+import com.cc.job.gui.history.EdgeStyleSnapshot;
 import com.cc.job.gui.model.NodeConnection;
 import com.cc.job.gui.model.ProcessNode;
+import com.cc.job.gui.view.EdgeStyleDialog;
+import javafx.scene.Node;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.layout.Pane;
 import javafx.scene.shape.Circle;
+import javafx.stage.Stage;
+import javafx.stage.Window;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,24 +27,60 @@ public class CanvasConnectionManager {
     private final Pane canvas;
     private final List<NodeConnection> connections;
     private final List<GroupContainer> groupContainers;
+    private final List<ConditionNode> conditionNodes;
     private final Runnable notifyChanged;
     private final Consumer<String> logger;
+    private Stage ownerStage; // 主窗口Stage，用于打开对话框
+    /** 由画布设置：请求删除连接时调用（可带 recordHistory），用于撤销入栈 */
+    private Consumer<NodeConnection> onRequestRemoveConnection;
+    /** 由画布设置：连线样式变更时调用，用于撤销/重做入栈 */
+    private EdgeStyleChangeRecordCallback onRecordEdgeStyleChange;
+    
+    /** 连线样式变更记录回调，参数为 (连接, 旧快照, 新快照) */
+    @FunctionalInterface
+    public interface EdgeStyleChangeRecordCallback {
+        void record(NodeConnection conn, EdgeStyleSnapshot oldSnapshot, EdgeStyleSnapshot newSnapshot);
+    }
     
     public CanvasConnectionManager(Pane canvas, List<NodeConnection> connections, 
                                    List<GroupContainer> groupContainers,
+                                   List<ConditionNode> conditionNodes,
                                    Runnable notifyChanged, Consumer<String> logger) {
         this.canvas = canvas;
         this.connections = connections;
         this.groupContainers = groupContainers;
+        this.conditionNodes = conditionNodes != null ? conditionNodes : new ArrayList<>();
         this.notifyChanged = notifyChanged;
         this.logger = logger;
     }
     
     /**
+     * 设置主窗口Stage
+     */
+    public void setOwnerStage(Stage ownerStage) {
+        this.ownerStage = ownerStage;
+    }
+    
+    /**
+     * 设置“请求删除连接”回调。由画布传入（如 c -> canvas.removeConnection(c, true)），
+     * 以便删除连接时入撤销栈；右键“删除连接”将调用此回调。
+     */
+    public void setOnRequestRemoveConnection(Consumer<NodeConnection> callback) {
+        this.onRequestRemoveConnection = callback;
+    }
+    
+    /**
+     * 设置连线样式变更记录回调，用于撤销/重做入栈。
+     */
+    public void setOnRecordEdgeStyleChange(EdgeStyleChangeRecordCallback callback) {
+        this.onRecordEdgeStyleChange = callback;
+    }
+    
+    /**
      * 添加连接线
      */
-    public NodeConnection addConnection(javafx.scene.Node sourceOwner, Pane sourceConnectorParent, Circle sourceConnector,
-                                        javafx.scene.Node targetOwner, Pane targetConnectorParent, Circle targetConnector) {
+    public NodeConnection addConnection(Node sourceOwner, Pane sourceConnectorParent, Circle sourceConnector,
+                                        Node targetOwner, Pane targetConnectorParent, Circle targetConnector) {
         NodeConnection connection = new NodeConnection(sourceOwner, sourceConnectorParent, sourceConnector,
                                                        targetOwner, targetConnectorParent, targetConnector);
         configureConnectionInteractions(connection);
@@ -71,6 +114,16 @@ public class CanvasConnectionManager {
                     break;
                 }
             }
+            // 检查是否由条件节点管理
+            if (!isManagedByContainer) {
+                for (ConditionNode conditionNode : conditionNodes) {
+                    List<NodeConnection> managedConnections = conditionNode.getManagedConnections();
+                    if (managedConnections != null && managedConnections.contains(connection)) {
+                        isManagedByContainer = true;
+                        break;
+                    }
+                }
+            }
             
             if (isManagedByContainer) {
                 canvas.getChildren().add(connection);
@@ -95,16 +148,27 @@ public class CanvasConnectionManager {
     }
     
     /**
+     * 根据 edgeId 查找连接
+     */
+    public NodeConnection getConnectionByEdgeId(String edgeId) {
+        if (edgeId == null) return null;
+        for (NodeConnection connection : connections) {
+            if (edgeIdMatches(edgeId, connection.getEdgeId())) {
+                return connection;
+            }
+        }
+        return null;
+    }
+    
+    /**
      * 根据 edgeId 移除连接
      */
     public boolean removeConnectionByEdgeId(String edgeId) {
         if (edgeId == null) return false;
-        
-        for (NodeConnection connection : new ArrayList<>(connections)) {
-            if (edgeIdMatches(edgeId, connection.getEdgeId())) {
-                removeConnection(connection);
-                return true;
-            }
+        NodeConnection connection = getConnectionByEdgeId(edgeId);
+        if (connection != null) {
+            removeConnection(connection);
+            return true;
         }
         return false;
     }
@@ -120,17 +184,141 @@ public class CanvasConnectionManager {
     
     private void configureConnectionInteractions(NodeConnection connection) {
         ContextMenu menu = new ContextMenu();
+        
+        // 设置样式菜单项
+        MenuItem styleItem = new MenuItem("设置样式");
+        styleItem.setOnAction(e -> {
+            try {
+                // 如果ownerStage为null，尝试从connection的场景中获取
+                Stage stageToUse = ownerStage;
+                if (stageToUse == null && connection != null && connection.getScene() != null) {
+                    Window window = connection.getScene().getWindow();
+                    if (window instanceof Stage) {
+                        stageToUse = (Stage) window;
+                    }
+                }
+                
+                if (stageToUse == null) {
+                    logger.accept("⚠ 无法打开样式设置对话框：ownerStage未设置");
+                    return;
+                }
+                if (connection == null) {
+                    logger.accept("⚠ 无法打开样式设置对话框：连线对象为空");
+                    return;
+                }
+                
+                EdgeStyleSnapshot oldSnapshot = EdgeStyleSnapshot.from(connection);
+                EdgeStyleDialog dialog = new EdgeStyleDialog(stageToUse, connection);
+                java.util.Optional<NodeConnection.EdgeStyle> result = dialog.showAndWait();
+                if (result.isPresent()) {
+                    // 用户点击了"保存"按钮
+                    NodeConnection.EdgeStyle style = result.get();
+                    connection.setEdgeStyle(style);
+                    
+                    // 设置颜色（总是设置，即使没有改变）
+                    String edgeColor = dialog.getEdgeColor();
+                    if (edgeColor != null && !edgeColor.isEmpty()) {
+                        connection.setEdgeColor(edgeColor);
+                    } else {
+                        // 如果颜色为空，使用默认颜色
+                        connection.setEdgeColor("#374151");
+                    }
+                    
+                    // 设置标签（总是设置，即使为空也要清除之前的标签）
+                    String labelText = dialog.getLabelText();
+                    if (labelText != null) {
+                        connection.setLabelText(labelText.trim());
+                    } else {
+                        connection.setLabelText("");
+                    }
+                    
+                    if (onRecordEdgeStyleChange != null) {
+                        EdgeStyleSnapshot newSnapshot = EdgeStyleSnapshot.from(connection);
+                        onRecordEdgeStyleChange.record(connection, oldSnapshot, newSnapshot);
+                    }
+                    notifyChanged.run();
+                    logger.accept("✓ 连线样式已更新");
+                }
+            } catch (Exception ex) {
+                logger.accept("✗ 打开样式设置对话框失败: " + ex.getMessage());
+                ex.printStackTrace();
+            }
+        });
+        
         MenuItem deleteItem = new MenuItem("删除连接");
         deleteItem.setStyle("-fx-text-fill: #EF4444;");
         deleteItem.setOnAction(e -> {
             String sourceName = getOwnerName(connection.getSourceOwner());
             String targetName = getOwnerName(connection.getTargetOwner());
             logger.accept("🗑️ 准备删除连接: " + sourceName + " → " + targetName);
-            removeConnection(connection);
+            if (onRequestRemoveConnection != null) {
+                onRequestRemoveConnection.accept(connection);
+            } else {
+                removeConnection(connection);
+            }
             logger.accept("提示: 删除后需点击保存按钮以持久化任务组变更");
         });
         
-        menu.getItems().add(deleteItem);
+        menu.getItems().addAll(styleItem, new SeparatorMenuItem(), deleteItem);
+        
+        // 配置NodeConnection的右键菜单回调（使用NodeConnection自己的菜单）
+        connection.setOnEditStyle(() -> {
+            try {
+                // 如果ownerStage为null，尝试从connection的场景中获取
+                Stage stageToUse = ownerStage;
+                if (stageToUse == null && connection != null && connection.getScene() != null) {
+                    javafx.stage.Window window = connection.getScene().getWindow();
+                    if (window instanceof Stage) {
+                        stageToUse = (Stage) window;
+                    }
+                }
+                
+                if (stageToUse == null) {
+                    logger.accept("⚠ 无法打开样式设置对话框：ownerStage未设置");
+                    return;
+                }
+                if (connection == null) {
+                    logger.accept("⚠ 无法打开样式设置对话框：连线对象为空");
+                    return;
+                }
+                
+                EdgeStyleSnapshot oldSnapshot = EdgeStyleSnapshot.from(connection);
+                EdgeStyleDialog dialog = new EdgeStyleDialog(stageToUse, connection);
+                java.util.Optional<NodeConnection.EdgeStyle> result = dialog.showAndWait();
+                if (result.isPresent()) {
+                    // 用户点击了"保存"按钮
+                    NodeConnection.EdgeStyle style = result.get();
+                    connection.setEdgeStyle(style);
+                    
+                    // 设置颜色（总是设置，即使没有改变）
+                    String edgeColor = dialog.getEdgeColor();
+                    if (edgeColor != null && !edgeColor.isEmpty()) {
+                        connection.setEdgeColor(edgeColor);
+                    } else {
+                        // 如果颜色为空，使用默认颜色
+                        connection.setEdgeColor("#374151");
+                    }
+                    
+                    // 设置标签（总是设置，即使为空也要清除之前的标签）
+                    String labelText = dialog.getLabelText();
+                    if (labelText != null) {
+                        connection.setLabelText(labelText.trim());
+                    } else {
+                        connection.setLabelText("");
+                    }
+                    
+                    if (onRecordEdgeStyleChange != null) {
+                        EdgeStyleSnapshot newSnapshot = EdgeStyleSnapshot.from(connection);
+                        onRecordEdgeStyleChange.record(connection, oldSnapshot, newSnapshot);
+                    }
+                    notifyChanged.run();
+                    logger.accept("✓ 连线样式已更新");
+                }
+            } catch (Exception ex) {
+                logger.accept("✗ 打开样式设置对话框失败: " + ex.getMessage());
+                ex.printStackTrace();
+            }
+        });
         
         connection.setOnContextMenuRequested(event -> {
             connection.toFront();

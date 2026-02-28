@@ -56,8 +56,8 @@ public class ShowExecutorListDialog extends Dialog<Void> {
 
         styleDialog();
         BorderPane root = new BorderPane();
+        root.getStyleClass().add("dialog-content-root");
         root.setPadding(new Insets(16));
-        root.setStyle("-fx-background-color: " + StyleUtil.BG_SECONDARY + ";");
 
         root.setTop(createFilterBar());
         root.setCenter(createTable());
@@ -82,12 +82,10 @@ public class ShowExecutorListDialog extends Dialog<Void> {
         getDialogPane().setMaxHeight(Double.MAX_VALUE);
         setResizable(true);
 
-        // 设置对话框样式 - 与主页面背景色一致
-        getDialogPane().setStyle(
-                "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                        "-fx-background-radius: " + StyleUtil.RADIUS_LG + "; " +
-                        "-fx-border-radius: " + StyleUtil.RADIUS_LG + ";"
-        );
+        String dialogCss = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (dialogCss != null && !dialogCss.isEmpty()) {
+            getDialogPane().getStylesheets().add(dialogCss);
+        }
 
         Platform.runLater(() -> {
             Stage stage = (Stage) getDialogPane().getScene().getWindow();
@@ -96,12 +94,10 @@ public class ShowExecutorListDialog extends Dialog<Void> {
                 stage.setMinWidth(1200);
                 stage.setMinHeight(700);
                 
-                // 加载全局CSS样式
-                try {
-                    String css = getClass().getResource("/styles.css").toExternalForm();
+                // 加载当前主题样式
+                String css = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+                if (css != null && !css.isEmpty()) {
                     stage.getScene().getStylesheets().add(css);
-                } catch (Exception e) {
-                    // CSS文件加载失败，忽略
                 }
                 
                 stage.setOnCloseRequest(event -> {
@@ -113,38 +109,33 @@ public class ShowExecutorListDialog extends Dialog<Void> {
 
     private Node createFilterBar() {
         VBox container = new VBox(12);
+        container.getStyleClass().add("dialog-section");
         container.setPadding(new Insets(16, 16, 16, 16));
-        container.setStyle(
-                "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                "-fx-background-radius: " + StyleUtil.RADIUS_LG + "; " +
-                "-fx-effect: " + StyleUtil.SHADOW_SM + ";"
-        );
 
         // 过滤输入区域
         GridPane grid = new GridPane();
         grid.setHgap(12);
         grid.setVgap(10);
 
-        String labelStyle = StyleUtil.body();
+        String labelStyle = StyleUtil.bodyFontOnly();
 
         appNameField = new TextField();
         appNameField.setPromptText("请输入AppName");
-        appNameField.setStyle(StyleUtil.searchField());
+        appNameField.getStyleClass().add("dialog-search-field");
 
         titleField = new TextField();
         titleField.setPromptText("请输入执行器名称");
-        titleField.setStyle(StyleUtil.searchField());
+        titleField.getStyleClass().add("dialog-search-field");
 
         Button searchBtn = new Button("搜索");
-        searchBtn.setStyle(StyleUtil.primaryButton());
-        StyleUtil.applyPrimaryButtonHover(searchBtn);
+        searchBtn.getStyleClass().add("dialog-button-primary");
         searchBtn.setOnAction(e -> {
             pageNum = 1;
             loadPage(true);
         });
 
         Button resetBtn = new Button("重置");
-        resetBtn.setStyle(StyleUtil.secondaryButton());
+        resetBtn.getStyleClass().add("dialog-button-secondary");
         resetBtn.setOnAction(e -> {
             appNameField.clear();
             titleField.clear();
@@ -171,13 +162,11 @@ public class ShowExecutorListDialog extends Dialog<Void> {
         actionBox.setAlignment(Pos.CENTER_LEFT);
 
         Button addBtn = new Button("+ 新增");
-        addBtn.setStyle(StyleUtil.successButton());
-        StyleUtil.applySuccessButtonHover(addBtn);
+        addBtn.getStyleClass().add("dialog-button-success");
         addBtn.setOnAction(e -> handleAdd());
 
         Button deleteBtn = new Button("删除");
-        deleteBtn.setStyle(StyleUtil.errorButton());
-        StyleUtil.applyErrorButtonHover(deleteBtn);
+        deleteBtn.getStyleClass().add("dialog-button-error");
         deleteBtn.setOnAction(e -> handleDelete());
 
         actionBox.getChildren().addAll(addBtn, deleteBtn);
@@ -256,7 +245,7 @@ public class ShowExecutorListDialog extends Dialog<Void> {
         addressCol.setCellFactory(col -> new TableCell<>() {
             private final Hyperlink viewLink = new Hyperlink("查看");
             {
-                viewLink.setStyle("-fx-text-fill: " + StyleUtil.PRIMARY + ";");
+                viewLink.setStyle("-fx-text-fill: " + StyleUtil.linkPrimaryColor() + ";");
                 viewLink.setOnAction(e -> {
                     JobGroupVO item = getTableView().getItems().get(getIndex());
                     if (item != null) {
@@ -285,8 +274,8 @@ public class ShowExecutorListDialog extends Dialog<Void> {
             private final Hyperlink editLink = new Hyperlink("编辑");
             private final Hyperlink deleteLink = new Hyperlink("删除");
             {
-                viewLink.setStyle("-fx-text-fill: " + StyleUtil.PRIMARY + ";");
-                editLink.setStyle("-fx-text-fill: " + StyleUtil.PRIMARY + ";");
+                viewLink.setStyle("-fx-text-fill: " + StyleUtil.linkPrimaryColor() + ";");
+                editLink.setStyle("-fx-text-fill: " + StyleUtil.linkPrimaryColor() + ";");
                 deleteLink.setStyle("-fx-text-fill: " + StyleUtil.ERROR + ";");
                 
                 viewLink.setOnAction(e -> {
@@ -331,16 +320,16 @@ public class ShowExecutorListDialog extends Dialog<Void> {
 
     private Node createPagerBar() {
         totalLabel = new Label("共 0 条");
-        totalLabel.setStyle(StyleUtil.body());
+        totalLabel.setStyle(StyleUtil.bodyFontOnly());
 
         prevBtn = new Button("上一页");
-        prevBtn.setStyle(StyleUtil.secondaryButton());
+        prevBtn.getStyleClass().add("dialog-button-secondary");
         nextBtn = new Button("下一页");
-        nextBtn.setStyle(StyleUtil.secondaryButton());
+        nextBtn.getStyleClass().add("dialog-button-secondary");
         
         pageField = new TextField(String.valueOf(pageNum));
         pageField.setPrefWidth(60);
-        pageField.setStyle(StyleUtil.searchField());
+        pageField.getStyleClass().add("dialog-search-field");
         pageField.setOnAction(e -> {
             try {
                 int p = Integer.parseInt(pageField.getText().trim());
@@ -377,9 +366,9 @@ public class ShowExecutorListDialog extends Dialog<Void> {
         });
 
         Label pageSizeLabel = new Label("每页");
-        pageSizeLabel.setStyle(StyleUtil.body());
+        pageSizeLabel.setStyle(StyleUtil.bodyFontOnly());
         Label pageLabel = new Label("页码");
-        pageLabel.setStyle(StyleUtil.body());
+        pageLabel.setStyle(StyleUtil.bodyFontOnly());
 
         HBox pager = new HBox(12,
                 totalLabel,
@@ -388,13 +377,9 @@ public class ShowExecutorListDialog extends Dialog<Void> {
                 pageLabel, pageField,
                 nextBtn
         );
+        pager.getStyleClass().add("dialog-section");
         pager.setAlignment(Pos.CENTER_LEFT);
         pager.setPadding(new Insets(16, 16, 16, 16));
-        pager.setStyle(
-                "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                "-fx-background-radius: " + StyleUtil.RADIUS_LG + "; " +
-                "-fx-effect: " + StyleUtil.SHADOW_SM + ";"
-        );
         return pager;
     }
 
@@ -464,7 +449,7 @@ public class ShowExecutorListDialog extends Dialog<Void> {
         grid.setVgap(15);
         grid.setPadding(new Insets(20));
         
-        String labelStyle = StyleUtil.body();
+        String labelStyle = StyleUtil.bodyFontOnly();
         
         // AppName
         Label appNameLabel = new Label("AppName");
@@ -472,7 +457,7 @@ public class ShowExecutorListDialog extends Dialog<Void> {
         TextField appNameInput = new TextField();
         appNameInput.setPrefWidth(300);
         appNameInput.setPromptText("请输入执行器AppName");
-        appNameInput.setStyle(StyleUtil.searchField());
+        appNameInput.getStyleClass().add("dialog-search-field");
         
         // 执行器名称
         Label titleLabel = new Label("执行器名称");
@@ -480,7 +465,7 @@ public class ShowExecutorListDialog extends Dialog<Void> {
         TextField titleInput = new TextField();
         titleInput.setPrefWidth(300);
         titleInput.setPromptText("请输入执行器名称");
-        titleInput.setStyle(StyleUtil.searchField());
+        titleInput.getStyleClass().add("dialog-search-field");
         
         // 注册方式
         Label typeLabel = new Label("注册方式");
@@ -535,7 +520,7 @@ public class ShowExecutorListDialog extends Dialog<Void> {
         // 设置按钮样式
         Button saveBtnNode = (Button) dialog.getDialogPane().lookupButton(saveBtn);
         if (saveBtnNode != null) {
-            saveBtnNode.setStyle(StyleUtil.primaryButton());
+            saveBtnNode.getStyleClass().add("dialog-button-primary");
         }
         
         dialog.setResultConverter(buttonType -> {
@@ -652,12 +637,12 @@ public class ShowExecutorListDialog extends Dialog<Void> {
 
         if (addresses == null || addresses.isEmpty()) {
             Label emptyLabel = new Label("暂无注册节点");
-            emptyLabel.setStyle(StyleUtil.body());
+            emptyLabel.setStyle(StyleUtil.bodyFontOnly());
             content.getChildren().add(emptyLabel);
         } else {
             for (String address : addresses) {
                 Label addressLabel = new Label(address);
-                addressLabel.setStyle(StyleUtil.body());
+                addressLabel.setStyle(StyleUtil.bodyFontOnly());
                 content.getChildren().add(addressLabel);
             }
         }

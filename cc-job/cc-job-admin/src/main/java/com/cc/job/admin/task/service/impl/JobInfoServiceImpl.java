@@ -22,6 +22,7 @@ import com.cc.job.xo.model.form.JobGlueForm;
 import com.cc.job.xo.model.vo.JobNodeVo;
 import com.cc.job.admin.task.thread.JobScheduleHelper;
 import com.cc.job.admin.task.thread.JobTriggerPoolHelper;
+import com.cc.job.admin.task.trigger.XxlJobTrigger;
 import com.cc.job.admin.task.utils.I18nUtil;
 import com.cc.job.admin.config.XxlJobAdminConfig;
 import com.xxl.job.core.biz.model.ReturnT;
@@ -121,6 +122,7 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         put("SQL","custom-sql");
         put("API","custom-api");
         put("BEAN","custom-bean");
+        put("DATAX","datax");
         put("GLUE_GROOVY","custom-java");
         put("GLUE_SHELL","custom-shell");
         put("GLUE_PYTHON","custom-python");
@@ -158,8 +160,11 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         if (StringUtils.isNotBlank(queryParams.getExecutorHandler())) {
             wrapper.eq(JobInfo::getExecutorHandler, queryParams.getExecutorHandler());
         }
-
-        wrapper.in(JobInfo::getJobType, 0, 2);
+        if (queryParams.getJobType() != null) {
+            wrapper.eq(JobInfo::getJobType, queryParams.getJobType());
+        } else {
+            wrapper.in(JobInfo::getJobType, 0, 2);
+        }
         wrapper.in(JobInfo::getNodeFlag, "N");
         wrapper.orderByDesc(JobInfo::getUpdateTime);
 
@@ -409,17 +414,61 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
 
         log.debug("[JobInfoService] 创建任务日志记录 - jobId: {}, logId: {}", taskInfo.getId(), logId);
 
-        JobTriggerPoolHelper.trigger(taskInfoTriggerDto.getId().intValue(), TriggerTypeEnum.MANUAL, -1, null, taskInfoTriggerDto.getExecutorParam(), taskInfoTriggerDto.getAddressList(), logId);
-
-        // 只在任务组（jobType == 2）时记录触发用户ID
-        if (taskInfo.getJobType() == 2 && taskInfoTriggerDto.getTriggerUserId() != null) {
-            taskInfo.setTriggerUserId(taskInfoTriggerDto.getTriggerUserId());
-        }
-        
-        // 原子性设置运行状态（在事务中，行锁保护）
-        if (taskInfo.getJobType() == 2 && taskInfo.getTriggerOneStatus() == 0) {
-            taskInfo.setTriggerOneStatus(1);
-            this.updateById(taskInfo);
+        // ⭐ 对于任务组（jobType == 2），使用同步触发，以便立即捕获触发失败的情况
+        // 如果触发失败，需要回滚 triggerOneStatus 状态，避免前端一直显示运行中
+        if (taskInfo.getJobType() == 2) {
+            try {
+                // 同步触发任务组
+                XxlJobTrigger.trigger(
+                    taskInfoTriggerDto.getId(),
+                    TriggerTypeEnum.MANUAL,
+                    -1,
+                    null,
+                    taskInfoTriggerDto.getExecutorParam(),
+                    taskInfoTriggerDto.getAddressList(),
+                    logId,
+                    taskInfoTriggerDto.getJobFlowPositionIds(),
+                    taskInfoTriggerDto.getJobPauseStatusIds()
+                );
+                
+                // 触发成功，设置运行状态
+                // 只在任务组（jobType == 2）时记录触发用户ID
+                if (taskInfoTriggerDto.getTriggerUserId() != null) {
+                    taskInfo.setTriggerUserId(taskInfoTriggerDto.getTriggerUserId());
+                }
+                
+                // 原子性设置运行状态（在事务中，行锁保护）
+                if (taskInfo.getTriggerOneStatus() == 0) {
+                    taskInfo.setTriggerOneStatus(1);
+                    this.updateById(taskInfo);
+                }
+            } catch (Exception e) {
+                // 触发失败，回滚 triggerOneStatus 状态
+                log.error("[JobInfoService] 任务组触发失败 - jobId: {}, logId: {}, 错误: {}", 
+                    taskInfo.getId(), logId, e.getMessage(), e);
+                
+                // 回滚 triggerOneStatus 状态为 0（未运行）
+                // 使用 stopJobCompose 方法确保状态正确回滚
+                try {
+                    jobInfoMapper.stopJobCompose(jobId);
+                } catch (Exception ex) {
+                    log.warn("[JobInfoService] 回滚 triggerOneStatus 状态失败 - jobId: {}", jobId, ex);
+                }
+                
+                // 抛出异常，让前端能捕获并显示错误
+                throw new BusinessException("任务组触发失败: " + e.getMessage());
+            }
+        } else {
+            // 对于普通任务，继续使用异步触发
+            JobTriggerPoolHelper.trigger(taskInfoTriggerDto.getId().intValue(),
+                    TriggerTypeEnum.MANUAL,
+                    -1,
+                    null,
+                    taskInfoTriggerDto.getExecutorParam(),
+                    taskInfoTriggerDto.getAddressList(),
+                    logId,
+                    taskInfoTriggerDto.getJobFlowPositionIds(),
+                    taskInfoTriggerDto.getJobPauseStatusIds());
         }
 
         // 返回日志ID（字符串格式）
@@ -1242,5 +1291,27 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
             // 异常情况下，回退到数据库状态检查
             return false;
         }
+    }
+
+    @Override
+    public int resetTriggerOneStatus(Long id) {
+        if (id == null) {
+            return 0;
+        }
+        return jobInfoMapper.stopJobCompose(id);
+    }
+
+    @Override
+    public long countTaskGroups() {
+        LambdaQueryWrapper<JobInfo> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(JobInfo::getJobType, 2).eq(JobInfo::getNodeFlag, "N");
+        return this.count(wrapper);
+    }
+
+    @Override
+    public long countJobs() {
+        LambdaQueryWrapper<JobInfo> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(JobInfo::getJobType, 0, 2).eq(JobInfo::getNodeFlag, "N");
+        return this.count(wrapper);
     }
 }

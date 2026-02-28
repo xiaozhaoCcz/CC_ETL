@@ -10,6 +10,7 @@ import org.slf4j.helpers.MessageFormatter;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Date;
+import java.util.List;
 
 /**
  * helper for xxl-job
@@ -77,6 +78,14 @@ public class XxlJobHelper {
         }
 
         return xxlJobContext.getShardIndex();
+    }
+
+    public static List<Integer> getJobFlowPositionIds() {
+        XxlJobContext xxlJobContext = XxlJobContext.getXxlJobContext();
+        if (xxlJobContext == null) {
+            return null;
+        }
+        return xxlJobContext.getJobFlowPositionIds();
     }
 
     /**
@@ -271,6 +280,13 @@ public class XxlJobHelper {
         }
         return true;
     }
-
-
+    // ---------------------- tool for ExecuteResult ----------------------
+    public static boolean executeResult(Object result) {
+        XxlJobContext xxlJobContext = XxlJobContext.getXxlJobContext();
+        if(xxlJobContext == null){
+            return false;
+        }
+        xxlJobContext.setExecuteResult(result);
+        return true;
+    }
 }

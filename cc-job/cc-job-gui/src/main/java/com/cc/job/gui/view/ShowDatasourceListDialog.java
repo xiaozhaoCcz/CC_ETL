@@ -62,8 +62,8 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
 
         styleDialog();
         BorderPane root = new BorderPane();
+        root.getStyleClass().add("dialog-content-root");
         root.setPadding(new Insets(16));
-        root.setStyle("-fx-background-color: " + StyleUtil.BG_SECONDARY + ";");
 
         root.setTop(createFilterBar());
         root.setCenter(createTable());
@@ -85,11 +85,10 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
         getDialogPane().setMaxHeight(Double.MAX_VALUE);
         setResizable(true);
 
-        getDialogPane().setStyle(
-                "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                        "-fx-background-radius: " + StyleUtil.RADIUS_LG + "; " +
-                        "-fx-border-radius: " + StyleUtil.RADIUS_LG + ";"
-        );
+        String dialogCss = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (dialogCss != null && !dialogCss.isEmpty()) {
+            getDialogPane().getStylesheets().add(dialogCss);
+        }
 
         Platform.runLater(() -> {
             Stage stage = (Stage) getDialogPane().getScene().getWindow();
@@ -97,11 +96,9 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
                 stage.setResizable(true);
                 stage.setMinWidth(1200);
                 stage.setMinHeight(700);
-                try {
-                    String css = getClass().getResource("/styles.css").toExternalForm();
+                String css = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+                if (css != null && !css.isEmpty()) {
                     stage.getScene().getStylesheets().add(css);
-                } catch (Exception e) {
-                    // CSS文件加载失败，忽略
                 }
                 stage.setOnCloseRequest(event -> close());
             }
@@ -110,22 +107,18 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
 
     private Node createFilterBar() {
         VBox container = new VBox(12);
+        container.getStyleClass().add("dialog-section");
         container.setPadding(new Insets(16, 16, 16, 16));
-        container.setStyle(
-                "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                "-fx-background-radius: " + StyleUtil.RADIUS_LG + "; " +
-                "-fx-effect: " + StyleUtil.SHADOW_SM + ";"
-        );
 
         GridPane grid = new GridPane();
         grid.setHgap(12);
         grid.setVgap(10);
 
-        String labelStyle = StyleUtil.body();
+        String labelStyle = StyleUtil.bodyFontOnly();
 
         datasourceNameField = new TextField();
         datasourceNameField.setPromptText("请输入数据源名称");
-        datasourceNameField.setStyle(StyleUtil.searchField());
+        datasourceNameField.getStyleClass().add("dialog-search-field");
 
         datasourceTypeCombo = new ComboBox<>(FXCollections.observableArrayList(DATASOURCE_TYPES));
         datasourceTypeCombo.getSelectionModel().selectFirst();
@@ -133,18 +126,17 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
 
         databaseNameField = new TextField();
         databaseNameField.setPromptText("请输入数据库名");
-        databaseNameField.setStyle(StyleUtil.searchField());
+        databaseNameField.getStyleClass().add("dialog-search-field");
 
         Button searchBtn = new Button("搜索");
-        searchBtn.setStyle(StyleUtil.primaryButton());
-        StyleUtil.applyPrimaryButtonHover(searchBtn);
+        searchBtn.getStyleClass().add("dialog-button-primary");
         searchBtn.setOnAction(e -> {
             pageNum = 1;
             loadPage(true);
         });
 
         Button resetBtn = new Button("重置");
-        resetBtn.setStyle(StyleUtil.secondaryButton());
+        resetBtn.getStyleClass().add("dialog-button-secondary");
         resetBtn.setOnAction(e -> {
             datasourceNameField.clear();
             datasourceTypeCombo.getSelectionModel().selectFirst();
@@ -176,13 +168,11 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
         actionBox.setAlignment(Pos.CENTER_LEFT);
 
         Button addBtn = new Button("+ 新增");
-        addBtn.setStyle(StyleUtil.successButton());
-        StyleUtil.applySuccessButtonHover(addBtn);
+        addBtn.getStyleClass().add("dialog-button-success");
         addBtn.setOnAction(e -> handleAdd());
 
         Button deleteBtn = new Button("删除");
-        deleteBtn.setStyle(StyleUtil.errorButton());
-        StyleUtil.applyErrorButtonHover(deleteBtn);
+        deleteBtn.getStyleClass().add("dialog-button-error");
         deleteBtn.setOnAction(e -> handleBatchDelete());
 
         actionBox.getChildren().addAll(addBtn, deleteBtn);
@@ -294,7 +284,7 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
             private final Hyperlink testLink = new Hyperlink("测试连接");
             private final Hyperlink deleteLink = new Hyperlink("删除");
             {
-                editLink.setStyle("-fx-text-fill: " + StyleUtil.PRIMARY + ";");
+                editLink.setStyle("-fx-text-fill: " + StyleUtil.linkPrimaryColor() + ";");
                 testLink.setStyle("-fx-text-fill: " + StyleUtil.SUCCESS + ";");
                 deleteLink.setStyle("-fx-text-fill: " + StyleUtil.ERROR + ";");
                 
@@ -330,16 +320,16 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
 
     private Node createPagerBar() {
         totalLabel = new Label("共 0 条");
-        totalLabel.setStyle(StyleUtil.body());
+        totalLabel.setStyle(StyleUtil.bodyFontOnly());
 
         prevBtn = new Button("上一页");
-        prevBtn.setStyle(StyleUtil.secondaryButton());
+        prevBtn.getStyleClass().add("dialog-button-secondary");
         nextBtn = new Button("下一页");
-        nextBtn.setStyle(StyleUtil.secondaryButton());
+        nextBtn.getStyleClass().add("dialog-button-secondary");
         
         pageField = new TextField(String.valueOf(pageNum));
         pageField.setPrefWidth(60);
-        pageField.setStyle(StyleUtil.searchField());
+        pageField.getStyleClass().add("dialog-search-field");
         pageField.setOnAction(e -> {
             try {
                 int p = Integer.parseInt(pageField.getText().trim());
@@ -376,9 +366,9 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
         });
 
         Label pageSizeLabel = new Label("每页");
-        pageSizeLabel.setStyle(StyleUtil.body());
+        pageSizeLabel.setStyle(StyleUtil.bodyFontOnly());
         Label pageLabel = new Label("页码");
-        pageLabel.setStyle(StyleUtil.body());
+        pageLabel.setStyle(StyleUtil.bodyFontOnly());
 
         HBox pager = new HBox(12,
                 totalLabel,
@@ -387,13 +377,9 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
                 pageLabel, pageField,
                 nextBtn
         );
+        pager.getStyleClass().add("dialog-section");
         pager.setAlignment(Pos.CENTER_LEFT);
         pager.setPadding(new Insets(16, 16, 16, 16));
-        pager.setStyle(
-                "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                "-fx-background-radius: " + StyleUtil.RADIUS_LG + "; " +
-                "-fx-effect: " + StyleUtil.SHADOW_SM + ";"
-        );
         return pager;
     }
 
@@ -473,7 +459,7 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
         grid.setVgap(15);
         grid.setPadding(new Insets(20));
 
-        String labelStyle = StyleUtil.body();
+        String labelStyle = StyleUtil.bodyFontOnly();
 
         // 数据源名称
         Label nameLabel = new Label("数据源名称");
@@ -481,7 +467,7 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
         TextField nameInput = new TextField();
         nameInput.setPrefWidth(300);
         nameInput.setPromptText("请输入数据源名称");
-        nameInput.setStyle(StyleUtil.searchField());
+        nameInput.getStyleClass().add("dialog-search-field");
 
         // 数据源类型
         Label typeLabel = new Label("数据源类型");
@@ -497,7 +483,7 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
         TextField dbInput = new TextField();
         dbInput.setPrefWidth(300);
         dbInput.setPromptText("请输入数据库名");
-        dbInput.setStyle(StyleUtil.searchField());
+        dbInput.getStyleClass().add("dialog-search-field");
 
         // 用户名
         Label userLabel = new Label("用户名");
@@ -505,7 +491,7 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
         TextField userInput = new TextField();
         userInput.setPrefWidth(300);
         userInput.setPromptText("请输入用户名");
-        userInput.setStyle(StyleUtil.searchField());
+        userInput.getStyleClass().add("dialog-search-field");
 
         // 密码
         Label pwdLabel = new Label("密码");
@@ -513,7 +499,7 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
         PasswordField pwdInput = new PasswordField();
         pwdInput.setPrefWidth(300);
         pwdInput.setPromptText("请输入密码");
-        pwdInput.setStyle(StyleUtil.searchField());
+        pwdInput.getStyleClass().add("dialog-search-field");
 
         // JDBC URL
         Label urlLabel = new Label("JDBC URL");
@@ -521,7 +507,7 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
         TextField urlInput = new TextField();
         urlInput.setPrefWidth(300);
         urlInput.setPromptText("jdbc:mysql://host:port/database");
-        urlInput.setStyle(StyleUtil.searchField());
+        urlInput.getStyleClass().add("dialog-search-field");
 
         // 驱动类
         Label driverLabel = new Label("JDBC驱动类");
@@ -529,7 +515,7 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
         TextField driverInput = new TextField();
         driverInput.setPrefWidth(300);
         driverInput.setPromptText("com.mysql.cj.jdbc.Driver");
-        driverInput.setStyle(StyleUtil.searchField());
+        driverInput.getStyleClass().add("dialog-search-field");
 
         // 备注
         Label commentLabel = new Label("备注");
@@ -538,7 +524,7 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
         commentInput.setPrefWidth(300);
         commentInput.setPrefRowCount(3);
         commentInput.setWrapText(true);
-        commentInput.setStyle(StyleUtil.searchField());
+        commentInput.getStyleClass().add("dialog-search-field");
 
         // 监听数据源类型变化，自动填充驱动类
         typeCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
@@ -588,7 +574,7 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
         // 测试连接按钮处理
         Button testBtnNode = (Button) dialog.getDialogPane().lookupButton(testBtn);
         if (testBtnNode != null) {
-            testBtnNode.setStyle(StyleUtil.successButton());
+            testBtnNode.getStyleClass().add("dialog-button-success");
             testBtnNode.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
                 event.consume();
                 JobJdbcDatasourceForm form = buildFormFromInputs(
@@ -601,7 +587,7 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
 
         Button saveBtnNode = (Button) dialog.getDialogPane().lookupButton(saveBtn);
         if (saveBtnNode != null) {
-            saveBtnNode.setStyle(StyleUtil.primaryButton());
+            saveBtnNode.getStyleClass().add("dialog-button-primary");
         }
 
         dialog.setResultConverter(buttonType -> {

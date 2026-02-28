@@ -157,29 +157,41 @@ public class IncrementalDataRefresher {
     }
     
     /**
-     * 通过查询SQL更新
+     * 通过查询SQL更新（从子查询结果中取各增量列的最大值作为新游标，保证“选最大的一条数据进行增量自增”）
      */
-    private void updateByQuerySql(Connection connection, String querySql, 
+    private void updateByQuerySql(Connection connection, String querySql,
                                  JobInfo jobInfo, List<DataxColumn> columnList) {
         String sql = replaceVariables(querySql, columnList);
-        String countSql = "SELECT COUNT(1) FROM (" + sql + ") t";
-        
-        try (PreparedStatement ps = connection.prepareStatement(countSql);
+        String maxSql = buildMaxFromSubquery(sql, columnList);
+
+        try (PreparedStatement ps = connection.prepareStatement(maxSql);
              ResultSet rs = ps.executeQuery()) {
-            
-            long count = 0;
+
             if (rs.next()) {
-                count = rs.getLong(1);
-                if (count == 0) {
-                    return;
+                if (columnList.size() >= 2) {
+                    applyStartEndRoll(rs, columnList);
+                } else {
+                    updateColumnValues(rs, columnList);
                 }
+                saveIncrementalData(jobInfo, columnList);
             }
-            
-            queryAndUpdateLastRow(connection, sql, count, columnList, jobInfo);
-            
+
         } catch (Exception e) {
             throw new BusinessException("查询SQL执行失败", e);
         }
+    }
+
+    /**
+     * 对自定义 SQL 结果集按增量列取最大值：SELECT MAX(t.col1), MAX(t.col2), ... FROM (userSql) t
+     */
+    private String buildMaxFromSubquery(String userSql, List<DataxColumn> columnList) {
+        StringBuilder sb = new StringBuilder("SELECT ");
+        for (DataxColumn column : columnList) {
+            sb.append("MAX(t.").append(column.getColumnKey()).append("),");
+        }
+        sb.deleteCharAt(sb.length() - 1);
+        sb.append(" FROM (").append(userSql).append(") t");
+        return sb.toString();
     }
     
     /**
@@ -193,7 +205,11 @@ public class IncrementalDataRefresher {
              ResultSet rs = ps.executeQuery()) {
             
             if (rs.next()) {
-                updateColumnValues(rs, columnList);
+                if (columnList.size() >= 2) {
+                    applyStartEndRoll(rs, columnList);
+                } else {
+                    updateColumnValues(rs, columnList);
+                }
                 saveIncrementalData(jobInfo, columnList);
             }
             
@@ -287,25 +303,7 @@ public class IncrementalDataRefresher {
     }
     
     /**
-     * 查询并更新最后一行
-     */
-    private void queryAndUpdateLastRow(Connection connection, String sql, long count,
-                                      List<DataxColumn> columnList, JobInfo jobInfo) 
-            throws SQLException {
-        String limitSql = sql + " LIMIT " + (count - 1) + ", 1";
-        
-        try (PreparedStatement ps = connection.prepareStatement(limitSql);
-             ResultSet rs = ps.executeQuery()) {
-            
-            if (rs.next()) {
-                updateColumnValues(rs, columnList);
-                saveIncrementalData(jobInfo, columnList);
-            }
-        }
-    }
-    
-    /**
-     * 更新列值
+     * 更新列值（单列或每列独立取 max 时使用）
      */
     private void updateColumnValues(ResultSet rs, List<DataxColumn> columnList) throws SQLException {
         for (int i = 0; i < columnList.size(); i++) {
@@ -322,12 +320,37 @@ public class IncrementalDataRefresher {
     }
     
     /**
-     * 保存增量数据
+     * start/end 双参数（或多列）滚动：前 N-1 列设为「原最后一列的值」，最后一列设为本次查询的 max。
+     * 语义为下次运行时 start=本次 end，end=本次新 max。
+     */
+    private void applyStartEndRoll(ResultSet rs, List<DataxColumn> columnList) throws SQLException {
+        int lastIdx = columnList.size() - 1;
+        String previousEnd = columnList.get(lastIdx).getColumnValue();
+        // 最后一列：本次 max
+        Object lastValue = rs.getObject(lastIdx + 1);
+        if (lastValue != null) {
+            DataxColumn lastCol = columnList.get(lastIdx);
+            long timestamp = parseTimestamp(lastValue.toString());
+            if (timestamp > 0) {
+                lastCol.setColumnValue(String.valueOf(timestamp));
+            } else {
+                lastCol.setColumnValue(lastValue.toString());
+            }
+        }
+        // 前 N-1 列：均设为原最后一列的值（本次的 end 作为下次的 start）
+        if (previousEnd != null) {
+            for (int i = 0; i < lastIdx; i++) {
+                columnList.get(i).setColumnValue(previousEnd);
+            }
+        }
+    }
+    
+    /**
+     * 保存增量数据（仅更新 increment_content 列，保证每次同步后只改写增量游标）
      */
     private void saveIncrementalData(JobInfo jobInfo, List<DataxColumn> columnList) {
         String jsonStr = JSONUtil.toJsonStr(columnList);
-        jobInfo.setIncrementContent(jsonStr);
-        jobInfoMapper.updateById(jobInfo);
+        jobInfoMapper.updateIncrementContent(jobInfo.getId(), jsonStr);
         logger.info("[IncrementalRefresher] 增量标记已更新 - jobId: {}", jobInfo.getId());
     }
     

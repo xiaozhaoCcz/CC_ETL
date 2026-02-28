@@ -1,6 +1,7 @@
 package com.cc.job.gui.view;
 
 import com.cc.job.gui.service.LoginService;
+import com.cc.job.gui.util.ThemeManager;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -39,18 +40,21 @@ public class RegisterView extends StackPane {
     }
     
     private void initializeUI() {
-        // 设置背景渐变
-        setStyle(
-            "-fx-background-color: linear-gradient(135deg, #667EEA 0%, #764BA2 100%);"
-        );
+        getStyleClass().add("register-root");
+        applyRootBackground();
         
-        // 创建注册卡片
         VBox registerCard = createRegisterCard();
-        
-        // 添加装饰元素
         Pane decorations = createDecorations();
-        
         getChildren().addAll(decorations, registerCard);
+    }
+    
+    private void applyRootBackground() {
+        boolean dark = "dark".equals(ThemeManager.getInstance().getTheme());
+        if (dark) {
+            setStyle("-fx-background-color: linear-gradient(135deg, #252526 0%, #1E1E1E 100%);");
+        } else {
+            setStyle("-fx-background-color: linear-gradient(135deg, #667EEA 0%, #764BA2 100%);");
+        }
     }
     
     /**
@@ -81,30 +85,20 @@ public class RegisterView extends StackPane {
         card.setPadding(new Insets(40));
         card.setMaxWidth(450);
         card.setMaxHeight(650);
-        card.setStyle(
-            "-fx-background-color: transparent;"
-        );
+        card.getStyleClass().add("register-card");
         
-        
-        // Logo
         StackPane logo = createLogo();
         
-        // 标题（改为深色，提高对比度）
         Label titleLabel = new Label("创建新账号");
-        titleLabel.setFont(Font.font("System", FontWeight.BOLD, 28));
-        titleLabel.setTextFill(Color.web("#1F2937")); // 深灰色，在浅色渐变背景上清晰可见
+        titleLabel.getStyleClass().add("register-title");
         
         Label subtitleLabel = new Label("填写以下信息完成注册");
-        subtitleLabel.setFont(Font.font("System", 14));
-        subtitleLabel.setTextFill(Color.web("#4B5563")); // 中灰色，清晰可读
+        subtitleLabel.getStyleClass().add("register-subtitle");
         
-        // 输入区域
         VBox inputArea = createInputArea();
         
-        // 错误提示
         errorLabel = new Label();
-        errorLabel.setTextFill(Color.web("#EF4444"));
-        errorLabel.setFont(Font.font("System", 12));
+        errorLabel.getStyleClass().add("register-error");
         errorLabel.setVisible(false);
         errorLabel.setWrapText(true);
         errorLabel.setMaxWidth(370);
@@ -169,54 +163,37 @@ public class RegisterView extends StackPane {
         VBox inputArea = new VBox(15);
         inputArea.setAlignment(Pos.CENTER);
         
-        // 用户名输入
         VBox usernameBox = createInputBox(
             "用户名",
             "请输入用户名（3-20个字符）",
             false
         );
-        usernameField = (TextField) ((VBox) usernameBox.getChildren().get(1)).getChildren().get(0);
+        usernameField = (TextField) usernameBox.getChildren().get(1);
         
-        // 密码输入
         VBox passwordBox = createInputBox(
             "密码",
             "请输入密码（至少6位）",
             true
         );
-        passwordField = (PasswordField) ((VBox) passwordBox.getChildren().get(1)).getChildren().get(0);
+        passwordField = (PasswordField) passwordBox.getChildren().get(1);
         
-        // 确认密码输入
         VBox confirmPasswordBox = createInputBox(
             "确认密码",
             "请再次输入密码",
             true
         );
-        confirmPasswordField = (PasswordField) ((VBox) confirmPasswordBox.getChildren().get(1)).getChildren().get(0);
+        confirmPasswordField = (PasswordField) confirmPasswordBox.getChildren().get(1);
         
         inputArea.getChildren().addAll(usernameBox, passwordBox, confirmPasswordBox);
         
         return inputArea;
     }
     
-    /**
-     * 创建输入框
-     */
     private VBox createInputBox(String label, String prompt, boolean isPassword) {
         VBox box = new VBox(8);
         
         Label labelNode = new Label(label);
-        labelNode.setFont(Font.font("System", FontWeight.BOLD, 13));
-        labelNode.setTextFill(Color.web("#374151")); // 深灰色，清晰可读
-        
-        VBox inputWrapper = new VBox();
-        inputWrapper.setStyle(
-            "-fx-background-color: white; " +
-            "-fx-border-color: #E5E7EB; " +
-            "-fx-border-width: 1; " +
-            "-fx-border-radius: 8; " +
-            "-fx-background-radius: 8;"
-        );
-        inputWrapper.setPadding(new Insets(8, 15, 8, 15));
+        labelNode.getStyleClass().add("register-label");
         
         TextField field;
         if (isPassword) {
@@ -225,38 +202,11 @@ public class RegisterView extends StackPane {
             field = new TextField();
         }
         field.setPromptText(prompt);
-        field.setStyle(
-            "-fx-background-color: transparent; " +
-            "-fx-border-width: 0; " +
-            "-fx-font-size: 14; " +
-            "-fx-text-fill: #1F2937;"
-        );
         field.setPrefWidth(370);
+        field.setPrefHeight(44);
+        field.getStyleClass().add("register-field");
         
-        // 焦点样式
-        field.focusedProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal) {
-                inputWrapper.setStyle(
-                    "-fx-background-color: white; " +
-                    "-fx-border-color: #667EEA; " +
-                    "-fx-border-width: 2; " +
-                    "-fx-border-radius: 8; " +
-                    "-fx-background-radius: 8;"
-                );
-            } else {
-                inputWrapper.setStyle(
-                    "-fx-background-color: white; " +
-                    "-fx-border-color: #E5E7EB; " +
-                    "-fx-border-width: 1; " +
-                    "-fx-border-radius: 8; " +
-                    "-fx-background-radius: 8;"
-                );
-            }
-        });
-        
-        inputWrapper.getChildren().add(field);
-        box.getChildren().addAll(labelNode, inputWrapper);
-        
+        box.getChildren().addAll(labelNode, field);
         return box;
     }
     
@@ -267,34 +217,8 @@ public class RegisterView extends StackPane {
         Button button = new Button("注册");
         button.setPrefWidth(370);
         button.setPrefHeight(45);
-        button.setFont(Font.font("System", FontWeight.BOLD, 15));
-        button.setStyle(
-            "-fx-background-color: linear-gradient(135deg, #667EEA 0%, #764BA2 100%); " +
-            "-fx-text-fill: black; " +
-            "-fx-background-radius: 8; " +
-            "-fx-cursor: hand; " +
-            "-fx-effect: dropshadow(gaussian, rgba(102, 126, 234, 0.3), 8, 0, 0, 3);"
-        );
-        
-        // 悬停效果
-        button.setOnMouseEntered(e -> button.setStyle(
-            "-fx-background-color: linear-gradient(135deg, #5568D3 0%, #63408A 100%); " +
-            "-fx-text-fill: black; " +
-            "-fx-background-radius: 8; " +
-            "-fx-cursor: hand; " +
-            "-fx-effect: dropshadow(gaussian, rgba(102, 126, 234, 0.5), 12, 0, 0, 5);"
-        ));
-        
-        button.setOnMouseExited(e -> button.setStyle(
-            "-fx-background-color: linear-gradient(135deg, #667EEA 0%, #764BA2 100%); " +
-            "-fx-text-fill: black; " +
-            "-fx-background-radius: 8; " +
-            "-fx-cursor: hand; " +
-            "-fx-effect: dropshadow(gaussian, rgba(102, 126, 234, 0.3), 8, 0, 0, 3);"
-        ));
-        
+        button.getStyleClass().add("register-primary-btn");
         button.setOnAction(e -> handleRegister());
-        
         return button;
     }
     
@@ -306,22 +230,10 @@ public class RegisterView extends StackPane {
         backArea.setAlignment(Pos.CENTER);
         
         Label text = new Label("已有账号？");
-        text.setFont(Font.font("System", 13));
-        text.setTextFill(Color.web("#4B5563")); // 中灰色，清晰可读
+        text.getStyleClass().add("register-subtitle");
         
         backButton = new Button("立即登录");
-        backButton.setFont(Font.font("System", FontWeight.BOLD, 13));
-        backButton.setTextFill(Color.web("#667EEA"));
-        backButton.setStyle(
-            "-fx-background-color: transparent; " +
-            "-fx-border-width: 0; " +
-            "-fx-cursor: hand; " +
-            "-fx-underline: true;"
-        );
-        
-        backButton.setOnMouseEntered(e -> backButton.setTextFill(Color.web("#5568D3")));
-        backButton.setOnMouseExited(e -> backButton.setTextFill(Color.web("#667EEA")));
-        
+        backButton.getStyleClass().add("register-link");
         backButton.setOnAction(e -> {
             if (onBack != null) {
                 onBack.run();

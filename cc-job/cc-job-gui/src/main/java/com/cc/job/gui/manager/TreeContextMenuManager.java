@@ -1,8 +1,12 @@
 package com.cc.job.gui.manager;
 
 import com.cc.job.gui.model.TreeNodeData;
+import com.cc.job.gui.util.StyleUtil;
+import com.cc.job.gui.util.ThemeManager;
 import com.cc.job.gui.view.TaskTreeView;
+import javafx.application.Platform;
 import javafx.scene.control.*;
+import javafx.scene.Scene;
 import java.util.Optional;
 
 /**
@@ -36,15 +40,24 @@ public class TreeContextMenuManager {
             default -> createDefaultMenu(menu, onRefresh);
         }
         
+        applyThemeToContextMenu(menu);
         return menu;
     }
     
     private void createPartitionMenu(ContextMenu menu, TreeNodeData nodeData, Runnable onRefresh, Runnable onDelete) {
         MenuItem newTaskItem = new MenuItem("新建任务组");
-        newTaskItem.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: #2563EB;");
+        newTaskItem.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: " + StyleUtil.linkPrimaryColor() + ";");
         newTaskItem.setOnAction(e -> {
             if (selectionCallback != null) {
                 selectionCallback.onNewJobGroup(nodeData.getId(), nodeData.getLabel());
+            }
+        });
+        MenuItem importTaskGroupItem = new MenuItem("导入任务组");
+        importTaskGroupItem.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: " + StyleUtil.linkPrimaryColor() + ";");
+        importTaskGroupItem.setOnAction(e -> {
+            if (selectionCallback != null) {
+                selectionCallback.onPartitionAction(nodeData.getId(), nodeData.getLabel(),
+                    TaskTreeView.TaskSelectionCallback.PartitionAction.IMPORT);
             }
         });
         
@@ -62,7 +75,7 @@ public class TreeContextMenuManager {
             }
         });
         
-        menu.getItems().addAll(newTaskItem, refreshItem, editItem, exportItem);
+        menu.getItems().addAll(newTaskItem, importTaskGroupItem, refreshItem, editItem, exportItem);
         
         if (supportsDeletion(nodeData)) {
             menu.getItems().addAll(new SeparatorMenuItem(), createDeleteMenuItem(onDelete));
@@ -71,7 +84,7 @@ public class TreeContextMenuManager {
     
     private void createTaskGroupMenu(ContextMenu menu, TreeNodeData nodeData, Runnable onRefresh, Runnable onDelete) {
         MenuItem addNodeItem = new MenuItem("新增节点");
-        addNodeItem.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: #10B981;");
+        addNodeItem.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: " + (StyleUtil.isDarkTheme() ? "#4EC9B0" : "#10B981") + ";");
         addNodeItem.setOnAction(e -> {
             if (selectionCallback != null) {
                 selectionCallback.onNewJobNode(nodeData.getId(), nodeData.getLabel());
@@ -84,8 +97,13 @@ public class TreeContextMenuManager {
                 selectionCallback.onJobGroupEdit(nodeData.getId(), nodeData.getLabel());
             }
         });
+        MenuItem exportItem = createMenuItem("导出", () -> {
+            if (selectionCallback != null) {
+                selectionCallback.onExportTaskGroup(nodeData.getId(), nodeData.getLabel());
+            }
+        });
         
-        menu.getItems().addAll(addNodeItem, refreshItem, editItem);
+        menu.getItems().addAll(addNodeItem, refreshItem, editItem, exportItem);
         
         if (supportsDeletion(nodeData)) {
             menu.getItems().addAll(new SeparatorMenuItem(), createDeleteMenuItem(onDelete));
@@ -148,12 +166,24 @@ public class TreeContextMenuManager {
     private ContextMenu createDefaultMenu(Runnable onRefresh) {
         ContextMenu menu = new ContextMenu();
         menu.getItems().add(createMenuItem("刷新", onRefresh));
+        applyThemeToContextMenu(menu);
         return menu;
+    }
+    
+    private void applyThemeToContextMenu(ContextMenu menu) {
+        menu.setOnShowing(e -> Platform.runLater(() -> {
+            Scene scene = menu.getScene();
+            if (scene != null) {
+                String url = ThemeManager.getInstance().getStylesheetUrl();
+                if (url != null && !url.isEmpty()) {
+                    scene.getStylesheets().add(url);
+                }
+            }
+        }));
     }
     
     private MenuItem createMenuItem(String text, Runnable action) {
         MenuItem item = new MenuItem(text);
-        item.setStyle("-fx-text-fill: #000000;");
         item.setOnAction(e -> { if (action != null) action.run(); });
         return item;
     }

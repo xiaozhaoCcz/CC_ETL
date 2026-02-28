@@ -441,4 +441,167 @@ public class AdminApiClient {
             return false;
         }
     }
+    
+    /**
+     * 保存节点执行结果到数据库
+     * 
+     * @param taskGroupId 任务组ID
+     * @param executionBatchId 执行批次ID
+     * @param nodeResults 节点结果列表，每个元素包含 jobId, jobName, resultData
+     * @return 是否保存成功
+     */
+    public boolean saveNodeResults(Long taskGroupId, String executionBatchId, List<Map<String, Object>> nodeResults) {
+        try {
+            Map<String, Object> params = new HashMap<>();
+            params.put("taskGroupId", taskGroupId);
+            params.put("executionBatchId", executionBatchId);
+            params.put("results", nodeResults);
+            
+            HttpResponse response = executePost("/api/v1/jobNodeResults/batchSave", JSONUtil.toJsonStr(params));
+            if (response != null && response.isOk()) {
+                logger.debug("[AdminApiClient] 保存节点结果成功 - taskGroupId: {}, batchId: {}, 数量: {}", 
+                        taskGroupId, executionBatchId, nodeResults != null ? nodeResults.size() : 0);
+                return true;
+            } else {
+                logger.error("[AdminApiClient] 保存节点结果失败 - taskGroupId: {}, batchId: {}", 
+                        taskGroupId, executionBatchId);
+                return false;
+            }
+        } catch (Exception e) {
+            logger.error("[AdminApiClient] 保存节点结果异常 - taskGroupId: {}, batchId: {}", 
+                    taskGroupId, executionBatchId, e);
+            return false;
+        }
+    }
+    
+    /**
+     * 根据任务组ID和批次ID获取节点执行结果
+     * 
+     * @param taskGroupId 任务组ID
+     * @param executionBatchId 执行批次ID
+     * @return 节点执行结果列表
+     */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> getNodeResultsByBatch(Long taskGroupId, String executionBatchId) {
+        try {
+            String path = "/api/v1/jobNodeResults/byBatch?taskGroupId=" + taskGroupId + "&executionBatchId=" + executionBatchId;
+            HttpResponse response = executeGet(path);
+            if (response != null && response.isOk()) {
+                Map<String, Object> resultMap = JSONUtil.toBean(response.body(), Map.class);
+                Object data = resultMap.get("data");
+                if (data != null) {
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> results = (List<Map<String, Object>>) (List<?>) JSONUtil.toList(JSONUtil.toJsonStr(data), Map.class);
+                    logger.debug("[AdminApiClient] 获取节点结果成功 - taskGroupId: {}, batchId: {}, 数量: {}", 
+                            taskGroupId, executionBatchId, results != null ? results.size() : 0);
+                    return results != null ? results : new ArrayList<>();
+                }
+                logger.warn("[AdminApiClient] 响应中data字段为空 - taskGroupId: {}, batchId: {}", 
+                        taskGroupId, executionBatchId);
+                return new ArrayList<>();
+            } else {
+                logger.error("[AdminApiClient] 获取节点结果失败 - taskGroupId: {}, batchId: {}", 
+                        taskGroupId, executionBatchId);
+                return new ArrayList<>();
+            }
+        } catch (Exception e) {
+            logger.error("[AdminApiClient] 获取节点结果异常 - taskGroupId: {}, batchId: {}", 
+                    taskGroupId, executionBatchId, e);
+            return new ArrayList<>();
+        }
+    }
+    
+    /**
+     * 获取最近一次执行的批次ID
+     * 
+     * @param taskGroupId 任务组ID
+     * @return 最近一次执行的批次ID，如果不存在则返回null
+     */
+    public String getLatestBatchId(Long taskGroupId) {
+        try {
+            String path = "/api/v1/jobNodeResults/latestBatchId?taskGroupId=" + taskGroupId;
+            HttpResponse response = executeGet(path);
+            if (response != null && response.isOk()) {
+                Map<String, Object> resultMap = JSONUtil.toBean(response.body(), Map.class);
+                Object data = resultMap.get("data");
+                if (data != null) {
+                    String batchId = data.toString();
+                    logger.debug("[AdminApiClient] 获取最近一次批次ID成功 - taskGroupId: {}, batchId: {}", 
+                            taskGroupId, batchId);
+                    return batchId;
+                }
+                logger.debug("[AdminApiClient] 未找到最近一次批次ID - taskGroupId: {}", taskGroupId);
+                return null;
+            } else {
+                logger.error("[AdminApiClient] 获取最近一次批次ID失败 - taskGroupId: {}", taskGroupId);
+                return null;
+            }
+        } catch (Exception e) {
+            logger.error("[AdminApiClient] 获取最近一次批次ID异常 - taskGroupId: {}", taskGroupId, e);
+            return null;
+        }
+    }
+
+    /**
+     * 获取最近一次全量跑的批次ID（该批次下节点结果数等于任务组节点总数）
+     *
+     * @param taskGroupId 任务组ID
+     * @return 批次ID，若无全量跑批次则返回null
+     */
+    public String getLatestFullRunBatchId(Long taskGroupId) {
+        try {
+            String path = "/api/v1/jobNodeResults/latestFullRunBatchId?taskGroupId=" + taskGroupId;
+            HttpResponse response = executeGet(path);
+            if (response != null && response.isOk()) {
+                Map<String, Object> resultMap = JSONUtil.toBean(response.body(), Map.class);
+                Object data = resultMap.get("data");
+                if (data != null) {
+                    String batchId = data.toString();
+                    logger.debug("[AdminApiClient] 获取最近一次全量跑批次ID成功 - taskGroupId: {}, batchId: {}",
+                            taskGroupId, batchId);
+                    return batchId;
+                }
+                logger.debug("[AdminApiClient] 未找到最近一次全量跑批次ID - taskGroupId: {}", taskGroupId);
+                return null;
+            } else {
+                logger.error("[AdminApiClient] 获取最近一次全量跑批次ID失败 - taskGroupId: {}", taskGroupId);
+                return null;
+            }
+        } catch (Exception e) {
+            logger.error("[AdminApiClient] 获取最近一次全量跑批次ID异常 - taskGroupId: {}", taskGroupId, e);
+            return null;
+        }
+    }
+
+    /**
+     * 根据任务组ID和节点jobId获取该节点最近一次执行结果（用于补全缺失上游）
+     *
+     * @param taskGroupId 任务组ID
+     * @param jobId 节点任务ID
+     * @return 节点结果 Map（含 jobId, jobName, resultData, filePath 等），不存在则返回null
+     */
+    public Map<String, Object> getLatestNodeResult(Long taskGroupId, Long jobId) {
+        try {
+            String path = "/api/v1/jobNodeResults/latestByJob?taskGroupId=" + taskGroupId + "&jobId=" + jobId;
+            HttpResponse response = executeGet(path);
+            if (response != null && response.isOk()) {
+                Map<String, Object> resultMap = JSONUtil.toBean(response.body(), Map.class);
+                Object data = resultMap.get("data");
+                if (data != null && data instanceof Map) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> nodeResult = (Map<String, Object>) data;
+                    logger.debug("[AdminApiClient] 获取节点最近一次结果成功 - taskGroupId: {}, jobId: {}",
+                            taskGroupId, jobId);
+                    return nodeResult;
+                }
+                return null;
+            } else {
+                logger.warn("[AdminApiClient] 获取节点最近一次结果失败 - taskGroupId: {}, jobId: {}", taskGroupId, jobId);
+                return null;
+            }
+        } catch (Exception e) {
+            logger.error("[AdminApiClient] 获取节点最近一次结果异常 - taskGroupId: {}, jobId: {}", taskGroupId, jobId, e);
+            return null;
+        }
+    }
 }

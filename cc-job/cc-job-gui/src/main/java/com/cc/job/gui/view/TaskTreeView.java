@@ -13,7 +13,6 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.StackPane;
-import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.util.Duration;
 
@@ -58,10 +57,11 @@ public class TaskTreeView extends VBox {
         }
         default void onPartitionAction(Long partitionId, String partitionName, PartitionAction action) {}
         default void onJobGroupEdit(Long taskGroupId, String taskGroupName) {}
+        default void onExportTaskGroup(Long taskGroupId, String taskGroupName) {}
         
         enum JobNodeAction { EDIT, LOCATE, PROPERTIES }
         enum EdgeAction { LOCATE, DELETE }
-        enum PartitionAction { EDIT, EXPORT }
+        enum PartitionAction { EDIT, EXPORT, IMPORT }
     }
     
     public TaskTreeView() {
@@ -71,7 +71,8 @@ public class TaskTreeView extends VBox {
     }
     
     private void initializeUI() {
-        setStyle("-fx-background-color: transparent; -fx-padding: 0 0 0 8;");
+        getStyleClass().add("tree-view-panel");
+        setStyle("-fx-padding: 0 0 0 8;");
         setMinWidth(240);
         setSpacing(10);
         
@@ -121,18 +122,7 @@ public class TaskTreeView extends VBox {
         searchField.setPrefHeight(28);
         searchField.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(searchField, Priority.ALWAYS);
-        
-        String normalStyle = "-fx-background-color: #FFFFFF; -fx-text-fill: #111827; -fx-font-size: 12px; " +
-            "-fx-padding: 4 8; -fx-border-color: #D1D5DB; -fx-border-width: 1; -fx-border-radius: 4; " +
-            "-fx-background-radius: 4; -fx-prompt-text-fill: #9CA3AF;";
-        
-        String focusedStyle = normalStyle.replace("#D1D5DB", "#6366F1") +
-            "-fx-effect: dropshadow(gaussian, rgba(99, 102, 241, 0.2), 3, 0, 0, 0);";
-        
-        searchField.setStyle(normalStyle);
-        searchField.focusedProperty().addListener((obs, was, is) -> {
-            searchField.setStyle(is ? focusedStyle : normalStyle);
-        });
+        searchField.getStyleClass().add("tree-search-field");
         
         searchField.textProperty().addListener((obs, oldVal, newVal) -> searchManager.filterTree(newVal));
         
@@ -232,6 +222,7 @@ public class TaskTreeView extends VBox {
                     iconContainer.setMaxSize(16, 16);
                     
                     textLabel = new Label();
+                    textLabel.getStyleClass().add("tree-cell-label");
                     
 //                    runningIndicator = new Circle(4);
 //                    runningIndicator.setFill(Color.web("#10B981"));
@@ -260,14 +251,13 @@ public class TaskTreeView extends VBox {
                 setText(null);
                 setGraphic(contentBox);
                 
-                setStyle(StyleUtil.body() + "-fx-padding: 8 12; -fx-background-radius: " + StyleUtil.RADIUS_MD + ";");
-                
+                getStyleClass().removeAll("tree-cell-content", "tree-cell-content-selected");
+                getStyleClass().add("tree-cell-content");
                 if (isSelected()) {
-                    setStyle("-fx-background-color: " + StyleUtil.PRIMARY + "20; -fx-text-fill: " + StyleUtil.PRIMARY + "; " +
-                        "-fx-font-size: 13px; -fx-font-weight: 600; -fx-padding: 8 12; -fx-background-radius: " + StyleUtil.RADIUS_MD + ";");
-                    textLabel.setStyle("-fx-text-fill: " + StyleUtil.PRIMARY + ";");
+                    getStyleClass().add("tree-cell-content-selected");
+                    textLabel.getStyleClass().add("tree-cell-label-selected");
                 } else {
-                    textLabel.setStyle("-fx-text-fill: #374151;");
+                    textLabel.getStyleClass().remove("tree-cell-label-selected");
                 }
                 
                 setContextMenu(contextMenuManager.createContextMenu(item, getTreeItem(),
@@ -585,5 +575,13 @@ public class TaskTreeView extends VBox {
     public String getSelectedTask() {
         TreeItem<TreeNodeData> selected = treeView.getSelectionModel().getSelectedItem();
         return selected != null && selected.getValue() != null ? selected.getValue().getLabel() : null;
+    }
+
+    /**
+     * 获取当前树选中的节点数据（分区 type=0，任务组 type=1 等）
+     */
+    public TreeNodeData getSelectedTreeNodeData() {
+        TreeItem<TreeNodeData> selected = treeView.getSelectionModel().getSelectedItem();
+        return selected != null ? selected.getValue() : null;
     }
 }

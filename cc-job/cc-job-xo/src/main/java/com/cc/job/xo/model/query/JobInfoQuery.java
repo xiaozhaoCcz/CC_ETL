@@ -22,6 +22,11 @@ public class JobInfoQuery extends BasePageQuery {
 
     private String author;
 
+    /**
+     * 任务类型：0-单任务，2-任务组。可选，不传则查 0 和 2。
+     */
+    private Integer jobType;
+
     public Long getJobGroup() {
         return jobGroup;
     }
@@ -60,5 +65,13 @@ public class JobInfoQuery extends BasePageQuery {
 
     public void setAuthor(String author) {
         this.author = author;
+    }
+
+    public Integer getJobType() {
+        return jobType;
+    }
+
+    public void setJobType(Integer jobType) {
+        this.jobType = jobType;
     }
 }

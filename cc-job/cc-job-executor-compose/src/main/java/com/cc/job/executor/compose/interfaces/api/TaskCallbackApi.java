@@ -39,12 +39,17 @@ public class TaskCallbackApi {
         
         String executeKey = request.getExecuteKey();
         Boolean success = request.getSuccess();
+        Object executeResult = request.getExecuteResult();
         
-        logger.info("[TaskCallback] 收到任务执行结果 - executeKey: {}, 成功: {}", 
-                executeKey, success);
+        logger.info("[TaskCallback] 收到任务执行结果 - executeKey: {}, 成功: {}, 执行结果: {}", 
+                executeKey, success, executeResult);
         
         try {
             TaskWrapperFactory.getJobResults().put(executeKey, success);
+            // 存储执行结果
+            if (executeResult != null) {
+                TaskWrapperFactory.setJobExecuteResult(executeKey, executeResult);
+            }
             
             TaskWrapperFactory.notifyTaskComplete(executeKey);
             
@@ -65,10 +70,14 @@ public class TaskCallbackApi {
     public Map<String, Object> addJobGroupData(@RequestBody Map<String, Object> data) {
         String key = (String) data.get("key");
         Boolean value = (Boolean) data.get("value");
+        Object executeResult = data.get("executeResult");
         
         TaskResultCallbackRequest request = new TaskResultCallbackRequest();
         request.setExecuteKey(key);
         request.setSuccess(value);
+        if (executeResult != null) {
+            request.setExecuteResult(executeResult);
+        }
         
         return receiveTaskResult(request);
     }

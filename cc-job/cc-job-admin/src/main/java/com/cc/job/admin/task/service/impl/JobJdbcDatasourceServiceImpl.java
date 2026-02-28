@@ -8,6 +8,7 @@ import com.cc.job.admin.task.enums.DatasourceEnum;
 import com.cc.job.xo.common.exception.BusinessException;
 import com.cc.job.admin.task.command.JdbcCommand;
 import com.cc.job.xo.mapper.JobJdbcDatasourceMapper;
+import com.cc.job.xo.model.datax.DataxTable;
 import com.cc.job.xo.model.entity.JobJdbcDatasource;
 import com.cc.job.xo.model.form.JobJdbcDatasourceForm;
 import com.cc.job.xo.model.query.JobJdbcDatasourceQuery;
@@ -21,10 +22,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 
 
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
@@ -131,17 +129,16 @@ public class JobJdbcDatasourceServiceImpl extends ServiceImpl<JobJdbcDatasourceM
     }
 
     @Override
-    public List<String> getColumns(Long id, Map<String, String> params) {
+    public List<String> getColumns(Long id, Map<String,Object> params) {
         List<String> columns = new ArrayList<>();
         JobJdbcDatasource jobJdbcDatasource = this.getById(id);
         JdbcCommand jdbcCommand = new JdbcCommand(jobJdbcDatasource.getJdbcDriverClass(), jobJdbcDatasource.getJdbcUrl(), jobJdbcDatasource.getJdbcUsername(), jobJdbcDatasource.getJdbcPassword());
         Connection con = jdbcCommand.getConnection();
-        String tableName = params.get("tableName");
-        String sql = params.get("querySql");
-        if (StringUtils.isBlank(sql)) {
-            String schemaName = StringUtils.isBlank(jobJdbcDatasource.getSchemaName()) ? "" : jobJdbcDatasource.getSchemaName() + ".";
-            sql = "select * from " + schemaName + tableName + " t";
+        String sql = "select * from ";
+        if(params.get("tableSchema") != null){
+            sql += params.get("tableSchema") + ".";
         }
+        sql += params.get("tableName");
         PreparedStatement ps = null;
         ResultSet rs = null;
         try {
@@ -162,8 +159,8 @@ public class JobJdbcDatasourceServiceImpl extends ServiceImpl<JobJdbcDatasourceM
     }
 
     @Override
-    public List<String> getTables(Long id) {
-        List<String> tables = new ArrayList<>();
+    public List<DataxTable> getTables(Long id) {
+        List<DataxTable> tables = new ArrayList<>();
         JobJdbcDatasource jobJdbcDatasource = this.getById(id);
         JdbcCommand jdbcCommand = null;
         Connection con = null;
@@ -174,10 +171,11 @@ public class JobJdbcDatasourceServiceImpl extends ServiceImpl<JobJdbcDatasourceM
                 jdbcCommand = new JdbcCommand(jobJdbcDatasource.getJdbcDriverClass(), jobJdbcDatasource.getJdbcUrl(), jobJdbcDatasource.getJdbcUsername(), jobJdbcDatasource.getJdbcPassword(),jobJdbcDatasource.getSchemaName());
                  con = jdbcCommand.getConnection();
                  stmt = con.createStatement();
-                 rs = stmt.executeQuery("SELECT TABLE_NAME FROM ALL_TABLES WHERE OWNER = '"+jobJdbcDatasource.getSchemaName()+"'");
+                 String tableSchema = jobJdbcDatasource.getSchemaName();
+                 rs = stmt.executeQuery("SELECT TABLE_NAME FROM ALL_TABLES WHERE OWNER = '" + tableSchema + "'");
                  while (rs.next()) {
                      String tableName = rs.getString("TABLE_NAME");
-                     tables.add(tableName);
+                     tables.add(new DataxTable(tableSchema,tableName));
                  }
                  return tables;
             }
@@ -188,7 +186,8 @@ public class JobJdbcDatasourceServiceImpl extends ServiceImpl<JobJdbcDatasourceM
             // 遍历结果集并打印表名
             while (rs!=null&&rs.next()) {
                 String tableName = rs.getString("TABLE_NAME");
-                tables.add(tableName);
+                String tableSchema = rs.getString("TABLE_SCHEM");
+                tables.add(new DataxTable(tableSchema,tableName));
             }
         } catch (SQLException e) {
              throw new BusinessException(e);

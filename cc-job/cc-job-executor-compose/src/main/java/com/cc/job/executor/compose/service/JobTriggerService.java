@@ -1,7 +1,10 @@
 package com.cc.job.executor.compose.service;
 
-import cn.hutool.core.lang.Pair;
+import cn.hutool.json.JSONUtil;
 import com.cc.job.executor.compose.client.AdminApiClient;
+import com.cc.job.executor.compose.core.context.DataContext;
+import com.cc.job.executor.compose.core.model.ExecutionContext;
+import com.cc.job.executor.compose.core.resolver.ParameterResolver;
 import com.cc.job.executor.compose.infrastructure.constant.ExecutorConstants;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.entity.JobInfo;
@@ -25,10 +28,9 @@ import java.util.TreeMap;
 import java.util.HashMap;
 import java.util.Random;
 import java.util.LinkedHashMap;
-import java.util.Collections;
-import java.util.ArrayList;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -45,6 +47,7 @@ public class JobTriggerService {
     private static final Logger logger = LoggerFactory.getLogger(JobTriggerService.class);
     
     private final AdminApiClient adminApiClient;
+    private final ParameterResolver parameterResolver;
     
     @Value("${server.port:8500}")
     private int port;
@@ -79,8 +82,9 @@ public class JobTriggerService {
      */
     private static final int VIRTUAL_NODE_NUM = 100;
     
-    public JobTriggerService(AdminApiClient adminApiClient) {
+    public JobTriggerService(AdminApiClient adminApiClient, ParameterResolver parameterResolver) {
         this.adminApiClient = adminApiClient;
+        this.parameterResolver = parameterResolver;
     }
     
     /**
@@ -92,6 +96,19 @@ public class JobTriggerService {
      * @return 是否触发成功
      */
     public boolean triggerJob(XxlJobContext xxlJobContext, JobInfo jobInfo, String randomId) {
+        return triggerJob(xxlJobContext, jobInfo, randomId, null);
+    }
+    
+    /**
+     * 触发任务执行（带执行上下文）
+     * 
+     * @param xxlJobContext 任务上下文
+     * @param jobInfo 任务信息
+     * @param randomId 批次ID
+     * @param context 执行上下文（用于参数解析）
+     * @return 是否触发成功
+     */
+    public boolean triggerJob(XxlJobContext xxlJobContext, JobInfo jobInfo, String randomId, ExecutionContext context) {
         logger.debug("[JobTrigger] 开始触发任务 - jobId: {}, handler: {}, randomId: {}",
                 jobInfo.getId(), jobInfo.getExecutorHandler(), randomId);
         
@@ -131,10 +148,10 @@ public class JobTriggerService {
             // 5. 根据路由策略触发任务
             if ("SHARDING_BROADCAST".equals(routeStrategy)) {
                 // 分片广播：向所有执行器发送任务
-                return triggerShardingBroadcast(xxlJobContext, jobInfo, randomId, composeAddress, registryList);
+                return triggerShardingBroadcast(xxlJobContext, jobInfo, randomId, composeAddress, registryList, context);
             } else {
                 // 普通路由：选择一个执行器
-                return triggerNormal(xxlJobContext, jobInfo, randomId, composeAddress, registryList, routeStrategy);
+                return triggerNormal(xxlJobContext, jobInfo, randomId, composeAddress, registryList, routeStrategy, context);
             }
             
         } catch (Exception e) {
@@ -148,12 +165,12 @@ public class JobTriggerService {
      * 分片广播触发
      */
     private boolean triggerShardingBroadcast(XxlJobContext xxlJobContext, JobInfo jobInfo, String randomId,
-                                             String composeAddress, List<String> registryList) {
+                                             String composeAddress, List<String> registryList, ExecutionContext context) {
         logger.info("[JobTrigger] 分片广播触发 - jobId: {}, 执行器数量: {}", jobInfo.getId(), registryList.size());
         
         boolean allSuccess = true;
         for (int i = 0; i < registryList.size(); i++) {
-            TriggerParam triggerParam = createTriggerParam(jobInfo, randomId, xxlJobContext, composeAddress, i, registryList.size());
+            TriggerParam triggerParam = createTriggerParam(jobInfo, randomId, xxlJobContext, composeAddress, i, registryList.size(), context);
             boolean success = doTrigger(xxlJobContext, jobInfo, randomId, triggerParam, registryList.get(i));
             if (!success) {
                 allSuccess = false;
@@ -167,11 +184,11 @@ public class JobTriggerService {
      * 普通路由触发
      */
     private boolean triggerNormal(XxlJobContext xxlJobContext, JobInfo jobInfo, String randomId,
-                                  String composeAddress, List<String> registryList, String routeStrategy) {
+                                  String composeAddress, List<String> registryList, String routeStrategy, ExecutionContext context) {
         logger.debug("[JobTrigger] 普通路由触发 - jobId: {}, 路由策略: {}", jobInfo.getId(), routeStrategy);
         
         // 构建触发参数
-        TriggerParam triggerParam = createTriggerParam(jobInfo, randomId, xxlJobContext, composeAddress, 0, 1);
+        TriggerParam triggerParam = createTriggerParam(jobInfo, randomId, xxlJobContext, composeAddress, 0, 1, context);
         
         // 路由选择执行器地址
         String address = selectAddress(triggerParam, registryList, routeStrategy);
@@ -184,22 +201,73 @@ public class JobTriggerService {
         // 触发任务
         return doTrigger(xxlJobContext, jobInfo, randomId, triggerParam, address);
     }
-    
+
     /**
-     * 创建触发参数
+     * 创建触发参数（带执行上下文，用于参数解析）
      */
     private TriggerParam createTriggerParam(JobInfo jobInfo, String randomId, XxlJobContext xxlJobContext,
-                                           String composeAddress, int broadcastIndex, int broadcastTotal) {
+                                           String composeAddress, int broadcastIndex, int broadcastTotal, ExecutionContext context) {
+        // 获取原始参数
+        String executorParam = jobInfo.getExecutorParam();
+        String reqUrl = jobInfo.getReqUrl();
+        String reqBody = jobInfo.getReqBody();
+        String reqHeader = jobInfo.getReqHeader();
+        String glueSource = jobInfo.getGlueSource();
+        
+        // 如果提供了执行上下文，解析并替换参数中的变量
+        if (context != null && context.getDataContext() != null && context.getJobNameMap() != null) {
+            DataContext dataContext = context.getDataContext();
+            Map<String, Long> jobNameMap = context.getJobNameMap();
+            
+            // 解析 executorParam
+            if (executorParam != null && !executorParam.isEmpty()) {
+                executorParam = parameterResolver.resolve(executorParam, dataContext, jobNameMap);
+                logger.debug("[JobTrigger] 解析 executorParam - jobId: {}, 原始: {}, 解析后: {}", 
+                        jobInfo.getId(), jobInfo.getExecutorParam(), executorParam);
+            }
+            
+            // 解析 reqUrl
+            if (reqUrl != null && !reqUrl.isEmpty()) {
+                reqUrl = parameterResolver.resolve(reqUrl, dataContext, jobNameMap);
+                logger.debug("[JobTrigger] 解析 reqUrl - jobId: {}, 原始: {}, 解析后: {}", 
+                        jobInfo.getId(), jobInfo.getReqUrl(), reqUrl);
+            }
+            
+            // 解析 reqBody
+            if (reqBody != null && !reqBody.isEmpty()) {
+                reqBody = parameterResolver.resolve(reqBody, dataContext, jobNameMap);
+                logger.debug("[JobTrigger] 解析 reqBody - jobId: {}, 原始: {}, 解析后: {}", 
+                        jobInfo.getId(), jobInfo.getReqBody(), reqBody);
+            }
+            
+            // 解析 reqHeader
+            if (reqHeader != null && !reqHeader.isEmpty()) {
+                reqHeader = parameterResolver.resolve(reqHeader, dataContext, jobNameMap);
+                logger.debug("[JobTrigger] 解析 reqHeader - jobId: {}, 原始: {}, 解析后: {}", 
+                        jobInfo.getId(), jobInfo.getReqHeader(), reqHeader);
+            }
+            
+            // 解析 glueSource（对于 GLUE 任务）
+            // 注意：对于GLUE脚本，我们采用混合策略：
+            // 1. 简单值：继续使用字符串替换
+            // 2. 复杂对象：通过环境变量传递（在脚本执行时设置）
+            // 3. Java GLUE：通过DataContextAccessor API访问（在执行器中注入）
+            if (glueSource != null && !glueSource.isEmpty()) {
+                glueSource = parameterResolver.resolve(glueSource, dataContext, jobNameMap);
+                logger.debug("[JobTrigger] 解析 glueSource - jobId: {}", jobInfo.getId());
+            }
+        }
+        
         TriggerParam triggerParam = new TriggerParam();
         triggerParam.setJobId(jobInfo.getId().intValue());
         triggerParam.setExecutorHandler(jobInfo.getExecutorHandler());
-        triggerParam.setExecutorParams(randomId);
+        triggerParam.setExecutorParams(executorParam != null ? executorParam : randomId);
         triggerParam.setExecutorBlockStrategy(jobInfo.getExecutorBlockStrategy());
         triggerParam.setExecutorTimeout(jobInfo.getExecutorTimeout());
         triggerParam.setLogId(-1);  // -1 表示这是任务组子任务
         triggerParam.setRandomId(randomId);  // 设置 randomId，用于回调时标识任务组
         triggerParam.setGlueType(jobInfo.getGlueType());
-        triggerParam.setGlueSource(jobInfo.getGlueSource());
+        triggerParam.setGlueSource(glueSource);
         
         if (jobInfo.getGlueUpdateTime() != null) {
             triggerParam.setGlueUpdateTime(jobInfo.getGlueUpdateTime().toInstant(ZoneOffset.of("+8")).toEpochMilli());
@@ -208,20 +276,69 @@ public class JobTriggerService {
         triggerParam.setBroadcastIndex(broadcastIndex);
         triggerParam.setBroadcastTotal(broadcastTotal);
         
-        // 设置 HTTP 任务参数
-        triggerParam.setReqBody(jobInfo.getReqBody());
-        triggerParam.setReqHeader(jobInfo.getReqHeader());
+        // 设置 HTTP 任务参数（使用解析后的值）
+        triggerParam.setReqBody(reqBody);
+        triggerParam.setReqHeader(reqHeader);
         triggerParam.setReqType(jobInfo.getReqType());
-        triggerParam.setReqUrl(jobInfo.getReqUrl());
+        triggerParam.setReqUrl(reqUrl);
         
         triggerParam.setXxlJobContext(xxlJobContext);
         // 关键：将 address 设置为 compose 执行器地址，这样子任务完成后会回调到 compose 执行器
         triggerParam.setAddress(composeAddress);
         
+        // 对于GLUE任务，序列化上下文数据以便脚本访问
+        if (context != null && context.getDataContext() != null && 
+            jobInfo.getGlueType() != null && isGlueType(jobInfo.getGlueType())) {
+            try {
+                String contextJson = serializeDataContext(context.getDataContext());
+                triggerParam.setContextData(contextJson);
+                logger.debug("[JobTrigger] 序列化上下文数据 - jobId: {}, 数据大小: {} 字符", 
+                        jobInfo.getId(), contextJson != null ? contextJson.length() : 0);
+            } catch (Exception e) {
+                logger.warn("[JobTrigger] 序列化上下文数据失败 - jobId: {}", jobInfo.getId(), e);
+            }
+        }
+        
         logger.debug("[JobTrigger] 创建触发参数 - jobId: {}, randomId: {}, 回调地址: {}", 
                 jobInfo.getId(), randomId, composeAddress);
         
         return triggerParam;
+    }
+    
+    /**
+     * 判断是否是GLUE类型
+     */
+    private boolean isGlueType(String glueType) {
+        if (glueType == null) {
+            return false;
+        }
+        return glueType.startsWith("GLUE_") || "GLUE_GROOVY".equals(glueType);
+    }
+    
+    /**
+     * 序列化DataContext为JSON字符串
+     * 
+     * @param dataContext 数据上下文
+     * @return JSON字符串
+     */
+    private String serializeDataContext(DataContext dataContext) {
+        if (dataContext == null) {
+            return "{}";
+        }
+        
+        try {
+            // 将DataContext转换为Map
+            Map<String, Object> contextMap = new java.util.HashMap<>();
+            for (String key : dataContext.keySet()) {
+                contextMap.put(key, dataContext.get(key));
+            }
+            
+            // 序列化为JSON
+            return JSONUtil.toJsonStr(contextMap);
+        } catch (Exception e) {
+            logger.error("[JobTrigger] 序列化DataContext失败", e);
+            return "{}";
+        }
     }
     
     /**

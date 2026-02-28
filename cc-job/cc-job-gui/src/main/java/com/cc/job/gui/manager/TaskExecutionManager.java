@@ -1,6 +1,7 @@
 package com.cc.job.gui.manager;
 
 import com.cc.job.gui.model.ProcessNode;
+import com.cc.job.gui.model.ProcessNode.GraphNodeState;
 import com.cc.job.gui.model.RunningJobGroup;
 import com.cc.job.gui.service.JobInfoService;
 import com.cc.job.gui.service.JobLogService;
@@ -124,10 +125,15 @@ public class TaskExecutionManager {
             handleSSEMessage(message, randomId);
         });
         
+        // 统计节点ID列表
+        List<Integer> jobFlowPositionIds = collectNonBlockedNodeIds();
+        List<Integer> jobPauseStatusIds = collectPausedNodeIds();
+        
         // 触发任务
         new Thread(() -> {
             try {
-                Long logId = jobInfoService.triggerJob(currentJobId, randomId);
+                Long logId = jobInfoService.triggerJob(currentJobId, randomId, 
+                                                      jobFlowPositionIds, jobPauseStatusIds);
                 runningJob.setLogId(logId);
                 
                 Platform.runLater(() -> {
@@ -154,6 +160,8 @@ public class TaskExecutionManager {
                     
                     runningJob.cleanup();
                     runningJobs.remove(currentJobId);
+                    // ⭐ 隐藏标签页上的运行状态绿点
+                    navigationBar.updateTaskGroupRunningStatus(currentJobId, false);
                     updateToolBarRunningJobs();
                     canvas.setAllConnectionsRunning(false);
                     toolBar.setRunButtonLoading(false);
@@ -216,6 +224,27 @@ public class TaskExecutionManager {
     private void handleSSEMessage(SSEService.SSEMessage message, String expectedRandomId) {
         if (message.getStatus() != null && message.getStatus() == -1) {
             logPanel.error("❌ SSE连接错误: " + message.getResult());
+            
+            // ⭐ SSE连接错误时，清理运行状态并隐藏绿点
+            String errorRandomId = message.getRandomId();
+            Long errorJobId = message.getParentJobId() != null ? message.getParentJobId() : message.getJobId();
+            
+            if (errorJobId != null && errorRandomId != null && errorRandomId.equals(expectedRandomId)) {
+                RunningJobGroup runningJob = runningJobs.get(errorJobId);
+                if (runningJob != null && errorRandomId.equals(runningJob.getRandomId())) {
+                    Platform.runLater(() -> {
+                        logger.warn("SSE连接错误，清理任务组运行状态 - jobId: {}, randomId: {}", errorJobId, errorRandomId);
+                        runningJob.cleanup();
+                        runningJobs.remove(errorJobId);
+                        navigationBar.updateTaskGroupRunningStatus(errorJobId, false);
+                        updateToolBarRunningJobs();
+                        canvas.setAllConnectionsRunning(false);
+                        
+                        // 断开SSE连接
+                        SSEService.getInstance().disconnect(errorJobId, errorRandomId);
+                    });
+                }
+            }
             return;
         }
         
@@ -378,9 +407,18 @@ public class TaskExecutionManager {
         return runningJob != null && runningJob.isRunning();
     }
     
+    /**
+     * 应用退出时调用：仅停止本客户端发起的任务组（通知 Admin 置 trigger_one_status=0），再清理本地状态与 SSE。
+     * 关标签不调用此逻辑，不会停止任务组。
+     */
     public void cleanup() {
         for (Map.Entry<Long, RunningJobGroup> entry : new HashMap<>(runningJobs).entrySet()) {
             RunningJobGroup runningJob = entry.getValue();
+            try {
+                jobInfoService.stopJobCompose(runningJob.getJobId(), runningJob.getRandomId());
+            } catch (Exception e) {
+                logger.debug("退出时通知停止任务组失败（可忽略）- jobId: {}, randomId: {}", runningJob.getJobId(), runningJob.getRandomId(), e);
+            }
             try {
                 runningJob.cleanup();
                 SSEService.getInstance().disconnect(runningJob.getJobId(), runningJob.getRandomId());
@@ -389,6 +427,60 @@ public class TaskExecutionManager {
             }
         }
         runningJobs.clear();
+    }
+    
+    /**
+     * 收集除阻塞节点外的其他节点ID列表
+     * @return 节点ID列表（转换为Integer，过滤掉null）
+     */
+    private List<Integer> collectNonBlockedNodeIds() {
+        List<Integer> nodeIds = new ArrayList<>();
+        List<ProcessNode> nodes = canvas.getNodes();
+        
+        for (ProcessNode node : nodes) {
+            // 排除阻塞节点
+            if (node.getGraphState() != GraphNodeState.BLOCKED) {
+                Long jobId = node.getJobId();
+                if (jobId != null) {
+                    try {
+                        // 将Long转换为Integer
+                        nodeIds.add(jobId.intValue());
+                    } catch (ArithmeticException e) {
+                        // 如果jobId超出Integer范围，跳过该节点
+                        logger.warn("节点jobId超出Integer范围，跳过: {}", jobId);
+                    }
+                }
+            }
+        }
+        
+        return nodeIds;
+    }
+    
+    /**
+     * 收集暂停节点ID列表（enabled=false的节点）
+     * @return 暂停节点ID列表（转换为Integer，过滤掉null）
+     */
+    private List<Integer> collectPausedNodeIds() {
+        List<Integer> nodeIds = new ArrayList<>();
+        List<ProcessNode> nodes = canvas.getNodes();
+        
+        for (ProcessNode node : nodes) {
+            // 收集暂停节点（enabled=false）
+            if (!node.getEnabled()) {
+                Long jobId = node.getJobId();
+                if (jobId != null) {
+                    try {
+                        // 将Long转换为Integer
+                        nodeIds.add(jobId.intValue());
+                    } catch (ArithmeticException e) {
+                        // 如果jobId超出Integer范围，跳过该节点
+                        logger.warn("节点jobId超出Integer范围，跳过: {}", jobId);
+                    }
+                }
+            }
+        }
+        
+        return nodeIds;
     }
 }
 

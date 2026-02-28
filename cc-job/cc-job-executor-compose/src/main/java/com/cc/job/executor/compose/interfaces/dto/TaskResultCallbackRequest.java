@@ -21,6 +21,9 @@ public class TaskResultCallbackRequest {
     /** 执行耗时（毫秒） */
     private Long duration;
 
+    /** 执行结果 */
+    private Object executeResult;
+
     public String getExecuteKey() {
         return executeKey;
     }
@@ -53,6 +56,14 @@ public class TaskResultCallbackRequest {
         this.duration = duration;
     }
 
+    public Object getExecuteResult() {
+        return executeResult;
+    }
+
+    public void setExecuteResult(Object executeResult) {
+        this.executeResult = executeResult;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -61,12 +72,13 @@ public class TaskResultCallbackRequest {
         return Objects.equals(executeKey, that.executeKey) &&
                 Objects.equals(success, that.success) &&
                 Objects.equals(errorMessage, that.errorMessage) &&
-                Objects.equals(duration, that.duration);
+                Objects.equals(duration, that.duration) &&
+                Objects.equals(executeResult, that.executeResult);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(executeKey, success, errorMessage, duration);
+        return Objects.hash(executeKey, success, errorMessage, duration, executeResult);
     }
 
     @Override
@@ -76,6 +88,7 @@ public class TaskResultCallbackRequest {
                 ", success=" + success +
                 ", errorMessage='" + errorMessage + '\'' +
                 ", duration=" + duration +
+                ", executeResult=" + executeResult +
                 '}';
     }
 }

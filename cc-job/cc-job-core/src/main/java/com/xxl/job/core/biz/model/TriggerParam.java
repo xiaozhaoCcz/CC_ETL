@@ -3,6 +3,7 @@ package com.xxl.job.core.biz.model;
 import com.xxl.job.core.context.XxlJobContext;
 
 import java.io.Serializable;
+import java.util.List;
 
 /**
  * Created by xuxueli on 16/7/22.
@@ -41,6 +42,16 @@ public class TriggerParam implements Serializable{
     private String address;
     
     private String randomId;
+
+    private List<Integer> jobPauseStatusIds;
+
+    private List<Integer> jobFlowPositionIds;
+    
+    /**
+     * 执行上下文数据（JSON格式）
+     * 用于GLUE脚本访问其他任务的结果数据
+     */
+    private String contextData;
 
     public String getAddress() {
         return address;
@@ -195,6 +206,29 @@ public class TriggerParam implements Serializable{
         this.broadcastTotal = broadcastTotal;
     }
 
+    public List<Integer> getJobPauseStatusIds() {
+        return jobPauseStatusIds;
+    }
+
+    public void setJobPauseStatusIds(List<Integer> jobPauseStatusIds) {
+        this.jobPauseStatusIds = jobPauseStatusIds;
+    }
+
+    public List<Integer> getJobFlowPositionIds() {
+        return jobFlowPositionIds;
+    }
+
+    public void setJobFlowPositionIds(List<Integer> jobFlowPositionIds) {
+        this.jobFlowPositionIds = jobFlowPositionIds;
+    }
+    
+    public String getContextData() {
+        return contextData;
+    }
+    
+    public void setContextData(String contextData) {
+        this.contextData = contextData;
+    }
 
     @Override
     public String toString() {
@@ -213,5 +247,4 @@ public class TriggerParam implements Serializable{
                 ", broadcastTotal=" + broadcastTotal +
                 '}';
     }
-
 }

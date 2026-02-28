@@ -73,10 +73,31 @@ public class JobPartController {
         return new ResponseEntity<>(b, headers, HttpStatus.OK);
     }
 
+    @Operation(summary = "导出任务组数据")
+    @GetMapping("exportTaskGroup/{jobId}")
+    public ResponseEntity<byte[]> exportTaskGroup(@PathVariable Long jobId) {
+        byte[] b = jobPartService.exportTaskGroupData(jobId);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+        headers.setContentDisposition(ContentDisposition.builder("attachment")
+                .filename("taskgroup.cel")
+                .build());
+        return new ResponseEntity<>(b, headers, HttpStatus.OK);
+    }
+
     @Operation(summary = "导入数据")
     @PostMapping("importData")
     public Result<Void> importData(@RequestParam("file") MultipartFile file) {
         jobPartService.importData(file);
+        return Result.success();
+    }
+
+    @Operation(summary = "导入任务组到指定分区")
+    @PostMapping("importTaskGroup")
+    public Result<Void> importTaskGroup(
+            @RequestParam("partitionId") Long partitionId,
+            @RequestParam("file") MultipartFile file) {
+        jobPartService.importTaskGroup(partitionId, file);
         return Result.success();
     }
 }

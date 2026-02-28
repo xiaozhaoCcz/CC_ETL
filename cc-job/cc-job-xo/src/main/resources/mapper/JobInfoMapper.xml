@@ -27,7 +27,10 @@
 		t.child_job_id,
 		t.trigger_status,
 		t.trigger_last_time,
-		t.trigger_next_time
+		t.trigger_next_time,
+		t.increment_type,
+		t.increment_content,
+		t.increment_param_template
     </sql>
 
     <update id="stopJobCompose">
@@ -38,6 +41,9 @@
 		update job_info set pause_status = #{pauseStatus} where id = #{id};
 	</update>
 
+	<update id="updateIncrementContent">
+		update job_info set increment_content = #{incrementContent} where id = #{id};
+	</update>
 
     <select id="scheduleJobQuery" parameterType="java.util.HashMap" resultType="com.cc.job.xo.model.entity.JobInfo">
         SELECT <include refid="Base_Column_List" />

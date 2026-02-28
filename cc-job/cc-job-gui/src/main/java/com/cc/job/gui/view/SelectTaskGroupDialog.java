@@ -230,6 +230,10 @@ public class SelectTaskGroupDialog extends Dialog<SelectTaskGroupDialog.Selectio
     }
     
     private void styleDialog() {
+        String cssUrl = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (cssUrl != null && !cssUrl.isEmpty()) {
+            getDialogPane().getStylesheets().add(cssUrl);
+        }
         getDialogPane().setPrefWidth(560);
         getDialogPane().setPrefHeight(220);
         getDialogPane().setMinWidth(520);

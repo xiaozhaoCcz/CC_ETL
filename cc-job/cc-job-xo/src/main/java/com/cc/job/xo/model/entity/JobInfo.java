@@ -148,6 +148,10 @@ public class JobInfo extends BaseEntity {
      */
     private String incrementContent;
     /**
+     * 自定义增量参数模板，如 -DstartId=%s -DendId=%s，%s 按顺序替换为 increment_content 中的值
+     */
+    private String incrementParamTemplate;
+    /**
      * 最近一次运行耗时（毫秒）
      */
     private Long runTime;
@@ -428,6 +432,14 @@ public class JobInfo extends BaseEntity {
         this.incrementContent = incrementContent;
     }
 
+    public String getIncrementParamTemplate() {
+        return incrementParamTemplate;
+    }
+
+    public void setIncrementParamTemplate(String incrementParamTemplate) {
+        this.incrementParamTemplate = incrementParamTemplate;
+    }
+
     public Long getRunTime() {
         return runTime;
     }
@@ -459,6 +471,7 @@ public class JobInfo extends BaseEntity {
     public void setTriggerUserId(Integer triggerUserId) {
         this.triggerUserId = triggerUserId;
     }
+
 
     @Override
     public boolean equals(Object o) {
@@ -499,6 +512,7 @@ public class JobInfo extends BaseEntity {
                 Objects.equals(jdbcDatasourceId, jobInfo.jdbcDatasourceId) &&
                 Objects.equals(incrementType, jobInfo.incrementType) &&
                 Objects.equals(incrementContent, jobInfo.incrementContent) &&
+                Objects.equals(incrementParamTemplate, jobInfo.incrementParamTemplate) &&
                 Objects.equals(runTime, jobInfo.runTime) &&
                 Objects.equals(pauseStatus, jobInfo.pauseStatus) &&
                 Objects.equals(jobPartId, jobInfo.jobPartId) &&
@@ -507,7 +521,7 @@ public class JobInfo extends BaseEntity {
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), jobGroup, jobDesc, author, alarmEmail, scheduleType, scheduleConf, misfireStrategy, executorRouteStrategy, failStrategy, executorHandler, executorParam, executorBlockStrategy, executorTimeout, executorFailRetryCount, glueType, glueSource, glueRemark, glueUpdateTime, childJobId, triggerStatus, triggerOneStatus, triggerLastTime, triggerNextTime, jobType, parentId, reqType, reqHeader, reqBody, reqUrl, nodeFlag, jdbcDatasourceId, incrementType, incrementContent, runTime, pauseStatus, jobPartId, triggerUserId);
+        return Objects.hash(super.hashCode(), jobGroup, jobDesc, author, alarmEmail, scheduleType, scheduleConf, misfireStrategy, executorRouteStrategy, failStrategy, executorHandler, executorParam, executorBlockStrategy, executorTimeout, executorFailRetryCount, glueType, glueSource, glueRemark, glueUpdateTime, childJobId, triggerStatus, triggerOneStatus, triggerLastTime, triggerNextTime, jobType, parentId, reqType, reqHeader, reqBody, reqUrl, nodeFlag, jdbcDatasourceId, incrementType, incrementContent, incrementParamTemplate, runTime, pauseStatus, jobPartId, triggerUserId);
     }
 
     @Override
@@ -546,6 +560,7 @@ public class JobInfo extends BaseEntity {
                 ", jdbcDatasourceId=" + jdbcDatasourceId +
                 ", incrementType=" + incrementType +
                 ", incrementContent='" + incrementContent + '\'' +
+                ", incrementParamTemplate='" + incrementParamTemplate + '\'' +
                 ", runTime=" + runTime +
                 ", pauseStatus=" + pauseStatus +
                 ", jobPartId=" + jobPartId +

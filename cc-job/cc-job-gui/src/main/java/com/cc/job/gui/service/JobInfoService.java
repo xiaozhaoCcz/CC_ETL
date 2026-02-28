@@ -5,6 +5,7 @@ import com.cc.job.xo.common.result.Result;
 import com.cc.job.xo.common.result.PageResult;
 import com.cc.job.xo.model.dto.JobInfoTriggerDto;
 import com.cc.job.xo.model.entity.JobEdge;
+import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobLogglue;
 import com.cc.job.xo.model.entity.JobNode;
 import com.cc.job.xo.model.form.JobEdgeForm;
@@ -35,10 +36,14 @@ public class JobInfoService extends BaseService {
      * 触发任务执行
      * @param jobId 任务组ID
      * @param executorParam 执行参数（randomId）
+     * @param jobFlowPositionIds 排除阻塞节点的其他节点ID列表（可为null）
+     * @param jobPauseStatusIds 暂停节点ID列表（可为null）
      * @return 执行日志ID
      * @throws IOException 网络异常
      */
-    public Long triggerJob(Long jobId, String executorParam) throws IOException {
+    public Long triggerJob(Long jobId, String executorParam, 
+                          List<Integer> jobFlowPositionIds, 
+                          List<Integer> jobPauseStatusIds) throws IOException {
         // 构建请求参数
         Map<String, Object> requestMap = new HashMap<>();
         requestMap.put("id", jobId);
@@ -53,6 +58,16 @@ public class JobInfoService extends BaseService {
             } catch (NumberFormatException e) {
                 // 忽略解析错误
             }
+        }
+        
+        // 添加排除阻塞节点的其他节点ID列表
+        if (jobFlowPositionIds != null && !jobFlowPositionIds.isEmpty()) {
+            requestMap.put("jobFlowPositionIds", jobFlowPositionIds);
+        }
+        
+        // 添加暂停节点ID列表
+        if (jobPauseStatusIds != null && !jobPauseStatusIds.isEmpty()) {
+            requestMap.put("jobPauseStatusIds", jobPauseStatusIds);
         }
         
         Result<String> result = httpClient.post("/api/v1/jobInfos/trigger", requestMap, String.class);
@@ -96,6 +111,22 @@ public class JobInfoService extends BaseService {
     }
 
     /**
+     * 获取任务列表（不分页）
+     * @param jobType 任务类型，如 2 表示仅任务组，null 表示 0 和 2
+     * @return 任务列表
+     * @throws IOException 网络异常
+     */
+    public List<JobInfo> getJobInfoList(Integer jobType) throws IOException {
+        Map<String, String> params = new HashMap<>();
+        if (jobType != null) {
+            params.put("jobType", String.valueOf(jobType));
+        }
+        TypeToken<List<JobInfo>> typeToken = new TypeToken<List<JobInfo>>() {};
+        Result<List<JobInfo>> result = httpClient.get("/api/v1/jobInfos/list", typeToken, params);
+        return httpClient.extractData(result, "获取任务列表失败");
+    }
+
+    /**
      * 分页查询任务列表
      * @param query 查询参数
      * @return 分页结果
@@ -110,9 +141,28 @@ public class JobInfoService extends BaseService {
         extractors.put("jobDesc", JobInfoQuery::getJobDesc);
         extractors.put("executorHandler", JobInfoQuery::getExecutorHandler);
         extractors.put("author", JobInfoQuery::getAuthor);
+        extractors.put("jobType", JobInfoQuery::getJobType);
         
         Map<String, String> queryParams = HttpClientUtil.buildQueryParams(query, extractors);
         return httpClient.getPage("/api/v1/jobInfos/page", JobInfoVO.class, queryParams);
+    }
+
+    /**
+     * 将已有单任务加入画布（仅创建 JobNode，不创建/修改 JobInfo）
+     * @param jobInfoId 已有任务ID
+     * @param parentId 任务组ID
+     * @param x 节点X坐标
+     * @param y 节点Y坐标
+     * @return 创建的 JobNode，失败时抛出 IOException
+     */
+    public JobNode addExistingJobToCompose(Long jobInfoId, Long parentId, double x, double y) throws IOException {
+        Map<String, Object> body = new HashMap<>();
+        body.put("jobInfoId", jobInfoId);
+        body.put("parentId", parentId);
+        body.put("x", x);
+        body.put("y", y);
+        Result<JobNode> result = httpClient.post("/api/v1/jobInfos/addExistingJobToCompose", body, JobNode.class);
+        return httpClient.extractData(result, "将任务加入画布失败");
     }
 
     /**
@@ -185,8 +235,7 @@ public class JobInfoService extends BaseService {
      */
     public long saveJobInfo(JobInfoForm formData) throws IOException {
         Result<Long> result = httpClient.post("/api/v1/jobInfos", formData, Long.class);
-        Long data = httpClient.extractData(result, "保存任务节点失败");
-        return data;
+        return httpClient.extractData(result, "保存任务节点失败");
     }
 
     /**
@@ -209,6 +258,35 @@ public class JobInfoService extends BaseService {
      */
     public boolean updateJobNode(Long id, JobInfoForm formData) throws IOException {
         return httpClient.putForBoolean("/api/v1/jobInfos/" + id, formData);
+    }
+    
+    /**
+     * 创建条件节点
+     * @param parentTaskGroupId 父任务组ID
+     * @param conditionName 条件节点名称
+     * @param conditionExpression 条件表达式
+     * @param expressionType 表达式类型（SIMPLE/SCRIPT）
+     * @param conditionType 条件类型（IF/WHILE/FOREACH）
+     * @param x 节点X坐标
+     * @param y 节点Y坐标
+     * @return 创建的节点信息（包含jobId和nodeId）
+     * @throws IOException 网络异常
+     */
+    public Map<String, Object> createConditionNode(Long parentTaskGroupId, String conditionName, 
+                                                   String conditionExpression, String expressionType, 
+                                                   String conditionType, double x, double y) throws IOException {
+        Map<String, Object> requestMap = new HashMap<>();
+        requestMap.put("parentTaskGroupId", parentTaskGroupId);
+        requestMap.put("conditionName", conditionName);
+        requestMap.put("conditionExpression", conditionExpression);
+        requestMap.put("expressionType", expressionType);
+        requestMap.put("conditionType", conditionType);
+        requestMap.put("x", x);
+        requestMap.put("y", y);
+        
+        Result<Map<String, Object>> result = httpClient.post("/api/v1/jobInfos/createConditionNode", requestMap, 
+            new TypeToken<Map<String, Object>>(){});
+        return httpClient.extractData(result, "创建条件节点失败");
     }
     
     /**

@@ -9,6 +9,7 @@ import javafx.scene.control.ContentDisplay;
 import javafx.scene.layout.StackPane;
 import org.kordamp.ikonli.javafx.FontIcon;
 import com.cc.job.gui.util.IconUtil;
+import com.cc.job.gui.util.ThemeManager;
 
 /**
  * 折叠后的侧边栏 - 显示图标竖线
@@ -28,11 +29,7 @@ public class CollapsedSidebar extends VBox {
     }
     
     private void initializeUI() {
-        setStyle(
-            "-fx-background-color: #F3F4F6; " +
-            "-fx-border-color: #E5E7EB; " +
-            "-fx-border-width: 0 1 0 0;"
-        );
+        getStyleClass().add("collapsed-sidebar");
         // 设置固定宽度 - 使用min/max来确保宽度不变
         setMinWidth(40);
         setMaxWidth(40);
@@ -71,6 +68,13 @@ public class CollapsedSidebar extends VBox {
         showTreeViewButton(false);
         showMiniMapButton(false);
         showLogPanelButton(false);
+        
+        // 主题切换时重新应用按钮样式，使图标颜色跟随主题
+        ThemeManager.getInstance().addOnThemeChanged(() -> {
+            refreshButtonStyle(treeViewButton, false);
+            refreshButtonStyle(miniMapButton, false);
+            refreshButtonStyle(logPanelButton, false);
+        });
     }
     
     private Button createIconButton(FontIcon icon, String tooltipText) {
@@ -85,43 +89,55 @@ public class CollapsedSidebar extends VBox {
         button.setGraphic(iconWrapper);
         button.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
         button.setAlignment(Pos.CENTER);
-        button.setStyle(
-            "-fx-background-color: #FFFFFF; " +
-            "-fx-padding: 4; " +
-            "-fx-background-radius: 4; " +
-            "-fx-border-color: #E5E7EB; " +
-            "-fx-border-width: 1; " +
-            "-fx-border-radius: 4; " +
-            "-fx-cursor: hand;"
-        );
+        button.getStyleClass().add("sidebar-icon-button");
+        refreshButtonStyle(button, false);
         button.setPrefSize(36, 36);
         button.setMaxSize(36, 36);
         button.setMinSize(36, 36);
-        
+
         Tooltip tooltip = new Tooltip(tooltipText);
         button.setTooltip(tooltip);
         
-        button.setOnMouseEntered(e -> button.setStyle(
-            "-fx-background-color: #EEF2FF; " +
-            "-fx-padding: 4; " +
-            "-fx-background-radius: 4; " +
-            "-fx-border-color: #8B5CF6; " +
-            "-fx-border-width: 2; " +
-            "-fx-border-radius: 4; " +
-            "-fx-cursor: hand;"
-        ));
-        
-        button.setOnMouseExited(e -> button.setStyle(
-            "-fx-background-color: #FFFFFF; " +
-            "-fx-padding: 4; " +
-            "-fx-background-radius: 4; " +
-            "-fx-border-color: #E5E7EB; " +
-            "-fx-border-width: 1; " +
-            "-fx-border-radius: 4; " +
-            "-fx-cursor: hand;"
-        ));
+        button.setOnMouseEntered(e -> refreshButtonStyle(button, true));
+        button.setOnMouseExited(e -> refreshButtonStyle(button, false));
         
         return button;
+    }
+    
+    /**
+     * 根据当前主题和悬停状态刷新按钮及图标样式（主题切换或悬停时调用）。
+     */
+    private void refreshButtonStyle(Button button, boolean hover) {
+        if (button.getGraphic() instanceof StackPane wrapper && !wrapper.getChildren().isEmpty() && wrapper.getChildren().get(0) instanceof FontIcon icon) {
+            boolean dark = "dark".equals(ThemeManager.getInstance().getTheme());
+            applyIconButtonStyle(button, icon, dark, hover);
+        }
+    }
+    
+    private void applyIconButtonStyle(Button button, FontIcon icon, boolean dark, boolean hover) {
+        if (dark) {
+            button.setStyle(
+                "-fx-background-color: " + (hover ? "#505050" : "#3C3C3C") + "; " +
+                "-fx-padding: 4; " +
+                "-fx-background-radius: 4; " +
+                "-fx-border-color: #505050; " +
+                "-fx-border-width: 1; " +
+                "-fx-border-radius: 4; " +
+                "-fx-cursor: hand;"
+            );
+            icon.setStyle("-fx-font-family: 'FeatherIcons';-fx-font-size: 16px;-fx-icon-color: " + (hover ? "#D4D4D4" : "#9D9D9D") + ";");
+        } else {
+            button.setStyle(
+                "-fx-background-color: " + (hover ? "#E5E7EB" : "#FFFFFF") + "; " +
+                "-fx-padding: 4; " +
+                "-fx-background-radius: 4; " +
+                "-fx-border-color: " + (hover ? "#D1D5DB" : "#E5E7EB") + "; " +
+                "-fx-border-width: 1; " +
+                "-fx-border-radius: 4; " +
+                "-fx-cursor: hand;"
+            );
+            icon.setStyle("-fx-font-family: 'FeatherIcons';-fx-font-size: 16px;-fx-icon-color: " + (hover ? "#111827" : "#374151") + ";");
+        }
     }
     
     public void setOnTreeViewRestore(Runnable callback) {

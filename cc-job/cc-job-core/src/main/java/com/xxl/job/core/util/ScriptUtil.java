@@ -53,6 +53,22 @@ public class ScriptUtil {
      * @throws IOException
      */
     public static int execToFile(String command, String scriptFile, String logFile, String... params) throws IOException {
+        return execToFile(command, scriptFile, logFile, null, params);
+    }
+    
+    /**
+     * 脚本执行，日志文件实时输出（支持环境变量）
+     *
+     * @param command 命令
+     * @param scriptFile 脚本文件
+     * @param logFile 日志文件
+     * @param envVars 环境变量（Map<String, String>），可以为null
+     * @param params 脚本参数
+     * @return 退出码
+     * @throws IOException
+     */
+    public static int execToFile(String command, String scriptFile, String logFile, 
+                                 java.util.Map<String, String> envVars, String... params) throws IOException {
 
         FileOutputStream fileOutputStream = null;
         Thread inputThread = null;
@@ -72,8 +88,16 @@ public class ScriptUtil {
             }
             String[] cmdarrayFinal = cmdarray.toArray(new String[cmdarray.size()]);
 
-            // process-exec
-            final Process process = Runtime.getRuntime().exec(cmdarrayFinal);
+            // process-exec (使用ProcessBuilder以支持环境变量)
+            java.lang.ProcessBuilder processBuilder = new java.lang.ProcessBuilder(cmdarrayFinal);
+            
+            // 设置环境变量（如果提供）
+            if (envVars != null && !envVars.isEmpty()) {
+                java.util.Map<String, String> env = processBuilder.environment();
+                env.putAll(envVars);
+            }
+            
+            final Process process = processBuilder.start();
 
             // log-thread
             final FileOutputStream finalFileOutputStream = fileOutputStream;

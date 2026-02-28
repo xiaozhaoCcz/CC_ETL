@@ -69,16 +69,36 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
         if(!jobInfoIds.isEmpty()){
             jobNodeList = jobNodeService.list(new LambdaQueryWrapper<JobNode>().in(JobNode::getJobParentId, jobInfoIds));
             jobEdgeList = jobEdgeService.list(new LambdaQueryWrapper<JobEdge>().in(JobEdge::getJobParentId, jobInfoIds));
-            Map<Long, Long> jobIdToJobNodeIdMap = jobNodeList.stream().collect(Collectors.toMap(JobNode::getJobId, JobNode::getId));
+            // ⭐ 修复：只处理有jobId的节点（普通节点和任务组节点）
+            Map<Long, Long> jobIdToJobNodeIdMap = jobNodeList.stream()
+                .filter(node -> node.getJobId() != null) // 过滤掉条件节点（jobId为null）
+                .collect(Collectors.toMap(JobNode::getJobId, JobNode::getId));
             if(!jobIdToJobNodeIdMap.isEmpty()){
                 List<JobInfo> jobInfoList2 = jobInfoService.listByIds(jobIdToJobNodeIdMap.keySet());
                 Map<Long, String> jobInfoDescMap = jobInfoList2.stream().collect(Collectors.toMap(JobInfo::getId, JobInfo::getJobDesc));
                 jobInfoDescMap.forEach((k, v) -> jobNodeDescMap.put(jobIdToJobNodeIdMap.get(k), v));
             }
+            // ⭐ 修复：处理条件节点，从conditionExpression获取名称
+            for (JobNode jobNode : jobNodeList) {
+                // 判断是否为条件节点：nodeType为ConditionNode且jobId为null
+                if (jobNode.getJobId() == null && 
+                    (jobNode.getNodeType() != null && 
+                     ("ConditionNode".equalsIgnoreCase(jobNode.getNodeType()) || 
+                      "condition-node".equalsIgnoreCase(jobNode.getNodeType())))) {
+                    String conditionName = "条件节点"; // 默认值
+                    if (jobNode.getConditionExpression() != null && !jobNode.getConditionExpression().trim().isEmpty()) {
+                        conditionName = jobNode.getConditionExpression().trim();
+                    }
+                    jobNodeDescMap.put(jobNode.getId(), conditionName);
+                }
+            }
         }
 
         Map<Long, List<JobNode>> jobNodeMap = jobNodeList.stream().collect(Collectors.groupingBy(JobNode::getJobParentId));
         Map<Long, List<JobEdge>> jobEdgeMap = jobEdgeList.stream().collect(Collectors.groupingBy(JobEdge::getJobParentId));
+        // ⭐ 修复：创建nodeId到JobNode的映射，用于边标签构建时查找节点
+        Map<Long, JobNode> nodeIdToJobNodeMap = jobNodeList.stream()
+            .collect(Collectors.toMap(JobNode::getId, node -> node, (existing, replacement) -> existing));
 
         for (JobPart jobPart : jobPartList) {
             JobPartVo jobPartVo = new JobPartVo();
@@ -108,7 +128,8 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
                         for (JobNode jobNode : jobNodes) {
                             JobPartVo jobPartVoNode1 = new JobPartVo();
                             jobPartVoNode1.setId(jobNode.getId());
-                            jobPartVoNode1.setLabel(jobNodeDescMap.get(jobNode.getId()).trim());
+                            // ⭐ 修复：使用辅助方法获取节点描述，统一处理条件节点和普通节点
+                            jobPartVoNode1.setLabel(getNodeDescription(jobNode, jobNodeDescMap));
                             jobPartVoNode1.setType(4);
                             jobPartVoNode1.setExt1(String.valueOf(jobNode.getJobId()));
                             childrenJobPartVo2.add(jobPartVoNode1);
@@ -128,7 +149,12 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
                         for (JobEdge jobEdge : jobEdges) {
                             JobPartVo jobPartVoEdge1 = new JobPartVo();
                             jobPartVoEdge1.setId(jobEdge.getId());
-                            jobPartVoEdge1.setLabel((jobNodeDescMap.get(jobEdge.getFromNodeId()) + "➡" + jobNodeDescMap.get(jobEdge.getEndNodeId())).trim());
+                            // ⭐ 修复：使用辅助方法获取源节点和目标节点的描述，统一处理条件节点和普通节点
+                            JobNode fromNode = nodeIdToJobNodeMap.get(jobEdge.getFromNodeId());
+                            JobNode endNode = nodeIdToJobNodeMap.get(jobEdge.getEndNodeId());
+                            String fromNodeDesc = fromNode != null ? getNodeDescription(fromNode, jobNodeDescMap) : "未知节点";
+                            String endNodeDesc = endNode != null ? getNodeDescription(endNode, jobNodeDescMap) : "未知节点";
+                            jobPartVoEdge1.setLabel(fromNodeDesc + "➡" + endNodeDesc);
                             jobPartVoEdge1.setType(5);
                             childrenJobPartVo3.add(jobPartVoEdge1);
                         }
@@ -146,6 +172,38 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
             jobPartVos.add(jobPartVo);
         }
         return jobPartVos;
+    }
+
+    /**
+     * 获取节点描述（统一处理普通节点和条件节点）
+     * @param jobNode 节点对象
+     * @param jobNodeDescMap 节点描述Map（包含普通节点的描述）
+     * @return 节点描述
+     */
+    private String getNodeDescription(JobNode jobNode, Map<Long, String> jobNodeDescMap) {
+        if (jobNode == null) {
+            return "未知节点";
+        }
+        
+        // 先从Map中查找（普通节点和任务组节点）
+        String description = jobNodeDescMap.get(jobNode.getId());
+        if (description != null && !description.trim().isEmpty()) {
+            return description.trim();
+        }
+        
+        // 如果是条件节点，从conditionExpression获取
+        if (jobNode.getJobId() == null && 
+            (jobNode.getNodeType() != null && 
+             ("ConditionNode".equalsIgnoreCase(jobNode.getNodeType()) || 
+              "condition-node".equalsIgnoreCase(jobNode.getNodeType())))) {
+            if (jobNode.getConditionExpression() != null && !jobNode.getConditionExpression().trim().isEmpty()) {
+                return jobNode.getConditionExpression().trim();
+            }
+            return "条件节点";
+        }
+        
+        // 默认值
+        return "未知节点";
     }
 
     @Override
@@ -350,6 +408,83 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
     }
 
     /**
+     * 导出单个任务组数据（.cel 格式）
+     * 复用 PartitionExportData，partition 为 null，taskGroups 仅含一个任务组
+     */
+    @Override
+    public byte[] exportTaskGroupData(Long jobId) {
+        JobInfo taskGroup = jobInfoService.getById(jobId);
+        if (taskGroup == null) {
+            throw new RuntimeException("任务组不存在: " + jobId);
+        }
+        if (taskGroup.getJobType() == null || taskGroup.getJobType() != 2
+                || !"N".equals(taskGroup.getNodeFlag())) {
+            throw new RuntimeException("ID 不是任务组: " + jobId);
+        }
+
+        PartitionExportData.TaskGroupInfo taskGroupInfo = new PartitionExportData.TaskGroupInfo();
+        taskGroupInfo.setTaskGroupData(convertToTaskInfoData(taskGroup));
+
+        List<JobNode> jobNodeList = jobNodeService.list(
+            new LambdaQueryWrapper<JobNode>().eq(JobNode::getJobParentId, taskGroup.getId()));
+        List<PartitionExportData.NodeInfo> nodeInfoList = new ArrayList<>();
+        for (JobNode jobNode : jobNodeList) {
+            PartitionExportData.NodeInfo nodeInfo = new PartitionExportData.NodeInfo();
+            nodeInfo.setNodeId(jobNode.getId());
+            nodeInfo.setJobId(jobNode.getJobId());
+            nodeInfo.setJobParentId(jobNode.getJobParentId());
+            nodeInfo.setNodePositionX(jobNode.getNodePositionX());
+            nodeInfo.setNodePositionY(jobNode.getNodePositionY());
+            nodeInfo.setNodeInDegree(jobNode.getNodeInDegree());
+            nodeInfo.setNodeOutDegree(jobNode.getNodeOutDegree());
+            nodeInfo.setSort(jobNode.getSort());
+            nodeInfo.setChildren(jobNode.getChildren());
+            nodeInfo.setProperties(jobNode.getProperties());
+            nodeInfo.setNodeType(jobNode.getNodeType());
+            nodeInfo.setTriggerStatus(jobNode.getTriggerStatus());
+            JobInfo nodeJobInfo = jobInfoService.getById(jobNode.getJobId());
+            if (nodeJobInfo != null) {
+                nodeInfo.setTaskInfo(convertToTaskInfoData(nodeJobInfo));
+            }
+            nodeInfoList.add(nodeInfo);
+        }
+        taskGroupInfo.setNodes(nodeInfoList);
+
+        List<JobEdge> jobEdgeList = jobEdgeService.list(
+            new LambdaQueryWrapper<JobEdge>().eq(JobEdge::getJobParentId, taskGroup.getId()));
+        List<PartitionExportData.EdgeInfo> edgeInfoList = new ArrayList<>();
+        for (JobEdge jobEdge : jobEdgeList) {
+            PartitionExportData.EdgeInfo edgeInfo = new PartitionExportData.EdgeInfo();
+            edgeInfo.setId(jobEdge.getId());
+            edgeInfo.setJobParentId(jobEdge.getJobParentId());
+            edgeInfo.setFromNodeId(jobEdge.getFromNodeId());
+            edgeInfo.setEndNodeId(jobEdge.getEndNodeId());
+            edgeInfo.setPointsList(jobEdge.getPointsList());
+            edgeInfo.setProperties(jobEdge.getProperties());
+            edgeInfo.setStartPoint(jobEdge.getStartPoint());
+            edgeInfo.setEndPoint(jobEdge.getEndPoint());
+            edgeInfoList.add(edgeInfo);
+        }
+        taskGroupInfo.setEdges(edgeInfoList);
+
+        PartitionExportData exportData = new PartitionExportData();
+        exportData.setPartition(null);
+        exportData.setTaskGroups(Collections.singletonList(taskGroupInfo));
+
+        Gson gson = new Gson();
+        String json = gson.toJson(exportData);
+        SecretKeySpec keySpec = new SecretKeySpec(SECRET_KEY.getBytes(), ALGORITHM);
+        try {
+            Cipher cipher = Cipher.getInstance(ALGORITHM);
+            cipher.init(Cipher.ENCRYPT_MODE, keySpec);
+            return cipher.doFinal(json.getBytes());
+        } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException
+                | IllegalBlockSizeException | BadPaddingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
      * 将JobInfo转换为TaskInfoData
      */
     private PartitionExportData.TaskInfoData convertToTaskInfoData(JobInfo jobInfo) {
@@ -386,6 +521,7 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
         taskInfoData.setJdbcDatasourceId(jobInfo.getJdbcDatasourceId());
         taskInfoData.setIncrementType(jobInfo.getIncrementType());
         taskInfoData.setIncrementContent(jobInfo.getIncrementContent());
+        taskInfoData.setIncrementParamTemplate(jobInfo.getIncrementParamTemplate());
         taskInfoData.setRunTime(jobInfo.getRunTime());
         taskInfoData.setPauseStatus(jobInfo.getPauseStatus());
         taskInfoData.setJobPartId(jobInfo.getJobPartId());
@@ -528,6 +664,115 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
     }
 
     /**
+     * 导入任务组到指定分区（.cel 格式：单任务组，partition 可为 null）
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void importTaskGroup(Long partitionId, MultipartFile file) {
+        if (partitionId == null) {
+            throw new RuntimeException("分区ID不能为空");
+        }
+        JobPart partition = this.getById(partitionId);
+        if (partition == null) {
+            throw new RuntimeException("分区不存在: " + partitionId);
+        }
+
+        Cipher cipher;
+        SecretKeySpec keySpec = new SecretKeySpec(SECRET_KEY.getBytes(), "AES");
+        byte[] decryptedBytes;
+        String json;
+        try {
+            cipher = Cipher.getInstance(ALGORITHM);
+            cipher.init(Cipher.DECRYPT_MODE, keySpec);
+            decryptedBytes = cipher.doFinal(file.getBytes());
+            json = new String(decryptedBytes, "UTF-8");
+        } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | IllegalBlockSizeException |
+                 BadPaddingException | IOException e) {
+            throw new RuntimeException("解密文件失败", e);
+        }
+
+        Gson gson = new Gson();
+        PartitionExportData exportData = gson.fromJson(json, PartitionExportData.class);
+        if (exportData == null || exportData.getTaskGroups() == null || exportData.getTaskGroups().isEmpty()) {
+            throw new RuntimeException("导入数据格式错误：需要至少一个任务组");
+        }
+
+        Map<Long, Long> oldToNewJobInfoIdMap = new HashMap<>();
+        Map<Long, Long> oldToNewNodeIdMap = new HashMap<>();
+        Map<Long, Long> oldToNewEdgeIdMap = new HashMap<>();
+        Long newPartitionId = partitionId;
+
+        for (PartitionExportData.TaskGroupInfo taskGroupInfo : exportData.getTaskGroups()) {
+            JobInfo newTaskGroup = convertToJobInfo(taskGroupInfo.getTaskGroupData());
+            newTaskGroup.setId(null);
+            newTaskGroup.setJobPartId(newPartitionId.intValue());
+            newTaskGroup.setJobType(2);
+            newTaskGroup.setNodeFlag("N");
+            newTaskGroup.setTriggerStatus(0);
+            jobInfoService.save(newTaskGroup);
+
+            Long newTaskGroupId = newTaskGroup.getId();
+            if (newTaskGroupId == null) {
+                throw new RuntimeException("创建任务组失败：未生成ID");
+            }
+            newTaskGroup.setExecutorParam(String.valueOf(newTaskGroupId));
+            jobInfoService.updateById(newTaskGroup);
+
+            Long oldTaskGroupId = taskGroupInfo.getTaskGroupData().getId();
+            oldToNewJobInfoIdMap.put(oldTaskGroupId, newTaskGroupId);
+
+            if (taskGroupInfo.getNodes() != null) {
+                for (PartitionExportData.NodeInfo nodeInfo : taskGroupInfo.getNodes()) {
+                    JobInfo newNodeJobInfo = convertToJobInfo(nodeInfo.getTaskInfo());
+                    newNodeJobInfo.setId(null);
+                    newNodeJobInfo.setParentId(newTaskGroupId);
+                    newNodeJobInfo.setTriggerStatus(0);
+                    jobInfoService.save(newNodeJobInfo);
+
+                    Long newJobInfoId = newNodeJobInfo.getId();
+                    Long oldJobInfoId = nodeInfo.getTaskInfo().getId();
+                    oldToNewJobInfoIdMap.put(oldJobInfoId, newJobInfoId);
+
+                    JobNode newJobNode = new JobNode();
+                    newJobNode.setJobId(newJobInfoId);
+                    newJobNode.setJobParentId(newTaskGroupId);
+                    newJobNode.setNodePositionX(nodeInfo.getNodePositionX());
+                    newJobNode.setNodePositionY(nodeInfo.getNodePositionY());
+                    newJobNode.setNodeInDegree(nodeInfo.getNodeInDegree());
+                    newJobNode.setNodeOutDegree(nodeInfo.getNodeOutDegree());
+                    newJobNode.setSort(nodeInfo.getSort());
+                    newJobNode.setChildren(nodeInfo.getChildren());
+                    newJobNode.setProperties(nodeInfo.getProperties());
+                    newJobNode.setNodeType(nodeInfo.getNodeType());
+                    newJobNode.setTriggerStatus(nodeInfo.getTriggerStatus());
+                    jobNodeService.save(newJobNode);
+
+                    oldToNewNodeIdMap.put(nodeInfo.getNodeId(), newJobNode.getId());
+                }
+            }
+
+            if (taskGroupInfo.getEdges() != null) {
+                for (PartitionExportData.EdgeInfo edgeInfo : taskGroupInfo.getEdges()) {
+                    Long newFromNodeId = oldToNewNodeIdMap.get(edgeInfo.getFromNodeId());
+                    Long newEndNodeId = oldToNewNodeIdMap.get(edgeInfo.getEndNodeId());
+                    if (newFromNodeId != null && newEndNodeId != null) {
+                        JobEdge newJobEdge = new JobEdge();
+                        newJobEdge.setJobParentId(newTaskGroupId);
+                        newJobEdge.setFromNodeId(newFromNodeId);
+                        newJobEdge.setEndNodeId(newEndNodeId);
+                        newJobEdge.setPointsList(edgeInfo.getPointsList());
+                        newJobEdge.setProperties(edgeInfo.getProperties());
+                        newJobEdge.setStartPoint(edgeInfo.getStartPoint());
+                        newJobEdge.setEndPoint(edgeInfo.getEndPoint());
+                        jobEdgeService.save(newJobEdge);
+                        oldToNewEdgeIdMap.put(edgeInfo.getId(), newJobEdge.getId());
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * 将TaskInfoData转换为JobInfo
      */
     private JobInfo convertToJobInfo(PartitionExportData.TaskInfoData taskInfoData) {
@@ -562,6 +807,7 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
         jobInfo.setJdbcDatasourceId(taskInfoData.getJdbcDatasourceId());
         jobInfo.setIncrementType(taskInfoData.getIncrementType());
         jobInfo.setIncrementContent(taskInfoData.getIncrementContent());
+        jobInfo.setIncrementParamTemplate(taskInfoData.getIncrementParamTemplate());
         jobInfo.setRunTime(taskInfoData.getRunTime());
         jobInfo.setPauseStatus(taskInfoData.getPauseStatus());
         jobInfo.setJobPartId(taskInfoData.getJobPartId());

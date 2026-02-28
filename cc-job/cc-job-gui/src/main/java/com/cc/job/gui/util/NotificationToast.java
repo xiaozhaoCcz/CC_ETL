@@ -62,6 +62,8 @@ public class NotificationToast {
     public static void show(String message, NotificationType type, long duration) {
         Platform.runLater(() -> {
             try {
+                boolean dark = "dark".equals(ThemeManager.getInstance().getTheme());
+
                 // 创建Stage
                 Stage stage = new Stage();
                 stage.initStyle(StageStyle.UNDECORATED);
@@ -118,6 +120,9 @@ public class NotificationToast {
                 rootPane.setPrefWidth(WIDTH);
                 rootPane.setMinWidth(WIDTH);
                 rootPane.setMaxWidth(WIDTH);
+                if (dark) {
+                    rootPane.setStyle("-fx-background-color: #2D2D30; -fx-background-radius: " + CORNER_RADIUS + ";");
+                }
 
                 
                 // 第四层：内容容器（透明背景，不设置圆角）
@@ -155,19 +160,23 @@ public class NotificationToast {
                 );
                 iconContainer.getChildren().add(iconLabel);
                 
+                String titleColor = dark ? "#D4D4D4" : StyleUtil.GRAY_900;
                 // 标题
                 Label titleLabel = new Label(titleText);
                 titleLabel.setStyle(
                     "-fx-font-size: 18; " +
-                    "-fx-text-fill: " + StyleUtil.GRAY_900 + "; " +
+                    "-fx-text-fill: " + titleColor + "; " +
                     "-fx-font-weight: bold;"
                 );
                 
+                String closeColor = dark ? "#9D9D9D" : StyleUtil.GRAY_400;
+                String closeHoverColor = dark ? "#D4D4D4" : StyleUtil.GRAY_600;
+                String closeHoverBg = dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)";
                 // 关闭按钮
                 Button closeButton = new Button("×");
                 closeButton.setStyle(
                     "-fx-background-color: transparent; " +
-                    "-fx-text-fill: " + StyleUtil.GRAY_400 + "; " +
+                    "-fx-text-fill: " + closeColor + "; " +
                     "-fx-font-size: 24; " +
                     "-fx-font-weight: normal; " +
                     "-fx-padding: 0; " +
@@ -179,8 +188,8 @@ public class NotificationToast {
                 );
                 closeButton.setOnMouseEntered(e -> {
                     closeButton.setStyle(
-                        "-fx-background-color: rgba(0,0,0,0.08); " +
-                        "-fx-text-fill: " + StyleUtil.GRAY_600 + "; " +
+                        "-fx-background-color: " + closeHoverBg + "; " +
+                        "-fx-text-fill: " + closeHoverColor + "; " +
                         "-fx-font-size: 24; " +
                         "-fx-font-weight: normal; " +
                         "-fx-padding: 0; " +
@@ -195,7 +204,7 @@ public class NotificationToast {
                 closeButton.setOnMouseExited(e -> {
                     closeButton.setStyle(
                         "-fx-background-color: transparent; " +
-                        "-fx-text-fill: " + StyleUtil.GRAY_400 + "; " +
+                        "-fx-text-fill: " + closeColor + "; " +
                         "-fx-font-size: 24; " +
                         "-fx-font-weight: normal; " +
                         "-fx-padding: 0; " +
@@ -218,12 +227,13 @@ public class NotificationToast {
                 contentBox.setAlignment(Pos.TOP_LEFT);
                 contentBox.setStyle("-fx-background-color: transparent;");
                 
+                String messageColor = dark ? "#D4D4D4" : StyleUtil.GRAY_700;
                 // 消息文本
                 Label messageLabel = new Label(message);
                 messageLabel.setWrapText(true);
                 messageLabel.setStyle(
                     "-fx-font-size: 15; " +
-                    "-fx-text-fill: " + StyleUtil.GRAY_700 + "; " +
+                    "-fx-text-fill: " + messageColor + "; " +
                     "-fx-font-weight: normal; " +
                     "-fx-line-spacing: 4;"
                 );
@@ -237,15 +247,19 @@ public class NotificationToast {
                 
                 // 添加阴影效果
                 DropShadow shadow = new DropShadow();
-                shadow.setColor(Color.color(0, 0, 0, 0.25));
+                shadow.setColor(Color.color(0, 0, 0, dark ? 0.5 : 0.25));
                 shadow.setRadius(20);
                 shadow.setOffsetX(0);
                 shadow.setOffsetY(8);
                 rootPane.setEffect(shadow);
-                
+
                 // 创建场景
                 Scene scene = new Scene(rootPane);
                 scene.setFill(Color.TRANSPARENT);
+                String stylesheetUrl = ThemeManager.getInstance().getStylesheetUrl();
+                if (stylesheetUrl != null && !stylesheetUrl.isEmpty()) {
+                    scene.getStylesheets().add(stylesheetUrl);
+                }
                 stage.setScene(scene);
                 
                 // 淡入和缩放动画

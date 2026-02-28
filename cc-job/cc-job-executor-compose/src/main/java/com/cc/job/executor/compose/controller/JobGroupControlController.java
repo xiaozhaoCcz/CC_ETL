@@ -1,6 +1,5 @@
 package com.cc.job.executor.compose.controller;
 
-import cn.hutool.core.lang.Pair;
 import com.cc.job.executor.compose.handler.JobGroupExecutorComplete;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

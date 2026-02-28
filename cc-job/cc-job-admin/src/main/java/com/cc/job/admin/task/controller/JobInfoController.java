@@ -229,8 +229,10 @@ public class JobInfoController {
         return Result.success(result);
     }
 
+    //废弃功能
     @Operation(summary = "暂停任务")
     @GetMapping("pauseJob/{id}")
+    @Deprecated
     public Result<Void>  pauseJob(@PathVariable Long id,Integer pauseStatus){
         boolean result = jobInfoService.pauseJob(id,pauseStatus);
         return Result.judge(result);
@@ -257,6 +259,36 @@ public class JobInfoController {
         return Result.success(jobEdge);
     }
 
+    @Operation(summary = "将已有单任务加入画布")
+    @PostMapping("addExistingJobToCompose")
+    public Result<JobNode> addExistingJobToCompose(@RequestBody Map<String, Object> formMap) {
+        Long jobInfoId = formMap.get("jobInfoId") != null ? Long.parseLong(String.valueOf(formMap.get("jobInfoId"))) : null;
+        Long parentId = formMap.get("parentId") != null ? Long.parseLong(String.valueOf(formMap.get("parentId"))) : null;
+        Double x = formMap.get("x") != null ? Double.parseDouble(String.valueOf(formMap.get("x"))) : 0.0;
+        Double y = formMap.get("y") != null ? Double.parseDouble(String.valueOf(formMap.get("y"))) : 0.0;
+        if (jobInfoId == null || parentId == null) {
+            return Result.failed("jobInfoId 和 parentId 不能为空");
+        }
+        JobNode jobNode = jobComposeService.addExistingJobToCompose(jobInfoId, parentId, x, y);
+        return Result.success(jobNode);
+    }
+
+    @Operation(summary = "创建条件节点")
+    @PostMapping("createConditionNode")
+    public Result<Map<String, Object>> createConditionNode(@RequestBody Map<String, Object> formMap) {
+        Long parentTaskGroupId = Long.parseLong(String.valueOf(formMap.get("parentTaskGroupId")));
+        String conditionName = String.valueOf(formMap.get("conditionName"));
+        String conditionExpression = formMap.get("conditionExpression") != null ? String.valueOf(formMap.get("conditionExpression")) : null;
+        String expressionType = formMap.get("expressionType") != null ? String.valueOf(formMap.get("expressionType")) : null;
+        String conditionType = formMap.get("conditionType") != null ? String.valueOf(formMap.get("conditionType")) : "IF";
+        double x = formMap.get("x") != null ? Double.parseDouble(String.valueOf(formMap.get("x"))) : 0.0;
+        double y = formMap.get("y") != null ? Double.parseDouble(String.valueOf(formMap.get("y"))) : 0.0;
+        
+        Map<String, Object> result = jobComposeService.createConditionNode(
+            parentTaskGroupId, conditionName, conditionExpression, expressionType, conditionType, x, y);
+        return Result.success(result);
+    }
+
     @Operation(summary = "任务运行状态")
     @GetMapping("getJobStatus/{id}")
     public Result<Boolean> getJobStatus(@Parameter(description = "任务ID") @PathVariable("id") Long id){
@@ -265,19 +297,21 @@ public class JobInfoController {
             return Result.success(false);
         }
         
-        // 对于任务组（jobType == 2），需要检查执行器中的实际运行状态
-        // 因为定时任务和手动启动可能使用不同的randomId，可以并行运行
+        // 对于任务组（jobType == 2），以执行器为准：先查执行器，再决定是否自愈 DB
         if (jobInfo.getJobType() == 2) {
-            // 检查执行器中是否有该任务组正在运行
             boolean isRunningInExecutor = jobInfoService.checkJobGroupRunningInExecutor(id);
-            // 如果执行器中有运行中的任务，返回true
             if (isRunningInExecutor) {
                 return Result.success(true);
             }
+            // 执行器上已无该任务组：视为未运行，并自愈 DB（避免异常退出后 trigger_one_status 一直为 1）
+            if (jobInfo.getTriggerOneStatus() != null && jobInfo.getTriggerOneStatus() > 0) {
+                jobInfoService.resetTriggerOneStatus(id);
+            }
+            return Result.success(false);
         }
         
-        // 对于普通任务或执行器中没有运行的任务组，检查数据库状态
-        return Result.success(jobInfo.getTriggerOneStatus() > 0);
+        // 普通任务：以数据库状态为准
+        return Result.success(jobInfo.getTriggerOneStatus() != null && jobInfo.getTriggerOneStatus() > 0);
     }
 
     @Operation(summary = "修改任务节点")

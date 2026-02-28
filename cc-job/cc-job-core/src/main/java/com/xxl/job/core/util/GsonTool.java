@@ -6,6 +6,7 @@ import com.google.gson.reflect.TypeToken;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -15,7 +16,14 @@ public class GsonTool {
 
     private static Gson gson = null;
     static {
-            gson= new GsonBuilder().setDateFormat("yyyy-MM-dd HH:mm:ss").create();
+            GsonBuilder builder = new GsonBuilder().setDateFormat("yyyy-MM-dd HH:mm:ss");
+            // 注册 LocalDateTime 适配器，解决 Java 9+ 模块系统限制
+            try {
+                builder.registerTypeAdapter(LocalDateTime.class, new LocalDateTimeAdapter());
+            } catch (Exception e) {
+                // 如果 LocalDateTime 类不存在（Java 8 以下），忽略错误
+            }
+            gson = builder.create();
     }
 
     /**

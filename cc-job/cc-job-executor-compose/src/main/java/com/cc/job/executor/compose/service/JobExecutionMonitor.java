@@ -1,5 +1,8 @@
 package com.cc.job.executor.compose.service;
 
+import com.cc.job.executor.compose.core.model.ExecutionContext;
+import com.cc.job.executor.compose.core.service.ResultStorageService;
+import com.cc.job.executor.compose.core.service.TaskWrapperFactory;
 import com.cc.job.executor.compose.infrastructure.constant.ExecutorConstants;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobNode;
@@ -23,23 +26,30 @@ public class JobExecutionMonitor implements Callable<String> {
     
     private final JobInfo jobInfo;
     private final JobNode node;
-    private final String randomId;
+    private final ExecutionContext context;
     private final Map<String, Boolean> jobResultMap;
     private final int retryCount;
     private final String executeKey;
     private final CountDownLatch latch;
+    private final ResultStorageService resultStorageService;
     
     private volatile boolean stop = false;
     
-    public JobExecutionMonitor(JobInfo jobInfo, JobNode node, String randomId,
+    public JobExecutionMonitor(JobInfo jobInfo, JobNode node, ExecutionContext context,
                               Map<String, Boolean> jobResultMap, int retryCount) {
+        this(jobInfo, node, context, jobResultMap, retryCount, null);
+    }
+    
+    public JobExecutionMonitor(JobInfo jobInfo, JobNode node, ExecutionContext context,
+                              Map<String, Boolean> jobResultMap, int retryCount, ResultStorageService resultStorageService) {
         this.jobInfo = jobInfo;
         this.node = node;
-        this.randomId = randomId;
+        this.context = context;
         this.jobResultMap = jobResultMap;
         this.retryCount = retryCount;
-        this.executeKey = buildExecuteKey(jobInfo.getId(), randomId);
+        this.executeKey = buildExecuteKey(jobInfo.getId(), context.getExecutionBatchId());
         this.latch = new CountDownLatch(1);
+        this.resultStorageService = resultStorageService;
     }
     
     public String getExecuteKey() {
@@ -61,24 +71,79 @@ public class JobExecutionMonitor implements Callable<String> {
     @Override
     public String call() {
         logger.debug("[JobMonitor] 开始监听任务 - jobId: {}, randomId: {}, executeKey: {}", 
-                jobInfo.getId(), randomId, executeKey);
+                jobInfo.getId(), context.getExecutionBatchId(), executeKey);
         
         try {
-            latch.await();
+            // 计算超时时间：任务超时时间 + 缓冲时间（30秒用于回调）
+            long timeoutSeconds = jobInfo.getExecutorTimeout() > 0 
+                    ? jobInfo.getExecutorTimeout() + 30 
+                    : 300; // 默认5分钟
+            
+            boolean awaitResult = latch.await(timeoutSeconds, java.util.concurrent.TimeUnit.SECONDS);
             
             if (stop) {
                 logger.debug("[JobMonitor] 监听被停止 - jobId: {}", jobInfo.getId());
                 return ExecutorConstants.ExecutionResult.SUCCESS;
             }
             
+            // 如果等待超时，检查任务是否真的还在执行
+            if (!awaitResult) {
+                logger.warn("[JobMonitor] 等待任务回调超时 - jobId: {}, executeKey: {}, 超时时间: {}秒", 
+                        jobInfo.getId(), executeKey, timeoutSeconds);
+                
+                // 检查任务是否已经完成但回调失败
+                Boolean success = jobResultMap.get(executeKey);
+                if (success == null) {
+                    // 任务结果不存在，可能是回调失败，标记为失败
+                    logger.error("[JobMonitor] 任务回调超时且结果不存在，可能回调失败 - jobId: {}, executeKey: {}", 
+                            jobInfo.getId(), executeKey);
+                    // 标记为失败，避免任务组一直运行
+                    jobResultMap.put(executeKey, false);
+                    return handleJobCompletion(false, retryCount);
+                }
+            }
+            
             Boolean success = jobResultMap.get(executeKey);
             if (success != null) {
                 logger.info("[JobMonitor] 任务执行完成 - jobId: {}, 成功: {}", jobInfo.getId(), success);
                 jobResultMap.remove(executeKey);
+                // 获取任务执行结果
+                Object executeResult = TaskWrapperFactory.getJobExecuteResult(executeKey);
+                Object executeResult1 = context.getXxlJobContext().getExecuteResult();
+                
+                // 优先使用 executeResult，如果没有则使用 executeResult1
+                Object finalResult = executeResult != null ? executeResult : executeResult1;
+                
+                if (finalResult != null) {
+                    logger.info("[JobMonitor] 任务执行结果 - jobId: {}, 任务名称: {}, 执行结果: {}", 
+                            jobInfo.getId(), jobInfo.getJobDesc(), finalResult);
+                    
+                    // 存储结果到数据上下文（如果任务执行成功）
+                    if (success && resultStorageService != null && context.getDataContext() != null) {
+                        try {
+                            resultStorageService.storeResult(context, jobInfo, finalResult);
+                            logger.debug("[JobMonitor] 任务结果已存储到数据上下文 - jobId: {}", jobInfo.getId());
+                        } catch (Exception e) {
+                            logger.error("[JobMonitor] 存储任务结果到数据上下文失败 - jobId: {}", jobInfo.getId(), e);
+                            // 不抛出异常，避免影响任务完成流程
+                        }
+                    }
+                    
+                    // 清理执行结果
+                    if (executeResult != null) {
+                        TaskWrapperFactory.removeJobExecuteResult(executeKey);
+                    }
+                } else {
+                    logger.debug("[JobMonitor] 任务执行结果为空 - jobId: {}, executeKey: {}", 
+                            jobInfo.getId(), executeKey);
+                }
                 return handleJobCompletion(success, retryCount);
             } else {
                 logger.warn("[JobMonitor] 任务结果不存在 - jobId: {}, executeKey: {}", jobInfo.getId(), executeKey);
-                return ExecutorConstants.ExecutionResult.SUCCESS;
+                // 如果结果不存在，可能是回调失败，标记为失败
+                logger.error("[JobMonitor] 任务结果不存在，可能回调失败，标记为失败 - jobId: {}, executeKey: {}", 
+                        jobInfo.getId(), executeKey);
+                return handleJobCompletion(false, retryCount);
             }
             
         } catch (InterruptedException e) {

@@ -1,5 +1,9 @@
 package com.xxl.job.core.context;
 
+import com.xxl.job.core.biz.model.TriggerParam;
+
+import java.util.List;
+
 /**
  * xxl-job context
  *
@@ -22,7 +26,7 @@ public class XxlJobContext {
     /**
      * job param
      */
-    private final String jobParam;
+    private String jobParam;
 
     // ---------------------- for log ----------------------
 
@@ -61,6 +65,13 @@ public class XxlJobContext {
     private String handleMsg;
 
 
+    private List<Integer> jobFlowPositionIds;
+
+    private Object executeResult;
+
+    private TriggerParam triggerParam;
+
+
     public XxlJobContext(long jobId, String jobParam, String jobLogFileName, int shardIndex, int shardTotal) {
         this.jobId = jobId;
         this.jobParam = jobParam;
@@ -69,6 +80,18 @@ public class XxlJobContext {
         this.shardTotal = shardTotal;
 
         this.handleCode = HANDLE_CODE_SUCCESS;  // default success
+    }
+
+    public XxlJobContext(long jobId, String jobParam, String jobLogFileName, int shardIndex, int shardTotal,List<Integer> jobFlowPositionIds) {
+        this.jobId = jobId;
+        this.jobParam = jobParam;
+        this.jobLogFileName = jobLogFileName;
+        this.shardIndex = shardIndex;
+        this.shardTotal = shardTotal;
+
+        this.handleCode = HANDLE_CODE_SUCCESS;  // default success
+
+        this.jobFlowPositionIds = jobFlowPositionIds;
     }
 
     public long getJobId() {
@@ -81,6 +104,10 @@ public class XxlJobContext {
 
     public String getJobParam() {
         return jobParam;
+    }
+
+    public void setJobParam(String jobParam){
+        this.jobParam = jobParam;
     }
 
     public String getJobLogFileName() {
@@ -111,6 +138,30 @@ public class XxlJobContext {
         return handleMsg;
     }
 
+
+    public List<Integer> getJobFlowPositionIds() {
+        return jobFlowPositionIds;
+    }
+
+    public void setJobFlowPositionIds(List<Integer> jobFlowPositionIds) {
+        this.jobFlowPositionIds = jobFlowPositionIds;
+    }
+    public void setExecuteResult(Object executeResult) {
+        this.executeResult = executeResult;
+    }
+
+    public Object getExecuteResult() {
+        return executeResult;
+    }
+
+    public TriggerParam getTriggerParam() {
+        return triggerParam;
+    }
+
+    public void setTriggerParam(TriggerParam triggerParam) {
+        this.triggerParam = triggerParam;
+    }
+
     // ---------------------- tool ----------------------
 
     private static InheritableThreadLocal<XxlJobContext> contextHolder = new InheritableThreadLocal<XxlJobContext>(); // support for child thread of job handler)
@@ -122,5 +173,4 @@ public class XxlJobContext {
     public static XxlJobContext getXxlJobContext(){
         return contextHolder.get();
     }
-
 }

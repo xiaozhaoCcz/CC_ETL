@@ -15,11 +15,17 @@ public class CSharpGlueJobHandler extends IJobHandler {
     private int jobId;
     private long glueUpdatetime;
     private String gluesource;
+    private String contextData;  // 执行上下文数据（JSON格式）
 
     public CSharpGlueJobHandler(int jobId, long glueUpdatetime, String gluesource) {
+        this(jobId, glueUpdatetime, gluesource, null);
+    }
+    
+    public CSharpGlueJobHandler(int jobId, long glueUpdatetime, String gluesource, String contextData) {
         this.jobId = jobId;
         this.glueUpdatetime = glueUpdatetime;
         this.gluesource = gluesource;
+        this.contextData = contextData;
     }
 
     public long getGlueUpdatetime() {
@@ -29,7 +35,7 @@ public class CSharpGlueJobHandler extends IJobHandler {
     @Override
     public void execute() throws Exception {
         XxlJobHelper.log("----------- C# glue.version:" + glueUpdatetime + " -----------");
-        CSharpGlueFactory.executeCSharpGlue(gluesource, jobId, glueUpdatetime);
+        CSharpGlueFactory.executeCSharpGlue(gluesource, jobId, glueUpdatetime, contextData);
     }
 
     @Override

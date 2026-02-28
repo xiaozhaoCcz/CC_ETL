@@ -1,12 +1,13 @@
 package com.cc.job.executor.compose.core.model;
 
+import com.cc.job.executor.compose.core.context.DataContext;
 import com.cc.job.xo.model.entity.JobEdge;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobNode;
 import com.xxl.job.core.context.XxlJobContext;
 
 import java.util.List;
-import java.util.Objects;
+import java.util.Map;
 
 /**
  * 任务组执行上下文
@@ -38,10 +39,17 @@ public class ExecutionContext {
     /** 执行键 */
     private String executeKey;
 
+    
+    /** 数据上下文 */
+    private DataContext dataContext;
+    
+    /** jobName 到 jobId 的映射（用于参数解析） */
+    private Map<String, Long> jobNameMap;
+
     public ExecutionContext() {
     }
 
-    public ExecutionContext(Long taskGroupId, String executionBatchId, JobInfo taskGroupInfo, List<JobNode> nodes, List<JobEdge> edges, XxlJobContext xxlJobContext, String executeKey) {
+    public ExecutionContext(Long taskGroupId, String executionBatchId, JobInfo taskGroupInfo, List<JobNode> nodes, List<JobEdge> edges, XxlJobContext xxlJobContext, String executeKey,List<Integer> jobPauseStatusIds) {
         this.taskGroupId = taskGroupId;
         this.executionBatchId = executionBatchId;
         this.taskGroupInfo = taskGroupInfo;
@@ -49,6 +57,18 @@ public class ExecutionContext {
         this.edges = edges;
         this.xxlJobContext = xxlJobContext;
         this.executeKey = executeKey;
+    }
+    
+    public ExecutionContext(Long taskGroupId, String executionBatchId, JobInfo taskGroupInfo, List<JobNode> nodes, List<JobEdge> edges, XxlJobContext xxlJobContext, String executeKey, DataContext dataContext, Map<String, Long> jobNameMap) {
+        this.taskGroupId = taskGroupId;
+        this.executionBatchId = executionBatchId;
+        this.taskGroupInfo = taskGroupInfo;
+        this.nodes = nodes;
+        this.edges = edges;
+        this.xxlJobContext = xxlJobContext;
+        this.executeKey = executeKey;
+        this.dataContext = dataContext;
+        this.jobNameMap = jobNameMap;
     }
 
     public static ExecutionContextBuilder builder() {
@@ -111,37 +131,22 @@ public class ExecutionContext {
         this.executeKey = executeKey;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        ExecutionContext that = (ExecutionContext) o;
-        return Objects.equals(taskGroupId, that.taskGroupId) &&
-                Objects.equals(executionBatchId, that.executionBatchId) &&
-                Objects.equals(taskGroupInfo, that.taskGroupInfo) &&
-                Objects.equals(nodes, that.nodes) &&
-                Objects.equals(edges, that.edges) &&
-                Objects.equals(xxlJobContext, that.xxlJobContext) &&
-                Objects.equals(executeKey, that.executeKey);
+    public DataContext getDataContext() {
+        return dataContext;
+    }
+    
+    public void setDataContext(DataContext dataContext) {
+        this.dataContext = dataContext;
+    }
+    
+    public Map<String, Long> getJobNameMap() {
+        return jobNameMap;
+    }
+    
+    public void setJobNameMap(Map<String, Long> jobNameMap) {
+        this.jobNameMap = jobNameMap;
     }
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(taskGroupId, executionBatchId, taskGroupInfo, nodes, edges, xxlJobContext, executeKey);
-    }
-
-    @Override
-    public String toString() {
-        return "ExecutionContext{" +
-                "taskGroupId=" + taskGroupId +
-                ", executionBatchId='" + executionBatchId + '\'' +
-                ", taskGroupInfo=" + taskGroupInfo +
-                ", nodes=" + nodes +
-                ", edges=" + edges +
-                ", xxlJobContext=" + xxlJobContext +
-                ", executeKey='" + executeKey + '\'' +
-                '}';
-    }
 
     public static class ExecutionContextBuilder {
         private Long taskGroupId;
@@ -151,6 +156,9 @@ public class ExecutionContext {
         private List<JobEdge> edges;
         private XxlJobContext xxlJobContext;
         private String executeKey;
+        private List<Integer> jobPauseStatusIds;
+        private DataContext dataContext;
+        private Map<String, Long> jobNameMap;
 
         ExecutionContextBuilder() {
         }
@@ -190,8 +198,23 @@ public class ExecutionContext {
             return this;
         }
 
+        public ExecutionContextBuilder jobPauseStatusIds(List<Integer> jobPauseStatusIds){
+            this.jobPauseStatusIds = jobPauseStatusIds;
+            return this;
+        }
+        
+        public ExecutionContextBuilder dataContext(DataContext dataContext) {
+            this.dataContext = dataContext;
+            return this;
+        }
+        
+        public ExecutionContextBuilder jobNameMap(Map<String, Long> jobNameMap) {
+            this.jobNameMap = jobNameMap;
+            return this;
+        }
+
         public ExecutionContext build() {
-            return new ExecutionContext(taskGroupId, executionBatchId, taskGroupInfo, nodes, edges, xxlJobContext, executeKey);
+            return new ExecutionContext(taskGroupId, executionBatchId, taskGroupInfo, nodes, edges, xxlJobContext, executeKey, dataContext, jobNameMap);
         }
     }
 }

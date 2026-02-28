@@ -45,6 +45,9 @@ public class TaskWrapperFactory {
     /** 存储任务执行结果 */
     private static final Map<String, Boolean> JOB_RESULTS = new ConcurrentHashMap<>();
     
+    /** 存储任务执行结果（executeResult） */
+    private static final Map<String, Object> JOB_EXECUTE_RESULTS = new ConcurrentHashMap<>();
+    
     /** 存储任务执行监听器 */
     private static final Map<String, JobExecutionMonitor> MONITOR_MAP = new ConcurrentHashMap<>();
     
@@ -70,7 +73,7 @@ public class TaskWrapperFactory {
             }
             
             WorkerWrapper<Long, String> worker = createWorker(
-                    context, node, jobInfo, jobInfoMap);
+                    context, node, jobInfo);
             result.add(worker);
         }
         
@@ -82,7 +85,7 @@ public class TaskWrapperFactory {
      * 创建单个 Worker
      */
     private WorkerWrapper<Long, String> createWorker(ExecutionContext context, JobNode node, 
-                                                    JobInfo jobInfo, Map<Long, JobInfo> jobInfoMap) {
+                                                    JobInfo jobInfo) {
         return new WorkerWrapper<Long, String>()
                 .id(String.valueOf(node.getId()))
                 .param(node.getJobId())
@@ -182,6 +185,29 @@ public class TaskWrapperFactory {
      */
     public static Map<String, Boolean> getJobResults() {
         return JOB_RESULTS;
+    }
+    
+    /**
+     * 设置任务执行结果（executeResult）
+     */
+    public static void setJobExecuteResult(String executeKey, Object executeResult) {
+        JOB_EXECUTE_RESULTS.put(executeKey, executeResult);
+        logger.debug("[TaskWrapperFactory] 存储任务执行结果 - executeKey: {}, executeResult: {}", 
+                executeKey, executeResult);
+    }
+    
+    /**
+     * 获取任务执行结果（executeResult）
+     */
+    public static Object getJobExecuteResult(String executeKey) {
+        return JOB_EXECUTE_RESULTS.get(executeKey);
+    }
+    
+    /**
+     * 移除任务执行结果（executeResult）
+     */
+    public static Object removeJobExecuteResult(String executeKey) {
+        return JOB_EXECUTE_RESULTS.remove(executeKey);
     }
     
     /**

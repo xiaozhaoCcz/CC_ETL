@@ -6,6 +6,7 @@ import com.cc.job.admin.task.trigger.XxlJobTrigger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -90,7 +91,9 @@ public class JobTriggerPoolHelper {
                            final String executorShardingParam,
                            final String executorParam,
                            final String addressList,
-                           final long logId
+                           final long logId,
+                           final List<Integer> jobFlowPositionIds,
+                           final List<Integer> jobPauseStatusIds
     ) {
 
         // choose thread pool
@@ -109,7 +112,7 @@ public class JobTriggerPoolHelper {
 
                 try {
                     // do trigger
-                    XxlJobTrigger.trigger((long) jobId, triggerType, failRetryCount, executorShardingParam, executorParam, addressList,logId);
+                    XxlJobTrigger.trigger((long) jobId, triggerType, failRetryCount, executorShardingParam, executorParam, addressList,logId,jobFlowPositionIds,jobPauseStatusIds);
                 } catch (Exception e) {
                     logger.error(e.getMessage(), e);
                 } finally {
@@ -160,8 +163,8 @@ public class JobTriggerPoolHelper {
      *          null: use job param
      *          not null: cover job param
      */
-    public static void trigger(int jobId, TriggerTypeEnum triggerType, int failRetryCount, String executorShardingParam, String executorParam, String addressList, long logId) {
-        helper.addTrigger(jobId, triggerType, failRetryCount, executorShardingParam, executorParam, addressList,logId);
+    public static void trigger(int jobId, TriggerTypeEnum triggerType, int failRetryCount, String executorShardingParam, String executorParam, String addressList, long logId, List<Integer> jobFlowPositionIds,List<Integer> jobPauseStatusIds) {
+        helper.addTrigger(jobId, triggerType, failRetryCount, executorShardingParam, executorParam, addressList,logId,jobFlowPositionIds,jobPauseStatusIds);
     }
 
 }

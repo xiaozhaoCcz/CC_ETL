@@ -116,7 +116,8 @@ public class ExecutorBizImpl implements ExecutorBiz {
             // valid handler
             if (jobHandler == null) {
                 try {
-                    jobHandler = new CSharpGlueJobHandler(triggerParam.getJobId(), triggerParam.getGlueUpdateTime(), triggerParam.getGlueSource());
+                    jobHandler = new CSharpGlueJobHandler(triggerParam.getJobId(), triggerParam.getGlueUpdateTime(), 
+                        triggerParam.getGlueSource(), triggerParam.getContextData());
                 } catch (Exception e) {
                     logger.error(e.getMessage(), e);
                     return new ReturnT<String>(ReturnT.FAIL_CODE, e.getMessage());
@@ -137,7 +138,9 @@ public class ExecutorBizImpl implements ExecutorBiz {
 
             // valid handler
             if (jobHandler == null) {
-                jobHandler = new ScriptJobHandler(triggerParam.getJobId(), triggerParam.getGlueUpdateTime(), triggerParam.getGlueSource(), GlueTypeEnum.match(triggerParam.getGlueType()));
+                jobHandler = new ScriptJobHandler(triggerParam.getJobId(), triggerParam.getGlueUpdateTime(), 
+                    triggerParam.getGlueSource(), GlueTypeEnum.match(triggerParam.getGlueType()), 
+                    triggerParam.getContextData());
             }
         } else {
             return new ReturnT<String>(ReturnT.FAIL_CODE, "glueType[" + triggerParam.getGlueType() + "] is not valid.");

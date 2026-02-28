@@ -114,6 +114,7 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
      */
     private VBox createContent(List<JobGroup> jobGroupList) {
         VBox container = new VBox(15);
+        container.getStyleClass().add("dialog-content-root");
         container.setPadding(new Insets(20));
         container.setPrefWidth(800);
         // 初始高度较小，只显示基础配置和调度配置
@@ -369,13 +370,7 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
      */
     private VBox createSection(String title, FontIcon icon) {
         VBox section = new VBox(10);
-        section.setStyle(
-            "-fx-background-color: white; " +
-            "-fx-border-color: #E5E7EB; " +
-            "-fx-border-radius: 8; " +
-            "-fx-background-radius: 8; " +
-            "-fx-padding: 10;"
-        );
+        section.getStyleClass().add("dialog-section");
         
         HBox titleBox = new HBox(8);
         titleBox.setAlignment(Pos.CENTER_LEFT);
@@ -390,8 +385,7 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
         Label titleLabel = new Label(title);
         titleLabel.setStyle(
             "-fx-font-size: 16; " +
-            "-fx-font-weight: bold; " +
-            "-fx-text-fill: #1F2937;"
+            "-fx-font-weight: bold;"
         );
         
         if (icon != null) {
@@ -420,10 +414,10 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
             labelBox.setAlignment(Pos.CENTER_LEFT);
             
             Label textLabel = new Label(text);
-            textLabel.setStyle("-fx-text-fill: #374151; -fx-font-size: 13;");
+            textLabel.setStyle("-fx-font-size: 13;");
             
             Label starLabel = new Label("*");
-            starLabel.setStyle("-fx-text-fill: #EF4444; -fx-font-size: 13; -fx-font-weight: bold;");
+            starLabel.setStyle("-fx-font-size: 13; -fx-font-weight: bold;");
             
             labelBox.getChildren().addAll(textLabel, starLabel);
             
@@ -434,7 +428,7 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
             label.setTooltip(new Tooltip(text + " *"));
         } else {
             label.setText(text);
-            label.setStyle("-fx-text-fill: #374151; -fx-font-size: 13;");
+            label.setStyle("-fx-font-size: 13;");
             label.setTooltip(new Tooltip(text));
         }
         
@@ -634,11 +628,11 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
         getDialogPane().setMaxHeight(Double.MAX_VALUE);
         setResizable(true);
         
-        getDialogPane().setStyle(
-            "-fx-background-color: #F9FAFB; " +
-            "-fx-background-radius: 8; " +
-            "-fx-border-radius: 8;"
-        );
+        String css = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (css != null && !css.isEmpty()) {
+            getDialogPane().getStylesheets().add(css);
+        }
+        
         
         Button saveButton = (Button) getDialogPane().lookupButton(saveButtonType);
         if (saveButton != null) {
@@ -658,7 +652,6 @@ public class NewJobGroupDialog extends Dialog<JobInfoForm> {
         if (cancelButton != null) {
             cancelButton.setStyle(
                 "-fx-background-color: #F3F4F6; " +
-                "-fx-text-fill: #374151; " +
                 "-fx-font-size: 13; " +
                 "-fx-padding: 8 20 8 20; " +
                 "-fx-border-color: #D1D5DB; " +

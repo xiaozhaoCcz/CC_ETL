@@ -28,23 +28,33 @@ public class JobNode extends BaseEntity {
 
     private String nodeType;
 
+    private String nodeParentId;
+
+    /**
+     * 条件表达式（条件节点专用）
+     */
+    private String conditionExpression;
+
+    /**
+     * 表达式类型：SIMPLE-简单表达式，SCRIPT-脚本表达式
+     */
+    private String expressionType;
+
     /**
      * 节点运行状态：-1=未运行, 0=失败, 1=成功, 2=运行中
      */
     private Integer triggerStatus;
 
-    @Override
-    public boolean equals(Object o) {
-        if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
-        JobNode taskNode = (JobNode) o;
-        return Objects.equals(jobId, taskNode.jobId) && Objects.equals(jobParentId, taskNode.jobParentId) && Objects.equals(nodePositionX, taskNode.nodePositionX) && Objects.equals(nodePositionY, taskNode.nodePositionY) && Objects.equals(nodeInDegree, taskNode.nodeInDegree) && Objects.equals(nodeOutDegree, taskNode.nodeOutDegree) && Objects.equals(sort, taskNode.sort);
-    }
+    /**
+     * 节点备注
+     */
+    private String remark;
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(super.hashCode(), jobId, jobParentId, nodePositionX, nodePositionY, nodeInDegree, nodeOutDegree, sort);
-    }
+    /**
+     * 节点标签（JSON格式存储标签列表）
+     */
+    private String tags;
+
 
     public Long getJobId() {
         return jobId;
@@ -126,6 +136,22 @@ public class JobNode extends BaseEntity {
         this.nodeType = nodeType;
     }
 
+    public String getConditionExpression() {
+        return conditionExpression;
+    }
+
+    public void setConditionExpression(String conditionExpression) {
+        this.conditionExpression = conditionExpression;
+    }
+
+    public String getExpressionType() {
+        return expressionType;
+    }
+
+    public void setExpressionType(String expressionType) {
+        this.expressionType = expressionType;
+    }
+
     public Integer getTriggerStatus() {
         return triggerStatus;
     }
@@ -134,20 +160,28 @@ public class JobNode extends BaseEntity {
         this.triggerStatus = triggerStatus;
     }
 
-    @Override
-    public String toString() {
-        return "JobNode{" +
-                "jobId=" + jobId +
-                ", jobParentId=" + jobParentId +
-                ", nodePositionX=" + nodePositionX +
-                ", nodePositionY=" + nodePositionY +
-                ", nodeInDegree=" + nodeInDegree +
-                ", nodeOutDegree=" + nodeOutDegree +
-                ", sort=" + sort +
-                ", children='" + children + '\'' +
-                ", properties='" + properties + '\'' +
-                ", nodeType='" + nodeType + '\'' +
-                ", triggerStatus=" + triggerStatus +
-                '}';
+    public String getRemark() {
+        return remark;
     }
+
+    public void setRemark(String remark) {
+        this.remark = remark;
+    }
+
+    public String getTags() {
+        return tags;
+    }
+
+    public void setTags(String tags) {
+        this.tags = tags;
+    }
+
+    public String getNodeParentId() {
+        return nodeParentId;
+    }
+
+    public void setNodeParentId(String nodeParentId) {
+        this.nodeParentId = nodeParentId;
+    }
+
 }

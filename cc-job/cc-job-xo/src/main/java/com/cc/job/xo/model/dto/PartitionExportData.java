@@ -150,6 +150,7 @@ public class PartitionExportData implements Serializable {
         private Long jdbcDatasourceId;
         private Integer incrementType;
         private String incrementContent;
+        private String incrementParamTemplate;
         private Long runTime;
         private Integer pauseStatus;
         private Integer jobPartId;
@@ -401,6 +402,14 @@ public class PartitionExportData implements Serializable {
 
         public void setIncrementContent(String incrementContent) {
             this.incrementContent = incrementContent;
+        }
+
+        public String getIncrementParamTemplate() {
+            return incrementParamTemplate;
+        }
+
+        public void setIncrementParamTemplate(String incrementParamTemplate) {
+            this.incrementParamTemplate = incrementParamTemplate;
         }
 
         public Long getRunTime() {

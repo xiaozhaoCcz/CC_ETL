@@ -143,9 +143,10 @@ public class DataManager {
         List<ProcessNode> nodes = canvas.getNodes();
         List<NodeConnection> connections = canvas.getConnections();
         List<GroupContainer> groups = canvas.getGroupContainers();
+        List<com.cc.job.gui.model.ConditionNode> conditionNodes = canvas.getConditionNodes();
         
-        logPanel.info(String.format("节点: %d, 连接: %d, 任务组: %d", 
-            nodes.size(), connections.size(), groups.size()));
+        logPanel.info(String.format("节点: %d, 连接: %d, 任务组: %d, 条件节点: %d", 
+            nodes.size(), connections.size(), groups.size(), conditionNodes.size()));
         
         try {
             // 构建节点数据
@@ -164,6 +165,25 @@ public class DataManager {
                 Map<String, Object> propertiesMap = new HashMap<>();
                 if (node.getJobId() != null) {
                     propertiesMap.put("jobId", node.getJobId());
+                }
+                // 添加节点颜色到properties
+                if (node.getCurrentColor() != null) {
+                    propertiesMap.put("color", node.getCurrentColor());
+                }
+                // 添加节点大小到properties
+                propertiesMap.put("width", node.getNodeWidth());
+                propertiesMap.put("height", node.getNodeHeight());
+                // 添加边框样式到properties
+                propertiesMap.put("borderStyle", node.getBorderStyle().name());
+                // 添加边框粗细到properties
+                propertiesMap.put("borderWidth", node.getBorderWidth());
+                // 添加节点备注到properties
+                if (node.getRemark() != null && !node.getRemark().trim().isEmpty()) {
+                    propertiesMap.put("remark", node.getRemark());
+                }
+                // 添加节点标签到properties
+                if (node.getTags() != null && !node.getTags().isEmpty()) {
+                    propertiesMap.put("tags", node.getTags());
                 }
                 nodeData.put("properties", apiUtil.getGson().toJson(propertiesMap));
                 
@@ -201,6 +221,56 @@ public class DataManager {
                 addedNodeIds.add(group.getNodeId());
             }
             
+            // 添加条件节点
+            for (ConditionNode conditionNode : conditionNodes) {
+                if (conditionNode.getNodeId() == null || addedNodeIds.contains(conditionNode.getNodeId())) continue;
+                
+                Map<String, Object> nodeData = new HashMap<>();
+                nodeData.put("id", conditionNode.getNodeId());
+                nodeData.put("type", "ConditionNode");
+                nodeData.put("x", conditionNode.getLayoutX());
+                nodeData.put("y", conditionNode.getLayoutY());
+                
+                Map<String, Object> propertiesMap = new HashMap<>();
+                // 保存条件节点属性
+                if (conditionNode.getConditionExpression() != null) {
+                    propertiesMap.put("conditionExpression", conditionNode.getConditionExpression());
+                }
+                if (conditionNode.getExpressionType() != null) {
+                    propertiesMap.put("expressionType", conditionNode.getExpressionType().toString());
+                }
+                // ⭐ 新增：保存conditionType
+                if (conditionNode.getConditionType() != null) {
+                    propertiesMap.put("conditionType", conditionNode.getConditionType().toString());
+                }
+                // ⭐ 新增：保存容器大小
+                propertiesMap.put("width", conditionNode.getContainerWidth());
+                propertiesMap.put("height", conditionNode.getContainerHeight());
+                
+                // 保存子节点ID列表
+                List<String> childNodeIds = new ArrayList<>();
+                if (conditionNode.getManagedCanvasNodes() != null) {
+                    for (ProcessNode child : conditionNode.getManagedCanvasNodes()) {
+                        if (child.getNodeId() != null) {
+                            childNodeIds.add(child.getNodeId());
+                        }
+                    }
+                }
+                // 也包含嵌套的条件节点
+                if (conditionNode.getManagedConditionNodes() != null) {
+                    for (com.cc.job.gui.model.ConditionNode childCondition : conditionNode.getManagedConditionNodes()) {
+                        if (childCondition.getNodeId() != null) {
+                            childNodeIds.add(childCondition.getNodeId());
+                        }
+                    }
+                }
+                propertiesMap.put("children", childNodeIds);
+                nodeData.put("properties", apiUtil.getGson().toJson(propertiesMap));
+                
+                nodesData.add(nodeData);
+                addedNodeIds.add(conditionNode.getNodeId());
+            }
+            
             // 构建连线数据
             List<Map<String, Object>> edgesData = new ArrayList<>();
             Set<String> addedEdgeKeys = new HashSet<>();
@@ -220,6 +290,38 @@ public class DataManager {
                 edgeData.put("targetNodeId", targetId);
                 edgeData.put("startPoint", "right");
                 edgeData.put("endPoint", "left");
+                
+                // ⭐ 修复：保存连线样式、颜色和标签信息
+                Map<String, Object> properties = new HashMap<>();
+                // 总是保存样式（默认 SOLID）
+                NodeConnection.EdgeStyle edgeStyle = conn.getEdgeStyle();
+                if (edgeStyle != null) {
+                    properties.put("edgeStyle", edgeStyle.name());
+                } else {
+                    properties.put("edgeStyle", NodeConnection.EdgeStyle.SOLID.name());
+                }
+                // 总是保存颜色（默认 #374151）
+                String edgeColor = conn.getEdgeColor();
+                if (edgeColor != null && !edgeColor.isEmpty()) {
+                    properties.put("edgeColor", edgeColor);
+                } else {
+                    properties.put("edgeColor", "#374151");
+                }
+                // 总是保存标签（默认空字符串，以支持清除标签）
+                String labelText = conn.getLabelText();
+                if (labelText != null) {
+                    properties.put("labelText", labelText);
+                } else {
+                    properties.put("labelText", "");
+                }
+                // 总是保存properties（确保所有属性都有值）
+                String propertiesJson = apiUtil.getGson().toJson(properties);
+                edgeData.put("properties", propertiesJson);
+                
+                // 调试日志：记录保存的properties
+                logger.debug("保存连线properties: source={}, target={}, properties={}", 
+                    sourceId, targetId, propertiesJson);
+                
                 edgesData.add(edgeData);
             }
             
@@ -280,7 +382,7 @@ public class DataManager {
     public void refreshTreeView() {
         if (treeView != null) {
             treeView.refreshTreeData();
-            logPanel.success("✓ 任务树刷新成功");
+            logger.info("✓ 任务树刷新成功");
         }
     }
     
@@ -289,6 +391,8 @@ public class DataManager {
             return ((ProcessNode) owner).getNodeId();
         } else if (owner instanceof GroupContainer) {
             return ((GroupContainer) owner).getNodeId();
+        } else if (owner instanceof com.cc.job.gui.model.ConditionNode) {
+            return ((com.cc.job.gui.model.ConditionNode) owner).getNodeId();
         }
         return null;
     }

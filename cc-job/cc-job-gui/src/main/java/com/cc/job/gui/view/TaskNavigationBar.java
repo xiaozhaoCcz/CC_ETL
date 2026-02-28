@@ -14,7 +14,9 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.util.Duration;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -67,14 +69,12 @@ public class TaskNavigationBar extends HBox {
     }
     
     private void initializeUI() {
-        setStyle(
-            "-fx-background-color: #FFFFFF; " +
-            "-fx-border-color: transparent; " +
-            "-fx-border-width: 0;"
-        );
+        getStyleClass().add("task-nav-bar");
         setSpacing(0);
         setAlignment(Pos.CENTER_LEFT);
-        setPrefHeight(54);
+        setPrefHeight(40);
+        setMinHeight(40);
+        setMaxHeight(40);
         
         // 标签容器 - 无间距，标签页紧贴
         tabContainer = new HBox(0);
@@ -83,15 +83,10 @@ public class TaskNavigationBar extends HBox {
         
         // 滚动面板包装标签容器
         ScrollPane scrollPane = new ScrollPane(tabContainer);
+        scrollPane.getStyleClass().add("task-nav-scroll-pane");
         scrollPane.setFitToHeight(true);
         scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-        scrollPane.setStyle(
-            "-fx-background-color: transparent; " +
-            "-fx-border-width: 0; " +
-            "-fx-padding: 0; " +
-            "-fx-background-insets: 0;"
-        );
         scrollPane.setPannable(true);
         
         // 确保内容从最左边开始，移除默认的内容边距
@@ -128,6 +123,7 @@ public class TaskNavigationBar extends HBox {
         TaskTab tab = new TaskTab(taskGroupName, taskGroupId);
         tab.setOnClick(() -> switchToTaskGroup(taskGroupId));
         tab.setOnClose(() -> removeTaskGroup(taskGroupId));
+        setupTabContextMenu(tab);
         
         tabs.put(taskGroupId, tab);
         taskGroupIdToNameMap.put(taskGroupId, taskGroupName);
@@ -135,6 +131,99 @@ public class TaskNavigationBar extends HBox {
         
         // 自动切换到新添加的标签
         switchToTaskGroup(taskGroupId);
+    }
+    
+    /**
+     * 按界面从左到右顺序返回任务组 ID 列表
+     */
+    private List<Long> getOrderedTaskGroupIds() {
+        List<Long> ordered = new ArrayList<>();
+        for (javafx.scene.Node node : tabContainer.getChildren()) {
+            if (node instanceof TaskTab) {
+                ordered.add(((TaskTab) node).getTaskGroupId());
+            }
+        }
+        return ordered;
+    }
+    
+    /**
+     * 关闭除指定任务组外的所有标签
+     */
+    private void removeOtherTaskGroups(Long keepTaskGroupId) {
+        List<Long> toRemove = new ArrayList<>();
+        for (Long id : getOrderedTaskGroupIds()) {
+            if (!id.equals(keepTaskGroupId)) {
+                toRemove.add(id);
+            }
+        }
+        for (Long id : toRemove) {
+            removeTaskGroup(id);
+        }
+        if (tabs.containsKey(keepTaskGroupId)) {
+            switchToTaskGroup(keepTaskGroupId);
+        }
+    }
+    
+    /**
+     * 关闭指定任务组左侧的所有标签
+     */
+    private void removeTaskGroupsToLeft(Long ofTaskGroupId) {
+        List<Long> ordered = getOrderedTaskGroupIds();
+        int idx = ordered.indexOf(ofTaskGroupId);
+        if (idx <= 0) return;
+        List<Long> toRemove = new ArrayList<>(ordered.subList(0, idx));
+        for (Long id : toRemove) {
+            removeTaskGroup(id);
+        }
+        if (tabs.containsKey(ofTaskGroupId)) {
+            switchToTaskGroup(ofTaskGroupId);
+        }
+    }
+    
+    /**
+     * 关闭指定任务组右侧的所有标签
+     */
+    private void removeTaskGroupsToRight(Long ofTaskGroupId) {
+        List<Long> ordered = getOrderedTaskGroupIds();
+        int idx = ordered.indexOf(ofTaskGroupId);
+        if (idx < 0 || idx >= ordered.size() - 1) return;
+        List<Long> toRemove = new ArrayList<>(ordered.subList(idx + 1, ordered.size()));
+        for (Long id : toRemove) {
+            removeTaskGroup(id);
+        }
+        if (tabs.containsKey(ofTaskGroupId)) {
+            switchToTaskGroup(ofTaskGroupId);
+        }
+    }
+    
+    /**
+     * 为任务组标签设置右键菜单（关闭当前页 / 关闭其他页 / 关闭左侧页 / 关闭右侧页）
+     */
+    private void setupTabContextMenu(TaskTab tab) {
+        ContextMenu menu = new ContextMenu();
+        MenuItem closeCurrent = new MenuItem("关闭当前页");
+        MenuItem closeOthers = new MenuItem("关闭其他页");
+        MenuItem closeLeft = new MenuItem("关闭左侧页");
+        MenuItem closeRight = new MenuItem("关闭右侧页");
+        
+        closeCurrent.setOnAction(e -> removeTaskGroup(tab.getTaskGroupId()));
+        closeOthers.setOnAction(e -> removeOtherTaskGroups(tab.getTaskGroupId()));
+        closeLeft.setOnAction(e -> removeTaskGroupsToLeft(tab.getTaskGroupId()));
+        closeRight.setOnAction(e -> removeTaskGroupsToRight(tab.getTaskGroupId()));
+        
+        menu.setOnShowing(e -> {
+            List<Long> ordered = getOrderedTaskGroupIds();
+            int index = ordered.indexOf(tab.getTaskGroupId());
+            int size = ordered.size();
+            closeOthers.setDisable(size <= 1);
+            closeLeft.setDisable(index <= 0);
+            closeRight.setDisable(index < 0 || index >= size - 1);
+        });
+        
+        menu.getItems().addAll(closeCurrent, closeOthers, closeLeft, closeRight);
+        tab.setOnContextMenuRequested(e -> {
+            menu.show(tab, e.getScreenX(), e.getScreenY());
+        });
     }
     
     /**
@@ -434,25 +523,6 @@ public class TaskNavigationBar extends HBox {
      */
     private static class TaskTab extends StackPane {
         
-        // 移除圆角和边框，未选中时背景为白色，选中时为浅灰色
-        // 未选中标签右边有分割线，颜色与选中标签背景一致
-        private static final String BASE_STYLE =
-            "-fx-background-radius: 0; " +
-            "-fx-border-radius: 0; " +
-            "-fx-cursor: hand; " +
-            "-fx-effect: null;";
-        private static final String NORMAL_STYLE = BASE_STYLE +
-            "-fx-background-color: #FFFFFF; " +
-            "-fx-border-color: transparent transparent transparent rgba(243,244,246,0.9); " +
-            "-fx-border-width: 0 0 0 1;";
-        private static final String HOVER_STYLE = BASE_STYLE +
-            "-fx-background-color: rgba(241,245,249,0.95); " +
-            "-fx-border-color: transparent transparent transparent rgba(243,244,246,0.9); " +
-            "-fx-border-width: 0 0 0 1;";
-        private static final String ACTIVE_STYLE = BASE_STYLE +
-            "-fx-background-color: rgba(243,244,246,0.9); " +
-            "-fx-border-width: 0;";
-        
         private final String taskGroupName;
         private final Long taskGroupId; // ⚠️ 关键修复：存储任务组ID
         private boolean active;
@@ -472,8 +542,8 @@ public class TaskNavigationBar extends HBox {
         }
         
         private void initializeUI() {
+            getStyleClass().add("task-nav-tab");
             setPadding(new Insets(6, 14, 6, 14));
-            setStyle(NORMAL_STYLE);
             
             HBox content = new HBox(10);
             content.setAlignment(Pos.CENTER_LEFT);
@@ -494,41 +564,14 @@ public class TaskNavigationBar extends HBox {
             
             // 任务组名称
             nameLabel = new Label(taskGroupName);
-            nameLabel.setStyle(
-                "-fx-font-size: 12.5px; " +
-                "-fx-font-weight: 600; " +
-                "-fx-text-fill: " + StyleUtil.GRAY_600 + ";"
-            );
+            nameLabel.getStyleClass().add("task-nav-tab-name");
             
             // 关闭按钮
             Label closeIcon = new Label("×");
-            closeIcon.setStyle(
-                "-fx-text-fill: " + StyleUtil.GRAY_400 + "; " +
-                "-fx-font-size: 13px; " +
-                "-fx-font-weight: 400; " +
-                "-fx-padding: 0;"
-            );
+            closeIcon.getStyleClass().add("task-nav-tab-close-icon");
             StackPane closeBtn = new StackPane(closeIcon);
+            closeBtn.getStyleClass().add("task-nav-tab-close");
             closeBtn.setPrefSize(20, 20);
-            closeBtn.setStyle("-fx-background-color: transparent; -fx-background-radius: 10; -fx-cursor: hand;");
-            closeBtn.setOnMouseEntered(e -> {
-                closeBtn.setStyle("-fx-background-color: rgba(239,68,68,0.12); -fx-background-radius: 10; -fx-cursor: hand;");
-                closeIcon.setStyle(
-                    "-fx-text-fill: " + StyleUtil.ERROR + "; " +
-                    "-fx-font-size: 13px; " +
-                    "-fx-font-weight: 500; " +
-                    "-fx-padding: 0;"
-                );
-            });
-            closeBtn.setOnMouseExited(e -> {
-                closeBtn.setStyle("-fx-background-color: transparent; -fx-background-radius: 10; -fx-cursor: hand;");
-                closeIcon.setStyle(
-                    "-fx-text-fill: " + StyleUtil.GRAY_400 + "; " +
-                    "-fx-font-size: 13px; " +
-                    "-fx-font-weight: 400; " +
-                    "-fx-padding: 0;"
-                );
-            });
             closeBtn.setOnMouseClicked(e -> {
                 if (onCloseCallback != null) {
                     onCloseCallback.run();
@@ -545,46 +588,26 @@ public class TaskNavigationBar extends HBox {
                     onClickCallback.run();
                 }
             });
-            
-            // 悬停效果
-            setOnMouseEntered(e -> {
-                if (!active) {
-                    setStyle(HOVER_STYLE);
-                }
-            });
-            
-            setOnMouseExited(e -> updateStyle());
         }
         
         public void setActive(boolean active) {
             this.active = active;
-            updateStyle();
-        }
-        
-        private void updateStyle() {
-            setStyle(active ? ACTIVE_STYLE : NORMAL_STYLE);
-            updateLabelColor();
-        }
-        
-        private void updateLabelColor() {
             if (active) {
-                nameLabel.setStyle(
-                    "-fx-font-size: 12.5px; " +
-                    "-fx-font-weight: 700; " +
-                    "-fx-text-fill: " + StyleUtil.PRIMARY_DARK + ";"
-                );
-            } else if (isRunning) {
-                nameLabel.setStyle(
-                    "-fx-font-size: 12.5px; " +
-                    "-fx-font-weight: 600; " +
-                    "-fx-text-fill: " + StyleUtil.SUCCESS_DARK + ";"
-                );
+                if (!getStyleClass().contains("task-nav-tab-active")) {
+                    getStyleClass().add("task-nav-tab-active");
+                }
             } else {
-                nameLabel.setStyle(
-                    "-fx-font-size: 12.5px; " +
-                    "-fx-font-weight: 600; " +
-                    "-fx-text-fill: " + StyleUtil.GRAY_600 + ";"
-                );
+                getStyleClass().remove("task-nav-tab-active");
+            }
+            updateLabelState();
+        }
+        
+        private void updateLabelState() {
+            nameLabel.getStyleClass().removeAll("task-nav-tab-name-active", "task-nav-tab-name-running");
+            if (active) {
+                nameLabel.getStyleClass().add("task-nav-tab-name-active");
+            } else if (isRunning) {
+                nameLabel.getStyleClass().add("task-nav-tab-name-running");
             }
         }
         
@@ -614,7 +637,7 @@ public class TaskNavigationBar extends HBox {
                         runningIndicator.setOpacity(1.0);
                     }
                 }
-                updateLabelColor();
+                updateLabelState();
             });
         }
         

@@ -31,4 +31,13 @@ public interface JobInfoMapper extends BaseMapper<JobInfo> {
      */
     @Select("SELECT * FROM job_info WHERE id = #{id} AND is_deleted = 0 FOR UPDATE")
     JobInfo selectByIdForUpdate(@Param("id") Long id);
+
+    /**
+     * 仅更新增量内容（DataX 增量同步成功后更新游标，避免全表 update 覆盖其他字段）
+     *
+     * @param id              任务ID
+     * @param incrementContent 增量内容 JSON
+     * @return 更新行数
+     */
+    int updateIncrementContent(@Param("id") Long id, @Param("incrementContent") String incrementContent);
 }

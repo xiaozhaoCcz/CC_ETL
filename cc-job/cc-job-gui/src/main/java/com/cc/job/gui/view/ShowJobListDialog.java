@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 /**
@@ -66,16 +67,31 @@ public class ShowJobListDialog extends Dialog<Void> {
     private int pageSize = 10;
     private long total = 0;
 
+    private Runnable themeChangedListener;
+
+    /** 跳转到任务组回调（主窗口切换任务组），仅任务组行显示「跳转」时使用 */
+    private final BiConsumer<Long, String> onGoToTaskGroup;
+
     public ShowJobListDialog(Stage ownerStage) {
+        this(ownerStage, null);
+    }
+
+    public ShowJobListDialog(Stage ownerStage, BiConsumer<Long, String> onGoToTaskGroup) {
         this.ownerStage = ownerStage;
+        this.onGoToTaskGroup = onGoToTaskGroup;
         setTitle("任务列表");
         initOwner(ownerStage);
         initModality(Modality.WINDOW_MODAL);
 
         styleDialog();
+        setOnHidden(e -> {
+            if (themeChangedListener != null) {
+                com.cc.job.gui.util.ThemeManager.getInstance().removeOnThemeChanged(themeChangedListener);
+            }
+        });
         BorderPane root = new BorderPane();
+        root.getStyleClass().add("dialog-content-root");
         root.setPadding(new Insets(16));
-        root.setStyle("-fx-background-color: " + StyleUtil.BG_SECONDARY + ";");
 
         root.setTop(createTopSection());
         root.setCenter(createTable());
@@ -107,13 +123,11 @@ public class ShowJobListDialog extends Dialog<Void> {
         actionBar.setPadding(new Insets(0, 16, 0, 16));
 
         Button addBtn = new Button("新增");
-        addBtn.setStyle(StyleUtil.successButton());
-        StyleUtil.applySuccessButtonHover(addBtn);
+        addBtn.getStyleClass().add("dialog-button-success");
         addBtn.setOnAction(e -> handleAdd());
 
         Button deleteBtn = new Button("删除");
-        deleteBtn.setStyle(StyleUtil.errorButton());
-        StyleUtil.applyErrorButtonHover(deleteBtn);
+        deleteBtn.getStyleClass().add("dialog-button-error");
         deleteBtn.setOnAction(e -> handleBatchDelete());
 
         actionBar.getChildren().addAll(addBtn, deleteBtn);
@@ -134,12 +148,22 @@ public class ShowJobListDialog extends Dialog<Void> {
         getDialogPane().setMaxHeight(Double.MAX_VALUE);
         setResizable(true);
 
-        // 设置对话框样式 - 与主页面背景色一致
-        getDialogPane().setStyle(
-                "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                        "-fx-background-radius: " + StyleUtil.RADIUS_LG + "; " +
-                        "-fx-border-radius: " + StyleUtil.RADIUS_LG + ";"
-        );
+        String dialogCss = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+        if (dialogCss != null && !dialogCss.isEmpty()) {
+            getDialogPane().getStylesheets().add(dialogCss);
+        }
+
+        themeChangedListener = () -> {
+            javafx.scene.Scene scene = getDialogPane().getScene();
+            if (scene != null) {
+                scene.getStylesheets().clear();
+                String url = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+                if (url != null && !url.isEmpty()) {
+                    scene.getStylesheets().add(url);
+                }
+            }
+        };
+        com.cc.job.gui.util.ThemeManager.getInstance().addOnThemeChanged(themeChangedListener);
 
         Platform.runLater(() -> {
             Stage stage = (Stage) getDialogPane().getScene().getWindow();
@@ -148,12 +172,10 @@ public class ShowJobListDialog extends Dialog<Void> {
                 stage.setMinWidth(1080);
                 stage.setMinHeight(580);
                 
-                // 加载全局CSS样式
-                try {
-                    String css = getClass().getResource("/styles.css").toExternalForm();
+                // 加载当前主题样式
+                String css = com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl();
+                if (css != null && !css.isEmpty()) {
                     stage.getScene().getStylesheets().add(css);
-                } catch (Exception e) {
-                    // CSS文件加载失败，忽略
                 }
                 
                 stage.setOnCloseRequest(event -> {
@@ -170,17 +192,13 @@ public class ShowJobListDialog extends Dialog<Void> {
 
     private Node createFilterBar() {
         FlowPane pane = new FlowPane();
+        pane.getStyleClass().add("dialog-section");
         pane.setHgap(12);
         pane.setVgap(10);
         pane.setPadding(new Insets(16, 16, 16, 16));
-        pane.setStyle(
-                "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                "-fx-background-radius: " + StyleUtil.RADIUS_LG + "; " +
-                "-fx-effect: " + StyleUtil.SHADOW_SM + ";"
-        );
 
         // 创建标签样式
-        String labelStyle = StyleUtil.body();
+        String labelStyle = StyleUtil.bodyFontOnly();
 
         // 执行器下拉框
         jobGroupCombo = new ComboBox<>();
@@ -217,33 +235,29 @@ public class ShowJobListDialog extends Dialog<Void> {
         // 任务描述输入框
         jobDescField = new TextField();
         jobDescField.setPromptText("请输入任务描述");
-        jobDescField.setStyle(StyleUtil.searchField());
         jobDescField.setPrefWidth(180);
         jobDescField.setOnAction(e -> handleSearch());
 
         // JobHandler输入框
         handlerField = new TextField();
         handlerField.setPromptText("请输入JobHandler");
-        handlerField.setStyle(StyleUtil.searchField());
         handlerField.setPrefWidth(160);
         handlerField.setOnAction(e -> handleSearch());
 
         // 负责人输入框
         authorField = new TextField();
         authorField.setPromptText("请输入负责人");
-        authorField.setStyle(StyleUtil.searchField());
         authorField.setPrefWidth(140);
         authorField.setOnAction(e -> handleSearch());
 
         // 搜索按钮
         Button searchBtn = new Button("搜索");
-        searchBtn.setStyle(StyleUtil.primaryButton());
-        StyleUtil.applyPrimaryButtonHover(searchBtn);
+        searchBtn.getStyleClass().add("dialog-button-primary");
         searchBtn.setOnAction(e -> handleSearch());
 
         // 重置按钮
         Button resetBtn = new Button("重置");
-        resetBtn.setStyle(StyleUtil.secondaryButton());
+        resetBtn.getStyleClass().add("dialog-button-secondary");
         resetBtn.setOnAction(e -> handleReset());
 
         // 创建标签
@@ -410,6 +424,7 @@ public class ShowJobListDialog extends Dialog<Void> {
                 JobInfoVO job = getTableRow().getItem();
                 Label tag = createJobTypeTag(job.getJobType());
                 setGraphic(tag);
+                setAlignment(Pos.CENTER);
             }
         });
         typeCol.setMinWidth(80);
@@ -427,6 +442,7 @@ public class ShowJobListDialog extends Dialog<Void> {
                 JobInfoVO job = getTableRow().getItem();
                 Label tag = createStatusTag(job.getTriggerStatus());
                 setGraphic(tag);
+                setAlignment(Pos.CENTER);
             }
         });
         statusCol.setMinWidth(70);
@@ -439,6 +455,14 @@ public class ShowJobListDialog extends Dialog<Void> {
             }
             return new SimpleStringProperty("");
         });
+        createTimeCol.setCellFactory(col -> new TableCell<JobInfoVO, String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item);
+                setAlignment(Pos.CENTER);
+            }
+        });
         createTimeCol.setMinWidth(140);
 
         // 修改时间列
@@ -448,6 +472,14 @@ public class ShowJobListDialog extends Dialog<Void> {
                 return new SimpleStringProperty(c.getValue().getUpdateTime().format(DATE_FORMATTER));
             }
             return new SimpleStringProperty("");
+        });
+        updateTimeCol.setCellFactory(col -> new TableCell<JobInfoVO, String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item);
+                setAlignment(Pos.CENTER);
+            }
         });
         updateTimeCol.setMinWidth(140);
 
@@ -543,12 +575,12 @@ public class ShowJobListDialog extends Dialog<Void> {
                         "-fx-padding: 2 8; -fx-background-radius: 4; -fx-font-size: 11px;");
             } else {
                 tag.setText("任务");
-                tag.setStyle("-fx-background-color: #6366F1; -fx-text-fill: white; " +
+                tag.setStyle("-fx-background-color: #2563EB; -fx-text-fill: white; " +
                         "-fx-padding: 2 8; -fx-background-radius: 4; -fx-font-size: 11px;");
             }
         } else {
             tag.setText("任务");
-            tag.setStyle("-fx-background-color: #6366F1; -fx-text-fill: white; " +
+            tag.setStyle("-fx-background-color: #2563EB; -fx-text-fill: white; " +
                     "-fx-padding: 2 8; -fx-background-radius: 4; -fx-font-size: 11px;");
         }
         return tag;
@@ -584,32 +616,20 @@ public class ShowJobListDialog extends Dialog<Void> {
             private final MenuItem startItem = new MenuItem("启动");
             private final MenuItem stopItem = new MenuItem("停止");
             private final SeparatorMenuItem sep2 = new SeparatorMenuItem();
+            private final MenuItem goToItem = new MenuItem("跳转");
             private final MenuItem editItem = new MenuItem("编辑");
             private final MenuItem deleteItem = new MenuItem("删除");
             private final MenuItem copyItem = new MenuItem("复制");
 
             {
                 actionMenuBtn.getItems().addAll(runItem, logItem, nextTimeItem, sep1,
-                        startItem, stopItem, sep2, editItem, deleteItem, copyItem);
+                        startItem, stopItem, sep2, goToItem, editItem, deleteItem, copyItem);
                 actionMenuBtn.setPrefWidth(90);
                 actionMenuBtn.setMinWidth(90);
                 actionMenuBtn.setMaxWidth(90);
                 actionMenuBtn.setPrefHeight(26);
                 actionMenuBtn.setGraphicTextGap(4);
-                // 确保文字显示：设置文本颜色和内容显示方式
-                // 使用明确的样式设置，确保文字可见
-                actionMenuBtn.setStyle(
-                    "-fx-background-color: white; " +
-                    "-fx-text-fill: #374151; " +
-                    "-fx-font-size: 11px; " +
-                    "-fx-font-weight: 500; " +
-                    "-fx-padding: 4 8 4 8; " +
-                    "-fx-border-color: #D1D5DB; " +
-                    "-fx-border-width: 1; " +
-                    "-fx-border-radius: 4; " +
-                    "-fx-background-radius: 4; " +
-                    "-fx-content-display: LEFT; " +
-                    "-fx-text-overrun: VISIBLE;");
+                actionMenuBtn.getStyleClass().add("dialog-table-action-button");
             }
 
             @Override
@@ -636,6 +656,20 @@ public class ShowJobListDialog extends Dialog<Void> {
                 editItem.setDisable(running);
                 deleteItem.setDisable(running);
 
+                // 跳转：仅任务组且回调存在时显示，点击后执行回调并关闭对话框
+                goToItem.setVisible(isTaskGroup && onGoToTaskGroup != null);
+                goToItem.setOnAction(e -> {
+                    if (onGoToTaskGroup != null && currentJob.getJobType() != null && currentJob.getJobType() == 2) {
+                        Long id = currentJob.getId();
+                        String name = (currentJob.getJobDesc() != null && !currentJob.getJobDesc().isBlank())
+                                ? currentJob.getJobDesc() : "任务组 " + id;
+                        onGoToTaskGroup.accept(id, name);
+                        if (getDialogPane() != null && getDialogPane().getScene() != null && getDialogPane().getScene().getWindow() != null) {
+                            getDialogPane().getScene().getWindow().hide();
+                        }
+                    }
+                });
+
                 // 绑定事件处理器
                 runItem.setOnAction(e -> handleRun(currentJob));
                 logItem.setOnAction(e -> handleViewLog(currentJob));
@@ -656,16 +690,15 @@ public class ShowJobListDialog extends Dialog<Void> {
 
     private Node createPagerBar() {
         totalLabel = new Label("共 0 条");
-        totalLabel.setStyle(StyleUtil.body());
+        totalLabel.setStyle(StyleUtil.bodyFontOnly());
 
         prevBtn = new Button("上一页");
-        prevBtn.setStyle(StyleUtil.secondaryButton());
+        prevBtn.getStyleClass().add("dialog-button-secondary");
         nextBtn = new Button("下一页");
-        nextBtn.setStyle(StyleUtil.secondaryButton());
+        nextBtn.getStyleClass().add("dialog-button-secondary");
         
         pageField = new TextField(String.valueOf(pageNum));
         pageField.setPrefWidth(60);
-        pageField.setStyle(StyleUtil.searchField());
         pageField.setOnAction(e -> {
             try {
                 int p = Integer.parseInt(pageField.getText().trim());
@@ -702,9 +735,9 @@ public class ShowJobListDialog extends Dialog<Void> {
         });
 
         Label pageSizeLabel = new Label("每页");
-        pageSizeLabel.setStyle(StyleUtil.body());
+        pageSizeLabel.setStyle(StyleUtil.bodyFontOnly());
         Label pageLabel = new Label("页码");
-        pageLabel.setStyle(StyleUtil.body());
+        pageLabel.setStyle(StyleUtil.bodyFontOnly());
 
         HBox pager = new HBox(12,
                 totalLabel,
@@ -713,13 +746,9 @@ public class ShowJobListDialog extends Dialog<Void> {
                 pageLabel, pageField,
                 nextBtn
         );
+        pager.getStyleClass().add("dialog-section");
         pager.setAlignment(Pos.CENTER_LEFT);
         pager.setPadding(new Insets(16, 16, 16, 16));
-        pager.setStyle(
-                "-fx-background-color: " + StyleUtil.BG_PRIMARY + "; " +
-                "-fx-background-radius: " + StyleUtil.RADIUS_LG + "; " +
-                "-fx-effect: " + StyleUtil.SHADOW_SM + ";"
-        );
         return pager;
     }
 
@@ -818,14 +847,23 @@ public class ShowJobListDialog extends Dialog<Void> {
 
     private void handleRun(JobInfoVO job) {
         if (job == null || job.getId() == null) return;
-        
-        // 显示执行参数输入对话框
+
+        // DataX 任务：不弹框，直接使用任务已配置的执行参数触发
+        if ("DATAX".equalsIgnoreCase(job.getGlueType())) {
+            runAsync("执行任务", () -> {
+                jobInfoService.triggerOnce(job.getId(), safe(job.getExecutorParam()));
+                return "触发成功";
+            });
+            return;
+        }
+
+        // 非 DataX：显示执行参数输入对话框
         TextInputDialog dialog = new TextInputDialog(safe(job.getExecutorParam()));
         dialog.setTitle("执行一次");
         dialog.setHeaderText("任务: " + safe(job.getJobDesc()));
         dialog.setContentText("执行参数:");
         dialog.initOwner(getDialogPane().getScene().getWindow());
-        
+
         dialog.showAndWait().ifPresent(param -> {
             runAsync("执行任务", () -> {
                 jobInfoService.triggerOnce(job.getId(), param);
@@ -936,14 +974,23 @@ public class ShowJobListDialog extends Dialog<Void> {
                                 saveEditedJob(job.getId(), result, true);
                             }
                         });
+                        loadPage(false);
                     } else {
-                        // 普通任务 - 使用 NewJobDialog
-                        NewJobDialog dialog = new NewJobDialog(ownerStage, formData, groupList);
-                        dialog.showAndWait().ifPresent(result -> {
-                            if (result != null) {
-                                saveEditedJob(job.getId(), result, false);
-                            }
-                        });
+                        // DataX 任务 - 使用数据源同步向导页
+                        if ("runDataxHandler".equals(job.getExecutorHandler())) {
+                            ShowDataxSyncDialog dataxDialog = new ShowDataxSyncDialog(ownerStage, formData);
+                            dataxDialog.showAndWait();
+                            loadPage(false);
+                        } else {
+                            // 普通任务 - 使用 NewJobDialog
+                            NewJobDialog dialog = new NewJobDialog(ownerStage, formData, groupList);
+                            dialog.showAndWait().ifPresent(result -> {
+                                if (result != null) {
+                                    saveEditedJob(job.getId(), result, false);
+                                }
+                            });
+                            loadPage(false);
+                        }
                     }
                 });
             } catch (Exception ex) {

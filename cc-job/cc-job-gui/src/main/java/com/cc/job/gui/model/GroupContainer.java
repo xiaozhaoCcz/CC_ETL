@@ -1,5 +1,6 @@
 package com.cc.job.gui.model;
 
+import com.cc.job.gui.util.StyleUtil;
 import javafx.geometry.Insets;
 import javafx.scene.Cursor;
 import javafx.scene.control.ContextMenu;
@@ -41,10 +42,10 @@ public class GroupContainer extends StackPane {
     private final Circle leftConnector = new Circle(5, Color.web("#E0E7FF"));
     private final Circle rightConnector = new Circle(5, Color.web("#E0E7FF"));
     // ⭐ 新增：四个角的调整大小控制点
-    private final Circle topLeftResizeHandle = new Circle(6, Color.web("#6366F1"));
-    private final Circle topRightResizeHandle = new Circle(6, Color.web("#6366F1"));
-    private final Circle bottomLeftResizeHandle = new Circle(6, Color.web("#6366F1"));
-    private final Circle bottomRightResizeHandle = new Circle(6, Color.web("#6366F1"));
+    private final Circle topLeftResizeHandle = new Circle(6, Color.web("#2563EB"));
+    private final Circle topRightResizeHandle = new Circle(6, Color.web("#2563EB"));
+    private final Circle bottomLeftResizeHandle = new Circle(6, Color.web("#2563EB"));
+    private final Circle bottomRightResizeHandle = new Circle(6, Color.web("#2563EB"));
     private boolean expanded = true;
     private ContextMenu contextMenu;
     private Runnable onExpand; // 扩展回调（用于懒加载）
@@ -77,7 +78,7 @@ public class GroupContainer extends StackPane {
         frame.setArcWidth(12);
         frame.setArcHeight(12);
         frame.setFill(Color.web("#FFFFFF", 0.85));
-        frame.setStroke(Color.web("#6366F1"));
+        frame.setStroke(Color.web("#2563EB"));
         frame.setStrokeWidth(2);
         // ⭐ 修复：确保frame可以接收鼠标事件，以便触发右键菜单
         frame.setMouseTransparent(false);
@@ -92,29 +93,38 @@ public class GroupContainer extends StackPane {
 
         header = new VBox();
         header.setPadding(new Insets(6, 10, 6, 10));
-        header.setStyle("-fx-background-color: rgba(99,102,241,0.10); -fx-background-radius: 10 10 0 0;");
+        boolean dark = StyleUtil.isDarkTheme();
+        if (dark) {
+            header.setStyle("-fx-background-color: #2D2D30; -fx-background-radius: 10 10 0 0;");
+        } else {
+            header.setStyle("-fx-background-color: rgba(99,102,241,0.10); -fx-background-radius: 10 10 0 0;");
+        }
 
-        // 顶部栏：左标题 + 右上角 +/- 按钮
         HBox headerBar = new HBox();
         headerBar.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
 
         titleLabel = new Label(groupName);
-        titleLabel.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: #3730A3;");
+        titleLabel.setStyle("-fx-font-size: 13; -fx-font-weight: bold; -fx-text-fill: " + (dark ? "#569CD6" : "#3730A3") + ";");
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         toggleBtn = new Label("-");
-        toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #3730A3; -fx-background-color: rgba(99,102,241,0.12); -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;");
+        if (dark) {
+            toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #569CD6; -fx-background-color: #3C3C3C; -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;");
+            toggleBtn.setOnMouseEntered(e -> toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: white; -fx-background-color: #007ACC; -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;"));
+            toggleBtn.setOnMouseExited(e -> toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #569CD6; -fx-background-color: #3C3C3C; -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;"));
+        } else {
+            toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #3730A3; -fx-background-color: rgba(99,102,241,0.12); -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;");
+            toggleBtn.setOnMouseEntered(e -> toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: white; -fx-background-color: #2563EB; -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;"));
+            toggleBtn.setOnMouseExited(e -> toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #3730A3; -fx-background-color: rgba(99,102,241,0.12); -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;"));
+        }
         toggleBtn.setOnMouseClicked(e -> {
             toggle();
             e.consume();
         });
-        toggleBtn.setOnMouseEntered(e -> toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: white; -fx-background-color: #6366F1; -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;"));
-        toggleBtn.setOnMouseExited(e -> toggleBtn.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #3730A3; -fx-background-color: rgba(99,102,241,0.12); -fx-padding: 0 6 0 6; -fx-background-radius: 8; -fx-cursor: hand;"));
 
-        // 缩放比例显示标签
         zoomLabel = new Label("100%");
-        zoomLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #6366F1; -fx-background-color: rgba(99,102,241,0.12); -fx-padding: 2 6 2 6; -fx-background-radius: 4;");
+        zoomLabel.setStyle("-fx-font-size: 11; -fx-text-fill: " + (dark ? "#569CD6" : "#2563EB") + "; -fx-background-color: " + (dark ? "#3C3C3C" : "rgba(37,99,235,0.12)") + "; -fx-padding: 2 6 2 6; -fx-background-radius: 4;");
 
         headerBar.getChildren().addAll(titleLabel, spacer, zoomLabel, toggleBtn);
         header.getChildren().add(headerBar);
@@ -128,7 +138,7 @@ public class GroupContainer extends StackPane {
         connectorPane.setMouseTransparent(false);
         for (Circle c : new Circle[]{topConnector, bottomConnector, leftConnector, rightConnector}) {
             c.setRadius(5); // 与普通节点一致
-            c.setFill(Color.web("#8B5CF6")); // 与普通节点默认紫色一致
+            c.setFill(Color.web("#2563EB")); // 与普通节点默认蓝色一致
             c.setStroke(Color.WHITE);
             c.setStrokeWidth(2);
             c.setVisible(false); // 初始隐藏，悬停显示
@@ -137,11 +147,11 @@ public class GroupContainer extends StackPane {
             // 轻微投影
             c.setStyle("-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 2, 0, 0, 0.5);");
             c.setOnMouseEntered(ev -> {
-                c.setFill(Color.web("#A78BFA")); // 浅紫
+                c.setFill(Color.web("#93C5FD")); // 浅蓝
                 c.setCursor(Cursor.CROSSHAIR);
             });
             c.setOnMouseExited(ev -> {
-                c.setFill(Color.web("#8B5CF6"));
+                c.setFill(Color.web("#2563EB"));
             });
         }
 
@@ -296,11 +306,11 @@ public class GroupContainer extends StackPane {
 
             // 鼠标悬停效果
             handle.setOnMouseEntered(e -> {
-                handle.setFill(Color.web("#4F46E5"));
+                handle.setFill(Color.web("#1D4ED8"));
                 handle.setRadius(7);
             });
             handle.setOnMouseExited(e -> {
-                handle.setFill(Color.web("#6366F1"));
+                handle.setFill(Color.web("#2563EB"));
                 handle.setRadius(6);
             });
 

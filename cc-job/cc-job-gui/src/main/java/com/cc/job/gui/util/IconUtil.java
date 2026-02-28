@@ -1,17 +1,16 @@
 package com.cc.job.gui.util;
 
-import atlantafx.base.theme.Styles;
 import javafx.scene.paint.Color;
 import org.kordamp.ikonli.feather.Feather;
 import org.kordamp.ikonli.javafx.FontIcon;
 
 /**
- * 图标工具类 - 使用 Ikonli Dashicons 图标并与 Atlantafx 主题配色保持一致。
+ * 图标工具类 - 使用 Ikonli Feather 图标，不叠加 Atlantafx 样式以免覆盖图标字体导致乱码。
  */
 public final class IconUtil {
 
     private static final String SECONDARY_COLOR = "#64748B";
-    private static final String ACCENT_COLOR = "#6366F1";
+    private static final String ACCENT_COLOR = "#2563EB";
     private static final String SUCCESS_COLOR = "#10B981";
     private static final String WARNING_COLOR = "#F59E0B";
     private static final String DANGER_COLOR = "#EF4444";
@@ -24,10 +23,10 @@ public final class IconUtil {
 
     /**
      * 创建 Feather 线性图标。
+     * 不使用 Atlantafx Styles.FONT_ICON/TEXT_MUTED，避免覆盖 Ikonli 图标字体导致侧栏等处显示乱码。
      */
     private static FontIcon createFeatherIcon(Feather feather, String color, int size) {
         FontIcon icon = new FontIcon(feather);
-        icon.getStyleClass().addAll(Styles.FONT_ICON, Styles.TEXT_MUTED);
         icon.setIconSize(size);
         if (color != null) {
             icon.setIconColor(Color.web(color));
@@ -83,6 +82,22 @@ public final class IconUtil {
 
     public static FontIcon layoutVerticalIcon() {
         return createFeatherIcon(Feather.ALIGN_CENTER, SECONDARY_COLOR, 16);
+    }
+    
+    public static FontIcon alignLeftIcon() {
+        return createFeatherIcon(Feather.ALIGN_LEFT, SECONDARY_COLOR, 16);
+    }
+    
+    public static FontIcon alignRightIcon() {
+        return createFeatherIcon(Feather.ALIGN_RIGHT, SECONDARY_COLOR, 16);
+    }
+    
+    public static FontIcon alignCenterIcon() {
+        return createFeatherIcon(Feather.ALIGN_CENTER, SECONDARY_COLOR, 16);
+    }
+    
+    public static FontIcon gridIcon() {
+        return createFeatherIcon(Feather.GRID, SECONDARY_COLOR, 16);
     }
 
     public static FontIcon playIcon() {
@@ -168,7 +183,7 @@ public final class IconUtil {
     }
 
     public static FontIcon debugIcon() {
-        return createFeatherIcon(Feather.TERMINAL, "#7C3AED", 16);
+        return createFeatherIcon(Feather.TERMINAL, "#2563EB", 16);
     }
 
     // ============ 状态图标 ============
