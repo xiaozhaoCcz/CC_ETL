@@ -2,6 +2,8 @@ package com.cc.job.admin.task.thread;
 
 
 import com.cc.job.admin.config.XxlJobAdminConfig;
+import com.cc.job.admin.task.alarm.AlarmConvergenceHelper;
+import com.cc.job.admin.task.alarm.AlarmRuleChecker;
 import com.cc.job.admin.task.enums.TriggerTypeEnum;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobLog;
@@ -59,11 +61,22 @@ public class JobFailMonitorHelper {
 									XxlJobAdminConfig.getAdminConfig().getJobLogMapper().updateById(log);
 								}
 
-								// 2、fail alarm monitor
+								// 2、fail alarm monitor（支持告警收敛、告警规则：连续失败次数/仅工作时间）
 								int newAlarmStatus = 0;		// 告警状态：0-默认、-1=锁定状态、1-无需告警、2-告警成功、3-告警失败
 								if (info != null) {
-									boolean alarmResult = XxlJobAdminConfig.getAdminConfig().getJobAlarmer().alarm(info, log);
-									newAlarmStatus = alarmResult?2:3;
+									AlarmConvergenceHelper convergence = XxlJobAdminConfig.getAdminConfig().getAlarmConvergenceHelper();
+									AlarmRuleChecker ruleChecker = XxlJobAdminConfig.getAdminConfig().getAlarmRuleChecker();
+									if (convergence != null && convergence.shouldSkipAlarm(info.getId())) {
+										newAlarmStatus = 1; // 无需告警（收敛期内已告警过）
+									} else if (ruleChecker != null && ruleChecker.shouldSkipByRules(info.getId(), log)) {
+										newAlarmStatus = 1; // 无需告警（规则不满足：如连续失败未达次数或非工作时间）
+									} else {
+										boolean alarmResult = XxlJobAdminConfig.getAdminConfig().getJobAlarmer().alarm(info, log);
+										newAlarmStatus = alarmResult ? 2 : 3;
+										if (convergence != null) {
+											convergence.recordAlarm(info.getId());
+										}
+									}
 								} else {
 									newAlarmStatus = 1;
 								}

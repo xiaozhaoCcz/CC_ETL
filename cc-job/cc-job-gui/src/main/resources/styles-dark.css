@@ -918,6 +918,17 @@
     -fx-border-width: 1 0 2 0;
 }
 
+.task-nav-tab-dragging {
+    -fx-opacity: 0.85;
+    -fx-cursor: closed-hand;
+}
+
+.task-nav-drop-indicator {
+    -fx-stroke: #007ACC;
+    -fx-stroke-width: 2;
+    -fx-stroke-dash-array: 4 4;
+}
+
 .task-nav-tab-name {
     -fx-font-size: 12.5px;
     -fx-font-weight: 600;

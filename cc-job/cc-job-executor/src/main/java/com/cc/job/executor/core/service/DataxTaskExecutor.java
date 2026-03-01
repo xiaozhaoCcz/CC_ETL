@@ -103,8 +103,9 @@ public class DataxTaskExecutor {
             XxlJobHelper.log("DataX任务执行成功");
             logger.info("[DataxTaskExecutor] DataX任务执行成功 - jobId: {}", jobInfo.getId());
 
-            // 如果是增量同步，更新增量标记
-            if (jobInfo.getIncrementType() == ExecutorConstants.DataxType.INCREMENTAL) {
+            // 增量或参数增量同步成功后，更新游标
+            if (jobInfo.getIncrementType() == ExecutorConstants.DataxType.INCREMENTAL
+                    || jobInfo.getIncrementType() == ExecutorConstants.DataxType.PARAM_INCREMENTAL) {
                 dataRefresher.refreshIncrementalData(jobInfo);
             }
         } else {

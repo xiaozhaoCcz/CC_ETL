@@ -170,6 +170,35 @@ public class CanvasDataLoader {
                     node.setRemark(remark);
                 }
             }
+            // 从properties读取审批设置
+            Object requireApprovalObj = nodeData.getProperties().get("requireApproval");
+            if (requireApprovalObj != null) {
+                if (requireApprovalObj instanceof Boolean) {
+                    node.setRequireApproval((Boolean) requireApprovalObj);
+                } else if ("true".equalsIgnoreCase(String.valueOf(requireApprovalObj))) {
+                    node.setRequireApproval(true);
+                }
+            }
+            Object approverUserIdsObj = nodeData.getProperties().get("approverUserIds");
+            if (approverUserIdsObj != null) {
+                java.util.List<Long> ids = new java.util.ArrayList<>();
+                if (approverUserIdsObj instanceof java.util.List) {
+                    for (Object o : (java.util.List<?>) approverUserIdsObj) {
+                        if (o instanceof Number) ids.add(((Number) o).longValue());
+                        else if (o != null) try { ids.add(Long.parseLong(o.toString())); } catch (NumberFormatException ignored) { }
+                    }
+                } else if (approverUserIdsObj instanceof String) {
+                    try {
+                        com.google.gson.Gson gson = new com.google.gson.Gson();
+                        java.util.List<?> list = gson.fromJson((String) approverUserIdsObj, java.util.List.class);
+                        if (list != null) for (Object o : list) {
+                            if (o instanceof Number) ids.add(((Number) o).longValue());
+                            else if (o != null) try { ids.add(Long.parseLong(o.toString())); } catch (NumberFormatException ignored) { }
+                        }
+                    } catch (Exception ignored) { }
+                }
+                node.setApproverUserIds(ids);
+            }
         }
         
         return node;

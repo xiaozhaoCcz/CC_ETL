@@ -7,6 +7,7 @@ import com.xxl.job.core.biz.model.LogResult;
 import com.xxl.job.core.biz.model.ReturnT;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.cc.job.xo.model.dto.LogArchiveRequest;
 import com.cc.job.xo.model.query.JobLogQuery;
 import com.cc.job.xo.model.vo.JobLogVO;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -51,6 +52,18 @@ public class JobLogController {
     ) {
         boolean result = taskLogService.deleteJobLogs(queryParams);
         return Result.judge(result);
+    }
+
+    @RequirePermission(PermissionConstants.JOB_INFO_VIEW)
+    @Operation(summary = "日志归档：删除早于指定天数的日志")
+    @PostMapping("/archive")
+    public Result<Integer> archiveLogs(@RequestBody LogArchiveRequest request) {
+        int days = request.getOlderThanDays();
+        if (days < 1) {
+            return Result.failed("olderThanDays 至少为 1");
+        }
+        int deleted = taskLogService.archiveOlderThanDays(days);
+        return Result.success(deleted);
     }
 
     @RequirePermission(PermissionConstants.JOB_INFO_VIEW)

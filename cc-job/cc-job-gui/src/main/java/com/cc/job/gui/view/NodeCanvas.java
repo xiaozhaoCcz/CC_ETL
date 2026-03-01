@@ -2204,6 +2204,55 @@ public class NodeCanvas extends Pane {
         
         notifyNodeStructureChanged();
     }
+
+    /**
+     * 将画布模板追加到当前画布（在偏移处插入节点与连线）
+     * @return 是否成功
+     */
+    public boolean appendTemplateToCanvas(com.cc.job.gui.manager.CanvasTemplateManager.CanvasTemplate template,
+                                          double offsetX, double offsetY, java.util.function.Consumer<String> logCallback) {
+        if (template == null || template.getNodes() == null || template.getNodes().isEmpty()) {
+            if (logCallback != null) logCallback.accept("⚠ 模板无节点");
+            return false;
+        }
+        java.util.Map<String, ProcessNode> oldIdToNode = new java.util.HashMap<>();
+        for (com.cc.job.gui.manager.CanvasTemplateManager.TemplateNode tn : template.getNodes()) {
+            String newId = "tpl_" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+            JobComposeData.NodeData nodeData = new JobComposeData.NodeData();
+            nodeData.setId(newId);
+            nodeData.setType(tn.getNodeType() != null ? tn.getNodeType() : "rect");
+            nodeData.setJobName(tn.getNodeName() != null ? tn.getNodeName() : "Node");
+            nodeData.setX(tn.getX() + offsetX);
+            nodeData.setY(tn.getY() + offsetY);
+            nodeData.setProperties(tn.getProperties() != null ? tn.getProperties() : new java.util.HashMap<>());
+            ProcessNode node = dataLoader.createNodeFromData(nodeData);
+            if (node != null) {
+                setupNodeCallbacks(node);
+                nodeManager.addNode(node);
+                oldIdToNode.put(tn.getNodeId(), node);
+            }
+        }
+        if (template.getConnections() != null) {
+            int added = 0;
+            for (com.cc.job.gui.manager.CanvasTemplateManager.TemplateConnection tc : template.getConnections()) {
+                ProcessNode source = oldIdToNode.get(tc.getSourceNodeId());
+                ProcessNode target = oldIdToNode.get(tc.getTargetNodeId());
+                if (source != null && target != null) {
+                    javafx.scene.shape.Circle srcC = getConnectorByAnchor(source, "right", true);
+                    javafx.scene.shape.Circle tgtC = getConnectorByAnchor(target, "left", false);
+                    if (srcC != null && tgtC != null && connectionManager.addConnection(
+                            source, source.getConnectorPane(), srcC, target, target.getConnectorPane(), tgtC) != null) {
+                        added++;
+                    }
+                }
+            }
+            if (logCallback != null) logCallback.accept("✓ 已插入 " + template.getNodes().size() + " 个节点，" + added + " 条连线");
+        } else if (logCallback != null) {
+            logCallback.accept("✓ 已插入 " + template.getNodes().size() + " 个节点");
+        }
+        notifyNodeStructureChanged();
+        return true;
+    }
     
     /**
      * ⭐ 新增：从NodeData创建ConditionNode（不绑定子节点）

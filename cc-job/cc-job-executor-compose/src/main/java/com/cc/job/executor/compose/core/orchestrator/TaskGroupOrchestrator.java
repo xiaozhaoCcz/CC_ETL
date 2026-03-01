@@ -256,6 +256,28 @@ public class TaskGroupOrchestrator {
 
         // 解析执行参数，加载历史数据（如果指定了batchId）
         String historicalBatchId = parseBatchIdFromParam(executeParam);
+        // 解析恢复执行参数（审批通过后继续执行）
+        Long resumeFromNodeId = null;
+        String resumeBatchId = null;
+        if (executeParam != null && executeParam.trim().startsWith("{")) {
+            try {
+                Map<String, Object> paramMap = JSONUtil.toBean(executeParam.trim(), Map.class);
+                Object rb = paramMap.get("resumeBatchId");
+                Object fn = paramMap.get("fromNodeId");
+                if (rb != null && fn != null && !rb.toString().isEmpty()) {
+                    resumeBatchId = rb.toString();
+                    resumeFromNodeId = Long.parseLong(fn.toString());
+                    executionBatchId = resumeBatchId;
+                    Set<Long> resumeNodeIds = computeDownstreamNodeIds(edges, resumeFromNodeId);
+                    resumeNodeIds.add(resumeFromNodeId);
+                    nodes = nodes.stream().filter(n -> resumeNodeIds.contains(n.getId())).collect(Collectors.toList());
+                    edges = edges.stream().filter(e -> resumeNodeIds.contains(e.getFromNodeId()) && resumeNodeIds.contains(e.getEndNodeId())).collect(Collectors.toList());
+                    logger.info("[Orchestrator] 恢复执行模式 - fromNodeId: {}, 节点数: {}", resumeFromNodeId, nodes.size());
+                }
+            } catch (Exception e) {
+                logger.warn("[Orchestrator] 解析恢复参数失败 - executeParam: {}", executeParam, e);
+            }
+        }
         ExecutionContext tempContext = new ExecutionContext();
         tempContext.setTaskGroupId(taskGroupId);
         tempContext.setExecutionBatchId(executionBatchId);
@@ -321,7 +343,7 @@ public class TaskGroupOrchestrator {
         XxlJobContext xxlJobContext = XxlJobContext.getXxlJobContext();
         CONTEXT_HOLDER.set(xxlJobContext);
 
-        return ExecutionContext.builder()
+        ExecutionContext ctx = ExecutionContext.builder()
                 .taskGroupId(taskGroupId)
                 .executionBatchId(executionBatchId)
                 .taskGroupInfo(taskGroupInfo)
@@ -332,6 +354,32 @@ public class TaskGroupOrchestrator {
                 .dataContext(dataContext)
                 .jobNameMap(jobNameMap)
                 .build();
+        if (resumeFromNodeId != null && resumeBatchId != null) {
+            ctx.setResumeFromNodeId(resumeFromNodeId);
+            ctx.setResumeBatchId(resumeBatchId);
+        }
+        return ctx;
+    }
+
+    /** 计算从 fromNodeId 出发可到达的节点ID集合（含 fromNodeId 的下游） */
+    private Set<Long> computeDownstreamNodeIds(List<JobEdge> edges, Long fromNodeId) {
+        Set<Long> result = new HashSet<>();
+        Map<Long, List<Long>> adj = new HashMap<>();
+        for (JobEdge e : edges) {
+            if (e.getFromNodeId() != null && e.getEndNodeId() != null) {
+                adj.computeIfAbsent(e.getFromNodeId(), k -> new ArrayList<>()).add(e.getEndNodeId());
+            }
+        }
+        ArrayDeque<Long> queue = new ArrayDeque<>();
+        queue.add(fromNodeId);
+        result.add(fromNodeId);
+        while (!queue.isEmpty()) {
+            Long cur = queue.poll();
+            for (Long next : adj.getOrDefault(cur, Collections.emptyList())) {
+                if (result.add(next)) queue.add(next);
+            }
+        }
+        return result;
     }
 
     /**

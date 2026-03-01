@@ -273,6 +273,25 @@ public class NodeCallbackConfigurator {
             });
         });
 
+        // 审批设置回调
+        node.setOnApprovalSetting(() -> {
+            Platform.runLater(() -> {
+                javafx.stage.Stage stage = ownerStage;
+                if (stage == null && canvas.getScene() != null) {
+                    stage = (javafx.stage.Stage) canvas.getScene().getWindow();
+                }
+                if (stage == null) {
+                    NotificationToast.showWarning("⚠ 无法获取主窗口，无法打开审批设置");
+                    return;
+                }
+                com.cc.job.gui.view.NodeApprovalSettingDialog dialog = new com.cc.job.gui.view.NodeApprovalSettingDialog(stage, node);
+                dialog.showAndWait();
+                if (onColorChangedCallback != null) {
+                    onColorChangedCallback.run();
+                }
+            });
+        });
+
         // 保存为节点模板回调
         node.setOnSaveAsTemplate(() -> {
             Long jobId = node.getJobId();

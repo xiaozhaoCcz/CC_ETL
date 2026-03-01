@@ -122,6 +122,9 @@ public class JobInfoForm implements Serializable {
 
     private Integer jobPartId;
 
+    /** 审批等待超时时间（分钟），默认 1440 */
+    private Integer approvalWaitMinutes;
+
     private Double nodePositionX;
 
     private Double nodePositionY;
@@ -409,6 +412,14 @@ public class JobInfoForm implements Serializable {
 
     public void setJobPartId(Integer jobPartId) {
         this.jobPartId = jobPartId;
+    }
+
+    public Integer getApprovalWaitMinutes() {
+        return approvalWaitMinutes;
+    }
+
+    public void setApprovalWaitMinutes(Integer approvalWaitMinutes) {
+        this.approvalWaitMinutes = approvalWaitMinutes;
     }
 
     public Double getNodePositionX() {

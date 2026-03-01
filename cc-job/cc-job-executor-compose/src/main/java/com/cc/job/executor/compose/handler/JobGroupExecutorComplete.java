@@ -1,5 +1,6 @@
 package com.cc.job.executor.compose.handler;
 
+import com.cc.job.executor.compose.core.exception.WaitingApprovalException;
 import com.cc.job.executor.compose.core.orchestrator.TaskGroupOrchestrator;
 import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.handler.annotation.XxlJob;
@@ -69,7 +70,17 @@ public class JobGroupExecutorComplete {
         logger.info("[JobGroupExecutor] 批次ID: {}", executionBatchId);
         
         // 4. 委托给编排器执行（传递执行参数，用于解析历史批次ID）
-        orchestrator.execute(taskGroupId, executionBatchId, jobFlowPositionIds, executeParam);
+        try {
+            orchestrator.execute(taskGroupId, executionBatchId, jobFlowPositionIds, executeParam);
+        } catch (Exception e) {
+            Throwable cause = e.getCause();
+            if (e instanceof WaitingApprovalException || (cause != null && cause instanceof WaitingApprovalException)) {
+                logger.info("[JobGroupExecutor] 审批节点挂起等待审批");
+                XxlJobHelper.handleResult(300, "等待审批");
+            } else {
+                throw e;
+            }
+        }
     }
     
     /**

@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 @Tag(name = "datax接口")
 @RestController
@@ -51,6 +50,24 @@ public class JobDataxController {
     @PostMapping("/getJson")
     public Result<String> getJson(@RequestBody DataXParams dataXParams) {
         String json = dataxService.getJson(dataXParams);
+        return Result.success(json);
+    }
+
+    @RequirePermission(PermissionConstants.DATASOURCE_EDIT)
+    @Operation(summary = "预览（前N条）Reader JSON，用于 dry-run 或预览同步结果")
+    @PostMapping("/previewReaderJson")
+    public Result<String> previewReaderJson(@RequestBody Map<String, Object> body) {
+        DataXParams dataXParams = null;
+        if (body.get("dataXParams") instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> map = (Map<String, Object>) body.get("dataXParams");
+            dataXParams = new com.fasterxml.jackson.databind.ObjectMapper().convertValue(map, DataXParams.class);
+        }
+        int limit = body.get("previewLimit") instanceof Number ? ((Number) body.get("previewLimit")).intValue() : 10;
+        if (dataXParams == null) {
+            return Result.failed("dataXParams 不能为空");
+        }
+        String json = dataxService.getPreviewReaderJson(dataXParams, limit);
         return Result.success(json);
     }
 

@@ -140,7 +140,7 @@ public class JobInfo extends BaseEntity {
      */
     private Long jdbcDatasourceId;
     /**
-     * 增量类型：0-全量，1-增量
+     * 增量类型：0-全量，1-增量，2-参数增量
      */
     private Integer incrementType;
     /**
@@ -167,6 +167,10 @@ public class JobInfo extends BaseEntity {
      * 触发用户ID
      */
     private Integer triggerUserId;
+    /**
+     * 审批节点待办最长等待时间(分钟)，默认1440=24小时，超时未审批则本批次失败
+     */
+    private Integer approvalWaitMinutes;
 
     public Long getJobGroup() {
         return jobGroup;
@@ -472,6 +476,13 @@ public class JobInfo extends BaseEntity {
         this.triggerUserId = triggerUserId;
     }
 
+    public Integer getApprovalWaitMinutes() {
+        return approvalWaitMinutes;
+    }
+
+    public void setApprovalWaitMinutes(Integer approvalWaitMinutes) {
+        this.approvalWaitMinutes = approvalWaitMinutes;
+    }
 
     @Override
     public boolean equals(Object o) {
@@ -516,12 +527,13 @@ public class JobInfo extends BaseEntity {
                 Objects.equals(runTime, jobInfo.runTime) &&
                 Objects.equals(pauseStatus, jobInfo.pauseStatus) &&
                 Objects.equals(jobPartId, jobInfo.jobPartId) &&
-                Objects.equals(triggerUserId, jobInfo.triggerUserId);
+                Objects.equals(triggerUserId, jobInfo.triggerUserId) &&
+                Objects.equals(approvalWaitMinutes, jobInfo.approvalWaitMinutes);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), jobGroup, jobDesc, author, alarmEmail, scheduleType, scheduleConf, misfireStrategy, executorRouteStrategy, failStrategy, executorHandler, executorParam, executorBlockStrategy, executorTimeout, executorFailRetryCount, glueType, glueSource, glueRemark, glueUpdateTime, childJobId, triggerStatus, triggerOneStatus, triggerLastTime, triggerNextTime, jobType, parentId, reqType, reqHeader, reqBody, reqUrl, nodeFlag, jdbcDatasourceId, incrementType, incrementContent, incrementParamTemplate, runTime, pauseStatus, jobPartId, triggerUserId);
+        return Objects.hash(super.hashCode(), jobGroup, jobDesc, author, alarmEmail, scheduleType, scheduleConf, misfireStrategy, executorRouteStrategy, failStrategy, executorHandler, executorParam, executorBlockStrategy, executorTimeout, executorFailRetryCount, glueType, glueSource, glueRemark, glueUpdateTime, childJobId, triggerStatus, triggerOneStatus, triggerLastTime, triggerNextTime, jobType, parentId, reqType, reqHeader, reqBody, reqUrl, nodeFlag, jdbcDatasourceId, incrementType, incrementContent, incrementParamTemplate, runTime, pauseStatus, jobPartId, triggerUserId, approvalWaitMinutes);
     }
 
     @Override
@@ -565,6 +577,7 @@ public class JobInfo extends BaseEntity {
                 ", pauseStatus=" + pauseStatus +
                 ", jobPartId=" + jobPartId +
                 ", triggerUserId=" + triggerUserId +
+                ", approvalWaitMinutes=" + approvalWaitMinutes +
                 '}';
     }
 }

@@ -52,7 +52,7 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
     private int pageSize = 10;
     private long total = 0;
 
-    private static final String[] DATASOURCE_TYPES = {"", "MYSQL", "ORACLE", "POSTGRESQL"};
+    private static final String[] DATASOURCE_TYPES = {"", "MYSQL", "ORACLE", "POSTGRESQL", "MONGODB", "ELASTICSEARCH", "KAFKA"};
     private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public ShowDatasourceListDialog(Stage ownerStage) {
@@ -529,10 +529,11 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
         commentInput.setWrapText(true);
         commentInput.getStyleClass().add("dialog-search-field");
 
-        // 监听数据源类型变化，自动填充驱动类
+        // 监听数据源类型变化，自动填充驱动类与 URL 占位
         typeCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal != null && isBlank(driverInput.getText())) {
-                driverInput.setText(getDefaultDriver(newVal));
+            if (newVal != null) {
+                if (isBlank(driverInput.getText())) driverInput.setText(getDefaultDriver(newVal));
+                urlInput.setPromptText(getDefaultUrlPrompt(newVal));
             }
         });
 
@@ -754,11 +755,25 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
     }
 
     private String getDefaultDriver(String datasource) {
-        return switch (datasource) {
+        return switch (datasource != null ? datasource : "") {
             case "MYSQL" -> "com.mysql.cj.jdbc.Driver";
             case "ORACLE" -> "oracle.jdbc.driver.OracleDriver";
             case "POSTGRESQL" -> "org.postgresql.Driver";
+            case "MONGODB" -> "com.mongodb.jdbc.MongoDriver";
+            case "ELASTICSEARCH", "KAFKA" -> "";
             default -> "";
+        };
+    }
+
+    private String getDefaultUrlPrompt(String datasource) {
+        return switch (datasource != null ? datasource : "") {
+            case "MYSQL" -> "jdbc:mysql://host:3306/database";
+            case "ORACLE" -> "jdbc:oracle:thin:@host:1521:sid";
+            case "POSTGRESQL" -> "jdbc:postgresql://host:5432/database";
+            case "MONGODB" -> "mongodb://host:27017/database";
+            case "ELASTICSEARCH" -> "http://host:9200";
+            case "KAFKA" -> "localhost:9092 (bootstrap servers)";
+            default -> "jdbc:...";
         };
     }
 

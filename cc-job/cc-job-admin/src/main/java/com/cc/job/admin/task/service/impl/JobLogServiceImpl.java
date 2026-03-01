@@ -24,11 +24,15 @@ import com.cc.job.xo.mapper.JobLogMapper;
 import com.cc.job.admin.task.service.JobLogService;
 import com.cc.job.xo.model.entity.JobLog;
 import com.cc.job.xo.model.query.JobLogQuery;
+import com.cc.job.xo.model.vo.DashboardExecutionStatsVO;
+import com.cc.job.xo.model.vo.DashboardHealthVO;
 import com.cc.job.xo.model.vo.JobLogVO;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -115,6 +119,16 @@ public class JobLogServiceImpl extends ServiceImpl<JobLogMapper, JobLog> impleme
     }
 
     @Override
+    public int archiveOlderThanDays(int olderThanDays) {
+        LocalDateTime before = LocalDateTime.now().minusDays(olderThanDays);
+        LambdaQueryWrapper<JobLog> wrapper = new LambdaQueryWrapper<>();
+        wrapper.lt(JobLog::getTriggerTime, before);
+        int count = (int) this.count(wrapper);
+        this.remove(wrapper);
+        return count;
+    }
+
+    @Override
     public ReturnT<LogResult> getLogDetailCat(Long logId, int fromLineNum) {
         try {
             // valid
@@ -190,6 +204,9 @@ public class JobLogServiceImpl extends ServiceImpl<JobLogMapper, JobLog> impleme
 
         if(queryParams.getFilterTime()!=null&&queryParams.getFilterTime().length>0){
             wrapper.between(JobLog::getTriggerTime, DateUtils.formatDate(queryParams.getFilterTime()[0]),  DateUtils.formatDate(queryParams.getFilterTime()[1]));
+        }
+        if (queryParams.getKeyword() != null && !queryParams.getKeyword().trim().isEmpty()) {
+            wrapper.like(JobLog::getHandleMsg, "%" + queryParams.getKeyword().trim() + "%");
         }
     }
     
@@ -317,6 +334,121 @@ public class JobLogServiceImpl extends ServiceImpl<JobLogMapper, JobLog> impleme
         if (jobId != null) {
             wrapper.eq(JobLog::getJobId, jobId);
         }
+    }
+
+    @Override
+    public DashboardExecutionStatsVO getExecutionStats(LocalDateTime start, LocalDateTime end, Long jobId,
+                                                       int timeoutThresholdSeconds, int slowLogLimit) {
+        LambdaQueryWrapper<JobLog> w = new LambdaQueryWrapper<JobLog>()
+                .eq(JobLog::getHandleCode, 200)
+                .isNotNull(JobLog::getTriggerTime)
+                .isNotNull(JobLog::getHandleTime);
+        applyDashboardFilter(w, start, end, jobId);
+        w.orderByDesc(JobLog::getTriggerTime).last("LIMIT 5000");
+        List<JobLog> logs = this.list(w);
+        if (logs == null || logs.isEmpty()) {
+            DashboardExecutionStatsVO vo = new DashboardExecutionStatsVO();
+            vo.setAvgDurationMs(0L);
+            vo.setP99DurationMs(0L);
+            vo.setTimeoutCount(0L);
+            vo.setTotalCount(0L);
+            vo.setSlowLogs(List.of());
+            return vo;
+        }
+        List<Long> durationsMs = new ArrayList<>();
+        List<JobLog> withDuration = new ArrayList<>();
+        long thresholdMs = timeoutThresholdSeconds > 0 ? timeoutThresholdSeconds * 1000L : Long.MAX_VALUE;
+        for (JobLog log : logs) {
+            long ms = ChronoUnit.MILLIS.between(log.getTriggerTime(), log.getHandleTime());
+            if (ms >= 0) {
+                durationsMs.add(ms);
+                withDuration.add(log);
+            }
+        }
+        if (withDuration.isEmpty()) {
+            DashboardExecutionStatsVO vo = new DashboardExecutionStatsVO();
+            vo.setAvgDurationMs(0L);
+            vo.setP99DurationMs(0L);
+            vo.setTimeoutCount(0L);
+            vo.setTotalCount(0L);
+            vo.setSlowLogs(List.of());
+            return vo;
+        }
+        withDuration.sort(Comparator.comparingLong(l -> -ChronoUnit.MILLIS.between(l.getTriggerTime(), l.getHandleTime())));
+        long avg = durationsMs.stream().mapToLong(Long::longValue).sum() / durationsMs.size();
+        int p99Index = (int) Math.ceil(durationsMs.size() * 0.99) - 1;
+        if (p99Index < 0) p99Index = 0;
+        durationsMs.sort(Long::compareTo);
+        long p99 = durationsMs.get(Math.min(p99Index, durationsMs.size() - 1));
+        long timeoutCount = timeoutThresholdSeconds > 0
+                ? durationsMs.stream().filter(d -> d > thresholdMs).count()
+                : 0L;
+        List<Long> jobIds = withDuration.stream().map(JobLog::getJobId).distinct().toList();
+        Map<Long, JobInfo> jobInfoMap = taskInfoService.listByIds(jobIds).stream().collect(Collectors.toMap(JobInfo::getId, t -> t));
+        int limit = slowLogLimit <= 0 ? 20 : Math.min(slowLogLimit, 100);
+        List<DashboardExecutionStatsVO.SlowLogItem> slowLogs = new ArrayList<>();
+        for (int i = 0; i < Math.min(limit, withDuration.size()); i++) {
+            JobLog l = withDuration.get(i);
+            long d = ChronoUnit.MILLIS.between(l.getTriggerTime(), l.getHandleTime());
+            DashboardExecutionStatsVO.SlowLogItem item = new DashboardExecutionStatsVO.SlowLogItem();
+            item.setLogId(l.getId());
+            item.setJobId(l.getJobId());
+            item.setJobDesc(jobInfoMap.containsKey(l.getJobId()) ? jobInfoMap.get(l.getJobId()).getJobDesc() : "");
+            item.setDurationMs(d);
+            slowLogs.add(item);
+        }
+        DashboardExecutionStatsVO vo = new DashboardExecutionStatsVO();
+        vo.setAvgDurationMs(avg);
+        vo.setP99DurationMs(p99);
+        vo.setTimeoutCount(timeoutCount);
+        vo.setTotalCount((long) withDuration.size());
+        vo.setSlowLogs(slowLogs);
+        return vo;
+    }
+
+    @Override
+    public DashboardHealthVO getHealthStats(LocalDateTime start, LocalDateTime end, Long jobId, int topN, int recentLogLimit) {
+        DashboardHealthVO vo = new DashboardHealthVO();
+        long success = countLogSuccess(start, end, jobId);
+        long fail = countLogFail(start, end, jobId);
+        long total = success + fail;
+        vo.setTotalFinished(total);
+        if (total > 0) {
+            vo.setSuccessRate(100.0 * success / total);
+            vo.setFailRate(100.0 * fail / total);
+        } else {
+            vo.setSuccessRate(100.0);
+            vo.setFailRate(0.0);
+        }
+        int limitTopN = topN <= 0 ? 10 : Math.min(topN, 50);
+        int limitRecent = recentLogLimit <= 0 ? 20 : Math.min(recentLogLimit, 100);
+        List<Map<String, Object>> failedCounts = baseMapper.listFailedJobCounts(start, end, jobId, limitTopN);
+        List<DashboardHealthVO.FailedJobItem> topNList = new ArrayList<>();
+        if (failedCounts != null && !failedCounts.isEmpty()) {
+            List<Long> jobIds = new ArrayList<>();
+            for (Map<String, Object> row : failedCounts) {
+                Object j = row.get("jobId");
+                if (j == null) j = row.get("job_id");
+                if (j != null) jobIds.add(((Number) j).longValue());
+            }
+            Map<Long, JobInfo> infoMap = jobIds.isEmpty() ? Map.of() : taskInfoService.listByIds(jobIds).stream().collect(Collectors.toMap(JobInfo::getId, x -> x));
+            for (Map<String, Object> row : failedCounts) {
+                Object j = row.get("jobId");
+                if (j == null) j = row.get("job_id");
+                Object c = row.get("failCount");
+                if (c == null) c = row.get("failcount");
+                if (j == null || c == null) continue;
+                DashboardHealthVO.FailedJobItem item = new DashboardHealthVO.FailedJobItem();
+                item.setJobId(((Number) j).longValue());
+                item.setFailCount(((Number) c).longValue());
+                item.setJobDesc(infoMap.containsKey(item.getJobId()) ? infoMap.get(item.getJobId()).getJobDesc() : "");
+                topNList.add(item);
+            }
+        }
+        vo.setFailedJobTopN(topNList);
+        List<Long> recentIds = baseMapper.listRecentFailLogIds(start, end, jobId, limitRecent);
+        vo.setRecentFailLogIds(recentIds != null ? recentIds : List.of());
+        return vo;
     }
     
     /**

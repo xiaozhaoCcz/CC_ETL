@@ -99,6 +99,8 @@ public class ProcessNode extends StackPane {
 
     // 保存为节点模板回调
     private Runnable onSaveAsTemplate;
+    // 审批设置回调
+    private Runnable onApprovalSetting;
     
     /** 拖拽调整大小结束回调，用于撤销/重做入栈；参数为 (旧宽, 旧高, 新宽, 新高) */
     private Consumer<ResizeRecord> onResizeFinished;
@@ -178,6 +180,10 @@ public class ProcessNode extends StackPane {
     private String remark = ""; // 节点备注
     private javafx.scene.control.Tooltip remarkTooltip; // 备注提示框
     private FontIcon remarkIcon; // 备注图标（显示在节点右下角）
+
+    // 审批相关：是否需要审批、审批人用户ID列表
+    private boolean requireApproval = false;
+    private java.util.List<Long> approverUserIds = new java.util.ArrayList<>();
     
     private static final double NODE_WIDTH = 180;
     private static final double NODE_HEIGHT = 80;
@@ -723,6 +729,14 @@ public class ProcessNode extends StackPane {
             }
         });
 
+        // 审批设置
+        MenuItem approvalSettingItem = new MenuItem("审批设置");
+        approvalSettingItem.setOnAction(e -> {
+            if (onApprovalSetting != null) {
+                onApprovalSetting.run();
+            }
+        });
+
         // 保存为节点模板
         MenuItem saveAsTemplateItem = new MenuItem("保存为节点模板");
         saveAsTemplateItem.setOnAction(e -> {
@@ -809,6 +823,7 @@ public class ProcessNode extends StackPane {
             dependenciesItem,
             editTagsItem,
             editRemarkItem,
+            approvalSettingItem,
             saveAsTemplateItem,
             separator1,
             styleItem,
@@ -990,6 +1005,10 @@ public class ProcessNode extends StackPane {
 
     public void setOnSaveAsTemplate(Runnable onSaveAsTemplate) {
         this.onSaveAsTemplate = onSaveAsTemplate;
+    }
+
+    public void setOnApprovalSetting(Runnable onApprovalSetting) {
+        this.onApprovalSetting = onApprovalSetting;
     }
     
     public void setIsInContainerChecker(java.util.function.Supplier<Boolean> isInContainerChecker) {
@@ -1961,6 +1980,24 @@ public class ProcessNode extends StackPane {
      */
     public String getRemark() {
         return remark;
+    }
+
+    // ==================== 审批相关 ====================
+
+    public boolean isRequireApproval() {
+        return requireApproval;
+    }
+
+    public void setRequireApproval(boolean requireApproval) {
+        this.requireApproval = requireApproval;
+    }
+
+    public java.util.List<Long> getApproverUserIds() {
+        return new java.util.ArrayList<>(approverUserIds);
+    }
+
+    public void setApproverUserIds(java.util.List<Long> approverUserIds) {
+        this.approverUserIds = approverUserIds != null ? new java.util.ArrayList<>(approverUserIds) : new java.util.ArrayList<>();
     }
     
     /**

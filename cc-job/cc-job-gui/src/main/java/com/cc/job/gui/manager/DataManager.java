@@ -127,6 +127,133 @@ public class DataManager {
     }
     
     /**
+     * 获取当前画布的节点与边的 JSON（用于保存为版本等），必须在 FX 线程调用。
+     * @return [nodesJson, edgesJson]，若无法生成则返回 null
+     */
+    public String[] getCurrentComposeJson() {
+        List<ProcessNode> nodes = canvas.getNodes();
+        List<NodeConnection> connections = canvas.getConnections();
+        List<GroupContainer> groups = canvas.getGroupContainers();
+        List<com.cc.job.gui.model.ConditionNode> conditionNodes = canvas.getConditionNodes();
+        try {
+            Set<String> addedNodeIds = new HashSet<>();
+            List<Map<String, Object>> nodesData = buildNodesData(nodes, groups, conditionNodes, addedNodeIds);
+            List<Map<String, Object>> edgesData = buildEdgesData(connections);
+            String nodesJson = apiUtil.getGson().toJson(nodesData);
+            String edgesJson = apiUtil.getGson().toJson(edgesData);
+            return new String[]{ nodesJson, edgesJson };
+        } catch (Exception e) {
+            logger.error("构建画布 JSON 失败", e);
+            return null;
+        }
+    }
+
+    private List<Map<String, Object>> buildNodesData(List<ProcessNode> nodes, List<GroupContainer> groups,
+            List<com.cc.job.gui.model.ConditionNode> conditionNodes, Set<String> addedNodeIds) {
+        List<Map<String, Object>> nodesData = new ArrayList<>();
+            
+        for (ProcessNode node : nodes) {
+            if (node.getNodeId() == null || addedNodeIds.contains(node.getNodeId())) continue;
+            Map<String, Object> nodeData = new HashMap<>();
+            nodeData.put("id", node.getNodeId());
+            nodeData.put("type", node.getType() != null ? node.getType() : "rect");
+            nodeData.put("x", node.getX());
+            nodeData.put("y", node.getY());
+            Map<String, Object> propertiesMap = new HashMap<>();
+            if (node.getJobId() != null) propertiesMap.put("jobId", node.getJobId());
+            if (node.getCurrentColor() != null) propertiesMap.put("color", node.getCurrentColor());
+            propertiesMap.put("width", node.getNodeWidth());
+            propertiesMap.put("height", node.getNodeHeight());
+            propertiesMap.put("borderStyle", node.getBorderStyle().name());
+            propertiesMap.put("borderWidth", node.getBorderWidth());
+            if (node.getRemark() != null && !node.getRemark().trim().isEmpty()) propertiesMap.put("remark", node.getRemark());
+            if (node.getTags() != null && !node.getTags().isEmpty()) propertiesMap.put("tags", node.getTags());
+            if (node.isRequireApproval()) propertiesMap.put("requireApproval", true);
+            if (node.getApproverUserIds() != null && !node.getApproverUserIds().isEmpty()) propertiesMap.put("approverUserIds", node.getApproverUserIds());
+            nodeData.put("properties", apiUtil.getGson().toJson(propertiesMap));
+            nodesData.add(nodeData);
+            addedNodeIds.add(node.getNodeId());
+        }
+        for (GroupContainer group : groups) {
+            if (group.getNodeId() == null) continue;
+            Map<String, Object> nodeData = new HashMap<>();
+            nodeData.put("id", group.getNodeId());
+            nodeData.put("type", "CustomGroup");
+            nodeData.put("x", group.getLayoutX());
+            nodeData.put("y", group.getLayoutY());
+            Map<String, Object> propertiesMap = new HashMap<>();
+            if (group.getGroupId() != null) propertiesMap.put("jobId", group.getGroupId());
+            List<String> childNodeIds = new ArrayList<>();
+            if (group.getManagedCanvasNodes() != null) {
+                for (ProcessNode child : group.getManagedCanvasNodes()) {
+                    if (child.getNodeId() != null) childNodeIds.add(child.getNodeId());
+                }
+            }
+            propertiesMap.put("children", childNodeIds);
+            nodeData.put("properties", apiUtil.getGson().toJson(propertiesMap));
+            nodesData.add(nodeData);
+            addedNodeIds.add(group.getNodeId());
+        }
+        for (ConditionNode conditionNode : conditionNodes) {
+            if (conditionNode.getNodeId() == null || addedNodeIds.contains(conditionNode.getNodeId())) continue;
+            Map<String, Object> nodeData = new HashMap<>();
+            nodeData.put("id", conditionNode.getNodeId());
+            nodeData.put("type", "ConditionNode");
+            nodeData.put("x", conditionNode.getLayoutX());
+            nodeData.put("y", conditionNode.getLayoutY());
+            Map<String, Object> propertiesMap = new HashMap<>();
+            if (conditionNode.getConditionExpression() != null) propertiesMap.put("conditionExpression", conditionNode.getConditionExpression());
+            if (conditionNode.getExpressionType() != null) propertiesMap.put("expressionType", conditionNode.getExpressionType().toString());
+            if (conditionNode.getConditionType() != null) propertiesMap.put("conditionType", conditionNode.getConditionType().toString());
+            propertiesMap.put("width", conditionNode.getContainerWidth());
+            propertiesMap.put("height", conditionNode.getContainerHeight());
+            List<String> childNodeIds = new ArrayList<>();
+            if (conditionNode.getManagedCanvasNodes() != null) {
+                for (ProcessNode child : conditionNode.getManagedCanvasNodes()) {
+                    if (child.getNodeId() != null) childNodeIds.add(child.getNodeId());
+                }
+            }
+            if (conditionNode.getManagedConditionNodes() != null) {
+                for (com.cc.job.gui.model.ConditionNode childCondition : conditionNode.getManagedConditionNodes()) {
+                    if (childCondition.getNodeId() != null) childNodeIds.add(childCondition.getNodeId());
+                }
+            }
+            propertiesMap.put("children", childNodeIds);
+            nodeData.put("properties", apiUtil.getGson().toJson(propertiesMap));
+            nodesData.add(nodeData);
+            addedNodeIds.add(conditionNode.getNodeId());
+        }
+        return nodesData;
+    }
+
+    private List<Map<String, Object>> buildEdgesData(List<NodeConnection> connections) {
+        List<Map<String, Object>> edgesData = new ArrayList<>();
+        Set<String> addedEdgeKeys = new HashSet<>();
+        for (NodeConnection conn : connections) {
+            String sourceId = getNodeId(conn.getSourceOwner());
+            String targetId = getNodeId(conn.getTargetOwner());
+            if (sourceId == null || targetId == null) continue;
+            String edgeKey = sourceId + "->" + targetId;
+            if (addedEdgeKeys.contains(edgeKey)) continue;
+            addedEdgeKeys.add(edgeKey);
+            Map<String, Object> edgeData = new HashMap<>();
+            edgeData.put("sourceNodeId", sourceId);
+            edgeData.put("targetNodeId", targetId);
+            edgeData.put("startPoint", "right");
+            edgeData.put("endPoint", "left");
+            Map<String, Object> properties = new HashMap<>();
+            NodeConnection.EdgeStyle edgeStyle = conn.getEdgeStyle();
+            properties.put("edgeStyle", edgeStyle != null ? edgeStyle.name() : NodeConnection.EdgeStyle.SOLID.name());
+            String edgeColor = conn.getEdgeColor();
+            properties.put("edgeColor", edgeColor != null && !edgeColor.isEmpty() ? edgeColor : "#374151");
+            properties.put("labelText", conn.getLabelText() != null ? conn.getLabelText() : "");
+            edgeData.put("properties", apiUtil.getGson().toJson(properties));
+            edgesData.add(edgeData);
+        }
+        return edgesData;
+    }
+
+    /**
      * 保存或更新任务组（内部方法）
      * @param currentTaskGroupId 任务组ID
      * @param async 是否异步执行
@@ -149,182 +276,9 @@ public class DataManager {
             nodes.size(), connections.size(), groups.size(), conditionNodes.size()));
         
         try {
-            // 构建节点数据
             Set<String> addedNodeIds = new HashSet<>();
-            List<Map<String, Object>> nodesData = new ArrayList<>();
-            
-            for (ProcessNode node : nodes) {
-                if (node.getNodeId() == null || addedNodeIds.contains(node.getNodeId())) continue;
-                
-                Map<String, Object> nodeData = new HashMap<>();
-                nodeData.put("id", node.getNodeId());
-                nodeData.put("type", node.getType() != null ? node.getType() : "rect");
-                nodeData.put("x", node.getX());
-                nodeData.put("y", node.getY());
-                
-                Map<String, Object> propertiesMap = new HashMap<>();
-                if (node.getJobId() != null) {
-                    propertiesMap.put("jobId", node.getJobId());
-                }
-                // 添加节点颜色到properties
-                if (node.getCurrentColor() != null) {
-                    propertiesMap.put("color", node.getCurrentColor());
-                }
-                // 添加节点大小到properties
-                propertiesMap.put("width", node.getNodeWidth());
-                propertiesMap.put("height", node.getNodeHeight());
-                // 添加边框样式到properties
-                propertiesMap.put("borderStyle", node.getBorderStyle().name());
-                // 添加边框粗细到properties
-                propertiesMap.put("borderWidth", node.getBorderWidth());
-                // 添加节点备注到properties
-                if (node.getRemark() != null && !node.getRemark().trim().isEmpty()) {
-                    propertiesMap.put("remark", node.getRemark());
-                }
-                // 添加节点标签到properties
-                if (node.getTags() != null && !node.getTags().isEmpty()) {
-                    propertiesMap.put("tags", node.getTags());
-                }
-                nodeData.put("properties", apiUtil.getGson().toJson(propertiesMap));
-                
-                nodesData.add(nodeData);
-                addedNodeIds.add(node.getNodeId());
-            }
-            
-            // 添加任务组节点
-            for (GroupContainer group : groups) {
-                if (group.getNodeId() == null) continue;
-                
-                Map<String, Object> nodeData = new HashMap<>();
-                nodeData.put("id", group.getNodeId());
-                nodeData.put("type", "CustomGroup");
-                nodeData.put("x", group.getLayoutX());
-                nodeData.put("y", group.getLayoutY());
-                
-                Map<String, Object> propertiesMap = new HashMap<>();
-                if (group.getGroupId() != null) {
-                    propertiesMap.put("jobId", group.getGroupId());
-                }
-                
-                List<String> childNodeIds = new ArrayList<>();
-                if (group.getManagedCanvasNodes() != null) {
-                    for (ProcessNode child : group.getManagedCanvasNodes()) {
-                        if (child.getNodeId() != null) {
-                            childNodeIds.add(child.getNodeId());
-                        }
-                    }
-                }
-                propertiesMap.put("children", childNodeIds);
-                nodeData.put("properties", apiUtil.getGson().toJson(propertiesMap));
-                
-                nodesData.add(nodeData);
-                addedNodeIds.add(group.getNodeId());
-            }
-            
-            // 添加条件节点
-            for (ConditionNode conditionNode : conditionNodes) {
-                if (conditionNode.getNodeId() == null || addedNodeIds.contains(conditionNode.getNodeId())) continue;
-                
-                Map<String, Object> nodeData = new HashMap<>();
-                nodeData.put("id", conditionNode.getNodeId());
-                nodeData.put("type", "ConditionNode");
-                nodeData.put("x", conditionNode.getLayoutX());
-                nodeData.put("y", conditionNode.getLayoutY());
-                
-                Map<String, Object> propertiesMap = new HashMap<>();
-                // 保存条件节点属性
-                if (conditionNode.getConditionExpression() != null) {
-                    propertiesMap.put("conditionExpression", conditionNode.getConditionExpression());
-                }
-                if (conditionNode.getExpressionType() != null) {
-                    propertiesMap.put("expressionType", conditionNode.getExpressionType().toString());
-                }
-                // ⭐ 新增：保存conditionType
-                if (conditionNode.getConditionType() != null) {
-                    propertiesMap.put("conditionType", conditionNode.getConditionType().toString());
-                }
-                // ⭐ 新增：保存容器大小
-                propertiesMap.put("width", conditionNode.getContainerWidth());
-                propertiesMap.put("height", conditionNode.getContainerHeight());
-                
-                // 保存子节点ID列表
-                List<String> childNodeIds = new ArrayList<>();
-                if (conditionNode.getManagedCanvasNodes() != null) {
-                    for (ProcessNode child : conditionNode.getManagedCanvasNodes()) {
-                        if (child.getNodeId() != null) {
-                            childNodeIds.add(child.getNodeId());
-                        }
-                    }
-                }
-                // 也包含嵌套的条件节点
-                if (conditionNode.getManagedConditionNodes() != null) {
-                    for (com.cc.job.gui.model.ConditionNode childCondition : conditionNode.getManagedConditionNodes()) {
-                        if (childCondition.getNodeId() != null) {
-                            childNodeIds.add(childCondition.getNodeId());
-                        }
-                    }
-                }
-                propertiesMap.put("children", childNodeIds);
-                nodeData.put("properties", apiUtil.getGson().toJson(propertiesMap));
-                
-                nodesData.add(nodeData);
-                addedNodeIds.add(conditionNode.getNodeId());
-            }
-            
-            // 构建连线数据
-            List<Map<String, Object>> edgesData = new ArrayList<>();
-            Set<String> addedEdgeKeys = new HashSet<>();
-            
-            for (NodeConnection conn : connections) {
-                String sourceId = getNodeId(conn.getSourceOwner());
-                String targetId = getNodeId(conn.getTargetOwner());
-                
-                if (sourceId == null || targetId == null) continue;
-                
-                String edgeKey = sourceId + "->" + targetId;
-                if (addedEdgeKeys.contains(edgeKey)) continue;
-                addedEdgeKeys.add(edgeKey);
-                
-                Map<String, Object> edgeData = new HashMap<>();
-                edgeData.put("sourceNodeId", sourceId);
-                edgeData.put("targetNodeId", targetId);
-                edgeData.put("startPoint", "right");
-                edgeData.put("endPoint", "left");
-                
-                // ⭐ 修复：保存连线样式、颜色和标签信息
-                Map<String, Object> properties = new HashMap<>();
-                // 总是保存样式（默认 SOLID）
-                NodeConnection.EdgeStyle edgeStyle = conn.getEdgeStyle();
-                if (edgeStyle != null) {
-                    properties.put("edgeStyle", edgeStyle.name());
-                } else {
-                    properties.put("edgeStyle", NodeConnection.EdgeStyle.SOLID.name());
-                }
-                // 总是保存颜色（默认 #374151）
-                String edgeColor = conn.getEdgeColor();
-                if (edgeColor != null && !edgeColor.isEmpty()) {
-                    properties.put("edgeColor", edgeColor);
-                } else {
-                    properties.put("edgeColor", "#374151");
-                }
-                // 总是保存标签（默认空字符串，以支持清除标签）
-                String labelText = conn.getLabelText();
-                if (labelText != null) {
-                    properties.put("labelText", labelText);
-                } else {
-                    properties.put("labelText", "");
-                }
-                // 总是保存properties（确保所有属性都有值）
-                String propertiesJson = apiUtil.getGson().toJson(properties);
-                edgeData.put("properties", propertiesJson);
-                
-                // 调试日志：记录保存的properties
-                logger.debug("保存连线properties: source={}, target={}, properties={}", 
-                    sourceId, targetId, propertiesJson);
-                
-                edgesData.add(edgeData);
-            }
-            
+            List<Map<String, Object>> nodesData = buildNodesData(nodes, groups, conditionNodes, addedNodeIds);
+            List<Map<String, Object>> edgesData = buildEdgesData(connections);
             String nodesJson = apiUtil.getGson().toJson(nodesData);
             String edgesJson = apiUtil.getGson().toJson(edgesData);
             

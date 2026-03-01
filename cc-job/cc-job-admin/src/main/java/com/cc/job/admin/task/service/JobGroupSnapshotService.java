@@ -3,6 +3,8 @@ package com.cc.job.admin.task.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.cc.job.xo.model.entity.JobGroupSnapshot;
 
+import java.util.List;
+
 /**
  * 任务组快照服务接口
  *
@@ -40,5 +42,11 @@ public interface JobGroupSnapshotService extends IService<JobGroupSnapshot> {
      * @return 是否成功
      */
     boolean deleteSnapshot(Long jobId, String randomId);
+
+    /** 保存为版本（randomId = "ver_" + versionName），用于版本与回滚 */
+    Long saveAsVersion(Long jobId, String versionName, String nodesJson, String edgesJson, String userId);
+
+    /** 列出任务组的手动版本列表（randomId 以 "ver_" 开头） */
+    List<JobGroupSnapshot> listVersions(Long jobId, int limit);
 }
 

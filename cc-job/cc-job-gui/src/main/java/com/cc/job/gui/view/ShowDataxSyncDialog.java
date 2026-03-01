@@ -65,8 +65,12 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     private TextArea readerSqlArea;
     private HBox readerColumnCheckBox;  // 表字段多选框容器（多列布局）
     private ScrollPane readerColumnScrollPane;  // 表字段滚动容器
-    private ComboBox<String> incrTypeCombo;  // 增量类型：全量/增量
+    private ComboBox<String> incrTypeCombo;  // 增量类型：全量/增量/参数增量
     private VBox incrConfigBox;  // 增量配置容器
+    private VBox incrModePanel;   // 增量模式区域（增量时显示）
+    private VBox paramIncrPanel;  // 参数增量区域（参数增量时显示）
+    private VBox paramIncrRowsContainer;  // 参数增量多参数行动态容器
+    private TextField paramIncrTemplateField;  // 参数增量时的参数模板（必填）
     private ComboBox<String> incrModeCombo;  // 增量模式：ID自增/时间自增
     private TextField incrColumnField;  // 增量字段名
     private TextField incrInitValueField;  // 增量初始值
@@ -426,6 +430,39 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                     incrParamTemplateField.setText(form.getIncrementParamTemplate());
                 }
                 updateIncrConfigVisibility();
+            } else if (incrType != null && incrType == 2) {
+                incrTypeCombo.setValue("参数增量");
+                paramIncrRowsContainer.getChildren().clear();
+                String content = form.getIncrementContent();
+                if (content != null && !content.trim().isEmpty()) {
+                    try {
+                        com.google.gson.JsonElement parsed = com.google.gson.JsonParser.parseString(content);
+                        if (parsed.isJsonArray()) {
+                            com.google.gson.JsonArray arr = parsed.getAsJsonArray();
+                            for (com.google.gson.JsonElement el : arr) {
+                                if (!el.isJsonObject()) continue;
+                                com.google.gson.JsonObject o = el.getAsJsonObject();
+                                addParamIncrRow();
+                                int last = paramIncrRowsContainer.getChildren().size() - 1;
+                                HBox row = (HBox) paramIncrRowsContainer.getChildren().get(last);
+                                if (row.getChildren().size() >= 3) {
+                                    ((TextField) row.getChildren().get(0)).setText(o.has("columnParam") ? o.get("columnParam").getAsString() : "");
+                                    ((TextField) row.getChildren().get(1)).setText(o.has("columnValue") ? o.get("columnValue").getAsString() : "");
+                                    ((TextField) row.getChildren().get(2)).setText(o.has("columnKey") ? o.get("columnKey").getAsString() : "");
+                                }
+                            }
+                        }
+                    } catch (Exception ignored) {
+                        addParamIncrRow();
+                    }
+                }
+                if (paramIncrRowsContainer.getChildren().isEmpty()) {
+                    addParamIncrRow();
+                }
+                if (paramIncrTemplateField != null && form.getIncrementParamTemplate() != null) {
+                    paramIncrTemplateField.setText(form.getIncrementParamTemplate());
+                }
+                updateIncrConfigVisibility();
             } else {
                 incrTypeCombo.setValue("全量");
                 updateIncrConfigVisibility();
@@ -574,7 +611,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         // 增量备份配置
         Label incrLabel = new Label("增量备份");
         incrLabel.setStyle(labelStyle);
-        incrTypeCombo = new ComboBox<>(FXCollections.observableArrayList("全量", "增量"));
+        incrTypeCombo = new ComboBox<>(FXCollections.observableArrayList("全量", "增量", "参数增量"));
         incrTypeCombo.getSelectionModel().selectFirst();
         HBox.setHgrow(incrTypeCombo, Priority.ALWAYS);
         incrTypeCombo.setOnAction(e -> updateIncrConfigVisibility());
@@ -586,7 +623,8 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         incrConfigBox.setStyle("-fx-background-radius: " + StyleUtil.RADIUS_MD + "; -fx-border-width: 1; -fx-border-radius: " + StyleUtil.RADIUS_MD + ";");
         incrConfigBox.setVisible(false);
         
-        // 增量模式
+        // ---------- 增量模式区域（选「增量」时显示）----------
+        incrModePanel = new VBox(8);
         HBox incrModeRow = new HBox(12);
         incrModeRow.setAlignment(Pos.CENTER_LEFT);
         Label incrModeLabel = new Label("增量模式");
@@ -597,7 +635,6 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         incrModeCombo.setOnAction(e -> updateIncrModeConfig());
         incrModeRow.getChildren().addAll(incrModeLabel, incrModeCombo);
         
-        // 增量字段
         HBox incrColumnRow = new HBox(12);
         incrColumnRow.setAlignment(Pos.CENTER_LEFT);
         Label incrColumnLabel = new Label("增量字段");
@@ -607,7 +644,6 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         HBox.setHgrow(incrColumnField, Priority.ALWAYS);
         incrColumnRow.getChildren().addAll(incrColumnLabel, incrColumnField);
         
-        // 初始值
         HBox incrValueRow = new HBox(12);
         incrValueRow.setAlignment(Pos.CENTER_LEFT);
         Label incrValueLabel = new Label("初始值");
@@ -617,7 +653,6 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         HBox.setHgrow(incrInitValueField, Priority.ALWAYS);
         incrValueRow.getChildren().addAll(incrValueLabel, incrInitValueField);
         
-        // 时间格式（仅时间自增时显示）
         HBox incrTimeFormatRow = new HBox(12);
         incrTimeFormatRow.setAlignment(Pos.CENTER_LEFT);
         Label incrTimeFormatLabel = new Label("时间格式");
@@ -628,7 +663,6 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         incrTimeFormatRow.getChildren().addAll(incrTimeFormatLabel, incrTimeFormatCombo);
         incrTimeFormatRow.setVisible(false);
         
-        // ID增量参数（可选）：自定义传给 DataX 的 -p 参数字符串，%s 按顺序替换为增量值
         HBox incrParamTemplateRow = new HBox(12);
         incrParamTemplateRow.setAlignment(Pos.CENTER_LEFT);
         Label incrParamTemplateLabel = new Label("ID增量参数");
@@ -638,7 +672,31 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         HBox.setHgrow(incrParamTemplateField, Priority.ALWAYS);
         incrParamTemplateRow.getChildren().addAll(incrParamTemplateLabel, incrParamTemplateField);
         
-        incrConfigBox.getChildren().addAll(incrModeRow, incrColumnRow, incrValueRow, incrTimeFormatRow, incrParamTemplateRow);
+        incrModePanel.getChildren().addAll(incrModeRow, incrColumnRow, incrValueRow, incrTimeFormatRow, incrParamTemplateRow);
+        
+        // ---------- 参数增量区域（选「参数增量」时显示）----------
+        paramIncrPanel = new VBox(8);
+        paramIncrPanel.setVisible(false);
+        Label paramIncrHint = new Label("多参数列表（参数名、参数值、对应源表字段用于刷新游标）");
+        paramIncrHint.setStyle(StyleUtil.bodyFontOnly());
+        paramIncrRowsContainer = new VBox(6);
+        addParamIncrRow();
+        HBox paramIncrAddRow = new HBox(8);
+        paramIncrAddRow.setAlignment(Pos.CENTER_LEFT);
+        javafx.scene.control.Button addParamBtn = new javafx.scene.control.Button("添加一行");
+        addParamBtn.setOnAction(e -> addParamIncrRow());
+        paramIncrAddRow.getChildren().add(addParamBtn);
+        HBox paramIncrTemplateRow = new HBox(12);
+        paramIncrTemplateRow.setAlignment(Pos.CENTER_LEFT);
+        Label paramIncrTemplateLabel = new Label("参数模板");
+        paramIncrTemplateLabel.setStyle(StyleUtil.bodyFontOnly() + " -fx-min-width: 80;");
+        paramIncrTemplateField = new TextField();
+        paramIncrTemplateField.setPromptText("必填，如 -DstartId=%s -DendId=%s，%s 按参数顺序替换");
+        HBox.setHgrow(paramIncrTemplateField, Priority.ALWAYS);
+        paramIncrTemplateRow.getChildren().addAll(paramIncrTemplateLabel, paramIncrTemplateField);
+        paramIncrPanel.getChildren().addAll(paramIncrHint, paramIncrRowsContainer, paramIncrAddRow, paramIncrTemplateRow);
+        
+        incrConfigBox.getChildren().addAll(incrModePanel, paramIncrPanel);
         
         VBox incrContainer = new VBox(8, incrTypeCombo, incrConfigBox);
         VBox.setVgrow(incrContainer, Priority.ALWAYS);
@@ -1199,6 +1257,41 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                     return;
                 }
             }
+            if ("参数增量".equals(incrTypeCombo.getValue())) {
+                int paramCount = 0;
+                boolean hasValid = false;
+                if (paramIncrRowsContainer != null) {
+                    for (javafx.scene.Node node : paramIncrRowsContainer.getChildren()) {
+                        if (!(node instanceof HBox) || ((HBox) node).getChildren().size() < 3) continue;
+                        HBox row = (HBox) node;
+                        String name = ((TextField) row.getChildren().get(0)).getText();
+                        String value = ((TextField) row.getChildren().get(1)).getText();
+                        if (name != null && !name.trim().isEmpty() && value != null && !value.trim().isEmpty()) {
+                            hasValid = true;
+                            paramCount++;
+                        }
+                    }
+                }
+                if (!hasValid) {
+                    showError("验证失败", "参数增量需要至少填写一行有效的参数名和参数值");
+                    return;
+                }
+                String template = paramIncrTemplateField != null ? paramIncrTemplateField.getText() : null;
+                if (template == null || template.trim().isEmpty()) {
+                    showError("验证失败", "参数增量需要填写参数模板");
+                    return;
+                }
+                int placeholderCount = 0;
+                int idx = 0;
+                while ((idx = template.indexOf("%s", idx)) != -1) {
+                    placeholderCount++;
+                    idx += 2;
+                }
+                if (placeholderCount < paramCount) {
+                    showError("验证失败", "参数模板中 %s 的数量不能少于有效参数数量");
+                    return;
+                }
+            }
             currentStep++;
             updateStepView();
         } else if (currentStep == 1) {
@@ -1335,12 +1428,17 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         }
         // 增量类型与增量内容（执行器依赖此判断是否追加 -p 参数及刷新增量标记）
         if (incrTypeCombo != null) {
-            int incrType = "增量".equals(incrTypeCombo.getValue()) ? 1 : 0;
+            String incrVal = incrTypeCombo.getValue();
+            int incrType = "增量".equals(incrVal) ? 1 : "参数增量".equals(incrVal) ? 2 : 0;
             form.setIncrementType(incrType);
             if (incrType == 1) {
                 form.setIncrementContent(buildIncrementContent());
                 form.setIncrementParamTemplate(incrParamTemplateField != null && incrParamTemplateField.getText() != null
                         ? incrParamTemplateField.getText().trim() : null);
+            } else if (incrType == 2) {
+                form.setIncrementContent(buildIncrementContent());
+                form.setIncrementParamTemplate(paramIncrTemplateField != null && paramIncrTemplateField.getText() != null
+                        ? paramIncrTemplateField.getText().trim() : null);
             } else {
                 form.setIncrementContent(null);
                 form.setIncrementParamTemplate(null);
@@ -1387,14 +1485,20 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                 readerParams.setType(0);
                 
                 // 设置增量类型和内容
-                int incrType = "全量".equals(incrTypeCombo.getValue()) ? 0 : 1;
+                String incrVal = incrTypeCombo.getValue();
+                int incrType = "全量".equals(incrVal) ? 0 : "参数增量".equals(incrVal) ? 2 : 1;
                 readerParams.setIncrementType(incrType);
                 if (incrType == 1) {
-                    // 构建增量内容
                     String incrementContent = buildIncrementContent();
                     readerParams.setIncrementContent(incrementContent);
                     if (incrParamTemplateField != null && incrParamTemplateField.getText() != null && !incrParamTemplateField.getText().trim().isEmpty()) {
                         readerParams.setIncrementParamTemplate(incrParamTemplateField.getText().trim());
+                    }
+                } else if (incrType == 2) {
+                    String incrementContent = buildIncrementContent();
+                    readerParams.setIncrementContent(incrementContent);
+                    if (paramIncrTemplateField != null && paramIncrTemplateField.getText() != null && !paramIncrTemplateField.getText().trim().isEmpty()) {
+                        readerParams.setIncrementParamTemplate(paramIncrTemplateField.getText().trim());
                     }
                 }
 
@@ -1799,26 +1903,60 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     
     // 更新增量配置可见性
     private void updateIncrConfigVisibility() {
-        boolean isIncremental = "增量".equals(incrTypeCombo.getValue());
+        String type = incrTypeCombo != null ? incrTypeCombo.getValue() : null;
+        boolean isFull = "全量".equals(type);
+        boolean isIncremental = "增量".equals(type);
+        boolean isParamIncr = "参数增量".equals(type);
         if (incrConfigBox != null) {
-            incrConfigBox.setVisible(isIncremental);
-            incrConfigBox.setManaged(isIncremental);
+            incrConfigBox.setVisible(!isFull);
+            incrConfigBox.setManaged(!isFull);
+        }
+        if (incrModePanel != null) {
+            incrModePanel.setVisible(isIncremental);
+            incrModePanel.setManaged(isIncremental);
+        }
+        if (paramIncrPanel != null) {
+            paramIncrPanel.setVisible(isParamIncr);
+            paramIncrPanel.setManaged(isParamIncr);
         }
         if (isIncremental) {
             updateIncrModeConfig();
         }
     }
     
-    // 更新增量模式配置
+    // 更新增量模式配置（时间格式行显隐）
     private void updateIncrModeConfig() {
-        if (incrModeCombo == null || incrConfigBox == null) return;
+        if (incrModeCombo == null || incrModePanel == null) return;
         boolean isTimeMode = "时间自增".equals(incrModeCombo.getValue());
-        // 找到时间格式行（incrConfigBox的最后一个子节点）
-        if (incrConfigBox.getChildren().size() > 3) {
-            Node timeFormatRow = incrConfigBox.getChildren().get(3);
+        if (incrModePanel.getChildren().size() > 3) {
+            Node timeFormatRow = incrModePanel.getChildren().get(3);
             timeFormatRow.setVisible(isTimeMode);
             timeFormatRow.setManaged(isTimeMode);
         }
+    }
+    
+    // 参数增量：添加一行（参数名、参数值、对应源表字段、删除按钮）
+    private void addParamIncrRow() {
+        if (paramIncrRowsContainer == null) return;
+        TextField paramName = new TextField();
+        paramName.setPromptText("参数名");
+        paramName.setPrefWidth(100);
+        TextField paramValue = new TextField();
+        paramValue.setPromptText("参数值");
+        paramValue.setPrefWidth(100);
+        TextField columnKey = new TextField();
+        columnKey.setPromptText("对应源表字段(可选)");
+        columnKey.setPrefWidth(120);
+        javafx.scene.control.Button delBtn = new javafx.scene.control.Button("删除");
+        delBtn.setOnAction(e -> {
+            if (paramIncrRowsContainer.getChildren().size() > 1) {
+                HBox row = (HBox) delBtn.getParent();
+                paramIncrRowsContainer.getChildren().remove(row);
+            }
+        });
+        HBox row = new HBox(8, paramName, paramValue, columnKey, delBtn);
+        row.setAlignment(Pos.CENTER_LEFT);
+        paramIncrRowsContainer.getChildren().add(row);
     }
     
     // 显示数据表占位符
@@ -2020,8 +2158,11 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         }
     }
     
-    // 构建增量内容JSON
+    // 构建增量内容JSON（增量=单字段+初始值；参数增量=多参数行）
     private String buildIncrementContent() {
+        if ("参数增量".equals(incrTypeCombo != null ? incrTypeCombo.getValue() : null)) {
+            return buildParamIncrContent();
+        }
         String columnKey = incrColumnField.getText().trim();
         String columnValue = incrInitValueField.getText().trim();
         String mode = incrModeCombo.getValue();
@@ -2031,11 +2172,10 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         String timeFormat = columnType == 1 && incrTimeFormatCombo.getValue() != null 
                 ? incrTimeFormatCombo.getValue() : "x";
         
-        // 构建DataxColumn对象
         com.google.gson.JsonObject columnObj = new com.google.gson.JsonObject();
         columnObj.addProperty("columnKey", columnKey);
         columnObj.addProperty("columnValue", columnValue);
-        columnObj.addProperty("columnParam", columnKey);  // 参数名通常与字段名相同
+        columnObj.addProperty("columnParam", columnKey);
         columnObj.addProperty("columnTimeFormat", timeFormat);
         columnObj.addProperty("columnType", columnType);
         
@@ -2043,6 +2183,29 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         jsonArray.add(columnObj);
         
         return new com.google.gson.Gson().toJson(jsonArray);
+    }
+    
+    // 参数增量：从多参数行构建 increment_content JSON
+    private String buildParamIncrContent() {
+        if (paramIncrRowsContainer == null) return "[]";
+        com.google.gson.JsonArray arr = new com.google.gson.JsonArray();
+        for (javafx.scene.Node node : paramIncrRowsContainer.getChildren()) {
+            if (!(node instanceof HBox)) continue;
+            HBox row = (HBox) node;
+            if (row.getChildren().size() < 3) continue;
+            TextField nameField = (TextField) row.getChildren().get(0);
+            TextField valueField = (TextField) row.getChildren().get(1);
+            TextField keyField = (TextField) row.getChildren().get(2);
+            String paramName = nameField.getText() != null ? nameField.getText().trim() : "";
+            String paramValue = valueField.getText() != null ? valueField.getText().trim() : "";
+            String columnKey = keyField.getText() != null ? keyField.getText().trim() : "";
+            com.google.gson.JsonObject obj = new com.google.gson.JsonObject();
+            obj.addProperty("columnParam", paramName);
+            obj.addProperty("columnValue", paramValue);
+            obj.addProperty("columnKey", columnKey);
+            arr.add(obj);
+        }
+        return new com.google.gson.Gson().toJson(arr);
     }
 
     private void copyToClipboard(String text) {

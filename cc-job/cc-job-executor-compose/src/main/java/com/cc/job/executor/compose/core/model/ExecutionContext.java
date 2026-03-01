@@ -46,6 +46,11 @@ public class ExecutionContext {
     /** jobName 到 jobId 的映射（用于参数解析） */
     private Map<String, Long> jobNameMap;
 
+    /** 恢复执行：从该节点ID之后继续（审批通过后触发） */
+    private Long resumeFromNodeId;
+    /** 恢复执行的批次ID */
+    private String resumeBatchId;
+
     public ExecutionContext() {
     }
 
@@ -147,6 +152,21 @@ public class ExecutionContext {
         this.jobNameMap = jobNameMap;
     }
 
+    public Long getResumeFromNodeId() {
+        return resumeFromNodeId;
+    }
+
+    public void setResumeFromNodeId(Long resumeFromNodeId) {
+        this.resumeFromNodeId = resumeFromNodeId;
+    }
+
+    public String getResumeBatchId() {
+        return resumeBatchId;
+    }
+
+    public void setResumeBatchId(String resumeBatchId) {
+        this.resumeBatchId = resumeBatchId;
+    }
 
     public static class ExecutionContextBuilder {
         private Long taskGroupId;

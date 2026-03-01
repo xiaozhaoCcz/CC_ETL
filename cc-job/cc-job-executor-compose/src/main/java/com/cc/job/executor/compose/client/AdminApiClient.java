@@ -326,6 +326,54 @@ public class AdminApiClient {
             return false;
         }
     }
+
+    /**
+     * 创建审批待办（执行到审批节点时调用）
+     */
+    public Long createPending(Long jobLogId, Long jobId, Long nodeId, String batchId,
+                              String approverUserIds, java.time.LocalDateTime waitDeadline) {
+        try {
+            Map<String, Object> body = new HashMap<>();
+            body.put("jobLogId", jobLogId);
+            body.put("jobId", jobId);
+            body.put("nodeId", nodeId);
+            body.put("batchId", batchId);
+            body.put("approverUserIds", approverUserIds);
+            if (waitDeadline != null) body.put("waitDeadline", waitDeadline.toString());
+            HttpResponse response = executePost("/api/v1/approvals/pending", JSONUtil.toJsonStr(body));
+            if (response != null && response.isOk()) {
+                Map<String, Object> resultMap = JSONUtil.toBean(response.body(), Map.class);
+                Object data = resultMap.get("data");
+                if (data != null) {
+                    if (data instanceof Number) return ((Number) data).longValue();
+                    return Long.parseLong(String.valueOf(data));
+                }
+            }
+            return null;
+        } catch (Exception e) {
+            logger.error("[AdminApiClient] 创建审批待办异常 - jobId: {}, nodeId: {}", jobId, nodeId, e);
+            return null;
+        }
+    }
+
+    /**
+     * 定时任务是否已审批通过过（仅审批一次）
+     */
+    public boolean isApprovalSatisfied(Long jobId, Long nodeId) {
+        try {
+            String path = "/api/v1/approvals/satisfied?jobId=" + jobId + "&nodeId=" + nodeId;
+            HttpResponse response = executeGet(path);
+            if (response != null && response.isOk()) {
+                Map<String, Object> resultMap = JSONUtil.toBean(response.body(), Map.class);
+                Object data = resultMap.get("data");
+                return Boolean.TRUE.equals(data);
+            }
+            return false;
+        } catch (Exception e) {
+            logger.warn("[AdminApiClient] 查询审批是否已满足异常 - jobId: {}, nodeId: {}", jobId, nodeId, e);
+            return false;
+        }
+    }
     
     /**
      * 更新任务组运行状态
