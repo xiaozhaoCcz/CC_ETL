@@ -2,6 +2,7 @@ package com.cc.job.gui.util;
 
 import com.cc.job.gui.infrastructure.client.HttpClientFactory;
 import com.cc.job.gui.infrastructure.config.ApplicationProperties;
+import com.cc.job.gui.util.SessionManager;
 import com.google.gson.Gson;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -150,20 +151,31 @@ public class ApiUtil {
      * @return Response，如果所有地址都失败则抛出异常
      * @throws IOException 网络异常
      */
+    /**
+     * 为请求添加 Authorization header（若已登录）
+     */
+    private Request addAuthorizationIfPresent(Request request) {
+        String auth = SessionManager.getInstance().getAuthorizationHeader();
+        if (auth == null || auth.isEmpty()) {
+            return request;
+        }
+        return request.newBuilder().addHeader("Authorization", auth).build();
+    }
+
     public Response executeRequestWithRetry(String path, java.util.function.Function<String, Request> requestBuilder) throws IOException {
         IOException lastException = null;
         
         // 如果没有配置多地址，使用单个地址（兼容旧代码）
         if (normalizedBaseUrls.isEmpty()) {
             String url = getBaseUrl() + path;
-            Request request = requestBuilder.apply(url);
+            Request request = addAuthorizationIfPresent(requestBuilder.apply(url));
             return getClient().newCall(request).execute();
         }
         
         for (String baseUrl : normalizedBaseUrls) {
             try {
                 String url = baseUrl + path;
-                Request request = requestBuilder.apply(url);
+                Request request = addAuthorizationIfPresent(requestBuilder.apply(url));
                 Response response = getClient().newCall(request).execute();
                 
                 if (response.isSuccessful()) {
@@ -171,7 +183,9 @@ public class ApiUtil {
                     return response;
                 } else {
                     logger.warn("[ApiUtil] 请求失败 - code: {}, url: {}", response.code(), url);
+                    String bodyStr = response.body() != null ? response.body().string() : "";
                     response.close();
+                    lastException = new IOException("HTTP " + response.code() + " " + bodyStr);
                 }
             } catch (IOException e) {
                 logger.warn("[ApiUtil] 请求异常 - address: {}, path: {}, error: {}", 

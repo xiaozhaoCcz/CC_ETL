@@ -6,10 +6,13 @@ import com.cc.job.gui.service.PermissionManageService;
 import com.cc.job.gui.util.NotificationToast;
 import com.cc.job.gui.util.ThemeManager;
 import com.cc.job.xo.model.entity.JobNode;
+import com.cc.job.xo.model.entity.JobPermission;
 import com.cc.job.xo.model.entity.JobRole;
 import com.cc.job.xo.model.vo.JobPartVo;
 import com.cc.job.xo.model.vo.UserListVO;
 import javafx.application.Platform;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
@@ -81,6 +84,23 @@ public class PermissionManageDialog extends Dialog<Void> {
     private List<JobPartVo> flatParts = new ArrayList<>();
     private List<JobPartVo> flatTaskGroups = new ArrayList<>();
 
+    // 角色权限 Tab（配置角色拥有哪些权限）
+    private ComboBox<JobRole> rolePermRoleCombo;
+    private TableView<PermissionCheckItem> rolePermTable;
+    private ObservableList<PermissionCheckItem> rolePermItems;
+    private Button saveRolePermButton;
+
+    /** 权限项（权限 + 是否勾选），用于角色权限配置表格 */
+    public static class PermissionCheckItem {
+        private final JobPermission permission;
+        private final BooleanProperty selected = new SimpleBooleanProperty(false);
+        public PermissionCheckItem(JobPermission permission) { this.permission = permission; }
+        public JobPermission getPermission() { return permission; }
+        public BooleanProperty selectedProperty() { return selected; }
+        public boolean isSelected() { return selected.get(); }
+        public void setSelected(boolean v) { selected.set(v); }
+    }
+
     public PermissionManageDialog(Stage owner) {
         initOwner(owner);
         initModality(Modality.APPLICATION_MODAL);
@@ -92,9 +112,12 @@ public class PermissionManageDialog extends Dialog<Void> {
         roleTab.setClosable(false);
         Tab resourceTab = new Tab("资源权限", createResourcePermissionTabContent());
         resourceTab.setClosable(false);
-        tabPane.getTabs().addAll(roleTab, resourceTab);
+        Tab rolePermTab = new Tab("角色权限", createRolePermissionTabContent());
+        rolePermTab.setClosable(false);
+        tabPane.getTabs().addAll(roleTab, resourceTab, rolePermTab);
         tabPane.getSelectionModel().selectedItemProperty().addListener((o, old, tab) -> {
             if (tab != null && "资源权限".equals(tab.getText())) loadTreeForResourcePicker();
+            if (tab != null && "角色权限".equals(tab.getText())) loadRolePermissionTabData();
         });
         getDialogPane().setContent(tabPane);
         String cssUrl = ThemeManager.getInstance().getStylesheetUrl();
@@ -311,6 +334,146 @@ public class PermissionManageDialog extends Dialog<Void> {
         root.getChildren().addAll(filterRow, listLabel, resourcePermissionTable, addSection);
         VBox.setVgrow(resourcePermissionTable, Priority.SOMETIMES);
         return root;
+    }
+
+    private VBox createRolePermissionTabContent() {
+        VBox root = new VBox(12);
+        root.setPadding(new Insets(16));
+        Label hint = new Label("说明：选择角色后勾选该角色拥有的权限，点击「保存」生效。管理员（角色ID=1）建议保留全部权限。");
+        hint.setWrapText(true);
+        hint.getStyleClass().add("hint-label");
+        HBox top = new HBox(10);
+        top.setAlignment(Pos.CENTER_LEFT);
+        top.getChildren().add(new Label("角色:"));
+        rolePermRoleCombo = new ComboBox<>();
+        rolePermRoleCombo.setMinWidth(220);
+        rolePermRoleCombo.setPromptText("请选择角色");
+        rolePermRoleCombo.setButtonCell(roleListCell());
+        rolePermRoleCombo.setCellFactory(lv -> roleListCell());
+        rolePermRoleCombo.getSelectionModel().selectedItemProperty().addListener((o, old, role) -> {
+            if (role != null) loadRolePermissionsForRole(role.getId());
+        });
+        saveRolePermButton = new Button("保存当前角色权限");
+        saveRolePermButton.setOnAction(e -> saveRolePermissions());
+        top.getChildren().addAll(rolePermRoleCombo, saveRolePermButton);
+        rolePermItems = FXCollections.observableArrayList();
+        rolePermTable = new TableView<>(rolePermItems);
+        rolePermTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        TableColumn<PermissionCheckItem, Boolean> colSel = new TableColumn<>("拥有");
+        colSel.setMinWidth(60);
+        colSel.setCellValueFactory(c -> c.getValue().selectedProperty());
+        colSel.setCellFactory(tc -> new TableCell<>() {
+            private final CheckBox check = new CheckBox();
+            { check.setOnAction(ev -> {
+                PermissionCheckItem item = getTableRow() != null ? getTableRow().getItem() : null;
+                if (item != null) item.setSelected(check.isSelected());
+            });
+            }
+            @Override
+            protected void updateItem(Boolean item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || getTableRow() == null || getTableRow().getItem() == null) {
+                    setGraphic(null);
+                    return;
+                }
+                PermissionCheckItem row = getTableRow().getItem();
+                check.selectedProperty().unbindBidirectional(row.selectedProperty());
+                check.selectedProperty().bindBidirectional(row.selectedProperty());
+                setGraphic(check);
+            }
+        });
+        TableColumn<PermissionCheckItem, String> colName = new TableColumn<>("权限名称");
+        colName.setCellValueFactory(c -> new ReadOnlyStringWrapper(c.getValue().getPermission().getName() != null ? c.getValue().getPermission().getName() : ""));
+        TableColumn<PermissionCheckItem, String> colCode = new TableColumn<>("权限码");
+        colCode.setCellValueFactory(c -> new ReadOnlyStringWrapper(c.getValue().getPermission().getPermissionCode() != null ? c.getValue().getPermission().getPermissionCode() : ""));
+        TableColumn<PermissionCheckItem, String> colDesc = new TableColumn<>("描述");
+        colDesc.setCellValueFactory(c -> new ReadOnlyStringWrapper(c.getValue().getPermission().getDescription() != null ? c.getValue().getPermission().getDescription() : ""));
+        rolePermTable.getColumns().addAll(colSel, colName, colCode, colDesc);
+        rolePermTable.setPrefHeight(320);
+        root.getChildren().addAll(hint, top, rolePermTable);
+        VBox.setVgrow(rolePermTable, Priority.ALWAYS);
+        return root;
+    }
+
+    private ListCell<JobRole> roleListCell() {
+        return new ListCell<>() {
+            @Override
+            protected void updateItem(JobRole item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : (item.getRoleName() != null ? item.getRoleName() : item.getRoleCode()) + " (ID:" + (item.getId() != null ? item.getId() : "") + ")");
+            }
+        };
+    }
+
+    private void loadRolePermissionTabData() {
+        if (rolePermRoleCombo == null) return;
+        rolePermRoleCombo.setItems(FXCollections.observableArrayList(allRolesItems));
+        new Thread(() -> {
+            try {
+                List<JobPermission> perms = permissionService.listPermissions();
+                Platform.runLater(() -> {
+                    rolePermItems.clear();
+                    if (perms != null) {
+                        for (JobPermission p : perms) {
+                            rolePermItems.add(new PermissionCheckItem(p));
+                        }
+                    }
+                    JobRole sel = rolePermRoleCombo.getSelectionModel().getSelectedItem();
+                    if (sel != null) loadRolePermissionsForRole(sel.getId());
+                });
+            } catch (IOException ex) {
+                logger.warn("加载权限列表失败: {}", ex.getMessage());
+                Platform.runLater(() -> NotificationToast.showError("获取权限列表失败: " + ex.getMessage()));
+            }
+        }).start();
+    }
+
+    private void loadRolePermissionsForRole(Long roleId) {
+        if (roleId == null || rolePermItems.isEmpty()) return;
+        new Thread(() -> {
+            try {
+                List<Long> permIds = permissionService.getRolePermissions(roleId);
+                Platform.runLater(() -> {
+                    for (PermissionCheckItem item : rolePermItems) {
+                        Long id = item.getPermission().getId();
+                        item.setSelected(id != null && permIds.contains(id));
+                    }
+                });
+            } catch (IOException ex) {
+                logger.warn("加载角色权限失败: {}", ex.getMessage());
+                Platform.runLater(() -> NotificationToast.showError("获取角色权限失败: " + ex.getMessage()));
+            }
+        }).start();
+    }
+
+    private void saveRolePermissions() {
+        JobRole role = rolePermRoleCombo != null ? rolePermRoleCombo.getSelectionModel().getSelectedItem() : null;
+        if (role == null || role.getId() == null) {
+            NotificationToast.showWarning("请先选择角色");
+            return;
+        }
+        List<Long> selectedIds = rolePermItems.stream()
+                .filter(PermissionCheckItem::isSelected)
+                .map(item -> item.getPermission().getId())
+                .filter(id -> id != null)
+                .collect(Collectors.toList());
+        final Long roleId = role.getId();
+        saveRolePermButton.setDisable(true);
+        new Thread(() -> {
+            try {
+                permissionService.updateRolePermissions(roleId, selectedIds);
+                Platform.runLater(() -> {
+                    NotificationToast.showSuccess("已保存角色权限");
+                    saveRolePermButton.setDisable(false);
+                });
+            } catch (IOException ex) {
+                logger.warn("保存角色权限失败: {}", ex.getMessage());
+                Platform.runLater(() -> {
+                    NotificationToast.showError("保存失败: " + ex.getMessage());
+                    saveRolePermButton.setDisable(false);
+                });
+            }
+        }).start();
     }
 
     private void buildResourcePickerContent() {

@@ -5,8 +5,10 @@ import com.cc.job.admin.exception.ForbiddenException;
 import com.cc.job.admin.task.auth.PermissionConstants;
 import com.cc.job.admin.task.auth.RequirePermission;
 import com.cc.job.xo.common.result.Result;
+import com.cc.job.xo.mapper.JobRolePermissionMapper;
 import com.cc.job.xo.mapper.JobUserRoleMapper;
 import com.cc.job.xo.model.entity.JobRole;
+import com.cc.job.xo.model.entity.JobRolePermission;
 import com.cc.job.xo.model.entity.JobUserRole;
 import com.cc.job.admin.task.service.JobRoleService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -14,6 +16,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -27,10 +30,13 @@ public class JobRoleManageController {
 
     private final JobRoleService jobRoleService;
     private final JobUserRoleMapper jobUserRoleMapper;
+    private final JobRolePermissionMapper jobRolePermissionMapper;
 
-    public JobRoleManageController(JobRoleService jobRoleService, JobUserRoleMapper jobUserRoleMapper) {
+    public JobRoleManageController(JobRoleService jobRoleService, JobUserRoleMapper jobUserRoleMapper,
+                                   JobRolePermissionMapper jobRolePermissionMapper) {
         this.jobRoleService = jobRoleService;
         this.jobUserRoleMapper = jobUserRoleMapper;
+        this.jobRolePermissionMapper = jobRolePermissionMapper;
     }
 
     @RequirePermission(PermissionConstants.PERMISSION_MANAGE)
@@ -49,6 +55,36 @@ public class JobRoleManageController {
             throw new ForbiddenException("超级管理员角色不可删除");
         }
         jobRoleService.removeById(id);
+        return Result.success();
+    }
+
+    @RequirePermission(PermissionConstants.PERMISSION_MANAGE)
+    @Operation(summary = "获取角色拥有的权限ID列表")
+    @GetMapping("/{roleId}/permissions")
+    public Result<List<Long>> getRolePermissions(@Parameter(description = "角色ID") @PathVariable Long roleId) {
+        List<JobRolePermission> list = jobRolePermissionMapper.selectList(
+                new LambdaQueryWrapper<JobRolePermission>().eq(JobRolePermission::getRoleId, roleId));
+        List<Long> permissionIds = list.stream().map(JobRolePermission::getPermissionId).distinct().toList();
+        return Result.success(permissionIds);
+    }
+
+    @RequirePermission(PermissionConstants.PERMISSION_MANAGE)
+    @Operation(summary = "更新角色权限")
+    @PutMapping("/{roleId}/permissions")
+    public Result<Void> updateRolePermissions(
+            @Parameter(description = "角色ID") @PathVariable Long roleId,
+            @RequestBody List<Long> permissionIds) {
+        jobRolePermissionMapper.delete(new LambdaQueryWrapper<JobRolePermission>().eq(JobRolePermission::getRoleId, roleId));
+        if (permissionIds != null && !permissionIds.isEmpty()) {
+            LocalDateTime now = LocalDateTime.now();
+            for (Long permissionId : permissionIds) {
+                JobRolePermission rp = new JobRolePermission();
+                rp.setRoleId(roleId);
+                rp.setPermissionId(permissionId);
+                rp.setCreateTime(now);
+                jobRolePermissionMapper.insert(rp);
+            }
+        }
         return Result.success();
     }
 }

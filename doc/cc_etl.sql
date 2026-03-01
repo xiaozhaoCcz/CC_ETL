@@ -5179,7 +5179,7 @@ CREATE TABLE `job_permission` (
   `is_deleted` int DEFAULT '0',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_permission_code` (`permission_code`)
-) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='权限表';
+) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='权限表';
 
 -- ----------------------------
 -- Records of job_permission
@@ -5196,6 +5196,8 @@ INSERT INTO `job_permission` (`id`, `permission_code`, `resource_type`, `action`
 INSERT INTO `job_permission` (`id`, `permission_code`, `resource_type`, `action`, `name`, `description`, `create_time`, `update_time`, `is_deleted`) VALUES (9, 'job_node:edit', 'JOB_NODE', 'EDIT', '节点编辑', '编辑任务节点', '2026-02-28 20:09:34', '2026-02-28 20:09:34', 0);
 INSERT INTO `job_permission` (`id`, `permission_code`, `resource_type`, `action`, `name`, `description`, `create_time`, `update_time`, `is_deleted`) VALUES (10, 'job_node:delete', 'JOB_NODE', 'DELETE', '节点删除', '删除任务节点', '2026-02-28 20:09:34', '2026-02-28 20:09:34', 0);
 INSERT INTO `job_permission` (`id`, `permission_code`, `resource_type`, `action`, `name`, `description`, `create_time`, `update_time`, `is_deleted`) VALUES (11, 'permission:manage', 'SYSTEM', 'MANAGE', '权限管理', '进入权限管理页面、管理用户与角色', '2026-02-28 20:09:34', '2026-02-28 20:09:34', 0);
+INSERT INTO `job_permission` (`id`, `permission_code`, `resource_type`, `action`, `name`, `description`, `create_time`, `update_time`, `is_deleted`) VALUES (12, 'datasource:view', 'DATASOURCE', 'VIEW', '数据源查看', '查看数据源列表与详情', '2026-02-28 20:09:34', '2026-02-28 20:09:34', 0);
+INSERT INTO `job_permission` (`id`, `permission_code`, `resource_type`, `action`, `name`, `description`, `create_time`, `update_time`, `is_deleted`) VALUES (13, 'datasource:edit', 'DATASOURCE', 'EDIT', '数据源编辑', '新增/修改/删除数据源、测试连接', '2026-02-28 20:09:34', '2026-02-28 20:09:34', 0);
 COMMIT;
 
 -- ----------------------------
@@ -5340,6 +5342,8 @@ INSERT INTO `job_role_permission` (`role_id`, `permission_id`, `create_time`) VA
 INSERT INTO `job_role_permission` (`role_id`, `permission_id`, `create_time`) VALUES (1, 9, '2026-02-28 20:09:34');
 INSERT INTO `job_role_permission` (`role_id`, `permission_id`, `create_time`) VALUES (1, 10, '2026-02-28 20:09:34');
 INSERT INTO `job_role_permission` (`role_id`, `permission_id`, `create_time`) VALUES (1, 11, '2026-02-28 20:09:34');
+INSERT INTO `job_role_permission` (`role_id`, `permission_id`, `create_time`) VALUES (1, 12, '2026-02-28 20:09:34');
+INSERT INTO `job_role_permission` (`role_id`, `permission_id`, `create_time`) VALUES (1, 13, '2026-02-28 20:09:34');
 INSERT INTO `job_role_permission` (`role_id`, `permission_id`, `create_time`) VALUES (2, 1, '2026-02-28 20:09:34');
 INSERT INTO `job_role_permission` (`role_id`, `permission_id`, `create_time`) VALUES (2, 4, '2026-02-28 20:09:34');
 INSERT INTO `job_role_permission` (`role_id`, `permission_id`, `create_time`) VALUES (2, 7, '2026-02-28 20:09:34');

@@ -12,6 +12,7 @@ public final class PermissionConstants {
     public static final String RESOURCE_PART = "PART";
     public static final String RESOURCE_JOB_INFO = "JOB_INFO";
     public static final String RESOURCE_JOB_NODE = "JOB_NODE";
+    public static final String RESOURCE_DATASOURCE = "DATASOURCE";
 
     /** 操作类型 */
     public static final String ACTION_VIEW = "VIEW";
@@ -33,6 +34,11 @@ public final class PermissionConstants {
 
     /** 权限管理（仅管理员可进入权限管理页面） */
     public static final String PERMISSION_MANAGE = "permission:manage";
+
+    /** 数据源查看（列表、分页、表单详情） */
+    public static final String DATASOURCE_VIEW = "datasource:view";
+    /** 数据源编辑（新增、修改、删除、测试连接） */
+    public static final String DATASOURCE_EDIT = "datasource:edit";
 
     /** 超级管理员用户ID（不可删除、不可取消管理员角色） */
     public static final long SUPER_ADMIN_USER_ID = 1L;

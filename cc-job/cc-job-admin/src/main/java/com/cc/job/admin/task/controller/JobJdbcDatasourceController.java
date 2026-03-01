@@ -7,6 +7,8 @@ import com.cc.job.xo.model.entity.JobJdbcDatasource;
 import com.cc.job.xo.model.form.JobJdbcDatasourceForm;
 import com.cc.job.xo.model.query.JobJdbcDatasourceQuery;
 import com.cc.job.xo.model.vo.JobJdbcDatasourceVO;
+import com.cc.job.admin.task.auth.PermissionConstants;
+import com.cc.job.admin.task.auth.RequirePermission;
 import com.cc.job.admin.task.service.JobJdbcDatasourceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -28,6 +30,7 @@ public class JobJdbcDatasourceController {
         this.jobJdbcDatasourceService = jobJdbcDatasourceService;
     }
 
+    @RequirePermission(PermissionConstants.DATASOURCE_VIEW)
     @Operation(summary = "jdbc数据源配置分页列表")
     @GetMapping("/page")
     public PageResult<JobJdbcDatasourceVO> getJdbcDatasourcePage(JobJdbcDatasourceQuery queryParams ) {
@@ -35,6 +38,7 @@ public class JobJdbcDatasourceController {
         return PageResult.success(result);
     }
 
+    @RequirePermission(PermissionConstants.DATASOURCE_VIEW)
     @Operation(summary = "jdbc数据源配置列表")
     @GetMapping("/list")
     public Result<List<JobJdbcDatasource>> getJdbcDatasourceList() {
@@ -42,6 +46,7 @@ public class JobJdbcDatasourceController {
         return Result.success(list);
     }
 
+    @RequirePermission(PermissionConstants.DATASOURCE_EDIT)
     @Operation(summary = "新增jdbc数据源配置")
     @PostMapping
     public Result<Void> saveJdbcDatasource(@RequestBody @Valid JobJdbcDatasourceForm formData ) {
@@ -49,6 +54,7 @@ public class JobJdbcDatasourceController {
         return Result.judge(result);
     }
 
+    @RequirePermission(PermissionConstants.DATASOURCE_VIEW)
     @Operation(summary = "获取jdbc数据源配置表单数据")
     @GetMapping("/{id}/form")
     public Result<JobJdbcDatasourceForm> getJdbcDatasourceForm(
@@ -58,6 +64,7 @@ public class JobJdbcDatasourceController {
         return Result.success(formData);
     }
 
+    @RequirePermission(PermissionConstants.DATASOURCE_EDIT)
     @Operation(summary = "修改jdbc数据源配置")
     @PutMapping(value = "/{id}")
     public Result<Void> updateJdbcDatasource(
@@ -68,6 +75,7 @@ public class JobJdbcDatasourceController {
         return Result.judge(result);
     }
 
+    @RequirePermission(PermissionConstants.DATASOURCE_EDIT)
     @Operation(summary = "删除jdbc数据源配置")
     @DeleteMapping("/{ids}")
     public Result<Void> deleteJdbcDatasources(
@@ -77,6 +85,7 @@ public class JobJdbcDatasourceController {
         return Result.judge(result);
     }
 
+    @RequirePermission(PermissionConstants.DATASOURCE_EDIT)
     @Operation(summary = "判断是否连接成功")
     @PostMapping("/isConnect")
     public Result<Boolean> isConnect(@RequestBody @Valid JobJdbcDatasourceForm formData ) {

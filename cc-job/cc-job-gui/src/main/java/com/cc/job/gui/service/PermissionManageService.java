@@ -2,6 +2,7 @@ package com.cc.job.gui.service;
 
 import com.cc.job.gui.util.SessionManager;
 import com.cc.job.xo.common.result.Result;
+import com.cc.job.xo.model.entity.JobPermission;
 import com.cc.job.xo.model.entity.JobRole;
 import com.cc.job.xo.model.vo.UserListVO;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -120,5 +121,23 @@ public class PermissionManageService extends BaseService {
 
     public void revokeResourcePermission(Long id) throws IOException {
         httpClient.deleteForBoolean("/api/v1/resourcePermissions/" + id);
+    }
+
+    /** 获取所有权限列表（用于角色权限配置） */
+    public List<JobPermission> listPermissions() throws IOException {
+        Result<List<JobPermission>> result = httpClient.get("/api/v1/permissions", new TypeToken<List<JobPermission>>() {});
+        return httpClient.extractData(result, "获取权限列表失败");
+    }
+
+    /** 获取角色拥有的权限ID列表 */
+    public List<Long> getRolePermissions(Long roleId) throws IOException {
+        Result<List<Long>> result = httpClient.get("/api/v1/roles/" + roleId + "/permissions", new TypeToken<List<Long>>() {});
+        List<Long> list = httpClient.extractDataOrNull(result, "获取角色权限失败");
+        return list != null ? list : new ArrayList<>();
+    }
+
+    /** 更新角色权限 */
+    public void updateRolePermissions(Long roleId, List<Long> permissionIds) throws IOException {
+        httpClient.put("/api/v1/roles/" + roleId + "/permissions", permissionIds != null ? permissionIds : new ArrayList<Long>(), Void.class);
     }
 }

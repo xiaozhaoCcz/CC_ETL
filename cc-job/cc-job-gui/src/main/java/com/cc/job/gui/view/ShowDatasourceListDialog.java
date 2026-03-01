@@ -414,9 +414,12 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
                     updatePagerButtons();
                 });
             } catch (Exception ex) {
+                String msg = ex.getMessage() != null ? ex.getMessage() : "";
+                boolean isForbidden = msg.contains("403") || msg.contains("无权限");
+                final String displayMsg = isForbidden ? "无权限访问数据源，请联系管理员授权" : msg;
                 Platform.runLater(() -> {
-                    totalLabel.setText("加载失败: " + ex.getMessage());
-                    showError("加载数据源列表失败", ex.getMessage());
+                    totalLabel.setText("加载失败: " + displayMsg);
+                    showError("加载数据源列表失败", displayMsg);
                 });
             } finally {
                 loading.set(false);
