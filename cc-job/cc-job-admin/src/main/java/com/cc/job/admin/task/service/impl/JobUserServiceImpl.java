@@ -4,15 +4,21 @@ import cn.hutool.core.lang.Assert;
 import cn.hutool.crypto.digest.BCrypt;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.cc.job.admin.task.auth.PermissionConstants;
 import com.cc.job.admin.task.service.JobUserService;
 import com.cc.job.admin.task.utils.JwtUtil;
 import com.cc.job.xo.common.exception.BusinessException;
+import com.cc.job.xo.mapper.JobResourcePermissionMapper;
 import com.cc.job.xo.mapper.JobUserMapper;
+import com.cc.job.xo.mapper.JobUserRoleMapper;
 import com.cc.job.xo.model.dto.LoginResult;
 import com.cc.job.xo.model.entity.JobUser;
+import com.cc.job.xo.model.entity.JobResourcePermission;
+import com.cc.job.xo.model.entity.JobUserRole;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 用户服务实现类
@@ -25,7 +31,12 @@ public class JobUserServiceImpl extends ServiceImpl<JobUserMapper, JobUser> impl
 
     private static final Logger log = LoggerFactory.getLogger(JobUserServiceImpl.class);
 
-    public JobUserServiceImpl() {
+    private final JobUserRoleMapper jobUserRoleMapper;
+    private final JobResourcePermissionMapper jobResourcePermissionMapper;
+
+    public JobUserServiceImpl(JobUserRoleMapper jobUserRoleMapper, JobResourcePermissionMapper jobResourcePermissionMapper) {
+        this.jobUserRoleMapper = jobUserRoleMapper;
+        this.jobResourcePermissionMapper = jobResourcePermissionMapper;
     }
 
     /**
@@ -176,6 +187,58 @@ public class JobUserServiceImpl extends ServiceImpl<JobUserMapper, JobUser> impl
      */
     public static String encodePassword(String rawPassword) {
         return BCrypt.hashpw(rawPassword, BCrypt.gensalt());
+    }
+
+    @Override
+    public JobUser createUserByAdmin(String username, String password) {
+        Assert.notBlank(username, "用户名不能为空");
+        Assert.notBlank(password, "密码不能为空");
+        if (username.length() < 3 || username.length() > 20) {
+            throw new BusinessException("用户名长度必须在3-20个字符之间");
+        }
+        if (password.length() < 6) {
+            throw new BusinessException("密码长度不能少于6位");
+        }
+        JobUser existing = findByUsername(username);
+        if (existing != null) {
+            throw new BusinessException("用户名已存在");
+        }
+        JobUser user = new JobUser();
+        user.setUsername(username);
+        user.setPassword(encodePassword(password));
+        save(user);
+        return user;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteUserById(Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("用户ID不能为空");
+        }
+        if (PermissionConstants.SUPER_ADMIN_USER_ID == userId) {
+            throw new BusinessException("不能删除超级管理员用户");
+        }
+        jobUserRoleMapper.delete(new LambdaQueryWrapper<JobUserRole>().eq(JobUserRole::getUserId, userId));
+        jobResourcePermissionMapper.delete(new LambdaQueryWrapper<JobResourcePermission>().eq(JobResourcePermission::getUserId, userId));
+        removeById(userId);
+    }
+
+    @Override
+    public void resetPassword(Long userId, String newPassword) {
+        if (userId == null) {
+            throw new IllegalArgumentException("用户ID不能为空");
+        }
+        Assert.notBlank(newPassword, "新密码不能为空");
+        if (newPassword.length() < 6) {
+            throw new BusinessException("密码长度不能少于6位");
+        }
+        JobUser user = getById(userId);
+        if (user == null) {
+            throw new BusinessException("用户不存在");
+        }
+        user.setPassword(encodePassword(newPassword));
+        updateById(user);
     }
 }
 

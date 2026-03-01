@@ -1,5 +1,7 @@
 package com.cc.job.admin.task.controller;
 
+import com.cc.job.admin.task.auth.PermissionConstants;
+import com.cc.job.admin.task.auth.RequirePermission;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.admin.task.service.JobGroupService;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -37,6 +39,7 @@ public class JobGroupController {
     }
 
 
+    @RequirePermission(PermissionConstants.JOB_INFO_VIEW)
     @Operation(summary = "task_group分页列表")
     @GetMapping("/{id}")
     public Result<JobGroup> getJobGroup(@Parameter(description = "执行器ID") @PathVariable("id") Long id) {
@@ -45,6 +48,7 @@ public class JobGroupController {
     }
 
 
+    @RequirePermission(PermissionConstants.JOB_INFO_VIEW)
     @Operation(summary = "task_group分页列表")
     @GetMapping("/page")
     public PageResult<JobGroupVO> getJobGroupPage(JobGroupQuery queryParams ) {
@@ -52,6 +56,7 @@ public class JobGroupController {
         return PageResult.success(result);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_EDIT)
     @Operation(summary = "新增task_group")
     @PostMapping
     public Result<Void> saveJobGroup(@RequestBody @Valid JobGroupForm formData ) {
@@ -59,6 +64,7 @@ public class JobGroupController {
         return Result.judge(result);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_VIEW)
     @Operation(summary = "获取task_group表单数据")
     @GetMapping("/{id}/form")
     public Result<JobGroupForm> getTaskGroupForm(
@@ -68,6 +74,7 @@ public class JobGroupController {
         return Result.success(formData);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_EDIT)
     @Operation(summary = "修改task_group")
     @PutMapping(value = "/{id}")
     public Result<Void> updateJobGroup(
@@ -78,6 +85,7 @@ public class JobGroupController {
         return Result.judge(result);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_EDIT)
     @Operation(summary = "删除task_group")
     @DeleteMapping("/{ids}")
     public Result<Void> deleteJobGroups(
@@ -88,6 +96,7 @@ public class JobGroupController {
     }
 
 
+    @RequirePermission(PermissionConstants.JOB_INFO_VIEW)
     @Operation(summary = "查看地址")
     @GetMapping("/findAddressList/{id}")
     public Result<List<String>> findAddressList(@PathVariable Long id){
@@ -95,6 +104,7 @@ public class JobGroupController {
         return Result.success(list);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_VIEW)
     @Operation(summary = "获取所有taskGroup")
     @GetMapping("/getAllJobGroupList")
     public Result<List<JobGroup>> getAllTaskGroupList(){

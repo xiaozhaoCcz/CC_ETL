@@ -90,6 +90,10 @@ public class PermissionManageDialog extends Dialog<Void> {
     private ObservableList<PermissionCheckItem> rolePermItems;
     private Button saveRolePermButton;
 
+    // 角色管理 Tab（新增/编辑/删除角色）
+    private TableView<JobRole> roleManageTable;
+    private ObservableList<JobRole> roleManageItems;
+
     /** 权限项（权限 + 是否勾选），用于角色权限配置表格 */
     public static class PermissionCheckItem {
         private final JobPermission permission;
@@ -110,14 +114,17 @@ public class PermissionManageDialog extends Dialog<Void> {
         TabPane tabPane = new TabPane();
         Tab roleTab = new Tab("用户与角色", createRoleTabContent());
         roleTab.setClosable(false);
+        Tab roleManageTab = new Tab("角色管理", createRoleManageTabContent());
+        roleManageTab.setClosable(false);
         Tab resourceTab = new Tab("资源权限", createResourcePermissionTabContent());
         resourceTab.setClosable(false);
         Tab rolePermTab = new Tab("角色权限", createRolePermissionTabContent());
         rolePermTab.setClosable(false);
-        tabPane.getTabs().addAll(roleTab, resourceTab, rolePermTab);
+        tabPane.getTabs().addAll(roleTab, roleManageTab, resourceTab, rolePermTab);
         tabPane.getSelectionModel().selectedItemProperty().addListener((o, old, tab) -> {
             if (tab != null && "资源权限".equals(tab.getText())) loadTreeForResourcePicker();
             if (tab != null && "角色权限".equals(tab.getText())) loadRolePermissionTabData();
+            if (tab != null && "角色管理".equals(tab.getText())) loadRoleManageTable();
         });
         getDialogPane().setContent(tabPane);
         String cssUrl = ThemeManager.getInstance().getStylesheetUrl();
@@ -151,7 +158,7 @@ public class PermissionManageDialog extends Dialog<Void> {
         HBox main = new HBox(16);
         main.setAlignment(Pos.CENTER_LEFT);
 
-        // 左侧：用户列表
+        // 左侧：用户列表 + 新增/删除/重置密码
         VBox left = new VBox(8);
         left.setMinWidth(220);
         left.getChildren().add(new Label("用户列表"));
@@ -166,7 +173,16 @@ public class PermissionManageDialog extends Dialog<Void> {
         });
         userList.getSelectionModel().selectedItemProperty().addListener((o, old, selected) -> onUserSelected(selected));
         VBox.setVgrow(userList, Priority.ALWAYS);
+        HBox userButtons = new HBox(8);
+        Button addUserBtn = new Button("新增用户");
+        addUserBtn.setOnAction(e -> showAddUserDialog());
+        Button deleteUserBtn = new Button("删除用户");
+        deleteUserBtn.setOnAction(e -> deleteSelectedUser());
+        Button resetPwdBtn = new Button("重置密码");
+        resetPwdBtn.setOnAction(e -> showResetPasswordDialog());
+        userButtons.getChildren().addAll(addUserBtn, deleteUserBtn, resetPwdBtn);
         left.getChildren().add(userList);
+        left.getChildren().add(userButtons);
 
         // 中间：当前用户已分配角色 + 操作按钮
         VBox center = new VBox(8);
@@ -393,6 +409,185 @@ public class PermissionManageDialog extends Dialog<Void> {
         root.getChildren().addAll(hint, top, rolePermTable);
         VBox.setVgrow(rolePermTable, Priority.ALWAYS);
         return root;
+    }
+
+    private VBox createRoleManageTabContent() {
+        VBox root = new VBox(12);
+        root.setPadding(new Insets(16));
+        Label hint = new Label("说明：可新增角色、编辑角色名称/编码/描述，或删除角色。超级管理员角色（ID=1）不可删除，仅可修改描述。");
+        hint.setWrapText(true);
+        hint.getStyleClass().add("hint-label");
+        HBox buttons = new HBox(8);
+        Button addRoleBtn = new Button("新增角色");
+        addRoleBtn.setOnAction(e -> showAddRoleDialog());
+        Button editRoleBtn = new Button("编辑选中角色");
+        editRoleBtn.setOnAction(e -> editSelectedRole());
+        Button deleteRoleBtn = new Button("删除选中角色");
+        deleteRoleBtn.setOnAction(e -> deleteSelectedRole());
+        buttons.getChildren().addAll(addRoleBtn, editRoleBtn, deleteRoleBtn);
+        roleManageItems = FXCollections.observableArrayList();
+        roleManageTable = new TableView<>(roleManageItems);
+        roleManageTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        TableColumn<JobRole, String> colName = new TableColumn<>("角色名称");
+        colName.setCellValueFactory(c -> new javafx.beans.property.SimpleStringProperty(c.getValue().getRoleName() != null ? c.getValue().getRoleName() : ""));
+        TableColumn<JobRole, String> colCode = new TableColumn<>("角色编码");
+        colCode.setCellValueFactory(c -> new javafx.beans.property.SimpleStringProperty(c.getValue().getRoleCode() != null ? c.getValue().getRoleCode() : ""));
+        TableColumn<JobRole, String> colDesc = new TableColumn<>("描述");
+        colDesc.setCellValueFactory(c -> new javafx.beans.property.SimpleStringProperty(c.getValue().getDescription() != null ? c.getValue().getDescription() : ""));
+        roleManageTable.getColumns().addAll(colName, colCode, colDesc);
+        roleManageTable.setPrefHeight(320);
+        root.getChildren().addAll(hint, buttons, roleManageTable);
+        VBox.setVgrow(roleManageTable, Priority.ALWAYS);
+        return root;
+    }
+
+    private void loadRoleManageTable() {
+        new Thread(() -> {
+            try {
+                List<JobRole> list = permissionService.listRoles();
+                Platform.runLater(() -> {
+                    roleManageItems.clear();
+                    if (list != null) roleManageItems.addAll(list);
+                });
+            } catch (IOException ex) {
+                logger.warn("加载角色列表失败: {}", ex.getMessage());
+                Platform.runLater(() -> NotificationToast.showError("获取角色列表失败: " + ex.getMessage()));
+            }
+        }).start();
+    }
+
+    private void showAddRoleDialog() {
+        Dialog<Map<String, String>> d = new Dialog<>();
+        d.setTitle("新增角色");
+        d.initOwner(getDialogPane().getScene().getWindow());
+        d.initModality(Modality.APPLICATION_MODAL);
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(20));
+        TextField nameField = new TextField();
+        nameField.setPromptText("角色名称");
+        nameField.setPrefWidth(240);
+        TextField codeField = new TextField();
+        codeField.setPromptText("角色编码（唯一）");
+        codeField.setPrefWidth(240);
+        TextField descField = new TextField();
+        descField.setPromptText("描述");
+        descField.setPrefWidth(240);
+        grid.add(new Label("角色名称:"), 0, 0);
+        grid.add(nameField, 1, 0);
+        grid.add(new Label("角色编码:"), 0, 1);
+        grid.add(codeField, 1, 1);
+        grid.add(new Label("描述:"), 0, 2);
+        grid.add(descField, 1, 2);
+        d.getDialogPane().setContent(grid);
+        d.getDialogPane().getButtonTypes().addAll(new ButtonType("确定", ButtonBar.ButtonData.OK_DONE), ButtonType.CANCEL);
+        d.setResultConverter(bt -> bt.getButtonData() == ButtonBar.ButtonData.OK_DONE
+                ? Map.of("roleName", nameField.getText().trim(), "roleCode", codeField.getText().trim(), "description", descField.getText().trim())
+                : null);
+        d.showAndWait().ifPresent(result -> {
+            String code = result.get("roleCode");
+            if (code == null || code.isEmpty()) {
+                NotificationToast.showWarning("角色编码不能为空");
+                return;
+            }
+            new Thread(() -> {
+                try {
+                    permissionService.createRole(result.get("roleName"), code, result.get("description"));
+                    Platform.runLater(() -> {
+                        loadRoleManageTable();
+                        loadRoles();
+                        if (rolePermRoleCombo != null) rolePermRoleCombo.setItems(FXCollections.observableArrayList(allRolesItems));
+                        NotificationToast.showSuccess("角色已创建");
+                    });
+                } catch (IOException ex) {
+                    Platform.runLater(() -> NotificationToast.showError("创建失败: " + ex.getMessage()));
+                }
+            }).start();
+        });
+    }
+
+    private void editSelectedRole() {
+        JobRole role = roleManageTable.getSelectionModel().getSelectedItem();
+        if (role == null) {
+            NotificationToast.showWarning("请先选择要编辑的角色");
+            return;
+        }
+        Dialog<Map<String, String>> d = new Dialog<>();
+        d.setTitle("编辑角色");
+        d.initOwner(getDialogPane().getScene().getWindow());
+        d.initModality(Modality.APPLICATION_MODAL);
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(20));
+        TextField nameField = new TextField(role.getRoleName() != null ? role.getRoleName() : "");
+        nameField.setPrefWidth(240);
+        TextField codeField = new TextField(role.getRoleCode() != null ? role.getRoleCode() : "");
+        codeField.setPrefWidth(240);
+        if (role.getId() != null && role.getId() == SUPER_ADMIN_ROLE_ID) {
+            codeField.setDisable(true);
+            nameField.setDisable(true);
+        }
+        TextField descField = new TextField(role.getDescription() != null ? role.getDescription() : "");
+        descField.setPrefWidth(240);
+        grid.add(new Label("角色名称:"), 0, 0);
+        grid.add(nameField, 1, 0);
+        grid.add(new Label("角色编码:"), 0, 1);
+        grid.add(codeField, 1, 1);
+        grid.add(new Label("描述:"), 0, 2);
+        grid.add(descField, 1, 2);
+        d.getDialogPane().setContent(grid);
+        d.getDialogPane().getButtonTypes().addAll(new ButtonType("确定", ButtonBar.ButtonData.OK_DONE), ButtonType.CANCEL);
+        d.setResultConverter(bt -> bt.getButtonData() == ButtonBar.ButtonData.OK_DONE
+                ? Map.of("roleName", nameField.getText().trim(), "roleCode", codeField.getText().trim(), "description", descField.getText().trim())
+                : null);
+        Long roleId = role.getId();
+        d.showAndWait().ifPresent(result -> {
+            new Thread(() -> {
+                try {
+                    permissionService.updateRole(roleId, result.get("roleName"), result.get("roleCode"), result.get("description"));
+                    Platform.runLater(() -> {
+                        loadRoleManageTable();
+                        loadRoles();
+                        loadRolePermissionTabData();
+                        NotificationToast.showSuccess("已保存");
+                    });
+                } catch (IOException ex) {
+                    Platform.runLater(() -> NotificationToast.showError("保存失败: " + ex.getMessage()));
+                }
+            }).start();
+        });
+    }
+
+    private void deleteSelectedRole() {
+        JobRole role = roleManageTable.getSelectionModel().getSelectedItem();
+        if (role == null) {
+            NotificationToast.showWarning("请先选择要删除的角色");
+            return;
+        }
+        if (role.getId() != null && role.getId() == SUPER_ADMIN_ROLE_ID) {
+            NotificationToast.showWarning("不能删除超级管理员角色");
+            return;
+        }
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("确认删除");
+        confirm.setHeaderText("删除角色 \"" + (role.getRoleName() != null ? role.getRoleName() : role.getRoleCode()) + "\"？");
+        confirm.initOwner(getDialogPane().getScene().getWindow());
+        if (confirm.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) return;
+        new Thread(() -> {
+            try {
+                permissionService.deleteRole(role.getId());
+                Platform.runLater(() -> {
+                    loadRoleManageTable();
+                    loadRoles();
+                    loadRolePermissionTabData();
+                    NotificationToast.showSuccess("已删除角色");
+                });
+            } catch (IOException ex) {
+                Platform.runLater(() -> NotificationToast.showError("删除失败: " + ex.getMessage()));
+            }
+        }).start();
     }
 
     private ListCell<JobRole> roleListCell() {
@@ -810,5 +1005,120 @@ public class PermissionManageDialog extends Dialog<Void> {
                 Platform.runLater(() -> NotificationToast.showError("移除角色失败: " + ex.getMessage()));
             }
         }).start();
+    }
+
+    private void showAddUserDialog() {
+        Dialog<Map<String, String>> d = new Dialog<>();
+        d.setTitle("新增用户");
+        d.initOwner(getDialogPane().getScene().getWindow());
+        d.initModality(Modality.APPLICATION_MODAL);
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(20));
+        TextField usernameField = new TextField();
+        usernameField.setPromptText("3-20个字符");
+        usernameField.setPrefWidth(240);
+        PasswordField passwordField = new PasswordField();
+        passwordField.setPromptText("至少6位");
+        passwordField.setPrefWidth(240);
+        grid.add(new Label("用户名:"), 0, 0);
+        grid.add(usernameField, 1, 0);
+        grid.add(new Label("初始密码:"), 0, 1);
+        grid.add(passwordField, 1, 1);
+        d.getDialogPane().setContent(grid);
+        ButtonType ok = new ButtonType("确定", ButtonBar.ButtonData.OK_DONE);
+        d.getDialogPane().getButtonTypes().addAll(ok, ButtonType.CANCEL);
+        d.setResultConverter(bt -> bt == ok ? Map.of("username", usernameField.getText().trim(), "password", passwordField.getText()) : null);
+        d.showAndWait().ifPresent(result -> {
+            String username = result.get("username");
+            String password = result.get("password");
+            if (username == null || username.length() < 3) {
+                NotificationToast.showWarning("用户名至少3个字符");
+                return;
+            }
+            if (password == null || password.length() < 6) {
+                NotificationToast.showWarning("密码至少6位");
+                return;
+            }
+            new Thread(() -> {
+                try {
+                    permissionService.createUser(username, password);
+                    Platform.runLater(() -> {
+                        loadUsers();
+                        NotificationToast.showSuccess("用户已创建");
+                    });
+                } catch (IOException ex) {
+                    Platform.runLater(() -> NotificationToast.showError("创建失败: " + ex.getMessage()));
+                }
+            }).start();
+        });
+    }
+
+    private void deleteSelectedUser() {
+        UserListVO user = userList.getSelectionModel().getSelectedItem();
+        if (user == null) {
+            NotificationToast.showWarning("请先选择要删除的用户");
+            return;
+        }
+        if (user.getId() != null && user.getId() == SUPER_ADMIN_USER_ID) {
+            NotificationToast.showWarning("不能删除超级管理员用户");
+            return;
+        }
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("确认删除");
+        confirm.setHeaderText("删除用户 \"" + (user.getUsername() != null ? user.getUsername() : "") + "\"？");
+        confirm.setContentText("将同时解除该用户的角色与资源权限，且不可恢复。");
+        confirm.initOwner(getDialogPane().getScene().getWindow());
+        if (confirm.showAndWait().orElse(ButtonType.CANCEL) != ButtonType.OK) return;
+        new Thread(() -> {
+            try {
+                permissionService.deleteUser(user.getId());
+                Platform.runLater(() -> {
+                    loadUsers();
+                    currentUserLabel.setText("请选择用户");
+                    userRolesItems.clear();
+                    NotificationToast.showSuccess("已删除用户");
+                });
+            } catch (IOException ex) {
+                Platform.runLater(() -> NotificationToast.showError("删除失败: " + ex.getMessage()));
+            }
+        }).start();
+    }
+
+    private void showResetPasswordDialog() {
+        UserListVO user = userList.getSelectionModel().getSelectedItem();
+        if (user == null) {
+            NotificationToast.showWarning("请先选择要重置密码的用户");
+            return;
+        }
+        Dialog<String> d = new Dialog<>();
+        d.setTitle("重置密码");
+        d.initOwner(getDialogPane().getScene().getWindow());
+        d.initModality(Modality.APPLICATION_MODAL);
+        VBox v = new VBox(10);
+        v.setPadding(new Insets(20));
+        v.getChildren().add(new Label("用户: " + (user.getUsername() != null ? user.getUsername() : user.getId())));
+        PasswordField pwd = new PasswordField();
+        pwd.setPromptText("新密码（至少6位）");
+        pwd.setPrefWidth(240);
+        v.getChildren().add(pwd);
+        d.getDialogPane().setContent(v);
+        d.getDialogPane().getButtonTypes().addAll(new ButtonType("确定", ButtonBar.ButtonData.OK_DONE), ButtonType.CANCEL);
+        d.setResultConverter(bt -> bt.getButtonData() == ButtonBar.ButtonData.OK_DONE ? pwd.getText() : null);
+        d.showAndWait().ifPresent(newPassword -> {
+            if (newPassword == null || newPassword.length() < 6) {
+                NotificationToast.showWarning("密码至少6位");
+                return;
+            }
+            new Thread(() -> {
+                try {
+                    permissionService.resetPassword(user.getId(), newPassword);
+                    Platform.runLater(() -> NotificationToast.showSuccess("密码已重置"));
+                } catch (IOException ex) {
+                    Platform.runLater(() -> NotificationToast.showError("重置失败: " + ex.getMessage()));
+                }
+            }).start();
+        });
     }
 }

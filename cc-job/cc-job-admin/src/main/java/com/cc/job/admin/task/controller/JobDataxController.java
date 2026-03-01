@@ -1,5 +1,7 @@
 package com.cc.job.admin.task.controller;
 
+import com.cc.job.admin.task.auth.PermissionConstants;
+import com.cc.job.admin.task.auth.RequirePermission;
 import com.cc.job.xo.common.result.Result;
 import com.cc.job.xo.model.datax.DataXParams;
 import com.cc.job.admin.task.service.DataxService;
@@ -27,6 +29,7 @@ public class JobDataxController {
         this.dataxService = dataxService;
     }
 
+    @RequirePermission(PermissionConstants.DATASOURCE_VIEW)
     @Operation(summary = "根据数据源获取所有的表")
     @GetMapping("/getTables/{id}")
     public Result<List<DataxTable>> getTables(@PathVariable Long id) {
@@ -35,6 +38,7 @@ public class JobDataxController {
     }
 
 
+    @RequirePermission(PermissionConstants.DATASOURCE_VIEW)
     @Operation(summary = "根据表获取所有的字段")
     @PostMapping("/getColumns/{id}")
     public Result<List<String>> getColumns(@PathVariable Long id, @RequestBody Map<String,Object> params) {
@@ -42,6 +46,7 @@ public class JobDataxController {
         return Result.success(tables);
     }
 
+    @RequirePermission(PermissionConstants.DATASOURCE_EDIT)
     @Operation(summary = "得到json")
     @PostMapping("/getJson")
     public Result<String> getJson(@RequestBody DataXParams dataXParams) {
@@ -49,6 +54,7 @@ public class JobDataxController {
         return Result.success(json);
     }
 
+    @RequirePermission(PermissionConstants.DATASOURCE_EDIT)
     @Operation(summary = "执行")
     @PostMapping("/batchBuildJson")
     public Result<List<String> > batchBuildJson(@RequestBody Map<String,Object> params) {

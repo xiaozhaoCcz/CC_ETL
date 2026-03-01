@@ -1,5 +1,7 @@
 package com.cc.job.admin.task.controller;
 
+import com.cc.job.admin.task.auth.PermissionConstants;
+import com.cc.job.admin.task.auth.RequirePermission;
 import com.cc.job.admin.task.service.JobLogService;
 import com.xxl.job.core.biz.model.LogResult;
 import com.xxl.job.core.biz.model.ReturnT;
@@ -33,6 +35,7 @@ public class JobLogController {
         this.taskLogService = taskLogService;
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_VIEW)
     @Operation(summary = "task_log分页列表")
     @GetMapping("/page")
     public PageResult<JobLogVO> getJobLogPage(JobLogQuery queryParams) {
@@ -40,6 +43,7 @@ public class JobLogController {
         return PageResult.success(result);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_VIEW)
     @Operation(summary = "删除task_log")
     @DeleteMapping
     public Result<Void> deleteJobLogs(
@@ -49,6 +53,7 @@ public class JobLogController {
         return Result.judge(result);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_VIEW)
     @Operation(summary = "查看log日志")
     @GetMapping("/logDetailCat")
     public Result<ReturnT<LogResult>> getLogDetailCat(@RequestParam("logId") Long logId, int fromLineNum) {

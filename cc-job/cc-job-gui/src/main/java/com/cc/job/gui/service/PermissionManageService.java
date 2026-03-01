@@ -140,4 +140,49 @@ public class PermissionManageService extends BaseService {
     public void updateRolePermissions(Long roleId, List<Long> permissionIds) throws IOException {
         httpClient.put("/api/v1/roles/" + roleId + "/permissions", permissionIds != null ? permissionIds : new ArrayList<Long>(), Void.class);
     }
+
+    /** 管理员创建用户 */
+    public UserListVO createUser(String username, String password) throws IOException {
+        Map<String, String> body = new HashMap<>();
+        body.put("username", username);
+        body.put("password", password);
+        Result<UserListVO> result = httpClient.post("/api/v1/users", body, UserListVO.class);
+        return httpClient.extractData(result, "创建用户失败");
+    }
+
+    /** 管理员删除用户 */
+    public void deleteUser(Long userId) throws IOException {
+        httpClient.deleteForBoolean("/api/v1/users/" + userId);
+    }
+
+    /** 管理员重置用户密码 */
+    public void resetPassword(Long userId, String newPassword) throws IOException {
+        Map<String, String> body = new HashMap<>();
+        body.put("password", newPassword);
+        httpClient.put("/api/v1/users/" + userId + "/password", body, Void.class);
+    }
+
+    /** 管理员新增角色 */
+    public JobRole createRole(String roleName, String roleCode, String description) throws IOException {
+        Map<String, String> body = new HashMap<>();
+        body.put("roleName", roleName != null ? roleName : "");
+        body.put("roleCode", roleCode);
+        body.put("description", description != null ? description : "");
+        Result<JobRole> result = httpClient.post("/api/v1/roles", body, JobRole.class);
+        return httpClient.extractData(result, "创建角色失败");
+    }
+
+    /** 管理员编辑角色 */
+    public void updateRole(Long roleId, String roleName, String roleCode, String description) throws IOException {
+        Map<String, String> body = new HashMap<>();
+        if (roleName != null) body.put("roleName", roleName);
+        if (roleCode != null) body.put("roleCode", roleCode);
+        if (description != null) body.put("description", description);
+        httpClient.put("/api/v1/roles/" + roleId, body, Void.class);
+    }
+
+    /** 管理员删除角色 */
+    public void deleteRole(Long roleId) throws IOException {
+        httpClient.deleteForBoolean("/api/v1/roles/" + roleId);
+    }
 }

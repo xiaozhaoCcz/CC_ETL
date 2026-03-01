@@ -242,6 +242,8 @@ public class TopToolBar extends VBox {
     private Menu recentFilesMenu;
 
     private MenuItem permissionManageItem;
+    private Menu permissionMenuRef;
+    private MenuItem datasourceMenuListItem;
     
     public TopToolBar() {
         initializeUI();
@@ -287,11 +289,27 @@ public class TopToolBar extends VBox {
         // 窗口菜单
         Menu windowMenu = createWindowMenu();
         
+        // 权限菜单（独立导航栏，仅拥有 permission:manage 时显示）
+        Menu permissionMenu = createPermissionMenu();
+        
         // 帮助菜单
         Menu helpMenu = createHelpMenu();
 
-        menuBar.getMenus().addAll(fileMenu, editMenu, selectMenu, viewMenu, goMenu, runMenu, jobMenu, windowMenu, helpMenu);
+        menuBar.getMenus().addAll(fileMenu, editMenu, selectMenu, viewMenu, goMenu, runMenu, jobMenu, windowMenu, permissionMenu, helpMenu);
         return menuBar;
+    }
+    
+    /**
+     * 独立的「权限」导航菜单，仅放权限管理入口；未授权用户不显示该菜单。
+     */
+    private Menu createPermissionMenu() {
+        permissionMenuRef = new Menu("权限");
+        permissionManageItem = new MenuItem("权限管理");
+        permissionManageItem.setOnAction(e -> safeCall(ToolBarCallback::onPermissionManage));
+        permissionManageItem.setDisable(true);
+        permissionMenuRef.getItems().add(permissionManageItem);
+        updatePermissionMenuVisibility();
+        return permissionMenuRef;
     }
     
     private Menu createFileMenu() {
@@ -664,8 +682,8 @@ public class TopToolBar extends VBox {
         
         jobMenu.getItems().addAll(jobMenuList, jobGroupMenuList, jobLogMenuList, taskReportItem, new SeparatorMenuItem());
         
-        MenuItem datasourceMenuList = new MenuItem("数据源管理");
-        datasourceMenuList.setOnAction(e -> safeCall(ToolBarCallback::onDatasourceList));
+        datasourceMenuListItem = new MenuItem("数据源管理");
+        datasourceMenuListItem.setOnAction(e -> safeCall(ToolBarCallback::onDatasourceList));
         
         MenuItem dataxSyncMenuItem = new MenuItem("数据源同步");
         dataxSyncMenuItem.setOnAction(e -> safeCall(ToolBarCallback::onDataxSync));
@@ -673,7 +691,7 @@ public class TopToolBar extends VBox {
         MenuItem dataxGroupSyncMenuItem = new MenuItem("多数据源同步");
         dataxGroupSyncMenuItem.setOnAction(e -> safeCall(ToolBarCallback::onDataxGroupSync));
         
-        jobMenu.getItems().addAll(datasourceMenuList, new SeparatorMenuItem(), dataxSyncMenuItem, dataxGroupSyncMenuItem, new SeparatorMenuItem());
+        jobMenu.getItems().addAll(datasourceMenuListItem, new SeparatorMenuItem(), dataxSyncMenuItem, dataxGroupSyncMenuItem, new SeparatorMenuItem());
         
         // 任务组操作
         MenuItem newJobGroupItem = new MenuItem("新建任务组");
@@ -751,16 +769,11 @@ public class TopToolBar extends VBox {
         
         MenuItem settingsItem = new MenuItem("系统设置");
         settingsItem.setOnAction(e -> safeCall(ToolBarCallback::onSettings));
-
-        permissionManageItem = new MenuItem("权限管理");
-        permissionManageItem.setOnAction(e -> safeCall(ToolBarCallback::onPermissionManage));
-        permissionManageItem.setDisable(true);
-        updatePermissionMenuVisibility();
         
         MenuItem aboutItem = new MenuItem("关于 CcETL");
         aboutItem.setOnAction(e -> safeCall(ToolBarCallback::onAbout));
         
-        helpMenu.getItems().addAll(settingsItem, permissionManageItem, aboutItem, new SeparatorMenuItem());
+        helpMenu.getItems().addAll(settingsItem, aboutItem, new SeparatorMenuItem());
         
         MenuItem checkUpdateItem = new MenuItem("检查更新");
         checkUpdateItem.setOnAction(e -> safeCall(ToolBarCallback::onCheckUpdate));
@@ -780,11 +793,19 @@ public class TopToolBar extends VBox {
     }
 
     /**
-     * 根据当前用户权限更新「权限管理」菜单是否可用（仅拥有 permission:manage 的管理员可用）
+     * 根据当前用户权限更新「权限」菜单可见性及「权限管理」是否可用；同时更新「数据源管理」等入口可见性。
      */
     public void updatePermissionMenuVisibility() {
+        boolean hasPermission = SessionManager.getInstance().hasPermission("permission:manage");
+        if (permissionMenuRef != null) {
+            permissionMenuRef.setVisible(hasPermission);
+        }
         if (permissionManageItem != null) {
-            permissionManageItem.setDisable(!SessionManager.getInstance().hasPermission("permission:manage"));
+            permissionManageItem.setDisable(!hasPermission);
+        }
+        boolean hasDatasourceView = SessionManager.getInstance().hasPermission("datasource:view");
+        if (datasourceMenuListItem != null) {
+            datasourceMenuListItem.setVisible(hasDatasourceView);
         }
     }
     
