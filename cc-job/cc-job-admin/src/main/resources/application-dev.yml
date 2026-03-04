@@ -52,6 +52,7 @@ mybatis-plus:
     # log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 
 # xxl-job 定时任务配置
+# accessToken 需与执行器（executor-compose）的 accessToken 配置为相同值，否则执行器回调会 401
 xxl:
   job:
     i18n: zh_CN

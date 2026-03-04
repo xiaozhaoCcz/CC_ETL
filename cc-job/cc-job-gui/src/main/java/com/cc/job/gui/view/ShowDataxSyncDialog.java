@@ -144,6 +144,10 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     /** 主窗口引用，用于关闭弹窗后弹出成功提示时的 Alert owner */
     private final Stage ownerStage;
 
+    /** 编辑时解析出的 Reader/Writer 配置，在异步加载表/列完成后用于选中表与列，用后置空 */
+    private volatile ParsedRwConfig pendingReaderConfig;
+    private volatile ParsedRwConfig pendingWriterConfig;
+
     public ShowDataxSyncDialog(Stage ownerStage) {
         this(ownerStage, null);
     }
@@ -184,15 +188,13 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
 
         getDialogPane().setContent(root);
 
-        // 加载数据源
+        // 加载数据源；编辑模式下在数据源加载完成后再预填（见 loadDatasources）
         loadDatasources();
         updateStepView();
-        // 编辑模式：直接进入第三步并预填
-        if (editForm != null) {
-            currentStep = 2;
-            updateStepView();
-            Platform.runLater(() -> applyEditData(editForm));
+        if (editForm == null) {
+            // 新建模式无需预填
         }
+        // 编辑模式预填在 loadDatasources 完成后的回调中执行，保证 allDatasources 已就绪
     }
 
     private void styleDialog() {
@@ -231,11 +233,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         step2Label = createStepLabel("2. Writer配置", false);
         step3Label = createStepLabel("3. 生成JSON", false);
 
-        if (editForm != null) {
-            steps.getChildren().add(step3Label);
-        } else {
-            steps.getChildren().addAll(step1Label, createStepLine(), step2Label, createStepLine(), step3Label);
-        }
+        steps.getChildren().addAll(step1Label, createStepLine(), step2Label, createStepLine(), step3Label);
         return steps;
     }
 
@@ -291,12 +289,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         resetBtn.getStyleClass().add("dialog-button-secondary");
         resetBtn.setOnAction(e -> handleReset());
 
-        if (editForm != null) {
-            nextBtn.setText("确认");
-            bar.getChildren().add(nextBtn);
-        } else {
-            bar.getChildren().addAll(resetBtn, prevBtn, nextBtn);
-        }
+        bar.getChildren().addAll(resetBtn, prevBtn, nextBtn);
         return bar;
     }
 
@@ -327,7 +320,105 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     }
 
     /**
-     * 编辑模式下预填第三步表单与 JSON（执行器、负责人、调度、高级配置、executorParam）
+     * 从 executorParam（DataX JSON）解析出的 Reader 配置，用于编辑时反填第一步
+     */
+    private static class ParsedRwConfig {
+        String jdbcUrl;
+        String username;
+        String password;
+        String tableName;
+        String schemaName;
+        List<String> columns;
+        String querySql;
+        String writeMode; // 仅 Writer 使用
+    }
+
+    /**
+     * 从 DataX job JSON 解析 reader 与 writer 配置；解析失败返回 null。
+     * 兼容 job.content[0].reader/writer 下 parameter.connection 为数组或单对象的格式。
+     */
+    private static class ParsedDataxResult {
+        ParsedRwConfig reader;
+        ParsedRwConfig writer;
+    }
+
+    private static ParsedDataxResult parseDataxJson(String json) {
+        if (json == null || json.trim().isEmpty()) return null;
+        try {
+            com.google.gson.JsonElement root = com.google.gson.JsonParser.parseString(json.trim());
+            if (!root.isJsonObject()) return null;
+            com.google.gson.JsonObject job = root.getAsJsonObject().getAsJsonObject("job");
+            if (job == null) return null;
+            com.google.gson.JsonArray content = job.getAsJsonArray("content");
+            if (content == null || content.size() == 0) return null;
+            com.google.gson.JsonObject content0 = content.get(0).getAsJsonObject();
+            com.google.gson.JsonObject readerObj = content0.getAsJsonObject("reader");
+            com.google.gson.JsonObject writerObj = content0.getAsJsonObject("writer");
+            if (readerObj == null || writerObj == null) return null;
+            ParsedRwConfig reader = parseRwParameter(readerObj.getAsJsonObject("parameter"), false);
+            ParsedRwConfig writer = parseRwParameter(writerObj.getAsJsonObject("parameter"), true);
+            if (reader == null || writer == null) return null;
+            ParsedDataxResult result = new ParsedDataxResult();
+            result.reader = reader;
+            result.writer = writer;
+            return result;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static ParsedRwConfig parseRwParameter(com.google.gson.JsonObject parameter, boolean isWriter) {
+        if (parameter == null) return null;
+        ParsedRwConfig config = new ParsedRwConfig();
+        config.username = parameter.has("username") ? parameter.get("username").getAsString() : null;
+        config.password = parameter.has("password") ? parameter.get("password").getAsString() : null;
+        config.columns = new ArrayList<>();
+        if (parameter.has("column")) {
+            com.google.gson.JsonElement colEl = parameter.get("column");
+            if (colEl.isJsonArray()) {
+                for (com.google.gson.JsonElement e : colEl.getAsJsonArray()) {
+                    config.columns.add(e.getAsString());
+                }
+            }
+        }
+        config.querySql = parameter.has("querySql") ? parameter.get("querySql").getAsString() : null;
+        if (isWriter) {
+            config.writeMode = parameter.has("writeMode") ? parameter.get("writeMode").getAsString() : null;
+        }
+        com.google.gson.JsonElement connEl = parameter.get("connection");
+        if (connEl == null) return null;
+        com.google.gson.JsonObject connObj = null;
+        if (connEl.isJsonArray()) {
+            com.google.gson.JsonArray arr = connEl.getAsJsonArray();
+            if (arr.size() > 0) connObj = arr.get(0).getAsJsonObject();
+        } else if (connEl.isJsonObject()) {
+            connObj = connEl.getAsJsonObject();
+        }
+        if (connObj == null) return null;
+        // jdbcUrl 可能是单字符串或数组
+        if (connObj.has("jdbcUrl")) {
+            com.google.gson.JsonElement urlEl = connObj.get("jdbcUrl");
+            if (urlEl.isJsonPrimitive()) config.jdbcUrl = urlEl.getAsString();
+            else if (urlEl.isJsonArray() && urlEl.getAsJsonArray().size() > 0)
+                config.jdbcUrl = urlEl.getAsJsonArray().get(0).getAsString();
+        }
+        if (connObj.has("table")) {
+            com.google.gson.JsonElement tableEl = connObj.get("table");
+            if (tableEl.isJsonPrimitive()) config.tableName = tableEl.getAsString();
+            else if (tableEl.isJsonArray() && tableEl.getAsJsonArray().size() > 0)
+                config.tableName = tableEl.getAsJsonArray().get(0).getAsString();
+        }
+        if (connObj.has("querySql")) {
+            com.google.gson.JsonElement q = connObj.get("querySql");
+            if (q.isJsonPrimitive()) config.querySql = q.getAsString();
+            else if (q.isJsonArray() && q.getAsJsonArray().size() > 0)
+                config.querySql = q.getAsJsonArray().get(0).getAsString();
+        }
+        return config;
+    }
+
+    /**
+     * 编辑模式下预填第三步表单与 JSON（执行器、负责人、调度、高级配置、executorParam），并解析 executorParam 反填第一步 Reader、第二步 Writer
      */
     private void applyEditData(JobInfoForm form) {
         if (form == null || jobGroupCombo == null) return;
@@ -468,6 +559,101 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                 updateIncrConfigVisibility();
             }
         }
+        // 解析 executorParam 反填第一步 Reader、第二步 Writer
+        String executorParam = form.getExecutorParam();
+        if (executorParam != null && !executorParam.trim().isEmpty()) {
+            ParsedDataxResult parsed = parseDataxJson(executorParam);
+            if (parsed != null) {
+                applyParsedReaderConfig(parsed.reader);
+                applyParsedWriterConfig(parsed.writer);
+            }
+        }
+    }
+
+    private static String normalizeJdbcUrl(String url) {
+        if (url == null) return "";
+        String s = url.trim();
+        int q = s.indexOf('?');
+        if (q > 0) s = s.substring(0, q);
+        return s;
+    }
+
+    private void applyParsedReaderConfig(ParsedRwConfig reader) {
+        if (reader == null || reader.jdbcUrl == null) return;
+        String urlNorm = normalizeJdbcUrl(reader.jdbcUrl);
+        for (JobJdbcDatasource ds : allDatasources) {
+            if (urlNorm.equals(normalizeJdbcUrl(ds.getJdbcUrl()))) {
+                if (readerDsTypeCombo != null) readerDsTypeCombo.setValue(ds.getDatasource());
+                filterReaderDatasources();
+                if (readerDatasourceCombo != null) readerDatasourceCombo.setValue(ds);
+                if (readerSqlArea != null && reader.querySql != null) readerSqlArea.setText(reader.querySql);
+                pendingReaderConfig = reader;
+                loadReaderTables();
+                return;
+            }
+        }
+        if (readerSqlArea != null && reader.querySql != null) readerSqlArea.setText(reader.querySql);
+    }
+
+    private void applyParsedWriterConfig(ParsedRwConfig writer) {
+        if (writer == null || writer.jdbcUrl == null) return;
+        String urlNorm = normalizeJdbcUrl(writer.jdbcUrl);
+        for (JobJdbcDatasource ds : allDatasources) {
+            if (urlNorm.equals(normalizeJdbcUrl(ds.getJdbcUrl()))) {
+                if (writerDsTypeCombo != null) writerDsTypeCombo.setValue(ds.getDatasource());
+                filterWriterDatasources();
+                if (writerDatasourceCombo != null) writerDatasourceCombo.setValue(ds);
+                if (writeModeCombo != null && writer.writeMode != null) {
+                    for (String mode : WRITE_MODES) {
+                        if (writer.writeMode.equalsIgnoreCase(mode)) {
+                            writeModeCombo.setValue(mode);
+                            break;
+                        }
+                    }
+                }
+                pendingWriterConfig = writer;
+                loadWriterTables();
+                return;
+            }
+        }
+    }
+
+    /** 在已加载的 Reader 表列表中按表名选中对应项 */
+    private void selectReaderTableByName(String tableName) {
+        if (tableName == null || readerTableToggleGroup == null) return;
+        for (Toggle t : readerTableToggleGroup.getToggles()) {
+            Object ud = t.getUserData();
+            if (ud instanceof DataxTable) {
+                if (tableName.equals(((DataxTable) ud).getTableName())) {
+                    readerTableToggleGroup.selectToggle(t);
+                    return;
+                }
+            }
+        }
+    }
+
+    /** 在已加载的 Writer 表列表中按表名选中对应项 */
+    private void selectWriterTableByName(String tableName) {
+        if (tableName == null || writerTableToggleGroup == null) return;
+        for (Toggle t : writerTableToggleGroup.getToggles()) {
+            Object ud = t.getUserData();
+            if (ud instanceof DataxTable) {
+                if (tableName.equals(((DataxTable) ud).getTableName())) {
+                    writerTableToggleGroup.selectToggle(t);
+                    return;
+                }
+            }
+        }
+    }
+
+    /** 在表字段多选框中勾选指定列名 */
+    private void selectColumnCheckBoxes(HBox container, List<String> columnNames) {
+        if (container == null || columnNames == null || columnNames.isEmpty()) return;
+        forEachColumnCheckBox(container, cb -> {
+            if (cb.getUserData() != null && columnNames.contains(cb.getUserData().toString())) {
+                cb.setSelected(true);
+            }
+        });
     }
 
     private Node createReaderPane() {
@@ -1685,6 +1871,9 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         new Thread(() -> {
             try {
                 allDatasources = datasourceService.getDatasourceList();
+                if (editForm != null) {
+                    Platform.runLater(() -> applyEditData(editForm));
+                }
             } catch (Exception e) {
                 Platform.runLater(() -> showError("加载数据源失败", e.getMessage()));
             }
@@ -1728,6 +1917,11 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                         // 有数据时显示边框和多列布局
                         showTableContent(readerTableRadioBox, tables, readerTableToggleGroup, 
                                 table -> loadReaderColumns());
+                        // 编辑时反填：选中解析出的表并加载列
+                        if (pendingReaderConfig != null) {
+                            selectReaderTableByName(pendingReaderConfig.tableName);
+                            loadReaderColumns();
+                        }
                     }
                 });
             } catch (Exception e) {
@@ -1758,6 +1952,11 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                         // 有数据时显示边框和多列布局
                         showTableContent(writerTableRadioBox, tables, writerTableToggleGroup, 
                                 table -> loadWriterColumns());
+                        // 编辑时反填：选中解析出的表并加载列
+                        if (pendingWriterConfig != null) {
+                            selectWriterTableByName(pendingWriterConfig.tableName);
+                            loadWriterColumns();
+                        }
                     }
                 });
             } catch (Exception e) {
@@ -1794,6 +1993,11 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                     } else {
                         // 有数据时显示边框和多列布局
                         showColumnContent(readerColumnCheckBox, columns);
+                        // 编辑时反填：勾选解析出的列
+                        if (pendingReaderConfig != null && pendingReaderConfig.columns != null && !pendingReaderConfig.columns.isEmpty()) {
+                            selectColumnCheckBoxes(readerColumnCheckBox, pendingReaderConfig.columns);
+                            pendingReaderConfig = null;
+                        }
                     }
                 });
             } catch (Exception e) {
@@ -1830,6 +2034,11 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                     } else {
                         // 有数据时显示边框和多列布局
                         showColumnContent(writerColumnCheckBox, columns);
+                        // 编辑时反填：勾选解析出的列
+                        if (pendingWriterConfig != null && pendingWriterConfig.columns != null && !pendingWriterConfig.columns.isEmpty()) {
+                            selectColumnCheckBoxes(writerColumnCheckBox, pendingWriterConfig.columns);
+                            pendingWriterConfig = null;
+                        }
                     }
                 });
             } catch (Exception e) {
