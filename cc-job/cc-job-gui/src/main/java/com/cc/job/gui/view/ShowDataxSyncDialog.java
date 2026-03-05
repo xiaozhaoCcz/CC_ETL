@@ -564,6 +564,10 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         if (executorParam != null && !executorParam.trim().isEmpty()) {
             ParsedDataxResult parsed = parseDataxJson(executorParam);
             if (parsed != null) {
+                // Writer 的 jdbcUrl 解析可能因 JSON 结构差异为空；同库同步时用 Reader 的 jdbcUrl 回退
+                if (parsed.writer != null && parsed.writer.jdbcUrl == null && parsed.reader != null && parsed.reader.jdbcUrl != null) {
+                    parsed.writer.jdbcUrl = parsed.reader.jdbcUrl;
+                }
                 applyParsedReaderConfig(parsed.reader);
                 applyParsedWriterConfig(parsed.writer);
             }
@@ -585,7 +589,11 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
             if (urlNorm.equals(normalizeJdbcUrl(ds.getJdbcUrl()))) {
                 if (readerDsTypeCombo != null) readerDsTypeCombo.setValue(ds.getDatasource());
                 filterReaderDatasources();
-                if (readerDatasourceCombo != null) readerDatasourceCombo.setValue(ds);
+                if (readerDatasourceCombo != null) {
+                    readerDatasourceCombo.setOnAction(null);
+                    readerDatasourceCombo.setValue(ds);
+                    readerDatasourceCombo.setOnAction(e -> loadReaderTables());
+                }
                 if (readerSqlArea != null && reader.querySql != null) readerSqlArea.setText(reader.querySql);
                 pendingReaderConfig = reader;
                 loadReaderTables();
@@ -600,9 +608,12 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         String urlNorm = normalizeJdbcUrl(writer.jdbcUrl);
         for (JobJdbcDatasource ds : allDatasources) {
             if (urlNorm.equals(normalizeJdbcUrl(ds.getJdbcUrl()))) {
-                if (writerDsTypeCombo != null) writerDsTypeCombo.setValue(ds.getDatasource());
+                if (writerDsTypeCombo != null) {
+                    writerDsTypeCombo.setOnAction(null);
+                    writerDsTypeCombo.setValue(ds.getDatasource());
+                    writerDsTypeCombo.setOnAction(e -> filterWriterDatasources());
+                }
                 filterWriterDatasources();
-                if (writerDatasourceCombo != null) writerDatasourceCombo.setValue(ds);
                 if (writeModeCombo != null && writer.writeMode != null) {
                     for (String mode : WRITE_MODES) {
                         if (writer.writeMode.equalsIgnoreCase(mode)) {
@@ -612,19 +623,32 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                     }
                 }
                 pendingWriterConfig = writer;
-                loadWriterTables();
+                // 延后设置 Writer 数据源并加载表，确保 filterWriterDatasources 的 setItems 已生效
+                final JobJdbcDatasource dsFinal = ds;
+                Platform.runLater(() -> {
+                    if (writerDatasourceCombo != null) {
+                        writerDatasourceCombo.setOnAction(null);
+                        writerDatasourceCombo.setValue(dsFinal);
+                        writerDatasourceCombo.setOnAction(e -> loadWriterTables());
+                    }
+                    loadWriterTables();
+                });
                 return;
             }
         }
     }
 
-    /** 在已加载的 Reader 表列表中按表名选中对应项 */
+    /** 在已加载的 Reader 表列表中按表名选中对应项；支持 schema.table 形式用点号后子串回退匹配 */
     private void selectReaderTableByName(String tableName) {
         if (tableName == null || readerTableToggleGroup == null) return;
+        String nameToMatch = tableName.trim();
+        String fallbackName = nameToMatch.contains(".") ? nameToMatch.substring(nameToMatch.lastIndexOf('.') + 1) : null;
         for (Toggle t : readerTableToggleGroup.getToggles()) {
             Object ud = t.getUserData();
             if (ud instanceof DataxTable) {
-                if (tableName.equals(((DataxTable) ud).getTableName())) {
+                String tn = ((DataxTable) ud).getTableName();
+                if (tn == null) continue;
+                if (nameToMatch.equals(tn) || (fallbackName != null && fallbackName.equals(tn))) {
                     readerTableToggleGroup.selectToggle(t);
                     return;
                 }
@@ -632,13 +656,17 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         }
     }
 
-    /** 在已加载的 Writer 表列表中按表名选中对应项 */
+    /** 在已加载的 Writer 表列表中按表名选中对应项；支持 schema.table 形式用点号后子串回退匹配 */
     private void selectWriterTableByName(String tableName) {
         if (tableName == null || writerTableToggleGroup == null) return;
+        String nameToMatch = tableName.trim();
+        String fallbackName = nameToMatch.contains(".") ? nameToMatch.substring(nameToMatch.lastIndexOf('.') + 1) : null;
         for (Toggle t : writerTableToggleGroup.getToggles()) {
             Object ud = t.getUserData();
             if (ud instanceof DataxTable) {
-                if (tableName.equals(((DataxTable) ud).getTableName())) {
+                String tn = ((DataxTable) ud).getTableName();
+                if (tn == null) continue;
+                if (nameToMatch.equals(tn) || (fallbackName != null && fallbackName.equals(tn))) {
                     writerTableToggleGroup.selectToggle(t);
                     return;
                 }
@@ -646,12 +674,19 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         }
     }
 
-    /** 在表字段多选框中勾选指定列名 */
+    /** 在表字段多选框中勾选指定列名；列名做 trim 并忽略大小写匹配 */
     private void selectColumnCheckBoxes(HBox container, List<String> columnNames) {
         if (container == null || columnNames == null || columnNames.isEmpty()) return;
+        java.util.Set<String> normalized = new java.util.HashSet<>();
+        for (String s : columnNames) {
+            if (s != null) normalized.add(s.trim().toLowerCase());
+        }
         forEachColumnCheckBox(container, cb -> {
-            if (cb.getUserData() != null && columnNames.contains(cb.getUserData().toString())) {
-                cb.setSelected(true);
+            if (cb.getUserData() != null) {
+                String col = cb.getUserData().toString().trim();
+                if (normalized.contains(col.toLowerCase())) {
+                    cb.setSelected(true);
+                }
             }
         });
     }
@@ -2207,6 +2242,12 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     private void showTableContent(HBox container, List<DataxTable> items, ToggleGroup toggleGroup,
                                   java.util.function.Consumer<DataxTable> onSelect) {
         container.getChildren().clear();
+        // 清空 ToggleGroup 中残留的旧 toggles，避免 selectXxxTableByName 选到已不可见的 RadioButton
+        for (Toggle t : new ArrayList<>(toggleGroup.getToggles())) {
+            if (t instanceof RadioButton) {
+                ((RadioButton) t).setToggleGroup(null);
+            }
+        }
         container.setPadding(new Insets(12, 16, 12, 16));
         container.getStyleClass().add("dialog-section");
         container.setStyle("-fx-background-radius: " + StyleUtil.RADIUS_MD + "; -fx-border-width: 1; " +

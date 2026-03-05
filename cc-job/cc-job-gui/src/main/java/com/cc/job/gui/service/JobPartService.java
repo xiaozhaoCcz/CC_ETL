@@ -3,6 +3,7 @@ package com.cc.job.gui.service;
 import com.cc.job.xo.common.result.Result;
 import com.cc.job.xo.model.vo.JobPartVo;
 import com.cc.job.gui.model.JobComposeData;
+import com.cc.job.gui.util.SessionManager;
 import com.google.gson.reflect.TypeToken;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -393,12 +394,15 @@ public class JobPartService extends  BaseService {
      * @throws IOException 网络异常
      */
     public byte[] exportData(Long partId) throws IOException {
-        // 这个方法需要直接返回字节数组，不能使用通用的工具类
-        // 保留原有实现，但需要添加import
-        okhttp3.Request request = new okhttp3.Request.Builder()
+        // 这个方法需要直接返回字节数组，不能使用通用的工具类；请求需携带 JWT 鉴权
+        okhttp3.Request.Builder reqBuilder = new okhttp3.Request.Builder()
                 .url(httpClient.buildUrl("/api/v1/jobParts/exportData/" + partId))
-                .get()
-                .build();
+                .get();
+        String auth = SessionManager.getInstance().getAuthorizationHeader();
+        if (auth != null && !auth.isEmpty()) {
+            reqBuilder.addHeader("Authorization", auth);
+        }
+        okhttp3.Request request = reqBuilder.build();
 
         try (okhttp3.Response response = apiUtil.getClient().newCall(request).execute()) {
             if (!response.isSuccessful()) {
@@ -415,10 +419,14 @@ public class JobPartService extends  BaseService {
      * @throws IOException 网络异常
      */
     public byte[] exportTaskGroupData(Long jobId) throws IOException {
-        okhttp3.Request request = new okhttp3.Request.Builder()
+        okhttp3.Request.Builder reqBuilder = new okhttp3.Request.Builder()
                 .url(httpClient.buildUrl("/api/v1/jobParts/exportTaskGroup/" + jobId))
-                .get()
-                .build();
+                .get();
+        String auth = SessionManager.getInstance().getAuthorizationHeader();
+        if (auth != null && !auth.isEmpty()) {
+            reqBuilder.addHeader("Authorization", auth);
+        }
+        okhttp3.Request request = reqBuilder.build();
         try (okhttp3.Response response = apiUtil.getClient().newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 throw new IOException("导出任务组数据失败: " + response);
@@ -467,10 +475,14 @@ public class JobPartService extends  BaseService {
         builder.addFormDataPart("file", file.getName(), fileBody);
         okhttp3.RequestBody requestBody = builder.build();
         
-        okhttp3.Request request = new okhttp3.Request.Builder()
+        okhttp3.Request.Builder reqBuilder = new okhttp3.Request.Builder()
                 .url(url)
-                .post(requestBody)
-                .build();
+                .post(requestBody);
+        String auth = SessionManager.getInstance().getAuthorizationHeader();
+        if (auth != null && !auth.isEmpty()) {
+            reqBuilder.addHeader("Authorization", auth);
+        }
+        okhttp3.Request request = reqBuilder.build();
         
         try (okhttp3.Response response = apiUtil.getClient().newCall(request).execute()) {
             if (!response.isSuccessful()) {
@@ -507,10 +519,14 @@ public class JobPartService extends  BaseService {
         );
         builder.addFormDataPart("file", file.getName(), fileBody);
         okhttp3.RequestBody requestBody = builder.build();
-        okhttp3.Request request = new okhttp3.Request.Builder()
+        okhttp3.Request.Builder reqBuilder = new okhttp3.Request.Builder()
                 .url(url)
-                .post(requestBody)
-                .build();
+                .post(requestBody);
+        String auth = SessionManager.getInstance().getAuthorizationHeader();
+        if (auth != null && !auth.isEmpty()) {
+            reqBuilder.addHeader("Authorization", auth);
+        }
+        okhttp3.Request request = reqBuilder.build();
 
         try (okhttp3.Response response = apiUtil.getClient().newCall(request).execute()) {
             if (!response.isSuccessful()) {
