@@ -231,7 +231,7 @@ public class CanvasSelectionManager {
         selectionBoundingBox.setWidth(maxX - minX + padding * 2);
         selectionBoundingBox.setHeight(maxY - minY + padding * 2);
         selectionBoundingBox.setVisible(true);
-        // 仅更新几何与可见性，不 remove/add，避免每帧触发布局；保证在选择框显示时置于节点下层
+        // 置于最前以便多选时能看见框选范围（已 setMouseTransparent(true)，不阻挡点击）
         selectionBoundingBox.toBack();
     }
     

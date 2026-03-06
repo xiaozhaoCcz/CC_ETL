@@ -61,6 +61,28 @@ public class NodeCallbackConfigurator {
             return;
         }
         
+        // 多选时右键菜单文案与批量操作：提供当前选区
+        node.setSelectionSupplier(() -> canvas.getSelectedNodes());
+        // 右键菜单打开时保存选区快照，关闭时清除，避免点击菜单项时选区已被清空（如框选后点“设置节点状态”）
+        node.setOnContextMenuAboutToShow(() -> canvas.setContextMenuSelectionSnapshot(canvas.getSelectedNodes()));
+        node.setOnContextMenuHidden(() -> canvas.clearContextMenuSelectionSnapshot());
+        
+        // 节点状态：多选时对选区全部设置，否则仅当前节点；并记录撤销（优先使用菜单快照）
+        node.setOnSetGraphStateRequested(state -> {
+            java.util.Map<Long, ProcessNode.GraphNodeState> oldSnapshot = canvas.getGraphStateSnapshot();
+            java.util.Set<ProcessNode> sel = canvas.getContextMenuSelectionSnapshot();
+            if (sel == null) sel = canvas.getSelectedNodes();
+            if (sel != null && sel.size() > 1 && sel.contains(node)) {
+                for (ProcessNode n : sel) {
+                    n.setGraphState(state);
+                }
+            } else {
+                node.setGraphState(state);
+            }
+            java.util.Map<Long, ProcessNode.GraphNodeState> newSnapshot = canvas.getGraphStateSnapshot();
+            canvas.pushGraphStateChangeAction(oldSnapshot, newSnapshot);
+        });
+        
         // 编辑回调 - 动态获取 jobId，避免闭包捕获问题
         node.setOnEdit(() -> {
             Long jobId = node.getJobId();
@@ -74,9 +96,20 @@ public class NodeCallbackConfigurator {
             nodeOperationManager.editNode(jobId, node, currentTaskGroupId);
         });
         
-        // 复制回调 - 动态获取 jobId
-        // 右键菜单复制：直接创建新节点（复制+粘贴一步完成）
+        // 复制回调：多选时复制到剪贴板（与 Ctrl+C 一致），单节点时复制并直接创建新节点（优先使用菜单快照）
         node.setOnCopy(() -> {
+            java.util.Set<ProcessNode> selected = canvas.getContextMenuSelectionSnapshot();
+            if (selected == null) {
+                selected = canvas.getSelectedNodes();
+            }
+            final java.util.Set<ProcessNode> toUse = selected;
+            if (toUse != null && toUse.size() > 1 && toUse.contains(node)) {
+                nodeOperationManager.copyNodesToClipboard(toUse, currentTaskGroupId);
+                Platform.runLater(() -> {
+                    NotificationToast.showSuccess("已复制 " + toUse.size() + " 个节点到剪贴板");
+                });
+                return;
+            }
             Long jobId = node.getJobId();
             if (jobId == null) {
                 Platform.runLater(() -> {

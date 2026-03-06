@@ -91,6 +91,15 @@ public class ProcessNode extends StackPane {
     private Runnable onRemoveFromContainer;
     private java.util.function.Supplier<Boolean> isInContainerChecker; // 检查节点是否在容器内
     
+    /** 当前选区提供者（用于多选时动态更新右键菜单文案） */
+    private java.util.function.Supplier<java.util.Set<ProcessNode>> selectionSupplier;
+    /** 节点状态设置请求回调（支持多选时批量设置） */
+    private java.util.function.Consumer<GraphNodeState> onSetGraphStateRequested;
+    /** 右键菜单即将显示时回调（用于保存选区快照，避免点击菜单项时选区被清空） */
+    private Runnable onContextMenuAboutToShow;
+    /** 右键菜单关闭时回调（用于清除选区快照） */
+    private Runnable onContextMenuHidden;
+    
     // 颜色变更回调
     private Runnable onColorChanged; // 颜色变更时的回调,用于保存到数据库
     
@@ -772,25 +781,41 @@ public class ProcessNode extends StackPane {
         // 设置为开始节点
         MenuItem startNodeItem = new MenuItem("开始节点");
         startNodeItem.setOnAction(e -> {
-            setGraphState(GraphNodeState.START);
+            if (onSetGraphStateRequested != null) {
+                onSetGraphStateRequested.accept(GraphNodeState.START);
+            } else {
+                setGraphState(GraphNodeState.START);
+            }
         });
         
         // 设置为终止节点
         MenuItem stopNodeItem = new MenuItem("终止节点");
         stopNodeItem.setOnAction(e -> {
-            setGraphState(GraphNodeState.STOP);
+            if (onSetGraphStateRequested != null) {
+                onSetGraphStateRequested.accept(GraphNodeState.STOP);
+            } else {
+                setGraphState(GraphNodeState.STOP);
+            }
         });
         
         // 设置为阻塞节点
         MenuItem blockedNodeItem = new MenuItem("阻塞节点");
         blockedNodeItem.setOnAction(e -> {
-            setGraphState(GraphNodeState.BLOCKED);
+            if (onSetGraphStateRequested != null) {
+                onSetGraphStateRequested.accept(GraphNodeState.BLOCKED);
+            } else {
+                setGraphState(GraphNodeState.BLOCKED);
+            }
         });
         
         // 取消特殊状态（恢复为普通节点）
         MenuItem normalNodeItem = new MenuItem("取消特殊状态");
         normalNodeItem.setOnAction(e -> {
-            setGraphState(GraphNodeState.NORMAL);
+            if (onSetGraphStateRequested != null) {
+                onSetGraphStateRequested.accept(GraphNodeState.NORMAL);
+            } else {
+                setGraphState(GraphNodeState.NORMAL);
+            }
         });
         
         stateMenu.getItems().addAll(startNodeItem, stopNodeItem, blockedNodeItem, normalNodeItem);
@@ -834,8 +859,13 @@ public class ProcessNode extends StackPane {
             deleteItem
         );
         
+        contextMenu.setOnHidden(ev -> {
+            if (onContextMenuHidden != null) onContextMenuHidden.run();
+        });
+        
         // 右键显示菜单
         this.setOnContextMenuRequested(e -> {
+            if (onContextMenuAboutToShow != null) onContextMenuAboutToShow.run();
             // 动态更新"移出容器"菜单项的可见性
             boolean isInContainer = isInContainerChecker != null && isInContainerChecker.get();
             if (isInContainer) {
@@ -853,6 +883,17 @@ public class ProcessNode extends StackPane {
             } else {
                 // 如果节点不在容器内，隐藏菜单项
                 removeFromContainerItem.setVisible(false);
+            }
+            // 多选时动态更新「删除节点」「节点状态」菜单文案
+            if (selectionSupplier != null) {
+                java.util.Set<ProcessNode> sel = selectionSupplier.get();
+                if (sel != null && sel.size() > 1 && sel.contains(this)) {
+                    deleteItem.setText("删除选中的 " + sel.size() + " 个节点");
+                    stateMenu.setText("将选中的 " + sel.size() + " 个节点设为…");
+                } else {
+                    deleteItem.setText("删除节点");
+                    stateMenu.setText("节点状态");
+                }
             }
             contextMenu.show(this, e.getScreenX(), e.getScreenY());
             e.consume();
@@ -1013,6 +1054,22 @@ public class ProcessNode extends StackPane {
     
     public void setIsInContainerChecker(java.util.function.Supplier<Boolean> isInContainerChecker) {
         this.isInContainerChecker = isInContainerChecker;
+    }
+    
+    public void setSelectionSupplier(java.util.function.Supplier<java.util.Set<ProcessNode>> selectionSupplier) {
+        this.selectionSupplier = selectionSupplier;
+    }
+    
+    public void setOnSetGraphStateRequested(java.util.function.Consumer<GraphNodeState> onSetGraphStateRequested) {
+        this.onSetGraphStateRequested = onSetGraphStateRequested;
+    }
+    
+    public void setOnContextMenuAboutToShow(Runnable onContextMenuAboutToShow) {
+        this.onContextMenuAboutToShow = onContextMenuAboutToShow;
+    }
+    
+    public void setOnContextMenuHidden(Runnable onContextMenuHidden) {
+        this.onContextMenuHidden = onContextMenuHidden;
     }
     
     /**

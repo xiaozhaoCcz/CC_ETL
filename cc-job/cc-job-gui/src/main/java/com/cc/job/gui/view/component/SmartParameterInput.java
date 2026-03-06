@@ -738,6 +738,32 @@ public class SmartParameterInput extends CodeArea {
     }
     
     /**
+     * 从 dotPos 起向后扫描，返回当前参数表达式（#{...}.attr...）的结束位置（下一字符下标）。
+     * 与语法高亮一致：属性名可含 [^\\s}()"\']+ 及可选方法调用 ([^)]*)；遇空格、"、'、换行、}、, 等结束。
+     */
+    private int findParameterExpressionEnd(String text, int dotPos) {
+        int pos = dotPos + 1;
+        while (pos < text.length()) {
+            char c = text.charAt(pos);
+            if (c == ' ' || c == '"' || c == '\'' || c == '\n' || c == '\t' || c == '}' || c == ',') {
+                break;
+            }
+            if (c == '(') {
+                pos++;
+                while (pos < text.length() && text.charAt(pos) != ')') {
+                    pos++;
+                }
+                if (pos < text.length()) {
+                    pos++;
+                }
+            } else {
+                pos++;
+            }
+        }
+        return pos;
+    }
+    
+    /**
      * 智能删除处理
      */
     private void handleSmartDelete(KeyEvent event) {
@@ -772,42 +798,47 @@ public class SmartParameterInput extends CodeArea {
         }
         
         if (dotPos >= 0) {
-            // 在属性部分，只删除当前属性（不删除前面的路径）
-            int attrStart = dotPos + 1;
-            int attrEnd = isBackspace ? caretPosition : caretPosition + 1;
-            
-            // 找到当前属性的结束位置（空格、换行、制表符、}、. 或字符串结束）
-            if (!isBackspace) {
-                // 向前查找属性结束位置
-                for (int i = caretPosition + 1; i < text.length(); i++) {
-                    char c = text.charAt(i);
-                    if (c == ' ' || c == '\n' || c == '\t' || c == '}' || c == '.') {
-                        attrEnd = i;
-                        break;
+            int paramExprEnd = findParameterExpressionEnd(text, dotPos);
+            // 仅当光标在参数表达式内部时才按段删除；否则不消费事件，交给默认逐字删除
+            boolean cursorInsideExpr = isBackspace ? caretPosition <= paramExprEnd : caretPosition < paramExprEnd;
+            if (cursorInsideExpr) {
+                // 在属性部分，只删除当前属性（不删除前面的路径）
+                int attrStart = dotPos + 1;
+                int attrEnd = isBackspace ? caretPosition : caretPosition + 1;
+                
+                // 找到当前属性的结束位置（空格、换行、制表符、}、. 或字符串结束）
+                if (!isBackspace) {
+                    // 向前查找属性结束位置
+                    for (int i = caretPosition + 1; i < text.length(); i++) {
+                        char c = text.charAt(i);
+                        if (c == ' ' || c == '\n' || c == '\t' || c == '}' || c == '.') {
+                            attrEnd = i;
+                            break;
+                        }
+                    }
+                } else {
+                    // Backspace：需要找到当前属性的开始位置（从光标向前查找）
+                    // 属性名可能包含字母、数字、下划线，还可能包含方法调用的括号
+                    for (int i = caretPosition - 1; i >= attrStart; i--) {
+                        char c = text.charAt(i);
+                        // 如果遇到非属性字符（空格、换行、制表符、}、.），说明属性开始位置在 i+1
+                        if (c == ' ' || c == '\n' || c == '\t' || c == '}' || c == '.') {
+                            attrStart = i + 1;
+                            break;
+                        }
                     }
                 }
-            } else {
-                // Backspace：需要找到当前属性的开始位置（从光标向前查找）
-                // 属性名可能包含字母、数字、下划线，还可能包含方法调用的括号
-                for (int i = caretPosition - 1; i >= attrStart; i--) {
-                    char c = text.charAt(i);
-                    // 如果遇到非属性字符（空格、换行、制表符、}、.），说明属性开始位置在 i+1
-                    if (c == ' ' || c == '\n' || c == '\t' || c == '}' || c == '.') {
-                        attrStart = i + 1;
-                        break;
-                    }
+                
+                // 确保在属性范围内，且不超出参数表达式
+                if (attrEnd > attrStart && attrEnd <= paramExprEnd && checkPosition >= attrStart && checkPosition <= attrEnd) {
+                    event.consume();
+                    String before = text.substring(0, attrStart);
+                    String after = text.substring(attrEnd);
+                    String newText = before + after;
+                    replaceText(0, getLength(), newText);
+                    moveTo(attrStart);
+                    return;
                 }
-            }
-            
-            // 确保在属性范围内
-            if (attrEnd > attrStart && checkPosition >= attrStart && checkPosition <= attrEnd) {
-                event.consume();
-                String before = text.substring(0, attrStart);
-                String after = text.substring(attrEnd);
-                String newText = before + after;
-                replaceText(0, getLength(), newText);
-                moveTo(attrStart);
-                return;
             }
         }
         

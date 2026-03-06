@@ -102,6 +102,8 @@ public class NodeCanvas extends Pane {
     // 拖拽过程中的平滑滚动
     private AnimationTimer dragScrollTimer;
     private ProcessNode currentDragNode;
+    /** 本次拖拽是在该节点上按下触发的，用于区分“点菜单项后释放在节点上”导致的 dragFinished，避免误清选区 */
+    private ProcessNode lastDragStartedNode = null;
     private volatile boolean scrollAnimationRunning = false;
     private long lastScrollFrameTime = 0; // 纳秒，用于 deltaTime 计算
     
@@ -307,6 +309,23 @@ public class NodeCanvas extends Pane {
         return selectionManager.getSelectedNodes();
     }
     
+    /** 右键菜单打开时保存的选区快照，避免点击菜单项时选区已被清空；菜单关闭后清除 */
+    private Set<ProcessNode> contextMenuSelectionSnapshot;
+    
+    public void setContextMenuSelectionSnapshot(Set<ProcessNode> snapshot) {
+        this.contextMenuSelectionSnapshot = snapshot != null ? new java.util.HashSet<>(snapshot) : null;
+    }
+    
+    public void clearContextMenuSelectionSnapshot() {
+        this.contextMenuSelectionSnapshot = null;
+    }
+    
+    /** 若有右键菜单快照则返回快照，否则返回 null（调用方再回退到 getSelectedNodes） */
+    public Set<ProcessNode> getContextMenuSelectionSnapshot() {
+        return contextMenuSelectionSnapshot != null && !contextMenuSelectionSnapshot.isEmpty()
+            ? contextMenuSelectionSnapshot : null;
+    }
+    
     public boolean isSelectionMode() {
         return selectionManager.isSelectionMode();
     }
@@ -357,8 +376,16 @@ public class NodeCanvas extends Pane {
     
     private void setupNodeCallbacks(ProcessNode node) {
         // 节点操作回调（需要由外部通过 configureNodeCallbacks 设置）
-        // 这里只设置画布内部的回调
-        node.setOnDelete(() -> removeNode(node, true));
+        // 这里只设置画布内部的回调；多选时删除整组，否则只删当前节点
+        node.setOnDelete(() -> {
+            java.util.Set<ProcessNode> selected = getContextMenuSelectionSnapshot();
+            if (selected == null) selected = selectionManager.getSelectedNodes();
+            if (selected.size() > 1 && selected.contains(node)) {
+                removeNodesAsBatch(selected);
+            } else {
+                removeNode(node, true);
+            }
+        });
         
         // 设置节点状态变化回调，用于状态传播
         node.setOnStateChange((changedNode, oldState, newState) -> {
@@ -416,6 +443,7 @@ public class NodeCanvas extends Pane {
                 selectionManager.setMovingSelection(true);
                 selectionManager.setDragStartNode(node);
             }
+            lastDragStartedNode = node;
         });
         
         node.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_CLICKED, e -> {
@@ -430,66 +458,52 @@ public class NodeCanvas extends Pane {
         });
         
         node.setOnDragFinished((oldX, oldY, newX, newY) -> {
+            boolean dragStartedHere = (lastDragStartedNode == node);
+            lastDragStartedNode = null;
+
             isDragging = false; // 标记拖拽结束
             currentDragNode = null; // 清除当前拖拽节点
             stopDragScrollAnimation(); // 停止滚动动画
-            // 隐藏对齐参考线
             hideAlignmentGuides();
-            
-            // 拖拽结束后，如果鼠标不在画布上，隐藏坐标标签
-            // 否则继续显示鼠标坐标
-            
-            // 检查拖拽前节点是否被选中
+
             boolean wasSelectedBeforeDrag = nodeSelectedBeforeDrag.getOrDefault(node, false);
-            nodeSelectedBeforeDrag.remove(node); // 清除记录
-            
-            currentDragNode = null;
-            
-            // 拖拽结束后，检查是否需要左侧或上侧扩展
+            nodeSelectedBeforeDrag.remove(node);
+
             checkAndExpandCanvas(node);
-            
-            // ⭐ 修复：如果节点已经在条件节点容器中，不要调用checkNodeInConditionContainer
-            // 因为节点在contentLayer中时，坐标是相对坐标，checkNodeInConditionContainer可能会误判
             ConditionNode existingContainer = findConditionNodeContaining(node, conditionNodes);
             if (existingContainer == null) {
-                // 只有节点不在任何容器中时，才检查是否进入容器
                 checkNodeInConditionContainer(node);
             }
-            
+
             if (selectionManager.isMovingSelection() && selectionManager.getDragStartNode() == node) {
                 selectionManager.setMovingSelection(false);
                 selectionManager.setDragStartNode(null);
             }
-            
+
             double deltaX = Math.abs(newX - oldX);
             double deltaY = Math.abs(newY - oldY);
             boolean isClick = deltaX < 3 && deltaY < 3;
-            
-            if (undoRedoManager != null && historyEnabled && !isClick) {
+
+            boolean didPushMove = false;
+            if (undoRedoManager != null && historyEnabled && !isClick && dragStartedHere) {
                 pushAction(new MoveNodeAction(node, oldX, oldY, newX, newY));
+                didPushMove = true;
             }
-            
-            // 节点位置改变，标记有未保存的更改
+
             if (!isClick) {
                 markAsUnsaved();
             }
-            
-            // 只有在拖拽前节点就已经被选中的情况下，才更新选择框
-            // 如果节点在拖拽前没有被选中，拖拽后也不应该显示选择框
+
             if (wasSelectedBeforeDrag) {
-                // 确保节点仍在选中列表中（可能被其他操作清除）
                 if (selectionManager.getSelectedNodes().contains(node)) {
                     selectionManager.updateSelectionBoundingBox();
                 }
-            } else {
-                // 如果节点在拖拽前没有被选中，拖拽后应该清除选择状态
-                // 这样可以避免移动节点后意外显示红色框
+            } else if (didPushMove) {
                 if (selectionManager.getSelectedNodes().contains(node)) {
-                    // 如果节点被选中了（可能是拖拽过程中触发的），清除选择
                     selectionManager.clearSelection();
                 }
             }
-            
+
             notifyNodeStructureChanged();
         });
         
@@ -1467,13 +1481,16 @@ public class NodeCanvas extends Pane {
     private void setupSelectionHandlers() {
         this.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> {
             if (e.isPrimaryButtonDown()) {
+                javafx.scene.Node target = e.getTarget() instanceof javafx.scene.Node ? (javafx.scene.Node) e.getTarget() : null;
+                boolean targetDifferentScene = target != null && target.getScene() != null && this.getScene() != null && target.getScene() != this.getScene();
+                if (targetDifferentScene) {
+                    return;
+                }
                 boolean isClickOnNodeOrEdge = isClickOnNodeOrEdge((javafx.scene.Node) e.getTarget());
                 if (!isClickOnNodeOrEdge) {
-                    // 左键点击空白时关闭画布右键菜单（框选 filter 会 consume，setOnMousePressed 收不到）
                     if (canvasContextMenu != null && canvasContextMenu.isShowing()) {
                         canvasContextMenu.hide();
                     }
-                    // 空白处按下即开始框选（无需先开框选模式）
                     Point2D localPoint = sceneToLocal(e.getSceneX(), e.getSceneY());
                     selectionManager.startSelection(localPoint.getX(), localPoint.getY());
                     e.consume();
@@ -4436,6 +4453,67 @@ public class NodeCanvas extends Pane {
         if (conn == null || oldSnapshot == null || newSnapshot == null) return;
         if (oldSnapshot.equals(newSnapshot)) return;
         pushAction(new EdgeStyleAction(conn, oldSnapshot, newSnapshot));
+    }
+    
+    /**
+     * 获取当前画布上所有节点的图状态快照（jobId -> GraphNodeState），用于节点状态撤销/重做。
+     */
+    public Map<Long, ProcessNode.GraphNodeState> getGraphStateSnapshot() {
+        Map<Long, ProcessNode.GraphNodeState> snapshot = new HashMap<>();
+        for (ProcessNode node : nodes) {
+            if (node.getJobId() != null) {
+                snapshot.put(node.getJobId(), node.getGraphState());
+            }
+        }
+        return snapshot;
+    }
+    
+    /**
+     * 记录图状态变更并入栈，用于节点状态（开始/终止/阻塞/取消）的撤销/重做。
+     * 仅当快照有变化时入栈。
+     */
+    public void pushGraphStateChangeAction(Map<Long, ProcessNode.GraphNodeState> oldSnapshot, Map<Long, ProcessNode.GraphNodeState> newSnapshot) {
+        if (oldSnapshot == null || newSnapshot == null) return;
+        if (oldSnapshot.equals(newSnapshot)) return;
+        pushAction(new GraphStateChangeAction(new HashMap<>(oldSnapshot), new HashMap<>(newSnapshot)));
+    }
+    
+    /** 节点状态变更的撤销/重做：按 jobId 恢复各节点的 GraphNodeState */
+    private class GraphStateChangeAction implements CanvasAction {
+        private final Map<Long, ProcessNode.GraphNodeState> oldSnapshot;
+        private final Map<Long, ProcessNode.GraphNodeState> newSnapshot;
+        
+        GraphStateChangeAction(Map<Long, ProcessNode.GraphNodeState> oldSnapshot, Map<Long, ProcessNode.GraphNodeState> newSnapshot) {
+            this.oldSnapshot = oldSnapshot;
+            this.newSnapshot = newSnapshot;
+        }
+        
+        @Override
+        public void undo() {
+            applySnapshot(oldSnapshot);
+        }
+        
+        @Override
+        public void redo() {
+            applySnapshot(newSnapshot);
+        }
+        
+        private void applySnapshot(Map<Long, ProcessNode.GraphNodeState> snapshot) {
+            for (Map.Entry<Long, ProcessNode.GraphNodeState> e : snapshot.entrySet()) {
+                ProcessNode node = getNodeByJobId(e.getKey());
+                if (node != null) {
+                    node.setGraphStateInternal(e.getValue());
+                }
+            }
+            updateConnectionStylesForGraphState();
+        }
+    }
+    
+    /** 应用快照后刷新连线样式（与图状态相关的虚线等） */
+    private void updateConnectionStylesForGraphState() {
+        for (NodeConnection conn : connections) {
+            updateConnectionBlockedState(conn);
+        }
     }
     
     // ==================== 智能对齐相关方法 ====================
