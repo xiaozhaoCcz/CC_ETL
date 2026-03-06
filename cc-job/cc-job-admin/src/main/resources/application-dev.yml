@@ -67,6 +67,12 @@ xxl:
 
 # CC-Job 节点执行结果存储配置
 cc-job:
+  # SSE 多实例广播：多 Admin 实例时设为 true，通过数据库表跨实例推送节点状态到 PC
+  sse:
+    broadcast:
+      enabled: false   # true 时启用数据库广播
+      poll-interval-ms: 300      # 轮询间隔（毫秒）
+      cleanup-interval-ms: 300000  # 清理已处理记录的间隔（毫秒，默认 5 分钟）
   result:
     storage:
       file:
