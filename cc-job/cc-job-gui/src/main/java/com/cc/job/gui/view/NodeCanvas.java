@@ -445,7 +445,11 @@ public class NodeCanvas extends Pane {
             }
             lastDragStartedNode = node;
         });
-        
+        // 节点“点击”（未拖拽）时清除 isDragging，否则 MOUSE_CLICKED 时仍为 true，Shift+点击多选不生效
+        node.setOnClicked(() -> {
+            isDragging = false;
+        });
+
         node.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_CLICKED, e -> {
             if (e.getButton() != javafx.scene.input.MouseButton.PRIMARY) return;
             if (!selectionManager.isMovingSelection() && !isDragging) {
