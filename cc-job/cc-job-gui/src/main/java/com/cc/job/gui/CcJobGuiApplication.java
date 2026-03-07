@@ -188,6 +188,7 @@ public class CcJobGuiApplication extends Application {
         try {
             // 创建主视图
             MainView mainView = new MainView();
+            mainView.setHostServices(getHostServices());
             
             // 创建场景
             Scene scene = new Scene(mainView, 1920, 1080);

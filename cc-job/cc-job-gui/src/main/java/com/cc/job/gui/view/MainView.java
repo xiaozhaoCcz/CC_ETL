@@ -1,6 +1,7 @@
 package com.cc.job.gui.view;
 
 import com.cc.job.gui.history.UndoRedoManager;
+import com.cc.job.gui.infrastructure.constant.GuiConstants;
 import com.cc.job.gui.manager.*;
 import com.cc.job.gui.model.*;
 import com.cc.job.gui.service.*;
@@ -8,6 +9,7 @@ import com.cc.job.gui.util.*;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.form.JobInfoForm;
 import com.cc.job.xo.model.vo.JobPartVo;
+import javafx.application.HostServices;
 import javafx.application.Platform;
 import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
@@ -84,6 +86,13 @@ public class MainView extends BorderPane {
 
     // 任务组ID -> 画布尺寸映射（每个任务组单独画布尺寸）
     private final Map<Long, CanvasSize> taskGroupCanvasSizes = new HashMap<>();
+
+    /** 用于在浏览器中打开链接（用户手册、报告问题、在线帮助等），由 CcJobGuiApplication 注入 */
+    private HostServices hostServices;
+
+    public void setHostServices(HostServices hostServices) {
+        this.hostServices = hostServices;
+    }
 
     public MainView() {
         this.jobGroupService = new JobGroupService();
@@ -1341,8 +1350,7 @@ public class MainView extends BorderPane {
             // 帮助菜单
             @Override
             public void onUserManual() {
-                // 打开用户手册（可以是本地文件或在线链接）
-                logger.info("用户手册功能开发中...");
+                openUrlInBrowser(GuiConstants.Help.USER_MANUAL_URL, "用户手册");
             }
 
             @Override
@@ -1376,25 +1384,32 @@ public class MainView extends BorderPane {
             
             @Override
             public void onCheckUpdate() {
-                logger.info("检查更新功能开发中...");
+                if (hostServices != null) {
+                    try {
+                        hostServices.showDocument(GuiConstants.Help.RELEASES_URL);
+                        NotificationToast.showSuccess("已在浏览器中打开 Releases 页面，请查看是否有新版本");
+                    } catch (Exception e) {
+                        logger.warn("打开检查更新页面失败: {}", e.getMessage());
+                        NotificationToast.showError("无法打开浏览器: " + e.getMessage());
+                    }
+                } else {
+                    NotificationToast.showWarning("无法打开浏览器，请手动访问: " + GuiConstants.Help.RELEASES_URL);
+                }
             }
             
             @Override
             public void onReportIssue() {
-                // 打开报告问题的链接或对话框
-                logger.info("报告问题功能开发中...");
+                openUrlInBrowser(GuiConstants.Help.REPORT_ISSUE_URL, "报告问题");
             }
             
             @Override
             public void onFeedback() {
-                // 打开反馈建议的链接或对话框
-                logger.info("反馈建议功能开发中...");
+                openUrlInBrowser(GuiConstants.Help.FEEDBACK_URL, "反馈建议");
             }
             
             @Override
             public void onOnlineHelp() {
-                // 打开在线帮助
-                logger.info("在线帮助功能开发中...");
+                openUrlInBrowser(GuiConstants.Help.ONLINE_HELP_URL, "在线帮助");
             }
         });
 
@@ -3067,11 +3082,72 @@ public class MainView extends BorderPane {
     }
     
     /**
-     * 显示转到分区对话框
+     * 显示转到分区对话框：列出所有分区，选择后定位到该分区并清空画布。
      */
     private void showGoToPartitionDialog() {
-        // TODO: 实现转到分区
-        logger.info("转到分区功能开发中...");
+        new Thread(() -> {
+            try {
+                List<JobPartVo> tree = new JobPartService().getTree();
+                List<JobPartVo> partitions = new ArrayList<>();
+                if (tree != null) {
+                    for (JobPartVo part : tree) {
+                        if (part.getType() != null && part.getType() == 0) {
+                            partitions.add(part);
+                        }
+                    }
+                }
+                List<JobPartVo> finalList = partitions;
+                Platform.runLater(() -> {
+                    if (finalList.isEmpty()) {
+                        NotificationToast.showWarning("暂无分区，请先新建分区。");
+                        return;
+                    }
+                    ChoiceDialog<String> dialog = new ChoiceDialog<>();
+                    dialog.setTitle("转到分区");
+                    dialog.setHeaderText(null);
+                    dialog.setContentText("请选择分区:");
+                    List<String> names = new ArrayList<>();
+                    for (JobPartVo p : finalList) {
+                        names.add(p.getLabel() != null ? p.getLabel() : "分区 " + p.getId());
+                    }
+                    dialog.getItems().addAll(names);
+                    String themeCss3 = ThemeManager.getInstance().getStylesheetUrl();
+                    if (themeCss3 != null && !themeCss3.isEmpty()) {
+                        dialog.getDialogPane().getStylesheets().add(themeCss3);
+                    }
+                    Optional<String> result = dialog.showAndWait();
+                    result.ifPresent(partitionName -> {
+                        for (JobPartVo p : finalList) {
+                            String name = p.getLabel() != null ? p.getLabel() : "分区 " + p.getId();
+                            if (name.equals(partitionName)) {
+                                Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
+                                if (currentTaskGroupId != null && currentTaskGroupId != 0) {
+                                    if (canvas.hasUnsavedChanges()) {
+                                        dataManager.saveOrUpdateJob(currentTaskGroupId);
+                                    }
+                                    canvas.markAsSaved();
+                                    saveCurrentScrollPosition();
+                                }
+                                treeView.clearSelection();
+                                canvas.disableAutoSave();
+                                canvas.clear();
+                                canvas.enableAutoSave();
+                                pageStoreHelper.setCurrentPage(null);
+                                toolBar.setCurrentTaskGroupId(null);
+                                treeView.selectPartitionById(p.getId());
+                                logger.info("已转到分区: " + name);
+                                break;
+                            }
+                        }
+                    });
+                });
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    NotificationToast.showError("✗ 加载分区列表失败: " + e.getMessage());
+                });
+                logger.error("✗ 加载分区列表失败: {}", e.getMessage());
+            }
+        }).start();
     }
     
     /**
@@ -3229,6 +3305,26 @@ public class MainView extends BorderPane {
         dialog.show();
     }
     
+    /**
+     * 使用系统默认浏览器打开 URL，用于用户手册、报告问题、反馈建议、在线帮助等。
+     */
+    private void openUrlInBrowser(String url, String label) {
+        if (url == null || url.isEmpty()) {
+            NotificationToast.showWarning(label + "链接未配置");
+            return;
+        }
+        if (hostServices != null) {
+            try {
+                hostServices.showDocument(url);
+            } catch (Exception e) {
+                logger.warn("打开链接失败 {}: {}", label, e.getMessage());
+                NotificationToast.showError("无法打开浏览器: " + e.getMessage());
+            }
+        } else {
+            NotificationToast.showWarning("无法打开浏览器，请手动访问: " + url);
+        }
+    }
+
     /**
      * 显示关于对话框
      */

@@ -237,6 +237,8 @@ public class JobInfoServiceImpl extends ServiceImpl<JobInfoMapper, JobInfo> impl
         // 补充运行时长（毫秒）
         if (entity != null) {
             taskInfoForm.setRunTime(entity.getRunTime());
+            // 显式设置 executorParam，确保 DataX 等任务的 JSON 配置在编辑时能正确回填（避免 copyProperties 或序列化遗漏）
+            taskInfoForm.setExecutorParam(entity.getExecutorParam());
         }
         return taskInfoForm;
     }

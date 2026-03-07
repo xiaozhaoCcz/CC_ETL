@@ -148,6 +148,9 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     private volatile ParsedRwConfig pendingReaderConfig;
     private volatile ParsedRwConfig pendingWriterConfig;
 
+    /** 编辑/预填时解析出的 Writer 配置，延后到切换到步骤 1 时再应用（保证 Writer 面板已在场景中） */
+    private ParsedRwConfig deferredWriterConfig;
+
     public ShowDataxSyncDialog(Stage ownerStage) {
         this(ownerStage, null);
     }
@@ -308,7 +311,15 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         contentPane.getChildren().clear();
         switch (currentStep) {
             case 0 -> contentPane.getChildren().add(readerPaneCache);
-            case 1 -> contentPane.getChildren().add(writerPaneCache);
+            case 1 -> {
+                contentPane.getChildren().add(writerPaneCache);
+                // 编辑/预填时延后的 Writer 配置在此应用，此时 Writer 面板已在场景中，回填可生效
+                if (deferredWriterConfig != null) {
+                    ParsedRwConfig toApply = deferredWriterConfig;
+                    deferredWriterConfig = null;
+                    applyParsedWriterConfig(toApply);
+                }
+            }
             case 2 -> {
                 contentPane.getChildren().add(resultPaneCache);
                 if (initialJsonForNode != null && jsonResultArea != null) {
@@ -569,7 +580,8 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                     parsed.writer.jdbcUrl = parsed.reader.jdbcUrl;
                 }
                 applyParsedReaderConfig(parsed.reader);
-                applyParsedWriterConfig(parsed.writer);
+                // Writer 延后到用户切换到步骤 1 时再应用，避免 Writer 面板未在场景中导致回填不生效
+                deferredWriterConfig = parsed.writer;
             }
         }
     }
@@ -579,7 +591,32 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         String s = url.trim();
         int q = s.indexOf('?');
         if (q > 0) s = s.substring(0, q);
+        // 使 127.0.0.1 与 localhost 等价，避免 JSON 与数据源列表 URL 因主机名不同而匹配失败
+        s = s.replace("//localhost:", "//127.0.0.1:").replace("//localhost/", "//127.0.0.1/");
         return s;
+    }
+
+    /** 提取 JDBC URL 的「协议+主机+端口」前缀。如 jdbc:mysql://127.0.0.1:3306/test2 -> jdbc:mysql://127.0.0.1:3306 */
+    private static String jdbcUrlHostPortPrefix(String url) {
+        if (url == null) return "";
+        String s = normalizeJdbcUrl(url);
+        int afterScheme = s.indexOf("://");
+        if (afterScheme < 0) return s;
+        int pathStart = s.indexOf("/", afterScheme + 2);
+        return pathStart > 0 ? s.substring(0, pathStart) : s;
+    }
+
+    /** 从 JDBC URL 提取数据库名（路径第一段）。如 jdbc:mysql://127.0.0.1:3306/test2 -> test2 */
+    private static String jdbcUrlDatabaseName(String url) {
+        if (url == null) return "";
+        String s = normalizeJdbcUrl(url);
+        int afterScheme = s.indexOf("://");
+        if (afterScheme < 0) return "";
+        int pathStart = s.indexOf("/", afterScheme + 2);
+        if (pathStart < 0 || pathStart + 1 >= s.length()) return "";
+        String path = s.substring(pathStart + 1);
+        int slash = path.indexOf("/");
+        return slash > 0 ? path.substring(0, slash) : path;
     }
 
     private void applyParsedReaderConfig(ParsedRwConfig reader) {
@@ -605,37 +642,53 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
 
     private void applyParsedWriterConfig(ParsedRwConfig writer) {
         if (writer == null || writer.jdbcUrl == null) return;
-        String urlNorm = normalizeJdbcUrl(writer.jdbcUrl);
+        String writerUrlNorm = normalizeJdbcUrl(writer.jdbcUrl);
         for (JobJdbcDatasource ds : allDatasources) {
-            if (urlNorm.equals(normalizeJdbcUrl(ds.getJdbcUrl()))) {
-                if (writerDsTypeCombo != null) {
-                    writerDsTypeCombo.setOnAction(null);
-                    writerDsTypeCombo.setValue(ds.getDatasource());
-                    writerDsTypeCombo.setOnAction(e -> filterWriterDatasources());
-                }
-                filterWriterDatasources();
-                if (writeModeCombo != null && writer.writeMode != null) {
-                    for (String mode : WRITE_MODES) {
-                        if (writer.writeMode.equalsIgnoreCase(mode)) {
-                            writeModeCombo.setValue(mode);
-                            break;
-                        }
-                    }
-                }
-                pendingWriterConfig = writer;
-                // 延后设置 Writer 数据源并加载表，确保 filterWriterDatasources 的 setItems 已生效
-                final JobJdbcDatasource dsFinal = ds;
-                Platform.runLater(() -> {
-                    if (writerDatasourceCombo != null) {
-                        writerDatasourceCombo.setOnAction(null);
-                        writerDatasourceCombo.setValue(dsFinal);
-                        writerDatasourceCombo.setOnAction(e -> loadWriterTables());
-                    }
-                    loadWriterTables();
-                });
+            if (writerUrlNorm.equals(normalizeJdbcUrl(ds.getJdbcUrl()))) {
+                applyWriterConfigToUi(writer, ds);
                 return;
             }
         }
+        // 无精确匹配时只按「库名一致」回退：必须与 JSON 中 writer 的数据库名相同，避免选到下拉第一个（如 yanhuo-test）导致密码/库错误
+        String writerDbName = jdbcUrlDatabaseName(writer.jdbcUrl);
+        if (writerDbName.isEmpty()) return;
+        String writerPrefix = jdbcUrlHostPortPrefix(writer.jdbcUrl);
+        for (JobJdbcDatasource ds : allDatasources) {
+            String dsUrlNorm = normalizeJdbcUrl(ds.getJdbcUrl());
+            if (!dsUrlNorm.startsWith(writerPrefix)) continue;
+            String dsDbName = jdbcUrlDatabaseName(ds.getJdbcUrl());
+            if (writerDbName.equals(dsDbName)) {
+                applyWriterConfigToUi(writer, ds);
+                return;
+            }
+        }
+    }
+
+    private void applyWriterConfigToUi(ParsedRwConfig writer, JobJdbcDatasource ds) {
+        if (writerDsTypeCombo != null) {
+            writerDsTypeCombo.setOnAction(null);
+            writerDsTypeCombo.setValue(ds.getDatasource());
+            writerDsTypeCombo.setOnAction(e -> filterWriterDatasources());
+        }
+        filterWriterDatasources();
+        if (writeModeCombo != null && writer.writeMode != null) {
+            for (String mode : WRITE_MODES) {
+                if (writer.writeMode.equalsIgnoreCase(mode)) {
+                    writeModeCombo.setValue(mode);
+                    break;
+                }
+            }
+        }
+        pendingWriterConfig = writer;
+        final JobJdbcDatasource dsFinal = ds;
+        Platform.runLater(() -> {
+            if (writerDatasourceCombo != null) {
+                writerDatasourceCombo.setOnAction(null);
+                writerDatasourceCombo.setValue(dsFinal);
+                writerDatasourceCombo.setOnAction(e -> loadWriterTables());
+            }
+            loadWriterTables();
+        });
     }
 
     /** 在已加载的 Reader 表列表中按表名选中对应项；支持 schema.table 形式用点号后子串回退匹配 */
@@ -1908,6 +1961,18 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                 allDatasources = datasourceService.getDatasourceList();
                 if (editForm != null) {
                     Platform.runLater(() -> applyEditData(editForm));
+                } else if (initialJsonForNode != null && !initialJsonForNode.trim().isEmpty()) {
+                    // 从节点对话框打开且带已有 JSON 时，解析并反填 Reader；Writer 延后到切换到步骤 1 时应用
+                    Platform.runLater(() -> {
+                        ParsedDataxResult parsed = parseDataxJson(initialJsonForNode);
+                        if (parsed != null) {
+                            if (parsed.writer != null && parsed.writer.jdbcUrl == null && parsed.reader != null && parsed.reader.jdbcUrl != null) {
+                                parsed.writer.jdbcUrl = parsed.reader.jdbcUrl;
+                            }
+                            applyParsedReaderConfig(parsed.reader);
+                            deferredWriterConfig = parsed.writer;
+                        }
+                    });
                 }
             } catch (Exception e) {
                 Platform.runLater(() -> showError("加载数据源失败", e.getMessage()));
