@@ -166,22 +166,44 @@ public class JobJdbcDatasourceService extends BaseService {
     }
     
     /**
-     * 测试数据源连接
+     * 测试数据源连接。
+     * 成功返回 true；失败时抛出 IOException，消息为后端返回的失败原因（便于弹框提示用户）。
      */
     public boolean testConnection(JobJdbcDatasourceForm form) throws IOException {
         String path = CONNECT_API;
         String json = apiUtil.getGson().toJson(form);
-        
-        try (Response response = apiUtil.executeRequestWithRetry(path, url -> 
+
+        try (Response response = apiUtil.executeRequestWithRetry(path, url ->
                 new Request.Builder().url(url).post(RequestBody.create(json, JSON)).build())) {
-            if (!response.isSuccessful()) {
-                throw new IOException("请求失败: " + response);
-            }
             String responseBody = response.body().string();
+
+            if (!response.isSuccessful()) {
+                String reason = extractMessageFromBody(responseBody);
+                throw new IOException(reason != null ? reason : ("请求失败: HTTP " + response.code()));
+            }
+
             Type resultType = new TypeToken<Result<Boolean>>(){}.getType();
             Result<Boolean> result = apiUtil.getGson().fromJson(responseBody, resultType);
-            return Result.isSuccess(result) && Boolean.TRUE.equals(result.getData());
+            if (Result.isSuccess(result) && Boolean.TRUE.equals(result.getData())) {
+                return true;
+            }
+            String reason = result != null && result.getMsg() != null ? result.getMsg() : "连接失败，请检查配置";
+            throw new IOException(reason);
         }
+    }
+
+    /** 从错误响应体中解析出提示文案（支持 Result.msg 或 ReturnT.msg） */
+    private String extractMessageFromBody(String responseBody) {
+        if (responseBody == null || responseBody.isEmpty()) return null;
+        try {
+            com.google.gson.JsonObject obj = apiUtil.getGson().fromJson(responseBody, com.google.gson.JsonObject.class);
+            if (obj != null && obj.has("msg")) {
+                return obj.get("msg").getAsString();
+            }
+        } catch (Exception ignored) {
+            // ignore parse error
+        }
+        return null;
     }
 }
 
