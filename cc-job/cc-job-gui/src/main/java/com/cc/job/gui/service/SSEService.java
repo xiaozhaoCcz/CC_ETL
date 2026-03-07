@@ -1,6 +1,7 @@
 package com.cc.job.gui.service;
 
 import com.cc.job.gui.util.AppConfig;
+import com.cc.job.gui.util.SessionManager;
 import com.google.gson.Gson;
 import javafx.application.Platform;
 import org.slf4j.Logger;
@@ -144,6 +145,11 @@ public class SSEService {
                 connection.setRequestMethod("GET");
                 connection.setRequestProperty("Accept", "text/event-stream");
                 connection.setRequestProperty("Cache-Control", "no-cache");
+                // 携带 JWT，否则 /api/v1/sse 会返回 401
+                String authHeader = SessionManager.getInstance().getAuthorizationHeader();
+                if (authHeader != null && !authHeader.isEmpty()) {
+                    connection.setRequestProperty("Authorization", authHeader);
+                }
                 connection.setConnectTimeout(10000); // 10秒连接超时
                 // ⭐ 设置读取超时为30秒，这样readLine()会在超时时抛出SocketTimeoutException，可以被中断
                 // 如果不设置超时，readLine()会无限阻塞，无法被interrupt()中断

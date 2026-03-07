@@ -34,15 +34,59 @@ public class DataxServiceImpl implements DataxService {
     public String getJson(DataXParams dataXParams) {
         JSONObject jsonObject;
         DatasourceEnum datasourceEnum = DatasourceEnum.getSourceType(dataXParams.getSourceType());
-        jsonObject = switch (Objects.requireNonNull(datasourceEnum)) {
+        if (datasourceEnum == null) {
+            return "";
+        }
+        jsonObject = switch (datasourceEnum) {
             case MYSQL ->
                     dataXParams.getType() == 0 ? new MysqlReader().buildJson(dataXParams) : new MysqlWriter().buildJson(dataXParams);
             case ORACLE ->
                     dataXParams.getType() == 0 ? new OracleReader().buildJson(dataXParams) : new OracleWriter().buildJson(dataXParams);
             case POSTGRESQL ->
                     dataXParams.getType() == 0 ? new PostgreSqlReader().buildJson(dataXParams) : new PostgreSqlWriter().buildJson(dataXParams);
+            default -> null;
         };
-        return jsonObject.toString();
+        return jsonObject != null ? jsonObject.toString() : "";
+    }
+
+    @Override
+    public String getPreviewReaderJson(DataXParams dataXParams, int limit) {
+        if (dataXParams.getType() == null || dataXParams.getType() != 0) {
+            return getJson(dataXParams);
+        }
+        DatasourceEnum datasourceEnum = DatasourceEnum.getSourceType(dataXParams.getSourceType());
+        if (datasourceEnum == null) {
+            return getJson(dataXParams);
+        }
+        DataXParams copy = new DataXParams();
+        copy.setType(0);
+        copy.setSourceType(dataXParams.getSourceType());
+        copy.setUsername(dataXParams.getUsername());
+        copy.setPassword(dataXParams.getPassword());
+        copy.setDbName(dataXParams.getDbName());
+        copy.setJdbcUrl(dataXParams.getJdbcUrl());
+        copy.setTableName(dataXParams.getTableName());
+        copy.setSchemaName(dataXParams.getSchemaName());
+        copy.setIncrementType(0);
+        List<String> columns = dataXParams.getColumns();
+        if (columns == null || columns.isEmpty()) {
+            return getJson(dataXParams);
+        }
+        int safeLimit = Math.min(Math.max(limit, 1), 10000);
+        if (datasourceEnum == DatasourceEnum.MYSQL || datasourceEnum == DatasourceEnum.POSTGRESQL) {
+            String table = dataXParams.getTableName() != null ? dataXParams.getTableName() : "";
+            String colList = String.join(", ", columns);
+            copy.setQuerySql("SELECT " + colList + " FROM " + table + " LIMIT " + safeLimit);
+            copy.setColumns(null);
+        } else if (datasourceEnum == DatasourceEnum.ORACLE) {
+            String table = dataXParams.getTableName() != null ? dataXParams.getTableName() : "";
+            String colList = String.join(", ", columns);
+            copy.setQuerySql("SELECT " + colList + " FROM (SELECT " + colList + " FROM " + table + ") WHERE ROWNUM <= " + safeLimit);
+            copy.setColumns(null);
+        } else {
+            return getJson(dataXParams);
+        }
+        return getJson(copy);
     }
 
     @Override

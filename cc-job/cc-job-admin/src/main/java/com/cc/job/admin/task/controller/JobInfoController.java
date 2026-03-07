@@ -1,6 +1,8 @@
 package com.cc.job.admin.task.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cc.job.admin.task.auth.PermissionConstants;
+import com.cc.job.admin.task.auth.RequirePermission;
 import com.cc.job.admin.task.service.JobComposeService;
 import com.cc.job.admin.task.service.JobEdgeService;
 import com.cc.job.admin.task.service.JobNodeService;
@@ -59,6 +61,7 @@ public class JobInfoController {
         this.sseService = sseService;
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_VIEW)
     @Operation(summary = "initData")
     @GetMapping("initData")
     public Result< List<Long>> initData() {
@@ -66,6 +69,7 @@ public class JobInfoController {
         return Result.success(list);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_VIEW)
     @Operation(summary = "任务分页列表")
     @GetMapping("/page")
     public PageResult<JobInfoVO> getJobInfoPage(JobInfoQuery queryParams) {
@@ -73,20 +77,15 @@ public class JobInfoController {
         return PageResult.success(result);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_VIEW)
     @Operation(summary = "任务列表")
     @GetMapping("/list")
     public Result<List<JobInfo>> getJobInfoList(Integer jobType) {
-        LambdaQueryWrapper<JobInfo> wrapper = new LambdaQueryWrapper<>();
-        if(jobType!=null){
-            wrapper.eq(JobInfo::getJobType, jobType);
-        }else{
-            wrapper.in(JobInfo::getJobType,0,2);
-        }
-        wrapper.eq(JobInfo::getNodeFlag,"N");
-        List<JobInfo> list = jobInfoService.list(wrapper);
+        List<JobInfo> list = jobInfoService.getJobInfoListWithPermission(jobType);
         return Result.success(list);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_EDIT)
     @Operation(summary = "新增任务")
     @PostMapping
     public Result<Long> saveJobInfo(@RequestBody @Valid JobInfoForm formData) {
@@ -94,6 +93,7 @@ public class JobInfoController {
         return Result.success(id);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_VIEW)
     @Operation(summary = "获取任务表单数据")
     @GetMapping("/{id}/form")
     public Result<JobInfoForm> getJobInfoForm(
@@ -103,6 +103,7 @@ public class JobInfoController {
         return Result.success(formData);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_EDIT)
     @Operation(summary = "修改任务")
     @PutMapping(value = "/{id}")
     public Result<Void> updateJobInfo(
@@ -113,6 +114,7 @@ public class JobInfoController {
         return Result.judge(result);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_DELETE)
     @Operation(summary = "删除任务")
     @DeleteMapping("/{ids}")
     public Result<Void> deleteJobInfos(
@@ -122,6 +124,7 @@ public class JobInfoController {
         return Result.judge(result);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_EXECUTE)
     @Operation(summary = "执行任务一次")
     @PostMapping("/trigger")
     public Result<String> triggerJob(@RequestBody JobInfoTriggerDto taskInfoTriggerDto) {
@@ -129,6 +132,7 @@ public class JobInfoController {
         return Result.success(result);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_EXECUTE)
     @Operation(summary = "启动")
     @GetMapping("/startJob/{id}")
     public Result<Void> startJob(@Parameter(description = "任务ID") @PathVariable("id") Long id) {
@@ -136,6 +140,7 @@ public class JobInfoController {
         return Result.judge(result);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_EXECUTE)
     @Operation(summary = "停止")
     @GetMapping("/stopJob/{id}")
     public Result<Void> stopJob(@Parameter(description = "任务ID") @PathVariable("id") Long id) {
@@ -151,6 +156,7 @@ public class JobInfoController {
     }
 
 
+    @RequirePermission(PermissionConstants.JOB_INFO_EDIT)
     @Operation(summary = "保存任务运行集")
     @PostMapping("saveJobCompose")
     public Result<Void>  saveJobCompose(@RequestBody @Valid JobInfoForm formData){
@@ -159,6 +165,7 @@ public class JobInfoController {
         return Result.judge(result);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_EDIT)
     @Operation(summary = "修改任务运行集")
     @PutMapping("updateJobCompose/{id}")
     public Result<Void>  updateJobCompose(@Parameter(description = "任务ID") @PathVariable Long id,
@@ -168,6 +175,7 @@ public class JobInfoController {
         return Result.judge(result);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_EXECUTE)
     @Operation(summary = "停止任务集")
     @GetMapping("/stopJobCompose/{id}/{randomId}")
     public Result<Void> stopJobCompose(@Parameter(description = "任务组ID") @PathVariable("id") Long id,
@@ -217,6 +225,7 @@ public class JobInfoController {
         return Result.success(list);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_VIEW)
     @PostMapping("getJobCompose")
     public Result<Map<String,Object>> getJobCompose(@RequestBody Map<String,Object> formMap){
         Map<String,Object> map =  jobComposeService.getJobCompose(formMap);
@@ -238,6 +247,7 @@ public class JobInfoController {
         return Result.judge(result);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_EDIT)
     @Operation(summary = "添加任务节点")
     @PostMapping("saveJobNode")
     public Result<JobNode>  saveJobNode(@RequestBody @Valid JobInfoForm formData){
@@ -245,6 +255,7 @@ public class JobInfoController {
         return Result.success(jobNode);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_EDIT)
     @Operation(summary = "添加任务节点和边")
     @PostMapping("saveJobNodeAndJobEdges")
     public Result<Map<String,Object>>  saveJobNodeAndJobEdges(@RequestBody Map<String,Object> formMap){
@@ -252,6 +263,7 @@ public class JobInfoController {
         return Result.success(data);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_EDIT)
     @Operation(summary = "保存连线")
     @PostMapping("saveJobEdge")
     public Result<JobEdge> saveJobEdge(@RequestBody @Valid JobEdgeForm formData) {
@@ -259,6 +271,7 @@ public class JobInfoController {
         return Result.success(jobEdge);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_EDIT)
     @Operation(summary = "将已有单任务加入画布")
     @PostMapping("addExistingJobToCompose")
     public Result<JobNode> addExistingJobToCompose(@RequestBody Map<String, Object> formMap) {
@@ -273,6 +286,7 @@ public class JobInfoController {
         return Result.success(jobNode);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_EDIT)
     @Operation(summary = "创建条件节点")
     @PostMapping("createConditionNode")
     public Result<Map<String, Object>> createConditionNode(@RequestBody Map<String, Object> formMap) {
@@ -314,6 +328,7 @@ public class JobInfoController {
         return Result.success(jobInfo.getTriggerOneStatus() != null && jobInfo.getTriggerOneStatus() > 0);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_EDIT)
     @Operation(summary = "修改任务节点")
     @GetMapping("updateJobNode/{jobId}/{nodeId}")
     public Result<Long>  updateJobNode(@PathVariable Long jobId,@PathVariable Long nodeId){
@@ -328,6 +343,7 @@ public class JobInfoController {
         return Result.success(list);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_EDIT)
     @Operation(summary = "删除任务节点")
     @GetMapping("deleteJobNode/{nodeId}")
     public Result<Void>  deleteJobNode(@PathVariable Long nodeId){
@@ -388,6 +404,7 @@ public class JobInfoController {
         return Result.success(jobInfo);
     }
     
+    @RequirePermission(PermissionConstants.JOB_INFO_VIEW)
     @Operation(summary = "获取任务组的所有节点（供执行器调用）")
     @GetMapping("/nodes/{jobId}")
     public Result<List<JobNode>> getJobNodes(

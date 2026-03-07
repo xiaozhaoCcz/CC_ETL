@@ -4,7 +4,10 @@ public enum DatasourceEnum {
 
     MYSQL("mysql"),
     ORACLE("oracle"),
-    POSTGRESQL("postgresql");
+    POSTGRESQL("postgresql"),
+    MONGODB("mongodb"),
+    ELASTICSEARCH("elasticsearch"),
+    KAFKA("kafka");
 
     private final String datasourceName;
 

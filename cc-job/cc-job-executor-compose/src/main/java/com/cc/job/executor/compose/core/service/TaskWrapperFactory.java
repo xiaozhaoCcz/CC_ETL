@@ -127,6 +127,11 @@ public class TaskWrapperFactory {
             
             @Override
             public void begin(Long jobId) {
+                if (context.isPausedNode(node.getId())) {
+                    logger.info("[TaskWorker] 阻塞节点跳过 begin 状态上报 - jobId: {}, nodeId: {}",
+                            jobId, node.getId());
+                    return;
+                }
                 startTime = System.currentTimeMillis();
                 logger.info("[TaskWorker] 任务开始执行 - jobId: {}, nodeId: {}", 
                         jobId, node.getId());
@@ -138,6 +143,11 @@ public class TaskWrapperFactory {
             
             @Override
             public void result(boolean success, Long jobId, WorkResult<String> workResult) {
+                if (context.isPausedNode(node.getId())) {
+                    logger.info("[TaskWorker] 阻塞节点跳过 result 状态上报 - jobId: {}, nodeId: {}",
+                            jobId, node.getId());
+                    return;
+                }
                 long duration = System.currentTimeMillis() - startTime;
                 logger.info("[TaskWorker] 任务执行完成 - jobId: {}, 成功: {}, 耗时: {}ms", 
                         jobId, success, duration);

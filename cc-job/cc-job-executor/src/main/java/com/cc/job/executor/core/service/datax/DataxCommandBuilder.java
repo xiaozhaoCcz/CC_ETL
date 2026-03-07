@@ -45,8 +45,9 @@ public class DataxCommandBuilder {
         cmdList.add(dataxPy);
         cmdList.add(jsonFile);
         
-        // 如果是增量同步，添加参数
-        if (jobInfo.getIncrementType() == ExecutorConstants.DataxType.INCREMENTAL) {
+        // 增量或参数增量同步时，添加 -p 参数
+        if (jobInfo.getIncrementType() == ExecutorConstants.DataxType.INCREMENTAL
+                || jobInfo.getIncrementType() == ExecutorConstants.DataxType.PARAM_INCREMENTAL) {
             addIncrementalParams(cmdList, jobInfo);
         }
         

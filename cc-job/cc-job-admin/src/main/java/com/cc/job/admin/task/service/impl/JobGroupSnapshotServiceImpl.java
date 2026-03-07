@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.time.LocalDateTime;
 
 /**
@@ -76,6 +77,36 @@ public class JobGroupSnapshotServiceImpl extends ServiceImpl<JobGroupSnapshotMap
 
         log.warn("[Snapshot] 快照不存在，无法删除 - jobId: {}, randomId: {}", jobId, randomId);
         return false;
+    }
+
+    private static final String VERSION_PREFIX = "ver_";
+
+    @Override
+    public Long saveAsVersion(Long jobId, String versionName, String nodesJson, String edgesJson, String userId) {
+        String safeName = (versionName != null ? versionName.trim() : "").replaceAll("[^a-zA-Z0-9_\\-\\u4e00-\\u9fa5]", "_");
+        if (safeName.isEmpty()) safeName = "v" + System.currentTimeMillis();
+        String randomId = VERSION_PREFIX + safeName;
+        JobGroupSnapshot existing = getSnapshot(jobId, randomId);
+        if (existing != null) {
+            existing.setNodesJson(nodesJson);
+            existing.setEdgesJson(edgesJson);
+            existing.setTriggerUserId(userId);
+            existing.setUpdateTime(LocalDateTime.now());
+            updateById(existing);
+            return existing.getId();
+        }
+        return createSnapshot(jobId, randomId, nodesJson, edgesJson, userId);
+    }
+
+    @Override
+    public List<JobGroupSnapshot> listVersions(Long jobId, int limit) {
+        LambdaQueryWrapper<JobGroupSnapshot> w = new LambdaQueryWrapper<>();
+        w.eq(JobGroupSnapshot::getJobId, jobId)
+                .eq(JobGroupSnapshot::getIsDeleted, 0)
+                .likeRight(JobGroupSnapshot::getRandomId, VERSION_PREFIX)
+                .orderByDesc(JobGroupSnapshot::getCreateTime)
+                .last("LIMIT " + Math.min(limit, 100));
+        return list(w);
     }
 }
 

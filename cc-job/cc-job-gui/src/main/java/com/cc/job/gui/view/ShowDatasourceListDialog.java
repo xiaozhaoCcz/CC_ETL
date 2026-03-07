@@ -19,12 +19,15 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.stage.Window;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -52,7 +55,7 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
     private int pageSize = 10;
     private long total = 0;
 
-    private static final String[] DATASOURCE_TYPES = {"", "MYSQL", "ORACLE", "POSTGRESQL"};
+    private static final String[] DATASOURCE_TYPES = {"", "MYSQL", "ORACLE", "POSTGRESQL", "MONGODB", "ELASTICSEARCH", "KAFKA"};
     private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public ShowDatasourceListDialog(Stage ownerStage) {
@@ -414,9 +417,12 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
                     updatePagerButtons();
                 });
             } catch (Exception ex) {
+                String msg = ex.getMessage() != null ? ex.getMessage() : "";
+                boolean isForbidden = msg.contains("403") || msg.contains("无权限");
+                final String displayMsg = isForbidden ? "无权限访问数据源，请联系管理员授权" : msg;
                 Platform.runLater(() -> {
-                    totalLabel.setText("加载失败: " + ex.getMessage());
-                    showError("加载数据源列表失败", ex.getMessage());
+                    totalLabel.setText("加载失败: " + displayMsg);
+                    showError("加载数据源列表失败", displayMsg);
                 });
             } finally {
                 loading.set(false);
@@ -436,16 +442,25 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
 
     private void handleEdit(JobJdbcDatasourceVO item) {
         if (item == null || item.getId() == null) return;
-        // 加载表单数据
-        runAsync("加载数据", () -> {
+        if (loading.getAndSet(true)) return;
+        totalLabel.setText("加载数据...");
+        new Thread(() -> {
             try {
                 JobJdbcDatasourceForm form = datasourceService.getFormData(item.getId());
-                Platform.runLater(() -> showDatasourceFormDialog(form));
-                return "加载成功";
+                Platform.runLater(() -> {
+                    showDatasourceFormDialog(form);
+                    totalLabel.setText("共 " + total + " 条，当前页 " + pageNum);
+                    loading.set(false);
+                });
             } catch (Exception e) {
-                throw new RuntimeException("加载失败: " + e.getMessage(), e);
+                String msg = e.getMessage() != null ? e.getMessage() : "加载失败";
+                Platform.runLater(() -> {
+                    showError("加载失败", msg);
+                    totalLabel.setText("共 " + total + " 条，当前页 " + pageNum);
+                    loading.set(false);
+                });
             }
-        });
+        }, "datasource-edit-load").start();
     }
 
     private void showDatasourceFormDialog(JobJdbcDatasourceForm editItem) {
@@ -485,6 +500,18 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
         dbInput.setPromptText("请输入数据库名");
         dbInput.getStyleClass().add("dialog-search-field");
 
+        // 连接配置方式
+        Label configModeLabel = new Label("连接配置方式");
+        configModeLabel.setStyle(labelStyle);
+        ToggleGroup configModeGroup = new ToggleGroup();
+        RadioButton jdbcUrlRadio = new RadioButton("JDBC URL");
+        jdbcUrlRadio.setToggleGroup(configModeGroup);
+        jdbcUrlRadio.setSelected(true);
+        RadioButton ipPortRadio = new RadioButton("IP + 端口");
+        ipPortRadio.setToggleGroup(configModeGroup);
+        HBox configModeBox = new HBox(20, jdbcUrlRadio, ipPortRadio);
+        configModeBox.setAlignment(Pos.CENTER_LEFT);
+
         // 用户名
         Label userLabel = new Label("用户名");
         userLabel.setStyle(labelStyle);
@@ -501,13 +528,27 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
         pwdInput.setPromptText("请输入密码");
         pwdInput.getStyleClass().add("dialog-search-field");
 
-        // JDBC URL
+        // JDBC URL（配置方式为 JDBC URL 时显示）
         Label urlLabel = new Label("JDBC URL");
         urlLabel.setStyle(labelStyle);
         TextField urlInput = new TextField();
         urlInput.setPrefWidth(300);
         urlInput.setPromptText("jdbc:mysql://host:port/database");
         urlInput.getStyleClass().add("dialog-search-field");
+
+        // IP、端口（配置方式为 IP+端口 时显示）
+        Label ipLabel = new Label("IP 地址");
+        ipLabel.setStyle(labelStyle);
+        TextField ipInput = new TextField();
+        ipInput.setPrefWidth(200);
+        ipInput.setPromptText("127.0.0.1 或 host");
+        ipInput.getStyleClass().add("dialog-search-field");
+        Label portLabel = new Label("端口");
+        portLabel.setStyle(labelStyle);
+        TextField portInput = new TextField();
+        portInput.setPrefWidth(100);
+        portInput.setPromptText("3306");
+        portInput.getStyleClass().add("dialog-search-field");
 
         // 驱动类
         Label driverLabel = new Label("JDBC驱动类");
@@ -526,10 +567,33 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
         commentInput.setWrapText(true);
         commentInput.getStyleClass().add("dialog-search-field");
 
-        // 监听数据源类型变化，自动填充驱动类
+        // 配置方式切换时显示/隐藏 JDBC URL 与 IP+端口
+        urlLabel.visibleProperty().bind(Bindings.equal(configModeGroup.selectedToggleProperty(), jdbcUrlRadio));
+        urlLabel.managedProperty().bind(urlLabel.visibleProperty());
+        urlInput.visibleProperty().bind(Bindings.equal(configModeGroup.selectedToggleProperty(), jdbcUrlRadio));
+        urlInput.managedProperty().bind(urlInput.visibleProperty());
+        ipLabel.visibleProperty().bind(Bindings.equal(configModeGroup.selectedToggleProperty(), ipPortRadio));
+        ipLabel.managedProperty().bind(ipLabel.visibleProperty());
+        ipInput.visibleProperty().bind(Bindings.equal(configModeGroup.selectedToggleProperty(), ipPortRadio));
+        ipInput.managedProperty().bind(ipInput.visibleProperty());
+        portLabel.visibleProperty().bind(Bindings.equal(configModeGroup.selectedToggleProperty(), ipPortRadio));
+        portLabel.managedProperty().bind(portLabel.visibleProperty());
+        portInput.visibleProperty().bind(Bindings.equal(configModeGroup.selectedToggleProperty(), ipPortRadio));
+        portInput.managedProperty().bind(portInput.visibleProperty());
+
+        // 监听数据源类型变化，自动填充驱动类与 URL 占位、默认端口
         typeCombo.valueProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal != null && isBlank(driverInput.getText())) {
-                driverInput.setText(getDefaultDriver(newVal));
+            if (newVal != null) {
+                if (isBlank(driverInput.getText())) driverInput.setText(getDefaultDriver(newVal));
+                urlInput.setPromptText(getDefaultUrlPrompt(newVal));
+                if (ipPortRadio.isSelected() && isBlank(portInput.getText())) {
+                    portInput.setText(getDefaultPort(newVal));
+                }
+            }
+        });
+        configModeGroup.selectedToggleProperty().addListener((obs, oldVal, newVal) -> {
+            if (ipPortRadio.isSelected() && typeCombo.getValue() != null && isBlank(portInput.getText())) {
+                portInput.setText(getDefaultPort(typeCombo.getValue()));
             }
         });
 
@@ -539,16 +603,22 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
         grid.add(typeCombo, 1, 1);
         grid.add(dbLabel, 0, 2);
         grid.add(dbInput, 1, 2);
-        grid.add(userLabel, 0, 3);
-        grid.add(userInput, 1, 3);
-        grid.add(pwdLabel, 0, 4);
-        grid.add(pwdInput, 1, 4);
-        grid.add(urlLabel, 0, 5);
-        grid.add(urlInput, 1, 5);
-        grid.add(driverLabel, 0, 6);
-        grid.add(driverInput, 1, 6);
-        grid.add(commentLabel, 0, 7);
-        grid.add(commentInput, 1, 7);
+        grid.add(configModeLabel, 0, 3);
+        grid.add(configModeBox, 1, 3);
+        grid.add(userLabel, 0, 4);
+        grid.add(userInput, 1, 4);
+        grid.add(pwdLabel, 0, 5);
+        grid.add(pwdInput, 1, 5);
+        grid.add(urlLabel, 0, 6);
+        grid.add(urlInput, 1, 6);
+        grid.add(ipLabel, 0, 6);
+        grid.add(ipInput, 1, 6);
+        grid.add(portLabel, 2, 6);
+        grid.add(portInput, 3, 6);
+        grid.add(driverLabel, 0, 7);
+        grid.add(driverInput, 1, 7);
+        grid.add(commentLabel, 0, 8);
+        grid.add(commentInput, 1, 8);
 
         // 填充编辑数据
         if (editItem != null) {
@@ -559,9 +629,18 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
             dbInput.setText(safe(editItem.getDatabaseName()));
             userInput.setText(safe(editItem.getJdbcUsername()));
             pwdInput.setText(safe(editItem.getJdbcPassword()));
-            urlInput.setText(safe(editItem.getJdbcUrl()));
             driverInput.setText(safe(editItem.getJdbcDriverClass()));
             commentInput.setText(safe(editItem.getComments()));
+            String jdbcUrl = safe(editItem.getJdbcUrl());
+            urlInput.setText(jdbcUrl);
+            String[] parsed = parseIpPortFromJdbcUrl(jdbcUrl);
+            if (parsed != null && parsed.length >= 2) {
+                ipPortRadio.setSelected(true);
+                ipInput.setText(parsed[0]);
+                portInput.setText(parsed[1]);
+            } else {
+                jdbcUrlRadio.setSelected(true);
+            }
         }
 
         dialog.getDialogPane().setContent(grid);
@@ -571,16 +650,17 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
         ButtonType cancelBtn = new ButtonType("取消", ButtonBar.ButtonData.CANCEL_CLOSE);
         dialog.getDialogPane().getButtonTypes().addAll(testBtn, saveBtn, cancelBtn);
 
-        // 测试连接按钮处理
+        // 测试连接按钮处理（使用编辑弹窗作为提示框 owner，避免提示被挡在后方）
         Button testBtnNode = (Button) dialog.getDialogPane().lookupButton(testBtn);
         if (testBtnNode != null) {
             testBtnNode.getStyleClass().add("dialog-button-success");
             testBtnNode.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
                 event.consume();
-                JobJdbcDatasourceForm form = buildFormFromInputs(
-                        editItem, nameInput, typeCombo, dbInput, userInput, pwdInput, urlInput, driverInput, commentInput);
+                JobJdbcDatasourceForm form = buildFormFromInputs(editItem, nameInput, typeCombo, dbInput, userInput, pwdInput,
+                        urlInput, ipInput, portInput, ipPortRadio.isSelected(), driverInput, commentInput);
                 if (form != null) {
-                    testConnectionAsync(form);
+                    Window editWindow = testBtnNode.getScene() != null ? testBtnNode.getScene().getWindow() : null;
+                    testConnectionAsync(form, editWindow);
                 }
             });
         }
@@ -592,7 +672,8 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
 
         dialog.setResultConverter(buttonType -> {
             if (buttonType == saveBtn) {
-                return buildFormFromInputs(editItem, nameInput, typeCombo, dbInput, userInput, pwdInput, urlInput, driverInput, commentInput);
+                return buildFormFromInputs(editItem, nameInput, typeCombo, dbInput, userInput, pwdInput,
+                        urlInput, ipInput, portInput, ipPortRadio.isSelected(), driverInput, commentInput);
             }
             return null;
         });
@@ -608,6 +689,7 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
             JobJdbcDatasourceForm editItem,
             TextField nameInput, ComboBox<String> typeCombo, TextField dbInput,
             TextField userInput, PasswordField pwdInput, TextField urlInput,
+            TextField ipInput, TextField portInput, boolean useIpPortMode,
             TextField driverInput, TextArea commentInput) {
         if (isBlank(nameInput.getText())) {
             showError("验证失败", "请输入数据源名称");
@@ -625,9 +707,32 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
             showError("验证失败", "请输入密码");
             return null;
         }
-        if (isBlank(urlInput.getText())) {
-            showError("验证失败", "请输入JDBC URL");
-            return null;
+        String type = typeCombo.getValue();
+        String jdbcUrl;
+        if (useIpPortMode) {
+            if (isBlank(ipInput.getText())) {
+                showError("验证失败", "请输入IP地址");
+                return null;
+            }
+            if (isBlank(portInput.getText())) {
+                showError("验证失败", "请输入端口");
+                return null;
+            }
+            if (!isIpPortSupported(type)) {
+                showError("验证失败", "当前数据源类型不支持 IP+端口 配置，请选择 JDBC URL 方式或使用 MYSQL/ORACLE/POSTGRESQL");
+                return null;
+            }
+            jdbcUrl = buildJdbcUrlFromIpPort(type, ipInput.getText().trim(), portInput.getText().trim(), dbInput.getText().trim());
+            if (jdbcUrl == null) {
+                showError("验证失败", "无法根据 IP、端口、数据库名生成 JDBC URL");
+                return null;
+            }
+        } else {
+            if (isBlank(urlInput.getText())) {
+                showError("验证失败", "请输入JDBC URL");
+                return null;
+            }
+            jdbcUrl = urlInput.getText().trim();
         }
         if (isBlank(driverInput.getText())) {
             showError("验证失败", "请输入JDBC驱动类");
@@ -639,27 +744,74 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
             form.setId(editItem.getId());
         }
         form.setDatasourceName(nameInput.getText().trim());
-        form.setDatasource(typeCombo.getValue());
+        form.setDatasource(type);
         form.setDatabaseName(dbInput.getText().trim());
         form.setJdbcUsername(userInput.getText().trim());
         form.setJdbcPassword(pwdInput.getText());
-        form.setJdbcUrl(urlInput.getText().trim());
+        form.setJdbcUrl(jdbcUrl);
         form.setJdbcDriverClass(driverInput.getText().trim());
         form.setComments(isBlank(commentInput.getText()) ? "备注" : commentInput.getText().trim());
         return form;
     }
 
-    private void testConnectionAsync(JobJdbcDatasourceForm form) {
-        runAsync("测试连接", () -> {
-            boolean connected = datasourceService.testConnection(form);
-            Platform.runLater(() -> {
-                if (connected) {
-                    showInfo("连接成功！");
-                } else {
-                    showError("测试连接", "连接失败，请检查配置");
+    private static boolean isIpPortSupported(String type) {
+        return "MYSQL".equals(type) || "ORACLE".equals(type) || "POSTGRESQL".equals(type);
+    }
+
+    private static String buildJdbcUrlFromIpPort(String type, String ip, String port, String dbName) {
+        if (ip == null || ip.trim().isEmpty() || port == null || port.trim().isEmpty() || dbName == null || dbName.trim().isEmpty())
+            return null;
+        return switch (type != null ? type : "") {
+            case "MYSQL" -> String.format("jdbc:mysql://%s:%s/%s", ip, port, dbName);
+            case "ORACLE" -> String.format("jdbc:oracle:thin:@%s:%s/%s", ip, port, dbName);
+            case "POSTGRESQL" -> String.format("jdbc:postgresql://%s:%s/%s", ip, port, dbName);
+            default -> null;
+        };
+    }
+
+    /** 从 JDBC URL 解析出 [host, port]，解析失败返回 null */
+    private static String[] parseIpPortFromJdbcUrl(String jdbcUrl) {
+        if (jdbcUrl == null || jdbcUrl.trim().isEmpty()) return null;
+        // 匹配 jdbc:mysql://host:port/ 或 jdbc:oracle:thin:@host:port/ 或 jdbc:postgresql://host:port/
+        Pattern pattern = Pattern.compile("(?:@|//)([^:/]+):(\\d+)(?:/|$)");
+        Matcher matcher = pattern.matcher(jdbcUrl.trim());
+        if (matcher.find()) {
+            return new String[]{matcher.group(1), matcher.group(2)};
+        }
+        return null;
+    }
+
+    private String getDefaultPort(String datasource) {
+        return switch (datasource != null ? datasource : "") {
+            case "MYSQL" -> "3306";
+            case "ORACLE" -> "1521";
+            case "POSTGRESQL" -> "5432";
+            default -> "";
+        };
+    }
+
+    /**
+     * 在后台测试连接，结果用提示框显示。
+     * @param form 数据源表单
+     * @param alertOwner 提示框所属窗口（如编辑弹窗）；为 null 时使用列表弹窗，并走 runAsync 状态条
+     */
+    private void testConnectionAsync(JobJdbcDatasourceForm form, Window alertOwner) {
+        if (alertOwner != null) {
+            new Thread(() -> {
+                try {
+                    datasourceService.testConnection(form);
+                    Platform.runLater(() -> showInfo("连接成功！", alertOwner));
+                } catch (Exception e) {
+                    String reason = e.getMessage() != null ? e.getMessage() : "连接失败，请检查配置";
+                    Platform.runLater(() -> showError("测试连接", reason, alertOwner));
                 }
-            });
-            return connected ? "连接成功" : "连接失败";
+            }, "datasource-test-connect").start();
+            return;
+        }
+        runAsync("测试连接", () -> {
+            datasourceService.testConnection(form);
+            Platform.runLater(() -> showInfo("连接成功！"));
+            return "连接成功";
         });
     }
 
@@ -668,17 +820,11 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
         runAsync("测试连接", () -> {
             try {
                 JobJdbcDatasourceForm form = datasourceService.getFormData(item.getId());
-                boolean connected = datasourceService.testConnection(form);
-                Platform.runLater(() -> {
-                    if (connected) {
-                        showInfo("连接成功！");
-                    } else {
-                        showError("测试连接", "连接失败，请检查配置");
-                    }
-                });
-                return connected ? "连接成功" : "连接失败";
+                datasourceService.testConnection(form);
+                Platform.runLater(() -> showInfo("连接成功！"));
+                return "连接成功";
             } catch (Exception e) {
-                throw new RuntimeException("测试连接失败: " + e.getMessage(), e);
+                throw new RuntimeException(e.getMessage() != null ? e.getMessage() : "连接失败，请检查配置", e);
             }
         });
     }
@@ -751,11 +897,25 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
     }
 
     private String getDefaultDriver(String datasource) {
-        return switch (datasource) {
+        return switch (datasource != null ? datasource : "") {
             case "MYSQL" -> "com.mysql.cj.jdbc.Driver";
             case "ORACLE" -> "oracle.jdbc.driver.OracleDriver";
             case "POSTGRESQL" -> "org.postgresql.Driver";
+            case "MONGODB" -> "com.mongodb.jdbc.MongoDriver";
+            case "ELASTICSEARCH", "KAFKA" -> "";
             default -> "";
+        };
+    }
+
+    private String getDefaultUrlPrompt(String datasource) {
+        return switch (datasource != null ? datasource : "") {
+            case "MYSQL" -> "jdbc:mysql://host:3306/database";
+            case "ORACLE" -> "jdbc:oracle:thin:@host:1521:sid";
+            case "POSTGRESQL" -> "jdbc:postgresql://host:5432/database";
+            case "MONGODB" -> "mongodb://host:27017/database";
+            case "ELASTICSEARCH" -> "http://host:9200";
+            case "KAFKA" -> "localhost:9092 (bootstrap servers)";
+            default -> "jdbc:...";
         };
     }
 
@@ -772,16 +932,24 @@ public class ShowDatasourceListDialog extends Dialog<Void> {
     }
 
     private void showError(String title, String msg) {
+        showError(title, msg, null);
+    }
+
+    private void showError(String title, String msg, Window owner) {
         Alert alert = new Alert(Alert.AlertType.ERROR, msg, ButtonType.OK);
         alert.setTitle(title);
-        alert.initOwner(getDialogPane().getScene().getWindow());
+        alert.initOwner(owner != null ? owner : (getDialogPane().getScene() != null ? getDialogPane().getScene().getWindow() : null));
         alert.showAndWait();
     }
 
     private void showInfo(String msg) {
+        showInfo(msg, null);
+    }
+
+    private void showInfo(String msg, Window owner) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION, msg, ButtonType.OK);
         alert.setTitle("提示");
-        alert.initOwner(getDialogPane().getScene().getWindow());
+        alert.initOwner(owner != null ? owner : (getDialogPane().getScene() != null ? getDialogPane().getScene().getWindow() : null));
         alert.showAndWait();
     }
 }

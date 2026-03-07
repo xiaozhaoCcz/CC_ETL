@@ -3,15 +3,22 @@ package com.cc.job.gui.view;
 import com.cc.job.gui.model.RunningJobGroup;
 import com.cc.job.gui.util.StyleUtil;
 import javafx.animation.FadeTransition;
+import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
+import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
+import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
+import javafx.scene.input.MouseButton;
+import javafx.scene.Cursor;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import javafx.scene.shape.Line;
 import javafx.util.Duration;
 
 import java.util.ArrayList;
@@ -59,6 +66,18 @@ public class TaskNavigationBar extends HBox {
     // 运行中的任务组列表
     private Map<Long, RunningJobGroup> runningJobs = new HashMap<>();
     
+    // 标签页拖拽排序状态
+    private static final double DRAG_THRESHOLD_PX = 5;
+    private static final int DROP_INDICATOR_ANIM_MS = 120;
+    private TaskTab dragTab;
+    private double dragPressSceneX;
+    private double dragPressLocalX;
+    private boolean dragStarted;
+    /** 拖拽时显示插入位置的 overlay，与 tabContainer 叠放 */
+    private Pane dragDropOverlay;
+    /** overlay 上的插入线 */
+    private Line dropIndicatorLine;
+    
     public interface TaskSwitchCallback {
         void onTaskSwitch(String taskGroupName, Long taskGroupId);
     }
@@ -81,15 +100,26 @@ public class TaskNavigationBar extends HBox {
         tabContainer.setAlignment(Pos.CENTER_LEFT);
         tabContainer.setPadding(new Insets(0));
         
-        // 滚动面板包装标签容器
-        ScrollPane scrollPane = new ScrollPane(tabContainer);
+        // 拖拽插入位置指示 overlay（与 tabContainer 同区、不拦截鼠标）
+        dragDropOverlay = new Pane();
+        dragDropOverlay.setMouseTransparent(true);
+        dragDropOverlay.setPickOnBounds(false);
+        dragDropOverlay.prefWidthProperty().bind(tabContainer.widthProperty());
+        dragDropOverlay.prefHeightProperty().bind(tabContainer.heightProperty());
+        dragDropOverlay.setMinSize(0, 0);
+        
+        StackPane scrollContent = new StackPane();
+        scrollContent.getChildren().addAll(tabContainer, dragDropOverlay);
+        StackPane.setAlignment(tabContainer, Pos.CENTER_LEFT);
+        StackPane.setAlignment(dragDropOverlay, Pos.CENTER_LEFT);
+        
+        ScrollPane scrollPane = new ScrollPane(scrollContent);
         scrollPane.getStyleClass().add("task-nav-scroll-pane");
         scrollPane.setFitToHeight(true);
         scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scrollPane.setPannable(true);
         
-        // 确保内容从最左边开始，移除默认的内容边距
         Platform.runLater(() -> {
             javafx.scene.Node content = scrollPane.getContent();
             if (content != null) {
@@ -98,8 +128,6 @@ public class TaskNavigationBar extends HBox {
         });
         
         HBox.setHgrow(scrollPane, Priority.ALWAYS);
-        
-        // 不再显示运行/停止按钮，这些按钮已移至顶部工具栏
         getChildren().add(scrollPane);
     }
     
@@ -124,6 +152,7 @@ public class TaskNavigationBar extends HBox {
         tab.setOnClick(() -> switchToTaskGroup(taskGroupId));
         tab.setOnClose(() -> removeTaskGroup(taskGroupId));
         setupTabContextMenu(tab);
+        setupTabDragReorder(tab);
         
         tabs.put(taskGroupId, tab);
         taskGroupIdToNameMap.put(taskGroupId, taskGroupName);
@@ -224,6 +253,163 @@ public class TaskNavigationBar extends HBox {
         tab.setOnContextMenuRequested(e -> {
             menu.show(tab, e.getScreenX(), e.getScreenY());
         });
+    }
+    
+    /**
+     * 为任务组标签注册拖拽排序：拖拽时标签跟随鼠标（translateX）+ 插入线指示，松手后重排并归位
+     */
+    private void setupTabDragReorder(TaskTab tab) {
+        tab.setOnMousePressed(e -> {
+            if (e.getButton() == MouseButton.PRIMARY) {
+                dragTab = tab;
+                dragPressSceneX = e.getSceneX();
+                Point2D localInContainer = tabContainer.sceneToLocal(e.getSceneX(), e.getSceneY());
+                dragPressLocalX = localInContainer.getX();
+                dragStarted = false;
+            }
+        });
+        tab.setOnMouseDragged(e -> {
+            if (dragTab != tab) return;
+            if (!dragStarted) {
+                if (Math.abs(e.getSceneX() - dragPressSceneX) > DRAG_THRESHOLD_PX) {
+                    dragStarted = true;
+                    tab.getStyleClass().add("task-nav-tab-dragging");
+                }
+            }
+            if (dragStarted) {
+                e.consume();
+                if (getScene() != null) {
+                    getScene().setCursor(Cursor.CLOSED_HAND);
+                }
+                Point2D localInContainer = tabContainer.sceneToLocal(e.getSceneX(), e.getSceneY());
+                double currentLocalX = localInContainer.getX();
+                tab.setTranslateX(currentLocalX - dragPressLocalX);
+                int targetIndex = getTargetIndexFromSceneX(e.getSceneX(), tab);
+                showDropIndicator(targetIndex);
+            }
+        });
+        tab.setOnMouseReleased(e -> {
+            if (e.getButton() == MouseButton.PRIMARY && dragTab == tab) {
+                if (dragStarted) {
+                    e.consume();
+                    int currentIndex = tabContainer.getChildren().indexOf(tab);
+                    int targetIndex = getTargetIndexFromSceneX(e.getSceneX(), tab);
+                    hideDropIndicator();
+                    reorderTab(tab, currentIndex, targetIndex);
+                    double fromX = tab.getTranslateX();
+                    if (Math.abs(fromX) > 1) {
+                        TranslateTransition tt = new TranslateTransition(Duration.millis(DROP_INDICATOR_ANIM_MS), tab);
+                        tt.setFromX(fromX);
+                        tt.setToX(0);
+                        tt.setOnFinished(ev -> tab.setTranslateX(0));
+                        tt.play();
+                    } else {
+                        tab.setTranslateX(0);
+                    }
+                    tab.getStyleClass().remove("task-nav-tab-dragging");
+                }
+                dragTab = null;
+                dragStarted = false;
+                if (getScene() != null) {
+                    getScene().setCursor(Cursor.DEFAULT);
+                }
+            }
+        });
+    }
+    
+    /**
+     * 按槽位计算目标索引：被拖 tab 用布局位置（bounds - translateX），其它用 boundsInParent
+     */
+    private int getTargetIndexFromSceneX(double sceneX, TaskTab draggedTab) {
+        Point2D local = tabContainer.sceneToLocal(new Point2D(sceneX, 0));
+        double x = local.getX();
+        javafx.collections.ObservableList<javafx.scene.Node> children = tabContainer.getChildren();
+        if (children.isEmpty()) return 0;
+        for (int i = 0; i < children.size(); i++) {
+            javafx.scene.Node node = children.get(i);
+            double slotMinX, slotMaxX;
+            if (node == draggedTab) {
+                Bounds b = node.getBoundsInParent();
+                double tx = node.getTranslateX();
+                slotMinX = b.getMinX() - tx;
+                slotMaxX = b.getMaxX() - tx;
+            } else {
+                Bounds b = node.getBoundsInParent();
+                slotMinX = b.getMinX();
+                slotMaxX = b.getMaxX();
+            }
+            if (slotMinX <= x && x <= slotMaxX) {
+                return i;
+            }
+        }
+        // 落在最左/最右外：按 x 与首尾槽位比较，不依赖被拖 tab 的 idx，这样中间 tab 也能拖到最右
+        int idx = children.indexOf(draggedTab);
+        double firstMin = getSlotMinX(children.get(0), draggedTab);
+        javafx.scene.Node lastNode = children.get(children.size() - 1);
+        double lastMax = getSlotMaxX(lastNode, draggedTab);
+        if (x <= firstMin) return 0;
+        if (x >= lastMax) return children.size() - 1;
+        return idx;
+    }
+    
+    private double getSlotMinX(javafx.scene.Node node, TaskTab draggedTab) {
+        Bounds b = node.getBoundsInParent();
+        return node == draggedTab ? b.getMinX() - node.getTranslateX() : b.getMinX();
+    }
+    
+    private double getSlotMaxX(javafx.scene.Node node, TaskTab draggedTab) {
+        Bounds b = node.getBoundsInParent();
+        return node == draggedTab ? b.getMaxX() - node.getTranslateX() : b.getMaxX();
+    }
+    
+    /** 目标索引对应槽位的左边界 X（与 overlay 坐标系一致），用于插入线位置 */
+    private double getDropIndicatorXForTargetIndex(int targetIndex, TaskTab draggedTab) {
+        javafx.collections.ObservableList<javafx.scene.Node> children = tabContainer.getChildren();
+        if (targetIndex <= 0 || children.isEmpty()) return 0;
+        if (targetIndex >= children.size()) {
+            javafx.scene.Node last = children.get(children.size() - 1);
+            return getSlotMaxX(last, draggedTab);
+        }
+        return getSlotMinX(children.get(targetIndex), draggedTab);
+    }
+    
+    private void showDropIndicator(int targetIndex) {
+        if (dropIndicatorLine == null) {
+            dropIndicatorLine = new Line();
+            dropIndicatorLine.getStyleClass().add("task-nav-drop-indicator");
+            dropIndicatorLine.setMouseTransparent(true);
+        }
+        if (!dragDropOverlay.getChildren().contains(dropIndicatorLine)) {
+            dragDropOverlay.getChildren().add(dropIndicatorLine);
+        }
+        updateDropIndicatorPosition(targetIndex);
+    }
+    
+    private void updateDropIndicatorPosition(int targetIndex) {
+        if (dropIndicatorLine == null || dragTab == null) return;
+        double x = getDropIndicatorXForTargetIndex(targetIndex, dragTab);
+        double h = dragDropOverlay.getHeight();
+        if (h <= 0) h = tabContainer.getHeight();
+        dropIndicatorLine.setStartX(x);
+        dropIndicatorLine.setStartY(0);
+        dropIndicatorLine.setEndX(x);
+        dropIndicatorLine.setEndY(Math.max(1, h));
+    }
+    
+    private void hideDropIndicator() {
+        if (dropIndicatorLine != null && dragDropOverlay.getChildren().contains(dropIndicatorLine)) {
+            dragDropOverlay.getChildren().remove(dropIndicatorLine);
+        }
+    }
+    
+    /**
+     * 将指定标签从当前索引移动到目标索引
+     */
+    private void reorderTab(TaskTab tab, int currentIndex, int targetIndex) {
+        tabContainer.getChildren().remove(tab);
+        int size = tabContainer.getChildren().size();
+        int insertIndex = Math.max(0, Math.min(targetIndex, size));
+        tabContainer.getChildren().add(insertIndex, tab);
     }
     
     /**

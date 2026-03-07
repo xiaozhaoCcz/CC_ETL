@@ -1,16 +1,19 @@
 package com.cc.job.executor.compose.core.service;
 
+import cn.hutool.json.JSONUtil;
 import com.cc.job.executor.compose.client.AdminApiClient;
+import com.cc.job.executor.compose.core.exception.WaitingApprovalException;
 import com.cc.job.executor.compose.core.model.ExecutionContext;
-import com.cc.job.executor.compose.core.service.ResultStorageService;
 import com.cc.job.executor.compose.service.JobExecutionMonitor;
 import com.cc.job.executor.compose.service.JobTriggerService;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobNode;
+import com.xxl.job.core.context.XxlJobHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.FutureTask;
@@ -57,9 +60,38 @@ public class TaskExecutor {
                 jobInfo.getId(), node.getId(), retryCount);
         
         try {
-            // 1. 检查并处理暂停状态（废弃）
-            //handlePauseIfNeeded(node,context.getJobPauseStatusIds());
-            
+            if (context.isPausedNode(node.getId())) {
+                logger.info("[TaskExecutor] 节点被阻塞，本次跳过执行 - jobId: {}, nodeId: {}",
+                        jobInfo.getId(), node.getId());
+                XxlJobHelper.log(context.getXxlJobContext(),
+                        "节点被阻塞，本次跳过执行 - jobId: {}, nodeId: {}", jobInfo.getId(), node.getId());
+                return SUCCESS;
+            }
+            // 1. 审批节点：恢复执行时 fromNode 视为已通过，直接跳过执行（由编排器 no-op 处理）；否则检查需审批则创建待办并挂起
+            if (context.getResumeFromNodeId() != null && context.getResumeFromNodeId().equals(node.getId())) {
+                return SUCCESS;
+            }
+            boolean requireApproval = parseRequireApproval(node.getProperties());
+            if (requireApproval) {
+                JobInfo taskGroup = context.getTaskGroupInfo();
+                boolean cronAndSatisfied = taskGroup != null && "CRON".equalsIgnoreCase(taskGroup.getScheduleType())
+                        && adminApiClient.isApprovalSatisfied(context.getTaskGroupId(), node.getId());
+                if (!cronAndSatisfied) {
+                    Long jobLogId = null;
+                    if (context.getXxlJobContext() != null && context.getXxlJobContext().getTriggerParam() != null) {
+                        jobLogId = context.getXxlJobContext().getTriggerParam().getLogId();
+                    }
+                    int waitMinutes = (taskGroup != null && taskGroup.getApprovalWaitMinutes() != null) ? taskGroup.getApprovalWaitMinutes() : 1440;
+                    LocalDateTime waitDeadline = LocalDateTime.now().plusMinutes(waitMinutes);
+                    String approverUserIds = parseApproverUserIds(node.getProperties());
+                    Long pendingId = adminApiClient.createPending(jobLogId, context.getTaskGroupId(), node.getId(),
+                            context.getExecutionBatchId(), approverUserIds, waitDeadline);
+                    if (pendingId != null) {
+                        logger.info("[TaskExecutor] 审批节点已创建待办 - pendingId: {}, nodeId: {}", pendingId, node.getId());
+                    }
+                    throw new WaitingApprovalException("等待审批");
+                }
+            }
             // 2. 触发任务执行（传入执行上下文，用于参数解析）
             boolean triggerSuccess = jobTriggerService.triggerJob(
                     context.getXxlJobContext(), jobInfo, context.getExecutionBatchId(), context);
@@ -267,6 +299,29 @@ public class TaskExecutor {
             logger.error("[TaskExecutor] 上报状态失败 - jobId: {}, status: {}", 
                     jobId, status, e);
         }
+    }
+
+    private boolean parseRequireApproval(String propertiesJson) {
+        if (propertiesJson == null || propertiesJson.trim().isEmpty()) return false;
+        try {
+            Map<String, Object> map = JSONUtil.toBean(propertiesJson, Map.class);
+            Object v = map.get("requireApproval");
+            if (v instanceof Boolean) return (Boolean) v;
+            if (v != null) return "true".equalsIgnoreCase(String.valueOf(v));
+        } catch (Exception ignored) { }
+        return false;
+    }
+
+    private String parseApproverUserIds(String propertiesJson) {
+        if (propertiesJson == null || propertiesJson.trim().isEmpty()) return null;
+        try {
+            Map<String, Object> map = JSONUtil.toBean(propertiesJson, Map.class);
+            Object v = map.get("approverUserIds");
+            if (v == null) return null;
+            if (v instanceof String) return (String) v;
+            return JSONUtil.toJsonStr(v);
+        } catch (Exception ignored) { }
+        return null;
     }
 }
 

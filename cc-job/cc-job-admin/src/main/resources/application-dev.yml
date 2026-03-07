@@ -52,6 +52,7 @@ mybatis-plus:
     # log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 
 # xxl-job 定时任务配置
+# accessToken 需与执行器（executor-compose）的 accessToken 配置为相同值，否则执行器回调会 401
 xxl:
   job:
     i18n: zh_CN
@@ -66,8 +67,50 @@ xxl:
 
 # CC-Job 节点执行结果存储配置
 cc-job:
+  # SSE 多实例广播：多 Admin 实例时设为 true，通过数据库表跨实例推送节点状态到 PC
+  sse:
+    broadcast:
+      enabled: false   # true 时启用数据库广播
+      poll-interval-ms: 300      # 轮询间隔（毫秒）
+      cleanup-interval-ms: 300000  # 清理已处理记录的间隔（毫秒，默认 5 分钟）
   result:
     storage:
       file:
         # 文件存储基础路径（绝对路径），需要与executor-compose模块保持一致
         basePath: /Users/xiaozhao/Desktop/xz/cc-job-results
+  # 告警 Webhook（任务失败时 POST JSON 到配置的 URL）
+  alarm:
+    webhook:
+      enabled: false
+      url: ''   # 例如 https://your-server.com/webhook，多个用逗号分隔
+      method: POST
+      connect-timeout-seconds: 10
+      read-timeout-seconds: 15
+      # headers: {}   # 可选，如 Authorization: Bearer xxx
+      # body-template: ''  # 可选，自定义 body 模板，占位符 {jobId},{jobDesc},{logId} 等
+    # 告警收敛：同一任务 N 分钟内只告警一次，0 表示关闭
+    convergence-minutes: 10
+    # 钉钉机器人告警（可选）
+    dingtalk:
+      enabled: false
+      webhook-url: ''   # 钉钉群机器人 Webhook 地址
+    # 企业微信机器人告警（可选）
+    wecom:
+      enabled: false
+      webhook-url: ''   # 企微群机器人 Webhook 地址
+    # 飞书机器人告警（可选）
+    feishu:
+      enabled: false
+      webhook-url: ''   # 飞书群机器人 Webhook 地址
+    # 告警规则：连续失败 N 次才告警、仅工作时间告警
+    rules:
+      consecutive-failures: 0   # 连续失败达到此次数才告警，0 关闭
+      work-hours-start: ''      # 仅工作时间开始 如 09:00
+      work-hours-end: ''        # 仅工作时间结束 如 18:00
+      work-days: '1-5'          # 工作日 1-7 表示周一到周日，如 1-5 表示工作日
+# 生命周期 Webhook：任务成功/失败时 POST JSON 到配置的 URL
+  lifecycle:
+    webhook:
+      enabled: false
+      url: []   # 例如 - https://your-server.com/webhook
+      events: []  # 空表示全部，可选 success, fail

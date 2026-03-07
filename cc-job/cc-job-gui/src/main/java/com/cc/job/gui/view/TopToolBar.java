@@ -58,6 +58,7 @@ public class TopToolBar extends VBox {
         void onStop(Long jobId);
         void onClear();
         void onSettings();
+        default void onPermissionManage() {}
         void onSelect(); // 框选功能
         void onLayoutHorizontal(); // 横向布局
         void onLayoutVertical(); // 纵向布局
@@ -82,10 +83,16 @@ public class TopToolBar extends VBox {
         void onJobGroupList();
         void onJobLogList();
         void onTaskReport(); // 任务报表
+        void onDashboardBigScreen(); // 统计大屏
         void onDatasourceList();
         void onDataxSync();
         void onDataxGroupSync();
+        default void onApprovalPending() {} // 待办审批
         void onExportCanvas(); // 导出画布
+        default void onSaveAsVersion() {} // 保存为版本
+        default void onVersionList() {} // 版本列表与回滚
+        default void onSaveSelectionAsCanvasTemplate() {} // 保存选中为画布模板
+        default void onInsertFromCanvasTemplate() {} // 从画布模板插入
 
         /**
          * 任务菜单需要的任务列表（供“任务”下拉菜单展示）
@@ -142,6 +149,7 @@ public class TopToolBar extends VBox {
         default void onToggleNodeLabels() {} // 显示/隐藏节点标签
         default void onToggleEdgeLabels() {} // 显示/隐藏连线标签
         default void onSetTheme(String theme) {} // 设置主题
+        default void onSetLocale(String locale) {} // 设置语言 zh_CN / en
         default void onToggleFullScreen() {} // 全屏
         
         // 转到菜单
@@ -176,6 +184,7 @@ public class TopToolBar extends VBox {
         
         // 帮助菜单
         default void onUserManual() {} // 用户手册
+        default void onNewUserGuide() {} // 新手引导
         default void onShortcutsList() {} // 快捷键列表
         default void onApiDocumentation() {} // API文档
         default void onChangelog() {} // 更新日志
@@ -239,6 +248,10 @@ public class TopToolBar extends VBox {
     
     // 最近打开的文件菜单引用
     private Menu recentFilesMenu;
+
+    private MenuItem permissionManageItem;
+    private Menu permissionMenuRef;
+    private MenuItem datasourceMenuListItem;
     
     public TopToolBar() {
         initializeUI();
@@ -284,11 +297,27 @@ public class TopToolBar extends VBox {
         // 窗口菜单
         Menu windowMenu = createWindowMenu();
         
+        // 权限菜单（独立导航栏，仅拥有 permission:manage 时显示）
+        Menu permissionMenu = createPermissionMenu();
+        
         // 帮助菜单
         Menu helpMenu = createHelpMenu();
 
-        menuBar.getMenus().addAll(fileMenu, editMenu, selectMenu, viewMenu, goMenu, runMenu, jobMenu, windowMenu, helpMenu);
+        menuBar.getMenus().addAll(fileMenu, editMenu, selectMenu, viewMenu, goMenu, runMenu, jobMenu, windowMenu, permissionMenu, helpMenu);
         return menuBar;
+    }
+    
+    /**
+     * 独立的「权限」导航菜单，仅放权限管理入口；未授权用户不显示该菜单。
+     */
+    private Menu createPermissionMenu() {
+        permissionMenuRef = new Menu("权限");
+        permissionManageItem = new MenuItem("权限管理");
+        permissionManageItem.setOnAction(e -> safeCall(ToolBarCallback::onPermissionManage));
+        permissionManageItem.setDisable(true);
+        permissionMenuRef.getItems().add(permissionManageItem);
+        updatePermissionMenuVisibility();
+        return permissionMenuRef;
     }
     
     private Menu createFileMenu() {
@@ -325,7 +354,15 @@ public class TopToolBar extends VBox {
         updateRecentFilesMenu(recentFilesMenu);
         recentFilesMenu.setOnShowing(e -> updateRecentFilesMenu(recentFilesMenu));
         
-        fileMenu.getItems().addAll(newItem, openItem, saveItem, saveAsItem, new SeparatorMenuItem(), recentFilesMenu);
+        // 版本子菜单
+        Menu versionMenu = new Menu("版本");
+        MenuItem saveVersionItem = new MenuItem("保存为版本");
+        saveVersionItem.setOnAction(e -> safeCall(ToolBarCallback::onSaveAsVersion));
+        MenuItem versionListItem = new MenuItem("版本列表与回滚");
+        versionListItem.setOnAction(e -> safeCall(ToolBarCallback::onVersionList));
+        versionMenu.getItems().addAll(saveVersionItem, versionListItem);
+        
+        fileMenu.getItems().addAll(newItem, openItem, saveItem, saveAsItem, versionMenu, new SeparatorMenuItem(), recentFilesMenu);
         
         // 导入子菜单
         Menu importMenu = new Menu("导入");
@@ -535,8 +572,12 @@ public class TopToolBar extends VBox {
         addBookmarkItem.setOnAction(e -> safeCall(ToolBarCallback::onAddBookmark));
         MenuItem bookmarkListItem = new MenuItem("书签列表");
         bookmarkListItem.setOnAction(e -> safeCall(ToolBarCallback::onBookmarkList));
+        MenuItem saveSelectionAsTemplateItem = new MenuItem("保存选中为画布模板");
+        saveSelectionAsTemplateItem.setOnAction(e -> safeCall(ToolBarCallback::onSaveSelectionAsCanvasTemplate));
+        MenuItem insertFromTemplateItem = new MenuItem("从画布模板插入");
+        insertFromTemplateItem.setOnAction(e -> safeCall(ToolBarCallback::onInsertFromCanvasTemplate));
         viewMenu.getItems().addAll(toggleTreeViewItem, toggleMiniMapItem, toggleLogPanelItem, new SeparatorMenuItem(),
-                addBookmarkItem, bookmarkListItem, new SeparatorMenuItem(), resetLayoutItem, new SeparatorMenuItem());
+                addBookmarkItem, bookmarkListItem, saveSelectionAsTemplateItem, insertFromTemplateItem, new SeparatorMenuItem(), resetLayoutItem, new SeparatorMenuItem());
         
         // 视图选项
         MenuItem toggleGridItem = new MenuItem("显示网格");
@@ -559,12 +600,19 @@ public class TopToolBar extends VBox {
         MenuItem autoThemeItem = new MenuItem("自动");
         autoThemeItem.setOnAction(e -> safeCall(cb -> cb.onSetTheme("auto")));
         themeMenu.getItems().addAll(lightThemeItem, darkThemeItem, autoThemeItem);
+
+        Menu langMenu = new Menu("语言");
+        MenuItem zhItem = new MenuItem("中文");
+        zhItem.setOnAction(e -> safeCall(cb -> cb.onSetLocale("zh_CN")));
+        MenuItem enItem = new MenuItem("English");
+        enItem.setOnAction(e -> safeCall(cb -> cb.onSetLocale("en")));
+        langMenu.getItems().addAll(zhItem, enItem);
         
         MenuItem fullScreenItem = new MenuItem("全屏");
         fullScreenItem.setAccelerator(new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.F11));
         fullScreenItem.setOnAction(e -> safeCall(ToolBarCallback::onToggleFullScreen));
         
-        viewMenu.getItems().addAll(themeMenu, new SeparatorMenuItem(), fullScreenItem);
+        viewMenu.getItems().addAll(themeMenu, langMenu, new SeparatorMenuItem(), fullScreenItem);
         
         return viewMenu;
     }
@@ -658,11 +706,15 @@ public class TopToolBar extends VBox {
         
         MenuItem taskReportItem = new MenuItem("任务报表");
         taskReportItem.setOnAction(e -> safeCall(ToolBarCallback::onTaskReport));
+        MenuItem bigScreenItem = new MenuItem("统计大屏");
+        bigScreenItem.setOnAction(e -> safeCall(ToolBarCallback::onDashboardBigScreen));
         
-        jobMenu.getItems().addAll(jobMenuList, jobGroupMenuList, jobLogMenuList, taskReportItem, new SeparatorMenuItem());
+        MenuItem approvalPendingItem = new MenuItem("待办审批");
+        approvalPendingItem.setOnAction(e -> safeCall(ToolBarCallback::onApprovalPending));
+        jobMenu.getItems().addAll(jobMenuList, jobGroupMenuList, jobLogMenuList, approvalPendingItem, taskReportItem, bigScreenItem, new SeparatorMenuItem());
         
-        MenuItem datasourceMenuList = new MenuItem("数据源管理");
-        datasourceMenuList.setOnAction(e -> safeCall(ToolBarCallback::onDatasourceList));
+        datasourceMenuListItem = new MenuItem("数据源管理");
+        datasourceMenuListItem.setOnAction(e -> safeCall(ToolBarCallback::onDatasourceList));
         
         MenuItem dataxSyncMenuItem = new MenuItem("数据源同步");
         dataxSyncMenuItem.setOnAction(e -> safeCall(ToolBarCallback::onDataxSync));
@@ -670,7 +722,7 @@ public class TopToolBar extends VBox {
         MenuItem dataxGroupSyncMenuItem = new MenuItem("多数据源同步");
         dataxGroupSyncMenuItem.setOnAction(e -> safeCall(ToolBarCallback::onDataxGroupSync));
         
-        jobMenu.getItems().addAll(datasourceMenuList, new SeparatorMenuItem(), dataxSyncMenuItem, dataxGroupSyncMenuItem, new SeparatorMenuItem());
+        jobMenu.getItems().addAll(datasourceMenuListItem, new SeparatorMenuItem(), dataxSyncMenuItem, dataxGroupSyncMenuItem, new SeparatorMenuItem());
         
         // 任务组操作
         MenuItem newJobGroupItem = new MenuItem("新建任务组");
@@ -732,6 +784,8 @@ public class TopToolBar extends VBox {
         
         MenuItem userManualItem = new MenuItem("用户手册");
         userManualItem.setOnAction(e -> safeCall(ToolBarCallback::onUserManual));
+        MenuItem newUserGuideItem = new MenuItem("新手引导");
+        newUserGuideItem.setOnAction(e -> safeCall(ToolBarCallback::onNewUserGuide));
         
         MenuItem shortcutsItem = new MenuItem("快捷键列表");
         shortcutsItem.setAccelerator(new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.SLASH, 
@@ -744,7 +798,7 @@ public class TopToolBar extends VBox {
         MenuItem changelogItem = new MenuItem("更新日志");
         changelogItem.setOnAction(e -> safeCall(ToolBarCallback::onChangelog));
         
-        helpMenu.getItems().addAll(userManualItem, shortcutsItem, apiDocItem, changelogItem, new SeparatorMenuItem());
+        helpMenu.getItems().addAll(userManualItem, newUserGuideItem, shortcutsItem, apiDocItem, changelogItem, new SeparatorMenuItem());
         
         MenuItem settingsItem = new MenuItem("系统设置");
         settingsItem.setOnAction(e -> safeCall(ToolBarCallback::onSettings));
@@ -769,6 +823,23 @@ public class TopToolBar extends VBox {
         helpMenu.getItems().addAll(checkUpdateItem, reportIssueItem, feedbackItem, new SeparatorMenuItem(), onlineHelpItem);
         
         return helpMenu;
+    }
+
+    /**
+     * 根据当前用户权限更新「权限」菜单可见性及「权限管理」是否可用；同时更新「数据源管理」等入口可见性。
+     */
+    public void updatePermissionMenuVisibility() {
+        boolean hasPermission = SessionManager.getInstance().hasPermission("permission:manage");
+        if (permissionMenuRef != null) {
+            permissionMenuRef.setVisible(hasPermission);
+        }
+        if (permissionManageItem != null) {
+            permissionManageItem.setDisable(!hasPermission);
+        }
+        boolean hasDatasourceView = SessionManager.getInstance().hasPermission("datasource:view");
+        if (datasourceMenuListItem != null) {
+            datasourceMenuListItem.setVisible(hasDatasourceView);
+        }
     }
     
     private HBox createToolBar() {

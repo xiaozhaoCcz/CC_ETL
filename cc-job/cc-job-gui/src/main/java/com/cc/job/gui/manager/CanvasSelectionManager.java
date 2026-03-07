@@ -33,7 +33,9 @@ public class CanvasSelectionManager {
     
     private boolean isMovingSelection = false;
     private ProcessNode dragStartNode;
-    
+    /** 每个选中节点一个红框，避免一个大框包住多节点造成误解 */
+    private final List<Rectangle> perNodeSelectionBoxes = new ArrayList<>();
+
     public CanvasSelectionManager(Pane canvas, List<ProcessNode> nodes, List<NodeConnection> connections,
                                   Consumer<String> logger, Runnable notifyChanged) {
         this.canvas = canvas;
@@ -93,7 +95,6 @@ public class CanvasSelectionManager {
         if (!enabled) {
             clearSelection();
         }
-        logger.accept(selectionMode ? "✓ 框选模式已启用" : "✓ 框选模式已禁用");
     }
     
     public void startSelection(double x, double y) {
@@ -134,9 +135,6 @@ public class CanvasSelectionManager {
         
         if (rectWidth > 5 && rectHeight > 5) {
             performSelection(rectX, rectY, rectWidth, rectHeight);
-            if (!selectedNodes.isEmpty()) {
-                logger.accept("✓ 框选完成: 选中 " + selectedNodes.size() + " 个节点, " + selectedConnections.size() + " 条边");
-            }
         } else {
             clearSelection();
         }
@@ -210,29 +208,37 @@ public class CanvasSelectionManager {
     }
     
     public void updateSelectionBoundingBox() {
+        selectionBoundingBox.setVisible(false);
+        for (Rectangle box : perNodeSelectionBoxes) {
+            canvas.getChildren().remove(box);
+        }
+        perNodeSelectionBoxes.clear();
+
         if (selectedNodes.isEmpty()) {
-            selectionBoundingBox.setVisible(false);
             return;
         }
-        
-        double minX = Double.MAX_VALUE, minY = Double.MAX_VALUE;
-        double maxX = Double.MIN_VALUE, maxY = Double.MIN_VALUE;
-        
-        for (ProcessNode node : selectedNodes) {
-            minX = Math.min(minX, node.getLayoutX());
-            minY = Math.min(minY, node.getLayoutY());
-            maxX = Math.max(maxX, node.getLayoutX() + node.getPrefWidth());
-            maxY = Math.max(maxY, node.getLayoutY() + node.getPrefHeight());
-        }
-        
+
         double padding = 10;
-        selectionBoundingBox.setX(minX - padding);
-        selectionBoundingBox.setY(minY - padding);
-        selectionBoundingBox.setWidth(maxX - minX + padding * 2);
-        selectionBoundingBox.setHeight(maxY - minY + padding * 2);
-        selectionBoundingBox.setVisible(true);
-        // 仅更新几何与可见性，不 remove/add，避免每帧触发布局；保证在选择框显示时置于节点下层
-        selectionBoundingBox.toBack();
+        String strokeColor = getSelectionBoundingBoxStrokeColor();
+        for (ProcessNode node : selectedNodes) {
+            double x = node.getLayoutX();
+            double y = node.getLayoutY();
+            double w = node.getPrefWidth() > 0 ? node.getPrefWidth() : 120;
+            double h = node.getPrefHeight() > 0 ? node.getPrefHeight() : 40;
+            Rectangle box = new Rectangle();
+            box.setFill(Color.TRANSPARENT);
+            box.setStroke(Color.web(strokeColor));
+            box.setStrokeWidth(2);
+            box.getStrokeDashArray().addAll(8.0, 4.0);
+            box.setMouseTransparent(true);
+            box.setX(x - padding);
+            box.setY(y - padding);
+            box.setWidth(w + padding * 2);
+            box.setHeight(h + padding * 2);
+            canvas.getChildren().add(box);
+            box.toFront();
+            perNodeSelectionBoxes.add(box);
+        }
     }
     
     public void clearSelection() {
@@ -254,6 +260,10 @@ public class CanvasSelectionManager {
             connection.setSelected(false);
         }
         selectionBoundingBox.setVisible(false);
+        for (Rectangle box : perNodeSelectionBoxes) {
+            canvas.getChildren().remove(box);
+        }
+        perNodeSelectionBoxes.clear();
     }
     
     public void highlightNode(ProcessNode node, boolean highlight) {
@@ -355,7 +365,6 @@ public class CanvasSelectionManager {
     
     public void alignHorizontal() {
         if (selectedNodes.size() < 2) {
-            logger.accept("⚠ 需要至少选中 2 个节点");
             return;
         }
         
@@ -371,12 +380,10 @@ public class CanvasSelectionManager {
         
         updateSelectionBoundingBox();
         notifyChanged.run();
-        logger.accept("✓ 横向布局完成: " + selectedNodes.size() + " 个节点已对齐");
     }
     
     public void alignVertical() {
         if (selectedNodes.size() < 2) {
-            logger.accept("⚠ 需要至少选中 2 个节点");
             return;
         }
         
@@ -392,7 +399,6 @@ public class CanvasSelectionManager {
         
         updateSelectionBoundingBox();
         notifyChanged.run();
-        logger.accept("✓ 纵向布局完成: " + selectedNodes.size() + " 个节点已对齐");
     }
     
     private boolean rectIntersects(double x1, double y1, double w1, double h1,
@@ -448,8 +454,9 @@ public class CanvasSelectionManager {
         for (NodeConnection conn : selectedConnections) {
             conn.setSelected(true);
         }
+        updateSelectionBoundingBox();
     }
-    
+
     /**
      * 重新添加选择矩形到画布（在清空后调用）
      */
@@ -459,6 +466,9 @@ public class CanvasSelectionManager {
         }
         if (!canvas.getChildren().contains(selectionBoundingBox)) {
             canvas.getChildren().add(selectionBoundingBox);
+        }
+        if (!selectedNodes.isEmpty()) {
+            updateSelectionBoundingBox();
         }
     }
 }

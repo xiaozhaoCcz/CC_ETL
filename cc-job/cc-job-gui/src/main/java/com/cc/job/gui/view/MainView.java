@@ -1,6 +1,7 @@
 package com.cc.job.gui.view;
 
 import com.cc.job.gui.history.UndoRedoManager;
+import com.cc.job.gui.infrastructure.constant.GuiConstants;
 import com.cc.job.gui.manager.*;
 import com.cc.job.gui.model.*;
 import com.cc.job.gui.service.*;
@@ -8,6 +9,7 @@ import com.cc.job.gui.util.*;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.form.JobInfoForm;
 import com.cc.job.xo.model.vo.JobPartVo;
+import javafx.application.HostServices;
 import javafx.application.Platform;
 import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
@@ -61,6 +63,7 @@ public class MainView extends BorderPane {
     private DialogManager dialogManager;
     private DataManager dataManager;
     private NodeCallbackConfigurator nodeCallbackConfigurator;
+    private com.cc.job.gui.manager.CanvasTemplateManager canvasTemplateManager;
     
     // 状态管理
     private UndoRedoManager undoRedoManager;
@@ -84,6 +87,13 @@ public class MainView extends BorderPane {
     // 任务组ID -> 画布尺寸映射（每个任务组单独画布尺寸）
     private final Map<Long, CanvasSize> taskGroupCanvasSizes = new HashMap<>();
 
+    /** 用于在浏览器中打开链接（用户手册、报告问题、在线帮助等），由 CcJobGuiApplication 注入 */
+    private HostServices hostServices;
+
+    public void setHostServices(HostServices hostServices) {
+        this.hostServices = hostServices;
+    }
+
     public MainView() {
         this.jobGroupService = new JobGroupService();
         initializeUI();
@@ -93,6 +103,11 @@ public class MainView extends BorderPane {
                 initializeManagers();
                 setupCallbacks();
                 setupKeyboardShortcuts();
+                // 后台拉取当前用户权限并刷新「权限管理」菜单可见性
+                new Thread(() -> {
+                    new PermissionManageService().fetchAndStorePermissions();
+                    Platform.runLater(() -> toolBar.updatePermissionMenuVisibility());
+                }).start();
             }
         });
     }
@@ -177,6 +192,7 @@ public class MainView extends BorderPane {
         taskExecutionManager = new TaskExecutionManager(canvas, logPanel, navigationBar, toolBar);
         nodeOperationManager = new NodeOperationManager(canvas, logPanel, treeView, ownerStage);
         dataManager = new DataManager(canvas, logPanel, treeView);
+        canvasTemplateManager = new com.cc.job.gui.manager.CanvasTemplateManager(msg -> logPanel.info(msg));
         nodeCallbackConfigurator = new NodeCallbackConfigurator(nodeOperationManager, canvas, logPanel);
         
         // 重要：设置对话框管理器的任务执行管理器（用于获取预测时间）
@@ -319,6 +335,70 @@ public class MainView extends BorderPane {
                     }
                 });
             }
+
+            @Override
+            public void onSaveAsVersion() {
+                Long jobId = pageStoreHelper.getCurrentTaskGroupId();
+                if (jobId == null || jobId == 0) {
+                    NotificationToast.showWarning("⚠ 请先选择一个任务组");
+                    return;
+                }
+                String[] json = dataManager.getCurrentComposeJson();
+                if (json == null || json.length != 2) {
+                    NotificationToast.showError("✗ 无法获取当前画布数据");
+                    return;
+                }
+                dialogManager.showSaveAsVersionDialog(jobId, json[0], json[1], () -> {});
+            }
+
+            @Override
+            public void onVersionList() {
+                Long jobId = pageStoreHelper.getCurrentTaskGroupId();
+                if (jobId == null || jobId == 0) {
+                    NotificationToast.showWarning("⚠ 请先选择一个任务组");
+                    return;
+                }
+                String taskGroupName = getJobNameById(jobId);
+                dialogManager.showVersionListDialog(jobId, taskGroupName != null ? taskGroupName : "任务组", composeData -> {
+                    if (composeData != null) {
+                        canvas.loadFromComposeData(composeData);
+                        NotificationToast.showSuccess("✓ 已恢复为该版本，可编辑后保存");
+                    }
+                });
+            }
+
+            @Override
+            public void onSaveSelectionAsCanvasTemplate() {
+                javafx.scene.control.TextInputDialog nameDialog = new javafx.scene.control.TextInputDialog("模板1");
+                nameDialog.setTitle("保存选中为画布模板");
+                nameDialog.setHeaderText("输入模板名称");
+                nameDialog.setContentText("模板名称：");
+                nameDialog.showAndWait().ifPresent(name -> {
+                    com.cc.job.gui.manager.CanvasTemplateManager.CanvasTemplate t = canvasTemplateManager.createTemplateFromSelection(canvas, name.trim(), "默认", "");
+                    if (t != null) {
+                        canvasTemplateManager.saveTemplate(t);
+                        NotificationToast.showSuccess("✓ 已保存为画布模板: " + name);
+                    }
+                });
+            }
+
+            @Override
+            public void onInsertFromCanvasTemplate() {
+                List<com.cc.job.gui.manager.CanvasTemplateManager.CanvasTemplate> list = canvasTemplateManager.getTemplates(null);
+                if (list == null || list.isEmpty()) {
+                    NotificationToast.showWarning("暂无画布模板，请先选中节点后使用「保存选中为画布模板」");
+                    return;
+                }
+                javafx.scene.control.ChoiceDialog<String> choice = new javafx.scene.control.ChoiceDialog<>(list.get(0).getTemplateName(), list.stream().map(com.cc.job.gui.manager.CanvasTemplateManager.CanvasTemplate::getTemplateName).toList());
+                choice.setTitle("从画布模板插入");
+                choice.setHeaderText("选择要插入的模板");
+                choice.showAndWait().ifPresent(selectedName -> {
+                    com.cc.job.gui.manager.CanvasTemplateManager.CanvasTemplate t = list.stream().filter(x -> selectedName.equals(x.getTemplateName())).findFirst().orElse(null);
+                    if (t != null && canvasTemplateManager.applyTemplateToCanvas(canvas, t, 50, 50)) {
+                        NotificationToast.showSuccess("✓ 已插入画布模板: " + selectedName);
+                    }
+                });
+            }
             
             @Override
             public void onNodeHistory() {
@@ -439,6 +519,13 @@ public class MainView extends BorderPane {
                 Stage ownerStage = (Stage) MainView.this.getScene().getWindow();
                 SettingsDialog settingsDialog = new SettingsDialog(ownerStage);
                 settingsDialog.showAndWait();
+            }
+
+            @Override
+            public void onPermissionManage() {
+                Stage ownerStage = (Stage) MainView.this.getScene().getWindow();
+                PermissionManageDialog dialog = new PermissionManageDialog(ownerStage);
+                dialog.showAndWait();
             }
 
             @Override
@@ -611,8 +698,18 @@ public class MainView extends BorderPane {
             }
 
             @Override
+            public void onApprovalPending() {
+                dialogManager.showApprovalPendingDialog();
+            }
+
+            @Override
             public void onTaskReport() {
                 dialogManager.showTaskReportDialog();
+            }
+
+            @Override
+            public void onDashboardBigScreen() {
+                dialogManager.showDashboardBigScreen();
             }
 
             @Override
@@ -1031,6 +1128,13 @@ public class MainView extends BorderPane {
                 ThemeManager.getInstance().setTheme(theme);
                 logger.info("已切换主题: " + theme);
             }
+
+            @Override
+            public void onSetLocale(String locale) {
+                java.util.Locale loc = "en".equalsIgnoreCase(locale) ? java.util.Locale.ENGLISH : java.util.Locale.SIMPLIFIED_CHINESE;
+                com.cc.job.gui.util.I18n.setLocale(loc);
+                NotificationToast.showSuccess("语言已切换，部分界面需重启后生效");
+            }
             
             @Override
             public void onToggleFullScreen() {
@@ -1246,8 +1350,14 @@ public class MainView extends BorderPane {
             // 帮助菜单
             @Override
             public void onUserManual() {
-                // 打开用户手册（可以是本地文件或在线链接）
-                logger.info("用户手册功能开发中...");
+                openUrlInBrowser(GuiConstants.Help.USER_MANUAL_URL, "用户手册");
+            }
+
+            @Override
+            public void onNewUserGuide() {
+                javafx.stage.Stage stage = (javafx.stage.Stage) MainView.this.getScene().getWindow();
+                NewUserGuideDialog dlg = new NewUserGuideDialog(stage);
+                dlg.showAndWait();
             }
             
             @Override
@@ -1274,25 +1384,32 @@ public class MainView extends BorderPane {
             
             @Override
             public void onCheckUpdate() {
-                logger.info("检查更新功能开发中...");
+                if (hostServices != null) {
+                    try {
+                        hostServices.showDocument(GuiConstants.Help.RELEASES_URL);
+                        NotificationToast.showSuccess("已在浏览器中打开 Releases 页面，请查看是否有新版本");
+                    } catch (Exception e) {
+                        logger.warn("打开检查更新页面失败: {}", e.getMessage());
+                        NotificationToast.showError("无法打开浏览器: " + e.getMessage());
+                    }
+                } else {
+                    NotificationToast.showWarning("无法打开浏览器，请手动访问: " + GuiConstants.Help.RELEASES_URL);
+                }
             }
             
             @Override
             public void onReportIssue() {
-                // 打开报告问题的链接或对话框
-                logger.info("报告问题功能开发中...");
+                openUrlInBrowser(GuiConstants.Help.REPORT_ISSUE_URL, "报告问题");
             }
             
             @Override
             public void onFeedback() {
-                // 打开反馈建议的链接或对话框
-                logger.info("反馈建议功能开发中...");
+                openUrlInBrowser(GuiConstants.Help.FEEDBACK_URL, "反馈建议");
             }
             
             @Override
             public void onOnlineHelp() {
-                // 打开在线帮助
-                logger.info("在线帮助功能开发中...");
+                openUrlInBrowser(GuiConstants.Help.ONLINE_HELP_URL, "在线帮助");
             }
         });
 
@@ -2965,15 +3082,76 @@ public class MainView extends BorderPane {
     }
     
     /**
-     * 显示转到分区对话框
+     * 显示转到分区对话框：列出所有分区，选择后定位到该分区并清空画布。
      */
     private void showGoToPartitionDialog() {
-        // TODO: 实现转到分区
-        logger.info("转到分区功能开发中...");
+        new Thread(() -> {
+            try {
+                List<JobPartVo> tree = new JobPartService().getTree();
+                List<JobPartVo> partitions = new ArrayList<>();
+                if (tree != null) {
+                    for (JobPartVo part : tree) {
+                        if (part.getType() != null && part.getType() == 0) {
+                            partitions.add(part);
+                        }
+                    }
+                }
+                List<JobPartVo> finalList = partitions;
+                Platform.runLater(() -> {
+                    if (finalList.isEmpty()) {
+                        NotificationToast.showWarning("暂无分区，请先新建分区。");
+                        return;
+                    }
+                    ChoiceDialog<String> dialog = new ChoiceDialog<>();
+                    dialog.setTitle("转到分区");
+                    dialog.setHeaderText(null);
+                    dialog.setContentText("请选择分区:");
+                    List<String> names = new ArrayList<>();
+                    for (JobPartVo p : finalList) {
+                        names.add(p.getLabel() != null ? p.getLabel() : "分区 " + p.getId());
+                    }
+                    dialog.getItems().addAll(names);
+                    String themeCss3 = ThemeManager.getInstance().getStylesheetUrl();
+                    if (themeCss3 != null && !themeCss3.isEmpty()) {
+                        dialog.getDialogPane().getStylesheets().add(themeCss3);
+                    }
+                    Optional<String> result = dialog.showAndWait();
+                    result.ifPresent(partitionName -> {
+                        for (JobPartVo p : finalList) {
+                            String name = p.getLabel() != null ? p.getLabel() : "分区 " + p.getId();
+                            if (name.equals(partitionName)) {
+                                Long currentTaskGroupId = pageStoreHelper.getCurrentTaskGroupId();
+                                if (currentTaskGroupId != null && currentTaskGroupId != 0) {
+                                    if (canvas.hasUnsavedChanges()) {
+                                        dataManager.saveOrUpdateJob(currentTaskGroupId);
+                                    }
+                                    canvas.markAsSaved();
+                                    saveCurrentScrollPosition();
+                                }
+                                treeView.clearSelection();
+                                canvas.disableAutoSave();
+                                canvas.clear();
+                                canvas.enableAutoSave();
+                                pageStoreHelper.setCurrentPage(null);
+                                toolBar.setCurrentTaskGroupId(null);
+                                treeView.selectPartitionById(p.getId());
+                                logger.info("已转到分区: " + name);
+                                break;
+                            }
+                        }
+                    });
+                });
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    NotificationToast.showError("✗ 加载分区列表失败: " + e.getMessage());
+                });
+                logger.error("✗ 加载分区列表失败: {}", e.getMessage());
+            }
+        }).start();
     }
     
     /**
-     * 显示快捷键列表对话框
+     * 显示快捷键列表对话框（含无障碍说明）
      */
     private void showShortcutsDialog() {
         Stage dialog = new Stage();
@@ -2989,8 +3167,20 @@ public class MainView extends BorderPane {
         
         VBox shortcutsBox = new VBox(5);
         
-        // 编辑快捷键
-        Label editLabel = new Label("编辑操作:");
+        // 文件
+        Label fileLabel = new Label("文件:");
+        fileLabel.setStyle("-fx-font-weight: bold;");
+        shortcutsBox.getChildren().add(fileLabel);
+        shortcutsBox.getChildren().add(new Label("Ctrl+N - 新建任务"));
+        shortcutsBox.getChildren().add(new Label("Ctrl+P - 新建分区"));
+        shortcutsBox.getChildren().add(new Label("Ctrl+O - 打开"));
+        shortcutsBox.getChildren().add(new Label("Ctrl+S - 保存"));
+        shortcutsBox.getChildren().add(new Label("Ctrl+Shift+S - 另存为"));
+        
+        shortcutsBox.getChildren().add(new Separator());
+        
+        // 编辑
+        Label editLabel = new Label("编辑:");
         editLabel.setStyle("-fx-font-weight: bold;");
         shortcutsBox.getChildren().add(editLabel);
         shortcutsBox.getChildren().add(new Label("Ctrl+Z - 撤销"));
@@ -3006,8 +3196,8 @@ public class MainView extends BorderPane {
         
         shortcutsBox.getChildren().add(new Separator());
         
-        // 视图快捷键
-        Label viewLabel = new Label("视图操作:");
+        // 视图
+        Label viewLabel = new Label("视图:");
         viewLabel.setStyle("-fx-font-weight: bold;");
         shortcutsBox.getChildren().add(viewLabel);
         shortcutsBox.getChildren().add(new Label("Ctrl+= - 放大"));
@@ -3017,18 +3207,46 @@ public class MainView extends BorderPane {
         
         shortcutsBox.getChildren().add(new Separator());
         
-        // 功能快捷键
-        Label funcLabel = new Label("功能操作:");
-        funcLabel.setStyle("-fx-font-weight: bold;");
-        shortcutsBox.getChildren().add(funcLabel);
-        shortcutsBox.getChildren().add(new Label("Ctrl+N - 新建任务"));
-        shortcutsBox.getChildren().add(new Label("Ctrl+O - 打开"));
-        shortcutsBox.getChildren().add(new Label("Ctrl+S - 保存"));
-        shortcutsBox.getChildren().add(new Label("Ctrl+Shift+S - 另存为"));
+        // 转到
+        Label goLabel = new Label("转到:");
+        goLabel.setStyle("-fx-font-weight: bold;");
+        shortcutsBox.getChildren().add(goLabel);
+        shortcutsBox.getChildren().add(new Label("Ctrl+G - 转到节点"));
+        shortcutsBox.getChildren().add(new Label("Ctrl+↑ - 上一个节点"));
+        shortcutsBox.getChildren().add(new Label("Ctrl+↓ - 下一个节点"));
+        
+        shortcutsBox.getChildren().add(new Separator());
+        
+        // 布局对齐（Mac 上 Ctrl 即 Command）
+        Label alignLabel = new Label("布局对齐:");
+        alignLabel.setStyle("-fx-font-weight: bold;");
+        shortcutsBox.getChildren().add(alignLabel);
+        shortcutsBox.getChildren().add(new Label("Ctrl+L - 左对齐"));
+        shortcutsBox.getChildren().add(new Label("Ctrl+C - 水平居中"));
+        shortcutsBox.getChildren().add(new Label("Ctrl+R - 右对齐"));
+        shortcutsBox.getChildren().add(new Label("Ctrl+T - 顶端对齐"));
+        shortcutsBox.getChildren().add(new Label("Ctrl+M - 垂直居中"));
+        shortcutsBox.getChildren().add(new Label("Ctrl+B - 底端对齐"));
+        
+        shortcutsBox.getChildren().add(new Separator());
+        
+        // 运行与帮助
+        Label runLabel = new Label("运行与帮助:");
+        runLabel.setStyle("-fx-font-weight: bold;");
+        shortcutsBox.getChildren().add(runLabel);
         shortcutsBox.getChildren().add(new Label("F5 - 运行任务组"));
         shortcutsBox.getChildren().add(new Label("Shift+F5 - 停止任务"));
-        shortcutsBox.getChildren().add(new Label("Ctrl+G - 转到节点"));
-        shortcutsBox.getChildren().add(new Label("Ctrl+Shift+? - 快捷键列表"));
+        shortcutsBox.getChildren().add(new Label("Ctrl+Shift+? - 本快捷键列表"));
+        
+        shortcutsBox.getChildren().add(new Separator());
+        
+        // 无障碍与键盘
+        Label a11yLabel = new Label("键盘与可访问性:");
+        a11yLabel.setStyle("-fx-font-weight: bold;");
+        shortcutsBox.getChildren().add(a11yLabel);
+        shortcutsBox.getChildren().add(new Label("Tab / Shift+Tab - 在按钮、输入框等控件间切换焦点"));
+        shortcutsBox.getChildren().add(new Label("画布获得焦点时，方向键可移动选中节点，回车可打开节点属性"));
+        shortcutsBox.getChildren().add(new Label("（Mac 上上述 Ctrl 组合键为 Command）"));
         
         ScrollPane scrollPane = new ScrollPane(shortcutsBox);
         scrollPane.getStyleClass().add("popup-content-scroll");
@@ -3042,7 +3260,7 @@ public class MainView extends BorderPane {
         
         content.getChildren().addAll(title, scrollPane, buttonBox);
         
-        Scene scene = new Scene(content, 400, 500);
+        Scene scene = new Scene(content, 420, 560);
         scene.getStylesheets().add(com.cc.job.gui.util.ThemeManager.getInstance().getStylesheetUrl());
         dialog.setScene(scene);
         dialog.show();
@@ -3087,6 +3305,26 @@ public class MainView extends BorderPane {
         dialog.show();
     }
     
+    /**
+     * 使用系统默认浏览器打开 URL，用于用户手册、报告问题、反馈建议、在线帮助等。
+     */
+    private void openUrlInBrowser(String url, String label) {
+        if (url == null || url.isEmpty()) {
+            NotificationToast.showWarning(label + "链接未配置");
+            return;
+        }
+        if (hostServices != null) {
+            try {
+                hostServices.showDocument(url);
+            } catch (Exception e) {
+                logger.warn("打开链接失败 {}: {}", label, e.getMessage());
+                NotificationToast.showError("无法打开浏览器: " + e.getMessage());
+            }
+        } else {
+            NotificationToast.showWarning("无法打开浏览器，请手动访问: " + url);
+        }
+    }
+
     /**
      * 显示关于对话框
      */

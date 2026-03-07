@@ -72,13 +72,15 @@ public class JobNodeResultServiceImpl extends ServiceImpl<JobNodeResultMapper, J
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean saveNodeResult(Long taskGroupId, String executionBatchId, Long jobId, String jobName, String resultData) {
+    public boolean saveNodeResult(Long taskGroupId, String executionBatchId, Long jobId, String jobName,
+                                  String instanceKey, String resultData) {
         try {
             JobNodeResult result = new JobNodeResult();
             result.setTaskGroupId(taskGroupId);
             result.setExecutionBatchId(executionBatchId);
             result.setJobId(jobId);
             result.setJobName(jobName);
+            result.setInstanceKey(instanceKey);
             result.setResultData(resultData);
 
             boolean success = this.save(result);
@@ -99,7 +101,7 @@ public class JobNodeResultServiceImpl extends ServiceImpl<JobNodeResultMapper, J
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public int batchSaveNodeResults(Long taskGroupId, String executionBatchId, List<Map<String, Object>> results) {
+    public int batchSaveNodeResults(Long taskGroupId, String executionBatchId, String instanceKey, List<Map<String, Object>> results) {
         if (results == null || results.isEmpty()) {
             log.warn("[JobNodeResult] 批量保存节点结果 - 结果列表为空");
             return 0;
@@ -113,6 +115,7 @@ public class JobNodeResultServiceImpl extends ServiceImpl<JobNodeResultMapper, J
                         nodeResult.setExecutionBatchId(executionBatchId);
                         nodeResult.setJobId(Long.valueOf(result.get("jobId").toString()));
                         nodeResult.setJobName(result.get("jobName") != null ? result.get("jobName").toString() : null);
+                        nodeResult.setInstanceKey(result.get("instanceKey") != null ? result.get("instanceKey").toString() : instanceKey);
                         nodeResult.setResultData(result.get("resultData") != null ? result.get("resultData").toString() : null);
                         nodeResult.setFilePath(result.get("filePath") != null ? result.get("filePath").toString() : null);
                         nodeResult.setDataSize(result.get("dataSize") != null ? Long.valueOf(result.get("dataSize").toString()) : null);
@@ -138,10 +141,11 @@ public class JobNodeResultServiceImpl extends ServiceImpl<JobNodeResultMapper, J
     }
 
     @Override
-    public List<JobNodeResult> getNodeResultsByBatch(Long taskGroupId, String executionBatchId) {
+    public List<JobNodeResult> getNodeResultsByBatch(Long taskGroupId, String executionBatchId, String instanceKey) {
         try {
             LambdaQueryWrapper<JobNodeResult> queryWrapper = new LambdaQueryWrapper<>();
             queryWrapper.eq(JobNodeResult::getTaskGroupId, taskGroupId)
+                    .eq(JobNodeResult::getInstanceKey, instanceKey)
                     .eq(JobNodeResult::getExecutionBatchId, executionBatchId)
                     .orderByAsc(JobNodeResult::getCreateTime);
 
@@ -157,10 +161,11 @@ public class JobNodeResultServiceImpl extends ServiceImpl<JobNodeResultMapper, J
     }
 
     @Override
-    public String getLatestBatchId(Long taskGroupId) {
+    public String getLatestBatchId(Long taskGroupId, String instanceKey) {
         try {
             LambdaQueryWrapper<JobNodeResult> queryWrapper = new LambdaQueryWrapper<>();
             queryWrapper.eq(JobNodeResult::getTaskGroupId, taskGroupId)
+                    .eq(JobNodeResult::getInstanceKey, instanceKey)
                     .orderByDesc(JobNodeResult::getCreateTime)
                     .last("LIMIT 1");
 
@@ -180,10 +185,11 @@ public class JobNodeResultServiceImpl extends ServiceImpl<JobNodeResultMapper, J
     }
 
     @Override
-    public JobNodeResult getLatestNodeResult(Long taskGroupId, Long jobId) {
+    public JobNodeResult getLatestNodeResult(Long taskGroupId, Long jobId, String instanceKey) {
         try {
             LambdaQueryWrapper<JobNodeResult> queryWrapper = new LambdaQueryWrapper<>();
             queryWrapper.eq(JobNodeResult::getTaskGroupId, taskGroupId)
+                    .eq(JobNodeResult::getInstanceKey, instanceKey)
                     .eq(JobNodeResult::getJobId, jobId)
                     .orderByDesc(JobNodeResult::getCreateTime)
                     .last("LIMIT 1");
@@ -205,7 +211,7 @@ public class JobNodeResultServiceImpl extends ServiceImpl<JobNodeResultMapper, J
     }
 
     @Override
-    public String getLatestFullRunBatchId(Long taskGroupId) {
+    public String getLatestFullRunBatchId(Long taskGroupId, String instanceKey) {
         if (taskGroupId == null) {
             return null;
         }
@@ -215,7 +221,7 @@ public class JobNodeResultServiceImpl extends ServiceImpl<JobNodeResultMapper, J
                 log.debug("[JobNodeResult] 任务组无节点，无法判定全量跑批次 - taskGroupId: {}", taskGroupId);
                 return null;
             }
-            String batchId = baseMapper.selectLatestFullRunBatchId(taskGroupId, nodeCount);
+            String batchId = baseMapper.selectLatestFullRunBatchId(taskGroupId, instanceKey, nodeCount);
             if (batchId != null) {
                 log.debug("[JobNodeResult] 获取最近一次全量跑批次ID - taskGroupId: {}, batchId: {}", taskGroupId, batchId);
             }

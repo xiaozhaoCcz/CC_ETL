@@ -61,6 +61,7 @@ public class ShowJobLogListDialog extends Dialog<Void> {
     private ComboBox<String> logStatusCombo;
     private DatePicker startDatePicker;
     private DatePicker endDatePicker;
+    private TextField keywordField;
 
     private Label totalLabel;
     private TextField pageField;
@@ -198,6 +199,10 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         startDatePicker = new DatePicker();
         endDatePicker = new DatePicker();
 
+        keywordField = new TextField();
+        keywordField.setPromptText("执行结果关键词");
+        keywordField.setPrefWidth(120);
+
         Button searchBtn = new Button("搜索");
         searchBtn.getStyleClass().add("dialog-button-primary");
         searchBtn.setOnAction(e -> {
@@ -212,6 +217,7 @@ public class ShowJobLogListDialog extends Dialog<Void> {
             logStatusCombo.getSelectionModel().selectFirst();
             startDatePicker.setValue(null);
             endDatePicker.setValue(null);
+            if (keywordField != null) keywordField.clear();
             pageNum = 1;
             loadPage(true);
         });
@@ -220,8 +226,14 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         clearBtn.getStyleClass().add("dialog-button-error");
         clearBtn.setOnAction(e -> handleClear());
 
+        Button archiveBtn = new Button("归档");
+        archiveBtn.getStyleClass().add("dialog-button-secondary");
+        archiveBtn.setOnAction(e -> handleArchive());
+
         Label executorLabel = new Label("执行器");
         executorLabel.setStyle(labelStyle);
+        Label keywordLabel = new Label("关键词");
+        keywordLabel.setStyle(labelStyle);
         Label statusLabel = new Label("任务状态");
         statusLabel.setStyle(labelStyle);
         Label timeLabel = new Label("调度时间");
@@ -229,16 +241,18 @@ public class ShowJobLogListDialog extends Dialog<Void> {
 
         grid.add(executorLabel, 0, 0);
         grid.add(jobGroupCombo, 1, 0);
-        grid.add(statusLabel, 2, 0);
-        grid.add(logStatusCombo, 3, 0);
-        grid.add(timeLabel, 4, 0);
-        grid.add(startDatePicker, 5, 0);
-        grid.add(new Label("至"), 6, 0);
-        grid.add(endDatePicker, 7, 0);
+        grid.add(keywordLabel, 2, 0);
+        grid.add(keywordField, 3, 0);
+        grid.add(statusLabel, 4, 0);
+        grid.add(logStatusCombo, 5, 0);
+        grid.add(timeLabel, 6, 0);
+        grid.add(startDatePicker, 7, 0);
+        grid.add(new Label("至"), 8, 0);
+        grid.add(endDatePicker, 9, 0);
 
-        HBox btnBox = new HBox(10, searchBtn, resetBtn, clearBtn);
+        HBox btnBox = new HBox(10, searchBtn, resetBtn, clearBtn, archiveBtn);
         btnBox.setAlignment(Pos.CENTER_LEFT);
-        grid.add(btnBox, 8, 0);
+        grid.add(btnBox, 10, 0);
 
         return grid;
     }
@@ -484,6 +498,9 @@ public class ShowJobLogListDialog extends Dialog<Void> {
                     end.atTime(23, 59, 59).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
             };
             query.setFilterTime(filterTime);
+        }
+        if (keywordField != null && keywordField.getText() != null && !keywordField.getText().trim().isEmpty()) {
+            query.setKeyword(keywordField.getText().trim());
         }
 
         new Thread(() -> {
@@ -1097,9 +1114,15 @@ public class ShowJobLogListDialog extends Dialog<Void> {
             if (buttonType == ButtonType.YES) {
                 runAsync("清理日志", () -> {
                     JobLogQuery query = new JobLogQuery();
+                    if (jobId != null) {
+                        query.setJobId(jobId);
+                    }
                     JobGroup selectedGroup = jobGroupCombo.getSelectionModel().getSelectedItem();
                     if (selectedGroup != null) {
                         query.setJobGroup(selectedGroup.getId());
+                    }
+                    if (keywordField != null && keywordField.getText() != null && !keywordField.getText().trim().isEmpty()) {
+                        query.setKeyword(keywordField.getText().trim());
                     }
                     String status = logStatusCombo.getValue();
                     if ("成功".equals(status)) {
@@ -1122,6 +1145,40 @@ public class ShowJobLogListDialog extends Dialog<Void> {
                     return ok ? "清理成功" : "清理失败";
                 });
             }
+        });
+    }
+
+    private void handleArchive() {
+        TextInputDialog input = new TextInputDialog("90");
+        input.setTitle("日志归档");
+        input.setHeaderText("删除早于指定天数的日志");
+        input.setContentText("保留最近 N 天：");
+        input.initOwner(getDialogPane().getScene().getWindow());
+        input.showAndWait().ifPresent(s -> {
+            int days;
+            try {
+                days = Integer.parseInt(s.trim());
+            } catch (NumberFormatException e) {
+                showError("输入错误", "请输入有效天数（数字）");
+                return;
+            }
+            if (days < 1) {
+                showError("输入错误", "保留天数至少为 1");
+                return;
+            }
+            Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+                    "将删除 " + days + " 天前的所有日志，是否继续？",
+                    ButtonType.YES, ButtonType.NO);
+            confirm.setTitle("确认归档");
+            confirm.initOwner(getDialogPane().getScene().getWindow());
+            confirm.showAndWait().ifPresent(btn -> {
+                if (btn == ButtonType.YES) {
+                    runAsync("归档", () -> {
+                        int deleted = jobLogService.archiveLogs(days);
+                        return "已归档（删除）" + deleted + " 条日志";
+                    });
+                }
+            });
         });
     }
 

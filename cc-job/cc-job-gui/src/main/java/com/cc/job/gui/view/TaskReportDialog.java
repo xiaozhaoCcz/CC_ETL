@@ -15,12 +15,14 @@ import javafx.geometry.Pos;
 import javafx.scene.chart.PieChart;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -101,10 +103,14 @@ public class TaskReportDialog extends Dialog<Void> {
         refreshButton.getStyleClass().add("secondary-button");
         refreshButton.setOnAction(e -> loadData());
 
+        Button exportButton = new Button("导出 Excel");
+        exportButton.getStyleClass().add("secondary-button");
+        exportButton.setOnAction(e -> exportExcel());
+
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        bar.getChildren().addAll(titleLabel, refreshButton, spacer);
+        bar.getChildren().addAll(titleLabel, refreshButton, exportButton, spacer);
         return bar;
     }
 
@@ -281,5 +287,53 @@ public class TaskReportDialog extends Dialog<Void> {
         pieData.get(0).setPieValue(success);
         pieData.get(1).setPieValue(fail);
         pieData.get(2).setPieValue(running);
+    }
+
+    private void exportExcel() {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("导出任务报表");
+        chooser.setInitialFileName("任务报表_" + LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE) + ".xlsx");
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Excel 文件", "*.xlsx"));
+        Stage stage = (Stage) getDialogPane().getScene().getWindow();
+        java.io.File file = chooser.showSaveDialog(stage);
+        if (file == null) return;
+
+        String range = timeRangeCombo != null ? timeRangeCombo.getValue() : "全部";
+        String start = null;
+        String end = null;
+        if (range != null && !"全部".equals(range)) {
+            LocalDate now = LocalDate.now();
+            if ("今日".equals(range)) {
+                start = now.atStartOfDay().format(ISO_LOCAL);
+                end = now.atTime(23, 59, 59).format(ISO_LOCAL);
+            } else if ("近7天".equals(range)) {
+                start = now.minusDays(6).atStartOfDay().format(ISO_LOCAL);
+                end = now.atTime(23, 59, 59).format(ISO_LOCAL);
+            } else if ("近30天".equals(range)) {
+                start = now.minusDays(29).atStartOfDay().format(ISO_LOCAL);
+                end = now.atTime(23, 59, 59).format(ISO_LOCAL);
+            }
+        }
+        Long jobId = null;
+        if (taskGroupCombo != null && taskGroupCombo.getValue() != null && !"全部".equals(taskGroupCombo.getValue())) {
+            int idx = taskGroupCombo.getItems().indexOf(taskGroupCombo.getValue());
+            if (idx > 0 && idx - 1 < taskGroupList.size()) {
+                jobId = taskGroupList.get(idx - 1).getId();
+            }
+        }
+        final String fStart = start;
+        final String fEnd = end;
+        final Long fJobId = jobId;
+        final Path path = file.toPath();
+
+        new Thread(() -> {
+            try {
+                dashboardService.downloadExport(path, fStart, fEnd, fJobId);
+                Platform.runLater(() -> com.cc.job.gui.util.NotificationToast.showSuccess("导出成功：" + path));
+            } catch (IOException ex) {
+                logger.warn("导出 Excel 失败", ex);
+                Platform.runLater(() -> com.cc.job.gui.util.NotificationToast.showError("导出失败：" + ex.getMessage()));
+            }
+        }, "task-report-export").start();
     }
 }

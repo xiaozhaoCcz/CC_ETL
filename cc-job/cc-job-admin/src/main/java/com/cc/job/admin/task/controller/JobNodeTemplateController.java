@@ -1,5 +1,7 @@
 package com.cc.job.admin.task.controller;
 
+import com.cc.job.admin.task.auth.PermissionConstants;
+import com.cc.job.admin.task.auth.RequirePermission;
 import com.cc.job.admin.task.service.JobNodeTemplateService;
 import com.cc.job.admin.task.utils.JwtUtil;
 import com.cc.job.xo.common.result.Result;
@@ -23,6 +25,7 @@ public class JobNodeTemplateController {
         this.jobNodeTemplateService = jobNodeTemplateService;
     }
 
+    @RequirePermission(PermissionConstants.JOB_NODE_VIEW)
     @Operation(summary = "获取模板列表")
     @GetMapping
     public Result<List<JobNodeTemplate>> list(
@@ -33,6 +36,7 @@ public class JobNodeTemplateController {
         return Result.success(list);
     }
 
+    @RequirePermission(PermissionConstants.JOB_NODE_EDIT)
     @Operation(summary = "新增模板")
     @PostMapping
     public Result<Long> save(@RequestBody JobNodeTemplate template, HttpServletRequest request) {
@@ -44,6 +48,7 @@ public class JobNodeTemplateController {
         return ok ? Result.success(template.getId()) : Result.failed("保存失败");
     }
 
+    @RequirePermission(PermissionConstants.JOB_NODE_EDIT)
     @Operation(summary = "更新模板")
     @PutMapping("/{id}")
     public Result<Void> update(
@@ -59,6 +64,7 @@ public class JobNodeTemplateController {
         return Result.judge(ok);
     }
 
+    @RequirePermission(PermissionConstants.JOB_NODE_EDIT)
     @Operation(summary = "删除模板")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@Parameter(description = "模板ID") @PathVariable Long id) {
@@ -66,6 +72,7 @@ public class JobNodeTemplateController {
         return Result.judge(ok);
     }
 
+    @RequirePermission(PermissionConstants.JOB_NODE_VIEW)
     @Operation(summary = "根据ID获取模板")
     @GetMapping("/{id}")
     public Result<JobNodeTemplate> getById(@Parameter(description = "模板ID") @PathVariable Long id) {

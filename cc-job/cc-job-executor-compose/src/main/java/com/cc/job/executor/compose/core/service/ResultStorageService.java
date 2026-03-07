@@ -5,7 +5,6 @@ import com.cc.job.executor.compose.client.AdminApiClient;
 import com.cc.job.executor.compose.core.context.DataContext;
 import com.cc.job.executor.compose.core.context.DataSourceType;
 import com.cc.job.executor.compose.core.model.ExecutionContext;
-import com.cc.job.executor.compose.core.service.FileStorageService;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.result.NodeResult;
 import com.cc.job.xo.model.result.SqlResult;
@@ -476,7 +475,8 @@ public class ResultStorageService {
             
             // 收集所有节点的执行结果（只收集当前运行产生的数据，不包含从数据库加载的数据）
             List<Map<String, Object>> nodeResults = new ArrayList<>();
-            Set<String> processedJobIds = new HashSet<>();
+            Map<Long, String> preferredResultKeyByJobId = new HashMap<>();
+            Map<Long, Integer> preferredPriorityByJobId = new HashMap<>();
             
             // 遍历数据上下文中的所有数据
             for (String key : dataContext.keySet()) {
@@ -494,37 +494,31 @@ public class ResultStorageService {
                 }
                 
                 String jobName = parts[0];
-                String attrPath = parts.length > 1 ? parts[1] : "result";
-                
-                // 跳过非result的键（只保存result数据）
-                if (!"result".equals(attrPath) && !"value".equals(attrPath) && !"list".equals(attrPath)) {
+                String attrPath = parts.length > 1 ? parts[1] : null;
+                int priority = getPersistPriority(attrPath);
+                if (priority < 0) {
                     continue;
                 }
                 
                 // 查找对应的jobId
-                Long jobId = null;
-                if (jobNameMap != null) {
-                    for (Map.Entry<String, Long> entry : jobNameMap.entrySet()) {
-                        String normalizedJobName = normalizeJobName(entry.getKey(), entry.getValue());
-                        if (normalizedJobName.equals(jobName)) {
-                            jobId = entry.getValue();
-                            break;
-                        }
-                    }
-                }
-                
+                Long jobId = resolveJobId(jobNameMap, jobName);
                 if (jobId == null) {
                     logger.debug("[ResultStorage] 未找到对应的jobId，跳过 - key: {}, jobName: {}", key, jobName);
                     continue;
                 }
-                
-                // 避免重复处理同一个jobId
-                String jobIdKey = jobId.toString();
-                if (processedJobIds.contains(jobIdKey)) {
-                    continue;
+
+                Integer currentPriority = preferredPriorityByJobId.get(jobId);
+                if (currentPriority == null || priority < currentPriority) {
+                    preferredPriorityByJobId.put(jobId, priority);
+                    preferredResultKeyByJobId.put(jobId, key);
                 }
-                
-                // 获取结果数据
+            }
+
+            for (Map.Entry<Long, String> preferredEntry : preferredResultKeyByJobId.entrySet()) {
+                Long jobId = preferredEntry.getKey();
+                String key = preferredEntry.getValue();
+                String[] parts = key.split("\\.", 2);
+                String jobName = parts[0];
                 Object resultData = dataContext.get(key);
                 if (resultData == null) {
                     continue;
@@ -562,6 +556,7 @@ public class ResultStorageService {
                 Map<String, Object> nodeResult = new HashMap<>();
                 nodeResult.put("jobId", jobId);
                 nodeResult.put("jobName", taskJobName != null ? taskJobName : jobName);
+                nodeResult.put("instanceKey", context.getInstanceKey());
                 // 如果文件保存成功，resultData可以为空；如果失败，则保存到数据库
                 if (filePath != null) {
                     nodeResult.put("filePath", filePath);
@@ -574,8 +569,6 @@ public class ResultStorageService {
                     nodeResult.put("resultData", resultDataJson);
                 }
                 nodeResults.add(nodeResult);
-                
-                processedJobIds.add(jobIdKey);
                 logger.debug("[ResultStorage] 收集节点结果 - jobId: {}, jobName: {}, filePath: {}, key: {}", 
                         jobId, taskJobName, filePath, key);
             }
@@ -587,7 +580,7 @@ public class ResultStorageService {
             }
             
             // 批量保存到数据库
-            boolean success = adminApiClient.saveNodeResults(taskGroupId, executionBatchId, nodeResults);
+            boolean success = adminApiClient.saveNodeResults(taskGroupId, executionBatchId, context.getInstanceKey(), nodeResults);
             
             if (success) {
                 logger.info("[ResultStorage] 任务组执行结果持久化成功 - taskGroupId: {}, batchId: {}, 节点数: {}", 
@@ -604,6 +597,35 @@ public class ResultStorageService {
                     taskGroupId, executionBatchId, e);
             return 0;
         }
+    }
+
+    private Long resolveJobId(Map<String, Long> jobNameMap, String jobName) {
+        if (jobNameMap == null || jobName == null) {
+            return null;
+        }
+        for (Map.Entry<String, Long> entry : jobNameMap.entrySet()) {
+            String normalizedJobName = normalizeJobName(entry.getKey(), entry.getValue());
+            if (normalizedJobName.equals(jobName)) {
+                return entry.getValue();
+            }
+        }
+        return null;
+    }
+
+    private int getPersistPriority(String attrPath) {
+        if (attrPath == null || attrPath.isEmpty()) {
+            return 0;
+        }
+        if ("result".equals(attrPath)) {
+            return 1;
+        }
+        if ("value".equals(attrPath)) {
+            return 2;
+        }
+        if ("list".equals(attrPath)) {
+            return 3;
+        }
+        return -1;
     }
 }
 

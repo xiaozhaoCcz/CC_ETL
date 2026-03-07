@@ -14,6 +14,8 @@ import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -326,6 +328,54 @@ public class AdminApiClient {
             return false;
         }
     }
+
+    /**
+     * 创建审批待办（执行到审批节点时调用）
+     */
+    public Long createPending(Long jobLogId, Long jobId, Long nodeId, String batchId,
+                              String approverUserIds, java.time.LocalDateTime waitDeadline) {
+        try {
+            Map<String, Object> body = new HashMap<>();
+            body.put("jobLogId", jobLogId);
+            body.put("jobId", jobId);
+            body.put("nodeId", nodeId);
+            body.put("batchId", batchId);
+            body.put("approverUserIds", approverUserIds);
+            if (waitDeadline != null) body.put("waitDeadline", waitDeadline.toString());
+            HttpResponse response = executePost("/api/v1/approvals/pending", JSONUtil.toJsonStr(body));
+            if (response != null && response.isOk()) {
+                Map<String, Object> resultMap = JSONUtil.toBean(response.body(), Map.class);
+                Object data = resultMap.get("data");
+                if (data != null) {
+                    if (data instanceof Number) return ((Number) data).longValue();
+                    return Long.parseLong(String.valueOf(data));
+                }
+            }
+            return null;
+        } catch (Exception e) {
+            logger.error("[AdminApiClient] 创建审批待办异常 - jobId: {}, nodeId: {}", jobId, nodeId, e);
+            return null;
+        }
+    }
+
+    /**
+     * 定时任务是否已审批通过过（仅审批一次）
+     */
+    public boolean isApprovalSatisfied(Long jobId, Long nodeId) {
+        try {
+            String path = "/api/v1/approvals/satisfied?jobId=" + jobId + "&nodeId=" + nodeId;
+            HttpResponse response = executeGet(path);
+            if (response != null && response.isOk()) {
+                Map<String, Object> resultMap = JSONUtil.toBean(response.body(), Map.class);
+                Object data = resultMap.get("data");
+                return Boolean.TRUE.equals(data);
+            }
+            return false;
+        } catch (Exception e) {
+            logger.warn("[AdminApiClient] 查询审批是否已满足异常 - jobId: {}, nodeId: {}", jobId, nodeId, e);
+            return false;
+        }
+    }
     
     /**
      * 更新任务组运行状态
@@ -450,11 +500,13 @@ public class AdminApiClient {
      * @param nodeResults 节点结果列表，每个元素包含 jobId, jobName, resultData
      * @return 是否保存成功
      */
-    public boolean saveNodeResults(Long taskGroupId, String executionBatchId, List<Map<String, Object>> nodeResults) {
+    public boolean saveNodeResults(Long taskGroupId, String executionBatchId, String instanceKey,
+                                   List<Map<String, Object>> nodeResults) {
         try {
             Map<String, Object> params = new HashMap<>();
             params.put("taskGroupId", taskGroupId);
             params.put("executionBatchId", executionBatchId);
+            params.put("instanceKey", instanceKey);
             params.put("results", nodeResults);
             
             HttpResponse response = executePost("/api/v1/jobNodeResults/batchSave", JSONUtil.toJsonStr(params));
@@ -482,9 +534,11 @@ public class AdminApiClient {
      * @return 节点执行结果列表
      */
     @SuppressWarnings("unchecked")
-    public List<Map<String, Object>> getNodeResultsByBatch(Long taskGroupId, String executionBatchId) {
+    public List<Map<String, Object>> getNodeResultsByBatch(Long taskGroupId, String executionBatchId, String instanceKey) {
         try {
-            String path = "/api/v1/jobNodeResults/byBatch?taskGroupId=" + taskGroupId + "&executionBatchId=" + executionBatchId;
+            String path = "/api/v1/jobNodeResults/byBatch?taskGroupId=" + taskGroupId
+                    + "&executionBatchId=" + encodeQueryParam(executionBatchId)
+                    + "&instanceKey=" + encodeQueryParam(instanceKey);
             HttpResponse response = executeGet(path);
             if (response != null && response.isOk()) {
                 Map<String, Object> resultMap = JSONUtil.toBean(response.body(), Map.class);
@@ -517,9 +571,10 @@ public class AdminApiClient {
      * @param taskGroupId 任务组ID
      * @return 最近一次执行的批次ID，如果不存在则返回null
      */
-    public String getLatestBatchId(Long taskGroupId) {
+    public String getLatestBatchId(Long taskGroupId, String instanceKey) {
         try {
-            String path = "/api/v1/jobNodeResults/latestBatchId?taskGroupId=" + taskGroupId;
+            String path = "/api/v1/jobNodeResults/latestBatchId?taskGroupId=" + taskGroupId
+                    + "&instanceKey=" + encodeQueryParam(instanceKey);
             HttpResponse response = executeGet(path);
             if (response != null && response.isOk()) {
                 Map<String, Object> resultMap = JSONUtil.toBean(response.body(), Map.class);
@@ -548,9 +603,10 @@ public class AdminApiClient {
      * @param taskGroupId 任务组ID
      * @return 批次ID，若无全量跑批次则返回null
      */
-    public String getLatestFullRunBatchId(Long taskGroupId) {
+    public String getLatestFullRunBatchId(Long taskGroupId, String instanceKey) {
         try {
-            String path = "/api/v1/jobNodeResults/latestFullRunBatchId?taskGroupId=" + taskGroupId;
+            String path = "/api/v1/jobNodeResults/latestFullRunBatchId?taskGroupId=" + taskGroupId
+                    + "&instanceKey=" + encodeQueryParam(instanceKey);
             HttpResponse response = executeGet(path);
             if (response != null && response.isOk()) {
                 Map<String, Object> resultMap = JSONUtil.toBean(response.body(), Map.class);
@@ -580,9 +636,11 @@ public class AdminApiClient {
      * @param jobId 节点任务ID
      * @return 节点结果 Map（含 jobId, jobName, resultData, filePath 等），不存在则返回null
      */
-    public Map<String, Object> getLatestNodeResult(Long taskGroupId, Long jobId) {
+    public Map<String, Object> getLatestNodeResult(Long taskGroupId, Long jobId, String instanceKey) {
         try {
-            String path = "/api/v1/jobNodeResults/latestByJob?taskGroupId=" + taskGroupId + "&jobId=" + jobId;
+            String path = "/api/v1/jobNodeResults/latestByJob?taskGroupId=" + taskGroupId
+                    + "&jobId=" + jobId
+                    + "&instanceKey=" + encodeQueryParam(instanceKey);
             HttpResponse response = executeGet(path);
             if (response != null && response.isOk()) {
                 Map<String, Object> resultMap = JSONUtil.toBean(response.body(), Map.class);
@@ -603,5 +661,9 @@ public class AdminApiClient {
             logger.error("[AdminApiClient] 获取节点最近一次结果异常 - taskGroupId: {}, jobId: {}", taskGroupId, jobId, e);
             return null;
         }
+    }
+
+    private String encodeQueryParam(String value) {
+        return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8);
     }
 }

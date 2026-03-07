@@ -2,7 +2,10 @@ package com.cc.job.admin.task.thread;
 
 import com.cc.job.admin.task.complete.XxlJobCompleter;
 import com.cc.job.admin.config.XxlJobAdminConfig;
+import com.cc.job.admin.task.validation.DataQualityValidationRunner;
 import com.cc.job.xo.model.entity.JobLog;
+import com.cc.job.xo.model.entity.JobValidation;
+import com.cc.job.xo.model.entity.JobJdbcDatasource;
 import com.cc.job.admin.task.utils.I18nUtil;
 import com.xxl.job.core.biz.model.HandleCallbackParam;
 import com.xxl.job.core.biz.model.ReturnT;
@@ -15,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.*;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 
 /**
  * job lose-monitor instance
@@ -188,11 +192,34 @@ public class JobCompleteHelper {
 			handleMsg.append(handleCallbackParam.getHandleMsg());
 		}
 
+		int handleCode = handleCallbackParam.getHandleCode();
+		// 同步后数据质量校验：任务成功且配置了校验时执行，不通过则改为失败
+		if (handleCode == ReturnT.SUCCESS_CODE && XxlJobAdminConfig.getAdminConfig().getJobValidationMapper() != null) {
+			LambdaQueryWrapper<JobValidation> q = new LambdaQueryWrapper<>();
+			q.eq(JobValidation::getJobId, log.getJobId()).eq(JobValidation::getIsDeleted, 0).last("LIMIT 1");
+			JobValidation validation = XxlJobAdminConfig.getAdminConfig().getJobValidationMapper().selectOne(q);
+			if (validation != null && validation.getJdbcDatasourceId() != null) {
+				JobJdbcDatasource ds = XxlJobAdminConfig.getAdminConfig().getJobJdbcDatasourceMapper().selectById(validation.getJdbcDatasourceId());
+				String validationError = DataQualityValidationRunner.runValidation(validation, ds);
+				if (validationError != null) {
+					handleCode = ReturnT.FAIL_CODE;
+					handleMsg.append("<br>[数据质量校验不通过] ").append(validationError);
+				}
+			}
+		}
+
 		// success, save log
 		log.setHandleTime(LocalDateTime.now());
-		log.setHandleCode(handleCallbackParam.getHandleCode());
+		log.setHandleCode(handleCode);
 		log.setHandleMsg(handleMsg.toString());
 		XxlJobCompleter.updateHandleInfoAndFinish(log);
+
+		// 生命周期 Webhook：任务成功/失败时通知外部
+		com.cc.job.admin.task.lifecycle.LifecycleWebhookSender sender = XxlJobAdminConfig.getAdminConfig().getLifecycleWebhookSender();
+		if (sender != null) {
+			String event = handleCallbackParam.getHandleCode() == ReturnT.SUCCESS_CODE ? "success" : "fail";
+			sender.send(log, event);
+		}
 
 		return ReturnT.SUCCESS;
 	}

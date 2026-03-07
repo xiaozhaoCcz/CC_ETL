@@ -250,6 +250,9 @@ public class JobLogService extends BaseService {
                 queryParams.put("filterTime[0]", query.getFilterTime()[0]);
                 queryParams.put("filterTime[1]", query.getFilterTime()[1]);
             }
+            if (query.getKeyword() != null && !query.getKeyword().trim().isEmpty()) {
+                queryParams.put("keyword", query.getKeyword().trim());
+            }
         }
         return httpClient.getPage("/api/v1/jobLogs/page", JobLogVO.class, queryParams);
     }
@@ -276,8 +279,26 @@ public class JobLogService extends BaseService {
                 queryParams.put("filterTime[0]", query.getFilterTime()[0]);
                 queryParams.put("filterTime[1]", query.getFilterTime()[1]);
             }
+            if (query.getKeyword() != null && !query.getKeyword().trim().isEmpty()) {
+                queryParams.put("keyword", query.getKeyword().trim());
+            }
         }
         return httpClient.deleteForBoolean("/api/v1/jobLogs", queryParams);
+    }
+
+    /**
+     * 日志归档：删除早于指定天数的日志
+     * @param olderThanDays 保留最近 N 天，早于的删除
+     * @return 本次删除条数
+     */
+    public int archiveLogs(int olderThanDays) throws IOException {
+        Map<String, Object> body = new HashMap<>();
+        body.put("olderThanDays", olderThanDays);
+        Result<Integer> result = httpClient.post("/api/v1/jobLogs/archive", body, Integer.class);
+        if (!Result.isSuccess(result)) {
+            throw new IOException(result != null ? result.getMsg() : "归档失败");
+        }
+        return result.getData() != null ? result.getData() : 0;
     }
     
     /**

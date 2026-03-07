@@ -434,6 +434,26 @@ public class TaskTreeView extends VBox {
         }
     }
     
+    /**
+     * 在树中定位并选中指定分区（type=0），展开该节点及其父节点并滚动到可见。
+     */
+    public void selectPartitionById(Long partitionId) {
+        if (partitionId == null) return;
+        
+        TreeItem<TreeNodeData> foundItem = dataManager.findTreeItemById(rootItem, partitionId);
+        if (foundItem != null) {
+            TreeItem<TreeNodeData> parent = foundItem.getParent();
+            while (parent != null && parent != rootItem) {
+                if (!parent.isExpanded()) parent.setExpanded(true);
+                parent = parent.getParent();
+            }
+            foundItem.setExpanded(true);
+            treeView.getSelectionModel().select(foundItem);
+            int row = treeView.getRow(foundItem);
+            if (row >= 0) treeView.scrollTo(row);
+        }
+    }
+    
     public void selectTaskGroupByName(String taskGroupName) {
         if (taskGroupName == null || taskGroupName.isEmpty()) return;
         

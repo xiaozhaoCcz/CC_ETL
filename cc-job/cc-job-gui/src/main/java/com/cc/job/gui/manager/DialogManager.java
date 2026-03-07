@@ -1,5 +1,6 @@
 package com.cc.job.gui.manager;
 
+import com.cc.job.gui.model.JobComposeData;
 import com.cc.job.gui.model.ProcessNode;
 import com.cc.job.gui.service.*;
 import com.cc.job.gui.util.NotificationToast;
@@ -10,6 +11,7 @@ import com.cc.job.xo.model.form.JobInfoForm;
 import javafx.application.Platform;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.TextInputDialog;
 import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 /**
  * 对话框管理器 - 负责各种对话框的显示和处理
@@ -32,6 +35,7 @@ public class DialogManager {
     private final JobInfoService jobInfoService;
     private final JobGroupService jobGroupService;
     private final JobPartService jobPartService;
+    private final JobGroupSnapshotService jobGroupSnapshotService;
     private final NodeTemplateManager nodeTemplateManager;
     
     private NodeOperationManager nodeOperationManager;
@@ -54,6 +58,7 @@ public class DialogManager {
         this.jobInfoService = new JobInfoService();
         this.jobGroupService = new JobGroupService();
         this.jobPartService = new JobPartService();
+        this.jobGroupSnapshotService = new JobGroupSnapshotService();
         this.nodeTemplateManager = new NodeTemplateManager(msg -> {
             if (logPanel != null) logPanel.appendText(msg + "\n");
         });
@@ -438,6 +443,74 @@ public class DialogManager {
     }
 
     /**
+     * 保存当前画布为版本（需在主线程调用前准备好 nodesJson、edgesJson）
+     * @param jobId 任务组ID
+     * @param nodesJson 节点 JSON
+     * @param edgesJson 边 JSON
+     * @param onSuccess 保存成功回调
+     */
+    public void showSaveAsVersionDialog(Long jobId, String nodesJson, String edgesJson, Runnable onSuccess) {
+        TextInputDialog input = new TextInputDialog("v1");
+        input.setTitle("保存为版本");
+        input.setHeaderText("输入版本名称（将覆盖同名校验）");
+        input.setContentText("版本名称：");
+        Optional<String> nameOpt = input.showAndWait();
+        nameOpt.ifPresent(versionName -> {
+            new Thread(() -> {
+                try {
+                    Long snapshotId = jobGroupSnapshotService.saveAsVersion(jobId, versionName, nodesJson, edgesJson);
+                    Platform.runLater(() -> {
+                        NotificationToast.showSuccess("✓ 已保存为版本: " + versionName);
+                        if (onSuccess != null) onSuccess.run();
+                    });
+                } catch (Exception e) {
+                    Platform.runLater(() -> NotificationToast.showError("✗ 保存版本失败: " + e.getMessage()));
+                    logger.error("保存版本失败", e);
+                }
+            }).start();
+        });
+    }
+
+    /**
+     * 显示版本列表对话框，选择版本后可回滚（将画布恢复为该版本内容）
+     * @param jobId 任务组ID
+     * @param taskGroupName 任务组名称（提示用）
+     * @param onRollback 回滚时回调，传入解析后的 JobComposeData，由调用方加载到画布并可选保存
+     */
+    public void showVersionListDialog(Long jobId, String taskGroupName, Consumer<JobComposeData> onRollback) {
+        new Thread(() -> {
+            try {
+                List<com.cc.job.xo.model.entity.JobGroupSnapshot> versions = jobGroupSnapshotService.listVersions(jobId, 50);
+                Platform.runLater(() -> {
+                    Optional<Long> snapshotIdOpt = VersionListDialog.showAndSelectRollback(ownerStage, versions);
+                    snapshotIdOpt.ifPresent(snapshotId -> {
+                        new Thread(() -> {
+                            try {
+                                com.cc.job.xo.model.entity.JobGroupSnapshot snapshot = jobGroupSnapshotService.getSnapshot(snapshotId);
+                                if (snapshot != null && snapshot.getNodesJson() != null && snapshot.getEdgesJson() != null) {
+                                    JobComposeData composeData = jobPartService.parseComposeFromGuiSnapshot(
+                                        snapshot.getNodesJson(), snapshot.getEdgesJson());
+                                    Platform.runLater(() -> {
+                                        if (onRollback != null) onRollback.accept(composeData);
+                                    });
+                                } else {
+                                    Platform.runLater(() -> NotificationToast.showError("✗ 快照内容无效"));
+                                }
+                            } catch (Exception e) {
+                                Platform.runLater(() -> NotificationToast.showError("✗ 获取快照失败: " + e.getMessage()));
+                                logger.error("获取快照失败", e);
+                            }
+                        }).start();
+                    });
+                });
+            } catch (Exception e) {
+                Platform.runLater(() -> NotificationToast.showError("✗ 获取版本列表失败: " + e.getMessage()));
+                logger.error("获取版本列表失败", e);
+            }
+        }).start();
+    }
+
+    /**
      * 显示任务列表对话框
      */
     public void showJobListDialog() {
@@ -505,6 +578,14 @@ public class DialogManager {
         taskReportDialog = new TaskReportDialog(ownerStage);
         taskReportDialog.setOnHidden(event -> taskReportDialog = null);
         taskReportDialog.show();
+    }
+
+    /**
+     * 显示统计大屏（全屏/大窗口）
+     */
+    public void showDashboardBigScreen() {
+        DashboardBigScreenStage stage = new DashboardBigScreenStage(ownerStage);
+        stage.show();
     }
     
     /**
@@ -574,6 +655,14 @@ public class DialogManager {
     public void showNodeDetailsDialog(Long jobId, Long taskGroupId, String nodeName, String nodeId) {
         NodeDetailsDialog dialog = new NodeDetailsDialog(ownerStage, jobId, taskGroupId, nodeName, nodeId, taskExecutionManager);
         dialog.show();
+    }
+
+    /**
+     * 显示待办审批对话框
+     */
+    public void showApprovalPendingDialog() {
+        ApprovalPendingDialog dialog = new ApprovalPendingDialog(ownerStage);
+        dialog.showAndWait();
     }
 }
 

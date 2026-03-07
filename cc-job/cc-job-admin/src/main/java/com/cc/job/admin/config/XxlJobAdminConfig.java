@@ -1,7 +1,10 @@
 package com.cc.job.admin.config;
 
 
+import com.cc.job.admin.task.alarm.AlarmConvergenceHelper;
+import com.cc.job.admin.task.alarm.AlarmRuleChecker;
 import com.cc.job.admin.task.alarm.JobAlarmer;
+import com.cc.job.admin.task.lifecycle.LifecycleWebhookSender;
 import com.cc.job.admin.task.scheduler.XxlJobScheduler;
 import com.cc.job.xo.mapper.*;
 import jakarta.annotation.Resource;
@@ -88,7 +91,17 @@ public class XxlJobAdminConfig implements InitializingBean, DisposableBean {
     @Resource
     private JobAlarmer jobAlarmer;
     @Resource
+    private AlarmConvergenceHelper alarmConvergenceHelper;
+    @Resource
+    private AlarmRuleChecker alarmRuleChecker;
+    @Resource
+    private LifecycleWebhookSender lifecycleWebhookSender;
+    @Resource
     private JobComposeMapper jobComposeMapper;
+    @Resource
+    private JobValidationMapper jobValidationMapper;
+    @Resource
+    private JobJdbcDatasourceMapper jobJdbcDatasourceMapper;
 
 
     public String getI18n() {
@@ -159,8 +172,28 @@ public class XxlJobAdminConfig implements InitializingBean, DisposableBean {
         return jobAlarmer;
     }
 
+    public AlarmConvergenceHelper getAlarmConvergenceHelper() {
+        return alarmConvergenceHelper;
+    }
+
+    public AlarmRuleChecker getAlarmRuleChecker() {
+        return alarmRuleChecker;
+    }
+
+    public LifecycleWebhookSender getLifecycleWebhookSender() {
+        return lifecycleWebhookSender;
+    }
+
     public JobComposeMapper getJobComposeMapper() {
         return jobComposeMapper;
+    }
+
+    public JobValidationMapper getJobValidationMapper() {
+        return jobValidationMapper;
+    }
+
+    public JobJdbcDatasourceMapper getJobJdbcDatasourceMapper() {
+        return jobJdbcDatasourceMapper;
     }
 
 }

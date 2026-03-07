@@ -46,5 +46,29 @@ public interface JobUserService extends IService<JobUser> {
      * @return 注册结果
      */
     LoginResult register(String username, String password);
+
+    /**
+     * 管理员创建用户（不自动登录）
+     *
+     * @param username 用户名
+     * @param password 初始密码
+     * @return 新用户
+     */
+    JobUser createUserByAdmin(String username, String password);
+
+    /**
+     * 管理员删除用户（禁止删除超级管理员；会解除该用户的角色与资源权限）
+     *
+     * @param userId 用户ID
+     */
+    void deleteUserById(Long userId);
+
+    /**
+     * 管理员重置用户密码
+     *
+     * @param userId   用户ID
+     * @param newPassword 新密码
+     */
+    void resetPassword(Long userId, String newPassword);
 }
 

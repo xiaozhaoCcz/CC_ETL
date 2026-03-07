@@ -5,6 +5,7 @@ import com.cc.job.xo.model.entity.JobLog;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -35,4 +36,15 @@ public interface JobLogMapper extends BaseMapper<JobLog> {
                                @Param("clearBeforeTime") Date clearBeforeTime,
                                @Param("clearBeforeNum") int clearBeforeNum,
                                @Param("pagesize") int pagesize);
+
+    /**
+     * 按任务ID查询最近若干条日志（含当前 logId），按 id 降序，用于连续失败次数统计
+     */
+    List<JobLog> listRecentByJobIdFromLogId(@Param("jobId") Long jobId, @Param("fromLogId") long fromLogId, @Param("limit") int limit);
+
+    /** 失败任务统计：job_id, fail_count，按失败次数降序 */
+    List<Map<String, Object>> listFailedJobCounts(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end, @Param("jobId") Long jobId, @Param("limit") int limit);
+
+    /** 最近失败日志 ID 列表，用于快捷跳转 */
+    List<Long> listRecentFailLogIds(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end, @Param("jobId") Long jobId, @Param("limit") int limit);
 }

@@ -149,6 +149,25 @@ public final class GuiConstants {
     }
 
     /**
+     * 帮助与外部链接常量（用户手册、问题反馈、在线帮助、检查更新等）
+     */
+    public static final class Help {
+        /** 用户手册 / 文档（与在线帮助可共用） */
+        public static final String USER_MANUAL_URL = "https://github.com/xiaozhaoCcz/CC_ETL#readme";
+        /** 报告问题（GitHub Issues） */
+        public static final String REPORT_ISSUE_URL = "https://github.com/xiaozhaoCcz/CC_ETL/issues";
+        /** 反馈建议（GitHub Issues 新建） */
+        public static final String FEEDBACK_URL = "https://github.com/xiaozhaoCcz/CC_ETL/issues/new";
+        /** 在线帮助（与用户手册一致，可后续改为独立文档站） */
+        public static final String ONLINE_HELP_URL = "https://github.com/xiaozhaoCcz/CC_ETL#readme";
+        /** 检查更新 - Releases 页面 */
+        public static final String RELEASES_URL = "https://github.com/xiaozhaoCcz/CC_ETL/releases";
+
+        private Help() {
+        }
+    }
+
+    /**
      * 错误消息常量
      */
     public static final class ErrorMessage {

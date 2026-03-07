@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.catalina.connector.ClientAbortException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -29,6 +30,10 @@ import java.util.concurrent.TimeUnit;
 public class SSEService {
 
     private static final Logger log = LoggerFactory.getLogger(SSEService.class);
+
+    /** 多实例时使用数据库广播，可选注入；无则仅本机推送 */
+    @Autowired(required = false)
+    private SseBroadcastProvider sseBroadcastProvider;
 
     // SSE连接池：key = parentJobId:randomId, value = List<SseEmitter>（支持多个连接）
     private static final Map<String, CopyOnWriteArrayList<SseEmitter>> SSE_CONNECTIONS = new ConcurrentHashMap<>();
@@ -158,8 +163,9 @@ public class SSEService {
 
     /**
      * 发送消息到指定连接
-     * 支持向多个连接同时发送消息
-     * 
+     * 若启用了广播（存在 SseBroadcastProvider），则只发布到广播表，由各实例轮询后在本机推送；
+     * 否则仅在本机连接中推送。
+     *
      * @param message 消息对象
      */
     public void sendMessage(Message message) {
@@ -169,17 +175,7 @@ public class SSEService {
         }
 
         String connectionKey = message.getParentJobId() + ":" + message.getRandomId();
-        CopyOnWriteArrayList<SseEmitter> emitters = SSE_CONNECTIONS.get(connectionKey);
-        
-        if (emitters == null || emitters.isEmpty()) {
-            log.debug("[SSE] ⚠️ 未找到连接 - key: {}, 当前连接数: {}", connectionKey, SSE_CONNECTIONS.size());
-            return;
-        }
-
-        // 准备要移除的失效连接
-        List<SseEmitter> deadEmitters = new ArrayList<>();
         String messageJson;
-        
         try {
             messageJson = OBJECT_MAPPER.writeValueAsString(message);
             if (messageJson == null) {
@@ -191,37 +187,60 @@ public class SSEService {
             return;
         }
 
-        // 向所有连接发送消息
+        if (sseBroadcastProvider != null) {
+            sseBroadcastProvider.publishNodeStatus(connectionKey, messageJson);
+            return;
+        }
+
+        sendMessageToLocalOnly(connectionKey, messageJson);
+    }
+
+    /**
+     * 仅在本机 SSE 连接中推送消息（供轮询任务调用，或单实例直推）
+     *
+     * @param connectionKey 连接键 parentJobId:randomId
+     * @param messageJson   消息体 JSON
+     * @return 是否向至少一个连接推送成功
+     */
+    public boolean sendMessageToLocalOnly(String connectionKey, String messageJson) {
+        if (connectionKey == null || messageJson == null) {
+            return false;
+        }
+        CopyOnWriteArrayList<SseEmitter> emitters = SSE_CONNECTIONS.get(connectionKey);
+        if (emitters == null || emitters.isEmpty()) {
+            log.debug("[SSE] ⚠️ 未找到连接 - key: {}, 当前连接数: {}", connectionKey, SSE_CONNECTIONS.size());
+            return false;
+        }
+
+        List<SseEmitter> deadEmitters = new ArrayList<>();
+        boolean anySent = false;
         for (SseEmitter emitter : emitters) {
             try {
                 emitter.send(SseEmitter.event()
                         .name("nodeStatus")
                         .data(messageJson));
+                anySent = true;
             } catch (Exception e) {
-                // 客户端主动关闭连接是正常情况，静默处理
                 if (isClientClosedException(e)) {
                     log.debug("[SSE] 客户端已关闭连接，移除 - key: {}", connectionKey);
                 } else {
                     log.warn("[SSE] 消息发送失败 - key: {}", connectionKey, e);
                 }
                 deadEmitters.add(emitter);
-                // 尝试完成连接
                 try {
                     emitter.complete();
                 } catch (Exception ex) {
-                    // 忽略完成时的异常
+                    // 忽略
                 }
             }
         }
-
-        // 移除失效的连接
         if (!deadEmitters.isEmpty()) {
             emitters.removeAll(deadEmitters);
-            // 如果列表为空，移除整个key
             if (emitters.isEmpty()) {
                 SSE_CONNECTIONS.remove(connectionKey);
             }
         }
+        return anySent;
     }
 
     /**

@@ -370,8 +370,8 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         glueIdeButton.setVisible(false);
         glueIdeButton.setManaged(false);
         
-        // 配置 datax 按钮（DataX 模式下使用）
-        configDataxButton = new Button("配置datax");
+        // datax任务按钮（DataX 模式下使用，点击进入数据源同步页面配置 reader/writer 并生成 JSON）
+        configDataxButton = new Button("datax任务");
         configDataxButton.setPrefWidth(300);
         configDataxButton.setStyle(
             "-fx-background-color: #2563EB; " +
@@ -714,27 +714,16 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
                 datasourceCombo.setManaged(false);
                 glueIdeButton.setVisible(false);
                 glueIdeButton.setManaged(false);
-                boolean isEditDatax = formData.getId() != null;
-                if (isEditDatax) {
-                    configDataxButton.setVisible(false);
-                    configDataxButton.setManaged(false);
-                    executorHandlerField.setVisible(true);
-                    executorHandlerField.setManaged(true);
-                    executorHandlerField.setDisable(true);
-                    executorHandlerField.setText("runDataxHandler");
-                } else {
-                    configDataxButton.setVisible(true);
-                    configDataxButton.setManaged(true);
-                    executorHandlerField.setVisible(false);
-                    executorHandlerField.setManaged(false);
-                }
-                executorParamArea.setPromptText("DataX JSON 配置，可点击「配置datax」生成");
-                executorParamArea.setPrefRowCount(8);
-                expandDataxJsonButton.setVisible(true);
-                expandDataxJsonButton.setManaged(true);
-                toggleExecutorParamArea(true);
-                executorParamLabel.setText("dataxJson");
-                executorParamLabel.setGraphic(null);
+                // JobHandler 位置始终显示「datax任务」按钮，点击进入数据源同步页面配置
+                executorHandlerField.setVisible(false);
+                executorHandlerField.setManaged(false);
+                configDataxButton.setVisible(true);
+                configDataxButton.setManaged(true);
+                configDataxButton.setText("datax任务");
+                // 隐藏 dataxJson 输入区域，JSON 通过「datax任务」按钮在数据源同步页配置后回写
+                toggleExecutorParamArea(false);
+                expandDataxJsonButton.setVisible(false);
+                expandDataxJsonButton.setManaged(false);
                 updateHandlerLabel("JobHandler");
             }
             default -> {
@@ -1361,7 +1350,7 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         if (glueType == GlueType.DATAX) {
             String param = executorParamArea.getActualText();
             if (param == null || param.trim().isEmpty()) {
-                errors.append("• 请配置 datax 或填写 dataxJson\n");
+                errors.append("• 请点击「datax任务」按钮配置 reader/writer 并生成 JSON\n");
             }
         }
         if (routeStrategyCombo.getValue() == null) {

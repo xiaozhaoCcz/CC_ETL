@@ -1,6 +1,5 @@
 package com.cc.job.gui.manager;
 
-import com.cc.job.gui.model.JobComposeData;
 import com.cc.job.gui.model.NodeConnection;
 import com.cc.job.gui.model.ProcessNode;
 import com.cc.job.gui.view.NodeCanvas;
@@ -10,6 +9,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.Set;
+import java.util.HashSet;
 
 /**
  * 画布模板管理器 - 负责画布模板的创建、保存、加载等操作
@@ -264,26 +265,88 @@ public class CanvasTemplateManager {
     }
     
     /**
-     * 应用模板到画布
+     * 从画布当前选中的节点及它们之间的连线创建模板
+     */
+    public CanvasTemplate createTemplateFromSelection(NodeCanvas canvas, String templateName,
+                                                      String templateCategory, String description) {
+        if (canvas == null) {
+            log("⚠ 画布无效");
+            return null;
+        }
+        Set<ProcessNode> selected = canvas.getSelectedNodes();
+        if (selected == null || selected.isEmpty()) {
+            log("⚠ 请先选中要保存为模板的节点");
+            return null;
+        }
+        CanvasTemplate template = new CanvasTemplate();
+        template.setTemplateName(templateName);
+        template.setTemplateCategory(templateCategory);
+        template.setDescription(description);
+        List<TemplateNode> templateNodes = new ArrayList<>();
+        for (ProcessNode node : selected) {
+            TemplateNode tn = new TemplateNode();
+            tn.setNodeId(node.getNodeId());
+            tn.setNodeType(node.getType());
+            tn.setNodeName(node.getJobHandlerName());
+            tn.setX(node.getLayoutX());
+            tn.setY(node.getLayoutY());
+            Map<String, Object> props = new HashMap<>();
+            props.put("color", node.getCurrentColor());
+            props.put("tags", node.getTags());
+            props.put("remark", node.getRemark());
+            tn.setProperties(props);
+            templateNodes.add(tn);
+        }
+        template.setNodes(templateNodes);
+        Set<String> selectedIds = new HashSet<>();
+        for (ProcessNode n : selected) {
+            if (n.getNodeId() != null) selectedIds.add(n.getNodeId());
+        }
+        List<TemplateConnection> templateConnections = new ArrayList<>();
+        for (NodeConnection conn : canvas.getConnections()) {
+            String srcId = conn.getSourceNode() != null ? conn.getSourceNode().getNodeId() : null;
+            String tgtId = conn.getTargetNode() != null ? conn.getTargetNode().getNodeId() : null;
+            if (srcId != null && tgtId != null && selectedIds.contains(srcId) && selectedIds.contains(tgtId)) {
+                TemplateConnection tc = new TemplateConnection();
+                tc.setSourceNodeId(srcId);
+                tc.setTargetNodeId(tgtId);
+                tc.setStartPoint("right");
+                tc.setEndPoint("left");
+                templateConnections.add(tc);
+            }
+        }
+        template.setConnections(templateConnections);
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("createTime", System.currentTimeMillis());
+        metadata.put("nodeCount", templateNodes.size());
+        metadata.put("connectionCount", templateConnections.size());
+        template.setMetadata(metadata);
+        log("✓ 已从选中创建画布模板: " + templateName);
+        return template;
+    }
+
+    /**
+     * 应用模板到画布（在指定偏移处插入）
      *
      * @param canvas 画布
      * @param template 模板
+     * @param offsetX 插入位置 X 偏移
+     * @param offsetY 插入位置 Y 偏移
      * @return 是否成功
      */
-    public boolean applyTemplateToCanvas(NodeCanvas canvas, CanvasTemplate template) {
-        if (canvas == null || template == null) {
+    public boolean applyTemplateToCanvas(NodeCanvas canvas, CanvasTemplate template, double offsetX, double offsetY) {
+        if (canvas == null || template == null || template.getNodes() == null) {
             log("⚠ 画布或模板无效");
             return false;
         }
-        
-        // TODO: 实现模板应用到画布的逻辑
-        // 这里需要：
-        // 1. 清空当前画布（可选）
-        // 2. 根据模板创建节点
-        // 3. 根据模板创建连接
-        
-        log("✓ 模板已应用到画布: " + template.getTemplateName());
-        return true;
+        return canvas.appendTemplateToCanvas(template, offsetX, offsetY, this::log);
+    }
+
+    /**
+     * 应用模板到画布（默认偏移 0,0）
+     */
+    public boolean applyTemplateToCanvas(NodeCanvas canvas, CanvasTemplate template) {
+        return applyTemplateToCanvas(canvas, template, 0, 0);
     }
     
     /**

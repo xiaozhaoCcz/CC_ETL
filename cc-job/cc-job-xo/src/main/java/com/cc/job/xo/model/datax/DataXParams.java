@@ -32,7 +32,7 @@ public class DataXParams implements Serializable {
 
     private Integer type;
 
-    // 0全量，1增量
+    // 0全量，1增量，2参数增量
     private Integer incrementType;
 
     // 增量字段，json

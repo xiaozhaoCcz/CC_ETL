@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cc.job.xo.mapper.JobSseBroadcastMapper">
+
+    <select id="selectPending" resultType="com.cc.job.xo.model.entity.JobSseBroadcast">
+        SELECT id, connection_key, message_json, status, created_at
+        FROM job_sse_broadcast
+        WHERE status = 0 AND created_at &gt; #{createdAfter}
+        ORDER BY id ASC
+        LIMIT #{limit}
+    </select>
+
+    <update id="markProcessed">
+        UPDATE job_sse_broadcast SET status = 1 WHERE id = #{id}
+    </update>
+
+    <delete id="deleteProcessedBefore">
+        DELETE FROM job_sse_broadcast
+        WHERE status = 1 AND created_at &lt; #{before}
+    </delete>
+</mapper>

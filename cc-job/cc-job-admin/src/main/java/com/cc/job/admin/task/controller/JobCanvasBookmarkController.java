@@ -1,5 +1,7 @@
 package com.cc.job.admin.task.controller;
 
+import com.cc.job.admin.task.auth.PermissionConstants;
+import com.cc.job.admin.task.auth.RequirePermission;
 import com.cc.job.admin.task.service.JobCanvasBookmarkService;
 import com.cc.job.admin.task.utils.JwtUtil;
 import com.cc.job.xo.common.result.Result;
@@ -23,6 +25,7 @@ public class JobCanvasBookmarkController {
         this.jobCanvasBookmarkService = jobCanvasBookmarkService;
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_VIEW)
     @Operation(summary = "按任务组获取书签列表")
     @GetMapping
     public Result<List<JobCanvasBookmark>> list(
@@ -31,6 +34,7 @@ public class JobCanvasBookmarkController {
         return Result.success(list);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_EDIT)
     @Operation(summary = "新增书签")
     @PostMapping
     public Result<Long> save(@RequestBody JobCanvasBookmark bookmark, HttpServletRequest request) {
@@ -42,6 +46,7 @@ public class JobCanvasBookmarkController {
         return ok ? Result.success(bookmark.getId()) : Result.failed("保存失败");
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_EDIT)
     @Operation(summary = "删除书签")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@Parameter(description = "书签ID") @PathVariable Long id) {
@@ -49,6 +54,7 @@ public class JobCanvasBookmarkController {
         return Result.judge(ok);
     }
 
+    @RequirePermission(PermissionConstants.JOB_INFO_VIEW)
     @Operation(summary = "根据ID获取书签")
     @GetMapping("/{id}")
     public Result<JobCanvasBookmark> getById(@Parameter(description = "书签ID") @PathVariable Long id) {

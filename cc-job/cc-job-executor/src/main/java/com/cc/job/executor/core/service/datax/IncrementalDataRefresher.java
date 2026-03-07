@@ -60,14 +60,18 @@ public class IncrementalDataRefresher {
      * @param jobInfo 任务信息
      */
     public void refreshIncrementalData(JobInfo jobInfo) {
-        logger.info("[IncrementalRefresher] 开始刷新增量数据 - jobId: {}", jobInfo.getId());
+        logger.info("[IncrementalRefresher] 开始刷新增量数据 - jobId: {}, incrementType: {}", jobInfo.getId(), jobInfo.getIncrementType());
         
         try {
             Map<String, String> configMap = parseDataxConfig(jobInfo.getExecutorParam());
             JobJdbcDatasource datasource = createDatasource(configMap);
             
             try (Connection connection = createConnection(datasource)) {
-                updateIncrementalMarkers(connection, configMap, jobInfo, datasource);
+                if (jobInfo.getIncrementType() == ExecutorConstants.DataxType.PARAM_INCREMENTAL) {
+                    updateParamIncrementalMarkers(connection, configMap, jobInfo, datasource);
+                } else {
+                    updateIncrementalMarkers(connection, configMap, jobInfo, datasource);
+                }
             }
             
             logger.info("[IncrementalRefresher] 增量数据刷新完成 - jobId: {}", jobInfo.getId());
@@ -154,6 +158,86 @@ public class IncrementalDataRefresher {
         } else {
             updateByTableName(connection, tableName, jobInfo, columnList, datasource);
         }
+    }
+    
+    /**
+     * 参数增量：取本次同步范围内的「最后一条」作为新游标并写回
+     */
+    private void updateParamIncrementalMarkers(Connection connection, Map<String, String> configMap,
+                                              JobInfo jobInfo, JobJdbcDatasource datasource) {
+        String querySql = configMap.get(QUERY_SQL);
+        String tableName = configMap.get(TABLE);
+        
+        JSONArray jsonArray = JSONUtil.parseArray(jobInfo.getIncrementContent());
+        List<DataxColumn> columnList = jsonArray.toList(DataxColumn.class);
+        if (columnList.isEmpty()) {
+            logger.warn("[IncrementalRefresher] 参数增量无参数，跳过刷新 - jobId: {}", jobInfo.getId());
+            return;
+        }
+        for (DataxColumn col : columnList) {
+            if (StringUtils.isBlank(col.getColumnKey()) && StringUtils.isNotBlank(col.getColumnParam())) {
+                col.setColumnKey(col.getColumnParam());
+            }
+        }
+        if (StringUtils.isNotBlank(querySql)) {
+            String replacedSql = replaceVariables(querySql, columnList);
+            String maxSql = buildMaxFromSubquery(replacedSql, columnList);
+            try (PreparedStatement ps = connection.prepareStatement(maxSql);
+                 ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    if (columnList.size() >= 2) {
+                        applyStartEndRoll(rs, columnList);
+                    } else {
+                        updateColumnValues(rs, columnList);
+                    }
+                    saveIncrementalData(jobInfo, columnList);
+                }
+            } catch (Exception e) {
+                throw new BusinessException("参数增量查询最后一条失败", e);
+            }
+        } else if (StringUtils.isNotBlank(tableName)) {
+            String rangeSql = buildParamIncrRangeMaxQuery(tableName, columnList);
+            try (PreparedStatement ps = connection.prepareStatement(rangeSql);
+                 ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    if (columnList.size() >= 2) {
+                        applyStartEndRoll(rs, columnList);
+                    } else {
+                        updateColumnValues(rs, columnList);
+                    }
+                    saveIncrementalData(jobInfo, columnList);
+                }
+            } catch (Exception e) {
+                throw new BusinessException("参数增量表查询最后一条失败", e);
+            }
+        } else {
+            logger.warn("[IncrementalRefresher] 参数增量无 querySql 无 table，跳过刷新 - jobId: {}", jobInfo.getId());
+        }
+    }
+    
+    /**
+     * 参数增量按表名：在本次参数范围内查 MAX(最后一列)，WHERE 为第一列>=v1 且 最后一列<=vLast（或单列 col>=v）
+     */
+    private String buildParamIncrRangeMaxQuery(String tableName, List<DataxColumn> columnList) {
+        DataxColumn lastCol = columnList.get(columnList.size() - 1);
+        String colKey = lastCol.getColumnKey();
+        if (StringUtils.isBlank(colKey)) {
+            throw new BusinessException("参数增量最后一列缺少 columnKey/columnParam");
+        }
+        StringBuilder sql = new StringBuilder("SELECT ");
+        for (DataxColumn column : columnList) {
+            sql.append("MAX(t.").append(column.getColumnKey()).append("),");
+        }
+        sql.deleteCharAt(sql.length() - 1);
+        sql.append(" FROM ").append(tableName).append(" t WHERE ");
+        if (columnList.size() == 1) {
+            sql.append("t.").append(colKey).append(" >= '").append(lastCol.getColumnValue()).append("'");
+        } else {
+            DataxColumn firstCol = columnList.get(0);
+            sql.append("t.").append(firstCol.getColumnKey()).append(" >= '").append(firstCol.getColumnValue()).append("'");
+            sql.append(" AND t.").append(colKey).append(" <= '").append(lastCol.getColumnValue()).append("'");
+        }
+        return sql.toString();
     }
     
     /**

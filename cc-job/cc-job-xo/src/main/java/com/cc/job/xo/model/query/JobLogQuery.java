@@ -19,6 +19,9 @@ public class JobLogQuery extends BasePageQuery {
 
     private String[] filterTime;
 
+    /** 关键词检索（匹配 handle_msg） */
+    private String keyword;
+
     public Long getJobId() {
         return jobId;
     }
@@ -49,5 +52,13 @@ public class JobLogQuery extends BasePageQuery {
 
     public void setFilterTime(String[] filterTime) {
         this.filterTime = filterTime;
+    }
+
+    public String getKeyword() {
+        return keyword;
+    }
+
+    public void setKeyword(String keyword) {
+        this.keyword = keyword;
     }
 }

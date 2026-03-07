@@ -65,8 +65,12 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     private TextArea readerSqlArea;
     private HBox readerColumnCheckBox;  // 表字段多选框容器（多列布局）
     private ScrollPane readerColumnScrollPane;  // 表字段滚动容器
-    private ComboBox<String> incrTypeCombo;  // 增量类型：全量/增量
+    private ComboBox<String> incrTypeCombo;  // 增量类型：全量/增量/参数增量
     private VBox incrConfigBox;  // 增量配置容器
+    private VBox incrModePanel;   // 增量模式区域（增量时显示）
+    private VBox paramIncrPanel;  // 参数增量区域（参数增量时显示）
+    private VBox paramIncrRowsContainer;  // 参数增量多参数行动态容器
+    private TextField paramIncrTemplateField;  // 参数增量时的参数模板（必填）
     private ComboBox<String> incrModeCombo;  // 增量模式：ID自增/时间自增
     private TextField incrColumnField;  // 增量字段名
     private TextField incrInitValueField;  // 增量初始值
@@ -140,6 +144,13 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     /** 主窗口引用，用于关闭弹窗后弹出成功提示时的 Alert owner */
     private final Stage ownerStage;
 
+    /** 编辑时解析出的 Reader/Writer 配置，在异步加载表/列完成后用于选中表与列，用后置空 */
+    private volatile ParsedRwConfig pendingReaderConfig;
+    private volatile ParsedRwConfig pendingWriterConfig;
+
+    /** 编辑/预填时解析出的 Writer 配置，延后到切换到步骤 1 时再应用（保证 Writer 面板已在场景中） */
+    private ParsedRwConfig deferredWriterConfig;
+
     public ShowDataxSyncDialog(Stage ownerStage) {
         this(ownerStage, null);
     }
@@ -180,15 +191,13 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
 
         getDialogPane().setContent(root);
 
-        // 加载数据源
+        // 加载数据源；编辑模式下在数据源加载完成后再预填（见 loadDatasources）
         loadDatasources();
         updateStepView();
-        // 编辑模式：直接进入第三步并预填
-        if (editForm != null) {
-            currentStep = 2;
-            updateStepView();
-            Platform.runLater(() -> applyEditData(editForm));
+        if (editForm == null) {
+            // 新建模式无需预填
         }
+        // 编辑模式预填在 loadDatasources 完成后的回调中执行，保证 allDatasources 已就绪
     }
 
     private void styleDialog() {
@@ -227,11 +236,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         step2Label = createStepLabel("2. Writer配置", false);
         step3Label = createStepLabel("3. 生成JSON", false);
 
-        if (editForm != null) {
-            steps.getChildren().add(step3Label);
-        } else {
-            steps.getChildren().addAll(step1Label, createStepLine(), step2Label, createStepLine(), step3Label);
-        }
+        steps.getChildren().addAll(step1Label, createStepLine(), step2Label, createStepLine(), step3Label);
         return steps;
     }
 
@@ -287,12 +292,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         resetBtn.getStyleClass().add("dialog-button-secondary");
         resetBtn.setOnAction(e -> handleReset());
 
-        if (editForm != null) {
-            nextBtn.setText("确认");
-            bar.getChildren().add(nextBtn);
-        } else {
-            bar.getChildren().addAll(resetBtn, prevBtn, nextBtn);
-        }
+        bar.getChildren().addAll(resetBtn, prevBtn, nextBtn);
         return bar;
     }
 
@@ -311,7 +311,15 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         contentPane.getChildren().clear();
         switch (currentStep) {
             case 0 -> contentPane.getChildren().add(readerPaneCache);
-            case 1 -> contentPane.getChildren().add(writerPaneCache);
+            case 1 -> {
+                contentPane.getChildren().add(writerPaneCache);
+                // 编辑/预填时延后的 Writer 配置在此应用，此时 Writer 面板已在场景中，回填可生效
+                if (deferredWriterConfig != null) {
+                    ParsedRwConfig toApply = deferredWriterConfig;
+                    deferredWriterConfig = null;
+                    applyParsedWriterConfig(toApply);
+                }
+            }
             case 2 -> {
                 contentPane.getChildren().add(resultPaneCache);
                 if (initialJsonForNode != null && jsonResultArea != null) {
@@ -323,7 +331,105 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     }
 
     /**
-     * 编辑模式下预填第三步表单与 JSON（执行器、负责人、调度、高级配置、executorParam）
+     * 从 executorParam（DataX JSON）解析出的 Reader 配置，用于编辑时反填第一步
+     */
+    private static class ParsedRwConfig {
+        String jdbcUrl;
+        String username;
+        String password;
+        String tableName;
+        String schemaName;
+        List<String> columns;
+        String querySql;
+        String writeMode; // 仅 Writer 使用
+    }
+
+    /**
+     * 从 DataX job JSON 解析 reader 与 writer 配置；解析失败返回 null。
+     * 兼容 job.content[0].reader/writer 下 parameter.connection 为数组或单对象的格式。
+     */
+    private static class ParsedDataxResult {
+        ParsedRwConfig reader;
+        ParsedRwConfig writer;
+    }
+
+    private static ParsedDataxResult parseDataxJson(String json) {
+        if (json == null || json.trim().isEmpty()) return null;
+        try {
+            com.google.gson.JsonElement root = com.google.gson.JsonParser.parseString(json.trim());
+            if (!root.isJsonObject()) return null;
+            com.google.gson.JsonObject job = root.getAsJsonObject().getAsJsonObject("job");
+            if (job == null) return null;
+            com.google.gson.JsonArray content = job.getAsJsonArray("content");
+            if (content == null || content.size() == 0) return null;
+            com.google.gson.JsonObject content0 = content.get(0).getAsJsonObject();
+            com.google.gson.JsonObject readerObj = content0.getAsJsonObject("reader");
+            com.google.gson.JsonObject writerObj = content0.getAsJsonObject("writer");
+            if (readerObj == null || writerObj == null) return null;
+            ParsedRwConfig reader = parseRwParameter(readerObj.getAsJsonObject("parameter"), false);
+            ParsedRwConfig writer = parseRwParameter(writerObj.getAsJsonObject("parameter"), true);
+            if (reader == null || writer == null) return null;
+            ParsedDataxResult result = new ParsedDataxResult();
+            result.reader = reader;
+            result.writer = writer;
+            return result;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static ParsedRwConfig parseRwParameter(com.google.gson.JsonObject parameter, boolean isWriter) {
+        if (parameter == null) return null;
+        ParsedRwConfig config = new ParsedRwConfig();
+        config.username = parameter.has("username") ? parameter.get("username").getAsString() : null;
+        config.password = parameter.has("password") ? parameter.get("password").getAsString() : null;
+        config.columns = new ArrayList<>();
+        if (parameter.has("column")) {
+            com.google.gson.JsonElement colEl = parameter.get("column");
+            if (colEl.isJsonArray()) {
+                for (com.google.gson.JsonElement e : colEl.getAsJsonArray()) {
+                    config.columns.add(e.getAsString());
+                }
+            }
+        }
+        config.querySql = parameter.has("querySql") ? parameter.get("querySql").getAsString() : null;
+        if (isWriter) {
+            config.writeMode = parameter.has("writeMode") ? parameter.get("writeMode").getAsString() : null;
+        }
+        com.google.gson.JsonElement connEl = parameter.get("connection");
+        if (connEl == null) return null;
+        com.google.gson.JsonObject connObj = null;
+        if (connEl.isJsonArray()) {
+            com.google.gson.JsonArray arr = connEl.getAsJsonArray();
+            if (arr.size() > 0) connObj = arr.get(0).getAsJsonObject();
+        } else if (connEl.isJsonObject()) {
+            connObj = connEl.getAsJsonObject();
+        }
+        if (connObj == null) return null;
+        // jdbcUrl 可能是单字符串或数组
+        if (connObj.has("jdbcUrl")) {
+            com.google.gson.JsonElement urlEl = connObj.get("jdbcUrl");
+            if (urlEl.isJsonPrimitive()) config.jdbcUrl = urlEl.getAsString();
+            else if (urlEl.isJsonArray() && urlEl.getAsJsonArray().size() > 0)
+                config.jdbcUrl = urlEl.getAsJsonArray().get(0).getAsString();
+        }
+        if (connObj.has("table")) {
+            com.google.gson.JsonElement tableEl = connObj.get("table");
+            if (tableEl.isJsonPrimitive()) config.tableName = tableEl.getAsString();
+            else if (tableEl.isJsonArray() && tableEl.getAsJsonArray().size() > 0)
+                config.tableName = tableEl.getAsJsonArray().get(0).getAsString();
+        }
+        if (connObj.has("querySql")) {
+            com.google.gson.JsonElement q = connObj.get("querySql");
+            if (q.isJsonPrimitive()) config.querySql = q.getAsString();
+            else if (q.isJsonArray() && q.getAsJsonArray().size() > 0)
+                config.querySql = q.getAsJsonArray().get(0).getAsString();
+        }
+        return config;
+    }
+
+    /**
+     * 编辑模式下预填第三步表单与 JSON（执行器、负责人、调度、高级配置、executorParam），并解析 executorParam 反填第一步 Reader、第二步 Writer
      */
     private void applyEditData(JobInfoForm form) {
         if (form == null || jobGroupCombo == null) return;
@@ -426,11 +532,216 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                     incrParamTemplateField.setText(form.getIncrementParamTemplate());
                 }
                 updateIncrConfigVisibility();
+            } else if (incrType != null && incrType == 2) {
+                incrTypeCombo.setValue("参数增量");
+                paramIncrRowsContainer.getChildren().clear();
+                String content = form.getIncrementContent();
+                if (content != null && !content.trim().isEmpty()) {
+                    try {
+                        com.google.gson.JsonElement parsed = com.google.gson.JsonParser.parseString(content);
+                        if (parsed.isJsonArray()) {
+                            com.google.gson.JsonArray arr = parsed.getAsJsonArray();
+                            for (com.google.gson.JsonElement el : arr) {
+                                if (!el.isJsonObject()) continue;
+                                com.google.gson.JsonObject o = el.getAsJsonObject();
+                                addParamIncrRow();
+                                int last = paramIncrRowsContainer.getChildren().size() - 1;
+                                HBox row = (HBox) paramIncrRowsContainer.getChildren().get(last);
+                                if (row.getChildren().size() >= 3) {
+                                    ((TextField) row.getChildren().get(0)).setText(o.has("columnParam") ? o.get("columnParam").getAsString() : "");
+                                    ((TextField) row.getChildren().get(1)).setText(o.has("columnValue") ? o.get("columnValue").getAsString() : "");
+                                    ((TextField) row.getChildren().get(2)).setText(o.has("columnKey") ? o.get("columnKey").getAsString() : "");
+                                }
+                            }
+                        }
+                    } catch (Exception ignored) {
+                        addParamIncrRow();
+                    }
+                }
+                if (paramIncrRowsContainer.getChildren().isEmpty()) {
+                    addParamIncrRow();
+                }
+                if (paramIncrTemplateField != null && form.getIncrementParamTemplate() != null) {
+                    paramIncrTemplateField.setText(form.getIncrementParamTemplate());
+                }
+                updateIncrConfigVisibility();
             } else {
                 incrTypeCombo.setValue("全量");
                 updateIncrConfigVisibility();
             }
         }
+        // 解析 executorParam 反填第一步 Reader、第二步 Writer
+        String executorParam = form.getExecutorParam();
+        if (executorParam != null && !executorParam.trim().isEmpty()) {
+            ParsedDataxResult parsed = parseDataxJson(executorParam);
+            if (parsed != null) {
+                // Writer 的 jdbcUrl 解析可能因 JSON 结构差异为空；同库同步时用 Reader 的 jdbcUrl 回退
+                if (parsed.writer != null && parsed.writer.jdbcUrl == null && parsed.reader != null && parsed.reader.jdbcUrl != null) {
+                    parsed.writer.jdbcUrl = parsed.reader.jdbcUrl;
+                }
+                applyParsedReaderConfig(parsed.reader);
+                // Writer 延后到用户切换到步骤 1 时再应用，避免 Writer 面板未在场景中导致回填不生效
+                deferredWriterConfig = parsed.writer;
+            }
+        }
+    }
+
+    private static String normalizeJdbcUrl(String url) {
+        if (url == null) return "";
+        String s = url.trim();
+        int q = s.indexOf('?');
+        if (q > 0) s = s.substring(0, q);
+        // 使 127.0.0.1 与 localhost 等价，避免 JSON 与数据源列表 URL 因主机名不同而匹配失败
+        s = s.replace("//localhost:", "//127.0.0.1:").replace("//localhost/", "//127.0.0.1/");
+        return s;
+    }
+
+    /** 提取 JDBC URL 的「协议+主机+端口」前缀。如 jdbc:mysql://127.0.0.1:3306/test2 -> jdbc:mysql://127.0.0.1:3306 */
+    private static String jdbcUrlHostPortPrefix(String url) {
+        if (url == null) return "";
+        String s = normalizeJdbcUrl(url);
+        int afterScheme = s.indexOf("://");
+        if (afterScheme < 0) return s;
+        int pathStart = s.indexOf("/", afterScheme + 2);
+        return pathStart > 0 ? s.substring(0, pathStart) : s;
+    }
+
+    /** 从 JDBC URL 提取数据库名（路径第一段）。如 jdbc:mysql://127.0.0.1:3306/test2 -> test2 */
+    private static String jdbcUrlDatabaseName(String url) {
+        if (url == null) return "";
+        String s = normalizeJdbcUrl(url);
+        int afterScheme = s.indexOf("://");
+        if (afterScheme < 0) return "";
+        int pathStart = s.indexOf("/", afterScheme + 2);
+        if (pathStart < 0 || pathStart + 1 >= s.length()) return "";
+        String path = s.substring(pathStart + 1);
+        int slash = path.indexOf("/");
+        return slash > 0 ? path.substring(0, slash) : path;
+    }
+
+    private void applyParsedReaderConfig(ParsedRwConfig reader) {
+        if (reader == null || reader.jdbcUrl == null) return;
+        String urlNorm = normalizeJdbcUrl(reader.jdbcUrl);
+        for (JobJdbcDatasource ds : allDatasources) {
+            if (urlNorm.equals(normalizeJdbcUrl(ds.getJdbcUrl()))) {
+                if (readerDsTypeCombo != null) readerDsTypeCombo.setValue(ds.getDatasource());
+                filterReaderDatasources();
+                if (readerDatasourceCombo != null) {
+                    readerDatasourceCombo.setOnAction(null);
+                    readerDatasourceCombo.setValue(ds);
+                    readerDatasourceCombo.setOnAction(e -> loadReaderTables());
+                }
+                if (readerSqlArea != null && reader.querySql != null) readerSqlArea.setText(reader.querySql);
+                pendingReaderConfig = reader;
+                loadReaderTables();
+                return;
+            }
+        }
+        if (readerSqlArea != null && reader.querySql != null) readerSqlArea.setText(reader.querySql);
+    }
+
+    private void applyParsedWriterConfig(ParsedRwConfig writer) {
+        if (writer == null || writer.jdbcUrl == null) return;
+        String writerUrlNorm = normalizeJdbcUrl(writer.jdbcUrl);
+        for (JobJdbcDatasource ds : allDatasources) {
+            if (writerUrlNorm.equals(normalizeJdbcUrl(ds.getJdbcUrl()))) {
+                applyWriterConfigToUi(writer, ds);
+                return;
+            }
+        }
+        // 无精确匹配时只按「库名一致」回退：必须与 JSON 中 writer 的数据库名相同，避免选到下拉第一个（如 yanhuo-test）导致密码/库错误
+        String writerDbName = jdbcUrlDatabaseName(writer.jdbcUrl);
+        if (writerDbName.isEmpty()) return;
+        String writerPrefix = jdbcUrlHostPortPrefix(writer.jdbcUrl);
+        for (JobJdbcDatasource ds : allDatasources) {
+            String dsUrlNorm = normalizeJdbcUrl(ds.getJdbcUrl());
+            if (!dsUrlNorm.startsWith(writerPrefix)) continue;
+            String dsDbName = jdbcUrlDatabaseName(ds.getJdbcUrl());
+            if (writerDbName.equals(dsDbName)) {
+                applyWriterConfigToUi(writer, ds);
+                return;
+            }
+        }
+    }
+
+    private void applyWriterConfigToUi(ParsedRwConfig writer, JobJdbcDatasource ds) {
+        if (writerDsTypeCombo != null) {
+            writerDsTypeCombo.setOnAction(null);
+            writerDsTypeCombo.setValue(ds.getDatasource());
+            writerDsTypeCombo.setOnAction(e -> filterWriterDatasources());
+        }
+        filterWriterDatasources();
+        if (writeModeCombo != null && writer.writeMode != null) {
+            for (String mode : WRITE_MODES) {
+                if (writer.writeMode.equalsIgnoreCase(mode)) {
+                    writeModeCombo.setValue(mode);
+                    break;
+                }
+            }
+        }
+        pendingWriterConfig = writer;
+        final JobJdbcDatasource dsFinal = ds;
+        Platform.runLater(() -> {
+            if (writerDatasourceCombo != null) {
+                writerDatasourceCombo.setOnAction(null);
+                writerDatasourceCombo.setValue(dsFinal);
+                writerDatasourceCombo.setOnAction(e -> loadWriterTables());
+            }
+            loadWriterTables();
+        });
+    }
+
+    /** 在已加载的 Reader 表列表中按表名选中对应项；支持 schema.table 形式用点号后子串回退匹配 */
+    private void selectReaderTableByName(String tableName) {
+        if (tableName == null || readerTableToggleGroup == null) return;
+        String nameToMatch = tableName.trim();
+        String fallbackName = nameToMatch.contains(".") ? nameToMatch.substring(nameToMatch.lastIndexOf('.') + 1) : null;
+        for (Toggle t : readerTableToggleGroup.getToggles()) {
+            Object ud = t.getUserData();
+            if (ud instanceof DataxTable) {
+                String tn = ((DataxTable) ud).getTableName();
+                if (tn == null) continue;
+                if (nameToMatch.equals(tn) || (fallbackName != null && fallbackName.equals(tn))) {
+                    readerTableToggleGroup.selectToggle(t);
+                    return;
+                }
+            }
+        }
+    }
+
+    /** 在已加载的 Writer 表列表中按表名选中对应项；支持 schema.table 形式用点号后子串回退匹配 */
+    private void selectWriterTableByName(String tableName) {
+        if (tableName == null || writerTableToggleGroup == null) return;
+        String nameToMatch = tableName.trim();
+        String fallbackName = nameToMatch.contains(".") ? nameToMatch.substring(nameToMatch.lastIndexOf('.') + 1) : null;
+        for (Toggle t : writerTableToggleGroup.getToggles()) {
+            Object ud = t.getUserData();
+            if (ud instanceof DataxTable) {
+                String tn = ((DataxTable) ud).getTableName();
+                if (tn == null) continue;
+                if (nameToMatch.equals(tn) || (fallbackName != null && fallbackName.equals(tn))) {
+                    writerTableToggleGroup.selectToggle(t);
+                    return;
+                }
+            }
+        }
+    }
+
+    /** 在表字段多选框中勾选指定列名；列名做 trim 并忽略大小写匹配 */
+    private void selectColumnCheckBoxes(HBox container, List<String> columnNames) {
+        if (container == null || columnNames == null || columnNames.isEmpty()) return;
+        java.util.Set<String> normalized = new java.util.HashSet<>();
+        for (String s : columnNames) {
+            if (s != null) normalized.add(s.trim().toLowerCase());
+        }
+        forEachColumnCheckBox(container, cb -> {
+            if (cb.getUserData() != null) {
+                String col = cb.getUserData().toString().trim();
+                if (normalized.contains(col.toLowerCase())) {
+                    cb.setSelected(true);
+                }
+            }
+        });
     }
 
     private Node createReaderPane() {
@@ -574,7 +885,7 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         // 增量备份配置
         Label incrLabel = new Label("增量备份");
         incrLabel.setStyle(labelStyle);
-        incrTypeCombo = new ComboBox<>(FXCollections.observableArrayList("全量", "增量"));
+        incrTypeCombo = new ComboBox<>(FXCollections.observableArrayList("全量", "增量", "参数增量"));
         incrTypeCombo.getSelectionModel().selectFirst();
         HBox.setHgrow(incrTypeCombo, Priority.ALWAYS);
         incrTypeCombo.setOnAction(e -> updateIncrConfigVisibility());
@@ -586,7 +897,8 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         incrConfigBox.setStyle("-fx-background-radius: " + StyleUtil.RADIUS_MD + "; -fx-border-width: 1; -fx-border-radius: " + StyleUtil.RADIUS_MD + ";");
         incrConfigBox.setVisible(false);
         
-        // 增量模式
+        // ---------- 增量模式区域（选「增量」时显示）----------
+        incrModePanel = new VBox(8);
         HBox incrModeRow = new HBox(12);
         incrModeRow.setAlignment(Pos.CENTER_LEFT);
         Label incrModeLabel = new Label("增量模式");
@@ -597,7 +909,6 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         incrModeCombo.setOnAction(e -> updateIncrModeConfig());
         incrModeRow.getChildren().addAll(incrModeLabel, incrModeCombo);
         
-        // 增量字段
         HBox incrColumnRow = new HBox(12);
         incrColumnRow.setAlignment(Pos.CENTER_LEFT);
         Label incrColumnLabel = new Label("增量字段");
@@ -607,7 +918,6 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         HBox.setHgrow(incrColumnField, Priority.ALWAYS);
         incrColumnRow.getChildren().addAll(incrColumnLabel, incrColumnField);
         
-        // 初始值
         HBox incrValueRow = new HBox(12);
         incrValueRow.setAlignment(Pos.CENTER_LEFT);
         Label incrValueLabel = new Label("初始值");
@@ -617,7 +927,6 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         HBox.setHgrow(incrInitValueField, Priority.ALWAYS);
         incrValueRow.getChildren().addAll(incrValueLabel, incrInitValueField);
         
-        // 时间格式（仅时间自增时显示）
         HBox incrTimeFormatRow = new HBox(12);
         incrTimeFormatRow.setAlignment(Pos.CENTER_LEFT);
         Label incrTimeFormatLabel = new Label("时间格式");
@@ -628,7 +937,6 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         incrTimeFormatRow.getChildren().addAll(incrTimeFormatLabel, incrTimeFormatCombo);
         incrTimeFormatRow.setVisible(false);
         
-        // ID增量参数（可选）：自定义传给 DataX 的 -p 参数字符串，%s 按顺序替换为增量值
         HBox incrParamTemplateRow = new HBox(12);
         incrParamTemplateRow.setAlignment(Pos.CENTER_LEFT);
         Label incrParamTemplateLabel = new Label("ID增量参数");
@@ -638,7 +946,31 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         HBox.setHgrow(incrParamTemplateField, Priority.ALWAYS);
         incrParamTemplateRow.getChildren().addAll(incrParamTemplateLabel, incrParamTemplateField);
         
-        incrConfigBox.getChildren().addAll(incrModeRow, incrColumnRow, incrValueRow, incrTimeFormatRow, incrParamTemplateRow);
+        incrModePanel.getChildren().addAll(incrModeRow, incrColumnRow, incrValueRow, incrTimeFormatRow, incrParamTemplateRow);
+        
+        // ---------- 参数增量区域（选「参数增量」时显示）----------
+        paramIncrPanel = new VBox(8);
+        paramIncrPanel.setVisible(false);
+        Label paramIncrHint = new Label("多参数列表（参数名、参数值、对应源表字段用于刷新游标）");
+        paramIncrHint.setStyle(StyleUtil.bodyFontOnly());
+        paramIncrRowsContainer = new VBox(6);
+        addParamIncrRow();
+        HBox paramIncrAddRow = new HBox(8);
+        paramIncrAddRow.setAlignment(Pos.CENTER_LEFT);
+        javafx.scene.control.Button addParamBtn = new javafx.scene.control.Button("添加一行");
+        addParamBtn.setOnAction(e -> addParamIncrRow());
+        paramIncrAddRow.getChildren().add(addParamBtn);
+        HBox paramIncrTemplateRow = new HBox(12);
+        paramIncrTemplateRow.setAlignment(Pos.CENTER_LEFT);
+        Label paramIncrTemplateLabel = new Label("参数模板");
+        paramIncrTemplateLabel.setStyle(StyleUtil.bodyFontOnly() + " -fx-min-width: 80;");
+        paramIncrTemplateField = new TextField();
+        paramIncrTemplateField.setPromptText("必填，如 -DstartId=%s -DendId=%s，%s 按参数顺序替换");
+        HBox.setHgrow(paramIncrTemplateField, Priority.ALWAYS);
+        paramIncrTemplateRow.getChildren().addAll(paramIncrTemplateLabel, paramIncrTemplateField);
+        paramIncrPanel.getChildren().addAll(paramIncrHint, paramIncrRowsContainer, paramIncrAddRow, paramIncrTemplateRow);
+        
+        incrConfigBox.getChildren().addAll(incrModePanel, paramIncrPanel);
         
         VBox incrContainer = new VBox(8, incrTypeCombo, incrConfigBox);
         VBox.setVgrow(incrContainer, Priority.ALWAYS);
@@ -1199,6 +1531,41 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                     return;
                 }
             }
+            if ("参数增量".equals(incrTypeCombo.getValue())) {
+                int paramCount = 0;
+                boolean hasValid = false;
+                if (paramIncrRowsContainer != null) {
+                    for (javafx.scene.Node node : paramIncrRowsContainer.getChildren()) {
+                        if (!(node instanceof HBox) || ((HBox) node).getChildren().size() < 3) continue;
+                        HBox row = (HBox) node;
+                        String name = ((TextField) row.getChildren().get(0)).getText();
+                        String value = ((TextField) row.getChildren().get(1)).getText();
+                        if (name != null && !name.trim().isEmpty() && value != null && !value.trim().isEmpty()) {
+                            hasValid = true;
+                            paramCount++;
+                        }
+                    }
+                }
+                if (!hasValid) {
+                    showError("验证失败", "参数增量需要至少填写一行有效的参数名和参数值");
+                    return;
+                }
+                String template = paramIncrTemplateField != null ? paramIncrTemplateField.getText() : null;
+                if (template == null || template.trim().isEmpty()) {
+                    showError("验证失败", "参数增量需要填写参数模板");
+                    return;
+                }
+                int placeholderCount = 0;
+                int idx = 0;
+                while ((idx = template.indexOf("%s", idx)) != -1) {
+                    placeholderCount++;
+                    idx += 2;
+                }
+                if (placeholderCount < paramCount) {
+                    showError("验证失败", "参数模板中 %s 的数量不能少于有效参数数量");
+                    return;
+                }
+            }
             currentStep++;
             updateStepView();
         } else if (currentStep == 1) {
@@ -1335,12 +1702,17 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         }
         // 增量类型与增量内容（执行器依赖此判断是否追加 -p 参数及刷新增量标记）
         if (incrTypeCombo != null) {
-            int incrType = "增量".equals(incrTypeCombo.getValue()) ? 1 : 0;
+            String incrVal = incrTypeCombo.getValue();
+            int incrType = "增量".equals(incrVal) ? 1 : "参数增量".equals(incrVal) ? 2 : 0;
             form.setIncrementType(incrType);
             if (incrType == 1) {
                 form.setIncrementContent(buildIncrementContent());
                 form.setIncrementParamTemplate(incrParamTemplateField != null && incrParamTemplateField.getText() != null
                         ? incrParamTemplateField.getText().trim() : null);
+            } else if (incrType == 2) {
+                form.setIncrementContent(buildIncrementContent());
+                form.setIncrementParamTemplate(paramIncrTemplateField != null && paramIncrTemplateField.getText() != null
+                        ? paramIncrTemplateField.getText().trim() : null);
             } else {
                 form.setIncrementContent(null);
                 form.setIncrementParamTemplate(null);
@@ -1387,14 +1759,20 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                 readerParams.setType(0);
                 
                 // 设置增量类型和内容
-                int incrType = "全量".equals(incrTypeCombo.getValue()) ? 0 : 1;
+                String incrVal = incrTypeCombo.getValue();
+                int incrType = "全量".equals(incrVal) ? 0 : "参数增量".equals(incrVal) ? 2 : 1;
                 readerParams.setIncrementType(incrType);
                 if (incrType == 1) {
-                    // 构建增量内容
                     String incrementContent = buildIncrementContent();
                     readerParams.setIncrementContent(incrementContent);
                     if (incrParamTemplateField != null && incrParamTemplateField.getText() != null && !incrParamTemplateField.getText().trim().isEmpty()) {
                         readerParams.setIncrementParamTemplate(incrParamTemplateField.getText().trim());
+                    }
+                } else if (incrType == 2) {
+                    String incrementContent = buildIncrementContent();
+                    readerParams.setIncrementContent(incrementContent);
+                    if (paramIncrTemplateField != null && paramIncrTemplateField.getText() != null && !paramIncrTemplateField.getText().trim().isEmpty()) {
+                        readerParams.setIncrementParamTemplate(paramIncrTemplateField.getText().trim());
                     }
                 }
 
@@ -1581,6 +1959,21 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         new Thread(() -> {
             try {
                 allDatasources = datasourceService.getDatasourceList();
+                if (editForm != null) {
+                    Platform.runLater(() -> applyEditData(editForm));
+                } else if (initialJsonForNode != null && !initialJsonForNode.trim().isEmpty()) {
+                    // 从节点对话框打开且带已有 JSON 时，解析并反填 Reader；Writer 延后到切换到步骤 1 时应用
+                    Platform.runLater(() -> {
+                        ParsedDataxResult parsed = parseDataxJson(initialJsonForNode);
+                        if (parsed != null) {
+                            if (parsed.writer != null && parsed.writer.jdbcUrl == null && parsed.reader != null && parsed.reader.jdbcUrl != null) {
+                                parsed.writer.jdbcUrl = parsed.reader.jdbcUrl;
+                            }
+                            applyParsedReaderConfig(parsed.reader);
+                            deferredWriterConfig = parsed.writer;
+                        }
+                    });
+                }
             } catch (Exception e) {
                 Platform.runLater(() -> showError("加载数据源失败", e.getMessage()));
             }
@@ -1624,6 +2017,11 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                         // 有数据时显示边框和多列布局
                         showTableContent(readerTableRadioBox, tables, readerTableToggleGroup, 
                                 table -> loadReaderColumns());
+                        // 编辑时反填：选中解析出的表并加载列
+                        if (pendingReaderConfig != null) {
+                            selectReaderTableByName(pendingReaderConfig.tableName);
+                            loadReaderColumns();
+                        }
                     }
                 });
             } catch (Exception e) {
@@ -1654,6 +2052,11 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                         // 有数据时显示边框和多列布局
                         showTableContent(writerTableRadioBox, tables, writerTableToggleGroup, 
                                 table -> loadWriterColumns());
+                        // 编辑时反填：选中解析出的表并加载列
+                        if (pendingWriterConfig != null) {
+                            selectWriterTableByName(pendingWriterConfig.tableName);
+                            loadWriterColumns();
+                        }
                     }
                 });
             } catch (Exception e) {
@@ -1690,6 +2093,11 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                     } else {
                         // 有数据时显示边框和多列布局
                         showColumnContent(readerColumnCheckBox, columns);
+                        // 编辑时反填：勾选解析出的列
+                        if (pendingReaderConfig != null && pendingReaderConfig.columns != null && !pendingReaderConfig.columns.isEmpty()) {
+                            selectColumnCheckBoxes(readerColumnCheckBox, pendingReaderConfig.columns);
+                            pendingReaderConfig = null;
+                        }
                     }
                 });
             } catch (Exception e) {
@@ -1726,6 +2134,11 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
                     } else {
                         // 有数据时显示边框和多列布局
                         showColumnContent(writerColumnCheckBox, columns);
+                        // 编辑时反填：勾选解析出的列
+                        if (pendingWriterConfig != null && pendingWriterConfig.columns != null && !pendingWriterConfig.columns.isEmpty()) {
+                            selectColumnCheckBoxes(writerColumnCheckBox, pendingWriterConfig.columns);
+                            pendingWriterConfig = null;
+                        }
                     }
                 });
             } catch (Exception e) {
@@ -1799,26 +2212,60 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     
     // 更新增量配置可见性
     private void updateIncrConfigVisibility() {
-        boolean isIncremental = "增量".equals(incrTypeCombo.getValue());
+        String type = incrTypeCombo != null ? incrTypeCombo.getValue() : null;
+        boolean isFull = "全量".equals(type);
+        boolean isIncremental = "增量".equals(type);
+        boolean isParamIncr = "参数增量".equals(type);
         if (incrConfigBox != null) {
-            incrConfigBox.setVisible(isIncremental);
-            incrConfigBox.setManaged(isIncremental);
+            incrConfigBox.setVisible(!isFull);
+            incrConfigBox.setManaged(!isFull);
+        }
+        if (incrModePanel != null) {
+            incrModePanel.setVisible(isIncremental);
+            incrModePanel.setManaged(isIncremental);
+        }
+        if (paramIncrPanel != null) {
+            paramIncrPanel.setVisible(isParamIncr);
+            paramIncrPanel.setManaged(isParamIncr);
         }
         if (isIncremental) {
             updateIncrModeConfig();
         }
     }
     
-    // 更新增量模式配置
+    // 更新增量模式配置（时间格式行显隐）
     private void updateIncrModeConfig() {
-        if (incrModeCombo == null || incrConfigBox == null) return;
+        if (incrModeCombo == null || incrModePanel == null) return;
         boolean isTimeMode = "时间自增".equals(incrModeCombo.getValue());
-        // 找到时间格式行（incrConfigBox的最后一个子节点）
-        if (incrConfigBox.getChildren().size() > 3) {
-            Node timeFormatRow = incrConfigBox.getChildren().get(3);
+        if (incrModePanel.getChildren().size() > 3) {
+            Node timeFormatRow = incrModePanel.getChildren().get(3);
             timeFormatRow.setVisible(isTimeMode);
             timeFormatRow.setManaged(isTimeMode);
         }
+    }
+    
+    // 参数增量：添加一行（参数名、参数值、对应源表字段、删除按钮）
+    private void addParamIncrRow() {
+        if (paramIncrRowsContainer == null) return;
+        TextField paramName = new TextField();
+        paramName.setPromptText("参数名");
+        paramName.setPrefWidth(100);
+        TextField paramValue = new TextField();
+        paramValue.setPromptText("参数值");
+        paramValue.setPrefWidth(100);
+        TextField columnKey = new TextField();
+        columnKey.setPromptText("对应源表字段(可选)");
+        columnKey.setPrefWidth(120);
+        javafx.scene.control.Button delBtn = new javafx.scene.control.Button("删除");
+        delBtn.setOnAction(e -> {
+            if (paramIncrRowsContainer.getChildren().size() > 1) {
+                HBox row = (HBox) delBtn.getParent();
+                paramIncrRowsContainer.getChildren().remove(row);
+            }
+        });
+        HBox row = new HBox(8, paramName, paramValue, columnKey, delBtn);
+        row.setAlignment(Pos.CENTER_LEFT);
+        paramIncrRowsContainer.getChildren().add(row);
     }
     
     // 显示数据表占位符
@@ -1860,6 +2307,12 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
     private void showTableContent(HBox container, List<DataxTable> items, ToggleGroup toggleGroup,
                                   java.util.function.Consumer<DataxTable> onSelect) {
         container.getChildren().clear();
+        // 清空 ToggleGroup 中残留的旧 toggles，避免 selectXxxTableByName 选到已不可见的 RadioButton
+        for (Toggle t : new ArrayList<>(toggleGroup.getToggles())) {
+            if (t instanceof RadioButton) {
+                ((RadioButton) t).setToggleGroup(null);
+            }
+        }
         container.setPadding(new Insets(12, 16, 12, 16));
         container.getStyleClass().add("dialog-section");
         container.setStyle("-fx-background-radius: " + StyleUtil.RADIUS_MD + "; -fx-border-width: 1; " +
@@ -2020,8 +2473,11 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         }
     }
     
-    // 构建增量内容JSON
+    // 构建增量内容JSON（增量=单字段+初始值；参数增量=多参数行）
     private String buildIncrementContent() {
+        if ("参数增量".equals(incrTypeCombo != null ? incrTypeCombo.getValue() : null)) {
+            return buildParamIncrContent();
+        }
         String columnKey = incrColumnField.getText().trim();
         String columnValue = incrInitValueField.getText().trim();
         String mode = incrModeCombo.getValue();
@@ -2031,11 +2487,10 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         String timeFormat = columnType == 1 && incrTimeFormatCombo.getValue() != null 
                 ? incrTimeFormatCombo.getValue() : "x";
         
-        // 构建DataxColumn对象
         com.google.gson.JsonObject columnObj = new com.google.gson.JsonObject();
         columnObj.addProperty("columnKey", columnKey);
         columnObj.addProperty("columnValue", columnValue);
-        columnObj.addProperty("columnParam", columnKey);  // 参数名通常与字段名相同
+        columnObj.addProperty("columnParam", columnKey);
         columnObj.addProperty("columnTimeFormat", timeFormat);
         columnObj.addProperty("columnType", columnType);
         
@@ -2043,6 +2498,29 @@ public class ShowDataxSyncDialog extends Dialog<Void> {
         jsonArray.add(columnObj);
         
         return new com.google.gson.Gson().toJson(jsonArray);
+    }
+    
+    // 参数增量：从多参数行构建 increment_content JSON
+    private String buildParamIncrContent() {
+        if (paramIncrRowsContainer == null) return "[]";
+        com.google.gson.JsonArray arr = new com.google.gson.JsonArray();
+        for (javafx.scene.Node node : paramIncrRowsContainer.getChildren()) {
+            if (!(node instanceof HBox)) continue;
+            HBox row = (HBox) node;
+            if (row.getChildren().size() < 3) continue;
+            TextField nameField = (TextField) row.getChildren().get(0);
+            TextField valueField = (TextField) row.getChildren().get(1);
+            TextField keyField = (TextField) row.getChildren().get(2);
+            String paramName = nameField.getText() != null ? nameField.getText().trim() : "";
+            String paramValue = valueField.getText() != null ? valueField.getText().trim() : "";
+            String columnKey = keyField.getText() != null ? keyField.getText().trim() : "";
+            com.google.gson.JsonObject obj = new com.google.gson.JsonObject();
+            obj.addProperty("columnParam", paramName);
+            obj.addProperty("columnValue", paramValue);
+            obj.addProperty("columnKey", columnKey);
+            arr.add(obj);
+        }
+        return new com.google.gson.Gson().toJson(arr);
     }
 
     private void copyToClipboard(String text) {

@@ -2,6 +2,7 @@ package com.cc.job.gui.service;
 
 import com.cc.job.gui.util.ApiUtil;
 import com.cc.job.gui.util.NotificationToast;
+import com.cc.job.gui.util.SessionManager;
 import com.cc.job.xo.common.result.PageResult;
 import com.cc.job.xo.common.result.Result;
 import com.google.gson.reflect.TypeToken;
@@ -172,6 +173,42 @@ public class HttpClientUtil {
     public <T> Result<T> get(String path, TypeToken<T> responseTypeToken, Map<String, String> queryParams) throws IOException {
         return executeRequestWithRetry(path, queryParams, null, "GET", null, responseTypeToken);
     }
+
+    /**
+     * 执行 GET 请求并返回原始响应体（如 Excel 文件流）
+     * @param path API 路径
+     * @param queryParams 查询参数，可为 null
+     * @return 响应体字节数组，失败返回 null 或抛异常
+     */
+    public byte[] getRaw(String path, Map<String, String> queryParams) throws IOException {
+        IOException lastException = null;
+        for (String baseUrl : normalizedBaseUrls) {
+            try {
+                String url = baseUrl + path;
+                HttpUrl.Builder urlBuilder = HttpUrl.parse(url).newBuilder();
+                if (queryParams != null) {
+                    queryParams.forEach(urlBuilder::addQueryParameter);
+                }
+                Request.Builder reqBuilder = new Request.Builder().url(urlBuilder.build()).get();
+                String auth = SessionManager.getInstance().getAuthorizationHeader();
+                if (auth != null && !auth.isEmpty()) {
+                    reqBuilder.addHeader("Authorization", auth);
+                }
+                try (Response response = apiUtil.getClient().newCall(reqBuilder.build()).execute()) {
+                    if (!response.isSuccessful() || response.body() == null) {
+                        continue;
+                    }
+                    return response.body().bytes();
+                }
+            } catch (IOException e) {
+                lastException = e;
+            }
+        }
+        if (lastException != null) {
+            throw lastException;
+        }
+        return null;
+    }
     
     /**
      * 执行GET请求并返回PageResult<T>
@@ -193,10 +230,12 @@ public class HttpClientUtil {
                     queryParams.forEach(urlBuilder::addQueryParameter);
                 }
                 
-                Request request = new Request.Builder()
-                        .url(urlBuilder.build())
-                        .get()
-                        .build();
+                Request.Builder reqBuilder = new Request.Builder().url(urlBuilder.build()).get();
+                String auth = SessionManager.getInstance().getAuthorizationHeader();
+                if (auth != null && !auth.isEmpty()) {
+                    reqBuilder.addHeader("Authorization", auth);
+                }
+                Request request = reqBuilder.build();
                 
                 PageResult<T> result = executePageRequest(request, itemType);
                 logger.debug("[HttpClientUtil] GET请求成功 - url: {}", url);
@@ -403,7 +442,10 @@ public class HttpClientUtil {
                     default:
                         throw new IllegalArgumentException("不支持的HTTP方法: " + method);
                 }
-                
+                String auth = SessionManager.getInstance().getAuthorizationHeader();
+                if (auth != null && !auth.isEmpty()) {
+                    requestBuilder.addHeader("Authorization", auth);
+                }
                 Request request = requestBuilder.build();
                 
                 // 根据类型执行请求

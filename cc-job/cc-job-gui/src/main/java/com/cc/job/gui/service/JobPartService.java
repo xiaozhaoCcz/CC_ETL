@@ -3,6 +3,7 @@ package com.cc.job.gui.service;
 import com.cc.job.xo.common.result.Result;
 import com.cc.job.xo.model.vo.JobPartVo;
 import com.cc.job.gui.model.JobComposeData;
+import com.cc.job.gui.util.SessionManager;
 import com.google.gson.reflect.TypeToken;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -393,12 +394,15 @@ public class JobPartService extends  BaseService {
      * @throws IOException 网络异常
      */
     public byte[] exportData(Long partId) throws IOException {
-        // 这个方法需要直接返回字节数组，不能使用通用的工具类
-        // 保留原有实现，但需要添加import
-        okhttp3.Request request = new okhttp3.Request.Builder()
+        // 这个方法需要直接返回字节数组，不能使用通用的工具类；请求需携带 JWT 鉴权
+        okhttp3.Request.Builder reqBuilder = new okhttp3.Request.Builder()
                 .url(httpClient.buildUrl("/api/v1/jobParts/exportData/" + partId))
-                .get()
-                .build();
+                .get();
+        String auth = SessionManager.getInstance().getAuthorizationHeader();
+        if (auth != null && !auth.isEmpty()) {
+            reqBuilder.addHeader("Authorization", auth);
+        }
+        okhttp3.Request request = reqBuilder.build();
 
         try (okhttp3.Response response = apiUtil.getClient().newCall(request).execute()) {
             if (!response.isSuccessful()) {
@@ -415,10 +419,14 @@ public class JobPartService extends  BaseService {
      * @throws IOException 网络异常
      */
     public byte[] exportTaskGroupData(Long jobId) throws IOException {
-        okhttp3.Request request = new okhttp3.Request.Builder()
+        okhttp3.Request.Builder reqBuilder = new okhttp3.Request.Builder()
                 .url(httpClient.buildUrl("/api/v1/jobParts/exportTaskGroup/" + jobId))
-                .get()
-                .build();
+                .get();
+        String auth = SessionManager.getInstance().getAuthorizationHeader();
+        if (auth != null && !auth.isEmpty()) {
+            reqBuilder.addHeader("Authorization", auth);
+        }
+        okhttp3.Request request = reqBuilder.build();
         try (okhttp3.Response response = apiUtil.getClient().newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 throw new IOException("导出任务组数据失败: " + response);
@@ -467,10 +475,14 @@ public class JobPartService extends  BaseService {
         builder.addFormDataPart("file", file.getName(), fileBody);
         okhttp3.RequestBody requestBody = builder.build();
         
-        okhttp3.Request request = new okhttp3.Request.Builder()
+        okhttp3.Request.Builder reqBuilder = new okhttp3.Request.Builder()
                 .url(url)
-                .post(requestBody)
-                .build();
+                .post(requestBody);
+        String auth = SessionManager.getInstance().getAuthorizationHeader();
+        if (auth != null && !auth.isEmpty()) {
+            reqBuilder.addHeader("Authorization", auth);
+        }
+        okhttp3.Request request = reqBuilder.build();
         
         try (okhttp3.Response response = apiUtil.getClient().newCall(request).execute()) {
             if (!response.isSuccessful()) {
@@ -507,10 +519,14 @@ public class JobPartService extends  BaseService {
         );
         builder.addFormDataPart("file", file.getName(), fileBody);
         okhttp3.RequestBody requestBody = builder.build();
-        okhttp3.Request request = new okhttp3.Request.Builder()
+        okhttp3.Request.Builder reqBuilder = new okhttp3.Request.Builder()
                 .url(url)
-                .post(requestBody)
-                .build();
+                .post(requestBody);
+        String auth = SessionManager.getInstance().getAuthorizationHeader();
+        if (auth != null && !auth.isEmpty()) {
+            reqBuilder.addHeader("Authorization", auth);
+        }
+        okhttp3.Request request = reqBuilder.build();
 
         try (okhttp3.Response response = apiUtil.getClient().newCall(request).execute()) {
             if (!response.isSuccessful()) {
@@ -521,6 +537,88 @@ public class JobPartService extends  BaseService {
             Type resultType = new TypeToken<Result<Void>>(){}.getType();
             Result<Void> result = apiUtil.getGson().fromJson(responseBody, resultType);
             return Result.isSuccess(result);
+        }
+    }
+
+    /**
+     * 从 GUI 保存的快照 JSON 解析为 JobComposeData（用于版本回滚）
+     * 格式：nodes 为 [{id, type, x, y, properties}], edges 为 [{sourceNodeId, targetNodeId, startPoint, endPoint, properties}]
+     */
+    public JobComposeData parseComposeFromGuiSnapshot(String nodesJson, String edgesJson) {
+        JobComposeData composeData = new JobComposeData();
+        if (nodesJson != null && !nodesJson.isEmpty()) {
+            try {
+                List<Map<String, Object>> nodeMaps = apiUtil.getGson().fromJson(
+                    nodesJson, new TypeToken<List<Map<String, Object>>>(){}.getType());
+                if (nodeMaps != null) {
+                    List<JobComposeData.NodeData> nodeList = new ArrayList<>();
+                    for (Map<String, Object> m : nodeMaps) {
+                        JobComposeData.NodeData node = parseNodeFromGuiSnapshot(m);
+                        if (node != null) nodeList.add(node);
+                    }
+                    composeData.setNodes(nodeList);
+                }
+            } catch (Exception e) {
+                logger.error("解析快照节点 JSON 失败: {}", e.getMessage(), e);
+            }
+        }
+        if (edgesJson != null && !edgesJson.isEmpty()) {
+            try {
+                List<Map<String, Object>> edgeMaps = apiUtil.getGson().fromJson(
+                    edgesJson, new TypeToken<List<Map<String, Object>>>(){}.getType());
+                if (edgeMaps != null) {
+                    List<JobComposeData.EdgeData> edgeList = new ArrayList<>();
+                    for (Map<String, Object> m : edgeMaps) {
+                        JobComposeData.EdgeData edge = new JobComposeData.EdgeData();
+                        edge.setId(String.valueOf(m.get("sourceNodeId")) + "->" + m.get("targetNodeId"));
+                        edge.setSourceNodeId(String.valueOf(m.get("sourceNodeId")));
+                        edge.setTargetNodeId(String.valueOf(m.get("targetNodeId")));
+                        edge.setSourceAnchor(m.get("startPoint") != null ? String.valueOf(m.get("startPoint")) : "right");
+                        edge.setTargetAnchor(m.get("endPoint") != null ? String.valueOf(m.get("endPoint")) : "left");
+                        Object props = m.get("properties");
+                        if (props instanceof String) {
+                            try {
+                                edge.setProperties(apiUtil.getGson().fromJson((String) props, new TypeToken<Map<String, Object>>(){}.getType()));
+                            } catch (Exception ignored) {}
+                        } else if (props instanceof Map) {
+                            edge.setProperties((Map<String, Object>) props);
+                        }
+                        edgeList.add(edge);
+                    }
+                    composeData.setEdges(edgeList);
+                }
+            } catch (Exception e) {
+                logger.error("解析快照边 JSON 失败: {}", e.getMessage(), e);
+            }
+        }
+        return composeData;
+    }
+
+    private JobComposeData.NodeData parseNodeFromGuiSnapshot(Map<String, Object> m) {
+        try {
+            JobComposeData.NodeData node = new JobComposeData.NodeData();
+            node.setId(String.valueOf(m.get("id")));
+            node.setType(m.get("type") != null ? String.valueOf(m.get("type")) : null);
+            if (m.get("x") != null) node.setX(((Number) m.get("x")).doubleValue());
+            if (m.get("y") != null) node.setY(((Number) m.get("y")).doubleValue());
+            Object props = m.get("properties");
+            Map<String, Object> propsMap = null;
+            if (props instanceof String) {
+                propsMap = apiUtil.getGson().fromJson((String) props, new TypeToken<Map<String, Object>>(){}.getType());
+                node.setProperties(propsMap);
+            } else if (props instanceof Map) {
+                propsMap = (Map<String, Object>) props;
+                node.setProperties(propsMap);
+            }
+            if (propsMap != null && propsMap.get("jobId") != null) {
+                try {
+                    node.setJobId(((Number) propsMap.get("jobId")).longValue());
+                } catch (Exception ignored) {}
+            }
+            return node;
+        } catch (Exception e) {
+            logger.error("解析快照节点项失败: {}", e.getMessage(), e);
+            return null;
         }
     }
 }

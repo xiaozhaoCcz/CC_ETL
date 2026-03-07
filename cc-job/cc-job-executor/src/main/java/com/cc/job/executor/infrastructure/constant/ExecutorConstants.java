@@ -46,6 +46,8 @@ public final class ExecutorConstants {
         public static final int FULL = 0;
         /** 增量同步 */
         public static final int INCREMENTAL = 1;
+        /** 参数增量同步（多自定义参数，执行后刷新游标） */
+        public static final int PARAM_INCREMENTAL = 2;
 
         private DataxType() {
         }

@@ -104,13 +104,18 @@ public class TaskGroupOrchestrator {
     @Value("${cc-job.job.admin.addresses}")
     private String adminAddresses;
 
+    private String buildInstanceKey() {
+        String executorIp = (ip != null && !ip.trim().isEmpty()) ? ip : IpUtil.getIp();
+        return "http://" + executorIp + ":" + httpPort + "/";
+    }
+
     public boolean updateRegistryWithHttpPort() {
         try {
             // 构建执行器地址（Netty端口）
             String executorIp = (ip != null && !ip.trim().isEmpty()) ? ip : IpUtil.getIp();
             String executorAddress = "http://" + executorIp + ":" + executorPort + "/";
 
-            String executorServerAddress = "http://" + executorIp + ":" + httpPort + "/";
+            String executorServerAddress = buildInstanceKey();
 
             // 构建请求参数
             Map<String, String> params = new HashMap<>();
@@ -161,13 +166,14 @@ public class TaskGroupOrchestrator {
      * @param executionBatchId 执行批次ID
      * @param executeParam 执行参数（可能包含batchId参数）
      */
-    public void execute(Long taskGroupId, String executionBatchId, List<Integer> jobFlowPositionIds, String executeParam) {
+    public void execute(Long taskGroupId, String executionBatchId, List<Integer> jobFlowPositionIds,
+                        List<Integer> jobPauseStatusIds, String executeParam) {
         logger.info("[Orchestrator] ========== 开始执行任务组 ==========");
         logger.info("[Orchestrator] 任务组ID: {}, 批次ID: {}, 执行参数: {}", taskGroupId, executionBatchId, executeParam);
 
         try {
             // 1. 准备执行上下文
-            ExecutionContext context = prepareExecution(taskGroupId, executionBatchId, jobFlowPositionIds, executeParam);
+            ExecutionContext context = prepareExecution(taskGroupId, executionBatchId, jobFlowPositionIds, jobPauseStatusIds, executeParam);
 
             // 2. 构建执行计划
             List<WorkerWrapper<Long, String>> workerWrappers = buildExecutionPlan(context);
@@ -190,8 +196,12 @@ public class TaskGroupOrchestrator {
     /**
      * 准备执行上下文
      */
-    private ExecutionContext prepareExecution(Long taskGroupId, String executionBatchId, List<Integer> jobFlowPositionIds, String executeParam) {
+    private ExecutionContext prepareExecution(Long taskGroupId, String executionBatchId,
+                                              List<Integer> jobFlowPositionIds,
+                                              List<Integer> jobPauseStatusIds,
+                                              String executeParam) {
         logger.debug("[Orchestrator] 准备执行上下文 - taskGroupId: {}", taskGroupId);
+        String instanceKey = buildInstanceKey();
 
         // 获取任务组信息
         JobInfo taskGroupInfo = adminApiClient.getJobInfo(taskGroupId);
@@ -256,11 +266,34 @@ public class TaskGroupOrchestrator {
 
         // 解析执行参数，加载历史数据（如果指定了batchId）
         String historicalBatchId = parseBatchIdFromParam(executeParam);
+        // 解析恢复执行参数（审批通过后继续执行）
+        Long resumeFromNodeId = null;
+        String resumeBatchId = null;
+        if (executeParam != null && executeParam.trim().startsWith("{")) {
+            try {
+                Map<String, Object> paramMap = JSONUtil.toBean(executeParam.trim(), Map.class);
+                Object rb = paramMap.get("resumeBatchId");
+                Object fn = paramMap.get("fromNodeId");
+                if (rb != null && fn != null && !rb.toString().isEmpty()) {
+                    resumeBatchId = rb.toString();
+                    resumeFromNodeId = Long.parseLong(fn.toString());
+                    executionBatchId = resumeBatchId;
+                    Set<Long> resumeNodeIds = computeDownstreamNodeIds(edges, resumeFromNodeId);
+                    resumeNodeIds.add(resumeFromNodeId);
+                    nodes = nodes.stream().filter(n -> resumeNodeIds.contains(n.getId())).collect(Collectors.toList());
+                    edges = edges.stream().filter(e -> resumeNodeIds.contains(e.getFromNodeId()) && resumeNodeIds.contains(e.getEndNodeId())).collect(Collectors.toList());
+                    logger.info("[Orchestrator] 恢复执行模式 - fromNodeId: {}, 节点数: {}", resumeFromNodeId, nodes.size());
+                }
+            } catch (Exception e) {
+                logger.warn("[Orchestrator] 解析恢复参数失败 - executeParam: {}", executeParam, e);
+            }
+        }
         ExecutionContext tempContext = new ExecutionContext();
         tempContext.setTaskGroupId(taskGroupId);
         tempContext.setExecutionBatchId(executionBatchId);
         tempContext.setDataContext(dataContext);
         tempContext.setJobNameMap(jobNameMap);
+        tempContext.setInstanceKey(instanceKey);
         if (historicalBatchId != null && !historicalBatchId.isEmpty()) {
             logger.info("[Orchestrator] 检测到历史批次ID参数，开始加载历史数据 - batchId: {}", historicalBatchId);
             int loadedCount = historicalDataLoader.loadFromDatabase(tempContext, taskGroupId, historicalBatchId);
@@ -268,8 +301,9 @@ public class TaskGroupOrchestrator {
         } else {
             // 部分跑时优先用最近一次全量跑批次，保证上游 #参数 有数据（方案一）
             boolean isPartialRun = jobFlowPositionIds != null && !jobFlowPositionIds.isEmpty();
+            boolean hasPausedNodes = jobPauseStatusIds != null && !jobPauseStatusIds.isEmpty();
             if (isPartialRun) {
-                String fullRunBatchId = adminApiClient.getLatestFullRunBatchId(taskGroupId);
+                String fullRunBatchId = adminApiClient.getLatestFullRunBatchId(taskGroupId, instanceKey);
                 if (fullRunBatchId != null && !fullRunBatchId.isEmpty()) {
                     logger.info("[Orchestrator] 部分跑检测到全量跑批次，加载其历史数据 - batchId: {}", fullRunBatchId);
                     int loadedCount = historicalDataLoader.loadFromDatabase(tempContext, taskGroupId, fullRunBatchId);
@@ -281,12 +315,19 @@ public class TaskGroupOrchestrator {
                         logger.info("[Orchestrator] 最近一次执行数据加载完成 - 加载数量: {}", loadedCount);
                     }
                 }
-            } else {
-                logger.debug("[Orchestrator] 未指定历史批次ID，尝试加载最近一次执行的数据");
-                int loadedCount = historicalDataLoader.loadLatestBatch(tempContext, taskGroupId);
-                if (loadedCount > 0) {
-                    logger.info("[Orchestrator] 最近一次执行数据加载完成 - 加载数量: {}", loadedCount);
+            } else if (hasPausedNodes) {
+                String fullRunBatchId = adminApiClient.getLatestFullRunBatchId(taskGroupId, instanceKey);
+                if (fullRunBatchId != null && !fullRunBatchId.isEmpty()) {
+                    Set<Long> pausedNodeJobIds = resolvePausedNodeJobIds(nodes, jobPauseStatusIds);
+                    int loadedCount = historicalDataLoader.loadSpecificJobResults(
+                            tempContext, taskGroupId, fullRunBatchId, pausedNodeJobIds);
+                    logger.info("[Orchestrator] 检测到阻塞节点，加载最近一次全量跑结果 - batchId: {}, 节点数: {}, 加载数量: {}",
+                            fullRunBatchId, pausedNodeJobIds.size(), loadedCount);
+                } else {
+                    logger.warn("[Orchestrator] 检测到阻塞节点，但未找到最近一次全量跑批次 - taskGroupId: {}", taskGroupId);
                 }
+            } else {
+                logger.debug("[Orchestrator] 普通全量跑不加载历史数据，参数解析严格依赖本次上游结果");
             }
         }
         // 部分跑时按节点补全缺失上游结果（方案二）
@@ -321,7 +362,7 @@ public class TaskGroupOrchestrator {
         XxlJobContext xxlJobContext = XxlJobContext.getXxlJobContext();
         CONTEXT_HOLDER.set(xxlJobContext);
 
-        return ExecutionContext.builder()
+        ExecutionContext ctx = ExecutionContext.builder()
                 .taskGroupId(taskGroupId)
                 .executionBatchId(executionBatchId)
                 .taskGroupInfo(taskGroupInfo)
@@ -331,7 +372,35 @@ public class TaskGroupOrchestrator {
                 .executeKey(buildExecuteKey(taskGroupId, executionBatchId))
                 .dataContext(dataContext)
                 .jobNameMap(jobNameMap)
+                .jobPauseStatusIds(jobPauseStatusIds)
+                .instanceKey(instanceKey)
                 .build();
+        if (resumeFromNodeId != null && resumeBatchId != null) {
+            ctx.setResumeFromNodeId(resumeFromNodeId);
+            ctx.setResumeBatchId(resumeBatchId);
+        }
+        return ctx;
+    }
+
+    /** 计算从 fromNodeId 出发可到达的节点ID集合（含 fromNodeId 的下游） */
+    private Set<Long> computeDownstreamNodeIds(List<JobEdge> edges, Long fromNodeId) {
+        Set<Long> result = new HashSet<>();
+        Map<Long, List<Long>> adj = new HashMap<>();
+        for (JobEdge e : edges) {
+            if (e.getFromNodeId() != null && e.getEndNodeId() != null) {
+                adj.computeIfAbsent(e.getFromNodeId(), k -> new ArrayList<>()).add(e.getEndNodeId());
+            }
+        }
+        ArrayDeque<Long> queue = new ArrayDeque<>();
+        queue.add(fromNodeId);
+        result.add(fromNodeId);
+        while (!queue.isEmpty()) {
+            Long cur = queue.poll();
+            for (Long next : adj.getOrDefault(cur, Collections.emptyList())) {
+                if (result.add(next)) queue.add(next);
+            }
+        }
+        return result;
     }
 
     /**
@@ -436,6 +505,18 @@ public class TaskGroupOrchestrator {
         }
         reached.removeAll(currentRunNodeIds);
         return reached;
+    }
+
+    private Set<Long> resolvePausedNodeJobIds(List<JobNode> nodes, List<Integer> jobPauseStatusIds) {
+        if (nodes == null || nodes.isEmpty() || jobPauseStatusIds == null || jobPauseStatusIds.isEmpty()) {
+            return Collections.emptySet();
+        }
+        Set<Integer> pausedNodeIdSet = new HashSet<>(jobPauseStatusIds);
+        return nodes.stream()
+                .filter(node -> node.getId() != null && pausedNodeIdSet.contains(node.getId().intValue()))
+                .map(JobNode::getJobId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
     }
 
     /**
@@ -690,8 +771,12 @@ public class TaskGroupOrchestrator {
 
             // 遍历所有节点，收集执行状态
             for (JobNode node : context.getNodes()) {
+                if (context.isPausedNode(node.getId())) {
+                    logger.info("[Orchestrator] 跳过阻塞节点状态保存 - nodeId: {}, jobId: {}",
+                            node.getId(), node.getJobId());
+                    continue;
+                }
                 Long nodeJobId = node.getJobId();
-                String nodeId = node.getId() != null ? String.valueOf(node.getId()) : String.valueOf(nodeJobId);
 
                 // 从 WorkerWrapper 中获取执行状态
                 WorkerWrapper<Long, String> wrapper = wrapperMap.get(String.valueOf(node.getId()));

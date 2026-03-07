@@ -96,6 +96,11 @@ public interface JobInfoService extends IService<JobInfo> {
 
     List<Long> initData();
 
+    /**
+     * 任务列表（按权限过滤）
+     */
+    List<JobInfo> getJobInfoListWithPermission(Integer jobType);
+
     boolean pauseJob(Long id, Integer pauseStatus);
 
     boolean checkJobGroupRunningInExecutor(Long id);
