@@ -19,8 +19,11 @@ public interface JobNodeResultMapper extends BaseMapper<JobNodeResult> {
      * 查询最近一次全量跑的批次ID（该批次下去重 job_id 数等于 nodeCount）
      */
     @Select("SELECT execution_batch_id FROM job_node_result WHERE task_group_id = #{taskGroupId} " +
+            "AND instance_key = #{instanceKey} " +
             "GROUP BY execution_batch_id HAVING COUNT(DISTINCT job_id) = #{nodeCount} " +
             "ORDER BY MAX(create_time) DESC LIMIT 1")
-    String selectLatestFullRunBatchId(@Param("taskGroupId") Long taskGroupId, @Param("nodeCount") long nodeCount);
+    String selectLatestFullRunBatchId(@Param("taskGroupId") Long taskGroupId,
+                                      @Param("instanceKey") String instanceKey,
+                                      @Param("nodeCount") long nodeCount);
 }
 

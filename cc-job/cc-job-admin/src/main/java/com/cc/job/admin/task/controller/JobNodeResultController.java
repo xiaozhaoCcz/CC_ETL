@@ -33,10 +33,11 @@ public class JobNodeResultController {
         try {
             Long taskGroupId = Long.valueOf(params.get("taskGroupId").toString());
             String executionBatchId = params.get("executionBatchId").toString();
+            String instanceKey = params.get("instanceKey") != null ? params.get("instanceKey").toString() : null;
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> results = (List<Map<String, Object>>) params.get("results");
 
-            int savedCount = jobNodeResultService.batchSaveNodeResults(taskGroupId, executionBatchId, results);
+            int savedCount = jobNodeResultService.batchSaveNodeResults(taskGroupId, executionBatchId, instanceKey, results);
             return Result.success(savedCount > 0);
         } catch (Exception e) {
             return Result.failed("保存节点结果失败: " + e.getMessage());
@@ -47,10 +48,11 @@ public class JobNodeResultController {
     @GetMapping("/byBatch")
     public Result<List<com.cc.job.xo.model.entity.JobNodeResult>> getNodeResultsByBatch(
             @Parameter(description = "任务组ID") @RequestParam("taskGroupId") Long taskGroupId,
-            @Parameter(description = "执行批次ID") @RequestParam("executionBatchId") String executionBatchId) {
+            @Parameter(description = "执行批次ID") @RequestParam("executionBatchId") String executionBatchId,
+            @Parameter(description = "实例隔离键") @RequestParam("instanceKey") String instanceKey) {
         try {
             List<com.cc.job.xo.model.entity.JobNodeResult> results = 
-                    jobNodeResultService.getNodeResultsByBatch(taskGroupId, executionBatchId);
+                    jobNodeResultService.getNodeResultsByBatch(taskGroupId, executionBatchId, instanceKey);
             return Result.success(results);
         } catch (Exception e) {
             return Result.failed("获取节点结果失败: " + e.getMessage());
@@ -60,9 +62,10 @@ public class JobNodeResultController {
     @Operation(summary = "获取最近一次执行的批次ID")
     @GetMapping("/latestBatchId")
     public Result<String> getLatestBatchId(
-            @Parameter(description = "任务组ID") @RequestParam("taskGroupId") Long taskGroupId) {
+            @Parameter(description = "任务组ID") @RequestParam("taskGroupId") Long taskGroupId,
+            @Parameter(description = "实例隔离键") @RequestParam("instanceKey") String instanceKey) {
         try {
-            String batchId = jobNodeResultService.getLatestBatchId(taskGroupId);
+            String batchId = jobNodeResultService.getLatestBatchId(taskGroupId, instanceKey);
             return Result.success(batchId);
         } catch (Exception e) {
             return Result.failed("获取最近一次批次ID失败: " + e.getMessage());
@@ -72,9 +75,10 @@ public class JobNodeResultController {
     @Operation(summary = "获取最近一次全量跑的批次ID")
     @GetMapping("/latestFullRunBatchId")
     public Result<String> getLatestFullRunBatchId(
-            @Parameter(description = "任务组ID") @RequestParam("taskGroupId") Long taskGroupId) {
+            @Parameter(description = "任务组ID") @RequestParam("taskGroupId") Long taskGroupId,
+            @Parameter(description = "实例隔离键") @RequestParam("instanceKey") String instanceKey) {
         try {
-            String batchId = jobNodeResultService.getLatestFullRunBatchId(taskGroupId);
+            String batchId = jobNodeResultService.getLatestFullRunBatchId(taskGroupId, instanceKey);
             return Result.success(batchId);
         } catch (Exception e) {
             return Result.failed("获取最近一次全量跑批次ID失败: " + e.getMessage());
@@ -85,15 +89,17 @@ public class JobNodeResultController {
     @GetMapping("/latestByJob")
     public Result<Map<String, Object>> getLatestByJob(
             @Parameter(description = "任务组ID") @RequestParam("taskGroupId") Long taskGroupId,
-            @Parameter(description = "节点任务ID") @RequestParam("jobId") Long jobId) {
+            @Parameter(description = "节点任务ID") @RequestParam("jobId") Long jobId,
+            @Parameter(description = "实例隔离键") @RequestParam("instanceKey") String instanceKey) {
         try {
-            com.cc.job.xo.model.entity.JobNodeResult result = jobNodeResultService.getLatestNodeResult(taskGroupId, jobId);
+            com.cc.job.xo.model.entity.JobNodeResult result = jobNodeResultService.getLatestNodeResult(taskGroupId, jobId, instanceKey);
             if (result == null) {
                 return Result.success(null);
             }
             java.util.Map<String, Object> map = new java.util.HashMap<>();
             map.put("jobId", result.getJobId());
             map.put("jobName", result.getJobName());
+            map.put("instanceKey", result.getInstanceKey());
             map.put("resultData", result.getResultData());
             map.put("filePath", result.getFilePath());
             map.put("dataSize", result.getDataSize());

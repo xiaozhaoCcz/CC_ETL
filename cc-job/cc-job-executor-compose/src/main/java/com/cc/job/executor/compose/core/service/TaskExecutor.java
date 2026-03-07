@@ -4,12 +4,11 @@ import cn.hutool.json.JSONUtil;
 import com.cc.job.executor.compose.client.AdminApiClient;
 import com.cc.job.executor.compose.core.exception.WaitingApprovalException;
 import com.cc.job.executor.compose.core.model.ExecutionContext;
-import com.cc.job.executor.compose.core.service.ResultStorageService;
 import com.cc.job.executor.compose.service.JobExecutionMonitor;
 import com.cc.job.executor.compose.service.JobTriggerService;
 import com.cc.job.xo.model.entity.JobInfo;
 import com.cc.job.xo.model.entity.JobNode;
-import com.xxl.job.core.context.XxlJobContext;
+import com.xxl.job.core.context.XxlJobHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -61,6 +60,13 @@ public class TaskExecutor {
                 jobInfo.getId(), node.getId(), retryCount);
         
         try {
+            if (context.isPausedNode(node.getId())) {
+                logger.info("[TaskExecutor] 节点被阻塞，本次跳过执行 - jobId: {}, nodeId: {}",
+                        jobInfo.getId(), node.getId());
+                XxlJobHelper.log(context.getXxlJobContext(),
+                        "节点被阻塞，本次跳过执行 - jobId: {}, nodeId: {}", jobInfo.getId(), node.getId());
+                return SUCCESS;
+            }
             // 1. 审批节点：恢复执行时 fromNode 视为已通过，直接跳过执行（由编排器 no-op 处理）；否则检查需审批则创建待办并挂起
             if (context.getResumeFromNodeId() != null && context.getResumeFromNodeId().equals(node.getId())) {
                 return SUCCESS;

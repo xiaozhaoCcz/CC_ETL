@@ -50,6 +50,10 @@ public class ExecutionContext {
     private Long resumeFromNodeId;
     /** 恢复执行的批次ID */
     private String resumeBatchId;
+    /** 本次运行中被显式阻塞的节点ID列表 */
+    private List<Integer> jobPauseStatusIds;
+    /** 实例隔离键 */
+    private String instanceKey;
 
     public ExecutionContext() {
     }
@@ -168,6 +172,33 @@ public class ExecutionContext {
         this.resumeBatchId = resumeBatchId;
     }
 
+    public List<Integer> getJobPauseStatusIds() {
+        return jobPauseStatusIds;
+    }
+
+    public void setJobPauseStatusIds(List<Integer> jobPauseStatusIds) {
+        this.jobPauseStatusIds = jobPauseStatusIds;
+    }
+
+    public boolean hasPausedNodes() {
+        return jobPauseStatusIds != null && !jobPauseStatusIds.isEmpty();
+    }
+
+    public boolean isPausedNode(Long nodeId) {
+        if (nodeId == null || jobPauseStatusIds == null || jobPauseStatusIds.isEmpty()) {
+            return false;
+        }
+        return jobPauseStatusIds.contains(nodeId.intValue());
+    }
+
+    public String getInstanceKey() {
+        return instanceKey;
+    }
+
+    public void setInstanceKey(String instanceKey) {
+        this.instanceKey = instanceKey;
+    }
+
     public static class ExecutionContextBuilder {
         private Long taskGroupId;
         private String executionBatchId;
@@ -179,6 +210,7 @@ public class ExecutionContext {
         private List<Integer> jobPauseStatusIds;
         private DataContext dataContext;
         private Map<String, Long> jobNameMap;
+        private String instanceKey;
 
         ExecutionContextBuilder() {
         }
@@ -233,8 +265,16 @@ public class ExecutionContext {
             return this;
         }
 
+        public ExecutionContextBuilder instanceKey(String instanceKey) {
+            this.instanceKey = instanceKey;
+            return this;
+        }
+
         public ExecutionContext build() {
-            return new ExecutionContext(taskGroupId, executionBatchId, taskGroupInfo, nodes, edges, xxlJobContext, executeKey, dataContext, jobNameMap);
+            ExecutionContext context = new ExecutionContext(taskGroupId, executionBatchId, taskGroupInfo, nodes, edges, xxlJobContext, executeKey, dataContext, jobNameMap);
+            context.setJobPauseStatusIds(jobPauseStatusIds);
+            context.setInstanceKey(instanceKey);
+            return context;
         }
     }
 }

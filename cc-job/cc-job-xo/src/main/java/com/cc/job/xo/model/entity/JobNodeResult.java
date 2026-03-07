@@ -35,6 +35,11 @@ public class JobNodeResult extends BaseEntity {
     private String jobName;
 
     /**
+     * 实例隔离键（executorServerAddress）
+     */
+    private String instanceKey;
+
+    /**
      * 执行结果数据（JSON格式，用于兼容小数据或作为后备）
      */
     private String resultData;
@@ -79,6 +84,14 @@ public class JobNodeResult extends BaseEntity {
 
     public void setJobName(String jobName) {
         this.jobName = jobName;
+    }
+
+    public String getInstanceKey() {
+        return instanceKey;
+    }
+
+    public void setInstanceKey(String instanceKey) {
+        this.instanceKey = instanceKey;
     }
 
     public String getResultData() {

@@ -25,12 +25,14 @@ import java.security.NoSuchAlgorithmException;
 import java.io.UnsupportedEncodingException;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Random;
 import java.util.LinkedHashMap;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -221,28 +223,28 @@ public class JobTriggerService {
             
             // 解析 executorParam
             if (executorParam != null && !executorParam.isEmpty()) {
-                executorParam = parameterResolver.resolve(executorParam, dataContext, jobNameMap);
+                executorParam = resolveTemplateStrict(executorParam, "executorParam", jobInfo, dataContext, jobNameMap);
                 logger.debug("[JobTrigger] 解析 executorParam - jobId: {}, 原始: {}, 解析后: {}", 
                         jobInfo.getId(), jobInfo.getExecutorParam(), executorParam);
             }
             
             // 解析 reqUrl
             if (reqUrl != null && !reqUrl.isEmpty()) {
-                reqUrl = parameterResolver.resolve(reqUrl, dataContext, jobNameMap);
+                reqUrl = resolveTemplateStrict(reqUrl, "reqUrl", jobInfo, dataContext, jobNameMap);
                 logger.debug("[JobTrigger] 解析 reqUrl - jobId: {}, 原始: {}, 解析后: {}", 
                         jobInfo.getId(), jobInfo.getReqUrl(), reqUrl);
             }
             
             // 解析 reqBody
             if (reqBody != null && !reqBody.isEmpty()) {
-                reqBody = parameterResolver.resolve(reqBody, dataContext, jobNameMap);
+                reqBody = resolveTemplateStrict(reqBody, "reqBody", jobInfo, dataContext, jobNameMap);
                 logger.debug("[JobTrigger] 解析 reqBody - jobId: {}, 原始: {}, 解析后: {}", 
                         jobInfo.getId(), jobInfo.getReqBody(), reqBody);
             }
             
             // 解析 reqHeader
             if (reqHeader != null && !reqHeader.isEmpty()) {
-                reqHeader = parameterResolver.resolve(reqHeader, dataContext, jobNameMap);
+                reqHeader = resolveTemplateStrict(reqHeader, "reqHeader", jobInfo, dataContext, jobNameMap);
                 logger.debug("[JobTrigger] 解析 reqHeader - jobId: {}, 原始: {}, 解析后: {}", 
                         jobInfo.getId(), jobInfo.getReqHeader(), reqHeader);
             }
@@ -253,7 +255,7 @@ public class JobTriggerService {
             // 2. 复杂对象：通过环境变量传递（在脚本执行时设置）
             // 3. Java GLUE：通过DataContextAccessor API访问（在执行器中注入）
             if (glueSource != null && !glueSource.isEmpty()) {
-                glueSource = parameterResolver.resolve(glueSource, dataContext, jobNameMap);
+                glueSource = resolveTemplateStrict(glueSource, "glueSource", jobInfo, dataContext, jobNameMap);
                 logger.debug("[JobTrigger] 解析 glueSource - jobId: {}", jobInfo.getId());
             }
         }
@@ -303,6 +305,31 @@ public class JobTriggerService {
                 jobInfo.getId(), randomId, composeAddress);
         
         return triggerParam;
+    }
+
+    private String resolveTemplateStrict(String template, String fieldName, JobInfo jobInfo,
+                                         DataContext dataContext, Map<String, Long> jobNameMap) {
+        Set<String> variables = parameterResolver.extractVariables(template);
+        if (variables.isEmpty()) {
+            return template;
+        }
+
+        List<String> missingVariables = new ArrayList<>();
+        for (String variable : variables) {
+            String value = parameterResolver.getValueFromContext(variable, dataContext, jobNameMap);
+            if (value == null) {
+                missingVariables.add(variable);
+            }
+        }
+
+        if (!missingVariables.isEmpty()) {
+            String message = "缺失上游结果: " + String.join(", ", missingVariables);
+            logger.error("[JobTrigger] 参数解析失败 - jobId: {}, field: {}, 缺失变量: {}",
+                    jobInfo.getId(), fieldName, missingVariables);
+            throw new IllegalStateException(message);
+        }
+
+        return parameterResolver.resolve(template, dataContext, jobNameMap);
     }
     
     /**

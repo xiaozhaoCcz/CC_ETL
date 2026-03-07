@@ -2,6 +2,7 @@ package com.cc.job.executor.compose.handler;
 
 import com.cc.job.executor.compose.core.exception.WaitingApprovalException;
 import com.cc.job.executor.compose.core.orchestrator.TaskGroupOrchestrator;
+import com.xxl.job.core.context.XxlJobContext;
 import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.handler.annotation.XxlJob;
 import org.apache.commons.lang3.StringUtils;
@@ -54,6 +55,10 @@ public class JobGroupExecutorComplete {
         long taskGroupId = XxlJobHelper.getJobId();
         String executeParam = XxlJobHelper.getJobParam();
         List<Integer> jobFlowPositionIds = XxlJobHelper.getJobFlowPositionIds();
+        XxlJobContext xxlJobContext = XxlJobContext.getXxlJobContext();
+        List<Integer> jobPauseStatusIds = xxlJobContext != null && xxlJobContext.getTriggerParam() != null
+                ? xxlJobContext.getTriggerParam().getJobPauseStatusIds()
+                : null;
 
         logger.info("[JobGroupExecutor] ========== 开始执行任务组 ==========");
         logger.info("[JobGroupExecutor] 任务组ID: {}, 执行参数: {}", taskGroupId, executeParam);
@@ -71,7 +76,7 @@ public class JobGroupExecutorComplete {
         
         // 4. 委托给编排器执行（传递执行参数，用于解析历史批次ID）
         try {
-            orchestrator.execute(taskGroupId, executionBatchId, jobFlowPositionIds, executeParam);
+            orchestrator.execute(taskGroupId, executionBatchId, jobFlowPositionIds, jobPauseStatusIds, executeParam);
         } catch (Exception e) {
             Throwable cause = e.getCause();
             if (e instanceof WaitingApprovalException || (cause != null && cause instanceof WaitingApprovalException)) {

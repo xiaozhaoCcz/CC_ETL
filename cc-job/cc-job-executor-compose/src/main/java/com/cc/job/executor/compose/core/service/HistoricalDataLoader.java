@@ -4,15 +4,13 @@ import cn.hutool.json.JSONUtil;
 import com.cc.job.executor.compose.client.AdminApiClient;
 import com.cc.job.executor.compose.core.context.DataContext;
 import com.cc.job.executor.compose.core.model.ExecutionContext;
-import com.cc.job.executor.compose.core.service.FileStorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 历史数据加载服务
@@ -59,7 +57,7 @@ public class HistoricalDataLoader {
                     taskGroupId, executionBatchId);
             
             // 从Admin API获取历史数据
-            List<Map<String, Object>> nodeResults = adminApiClient.getNodeResultsByBatch(taskGroupId, executionBatchId);
+            List<Map<String, Object>> nodeResults = adminApiClient.getNodeResultsByBatch(taskGroupId, executionBatchId, context.getInstanceKey());
             
             if (nodeResults == null || nodeResults.isEmpty()) {
                 logger.info("[HistoricalDataLoader] 未找到历史数据 - taskGroupId: {}, batchId: {}", 
@@ -234,7 +232,7 @@ public class HistoricalDataLoader {
             if (dataContext.get(normalizedJobName + ".result") != null) {
                 continue;
             }
-            Map<String, Object> nodeResult = adminApiClient.getLatestNodeResult(taskGroupId, jobId);
+            Map<String, Object> nodeResult = adminApiClient.getLatestNodeResult(taskGroupId, jobId, context.getInstanceKey());
             if (nodeResult != null && loadSingleNodeResult(dataContext, taskGroupId, nodeResult)) {
                 filled++;
             }
@@ -260,7 +258,7 @@ public class HistoricalDataLoader {
         
         try {
             // 获取最近一次执行的批次ID
-            String latestBatchId = adminApiClient.getLatestBatchId(taskGroupId);
+            String latestBatchId = adminApiClient.getLatestBatchId(taskGroupId, context.getInstanceKey());
             
             if (latestBatchId == null || latestBatchId.isEmpty()) {
                 logger.info("[HistoricalDataLoader] 未找到最近一次执行的批次 - taskGroupId: {}", taskGroupId);
@@ -277,6 +275,36 @@ public class HistoricalDataLoader {
             return 0;
         }
     }
+
+    /**
+     * 从指定批次中只加载给定节点的历史结果。
+     */
+    public int loadSpecificJobResults(ExecutionContext context, Long taskGroupId,
+                                      String executionBatchId, Set<Long> jobIds) {
+        if (context == null || context.getDataContext() == null || jobIds == null || jobIds.isEmpty()) {
+            return 0;
+        }
+        List<Map<String, Object>> nodeResults = adminApiClient.getNodeResultsByBatch(taskGroupId, executionBatchId, context.getInstanceKey());
+        if (nodeResults == null || nodeResults.isEmpty()) {
+            return 0;
+        }
+
+        int loadedCount = 0;
+        for (Map<String, Object> nodeResult : nodeResults) {
+            Object jobIdObj = nodeResult.get("jobId");
+            if (jobIdObj == null) {
+                continue;
+            }
+            Long jobId = Long.valueOf(jobIdObj.toString());
+            if (!jobIds.contains(jobId)) {
+                continue;
+            }
+            if (loadSingleNodeResult(context.getDataContext(), taskGroupId, nodeResult)) {
+                loadedCount++;
+            }
+        }
+        return loadedCount;
+    }
     
     /**
      * 将结果数据存储到数据上下文（标记为DATABASE来源）
@@ -288,7 +316,12 @@ public class HistoricalDataLoader {
         
         // 根据结果类型存储（与ResultStorageService相同的逻辑）
         if (result instanceof Map) {
-            storeMapResult(context, jobName, (Map<String, Object>) result, jobId);
+            Map<String, Object> resultMap = (Map<String, Object>) result;
+            if (isNodeResultMap(resultMap)) {
+                storeNodeResultMap(context, jobName, resultMap, jobId);
+            } else {
+                storeMapResult(context, jobName, resultMap, jobId);
+            }
         } else if (result instanceof List) {
             storeListResult(context, jobName, (List<Object>) result, jobId);
         } else if (result instanceof String) {
@@ -336,6 +369,94 @@ public class HistoricalDataLoader {
     private void storeSimpleResult(DataContext context, String jobName, Object result, Long jobId) {
         context.putFromDatabase(jobName + ".value", result, jobId);
         context.putFromDatabase(jobName + ".result", result, jobId);
+    }
+
+    private boolean isNodeResultMap(Map<String, Object> result) {
+        return result.containsKey("success")
+                || result.containsKey("data")
+                || result.containsKey("apiResult")
+                || result.containsKey("sqlResult")
+                || result.containsKey("beanResult")
+                || result.containsKey("glueResult");
+    }
+
+    private void storeNodeResultMap(DataContext context, String jobName, Map<String, Object> result, Long jobId) {
+        context.putFromDatabase(jobName, result, jobId);
+        context.putFromDatabase(jobName + ".result", result, jobId);
+
+        putIfPresent(context, jobName + ".code", result.get("code"), jobId);
+        putIfPresent(context, jobName + ".message", result.get("message"), jobId);
+        putIfPresent(context, jobName + ".success", result.get("success"), jobId);
+        putIfPresent(context, jobName + ".duration", result.get("duration"), jobId);
+        putIfPresent(context, jobName + ".timestamp", result.get("timestamp"), jobId);
+        putIfPresent(context, jobName + ".data", result.get("data"), jobId);
+
+        Object sqlResult = result.get("sqlResult");
+        if (sqlResult instanceof Map) {
+            storeSqlResultMap(context, jobName, (Map<String, Object>) sqlResult, jobId);
+        }
+
+        Object apiResult = result.get("apiResult");
+        if (apiResult instanceof Map) {
+            storeApiResultMap(context, jobName, (Map<String, Object>) apiResult, jobId);
+        }
+
+        Object beanResult = result.get("beanResult");
+        if (beanResult instanceof Map) {
+            storeBeanResultMap(context, jobName, (Map<String, Object>) beanResult, jobId);
+        }
+
+        Object glueResult = result.get("glueResult");
+        if (glueResult instanceof Map) {
+            storeGlueResultMap(context, jobName, (Map<String, Object>) glueResult, jobId);
+        }
+    }
+
+    private void storeSqlResultMap(DataContext context, String jobName, Map<String, Object> sqlResult, Long jobId) {
+        context.putFromDatabase(jobName + ".sqlResult", sqlResult, jobId);
+        putIfPresent(context, jobName + ".data", sqlResult.get("data"), jobId);
+        putIfPresent(context, jobName + ".count", sqlResult.get("count"), jobId);
+        putIfPresent(context, jobName + ".affectedRows", sqlResult.get("affectedRows"), jobId);
+        putIfPresent(context, jobName + ".columns", sqlResult.get("columns"), jobId);
+        putIfPresent(context, jobName + ".columnTypes", sqlResult.get("columnTypes"), jobId);
+        putIfPresent(context, jobName + ".sqlType", sqlResult.get("sqlType"), jobId);
+        putIfPresent(context, jobName + ".executedSql", sqlResult.get("executedSql"), jobId);
+    }
+
+    private void storeApiResultMap(DataContext context, String jobName, Map<String, Object> apiResult, Long jobId) {
+        context.putFromDatabase(jobName + ".apiResult", apiResult, jobId);
+        context.putFromDatabase(jobName + ".response", apiResult, jobId);
+        putIfPresent(context, jobName + ".response.statusCode", apiResult.get("statusCode"), jobId);
+        putIfPresent(context, jobName + ".response.body", apiResult.get("body"), jobId);
+        putIfPresent(context, jobName + ".response.rawBody", apiResult.get("rawBody"), jobId);
+        putIfPresent(context, jobName + ".response.headers", apiResult.get("headers"), jobId);
+        putIfPresent(context, jobName + ".request.url", apiResult.get("requestUrl"), jobId);
+        putIfPresent(context, jobName + ".request.method", apiResult.get("requestMethod"), jobId);
+        putIfPresent(context, jobName + ".responseTime", apiResult.get("responseTime"), jobId);
+    }
+
+    private void storeBeanResultMap(DataContext context, String jobName, Map<String, Object> beanResult, Long jobId) {
+        context.putFromDatabase(jobName + ".beanResult", beanResult, jobId);
+        putIfPresent(context, jobName + ".value", beanResult.get("value"), jobId);
+        putIfPresent(context, jobName + ".methodName", beanResult.get("methodName"), jobId);
+        putIfPresent(context, jobName + ".className", beanResult.get("className"), jobId);
+        putIfPresent(context, jobName + ".returnType", beanResult.get("returnType"), jobId);
+    }
+
+    private void storeGlueResultMap(DataContext context, String jobName, Map<String, Object> glueResult, Long jobId) {
+        context.putFromDatabase(jobName + ".glueResult", glueResult, jobId);
+        putIfPresent(context, jobName + ".output", glueResult.get("output"), jobId);
+        putIfPresent(context, jobName + ".error", glueResult.get("error"), jobId);
+        putIfPresent(context, jobName + ".exitCode", glueResult.get("exitCode"), jobId);
+        putIfPresent(context, jobName + ".result", glueResult.get("result"), jobId);
+        putIfPresent(context, jobName + ".scriptType", glueResult.get("scriptType"), jobId);
+        putIfPresent(context, jobName + ".logOutput", glueResult.get("logOutput"), jobId);
+    }
+
+    private void putIfPresent(DataContext context, String key, Object value, Long jobId) {
+        if (value != null) {
+            context.putFromDatabase(key, value, jobId);
+        }
     }
     
     /**
