@@ -87,8 +87,9 @@ Cc-ETL 基于 XXL-Job 深度改造，提供可视化定时任务调度与数据�
 #### 任务列表与编辑
 
 <div align="center">
-  <img src="./doc/image/02JobList.png" width="50%" alt="任务列表与编辑"/>
+  <img src="./doc/image/02Jobs.png" width="50%" alt="任务列表与编辑"/>
 </div>
+
 
 #### 数据源同步
 
