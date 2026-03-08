@@ -371,7 +371,7 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         glueIdeButton.setManaged(false);
         
         // datax任务按钮（DataX 模式下使用，点击进入数据源同步页面配置 reader/writer 并生成 JSON）
-        configDataxButton = new Button("datax任务");
+        configDataxButton = new Button("DataX");
         configDataxButton.setPrefWidth(300);
         configDataxButton.setStyle(
             "-fx-background-color: #2563EB; " +
@@ -719,7 +719,7 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
                 executorHandlerField.setManaged(false);
                 configDataxButton.setVisible(true);
                 configDataxButton.setManaged(true);
-                configDataxButton.setText("datax任务");
+                configDataxButton.setText("DataX任务");
                 // 隐藏 dataxJson 输入区域，JSON 通过「datax任务」按钮在数据源同步页配置后回写
                 toggleExecutorParamArea(false);
                 expandDataxJsonButton.setVisible(false);
@@ -1599,7 +1599,7 @@ public class NewJobNodeDialog extends Dialog<JobInfoForm> {
         BEAN("BEAN", "BEAN", false, false),
         API("API", "API", false, true),
         SQL("SQL", "SQL", false, false),
-        DATAX("DATAX", "datax任务", false, false),
+        DATAX("DATAX", "DataX", false, false),
         GLUE_GROOVY("GLUE_GROOVY", "GLUE(Java)", true, false),
         GLUE_SHELL("GLUE_SHELL", "GLUE(Shell)", true, false),
         GLUE_PYTHON("GLUE_PYTHON", "GLUE(Python)", true, false),
