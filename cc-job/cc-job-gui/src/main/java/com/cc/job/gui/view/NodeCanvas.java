@@ -2567,7 +2567,7 @@ public class NodeCanvas extends Pane {
     }
     
     // ==================== 定位操作 ====================
-    
+
     /**
      * 定位节点到视图中心并播放定位动画
      * @param node 要定位的节点
@@ -2575,7 +2575,6 @@ public class NodeCanvas extends Pane {
      */
     public boolean locateNode(ProcessNode node) {
         if (node == null || hostingScrollPane == null) return false;
-        
         // 播放定位动画
         node.playLocateAnimation();
         
@@ -2599,28 +2598,26 @@ public class NodeCanvas extends Pane {
         
         if (nodeWidth <= 0 || nodeHeight <= 0) return;
         
-        // 节点中心点
         double nodeCenterX = nodeX + nodeWidth / 2;
         double nodeCenterY = nodeY + nodeHeight / 2;
         
-        double viewportWidth = hostingScrollPane.getViewportBounds().getWidth();
-        double viewportHeight = hostingScrollPane.getViewportBounds().getHeight();
-        
+        // JavaFX ScrollPane maps hvalue/vvalue to content's layoutBounds (untransformed). Visible extent in content coords = viewport size in pixels.
+        double viewportWidthPx = hostingScrollPane.getViewportBounds().getWidth();
+        double viewportHeightPx = hostingScrollPane.getViewportBounds().getHeight();
         double canvasWidth = getPrefWidth();
         double canvasHeight = getPrefHeight();
+        double scrollableWidth = canvasWidth - viewportWidthPx;
+        double scrollableHeight = canvasHeight - viewportHeightPx;
         
-        // 计算滚动值，使节点居中
-        double scrollableWidth = canvasWidth - viewportWidth;
-        double scrollableHeight = canvasHeight - viewportHeight;
-        
+        double targetHValue = hostingScrollPane.getHvalue();
+        double targetVValue = hostingScrollPane.getVvalue();
         if (scrollableWidth > 0) {
-            double targetHValue = (nodeCenterX - viewportWidth / 2) / scrollableWidth;
+            targetHValue = (nodeCenterX - viewportWidthPx / 2) / scrollableWidth;
             targetHValue = Math.max(0, Math.min(1, targetHValue));
             hostingScrollPane.setHvalue(targetHValue);
         }
-        
         if (scrollableHeight > 0) {
-            double targetVValue = (nodeCenterY - viewportHeight / 2) / scrollableHeight;
+            targetVValue = (nodeCenterY - viewportHeightPx / 2) / scrollableHeight;
             targetVValue = Math.max(0, Math.min(1, targetVValue));
             hostingScrollPane.setVvalue(targetVValue);
         }
@@ -2646,24 +2643,19 @@ public class NodeCanvas extends Pane {
                 if (sourceNode != null && targetNode != null && hostingScrollPane != null) {
                     double centerX = (sourceNode.getLayoutX() + targetNode.getLayoutX()) / 2;
                     double centerY = (sourceNode.getLayoutY() + targetNode.getLayoutY()) / 2;
-                    
-                    // 直接计算滚动位置
-                    double viewportWidth = hostingScrollPane.getViewportBounds().getWidth();
-                    double viewportHeight = hostingScrollPane.getViewportBounds().getHeight();
+                    double viewportWidthPx = hostingScrollPane.getViewportBounds().getWidth();
+                    double viewportHeightPx = hostingScrollPane.getViewportBounds().getHeight();
                     double canvasWidth = getPrefWidth();
                     double canvasHeight = getPrefHeight();
-                    
-                    double scrollableWidth = canvasWidth - viewportWidth;
-                    double scrollableHeight = canvasHeight - viewportHeight;
-                    
+                    double scrollableWidth = canvasWidth - viewportWidthPx;
+                    double scrollableHeight = canvasHeight - viewportHeightPx;
                     if (scrollableWidth > 0) {
-                        double targetHValue = (centerX - viewportWidth / 2) / scrollableWidth;
+                        double targetHValue = (centerX - viewportWidthPx / 2) / scrollableWidth;
                         targetHValue = Math.max(0, Math.min(1, targetHValue));
                         hostingScrollPane.setHvalue(targetHValue);
                     }
-                    
                     if (scrollableHeight > 0) {
-                        double targetVValue = (centerY - viewportHeight / 2) / scrollableHeight;
+                        double targetVValue = (centerY - viewportHeightPx / 2) / scrollableHeight;
                         targetVValue = Math.max(0, Math.min(1, targetVValue));
                         hostingScrollPane.setVvalue(targetVValue);
                     }
