@@ -269,6 +269,7 @@
 .dialog-pane .table-view .table-cell {
     -fx-text-fill: #FFFFFF;
     -fx-background-color: transparent;
+    -fx-alignment: center;
 }
 
 .dialog-pane .table-view .column-header,
@@ -278,6 +279,7 @@
 
 .dialog-pane .table-view .column-header .label {
     -fx-text-fill: #FFFFFF;
+    -fx-alignment: center;
 }
 
 .dialog-pane .list-cell:filled:selected,
@@ -1331,6 +1333,14 @@
     -fx-text-fill: #9D9D9D;
     -fx-font-weight: 600;
     -fx-padding: 12 16;
+}
+
+.table-view .column-header .label {
+    -fx-alignment: center;
+}
+
+.table-view .table-cell {
+    -fx-alignment: center;
 }
 
 .table-row-cell {

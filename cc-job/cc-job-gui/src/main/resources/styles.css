@@ -1104,6 +1104,14 @@
     -fx-padding: 12 16;
 }
 
+.table-view .column-header .label {
+    -fx-alignment: center;
+}
+
+.table-view .table-cell {
+    -fx-alignment: center;
+}
+
 .table-row-cell {
     -fx-background-color: white;
     -fx-border-color: #F3F4F6;

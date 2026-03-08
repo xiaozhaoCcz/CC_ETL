@@ -138,12 +138,12 @@ public class ShowJobListDialog extends Dialog<Void> {
      * 设置对话框样式
      */
     private void styleDialog() {
-        getDialogPane().setPrefSize(1080, 680);
+        getDialogPane().setPrefSize(1500, 800);
         // 设置对话框大小
-        getDialogPane().setPrefWidth(1080);
-        getDialogPane().setPrefHeight(580);
+        getDialogPane().setPrefWidth(1500);
+        getDialogPane().setPrefHeight(800);
         getDialogPane().setMinWidth(1080);
-        getDialogPane().setMinHeight(580);
+        getDialogPane().setMinHeight(800);
         getDialogPane().setMaxWidth(Double.MAX_VALUE);
         getDialogPane().setMaxHeight(Double.MAX_VALUE);
         setResizable(true);
