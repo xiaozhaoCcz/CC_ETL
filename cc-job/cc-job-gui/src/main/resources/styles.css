@@ -1653,12 +1653,13 @@
 
 /* ============ 参数输入语法高亮样式（级联参数标签） ============ */
 
-/* 参数表达式高亮样式（#{nodeName}.code 等），级联标签感 */
+/* 参数表达式高亮样式（#{nodeName}.code 等），级联标签感，带间距与圆角 */
 .parameter-expression {
     -rtfx-background-color: #BFDBFE !important;
     -fx-fill: #0369A1 !important;
     -fx-font-weight: 500;
     -rtfx-background-radius: 6;
+    -rtfx-background-insets: 2 6 2 6;
 }
 
 /* 确保参数表达式背景色正确显示（针对 CodeArea） */
@@ -1666,6 +1667,7 @@
     -rtfx-background-color: #BFDBFE !important;
     -fx-fill: #0369A1 !important;
     -rtfx-background-radius: 6;
+    -rtfx-background-insets: 2 6 2 6;
 }
 
 /* ============ 登录/注册页浅色（供 style class 使用） ============ */
