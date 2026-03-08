@@ -225,7 +225,8 @@ CREATE DATABASE `cc_etl` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_c
 mysql -u root -p cc_job_admin < doc/cc_etl.sql
 ```
 
-（也可在 MySQL 客户端中执行 `doc/cc_etl.sql`。）
+（也可在 MySQL 客户端中执行 `doc/cc_etl.sql`，`doc/cc_etl_clean.sql`是一份干净的数据库，也可以直接导入。）
+
 
 ### 后端配置与启动
 

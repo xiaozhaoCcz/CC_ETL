@@ -80,11 +80,13 @@ public class NodeCanvas extends Pane {
     
     // 窗口自动滚动相关（专业级：对标 tldraw/draw.io 边沿跟随）
     private static final double VIEWPORT_EDGE_THRESHOLD = 100.0; // 距离可视窗口边缘的触发区（像素），越大越早跟随
-    private static final double SCROLL_SPEED = 0.02;             // 滚动速度系数（旧逻辑兼容，主逻辑用 SMOOTH_SCROLL_SPEED_PER_SECOND）
-    /** 进入边沿区后延迟多久才开始滚动（ms），偏小以接近实时跟随 */
-    private static final long EDGE_SCROLL_DELAY_MS = 40L;
-    /** 开始滚动后缓动加速时长（ms），偏短以便快速达到全速 */
-    private static final long EDGE_SCROLL_EASE_MS = 80L;
+    private static final double SCROLL_SPEED = 0.02;             // 滚动速度系数（保留兼容）
+    /** 进入边沿区后延迟多久才开始滚动（ms），极小以接近即时跟随 */
+    private static final long EDGE_SCROLL_DELAY_MS = 20L;
+    /** 目标插值系数（每帧向目标移动的比例），0.6 约 2～3 帧接近目标，专业级跟手 */
+    private static final double EDGE_SCROLL_LERP_FACTOR = 0.6;
+    /** 单帧最大滚动变化量（hvalue/vvalue），防止目标过远时一帧跳变 */
+    private static final double EDGE_SCROLL_MAX_DELTA_PER_FRAME = 0.28;
     
     // 防止重复扩展
     private boolean isExpanding = false; // 标记是否正在执行扩展操作
@@ -112,7 +114,7 @@ public class NodeCanvas extends Pane {
     private long lastScrollFrameTime = 0; // 纳秒，用于 deltaTime 计算
     /** 节点进入边沿区的时刻（纳秒），0 表示未在边沿区 */
     private long edgeScrollActivateTimeNanos = 0;
-    /** 边沿滚动实际开始时刻（纳秒），用于 easeInCubic 缓动，0 表示尚未开始滚动 */
+    /** 边沿滚动实际开始时刻（纳秒），0 表示尚未开始滚动 */
     private long edgeScrollStartTimeNanos = 0;
     
     // 主题相关
@@ -677,19 +679,6 @@ public class NodeCanvas extends Pane {
         }
     }
     
-    /** 平滑滚动最大 delta 时间（纳秒），防止长时间未运行导致大跳变 */
-    private static final long SCROLL_DELTA_NANOS_CAP = 100_000_000L; // 100ms
-    /** 每秒可滚动的比例（与帧率无关），2.0 即约 2 倍可滚动范围/秒，接近实时跟随 */
-    private static final double SMOOTH_SCROLL_SPEED_PER_SECOND = 2.0;
-    /** 边沿区 proximity 速度系数上限，越大贴边时滚动越快 */
-    private static final double EDGE_SCROLL_SPEED_MULTIPLIER_CAP = 4.5;
-
-    /**
-     * easeInCubic：t 在 [0,1]，返回值从 0 平滑加速到 1
-     */
-    private static double easeInCubic(double t) {
-        return t * t * t;
-    }
 
     /**
      * 获取画布当前缩放系数（用于边沿滚动速度与缩放一致）
@@ -705,14 +694,11 @@ public class NodeCanvas extends Pane {
     }
 
     /**
-     * 执行平滑滚动（由 AnimationTimer 调用，基于 deltaTime 与帧率脱耦）。
-     * 支持：缩小时跟随、边沿延迟启动、easeInCubic 缓动、缩放一致速度。
+     * 执行平滑滚动：目标导向插值算法（每帧向“节点处于安全区”的目标插值）。
+     * 视口在 2～3 帧内快速贴近目标，专业画图软件级跟手。
      */
     private void performSmoothScroll(ProcessNode node, long nowNanos, long deltaTimeNanos) {
         if (node == null || hostingScrollPane == null) return;
-        
-        double deltaSec = Math.min(deltaTimeNanos, SCROLL_DELTA_NANOS_CAP) / 1e9;
-        if (deltaSec <= 0) return;
         
         double nodeX = node.getLayoutX();
         double nodeY = node.getLayoutY();
@@ -725,7 +711,6 @@ public class NodeCanvas extends Pane {
         double viewportWidthPx = hostingScrollPane.getViewportBounds().getWidth();
         double viewportHeightPx = hostingScrollPane.getViewportBounds().getHeight();
         double scaleFactor = getCanvasScaleFactor();
-        // 缩小时视口像素对应更多内容坐标：有效视口（内容坐标）= 视口像素 / scale
         double effectiveViewportWidth = viewportWidthPx / scaleFactor;
         double effectiveViewportHeight = viewportHeightPx / scaleFactor;
         double currentHValue = hostingScrollPane.getHvalue();
@@ -761,40 +746,36 @@ public class NodeCanvas extends Pane {
         if (edgeScrollStartTimeNanos == 0) {
             edgeScrollStartTimeNanos = nowNanos;
         }
-        long easeNanos = EDGE_SCROLL_EASE_MS * 1_000_000L;
-        double easeT = Math.min(1.0, (double) (nowNanos - edgeScrollStartTimeNanos) / easeNanos);
-        double easeFactor = easeInCubic(easeT);
-        double step = SMOOTH_SCROLL_SPEED_PER_SECOND * deltaSec * easeFactor / scaleFactor;
         
-        double newHValue = currentHValue;
-        double newVValue = currentVValue;
-        boolean needsScroll = false;
-        
-        if (nodeCenterX < viewportLeft + VIEWPORT_EDGE_THRESHOLD && scrollableWidth > 0) {
-            double distance = (viewportLeft + VIEWPORT_EDGE_THRESHOLD) - nodeCenterX;
-            double speedMultiplier = Math.min(distance / VIEWPORT_EDGE_THRESHOLD, EDGE_SCROLL_SPEED_MULTIPLIER_CAP);
-            newHValue = Math.max(0, currentHValue - step * speedMultiplier);
-            needsScroll = true;
-        } else if (nodeCenterX > viewportRight - VIEWPORT_EDGE_THRESHOLD && scrollableWidth > 0) {
-            double distance = nodeCenterX - (viewportRight - VIEWPORT_EDGE_THRESHOLD);
-            double speedMultiplier = Math.min(distance / VIEWPORT_EDGE_THRESHOLD, EDGE_SCROLL_SPEED_MULTIPLIER_CAP);
-            newHValue = Math.min(1, currentHValue + step * speedMultiplier);
-            needsScroll = true;
+        // 目标导向：计算使节点处于安全区时的目标滚动位置（内容坐标 -> hvalue/vvalue）
+        double targetViewportLeft = viewportLeft;
+        double targetViewportTop = viewportTop;
+        if (scrollableWidth > 0) {
+            if (nodeCenterX < viewportLeft + VIEWPORT_EDGE_THRESHOLD) {
+                targetViewportLeft = Math.max(0, nodeCenterX - VIEWPORT_EDGE_THRESHOLD);
+            } else if (nodeCenterX > viewportRight - VIEWPORT_EDGE_THRESHOLD) {
+                targetViewportLeft = Math.min(scrollableWidth, nodeCenterX - effectiveViewportWidth + VIEWPORT_EDGE_THRESHOLD);
+            }
         }
-        
-        if (nodeCenterY < viewportTop + VIEWPORT_EDGE_THRESHOLD && scrollableHeight > 0) {
-            double distance = (viewportTop + VIEWPORT_EDGE_THRESHOLD) - nodeCenterY;
-            double speedMultiplier = Math.min(distance / VIEWPORT_EDGE_THRESHOLD, EDGE_SCROLL_SPEED_MULTIPLIER_CAP);
-            newVValue = Math.max(0, currentVValue - step * speedMultiplier);
-            needsScroll = true;
-        } else if (nodeCenterY > viewportBottom - VIEWPORT_EDGE_THRESHOLD && scrollableHeight > 0) {
-            double distance = nodeCenterY - (viewportBottom - VIEWPORT_EDGE_THRESHOLD);
-            double speedMultiplier = Math.min(distance / VIEWPORT_EDGE_THRESHOLD, EDGE_SCROLL_SPEED_MULTIPLIER_CAP);
-            newVValue = Math.min(1, currentVValue + step * speedMultiplier);
-            needsScroll = true;
+        if (scrollableHeight > 0) {
+            if (nodeCenterY < viewportTop + VIEWPORT_EDGE_THRESHOLD) {
+                targetViewportTop = Math.max(0, nodeCenterY - VIEWPORT_EDGE_THRESHOLD);
+            } else if (nodeCenterY > viewportBottom - VIEWPORT_EDGE_THRESHOLD) {
+                targetViewportTop = Math.min(scrollableHeight, nodeCenterY - effectiveViewportHeight + VIEWPORT_EDGE_THRESHOLD);
+            }
         }
+        double targetHValue = scrollableWidth > 0 ? Math.max(0, Math.min(1, targetViewportLeft / scrollableWidth)) : currentHValue;
+        double targetVValue = scrollableHeight > 0 ? Math.max(0, Math.min(1, targetViewportTop / scrollableHeight)) : currentVValue;
         
-        if (needsScroll) {
+        // 每帧向目标插值，并限制单帧变化量避免一帧跳变
+        double deltaH = (targetHValue - currentHValue) * EDGE_SCROLL_LERP_FACTOR;
+        double deltaV = (targetVValue - currentVValue) * EDGE_SCROLL_LERP_FACTOR;
+        deltaH = Math.max(-EDGE_SCROLL_MAX_DELTA_PER_FRAME, Math.min(EDGE_SCROLL_MAX_DELTA_PER_FRAME, deltaH));
+        deltaV = Math.max(-EDGE_SCROLL_MAX_DELTA_PER_FRAME, Math.min(EDGE_SCROLL_MAX_DELTA_PER_FRAME, deltaV));
+        double newHValue = Math.max(0, Math.min(1, currentHValue + deltaH));
+        double newVValue = Math.max(0, Math.min(1, currentVValue + deltaV));
+        
+        if (newHValue != currentHValue || newVValue != currentVValue) {
             hostingScrollPane.setHvalue(newHValue);
             hostingScrollPane.setVvalue(newVValue);
         }
