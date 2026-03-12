@@ -517,7 +517,6 @@ public class HttpClientUtil {
         try (Response response = apiUtil.getClient().newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 String errorBody = response.body() != null ? response.body().string() : "";
-                NotificationToast.showError("请求失败: HTTP " + response.code() + " - " + errorBody);
                 throw new IOException("请求失败: HTTP " + response.code() + " - " + errorBody);
             }
             String responseBody = response.body().string();
