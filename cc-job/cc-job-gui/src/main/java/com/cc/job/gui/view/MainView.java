@@ -416,7 +416,9 @@ public class MainView extends BorderPane {
             public void onRun() {
                 Long jobId = pageStoreHelper.getCurrentTaskGroupId();
                 String jobName = getJobNameById(jobId);
-                
+                // 保证运行框（左上角）的 currentTaskGroupId 与当前运行任务组一致，以便显示「运行中」和停止按钮
+                toolBar.setCurrentTaskGroupId(jobId);
+
                 // ⭐ 运行前检测循环依赖
                 boolean hasCycle = canvas.detectAndHighlightCycles();
                 if (hasCycle) {

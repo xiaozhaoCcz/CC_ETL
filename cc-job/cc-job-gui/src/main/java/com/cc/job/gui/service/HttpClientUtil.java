@@ -3,6 +3,7 @@ package com.cc.job.gui.service;
 import com.cc.job.gui.util.ApiUtil;
 import com.cc.job.gui.util.NotificationToast;
 import com.cc.job.gui.util.SessionManager;
+import javafx.application.Platform;
 import com.cc.job.xo.common.result.PageResult;
 import com.cc.job.xo.common.result.Result;
 import com.google.gson.reflect.TypeToken;
@@ -518,6 +519,11 @@ public class HttpClientUtil {
             if (!response.isSuccessful()) {
                 String errorBody = response.body() != null ? response.body().string() : "";
                 throw new IOException("请求失败: HTTP " + response.code() + " - " + errorBody);
+            }
+            // 滑动续期：服务端在响应头中返回新 token 时更新本地会话
+            String newToken = response.header("X-New-Access-Token");
+            if (newToken != null && !newToken.isEmpty()) {
+                Platform.runLater(() -> SessionManager.getInstance().updateToken(newToken));
             }
             String responseBody = response.body().string();
             return (T) apiUtil.getGson().fromJson(responseBody, resultType);

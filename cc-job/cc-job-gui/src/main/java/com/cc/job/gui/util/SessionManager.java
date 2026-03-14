@@ -136,6 +136,16 @@ public class SessionManager {
         }
         return null;
     }
+
+    /**
+     * 仅更新 token（滑动续期时由客户端收到 X-New-Access-Token 后调用），并持久化到本地
+     */
+    public void updateToken(String newToken) {
+        if (newToken != null && !newToken.isEmpty()) {
+            this.token = newToken;
+            saveSessionToFile();
+        }
+    }
     
     /**
      * 保存会话信息到本地文件

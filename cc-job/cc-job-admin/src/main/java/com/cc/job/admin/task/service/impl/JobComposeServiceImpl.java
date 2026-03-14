@@ -1304,9 +1304,7 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
         if (jobInfo.getJobType() == null || jobInfo.getJobType() != 0) {
             throw new BusinessException("仅支持将单任务加入画布");
         }
-        if (!"N".equalsIgnoreCase(jobInfo.getNodeFlag())) {
-            throw new BusinessException("该任务已是画布节点，请从任务列表选择单任务");
-        }
+        // 仅用 jobId + jobParentId 防重复，允许同一单任务加入不同任务组
         long count = jobNodeService.count(new LambdaQueryWrapper<JobNode>()
                 .eq(JobNode::getJobId, jobInfoId)
                 .eq(JobNode::getJobParentId, parentId));

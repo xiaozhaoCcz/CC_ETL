@@ -25,15 +25,24 @@ public class DateUtils {
         return Instant.ofEpochMilli(date.getTime()).atZone(ZoneId.systemDefault()).toLocalDateTime();
     }
 
+    /**
+     * 将日期时间字符串格式化为 yyyy-MM-dd HH:mm:ss。
+     * 兼容无时区的 ISO_LOCAL_DATE_TIME（如 2025-03-14T00:00:00）与带时区的 ZonedDateTime 格式。
+     */
     public static String formatDate(String isoDateString) {
-        // 解析字符串为ZonedDateTime对象
+        if (isoDateString == null || isoDateString.trim().isEmpty()) {
+            return null;
+        }
+        DateTimeFormatter targetFormatter = DateTimeFormatter.ofPattern(DATE_FORMAT1);
+        try {
+            // 先尝试按无时区的 LocalDateTime 解析（前端任务日志清理传入的格式）
+            LocalDateTime localDateTime = LocalDateTime.parse(isoDateString, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+            return localDateTime.atZone(ZoneId.systemDefault()).format(targetFormatter);
+        } catch (Exception ignored) {
+            // 再尝试带时区的 ZonedDateTime
+        }
         ZonedDateTime zonedDateTime = ZonedDateTime.parse(isoDateString);
-
-        // 定义目标格式
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(DATE_FORMAT1);
-
-        // 格式化日期时间
-        return zonedDateTime.format(formatter);
+        return zonedDateTime.format(targetFormatter);
     }
 
     public static String formatDate(String timeStamp, String timeFormat) {
