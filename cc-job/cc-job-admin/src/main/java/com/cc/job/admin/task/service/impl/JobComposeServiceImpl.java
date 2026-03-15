@@ -1304,26 +1304,38 @@ public class JobComposeServiceImpl extends ServiceImpl<JobComposeMapper, JobComp
         if (jobInfo.getJobType() == null || jobInfo.getJobType() != 0) {
             throw new BusinessException("仅支持将单任务加入画布");
         }
-        // 仅用 jobId + jobParentId 防重复，允许同一单任务加入不同任务组
-        long count = jobNodeService.count(new LambdaQueryWrapper<JobNode>()
-                .eq(JobNode::getJobId, jobInfoId)
-                .eq(JobNode::getJobParentId, parentId));
-        if (count > 0) {
-            throw new BusinessException("该任务已在本任务组中，请勿重复添加");
+        // 复制为新的 job_info，使 job_info 与 job_node 各新增一条
+        JobInfo copyJobInfo = BeanUtil.copyProperties(jobInfo, JobInfo.class, "id");
+        copyJobInfo.setId(null);
+        copyJobInfo.setJobDesc((jobInfo.getJobDesc() != null ? jobInfo.getJobDesc() : "") + "_copy");
+        copyJobInfo.setParentId(parentId);
+        copyJobInfo.setNodeFlag("Y");
+        copyJobInfo.setPauseStatus(0);
+        copyJobInfo.setGlueUpdateTime(LocalDateTime.now());
+        jobInfoService.save(copyJobInfo);
+
+        if (StringUtils.isNotBlank(copyJobInfo.getGlueRemark()) || StringUtils.isNotBlank(copyJobInfo.getGlueSource())) {
+            JobGlueForm glueForm = new JobGlueForm();
+            glueForm.setTaskId(copyJobInfo.getId());
+            glueForm.setGlueSource(copyJobInfo.getGlueSource());
+            glueForm.setGlueType(copyJobInfo.getGlueType());
+            glueForm.setGlueRemark(copyJobInfo.getGlueRemark());
+            jobInfoService.saveGlueSource(glueForm);
         }
+
         String nodeType = NODE_TYPE_MAP.get(jobInfo.getGlueType());
         if (nodeType == null) {
             nodeType = "custom-bean";
         }
         JobNode jobNode = new JobNode();
-        jobNode.setJobId(jobInfoId);
+        jobNode.setJobId(copyJobInfo.getId());
         jobNode.setJobParentId(parentId);
         jobNode.setNodePositionX(x != null ? x : 0.0);
         jobNode.setNodePositionY(y != null ? y : 0.0);
         jobNode.setNodeType(nodeType);
         jobNode.setTriggerStatus(-1);
         Map<String, Object> properties = new HashMap<>();
-        properties.put(JOB_ID, jobInfoId);
+        properties.put(JOB_ID, copyJobInfo.getId());
         properties.put("width", 160);
         properties.put("height", 90);
         jobNode.setProperties(JSONUtil.toJsonStr(properties));

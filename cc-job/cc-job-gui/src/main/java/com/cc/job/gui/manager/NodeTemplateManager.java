@@ -3,9 +3,9 @@ package com.cc.job.gui.manager;
 import com.cc.job.gui.model.ProcessNode;
 import com.cc.job.gui.service.JobInfoService;
 import com.cc.job.gui.service.JobNodeTemplateApiService;
+import com.cc.job.gui.util.ApiUtil;
 import com.cc.job.xo.model.entity.JobNodeTemplate;
 import com.cc.job.xo.model.form.JobInfoForm;
-import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,8 +66,7 @@ public class NodeTemplateManager {
             template.setDescription(description);
             template.setIsPublic(isPublic != null ? isPublic : 0);
             
-            Gson gson = new Gson();
-            template.setTemplateConfig(gson.toJson(formData));
+            template.setTemplateConfig(ApiUtil.getInstance().getGson().toJson(formData));
             
             log("✓ 模板已创建: " + templateName);
             return template;
@@ -94,9 +93,8 @@ public class NodeTemplateManager {
         }
         
         try {
-            Gson gson = new Gson();
             Type type = new TypeToken<JobInfoForm>(){}.getType();
-            JobInfoForm formData = gson.fromJson(template.getTemplateConfig(), type);
+            JobInfoForm formData = ApiUtil.getInstance().getGson().fromJson(template.getTemplateConfig(), type);
             
             // 设置节点位置
             formData.setNodePositionX(x);
