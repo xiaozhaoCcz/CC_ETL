@@ -3,6 +3,7 @@ package com.cc.job.gui.view;
 import com.cc.job.gui.service.JobGroupService;
 import com.cc.job.gui.service.JobLogService;
 import com.cc.job.gui.util.StyleUtil;
+import com.cc.job.gui.view.component.DateTimePicker;
 import com.cc.job.xo.common.result.PageResult;
 import com.cc.job.xo.model.entity.JobGroup;
 import com.cc.job.xo.model.query.JobLogQuery;
@@ -35,7 +36,6 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import javafx.scene.layout.FlowPane;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -59,8 +59,8 @@ public class ShowJobLogListDialog extends Dialog<Void> {
     private TableView<JobLogVO> tableView;
     private ComboBox<JobGroup> jobGroupCombo;
     private ComboBox<String> logStatusCombo;
-    private DatePicker startDatePicker;
-    private DatePicker endDatePicker;
+    private DateTimePicker startDateTimePicker;
+    private DateTimePicker endDateTimePicker;
     private TextField keywordField;
 
     private Label totalLabel;
@@ -195,9 +195,9 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         logStatusCombo.getItems().addAll("全部", "成功", "失败", "进行中");
         logStatusCombo.getSelectionModel().selectFirst();
 
-        // 调度时间范围
-        startDatePicker = new DatePicker();
-        endDatePicker = new DatePicker();
+        // 调度时间范围（一体化组件：年月日 + 时分秒）
+        startDateTimePicker = new DateTimePicker(0, 0, 0);
+        endDateTimePicker = new DateTimePicker(23, 59, 59);
 
         keywordField = new TextField();
         keywordField.setPromptText("执行结果关键词");
@@ -215,8 +215,8 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         resetBtn.setOnAction(e -> {
             jobGroupCombo.getSelectionModel().selectFirst();
             logStatusCombo.getSelectionModel().selectFirst();
-            startDatePicker.setValue(null);
-            endDatePicker.setValue(null);
+            startDateTimePicker.clear();
+            endDateTimePicker.clear();
             if (keywordField != null) keywordField.clear();
             pageNum = 1;
             loadPage(true);
@@ -246,9 +246,9 @@ public class ShowJobLogListDialog extends Dialog<Void> {
         grid.add(statusLabel, 4, 0);
         grid.add(logStatusCombo, 5, 0);
         grid.add(timeLabel, 6, 0);
-        grid.add(startDatePicker, 7, 0);
+        grid.add(startDateTimePicker, 7, 0);
         grid.add(new Label("至"), 8, 0);
-        grid.add(endDatePicker, 9, 0);
+        grid.add(endDateTimePicker, 9, 0);
 
         HBox btnBox = new HBox(10, searchBtn, resetBtn, clearBtn, archiveBtn);
         btnBox.setAlignment(Pos.CENTER_LEFT);
@@ -490,12 +490,12 @@ public class ShowJobLogListDialog extends Dialog<Void> {
             query.setLogStatus(3);
         }
         
-        if (startDatePicker.getValue() != null && endDatePicker.getValue() != null) {
-            LocalDate start = startDatePicker.getValue();
-            LocalDate end = endDatePicker.getValue();
+        LocalDateTime startDt = startDateTimePicker.getDateTime();
+        LocalDateTime endDt = endDateTimePicker.getDateTime();
+        if (startDt != null && endDt != null) {
             String[] filterTime = new String[]{
-                    start.atStartOfDay().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-                    end.atTime(23, 59, 59).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                    startDt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+                    endDt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
             };
             query.setFilterTime(filterTime);
         }
@@ -1132,12 +1132,12 @@ public class ShowJobLogListDialog extends Dialog<Void> {
                     } else if ("进行中".equals(status)) {
                         query.setLogStatus(3);
                     }
-                    if (startDatePicker.getValue() != null && endDatePicker.getValue() != null) {
-                        LocalDate start = startDatePicker.getValue();
-                        LocalDate end = endDatePicker.getValue();
+                    LocalDateTime startDt = startDateTimePicker.getDateTime();
+                    LocalDateTime endDt = endDateTimePicker.getDateTime();
+                    if (startDt != null && endDt != null) {
                         String[] filterTime = new String[]{
-                                start.atStartOfDay().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-                                end.atTime(23, 59, 59).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                                startDt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+                                endDt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
                         };
                         query.setFilterTime(filterTime);
                     }

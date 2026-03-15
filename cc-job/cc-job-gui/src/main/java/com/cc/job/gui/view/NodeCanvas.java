@@ -78,9 +78,15 @@ public class NodeCanvas extends Pane {
     private static final double EDGE_THRESHOLD = 100.0; // 距离边缘的阈值（像素）
     private static final double EXPAND_SIZE = 500.0;    // 每次扩展的大小
     
-    // 窗口自动滚动相关
-    private static final double VIEWPORT_EDGE_THRESHOLD = 50.0; // 距离可视窗口边缘的阈值（像素）
-    private static final double SCROLL_SPEED = 0.02;            // 滚动速度系数
+    // 窗口自动滚动相关（专业级：对标 tldraw/draw.io 边沿跟随）
+    private static final double VIEWPORT_EDGE_THRESHOLD = 100.0; // 距离可视窗口边缘的触发区（像素），越大越早跟随
+    private static final double SCROLL_SPEED = 0.02;             // 滚动速度系数（保留兼容）
+    /** 进入边沿区后延迟多久才开始滚动（ms），极小以接近即时跟随 */
+    private static final long EDGE_SCROLL_DELAY_MS = 20L;
+    /** 目标插值系数（每帧向目标移动的比例），0.6 约 2～3 帧接近目标，专业级跟手 */
+    private static final double EDGE_SCROLL_LERP_FACTOR = 0.6;
+    /** 单帧最大滚动变化量（hvalue/vvalue），防止目标过远时一帧跳变 */
+    private static final double EDGE_SCROLL_MAX_DELTA_PER_FRAME = 0.28;
     
     // 防止重复扩展
     private boolean isExpanding = false; // 标记是否正在执行扩展操作
@@ -106,6 +112,10 @@ public class NodeCanvas extends Pane {
     private ProcessNode lastDragStartedNode = null;
     private volatile boolean scrollAnimationRunning = false;
     private long lastScrollFrameTime = 0; // 纳秒，用于 deltaTime 计算
+    /** 节点进入边沿区的时刻（纳秒），0 表示未在边沿区 */
+    private long edgeScrollActivateTimeNanos = 0;
+    /** 边沿滚动实际开始时刻（纳秒），0 表示尚未开始滚动 */
+    private long edgeScrollStartTimeNanos = 0;
     
     // 主题相关
     private String currentTheme = "default"; // "default", "grid", "dots"
@@ -530,13 +540,15 @@ public class NodeCanvas extends Pane {
         
         scrollAnimationRunning = true;
         lastScrollFrameTime = 0;
+        edgeScrollActivateTimeNanos = 0;
+        edgeScrollStartTimeNanos = 0;
         dragScrollTimer = new AnimationTimer() {
             @Override
             public void handle(long now) {
                 if (currentDragNode != null && isDragging) {
                     long deltaNanos = lastScrollFrameTime == 0 ? 0 : (now - lastScrollFrameTime);
                     lastScrollFrameTime = now;
-                    performSmoothScroll(currentDragNode, deltaNanos);
+                    performSmoothScroll(currentDragNode, now, deltaNanos);
                 }
             }
         };
@@ -552,6 +564,8 @@ public class NodeCanvas extends Pane {
             dragScrollTimer = null;
         }
         scrollAnimationRunning = false;
+        edgeScrollActivateTimeNanos = 0;
+        edgeScrollStartTimeNanos = 0;
     }
     
     /**
@@ -665,27 +679,26 @@ public class NodeCanvas extends Pane {
         }
     }
     
-    /** 平滑滚动最大 delta 时间（纳秒），防止长时间未运行导致大跳变 */
-    private static final long SCROLL_DELTA_NANOS_CAP = 100_000_000L; // 100ms
-    /** 每秒可滚动的比例（与帧率无关），约 0.5 即半屏/秒，提高跟手度 */
-    private static final double SMOOTH_SCROLL_SPEED_PER_SECOND = 0.5;
 
     /**
-     * 执行平滑滚动（由 AnimationTimer 调用，基于 deltaTime 与帧率脱耦）
+     * 获取画布当前缩放系数（用于边沿滚动速度与缩放一致）
      */
-    private void performSmoothScroll(ProcessNode node, long deltaTimeNanos) {
-        if (node == null || hostingScrollPane == null) return;
-        
+    private double getCanvasScaleFactor() {
         for (javafx.scene.transform.Transform t : getTransforms()) {
             if (t instanceof Scale) {
                 Scale s = (Scale) t;
-                if (s.getX() < 1.0 || s.getY() < 1.0) return;
-                break;
+                return Math.max(1e-6, Math.min(s.getX(), s.getY()));
             }
         }
-        
-        double deltaSec = Math.min(deltaTimeNanos, SCROLL_DELTA_NANOS_CAP) / 1e9;
-        if (deltaSec <= 0) return;
+        return 1.0;
+    }
+
+    /**
+     * 执行平滑滚动：目标导向插值算法（每帧向“节点处于安全区”的目标插值）。
+     * 视口在 2～3 帧内快速贴近目标，专业画图软件级跟手。
+     */
+    private void performSmoothScroll(ProcessNode node, long nowNanos, long deltaTimeNanos) {
+        if (node == null || hostingScrollPane == null) return;
         
         double nodeX = node.getLayoutX();
         double nodeY = node.getLayoutY();
@@ -695,51 +708,74 @@ public class NodeCanvas extends Pane {
         
         double nodeCenterX = nodeX + nodeWidth / 2;
         double nodeCenterY = nodeY + nodeHeight / 2;
-        double viewportWidth = hostingScrollPane.getViewportBounds().getWidth();
-        double viewportHeight = hostingScrollPane.getViewportBounds().getHeight();
+        double viewportWidthPx = hostingScrollPane.getViewportBounds().getWidth();
+        double viewportHeightPx = hostingScrollPane.getViewportBounds().getHeight();
+        double scaleFactor = getCanvasScaleFactor();
+        double effectiveViewportWidth = viewportWidthPx / scaleFactor;
+        double effectiveViewportHeight = viewportHeightPx / scaleFactor;
         double currentHValue = hostingScrollPane.getHvalue();
         double currentVValue = hostingScrollPane.getVvalue();
         double canvasWidth = getPrefWidth();
         double canvasHeight = getPrefHeight();
-        double scrollableWidth = canvasWidth - viewportWidth;
-        double scrollableHeight = canvasHeight - viewportHeight;
+        double scrollableWidth = canvasWidth - effectiveViewportWidth;
+        double scrollableHeight = canvasHeight - effectiveViewportHeight;
         if (scrollableWidth <= 0 && scrollableHeight <= 0) return;
         
         double viewportLeft = scrollableWidth > 0 ? currentHValue * scrollableWidth : 0;
-        double viewportRight = viewportLeft + viewportWidth;
+        double viewportRight = viewportLeft + effectiveViewportWidth;
         double viewportTop = scrollableHeight > 0 ? currentVValue * scrollableHeight : 0;
-        double viewportBottom = viewportTop + viewportHeight;
+        double viewportBottom = viewportTop + effectiveViewportHeight;
         
-        double newHValue = currentHValue;
-        double newVValue = currentVValue;
-        boolean needsScroll = false;
-        double step = SMOOTH_SCROLL_SPEED_PER_SECOND * deltaSec;
+        boolean inEdgeZoneX = scrollableWidth > 0 && (nodeCenterX < viewportLeft + VIEWPORT_EDGE_THRESHOLD || nodeCenterX > viewportRight - VIEWPORT_EDGE_THRESHOLD);
+        boolean inEdgeZoneY = scrollableHeight > 0 && (nodeCenterY < viewportTop + VIEWPORT_EDGE_THRESHOLD || nodeCenterY > viewportBottom - VIEWPORT_EDGE_THRESHOLD);
+        boolean inEdgeZone = inEdgeZoneX || inEdgeZoneY;
         
-        if (nodeCenterX < viewportLeft + VIEWPORT_EDGE_THRESHOLD && scrollableWidth > 0) {
-            double distance = (viewportLeft + VIEWPORT_EDGE_THRESHOLD) - nodeCenterX;
-            double speedMultiplier = Math.min(distance / VIEWPORT_EDGE_THRESHOLD, 2.0);
-            newHValue = Math.max(0, currentHValue - step * speedMultiplier);
-            needsScroll = true;
-        } else if (nodeCenterX > viewportRight - VIEWPORT_EDGE_THRESHOLD && scrollableWidth > 0) {
-            double distance = nodeCenterX - (viewportRight - VIEWPORT_EDGE_THRESHOLD);
-            double speedMultiplier = Math.min(distance / VIEWPORT_EDGE_THRESHOLD, 2.0);
-            newHValue = Math.min(1, currentHValue + step * speedMultiplier);
-            needsScroll = true;
+        if (!inEdgeZone) {
+            edgeScrollActivateTimeNanos = 0;
+            edgeScrollStartTimeNanos = 0;
+            return;
         }
         
-        if (nodeCenterY < viewportTop + VIEWPORT_EDGE_THRESHOLD && scrollableHeight > 0) {
-            double distance = (viewportTop + VIEWPORT_EDGE_THRESHOLD) - nodeCenterY;
-            double speedMultiplier = Math.min(distance / VIEWPORT_EDGE_THRESHOLD, 2.0);
-            newVValue = Math.max(0, currentVValue - step * speedMultiplier);
-            needsScroll = true;
-        } else if (nodeCenterY > viewportBottom - VIEWPORT_EDGE_THRESHOLD && scrollableHeight > 0) {
-            double distance = nodeCenterY - (viewportBottom - VIEWPORT_EDGE_THRESHOLD);
-            double speedMultiplier = Math.min(distance / VIEWPORT_EDGE_THRESHOLD, 2.0);
-            newVValue = Math.min(1, currentVValue + step * speedMultiplier);
-            needsScroll = true;
+        if (edgeScrollActivateTimeNanos == 0) {
+            edgeScrollActivateTimeNanos = nowNanos;
+        }
+        long delayNanos = EDGE_SCROLL_DELAY_MS * 1_000_000L;
+        if (nowNanos - edgeScrollActivateTimeNanos < delayNanos) {
+            return;
+        }
+        if (edgeScrollStartTimeNanos == 0) {
+            edgeScrollStartTimeNanos = nowNanos;
         }
         
-        if (needsScroll) {
+        // 目标导向：计算使节点处于安全区时的目标滚动位置（内容坐标 -> hvalue/vvalue）
+        double targetViewportLeft = viewportLeft;
+        double targetViewportTop = viewportTop;
+        if (scrollableWidth > 0) {
+            if (nodeCenterX < viewportLeft + VIEWPORT_EDGE_THRESHOLD) {
+                targetViewportLeft = Math.max(0, nodeCenterX - VIEWPORT_EDGE_THRESHOLD);
+            } else if (nodeCenterX > viewportRight - VIEWPORT_EDGE_THRESHOLD) {
+                targetViewportLeft = Math.min(scrollableWidth, nodeCenterX - effectiveViewportWidth + VIEWPORT_EDGE_THRESHOLD);
+            }
+        }
+        if (scrollableHeight > 0) {
+            if (nodeCenterY < viewportTop + VIEWPORT_EDGE_THRESHOLD) {
+                targetViewportTop = Math.max(0, nodeCenterY - VIEWPORT_EDGE_THRESHOLD);
+            } else if (nodeCenterY > viewportBottom - VIEWPORT_EDGE_THRESHOLD) {
+                targetViewportTop = Math.min(scrollableHeight, nodeCenterY - effectiveViewportHeight + VIEWPORT_EDGE_THRESHOLD);
+            }
+        }
+        double targetHValue = scrollableWidth > 0 ? Math.max(0, Math.min(1, targetViewportLeft / scrollableWidth)) : currentHValue;
+        double targetVValue = scrollableHeight > 0 ? Math.max(0, Math.min(1, targetViewportTop / scrollableHeight)) : currentVValue;
+        
+        // 每帧向目标插值，并限制单帧变化量避免一帧跳变
+        double deltaH = (targetHValue - currentHValue) * EDGE_SCROLL_LERP_FACTOR;
+        double deltaV = (targetVValue - currentVValue) * EDGE_SCROLL_LERP_FACTOR;
+        deltaH = Math.max(-EDGE_SCROLL_MAX_DELTA_PER_FRAME, Math.min(EDGE_SCROLL_MAX_DELTA_PER_FRAME, deltaH));
+        deltaV = Math.max(-EDGE_SCROLL_MAX_DELTA_PER_FRAME, Math.min(EDGE_SCROLL_MAX_DELTA_PER_FRAME, deltaV));
+        double newHValue = Math.max(0, Math.min(1, currentHValue + deltaH));
+        double newVValue = Math.max(0, Math.min(1, currentVValue + deltaV));
+        
+        if (newHValue != currentHValue || newVValue != currentVValue) {
             hostingScrollPane.setHvalue(newHValue);
             hostingScrollPane.setVvalue(newVValue);
         }
@@ -2531,7 +2567,7 @@ public class NodeCanvas extends Pane {
     }
     
     // ==================== 定位操作 ====================
-    
+
     /**
      * 定位节点到视图中心并播放定位动画
      * @param node 要定位的节点
@@ -2539,7 +2575,6 @@ public class NodeCanvas extends Pane {
      */
     public boolean locateNode(ProcessNode node) {
         if (node == null || hostingScrollPane == null) return false;
-        
         // 播放定位动画
         node.playLocateAnimation();
         
@@ -2563,28 +2598,26 @@ public class NodeCanvas extends Pane {
         
         if (nodeWidth <= 0 || nodeHeight <= 0) return;
         
-        // 节点中心点
         double nodeCenterX = nodeX + nodeWidth / 2;
         double nodeCenterY = nodeY + nodeHeight / 2;
         
-        double viewportWidth = hostingScrollPane.getViewportBounds().getWidth();
-        double viewportHeight = hostingScrollPane.getViewportBounds().getHeight();
-        
+        // JavaFX ScrollPane maps hvalue/vvalue to content's layoutBounds (untransformed). Visible extent in content coords = viewport size in pixels.
+        double viewportWidthPx = hostingScrollPane.getViewportBounds().getWidth();
+        double viewportHeightPx = hostingScrollPane.getViewportBounds().getHeight();
         double canvasWidth = getPrefWidth();
         double canvasHeight = getPrefHeight();
+        double scrollableWidth = canvasWidth - viewportWidthPx;
+        double scrollableHeight = canvasHeight - viewportHeightPx;
         
-        // 计算滚动值，使节点居中
-        double scrollableWidth = canvasWidth - viewportWidth;
-        double scrollableHeight = canvasHeight - viewportHeight;
-        
+        double targetHValue = hostingScrollPane.getHvalue();
+        double targetVValue = hostingScrollPane.getVvalue();
         if (scrollableWidth > 0) {
-            double targetHValue = (nodeCenterX - viewportWidth / 2) / scrollableWidth;
+            targetHValue = (nodeCenterX - viewportWidthPx / 2) / scrollableWidth;
             targetHValue = Math.max(0, Math.min(1, targetHValue));
             hostingScrollPane.setHvalue(targetHValue);
         }
-        
         if (scrollableHeight > 0) {
-            double targetVValue = (nodeCenterY - viewportHeight / 2) / scrollableHeight;
+            targetVValue = (nodeCenterY - viewportHeightPx / 2) / scrollableHeight;
             targetVValue = Math.max(0, Math.min(1, targetVValue));
             hostingScrollPane.setVvalue(targetVValue);
         }
@@ -2610,24 +2643,19 @@ public class NodeCanvas extends Pane {
                 if (sourceNode != null && targetNode != null && hostingScrollPane != null) {
                     double centerX = (sourceNode.getLayoutX() + targetNode.getLayoutX()) / 2;
                     double centerY = (sourceNode.getLayoutY() + targetNode.getLayoutY()) / 2;
-                    
-                    // 直接计算滚动位置
-                    double viewportWidth = hostingScrollPane.getViewportBounds().getWidth();
-                    double viewportHeight = hostingScrollPane.getViewportBounds().getHeight();
+                    double viewportWidthPx = hostingScrollPane.getViewportBounds().getWidth();
+                    double viewportHeightPx = hostingScrollPane.getViewportBounds().getHeight();
                     double canvasWidth = getPrefWidth();
                     double canvasHeight = getPrefHeight();
-                    
-                    double scrollableWidth = canvasWidth - viewportWidth;
-                    double scrollableHeight = canvasHeight - viewportHeight;
-                    
+                    double scrollableWidth = canvasWidth - viewportWidthPx;
+                    double scrollableHeight = canvasHeight - viewportHeightPx;
                     if (scrollableWidth > 0) {
-                        double targetHValue = (centerX - viewportWidth / 2) / scrollableWidth;
+                        double targetHValue = (centerX - viewportWidthPx / 2) / scrollableWidth;
                         targetHValue = Math.max(0, Math.min(1, targetHValue));
                         hostingScrollPane.setHvalue(targetHValue);
                     }
-                    
                     if (scrollableHeight > 0) {
-                        double targetVValue = (centerY - viewportHeight / 2) / scrollableHeight;
+                        double targetVValue = (centerY - viewportHeightPx / 2) / scrollableHeight;
                         targetVValue = Math.max(0, Math.min(1, targetVValue));
                         hostingScrollPane.setVvalue(targetVValue);
                     }

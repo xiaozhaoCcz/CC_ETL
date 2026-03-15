@@ -4,8 +4,10 @@ import com.cc.job.gui.infrastructure.config.ApplicationProperties;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import okhttp3.OkHttpClient;
+import com.cc.job.gui.util.LocalDateAdapter;
 import com.cc.job.gui.util.LocalDateTimeAdapter;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 
@@ -55,7 +57,8 @@ public class HttpClientFactory {
      */
     private Gson createGson() {
         return new GsonBuilder()
-                .registerTypeAdapter(LocalDateTime.class, new LocalDateTimeAdapter())
+                .registerTypeHierarchyAdapter(LocalDateTime.class, new LocalDateTimeAdapter())
+                .registerTypeHierarchyAdapter(LocalDate.class, new LocalDateAdapter())
                 .create();
     }
     

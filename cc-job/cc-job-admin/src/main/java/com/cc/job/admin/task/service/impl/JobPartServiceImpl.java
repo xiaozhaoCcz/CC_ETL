@@ -551,6 +551,7 @@ public class JobPartServiceImpl extends ServiceImpl<JobPartMapper, JobPart> impl
         taskInfoData.setScheduleType(jobInfo.getScheduleType());
         taskInfoData.setScheduleConf(jobInfo.getScheduleConf());
         taskInfoData.setMisfireStrategy(jobInfo.getMisfireStrategy());
+        taskInfoData.setFailStrategy(jobInfo.getFailStrategy());
         taskInfoData.setExecutorRouteStrategy(jobInfo.getExecutorRouteStrategy());
         taskInfoData.setExecutorHandler(jobInfo.getExecutorHandler());
         taskInfoData.setExecutorParam(jobInfo.getExecutorParam());

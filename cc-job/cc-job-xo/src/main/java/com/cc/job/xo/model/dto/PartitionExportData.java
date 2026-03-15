@@ -127,6 +127,7 @@ public class PartitionExportData implements Serializable {
         private String scheduleType;
         private String scheduleConf;
         private String misfireStrategy;
+        private String failStrategy;
         private String executorRouteStrategy;
         private String executorHandler;
         private String executorParam;
@@ -442,6 +443,14 @@ public class PartitionExportData implements Serializable {
 
         public void setTriggerUserId(Integer triggerUserId) {
             this.triggerUserId = triggerUserId;
+        }
+
+        public String getFailStrategy() {
+            return failStrategy;
+        }
+
+        public void setFailStrategy(String failStrategy) {
+            this.failStrategy = failStrategy;
         }
     }
 

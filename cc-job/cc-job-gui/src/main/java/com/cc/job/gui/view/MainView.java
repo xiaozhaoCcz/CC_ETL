@@ -137,6 +137,8 @@ public class MainView extends BorderPane {
         leftContainer.getStyleClass().add("sidebar-left");
         leftContainer.getChildren().addAll(collapsedSidebar, leftArea);
         HBox.setHgrow(leftArea, Priority.ALWAYS);
+        leftContainer.setMinWidth(280);   // 40 折叠条 + 240 树最小宽度，避免分割条拖没
+        leftContainer.setMaxWidth(500);   // 限制左侧占屏比例，避免大屏时过宽
 
         // 任务组导航栏
         navigationBar = new TaskNavigationBar();
@@ -414,90 +416,7 @@ public class MainView extends BorderPane {
 
             @Override
             public void onRun() {
-                Long jobId = pageStoreHelper.getCurrentTaskGroupId();
-                String jobName = getJobNameById(jobId);
-                
-                // ⭐ 运行前检测循环依赖
-                boolean hasCycle = canvas.detectAndHighlightCycles();
-                if (hasCycle) {
-                    // 获取详细的循环信息
-                    com.cc.job.gui.manager.CycleDetectionManager.CycleDetectionResult result = 
-                        canvas.getCycleDetectionResult();
-                    
-                    // 构建循环路径信息
-                    StringBuilder message = new StringBuilder();
-                    message.append("检测到循环依赖，无法运行任务！\n\n");
-                    message.append("参与循环的连接线已标记为红色并加粗显示。\n\n");
-                    
-                    if (!result.getCyclePaths().isEmpty()) {
-                        message.append("循环路径：\n");
-                        for (int i = 0; i < result.getCyclePaths().size(); i++) {
-                            List<String> path = result.getCyclePaths().get(i);
-                            if (path.size() > 1) {
-                                message.append("循环 ").append(i + 1).append(": ");
-                                message.append(String.join(" → ", path));
-                                message.append("\n");
-                            }
-                        }
-                    }
-                    message.append("\n请修复循环依赖后再运行任务。");
-                    
-                    // 显示错误对话框阻止运行
-                    Alert alert = new Alert(Alert.AlertType.ERROR);
-                    alert.setTitle("循环依赖错误");
-                    alert.setHeaderText("存在循环依赖，无法运行");
-                    alert.setContentText(message.toString());
-                    alert.showAndWait();
-                    
-                    logPanel.error("✗ 存在循环依赖，运行已取消");
-                    return;
-                }
-                
-                // 清除循环标记（如果没有循环）
-                canvas.clearCycleHighlight();
-                
-                // ⭐ 清除节点状态缓存（避免旧状态影响）
-                NodeStatusSyncManager.getInstance().clearCacheForTaskGroupSwitch();
-                
-                // ⭐ 立即重置所有节点状态为空闲（让用户立即看到变化）
-                for (ProcessNode node : canvas.getNodes()) {
-                    node.updateStatus(ProcessNode.NodeStatus.IDLE);
-                }
-                
-                // 立即显示加载状态（转圈圈）
-                toolBar.setRunButtonLoading(true);
-                
-                // 如果有未保存的更改，在后台同步保存（等待完成后再运行）
-                if (canvas.hasUnsavedChanges()) {
-                    logPanel.info("💾 运行前保存数据...");
-                    
-                    // ⭐ 关键修复：在新线程中同步保存数据，确保保存完成后再触发运行
-                    // 避免保存和运行的时序竞态问题
-                    new Thread(() -> {
-                        try {
-                            // 同步保存（会阻塞当前线程，直到保存完成）
-                            dataManager.saveOrUpdateJobSync(jobId);
-                            
-                            Platform.runLater(() -> {
-                                canvas.markAsSaved();
-                                logPanel.info("✓ 保存完成，开始运行任务");
-                                // 保存完成后开始运行
-                                taskExecutionManager.triggerJobExecution(jobId, jobName != null ? jobName : "任务组" + jobId);
-                            });
-                        } catch (Exception e) {
-                            Platform.runLater(() -> {
-                                toolBar.setRunButtonLoading(false);
-                                logPanel.error("保存失败: " + e.getMessage());
-                                
-                                // ⭐ 保存失败时，从服务器同步节点状态（恢复为实际状态）
-                                canvas.syncPendingNodeStatus();
-                            });
-                        }
-                    }).start();
-                } else {
-                    // 没有未保存更改，直接运行
-                    taskExecutionManager.triggerJobExecution(jobId, jobName != null ? jobName : "任务组" + jobId);
-                }
+                doRunTaskGroup();
             }
 
             @Override
@@ -1572,11 +1491,7 @@ public class MainView extends BorderPane {
                 () -> restoreCanvasSize(taskGroupId));
         });
         
-        canvas.setOnRequestRunTaskGroup(() -> {
-            Long jobId = pageStoreHelper.getCurrentTaskGroupId();
-            String jobName = getJobNameById(jobId);
-            taskExecutionManager.triggerJobExecution(jobId, jobName);
-        });
+        canvas.setOnRequestRunTaskGroup(this::doRunTaskGroup);
         
         // 设置创建条件节点回调
         canvas.setOnRequestAddConditionNode(() -> {
@@ -3266,6 +3181,73 @@ public class MainView extends BorderPane {
         dialog.show();
     }
     
+    /**
+     * 执行运行当前任务组（与工具栏「开始」、画布右键「运行任务组」共用逻辑，保证运行框状态一致）
+     */
+    private void doRunTaskGroup() {
+        Long jobId = pageStoreHelper.getCurrentTaskGroupId();
+        if (jobId == null) {
+            NotificationToast.showWarning("⚠ 请先选择一个任务组");
+            return;
+        }
+        String jobName = getJobNameById(jobId);
+        toolBar.setCurrentTaskGroupId(jobId);
+        boolean hasCycle = canvas.detectAndHighlightCycles();
+        if (hasCycle) {
+            com.cc.job.gui.manager.CycleDetectionManager.CycleDetectionResult result =
+                canvas.getCycleDetectionResult();
+            StringBuilder message = new StringBuilder();
+            message.append("检测到循环依赖，无法运行任务！\n\n");
+            message.append("参与循环的连接线已标记为红色并加粗显示。\n\n");
+            if (!result.getCyclePaths().isEmpty()) {
+                message.append("循环路径：\n");
+                for (int i = 0; i < result.getCyclePaths().size(); i++) {
+                    List<String> path = result.getCyclePaths().get(i);
+                    if (path.size() > 1) {
+                        message.append("循环 ").append(i + 1).append(": ");
+                        message.append(String.join(" → ", path));
+                        message.append("\n");
+                    }
+                }
+            }
+            message.append("\n请修复循环依赖后再运行任务。");
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("循环依赖错误");
+            alert.setHeaderText("存在循环依赖，无法运行");
+            alert.setContentText(message.toString());
+            alert.showAndWait();
+            logPanel.error("✗ 存在循环依赖，运行已取消");
+            return;
+        }
+        canvas.clearCycleHighlight();
+        NodeStatusSyncManager.getInstance().clearCacheForTaskGroupSwitch();
+        for (ProcessNode node : canvas.getNodes()) {
+            node.updateStatus(ProcessNode.NodeStatus.IDLE);
+        }
+        toolBar.setRunButtonLoading(true);
+        if (canvas.hasUnsavedChanges()) {
+            logPanel.info("💾 运行前保存数据...");
+            new Thread(() -> {
+                try {
+                    dataManager.saveOrUpdateJobSync(jobId);
+                    Platform.runLater(() -> {
+                        canvas.markAsSaved();
+                        logPanel.info("✓ 保存完成，开始运行任务");
+                        taskExecutionManager.triggerJobExecution(jobId, jobName != null ? jobName : "任务组" + jobId);
+                    });
+                } catch (Exception e) {
+                    Platform.runLater(() -> {
+                        toolBar.setRunButtonLoading(false);
+                        logPanel.error("保存失败: " + e.getMessage());
+                        canvas.syncPendingNodeStatus();
+                    });
+                }
+            }).start();
+        } else {
+            taskExecutionManager.triggerJobExecution(jobId, jobName != null ? jobName : "任务组" + jobId);
+        }
+    }
+
     /**
      * 显示更新日志对话框
      */

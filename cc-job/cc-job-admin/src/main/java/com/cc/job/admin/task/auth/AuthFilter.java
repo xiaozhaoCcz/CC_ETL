@@ -108,6 +108,9 @@ public class AuthFilter extends OncePerRequestFilter {
             AuthContext.set(userId, username);
             request.setAttribute("userId", userId);
             request.setAttribute("username", username);
+            // 滑动续期：每次认证通过时返回新 token（有效期从当前起 24 小时），客户端有操作则续期
+            String newToken = JwtUtil.generateToken(userId, username);
+            response.setHeader("X-New-Access-Token", newToken);
             filterChain.doFilter(request, response);
         } finally {
             AuthContext.clear();

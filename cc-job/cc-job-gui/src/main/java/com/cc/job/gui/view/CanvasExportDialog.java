@@ -61,7 +61,15 @@ public class CanvasExportDialog extends Dialog<File> {
         if (css != null && !css.isEmpty()) {
             getDialogPane().getStylesheets().add(css);
         }
-        
+        getDialogPane().setMinWidth(480);
+        getDialogPane().setMinHeight(400);
+        getDialogPane().setMaxWidth(Double.MAX_VALUE);
+        getDialogPane().setMaxHeight(Double.MAX_VALUE);
+        setOnShown(e -> {
+            javafx.stage.Window w = getDialogPane().getScene().getWindow();
+            if (w instanceof javafx.stage.Stage) ((javafx.stage.Stage) w).setResizable(true);
+        });
+
         // 设置结果转换器
         setResultConverter(buttonType -> {
             if (buttonType == exportButtonType) {

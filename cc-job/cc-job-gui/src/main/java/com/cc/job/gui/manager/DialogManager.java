@@ -247,9 +247,9 @@ public class DialogManager {
                                     });
                                 } catch (Exception e) {
                                     Platform.runLater(() -> {
-                                        NotificationToast.showError("✗ 保存失败: " + e.getMessage());
+                                        NotificationToast.showError("✗ 保存节点失败: " + e.getMessage());
                                     });
-                                    logger.error("✗ 保存失败: {}", e.getMessage());
+                                    logger.error("✗ 保存节点失败: {}", e.getMessage(), e);
                                 }
                             }).start();
                         });
@@ -395,7 +395,7 @@ public class DialogManager {
                         Platform.runLater(() -> NotificationToast.showError("✗ 保存节点失败"));
                     }
                 } catch (Exception e) {
-                    Platform.runLater(() -> NotificationToast.showError("✗ 创建失败: " + e.getMessage()));
+                    Platform.runLater(() -> NotificationToast.showError("✗ 保存节点失败: " + e.getMessage()));
                     logger.error("从模板创建节点失败", e);
                 }
             }).start();

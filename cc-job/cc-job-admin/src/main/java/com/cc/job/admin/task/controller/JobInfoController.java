@@ -21,6 +21,7 @@ import com.cc.job.xo.model.vo.JobInfoVO;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cc.job.xo.common.result.PageResult;
 import com.cc.job.xo.common.result.Result;
+import com.cc.job.xo.common.exception.BusinessException;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
@@ -250,9 +251,13 @@ public class JobInfoController {
     @RequirePermission(PermissionConstants.JOB_INFO_EDIT)
     @Operation(summary = "添加任务节点")
     @PostMapping("saveJobNode")
-    public Result<JobNode>  saveJobNode(@RequestBody @Valid JobInfoForm formData){
-        JobNode jobNode = jobComposeService.saveJobNode(formData);
-        return Result.success(jobNode);
+    public Result<JobNode> saveJobNode(@RequestBody @Valid JobInfoForm formData) {
+        try {
+            JobNode jobNode = jobComposeService.saveJobNode(formData);
+            return Result.success(jobNode);
+        } catch (BusinessException e) {
+            return Result.failed(e.getMessage());
+        }
     }
 
     @RequirePermission(PermissionConstants.JOB_INFO_EDIT)
@@ -282,8 +287,12 @@ public class JobInfoController {
         if (jobInfoId == null || parentId == null) {
             return Result.failed("jobInfoId 和 parentId 不能为空");
         }
-        JobNode jobNode = jobComposeService.addExistingJobToCompose(jobInfoId, parentId, x, y);
-        return Result.success(jobNode);
+        try {
+            JobNode jobNode = jobComposeService.addExistingJobToCompose(jobInfoId, parentId, x, y);
+            return Result.success(jobNode);
+        } catch (BusinessException e) {
+            return Result.failed(e.getMessage());
+        }
     }
 
     @RequirePermission(PermissionConstants.JOB_INFO_EDIT)

@@ -138,6 +138,8 @@ public class PermissionManageDialog extends Dialog<Void> {
         getDialogPane().setPrefHeight(640);
         getDialogPane().setMinWidth(520);
         getDialogPane().setMinHeight(400);
+        getDialogPane().setMaxWidth(Double.MAX_VALUE);
+        getDialogPane().setMaxHeight(Double.MAX_VALUE);
         setOnShown(e -> {
             javafx.stage.Window w = getDialogPane().getScene().getWindow();
             if (w instanceof Stage) ((Stage) w).setResizable(true);

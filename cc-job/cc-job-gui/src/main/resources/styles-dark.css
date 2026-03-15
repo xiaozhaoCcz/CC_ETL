@@ -269,6 +269,7 @@
 .dialog-pane .table-view .table-cell {
     -fx-text-fill: #FFFFFF;
     -fx-background-color: transparent;
+    -fx-alignment: center;
 }
 
 .dialog-pane .table-view .column-header,
@@ -278,6 +279,7 @@
 
 .dialog-pane .table-view .column-header .label {
     -fx-text-fill: #FFFFFF;
+    -fx-alignment: center;
 }
 
 .dialog-pane .list-cell:filled:selected,
@@ -1333,6 +1335,14 @@
     -fx-padding: 12 16;
 }
 
+.table-view .column-header .label {
+    -fx-alignment: center;
+}
+
+.table-view .table-cell {
+    -fx-alignment: center;
+}
+
 .table-row-cell {
     -fx-background-color: #252526;
     -fx-border-color: #3C3C3C;
@@ -1779,12 +1789,14 @@
     -fx-fill: #9CDCFE !important;
     -fx-font-weight: 500;
     -rtfx-background-radius: 6;
+    -rtfx-background-insets: 2 6 2 6;
 }
 
 .parameter-input .parameter-expression {
     -rtfx-background-color: #264F78 !important;
     -fx-fill: #9CDCFE !important;
     -rtfx-background-radius: 6;
+    -rtfx-background-insets: 2 6 2 6;
 }
 
 /* 任务参数 CodeArea 深色：文字、光标、选区 */

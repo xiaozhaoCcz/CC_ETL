@@ -3,6 +3,7 @@ package com.cc.job.xo.model.form;
 import java.io.Serial;
 import java.io.Serializable;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import jakarta.validation.constraints.*;
@@ -89,6 +90,7 @@ public class JobInfoForm implements Serializable {
     private String glueRemark;
 
     @Schema(description = "GLUE更新时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime glueUpdateTime;
 
     @Schema(description = "子任务ID，多个逗号分隔")
