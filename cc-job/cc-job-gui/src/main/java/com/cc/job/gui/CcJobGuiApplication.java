@@ -110,11 +110,13 @@ public class CcJobGuiApplication extends Application {
         } catch (Exception e) {
         }
         
-        // 创建登录窗口
+        // 创建登录窗口（支持缩放，便于自适应不同屏幕）
         loginStage = new Stage();
         loginStage.setTitle("CcETL - 用户登录");
         loginStage.setScene(loginScene);
-        loginStage.setResizable(false);
+        loginStage.setResizable(true);
+        loginStage.setMinWidth(400);
+        loginStage.setMinHeight(500);
         loginStage.initStyle(StageStyle.UNDECORATED); // 无边框窗口
         
         // 窗口关闭事件

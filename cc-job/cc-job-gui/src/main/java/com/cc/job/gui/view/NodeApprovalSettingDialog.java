@@ -8,6 +8,7 @@ import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -47,6 +48,14 @@ public class NodeApprovalSettingDialog extends Dialog<Void> {
         if (cssUrl != null && !cssUrl.isEmpty()) {
             getDialogPane().getStylesheets().add(cssUrl);
         }
+        getDialogPane().setMinWidth(400);
+        getDialogPane().setMinHeight(380);
+        getDialogPane().setMaxWidth(Double.MAX_VALUE);
+        getDialogPane().setMaxHeight(Double.MAX_VALUE);
+        setOnShown(e -> {
+            javafx.stage.Window w = getDialogPane().getScene().getWindow();
+            if (w instanceof Stage) ((Stage) w).setResizable(true);
+        });
 
         setResultConverter(buttonType -> {
             if (buttonType == okButtonType) {
@@ -74,6 +83,7 @@ public class NodeApprovalSettingDialog extends Dialog<Void> {
         approverLabel.setStyle("-fx-font-size: 13; -fx-font-weight: 600;");
         userListView = new ListView<>();
         userListView.setPrefHeight(220);
+        VBox.setVgrow(userListView, Priority.ALWAYS);
         userListView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         userListView.setPlaceholder(new Label("加载用户列表中..."));
 

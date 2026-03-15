@@ -137,6 +137,8 @@ public class MainView extends BorderPane {
         leftContainer.getStyleClass().add("sidebar-left");
         leftContainer.getChildren().addAll(collapsedSidebar, leftArea);
         HBox.setHgrow(leftArea, Priority.ALWAYS);
+        leftContainer.setMinWidth(280);   // 40 折叠条 + 240 树最小宽度，避免分割条拖没
+        leftContainer.setMaxWidth(500);   // 限制左侧占屏比例，避免大屏时过宽
 
         // 任务组导航栏
         navigationBar = new TaskNavigationBar();

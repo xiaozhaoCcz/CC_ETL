@@ -238,12 +238,13 @@ public class SelectTaskGroupDialog extends Dialog<SelectTaskGroupDialog.Selectio
         getDialogPane().setPrefHeight(220);
         getDialogPane().setMinWidth(520);
         getDialogPane().setMinHeight(200);
-        setResizable(false);
-        
-        Platform.runLater(() -> {
+        getDialogPane().setMaxWidth(Double.MAX_VALUE);
+        getDialogPane().setMaxHeight(Double.MAX_VALUE);
+        setResizable(true);
+        setOnShown(e -> {
             Stage stage = (Stage) getDialogPane().getScene().getWindow();
             if (stage != null) {
-                stage.setResizable(false);
+                stage.setResizable(true);
             }
         });
     }

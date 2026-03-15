@@ -3,6 +3,7 @@ package com.cc.job.gui.view;
 import com.cc.job.gui.model.ProcessNode;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -41,7 +42,15 @@ public class NodeRemarkDialog extends Dialog<String> {
         
         // 设置样式
         styleDialog();
-        
+        getDialogPane().setMinWidth(400);
+        getDialogPane().setMinHeight(300);
+        getDialogPane().setMaxWidth(Double.MAX_VALUE);
+        getDialogPane().setMaxHeight(Double.MAX_VALUE);
+        setOnShown(e -> {
+            javafx.stage.Window w = getDialogPane().getScene().getWindow();
+            if (w instanceof javafx.stage.Stage) ((javafx.stage.Stage) w).setResizable(true);
+        });
+
         // 设置结果转换器
         setResultConverter(buttonType -> {
             if (buttonType == saveButtonType) {
@@ -65,7 +74,8 @@ public class NodeRemarkDialog extends Dialog<String> {
         remarkTextArea.setPromptText("输入节点备注信息...");
         remarkTextArea.setPrefRowCount(8);
         remarkTextArea.setWrapText(true);
-        
+        VBox.setVgrow(remarkTextArea, Priority.ALWAYS);
+
         // 如果节点已有备注，填充到输入框
         if (node != null && node.getRemark() != null && !node.getRemark().isEmpty()) {
             remarkTextArea.setText(node.getRemark());

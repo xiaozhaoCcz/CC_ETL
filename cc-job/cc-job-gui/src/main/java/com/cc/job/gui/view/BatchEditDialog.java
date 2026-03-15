@@ -65,7 +65,15 @@ public class BatchEditDialog extends Dialog<BatchEditDialog.BatchEditResult> {
         
         // 设置样式
         styleDialog();
-        
+        getDialogPane().setMinWidth(480);
+        getDialogPane().setMinHeight(400);
+        getDialogPane().setMaxWidth(Double.MAX_VALUE);
+        getDialogPane().setMaxHeight(Double.MAX_VALUE);
+        setOnShown(e -> {
+            javafx.stage.Window w = getDialogPane().getScene().getWindow();
+            if (w instanceof javafx.stage.Stage) ((javafx.stage.Stage) w).setResizable(true);
+        });
+
         // 设置结果转换器
         setResultConverter(buttonType -> {
             if (buttonType == applyButtonType) {
